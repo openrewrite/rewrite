@@ -18,6 +18,7 @@ package org.openrewrite.python.rpc;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.DependencyWorkspace;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -27,7 +28,8 @@ import java.util.List;
  * <p>
  * Bundles the optional, independent parsing inputs into one value so the API doesn't grow a long
  * tail of positional parameters (and adjacent same-typed arguments that are easy to transpose). Build
- * with {@code builder()}; every field is optional and defaults to {@code null}.
+ * with {@code builder()}; every field is optional and defaults to {@code null}, except that
+ * {@link #provisionDependencies} defaults to {@code true}.
  */
 @Value
 @Builder
@@ -48,14 +50,19 @@ public class ParseProjectOptions {
     Path relativeTo;
 
     /**
-     * Path to a virtual environment with the project's dependencies installed.
-     * <p>
-     * The caller (e.g. a CLI build step) provisions this environment and forwards its path so the
-     * parser can point ty-types at it, allowing supertypes that reach into third-party packages to
-     * resolve (e.g. a first-party class extending {@code pydantic.BaseModel}). The parser never
-     * provisions dependencies itself; when {@code null}, parsing proceeds without dependency-backed
-     * type resolution.
+     * Path to a virtual environment with the project's dependencies installed, typically the one
+     * {@link DependencyWorkspace#provision} returned. ty-types reads it, so that supertypes reaching
+     * into third-party packages resolve (e.g. a first-party class extending {@code pydantic.BaseModel}),
+     * and the dependency markers resolve against it. When {@code null}, the parse provisions one itself
+     * unless {@link #provisionDependencies} is off.
      */
     @Nullable
     Path dependencyPath;
+
+    /**
+     * Whether a parse given no {@link #dependencyPath} installs the project's dependencies itself. A host
+     * that provisions the env, and may fail to, turns it off, so that the parse installs nothing.
+     */
+    @Builder.Default
+    boolean provisionDependencies = true;
 }

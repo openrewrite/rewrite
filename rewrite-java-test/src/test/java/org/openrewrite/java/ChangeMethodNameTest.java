@@ -502,4 +502,81 @@ class ChangeMethodNameTest implements RewriteTest {
           .matches(f -> "Console.WriteX(System.String)".equals(f.getInvalidValue()))
           .matches(f -> "should be just the new name of the method, not a method pattern.".equals(f.getMessage()));
     }
+
+    @Test
+    void doNotRenameOverrideWhenClassAlreadyDeclaresTargetMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.Repository getById(..)", "getReferenceById", true, null)),
+          java(
+            """
+              package com.abc;
+              interface Repository<T, ID> {
+                  T getById(ID id);
+                  T getReferenceById(ID id);
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.abc;
+              class Decorator<T, ID> implements Repository<T, ID> {
+                  @Override
+                  public T getById(ID id) {
+                      return null;
+                  }
+
+                  @Override
+                  public T getReferenceById(ID id) {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameOverrideWhenClassDeclaresTargetNameWithOtherParameters() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("com.abc.Repository getById(..)", "getReferenceById", true, null)),
+          java(
+            """
+              package com.abc;
+              interface Repository<T, ID> {
+                  T getById(ID id);
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package com.abc;
+              class Decorator<T> implements Repository<T, Long> {
+                  @Override
+                  public T getById(Long id) {
+                      return null;
+                  }
+
+                  public T getReferenceById(String key) {
+                      return null;
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              class Decorator<T> implements Repository<T, Long> {
+                  @Override
+                  public T getReferenceById(Long id) {
+                      return null;
+                  }
+
+                  public T getReferenceById(String key) {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

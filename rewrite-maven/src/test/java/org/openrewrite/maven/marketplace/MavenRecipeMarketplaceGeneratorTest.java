@@ -25,7 +25,7 @@ import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
-import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.SharedMavenPomCacheExtension;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
@@ -76,16 +76,16 @@ class MavenRecipeMarketplaceGeneratorTest {
     }
 
     @Test
-    void generateMarketplaceFromJar(@TempDir Path tempDir) throws Exception {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+    void generateMarketplaceFromJar() throws Exception {
+        InMemoryExecutionContext ctx = SharedMavenPomCacheExtension.shareDownloads(
+                new InMemoryExecutionContext(Throwable::printStackTrace));
         HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender());
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         mavenCtx.setAddCentralRepository(true);
         mavenCtx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
 
-        LocalMavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir.resolve("artifacts"));
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-                artifactCache,
+                SharedArtifactCache.get(),
                 null,
                 new HttpUrlConnectionSender(),
                 Throwable::printStackTrace,
@@ -152,15 +152,15 @@ class MavenRecipeMarketplaceGeneratorTest {
 
     @Test
     void generateMarketplaceFromDirectory(@TempDir Path tempDir) throws Exception {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        InMemoryExecutionContext ctx = SharedMavenPomCacheExtension.shareDownloads(
+                new InMemoryExecutionContext(Throwable::printStackTrace));
         HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender());
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         mavenCtx.setAddCentralRepository(true);
         mavenCtx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
 
-        LocalMavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir.resolve("artifacts"));
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-                artifactCache,
+                SharedArtifactCache.get(),
                 null,
                 new HttpUrlConnectionSender(),
                 Throwable::printStackTrace,

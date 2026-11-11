@@ -38,7 +38,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 class SingletonTest implements RewriteTest {
 
     /**
-     * A simplified recipe that appends content to a text file.
+     * A simplified recipe that appends content to a text file not containing it yet.
      * Uses Singleton to ensure only one instance with the same content parameter makes changes.
      */
     @EqualsAndHashCode(callSuper = false)
@@ -61,7 +61,7 @@ class SingletonTest implements RewriteTest {
             return singleton(this, new TreeVisitor<>() {
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    if (tree instanceof PlainText plainText) {
+                    if (tree instanceof PlainText plainText && !plainText.getText().contains(content)) {
                         return plainText.withText(plainText.getText() + content);
                     }
                     return tree;
@@ -98,8 +98,6 @@ class SingletonTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(recipe)
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .validateRecipeSerialization(false),
           text("", "first")
         );
@@ -133,8 +131,6 @@ class SingletonTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(recipe)
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .validateRecipeSerialization(false),
           text("", "first second")
         );
@@ -146,8 +142,6 @@ class SingletonTest implements RewriteTest {
         // is included multiple times the singleton instance is shared only the first gets to make changes.
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .recipeFromYaml(
             """
               ---
@@ -229,8 +223,6 @@ class SingletonTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .recipe(recipe),
           text(
             "",
@@ -339,8 +331,6 @@ class SingletonTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(0)
             .recipe(recipe)
             .validateRecipeSerialization(false)
             .afterRecipe(run -> assertThat(CountingScanRecipe.SCAN_COUNT.get())

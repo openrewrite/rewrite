@@ -205,4 +205,27 @@ class FindPluginsTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * `matchesGlob` answers true for a null pattern, so an unset `pluginClass` once matched every plugin in the
+     * marker, marking any build that applied one. That makes this recipe unusable as a precondition, which is how
+     * it is most often reached.
+     */
+    @Test
+    void doesNotMatchUnrelatedPluginInMarkerWhenOnlyPluginIdGiven() {
+        rewriteRun(
+          spec -> spec.recipe(new FindPlugins("org.openrewrite.rewrite", null)),
+          text(
+            "stand-in for a kotlin gradle script",
+            spec -> spec.markers(GradleProject.builder()
+              .group("group")
+              .name("name")
+              .version("version")
+              .path("path")
+              .plugins(singletonList(new GradlePluginDescriptor("org.gradle.api.plugins.JavaPlugin", "java")))
+              .build()
+            )
+          )
+        );
+    }
 }

@@ -31,6 +31,26 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class ChangePropertyKeyTest implements RewriteTest {
 
     @Test
+    void movePropertyWithTrailingInlineCommentIntoNewMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.http.client.factory", "spring.http.clients.imperative.factory", null, null, null)),
+          yaml(
+            """
+              spring:
+                http:
+                  client:
+                    factory: jdk # Use the JdkClientHttpRequestFactory in RestClient.Builder to create the RestClient bean.
+              """,
+            """
+              spring:
+                http: # Use the JdkClientHttpRequestFactory in RestClient.Builder to create the RestClient bean.
+                  clients.imperative.factory: jdk
+              """
+          )
+        );
+    }
+
+    @Test
     void preserveParentAndTrailingCommentsBeforeSeveralRootSiblings() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
@@ -750,6 +770,241 @@ class ChangePropertyKeyTest implements RewriteTest {
                 b:
                   e: 2
                   c2.d: 1
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/353")
+    @Test
+    void doNotCopyDocumentCommentOntoRelocatedPropertyInLaterDocument() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePropertyKey("spring.sleuth.enabled", "management.tracing.enabled", null, null, null),
+            new ChangePropertyKey("spring.sleuth.sampler.probability", "management.tracing.sampling.probability", null, null, null)
+          ),
+          yaml(
+            """
+              # comment 1
+              spring:
+                application:
+                  name: testapp
+                sleuth:
+                  sampler:
+                    probability: 0.1
+                  enabled: true
+
+              ---
+              # overrides for staging
+              spring:
+                config:
+                  activate:
+                    on-profile: staging
+                sleuth:
+                  sampler:
+                    probability: 1.0
+              after: here
+              """,
+            """
+              # comment 1
+              spring:
+                application:
+                  name: testapp
+              management.tracing.enabled: true
+              management.tracing.sampling.probability: 0.1
+
+              ---
+              # overrides for staging
+              spring:
+                config:
+                  activate:
+                    on-profile: staging
+              after: here
+              management.tracing.sampling.probability: 1.0
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/353")
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void keepDocumentCommentAtTopWhenRemovingFirstEntryOfLaterDocument(boolean relaxedBinding) {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "management.tracing.sampling.probability", relaxedBinding, null, null)),
+          yaml(
+            """
+              a: b
+              ---
+              # overrides for staging
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+              after: here
+              """,
+            """
+              a: b
+              ---
+              # overrides for staging
+              after: here
+              management.tracing.sampling.probability: 1.0
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/353")
+    @Test
+    void keepDocumentCommentAtTopWhenRemovingFirstOfSeveralEntriesOfLaterDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "management.tracing.sampling.probability", null, null, null)),
+          yaml(
+            """
+              a: b
+              ---
+              # overrides for staging
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+              # about after
+              after: here
+              more: there
+              """,
+            """
+              a: b
+              ---
+              # overrides for staging
+              # about after
+              after: here
+              more: there
+              management.tracing.sampling.probability: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepCommentOfSoleRemainingSiblingWhenFirstEntryIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "management.tracing.sampling.probability", null, null, null)),
+          yaml(
+            """
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+              # about after
+              after: here
+              """,
+            """
+              # about after
+              after: here
+              management.tracing.sampling.probability: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotLeaveBlankLineWhenRemovedFirstEntryWasFollowedByOne() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "management.tracing.sampling.probability", null, null, null)),
+          yaml(
+            """
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+
+              after: here
+              more: there
+              """,
+            """
+              after: here
+              more: there
+              management.tracing.sampling.probability: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotLeaveBlankLineWhenRemovedFirstNestedEntryWasFollowedByOne() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "spring.tracing.probability", null, null, null)),
+          yaml(
+            """
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+
+                config: x
+              after: here
+              """,
+            """
+              spring:
+                config: x
+                tracing.probability: 1.0
+              after: here
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotCopyCommentOfRemovedFirstEntryOntoSoleRemainingSibling() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "spring.tracing.probability", null, null, null)),
+          yaml(
+            """
+              spring:
+                # about sleuth
+                sleuth:
+                  sampler:
+                    probability: 1.0
+                config: x
+              after: here
+              """,
+            """
+              spring:
+                config: x
+                # about sleuth
+                tracing.probability: 1.0
+              after: here
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/353")
+    @Test
+    void doNotCopyDocumentCommentWhenExclusionsRetainTheScope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth", "management.tracing", null, List.of("group"), null)),
+          yaml(
+            """
+              a: b
+              ---
+              # overrides for staging
+              spring:
+                sleuth:
+                  group: g
+                  enabled: true
+              after: here
+              """,
+            """
+              a: b
+              ---
+              # overrides for staging
+              spring:
+                sleuth:
+                  group: g
+              after: here
+              management.tracing:
+                enabled: true
               """
           )
         );

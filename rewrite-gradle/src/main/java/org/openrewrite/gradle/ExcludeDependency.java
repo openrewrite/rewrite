@@ -129,11 +129,11 @@ public class ExcludeDependency extends Recipe {
                         artifactId, ExcludeDependency::isExactOrBareWildcard));
     }
 
-    private static boolean isExactOrBareWildcard(@Nullable String v) {
+    static boolean isExactOrBareWildcard(@Nullable String v) {
         return v == null || effective(v) == null || COORDINATE.matcher(v).matches();
     }
 
-    private static @Nullable String effective(@Nullable String v) {
+    static @Nullable String effective(@Nullable String v) {
         return (v == null || v.isEmpty() || "*".equals(v)) ? null : v;
     }
 
@@ -185,7 +185,7 @@ public class ExcludeDependency extends Recipe {
                     }
 
                     // Transitive match (null side = match anything).
-                    if (dep.getResolvedDependency().findDependency(effG, effA) == null) {
+                    if (dep.getResolvedDependencyWithTransitives().findDependency(effG, effA) == null) {
                         return m;
                     }
 
@@ -350,8 +350,15 @@ public class ExcludeDependency extends Recipe {
                 Boolean.FALSE.equals(((J.Literal) assn.getAssignment()).getValue());
     }
 
-    private static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
-        for (Expression arg : method.getArguments()) {
+    static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
+        List<Expression> args = method.getArguments();
+        for (int i = 0; i < args.size(); i++) {
+            Expression arg = args.get(i);
+            // Kotlin's `exclude(group, module)` also takes its arguments by position
+            if (kotlinDsl && arg instanceof J.Literal && i == ("group".equals(name) ? 0 : 1)) {
+                Object v = ((J.Literal) arg).getValue();
+                return v == null ? null : v.toString();
+            }
             if (!kotlinDsl && arg instanceof G.MapEntry) {
                 G.MapEntry entry = (G.MapEntry) arg;
                 if (entry.getKey() instanceof J.Literal &&

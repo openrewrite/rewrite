@@ -31,6 +31,14 @@ export interface AddDependencyOptions {
     packageName: string;
     version: string;
     scope?: NpmDependencyScope;
+    /** Add only to a `package.json` that declared a package matching one of these globs before the cycle's edits. */
+    onlyIfDeclaring?: string[];
+    /**
+     * Add only to a `package.json` that resolves every `name@range` entry, e.g. `react@>=16.9.0 <18`: by the version
+     * its lock resolves, else when the declared constraint admits nothing outside the range. An undeclared package is
+     * taken from the nearest enclosing `package.json` that declares it.
+     */
+    onlyIfResolving?: string[];
 }
 
 /**
@@ -69,6 +77,21 @@ export interface UpgradeDependencyVersionOptions {
  */
 export function upgradeDependencyVersion(options: UpgradeDependencyVersionOptions): Promise<Recipe> {
     return prepareJavaRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", options);
+}
+
+export interface UpgradeDependencyVersionsOptions {
+    /** Nonempty package-name glob map. Overlapping patterns must specify the same target constraint. */
+    versions: Record<string, string>;
+    /** Verify the upgraded manifest before recovering from stale npm lock peer conflicts. Defaults to false. */
+    reconcileNpmPeerDependencies?: boolean;
+}
+
+/**
+ * Upgrade matching npm dependencies together and regenerate the lock file once.
+ * Delegates to `org.openrewrite.javascript.UpgradeDependencyVersions` via RPC.
+ */
+export function upgradeDependencyVersions(options: UpgradeDependencyVersionsOptions): Promise<Recipe> {
+    return prepareJavaRecipe("org.openrewrite.javascript.UpgradeDependencyVersions", options);
 }
 
 export interface ChangeDependencyOptions {

@@ -194,6 +194,38 @@ func TestNewRecipeImportsAreTemplateContextOnly(t *testing.T) {
 	)
 }
 
+func TestNewRecipeNamingThePackageOfAConversionBuildsWhatTheParserBuilds(t *testing.T) {
+	// Imports let the template resolve `time.Duration` to a type, so it builds
+	// the java.TypeCast the parser makes of the same text, not a call.
+	r := NewRecipe(
+		RecipeName("test.DurationOf"),
+		WithDisplayName("Use a duration"),
+		WithBefore(`x + 1`),
+		WithAfter(`time.Duration(x)`, Imports("time")),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			import "time"
+
+			var x = 1
+			var a = x + 1
+			var _ = time.Second
+		`, `
+			package main
+
+			import "time"
+
+			var x = 1
+			var a = time.Duration(x)
+			var _ = time.Second
+		`),
+	)
+}
+
 func TestNewRecipeWithSourceImports(t *testing.T) {
 	// SourceImports explicitly adds "strconv" to the file; the import cleanup
 	// pass removes "fmt" once the replacement no longer uses it.

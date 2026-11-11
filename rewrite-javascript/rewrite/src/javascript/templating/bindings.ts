@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {J, NameTree} from '../../java';
+import {J} from '../../java';
 import {JavaScriptVisitor} from '../visitor';
 import {isReference, scopeOf} from '../scope';
 
@@ -29,11 +29,6 @@ export async function renameBindings<T extends J>(tree: T, renames: Record<strin
 class RenameBindingsVisitor extends JavaScriptVisitor<undefined> {
     constructor(private readonly renames: Record<string, string>) {
         super();
-    }
-
-    // The class of `Mocked<T>` and a decorator's name sit behind this hook, which the base visitor holds closed
-    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
-        return await this.visit(nameTree, p) as N;
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {

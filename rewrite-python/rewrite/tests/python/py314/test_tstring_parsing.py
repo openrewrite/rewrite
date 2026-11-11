@@ -89,3 +89,8 @@ a = t"result: {
     1 + 2
 }"
 """))
+
+
+@pytest.mark.parametrize('line_break', ['\r\n', '\r'], ids=['crlf', 'cr'])
+def test_multiline_text_keeps_line_breaks(line_break):
+    RecipeSpec().rewrite_run(python("a = t'''x {name}\n    y'''\n".replace('\n', line_break)))

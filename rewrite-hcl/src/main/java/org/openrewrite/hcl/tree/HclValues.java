@@ -30,7 +30,7 @@ public final class HclValues {
     /**
      * Returns the value of an expression when it is statically known, unwrapping any parentheses.
      * <ul>
-     *     <li>{@code "hello"} and {@code ("hello")} yield {@code hello}, escape sequences are returned as written</li>
+     *     <li>{@code "hello"} and {@code ("hello")} yield {@code hello}, and {@code "a\"b"} yields {@code a"b}</li>
      *     <li>{@code ""} yields the empty string</li>
      *     <li>{@code 3}, {@code 1.50} and {@code true} yield their source text</li>
      * </ul>
@@ -50,7 +50,7 @@ public final class HclValues {
                 if (!(part instanceof Hcl.Literal)) {
                     return null;
                 }
-                value.append(((Hcl.Literal) part).getValueSource());
+                value.append(((Hcl.Literal) part).getValue());
             }
             return value.toString();
         }

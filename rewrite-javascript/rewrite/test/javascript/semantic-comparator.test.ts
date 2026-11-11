@@ -683,7 +683,9 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             await spec.rewriteRun(
                 //language=typescript
-                typescript('export function f() {}\nexport @dec function f() {}')
+                typescript(`
+                    export function f() {}
+                    export @dec function f() {}`)
             );
 
             expect(matches).toEqual([true, false]);

@@ -16,7 +16,7 @@
 package org.openrewrite.maven.search;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -27,6 +27,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.table.EffectiveMavenSettings;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
@@ -50,7 +51,7 @@ public class FindMavenSettings extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        XmlMapper mapper = new XmlMapper();
+        ObjectMapper mapper = MavenXmlMapper.writeMapper();
 
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override

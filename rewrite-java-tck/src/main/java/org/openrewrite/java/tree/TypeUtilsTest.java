@@ -49,6 +49,86 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void assignabilityWithRecursiveIntersectionBounds() {
+        rewriteRun(
+          java(
+            """
+              interface Type<T extends Type<T>> {}
+              interface NumericType<T extends NumericType<T>> extends Type<T> {}
+              interface RealType<T extends RealType<T>> extends NumericType<T> {}
+              interface NativeType<T extends NativeType<T>> extends Type<T> {}
+              class UnsignedShortType implements RealType<UnsignedShortType>, NativeType<UnsignedShortType> {}
+              class Test {
+                  static <T> T type(T value) { return value; }
+                  <T extends RealType<T> & NativeType<T>> boolean test(T value) {
+                      return UnsignedShortType.class.isInstance(type(value));
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                    if ("isInstance".equals(m.getSimpleName())) {
+                        var target = ((J.FieldAccess) m.getSelect()).getTarget().getType();
+                        var operand = (JavaType.GenericTypeVariable) m.getArguments().get(0).getType();
+                        for (var bound : operand.getBounds()) {
+                            assertThat(TypeUtils.isAssignableTo(target, bound)).isFalse();
+                            assertThat(TypeUtils.isAssignableTo(bound, target)).isFalse();
+                        }
+                    }
+                    return m;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void comparisonContextUsesIdentityForRecursiveTypeGraphs() {
+        var first = recursiveTypeVariable();
+        var second = recursiveTypeVariable();
+        var context = BOUND.enterComparison(first, first);
+
+        assertThat(context.isComparing(first, first)).isTrue();
+        assertThat(context.isComparing(second, second)).isFalse();
+        assertThat(context.enterComparison(second, second).isComparing(first, first)).isTrue();
+        assertThat(context.enterComparison(second, second).isComparing(second, second)).isTrue();
+        assertThat(TypeUtils.isOfType(first, second)).isTrue();
+        assertThat(first).isEqualTo(second);
+        assertThat(second).isEqualTo(first);
+        assertThat(first).isNotEqualTo(recursiveTypeVariable("NativeType"));
+        assertThat(first).isNotEqualTo(second.withName("U"));
+        assertThat(first).isNotEqualTo(second.withVariance(JavaType.GenericTypeVariable.Variance.INVARIANT));
+    }
+
+    @Test
+    void inferenceContextRecognizesRebuiltRecursiveGraphs() {
+        var first = recursiveTypeVariable();
+        var second = recursiveTypeVariable();
+        var rebuiltFirst = recursiveTypeVariable();
+        var rebuiltSecond = recursiveTypeVariable();
+        var context = TypeUtils.ComparisonContext.INFER.enterComparison(first, second);
+
+        assertThat(context.isComparing(rebuiltFirst, rebuiltSecond)).isTrue();
+        assertThat(context.flipInference().isComparing(rebuiltFirst, rebuiltSecond)).isTrue();
+        assertThat(context.isComparing(rebuiltFirst, recursiveTypeVariable("NativeType"))).isFalse();
+        assertThat(context.isComparing(rebuiltFirst.withName("U"), rebuiltSecond)).isFalse();
+        assertThat(context.isComparing(rebuiltFirst.withVariance(JavaType.GenericTypeVariable.Variance.INVARIANT), rebuiltSecond)).isFalse();
+    }
+
+    private static JavaType.GenericTypeVariable recursiveTypeVariable() {
+        return recursiveTypeVariable("RealType");
+    }
+
+    private static JavaType.GenericTypeVariable recursiveTypeVariable(String boundName) {
+        var variable = new JavaType.GenericTypeVariable(null, "T",
+          JavaType.GenericTypeVariable.Variance.COVARIANT, emptyList());
+        var bound = new JavaType.Parameterized(null, JavaType.ShallowClass.build(boundName), singletonList(variable));
+        return variable.unsafeSet("T", JavaType.GenericTypeVariable.Variance.COVARIANT, singletonList(bound));
+    }
+
+    @Test
     void isOverrideBasicInterface() {
         rewriteRun(
           java(

@@ -257,6 +257,7 @@ final class SemverVersion {
     static final class ParseResult {
         SemverQuery.Wildcard wildcard = SemverQuery.Wildcard.NONE;
         boolean valid = true;
+        boolean overflow;
         Partial version = new Partial();
         int len;
     }
@@ -267,11 +268,15 @@ final class SemverVersion {
         int len;
     }
 
-    private static TagResult parseTag(String input) {
-        return parseTagWithPreCount(input, 0);
+    private static TagResult parseTag(String input, BunRelease release) {
+        return parseTagWithPreCount(input, 0, release);
     }
 
     private static TagResult parseTagWithPreCount(String input, int initialPreCount) {
+        return parseTagWithPreCount(input, initialPreCount, BunRelease.PORTED);
+    }
+
+    private static TagResult parseTagWithPreCount(String input, int initialPreCount, BunRelease release) {
         int buildCount = 0;
         int preCount = initialPreCount;
         for (int k = 0; k < input.length(); k++) {
@@ -303,7 +308,7 @@ final class SemverVersion {
                     start = i + 1;
                 }
             } else if (c == '-') {
-                if (state != 1) {
+                if (state != 1 && (!release.keepsAHyphenInBuildMetadata() || state == 0)) {
                     state = 1;
                     start = i + 1;
                 }
@@ -394,7 +399,15 @@ final class SemverVersion {
                     i++;
                 }
                 lastCharI = i;
-                Long number = parseVersionNumber(input.substring(partStartI, lastCharI), release);
+                String digits = input.substring(partStartI, lastCharI);
+                Long number = parseVersionNumber(digits, release);
+                if (release.rejectsOverflowingVersionNumbers() && number == null && partI < 3) {
+                    result.valid = false;
+                    if (result.wildcard == SemverQuery.Wildcard.NONE) {
+                        result.overflow = true;
+                        break;
+                    }
+                }
                 if (partI == 0) {
                     result.version.major = number;
                     partI = 1;
@@ -420,7 +433,7 @@ final class SemverVersion {
                 while (i < input.length() && input.charAt(i) == ' ') {
                     i++;
                 }
-                TagResult tag = parseTag(input.substring(partStartI));
+                TagResult tag = parseTag(input.substring(partStartI), release);
                 result.version.pre = tag.pre;
                 result.version.build = tag.build;
                 i += tag.len;
@@ -489,7 +502,7 @@ final class SemverVersion {
             try {
                 return Long.parseUnsignedLong(input);
             } catch (NumberFormatException e) {
-                return 0L;
+                return release.rejectsOverflowingVersionNumbers() ? null : 0L;
             }
         }
         int digits = release.readsSixtyFourBitVersionNumbers() ? 20 : 10;
@@ -513,9 +526,10 @@ final class SemverVersion {
         }
         try {
             long value = Long.parseUnsignedLong(bytes.toString());
-            return Long.compareUnsigned(value, max(release)) > 0 ? 0L : value;
+            return Long.compareUnsigned(value, max(release)) > 0 ?
+                    (release.rejectsOverflowingVersionNumbers() ? null : 0L) : value;
         } catch (NumberFormatException e) {
-            return 0L;
+            return release.rejectsOverflowingVersionNumbers() ? null : 0L;
         }
     }
 }

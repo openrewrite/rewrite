@@ -139,6 +139,19 @@ export const DEFAULT_TRACKED_EXCLUSIONS = [
     "**/*.bundle.js"
 ];
 
+/** Lets `**` cross dot directories such as pnpm's `node_modules/.pnpm`, as .gitignore patterns do. */
+function exclusionMatcher(exclusions: string[]): picomatch.Matcher {
+    return picomatch(exclusions, {dot: true});
+}
+
+/**
+ * Git lists a symlink or submodule as a file even where it is a directory, and lists
+ * deleted files while they are still tracked.
+ */
+function isRegularFile(filePath: string): boolean {
+    return fs.statSync(filePath, {throwIfNoEntry: false})?.isFile() ?? false;
+}
+
 /**
  * Source file extensions for JavaScript/TypeScript.
  */
@@ -326,57 +339,24 @@ export class ProjectParser {
                 relativeTo: this.relativeTo
             });
 
-            // Check if Prettier is available
-            const detection = await prettierLoader.detectPrettier();
-
-            if (detection.available) {
-                // Prettier is available: add per-file PrettierStyle markers
-                for await (const sf of parser.parse(...discovered.jsFiles)) {
-                    current++;
-                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
-
-                    const prettierMarker = await prettierLoader.getConfigMarker(
-                        path.join(this.relativeTo, sf.sourcePath)
-                    );
-                    if (prettierMarker) {
-                        yield produce(sf, draft => {
-                            draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
-                        });
-                    } else {
-                        yield sf;
-                    }
+            const fallbackFiles: SourceFile[] = [];
+            for await (const sf of parser.parse(...discovered.jsFiles)) {
+                current++;
+                this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
+                const prettierMarker = await prettierLoader.getConfigMarker(
+                    path.join(this.relativeTo, sf.sourcePath)
+                );
+                if (prettierMarker) {
+                    yield produce(sf, draft => {
+                        draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
+                    });
+                } else {
+                    fallbackFiles.push(sf);
                 }
-            } else {
-                // Prettier is NOT available: auto-detect styles from parsed files
-                this.log("Prettier not found, auto-detecting styles...");
-
-                // Dynamic import to break circular dependency at module load time
-                // (see buildAutodetectMarker for explanation)
-                const {Autodetect} = await import("./autodetect.js");
-                const {JS} = await import("./tree.js");
-
-                const parsedFiles: SourceFile[] = [];
-
-                // Parse all JS files and collect them for sampling
-                for await (const sf of parser.parse(...discovered.jsFiles)) {
-                    current++;
-                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
-                    if (sf.kind === JS.Kind.CompilationUnit) {
-                        parsedFiles.push(sf);
-                    }
-                }
-
-                // Sample all parsed files and build Autodetect marker
-                const detector = Autodetect.detector();
-                for (const sf of parsedFiles) {
-                    await detector.sample(sf);
-                }
-                const autodetectMarker = detector.build();
-                this.log(`Auto-detected styles: indent=${detector.getTabsAndIndentsStyle().indentSize}, ` +
-                    `useTabs=${detector.getTabsAndIndentsStyle().useTabCharacter}`);
-
-                // Yield all files with the Autodetect marker
-                for (const sf of parsedFiles) {
+            }
+            if (fallbackFiles.length > 0) {
+                const autodetectMarker = await this.buildAutodetectMarker(fallbackFiles);
+                for (const sf of fallbackFiles) {
                     yield produce(sf, draft => {
                         draft.markers = replaceMarkerByKind(draft.markers, autodetectMarker);
                     });
@@ -517,8 +497,7 @@ export class ProjectParser {
                 const trimmed = line.trim();
                 if (trimmed) {
                     const fullPath = path.join(this.projectPath, trimmed);
-                    // git ls-files can return deleted files that are still tracked
-                    if (fs.existsSync(fullPath)) {
+                    if (isRegularFile(fullPath)) {
                         files.push(fullPath);
                     }
                 }
@@ -536,9 +515,8 @@ export class ProjectParser {
             for (const line of untracked.stdout.split("\n")) {
                 const trimmed = line.trim();
                 if (trimmed) {
-                    // Untracked files should exist, but check anyway for robustness
                     const fullPath = path.join(this.projectPath, trimmed);
-                    if (fs.existsSync(fullPath)) {
+                    if (isRegularFile(fullPath)) {
                         files.push(fullPath);
                     }
                 }
@@ -560,7 +538,7 @@ export class ProjectParser {
      */
     private async discoverFilesWithWalk(): Promise<string[]> {
         const files: string[] = [];
-        const isExcluded = picomatch(this.exclusions);
+        const isExcluded = exclusionMatcher(this.exclusions);
 
         const walk = async (dir: string, relativePath: string = "") => {
             let entries: fs.Dirent[];
@@ -605,7 +583,7 @@ export class ProjectParser {
 
         // Check exclusion patterns with relative path
         const relativePath = path.relative(this.projectPath, filePath);
-        const isExcluded = picomatch(exclusions);
+        const isExcluded = exclusionMatcher(exclusions);
         if (isExcluded(relativePath)) {
             return false;
         }

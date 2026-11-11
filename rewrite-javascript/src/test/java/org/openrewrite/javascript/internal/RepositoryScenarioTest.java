@@ -167,7 +167,7 @@ class RepositoryScenarioTest extends LockScenarioTest {
 
         for (Map.Entry<String, String> manifest : edited.entrySet()) {
             assertThat(written.get(manifest.getKey())).as("%s of %s", manifest.getKey(), label)
-                    .isEqualTo(manifest.getValue());
+                    .isEqualTo(failures.isEmpty() ? manifest.getValue() : scenario.tree("tree-before").get(manifest.getKey()));
         }
         String lockText = written.get(lock.toString().replace('\\', '/'));
         Result result = failures.isEmpty() ? Result.success(lockText) : Result.failure(failures.get(0));

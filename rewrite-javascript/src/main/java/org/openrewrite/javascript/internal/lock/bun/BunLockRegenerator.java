@@ -228,7 +228,7 @@ public final class BunLockRegenerator {
     }
 
     /**
-     * The lock bun writes as the release that installs ({@link Inputs#getRelease()}), after a second install over it
+     * The lock bun writes as the release that installs ({@link Inputs#release}), after a second install over it
      * changed nothing.
      */
     public Result regenerate() {
@@ -345,6 +345,9 @@ public final class BunLockRegenerator {
                 return lock;
             }
         }
+        if (!manager.options.isSaveLockfile()) {
+            return lock;
+        }
         String written = install.write(cleaned);
         if (written == null) {
             throw Rejected.deletesLock("the root has no package left");
@@ -436,6 +439,9 @@ public final class BunLockRegenerator {
             }
         }
         for (String patch : lockfile.patchedDependencies.values()) {
+            if (release.readsAnAbsolutePatchOutsideTheProject() && patch.startsWith("/")) {
+                throw CannotKnow.unread("absolute patch file " + patch);
+            }
             String path = RootRelativePath.normalize(separated(patch, inputs.getHost()));
             String contents = files.get(path);
             if (contents == null) {
@@ -445,6 +451,9 @@ public final class BunLockRegenerator {
                 if (holdsBelow(path, paths, files.keySet())) {
                     throw Rejected.rejects(Reason.RESOLUTION_REQUIRED,
                             "failed to read from patch file: EISDIR: Is a directory (pread()) (" + path + ")");
+                }
+                if (release.reportsAPatchFileNotFound()) {
+                    throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "patch file not found: '" + patch + "'");
                 }
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, release.quotesAMissingPatchFile() ?
                         "Couldn't find patch file: '" + patch + "'" : "could not find patch file " + patch);
@@ -529,6 +538,7 @@ public final class BunLockRegenerator {
                                  options.getSecurityScanner() + " bunfig.toml's install.security.scanner names, " +
                                  "a package's code it runs over the resolution");
         }
+        registry = registry.withNetworkSettings(options.getNetworkSettings());
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();
@@ -598,9 +608,16 @@ public final class BunLockRegenerator {
             root = manager.lockfile.appendPackage(root);
             packagesBefore = manager.lockfile.packages.size();
             manager.enqueueDependencyList(root.dependenciesOff, root.dependenciesLen);
-        } else {
-            manager.drainDependencyList();
         }
+        if (release.readsPackageExtensions()) {
+            manager.lockfile.packageExtensions.readRules(Json.parse(rootManifest, release), release);
+            for (Package pkg : manager.lockfile.packages) {
+                if (manager.lockfile.packageExtensions.extend(manager.lockfile, pkg)) {
+                    manager.enqueueDependencyList(pkg.dependenciesOff, pkg.dependenciesLen);
+                }
+            }
+        }
+        manager.drainDependencyList();
         return new PendingInstall(loadResult, manager, configVersion, packagesBefore, summary, directBefore);
     }
 

@@ -53,6 +53,13 @@ public class RecipeQualityValidation {
     private boolean noEditsInScanningPhase = true;
 
     /**
+     * Controls whether a ScanningRecipe's accumulator is validated to keep values, such as coordinates, paths and ids,
+     * and no {@link org.openrewrite.Heavyweight} objects such as trees, which would stay in memory all cycle.
+     */
+    @Builder.Default
+    private boolean lightweightAccumulators = true;
+
+    /**
      * Controls whether the recipe is validated to add only markers that report, such as search results and markup,
      * and none that it keeps information in.
      */
@@ -82,6 +89,13 @@ public class RecipeQualityValidation {
     private boolean importReferencedTypes = true;
 
     /**
+     * Controls whether the recipe is validated to remove the imports that the code it removes was the only use of,
+     * and to add none that nothing uses.
+     */
+    @Builder.Default
+    private boolean removeUnusedImports = true;
+
+    /**
      * Controls whether the recipe is validated to produce the tree that the source's parser makes of the text the
      * recipe's output prints, such as a J.Primitive and not a J.Identifier for {@code int}.
      */
@@ -94,6 +108,14 @@ public class RecipeQualityValidation {
      */
     @Builder.Default
     private boolean orderStepsForEarlierChanges = true;
+
+    /**
+     * Controls whether the recipe is validated to keep no {@link org.openrewrite.TreeVisitor} in a static field, where
+     * every thread visiting source files in parallel would share its state. Recipes a composite lists from dependency
+     * jars are left to the builds of the projects that own them.
+     */
+    @Builder.Default
+    private boolean noStaticVisitors = true;
 
     /**
      * Enable all recipe quality checks.
@@ -118,12 +140,15 @@ public class RecipeQualityValidation {
                 .types(quality.types())
                 .executionContextUnchanged(quality.executionContextUnchanged() && before.immutableExecutionContext())
                 .noEditsInScanningPhase(quality.noEditsInScanningPhase() && before.immutableScanning())
+                .lightweightAccumulators(quality.lightweightAccumulators())
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .importReferencedTypes(quality.importReferencedTypes())
+                .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
+                .noStaticVisitors(quality.noStaticVisitors())
                 .build();
     }
 }

@@ -54,7 +54,8 @@ class BunLockRoundTripTest {
     void writesBackWhatBunWrites(String name, BunScenarios.Lock lock) {
         BunScenarios.Scenario scenario = lock.getScenario();
         BunLockRegenerator.Inputs inputs = lock.inputs()
-          .files(patches(scenario.tree(lock.getPhase())))
+          .files(scenario.recordedRelease() != null && BunRelease.of(scenario.recordedRelease()).atLeast(1, 4, 4) ?
+                  scenario.tree(lock.getPhase()) : patches(scenario.tree(lock.getPhase())))
           .files(patches(scenario.filesAbove(lock.getPhase())))
           .build();
         String loadError = lock.loadError();

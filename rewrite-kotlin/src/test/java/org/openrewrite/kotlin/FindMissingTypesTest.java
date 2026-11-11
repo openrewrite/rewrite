@@ -18,11 +18,15 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class FindMissingTypesTest implements RewriteTest {
@@ -88,5 +92,19 @@ class FindMissingTypesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void javaVarargsCalledFromKotlinAndJava() {
+        // Kotlin maps String.format through reflection into the type cache it shares with the Java parser
+        JavaTypeCache cache = new JavaTypeCache();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("parse failed", t));
+        KotlinParser.builder().typeCache(cache).build()
+          .parse(ctx, "fun newline(): String = java.lang.String.format(\"%n\")").toList();
+        J.CompilationUnit java = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(cache).build()
+          .parse(ctx, "class A { String newline = String.format(\"%n\"); }").findFirst().orElseThrow();
+
+        assertThat(FindMissingTypes.findMissingTypes(java, false)).isEmpty();
     }
 }

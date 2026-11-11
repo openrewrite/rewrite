@@ -142,12 +142,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-        // FIXME fix formatting of control sections
-        return control;
-    }
-
-    @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
         getCursor().putMessage("lastLocation", loc);
         boolean alignToAnnotation = false;
@@ -286,7 +280,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         if (!Space.firstPrefix(control.getInit()).getLastWhitespace().contains("\n") && evaluate(() -> wrappingStyle.getForStatement().getAlignWhenMultiline(), false)) {
                             sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                             positionService = sourceFile.service(SourcePositionService.class);
-                            ColSpan colSpan = positionService.columnsOf(getCursor(), control.getInit().get(0));
+                            // JavaPrinter prints a loop's control directly, so replace the containing loop,
+                            // not just a Control cursor whose parent may still hold the old initializer.
+                            Cursor loopCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
+                            J.ForLoop currentLoop = ((J.ForLoop) loopCursor.getValue()).withControl(control);
+                            ColSpan colSpan = positionService.columnsOf(loopCursor.withValue(currentLoop), control.getInit().get(0));
                             getCursor().putMessage("lastIndent", colSpan.getStartColumn() - colSpan.getIndent() - 1 + indent);
                             getCursor().putMessage("indentType", IndentType.ALIGN);
                         }
@@ -341,6 +339,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR:
                     case ARRAY_INDEX:
+                    case FOREACH_ITERABLE:
                     case PARENTHESES:
                     case TYPE_PARAMETER: {
                         elem = visitAndCast(elem, p);
@@ -356,6 +355,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             getCursor().getParentOrThrow().putMessage("indentType", IndentType.ALIGN);
                         }
 
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    case FOREACH_VARIABLE:
+                        elem = visitForEachVariable(elem, indent, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
                     default:
@@ -400,6 +403,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         elem = visitAndCast(elem, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    case FOREACH_VARIABLE:
+                        elem = visitForEachVariable(elem, indent, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
                     default:
@@ -568,6 +575,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         return literal;
+    }
+
+    private J visitForEachVariable(J variable, int indent, P p) {
+        if (!variable.getPrefix().getLastWhitespace().contains("\n")) {
+            getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+        }
+        J v = visitAndCast(variable, p);
+        getCursor().putMessage("lastIndent", indent);
+        return v;
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {

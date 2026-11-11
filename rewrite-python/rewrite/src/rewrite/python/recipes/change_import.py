@@ -67,7 +67,7 @@ class ChangeImport(Recipe):
 
     old_module: str = field(default="", metadata=option(
         display_name="Old module",
-        description="The module to change imports from",
+        description="The module to change imports from.",
         example="collections"
     ))
 
@@ -80,7 +80,7 @@ class ChangeImport(Recipe):
 
     new_module: str = field(default="", metadata=option(
         display_name="New module",
-        description="The module to change imports to",
+        description="The module to change imports to.",
         example="collections.abc"
     ))
 
@@ -93,7 +93,7 @@ class ChangeImport(Recipe):
 
     new_alias: str | None = field(default=None, metadata=option(
         display_name="New alias",
-        description="Optional alias for the new import",
+        description="Optional alias for the new import.",
         required=False
     ))
 

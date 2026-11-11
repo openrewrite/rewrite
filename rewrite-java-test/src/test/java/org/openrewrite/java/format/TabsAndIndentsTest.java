@@ -20,12 +20,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
@@ -59,6 +62,75 @@ class TabsAndIndentsTest implements RewriteTest {
               )
             )
           )));
+    }
+
+    @Test
+    void formatChangedControlWithOriginalLoopCursor() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop.Control visitForControl(J.ForLoop.Control control, ExecutionContext ctx) {
+                  J.VariableDeclarations declaration = (J.VariableDeclarations) control.getInit().getFirst();
+                  J.VariableDeclarations.NamedVariable variable = declaration.getVariables().getFirst();
+                  J.Literal initializer = (J.Literal) variable.getInitializer();
+                  if (Integer.valueOf(0).equals(initializer.getValue())) {
+                      declaration = declaration.withVariables(List.of(variable.withInitializer(
+                        initializer.withValue(1).withValueSource("1"))));
+                      control = control.withInit(List.of(declaration));
+                  }
+                  return (J.ForLoop.Control) new AutoFormatVisitor<ExecutionContext>()
+                    .visitNonNull(control, ctx, getCursor().getParentTreeCursor());
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 0;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 1;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void formatMultilineForSubtree() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                  return autoFormat(forLoop, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j=handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j = handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """
+          )
+        );
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
@@ -927,6 +999,137 @@ class TabsAndIndentsTest implements RewriteTest {
                       labeled: for (int i = 0;
                                     i < 5;
                                     i++, m++, n++);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoop() {
+        rewriteRun(
+          autoFormat(style -> style.withContinuationIndent(2)),
+          java(
+            """
+              import java.util.List;
+              public class Test {
+                  public void test(List<String> list) {
+                  for (
+                   String s
+                   :
+                   list
+                  ) {
+                  }
+                  for (String s :
+                   list) {
+                  }
+                  for (String s
+                   : list) {
+                  }
+                  labeled: for (String s :
+                   list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              public class Test {
+                  public void test(List<String> list) {
+                      for (
+                        String s
+                        :
+                        list
+                      ) {
+                      }
+                      for (String s :
+                        list) {
+                      }
+                      for (String s
+                        : list) {
+                      }
+                      labeled: for (String s :
+                        list) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoopWithLambdaInIterable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.function.Supplier;
+
+              public class Test {
+                  public void test(Supplier<List<String>> supplier) {
+                  for (String s : get(() -> {
+                  return List.of("a");
+                  })) {
+                  }
+                  }
+                  List<String> get(Supplier<List<String>> supplier) {
+                      return supplier.get();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.function.Supplier;
+
+              public class Test {
+                  public void test(Supplier<List<String>> supplier) {
+                      for (String s : get(() -> {
+                          return List.of("a");
+                      })) {
+                      }
+                  }
+                  List<String> get(Supplier<List<String>> supplier) {
+                      return supplier.get();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoopVariableWithModifierOrAnnotationOnOwnLine() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                  for (final
+                   String s : list) {
+                  }
+                  for (@SuppressWarnings("unused")
+                   String s
+                   : list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                      for (final
+                              String s : list) {
+                      }
+                      for (@SuppressWarnings("unused")
+                              String s
+                              : list) {
+                      }
                   }
               }
               """

@@ -40,6 +40,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -308,14 +309,21 @@ public interface K extends J {
             }
 
             public K.CompilationUnit withClasses(List<JRightPadded<J.ClassDeclaration>> classes) {
-                List<JRightPadded<Statement>> statements = t.statements.stream()
-                        .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
-                        .collect(toList());
-
-                //noinspection unchecked
-                statements.addAll(0, classes.stream()
-                        .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(toList()));
+                // Top-level declarations initialize and read in source order, so each class keeps its position.
+                List<JRightPadded<Statement>> statements = new ArrayList<>(t.statements.size());
+                Iterator<JRightPadded<J.ClassDeclaration>> replacements = classes.iterator();
+                for (JRightPadded<Statement> statement : t.statements) {
+                    if (!(statement.getElement() instanceof J.ClassDeclaration)) {
+                        statements.add(statement);
+                    } else if (replacements.hasNext()) {
+                        //noinspection unchecked
+                        statements.add((JRightPadded<Statement>) (Object) replacements.next());
+                    }
+                }
+                while (replacements.hasNext()) {
+                    //noinspection unchecked
+                    statements.add((JRightPadded<Statement>) (Object) replacements.next());
+                }
 
                 return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }

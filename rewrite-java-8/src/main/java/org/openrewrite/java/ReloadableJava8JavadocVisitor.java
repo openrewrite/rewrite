@@ -106,6 +106,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         StringBuilder firstPrefixBuilder = new StringBuilder();
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
+        String marginLineEnd = null;
         boolean inFirstPrefix = true;
         boolean isPrefixAsterisk = true;
 
@@ -126,30 +127,32 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 }
             }
 
+            String lineEnd = null;
             if (c == '\r') {
-                continue;
+                if (i + 1 < source.length() && source.charAt(i + 1) == '\n') {
+                    continue;
+                }
+                lineEnd = "\r";
+            } else if (c == '\n') {
+                lineEnd = source.charAt(i - 1) == '\r' ? "\r\n" : "\n";
             }
 
-            if (c == '\n') {
-                char prev = source.charAt(i - 1);
+            if (lineEnd != null) {
                 if (inFirstPrefix) {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
-                    // Handle consecutive new lines.
-                    if ((prev == '\n' ||
-                            prev == '\r' && source.charAt(i - 2) == '\n')) {
-                        String prevLineLine = prev == '\n' ? "\n" : "\r\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
+                    if (marginBuilder != null && marginBuilder.length() == marginLineEnd.length()) {
+                        // Handle consecutive new lines.
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), marginLineEnd, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
-                        String newLine = prev == '\r' ? "\r\n" : "\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
-                        javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), marginLineEnd, Markers.EMPTY));
+                        javadocContent.append(marginBuilder.substring(marginLineEnd.length()));
                     }
-                    javadocContent.append(c);
+                    javadocContent.append('\n');
                 }
-                String newLine = prev == '\r' ? "\r\n" : "\n";
-                marginBuilder = new StringBuilder(newLine);
+                marginLineEnd = lineEnd;
+                marginBuilder = new StringBuilder(lineEnd);
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
@@ -166,11 +169,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                                     marginBuilder.toString(), Markers.EMPTY));
                             javadocContent.append(c);
                         } else {
-                            String newLine = marginBuilder.charAt(0) == '\r' ? "\r\n" : "\n";
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                    newLine, Markers.EMPTY));
-                            String margin = marginBuilder.toString();
-                            javadocContent.append(margin.substring(margin.indexOf("\n") + 1)).append(c);
+                                    marginLineEnd, Markers.EMPTY));
+                            javadocContent.append(marginBuilder.substring(marginLineEnd.length())).append(c);
                         }
                         marginBuilder = null;
                     }
@@ -732,7 +733,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     /**
      * Resolves a {@code pkg.Name} reference to the class symbol its package lists, which needs no class file
      * read, and types the tree with it so the type mapping can serve it from the factory. Every other shape,
-     * and a class not accessible from here, is left to attribution.
+     * and a class not accessible from here, is left to attribution. So is a package whose listing fails, as with an
+     * unreadable classpath jar.
      */
     private boolean resolveWithoutCompleting(JCTree tree) {
         if (!(tree instanceof JCTree.JCFieldAccess) || symbol == null) {
@@ -743,8 +745,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         if (packageName == null) {
             return false;
         }
-        Symbol.PackageSymbol pkg = classReader.enterPackage(packageName);
-        pkg.complete();
+        Symbol.PackageSymbol pkg;
+        try {
+            pkg = classReader.enterPackage(packageName);
+            pkg.complete();
+        } catch (Symbol.CompletionFailure ignored) {
+            return false;
+        }
         if (!pkg.exists()) {
             return false;
         }

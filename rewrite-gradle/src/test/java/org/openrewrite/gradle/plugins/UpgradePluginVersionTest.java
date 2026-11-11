@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.semver.Semver;
@@ -738,16 +739,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
-    void doesNotPinPropertyManagedVersions() {
+    void pinsVersionNoLongerManagedThroughImportedBom() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradePluginVersion("org.springframework.boot", "2.5.x", null)),
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "4.0.0", null)),
           buildGradle(
             """
               plugins {
                   id 'java'
-                  id 'org.springframework.boot' version '2.5.14'
-                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  id 'org.springframework.boot' version '3.5.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
               }
 
               repositories {
@@ -755,14 +756,14 @@ class UpgradePluginVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  runtimeOnly 'mysql:mysql-connector-java'
+                  testImplementation 'io.rest-assured:rest-assured'
               }
               """,
             """
               plugins {
                   id 'java'
-                  id 'org.springframework.boot' version '2.5.15'
-                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  id 'org.springframework.boot' version '4.0.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
               }
 
               repositories {
@@ -770,7 +771,7 @@ class UpgradePluginVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  runtimeOnly 'mysql:mysql-connector-java'
+                  testImplementation 'io.rest-assured:rest-assured:5.5.2'
               }
               """
           )
@@ -800,5 +801,55 @@ class UpgradePluginVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class OnGradle8 implements RewriteTest {
+
+        // Spring Boot 2's Gradle plugin calls Configuration#getUploadTaskName, which Gradle 9 removed
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.beforeRecipe(withToolingApi("8.14.5"));
+        }
+
+        @Test
+        void doesNotPinPropertyManagedVersions() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradePluginVersion("org.springframework.boot", "2.5.x", null)),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java'
+                      id 'org.springframework.boot' version '2.5.14'
+                      id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'mysql:mysql-connector-java'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java'
+                      id 'org.springframework.boot' version '2.5.15'
+                      id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'mysql:mysql-connector-java'
+                  }
+                  """
+              )
+            );
+        }
     }
 }

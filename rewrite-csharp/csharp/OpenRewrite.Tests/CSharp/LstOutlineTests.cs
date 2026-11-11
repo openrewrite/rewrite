@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.CSharp;
+using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.CSharp;
 
@@ -154,6 +157,20 @@ public class LstOutlineTests
 
         Assert.Equal("int", Node(outline.Root, "J.Literal").AttestedType);
         Assert.Null(Node(outline.Root, "J.Block").AttestedType);
+    }
+
+    [Fact]
+    public async Task OperatorsAttestTheMethodsTheyDeclare()
+    {
+        const string source = "class A { public static A operator +(A a, A b) => a; public static implicit operator A(int i) => new A(); }\n";
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var syntax = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("Operators", [syntax], refs,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var outline = LstOutline.Of(new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(syntax)));
+
+        Assert.Equal("A.op_Addition(A, A) : A", Node(outline.Root, "Cs.OperatorDeclaration").AttestedType);
+        Assert.Equal("A.op_Implicit(int) : A", Node(outline.Root, "Cs.ConversionOperatorDeclaration").AttestedType);
     }
 
     [Fact]

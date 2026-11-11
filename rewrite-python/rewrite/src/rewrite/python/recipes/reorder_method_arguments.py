@@ -17,7 +17,7 @@ ReorderMethodArguments recipe for Python that delegates to Java's ReorderMethodA
 
 This recipe reorders arguments in method invocations matching a pattern.
 """
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from rewrite import Recipe, option
 from rewrite.decorators import categorize
@@ -26,6 +26,7 @@ from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
+@dataclass
 class ReorderMethodArguments(Recipe):
     """
     Reorder arguments in method invocations matching a pattern.
@@ -40,33 +41,23 @@ class ReorderMethodArguments(Recipe):
         )
     """
 
-    method_pattern: str = field(metadata=option(
+    method_pattern: str = field(default="", metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to reorder.",
         example="datetime.datetime replace(..)"
     ))
 
-    new_parameter_names: list[str] = field(metadata=option(
+    new_parameter_names: list[str] | None = field(default=None, metadata=option(
         display_name="New parameter names",
         description="The parameter names in the desired order.",
         example='["year", "month", "day"]'
     ))
 
-    old_parameter_names: list[str] | None = field(metadata=option(
+    old_parameter_names: list[str] | None = field(default=None, metadata=option(
         display_name="Old parameter names",
         description="The current parameter names (optional if using positional reordering).",
         required=False
     ))
-
-    def __init__(
-            self,
-            method_pattern: str = "",
-            new_parameter_names: list[str] | None = None,
-            old_parameter_names: list[str] | None = None
-    ):
-        self.method_pattern = method_pattern
-        self.new_parameter_names = new_parameter_names
-        self.old_parameter_names = old_parameter_names
 
     @property
     def name(self) -> str:

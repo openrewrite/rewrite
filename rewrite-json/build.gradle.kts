@@ -2,7 +2,7 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-val antlrGeneration by configurations.creating {
+val antlrGeneration = configurations.create("antlrGeneration") {
     extendsFrom(configurations.implementation.get())
 }
 tasks.register<JavaExec>("generateAntlrSources") {

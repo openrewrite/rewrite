@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +43,8 @@ public final class BunOptions {
     @Getter(AccessLevel.PACKAGE)
     private BunRelease release = BunRelease.PORTED;
 
+    private final Map<String, Object> networkSettings = new LinkedHashMap<>();
+
     /**
      * The default registry's url ({@code options.scope.url.href}).
      */
@@ -55,6 +58,7 @@ public final class BunOptions {
     private boolean linkWorkspacePackages = true;
     private boolean frozenLockfile;
     private boolean loadLockfile = true;
+    private boolean saveLockfile = true;
 
     /**
      * From 1.4.1, bunfig.toml's {@code install.offline}, or {@code install.prefer = "offline"}: versions come from bun's
@@ -115,6 +119,39 @@ public final class BunOptions {
         BunOptions options = new BunOptions();
         options.release = release;
         options.apply(install, env);
+        for (String key : Arrays.asList("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY",
+                "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR")) {
+            options.networkSettings.put(key, env.setting(key));
+        }
+        for (String text : new String[]{userNpmrc, npmrc}) {
+            if (text != null) {
+                Map<String, @Nullable Object> ini = Ini.parse(text, env, release);
+                for (String key : Arrays.asList("ca", "cafile", "cert", "key")) {
+                    if (ini.containsKey(key)) {
+                        options.networkSettings.put(key, ini.get(key));
+                    }
+                }
+            }
+        }
+        if (installObj != null) {
+            for (String key : Arrays.asList("ca", "cafile")) {
+                Json.Expr value = installObj.get(key);
+                if (value != null) {
+                    options.networkSettings.put(key, true);
+                }
+            }
+        }
+        if (release.honoursLockfileSaveOptions()) {
+            Json.Expr lockfile = installObj == null ? null : installObj.getObject("lockfile");
+            Json.Expr save = lockfile == null ? null : lockfile.get("save");
+            if (save != null && save.asBool() != null) {
+                options.saveLockfile = save.asBool();
+            }
+            String skipSave = env.setting("BUN_CONFIG_SKIP_SAVE_LOCKFILE");
+            if (skipSave != null) {
+                options.saveLockfile = "0".equals(skipSave);
+            }
+        }
         return options;
     }
 
@@ -172,7 +209,8 @@ public final class BunOptions {
         }
         for (String key : new String[]{"BUN_CONFIG_REGISTRY", "NPM_CONFIG_REGISTRY", "npm_config_registry"}) {
             String value = env.setting(key);
-            if (value != null && !value.isEmpty() && (value.startsWith("https://") || value.startsWith("http://"))) {
+            if (value != null && !value.isEmpty() && (release.readsANonemptyRegistryEnvironmentValue() ||
+                    value.startsWith("https://") || value.startsWith("http://"))) {
                 registry = scopeUrl(value);
                 break;
             }

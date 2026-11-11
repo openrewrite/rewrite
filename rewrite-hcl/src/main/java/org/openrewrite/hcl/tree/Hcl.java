@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
+import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.marker.Markers;
@@ -496,7 +497,7 @@ public interface Hcl extends Tree {
                     } else if (attr.getValue() instanceof QuotedTemplate) {
                         QuotedTemplate q = (QuotedTemplate) attr.getValue();
                         return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),
-                                Space.EMPTY, Markers.EMPTY, value, value.toString()))));
+                                Space.EMPTY, Markers.EMPTY, HclString.decodeQuoted(value.toString()), value.toString()))));
                     }
                 }
                 return b;

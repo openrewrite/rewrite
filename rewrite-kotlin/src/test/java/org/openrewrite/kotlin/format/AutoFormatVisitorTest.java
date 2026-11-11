@@ -803,4 +803,32 @@ class AutoFormatVisitorTest implements RewriteTest {
           }
           """);
     }
+
+    @Test
+    void indentExpressionStatements() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(): Int {
+                  @Suppress("UNUSED_EXPRESSION")
+              1
+                  return run {
+                      val x = 1
+              x + 1
+                  }
+              }
+              """,
+            """
+              fun f(): Int {
+                  @Suppress("UNUSED_EXPRESSION")
+                  1
+                  return run {
+                      val x = 1
+                      x + 1
+                  }
+              }
+              """
+          )
+        );
+    }
 }

@@ -136,9 +136,7 @@ class CSharpSenderDocCommentTest {
     }
 
     private static String print(CsDocComment.DocComment d) {
-        PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0);
-        new CsDocCommentPrinter<Integer>().visit(d, out, new Cursor(null, Cursor.ROOT_VALUE));
-        return out.getOut();
+        return new CsDocCommentPrinter<Integer>().reduce(d, new PrintOutputCapture<>(0), new Cursor(null, Cursor.ROOT_VALUE)).getOut();
     }
 
     private static List<RpcObjectData> encode(List<RpcObjectData> batch) {

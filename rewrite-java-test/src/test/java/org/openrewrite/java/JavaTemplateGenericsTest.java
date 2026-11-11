@@ -296,7 +296,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
                   .bindType("java.util.function.Function<T, String>")
@@ -352,7 +351,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
                   .bindType("java.util.function.Function<T, String>")
@@ -410,7 +408,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
                   .bindType("java.util.function.Function<T, String>")
@@ -467,7 +464,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.intValue()")
                   .bindType("java.util.function.ToIntFunction<T>")
@@ -564,7 +560,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("#{any(java.util.Set<T>)}::contains")
                   .bindType("java.util.function.Predicate<T>")
@@ -708,6 +703,51 @@ class JavaTemplateGenericsTest implements RewriteTest {
 
                   U child() {
                       return getChild((U) this).orElseThrow();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateKeepsEnclosingMethodTypeVariable() {
+        //noinspection unchecked
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("List<T> list = (List<T>) #{any()};")
+                .contextSensitive()
+                .imports("java.util.List")
+                .build();
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.Block body = method.getBody();
+                  if (body == null || !body.getStatements().isEmpty()) {
+                      return method;
+                  }
+                  J.Identifier collection = ((J.VariableDeclarations) method.getParameters().getFirst()).getVariables().getFirst().getName();
+                  return template.apply(getCursor(), body.getCoordinates().firstStatement(), collection);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  <T> void test(Collection<T> collection) {
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  <T> void test(Collection<T> collection) {
+                      List<T> list = (List<T>) collection;
                   }
               }
               """

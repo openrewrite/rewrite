@@ -51,23 +51,11 @@ class CSharpRecipeTest implements RewriteTest {
 
     @BeforeAll
     static void setUpFactory() {
-        Path basePath = Paths.get(System.getProperty("user.dir"));
-        Path[] searchPaths = {
-          basePath.resolve("csharp"),
-          basePath.resolve("rewrite-csharp/csharp"),
-        };
-        for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-            if (csproj.toFile().exists()) {
-                CSharpRewriteRpc.setFactory(
-                  CSharpRewriteRpc.builder()
-                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
-                    .log(Paths.get("/tmp/csharp-rpc.log"))
-                );
-                return;
-            }
-        }
-        throw new IllegalStateException("Could not find C# Rewrite project");
+        CSharpRewriteRpc.setFactory(
+          CSharpRewriteRpc.builder()
+            .csharpServerEntry(CSharpServer.entry())
+            .log(Paths.get("/tmp/csharp-rpc.log"))
+        );
     }
 
     @AfterEach

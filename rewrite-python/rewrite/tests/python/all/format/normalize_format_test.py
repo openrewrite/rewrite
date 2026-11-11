@@ -7,7 +7,7 @@ from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
 class RemoveDecorators(PythonVisitor):
     def visit_method_declaration(self, method, p):
-        return method.replace(leading_annotations=[])
+        return method.replace(leading_annotations=[]) if method.leading_annotations else method
 
 
 def test_remove_decorator():

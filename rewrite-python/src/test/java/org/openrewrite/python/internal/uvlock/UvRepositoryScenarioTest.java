@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,13 +44,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Replays the corpus edits under {@code lock/repository/uv/}: a public repository's manifest before and after an edit,
- * its lock before, and the lock uv wrote, with the index responses the engine asks for recorded in {@code http/}.
- * A scenario named in {@code uv-repository-gaps.txt} is one the engine does not reproduce yet, and must still differ.
+ * its lock before, and the lock uv wrote at {@code recorded-at}, with the index responses the engine asks for in
+ * {@code http/}.
+ * A scenario named in {@code uv-repository-gaps.txt} is one the engine does not reproduce yet, and must still do what
+ * the file says instead: refuse for the reason it names, or write another lock.
  */
 class UvRepositoryScenarioTest {
 
     private static final Path ROOT = scenarioRoot();
-    private static final Set<String> GAPS = gaps();
+    private static final Map<String, String> GAPS = gaps();
 
     static Stream<String> scenarios() throws IOException {
         try (Stream<Path> dirs = Files.list(ROOT)) {
@@ -71,14 +74,20 @@ class UvRepositoryScenarioTest {
         });
         HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
         PythonExecutionContextView.view(ctx).setUvVersion(read(dir, "recorded-with").trim().replaceFirst("^uv ", ""));
+        if (Files.exists(dir.resolve("recorded-at"))) {
+            ctx.putMessage(UvLockEngine.CURRENT_TIME, Instant.parse(read(dir, "recorded-at").trim()));
+        }
 
         Result result = LockFileRegeneration.UV.regenerate(read(dir, "tree/pyproject.toml"),
           read(dir, "tree-before/pyproject.toml"), read(dir, "before"), ctx);
 
         assertThat(http.missing).as("index responses %s asked for that the scenario does not record", name).isEmpty();
         boolean reproduced = result.isSuccess() && read(dir, "after").equals(result.getLockFileContent());
-        if (GAPS.contains(name)) {
+        String gap = GAPS.get(name);
+        if (gap != null) {
             assertThat(reproduced).as("%s now matches uv, so remove it from uv-repository-gaps.txt", name).isFalse();
+            String outcome = result.isSuccess() ? "writes another lock" : "refuses: " + result.getFailure().getReason();
+            assertThat(outcome).as("what the engine does with %s", name).isEqualTo(gap);
         } else {
             assertThat(result.getErrorMessage()).as(name).isNull();
             assertThat(result.getLockFileContent()).as(name).isEqualTo(read(dir, "after"));
@@ -147,15 +156,16 @@ class UvRepositoryScenarioTest {
         }
     }
 
-    private static Set<String> gaps() {
+    private static Map<String, String> gaps() {
         try {
-            Set<String> names = new HashSet<>();
+            Map<String, String> outcomes = new HashMap<>();
             for (String line : Files.readAllLines(Paths.get(UvRepositoryScenarioTest.class.getResource("/uv-repository-gaps.txt").toURI()))) {
                 if (!line.trim().isEmpty() && !line.startsWith("#")) {
-                    names.add(line.split("\t")[0].trim());
+                    String[] columns = line.split("\t");
+                    outcomes.put(columns[0].trim(), columns[1].trim());
                 }
             }
-            return names;
+            return outcomes;
         } catch (IOException | URISyntaxException e) {
             throw new IllegalStateException(e);
         }

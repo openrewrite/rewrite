@@ -42,6 +42,7 @@ import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -351,21 +352,24 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Test
-    void canCallImperativeRecipeWithUnnecessaryArgsFromDeclarativeInTests() {
-        rewriteRun(spec -> spec.recipeFromYaml("""
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.recipe
-              displayName: Test Recipe
-              description: Test Recipe.
-              recipeList:
-                - org.openrewrite.NoArgRecipe:
-                    foo: bar
-              """,
-            "test.recipe"
-          ),
-          text("Hi", "NoArgRecipeHi")
-        );
+    void canNotCallImperativeRecipeWithUnnecessaryArgsFromDeclarative() {
+        assertThatExceptionOfType(AssertionError.class)
+          .isThrownBy(() -> rewriteRun(spec -> spec.recipeFromYaml("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Test Recipe
+                description: Test Recipe.
+                recipeList:
+                  - org.openrewrite.NoArgRecipe:
+                      foo: bar
+                """,
+              "test.recipe"
+            ),
+            text("Hi", "NoArgRecipeHi")
+          ))
+          .withMessageContaining("org.openrewrite.NoArgRecipe.foo")
+          .withMessageContaining("is not an option of this recipe, which takes no options");
     }
 
     @Test

@@ -509,6 +509,7 @@ public class SolutionParser
                 Log.Debug("  ... and {Remaining} more distinct diagnostics", grouped.Count - 10);
         }
 
+        solution = RemoveOuterBuilds(solution);
         RecordUnevaluatedProjects(declaredProjects, solution, diags);
 
         var projects = solution.Projects.ToList();
@@ -628,6 +629,29 @@ public class SolutionParser
         const string marker = "with message: ";
         var index = diagnostic.Message.IndexOf(marker, StringComparison.Ordinal);
         return (index < 0 ? diagnostic.Message : diagnostic.Message[(index + marker.Length)..]).Trim();
+    }
+
+    /// <summary>
+    /// MSBuildWorkspace loads a multi-targeted project once per entry of its <c>TargetFrameworks</c>,
+    /// empty entries included, so <c>;net10.0</c> also loads MSBuild's outer build. That variant has no
+    /// <c>Compile</c> target and so no documents, yet it carries a reference, which is what
+    /// <see cref="ParseProject"/> picks a variant by. It produces no assembly, so removing it takes no
+    /// types from a project that references it. It is the variant named after the file alone.
+    /// </summary>
+    private static Solution RemoveOuterBuilds(Solution solution)
+    {
+        static bool IsOuterBuild(Project p) =>
+            p.Name == Path.GetFileNameWithoutExtension(p.FilePath) && !p.Documents.Any();
+        var outerBuilds = solution.Projects
+            .Where(p => p.FilePath != null)
+            .GroupBy(p => p.FilePath, StringComparer.Ordinal)
+            .Where(variants => variants.Any(p => !IsOuterBuild(p)))
+            .SelectMany(variants => variants.Where(IsOuterBuild))
+            .Select(p => p.Id)
+            .ToList();
+        foreach (var outerBuild in outerBuilds)
+            solution = solution.RemoveProject(outerBuild);
+        return solution;
     }
 
     /// <summary>
@@ -862,8 +886,8 @@ public class SolutionParser
                     cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked, projectTypeCache);
                 }
 
-                // Attach formatting style marker from .editorconfig
-                var formatStyle = editorConfigResolver.Resolve(unit.FilePath);
+                // Attach formatting style marker from .editorconfig, and the file's own indentation where it sets none
+                var formatStyle = editorConfigResolver.Resolve(unit.FilePath, cu);
                 cu = cu.WithMarkers(cu.Markers.Add(formatStyle));
 
                 if (requirePrintEqualsInput)

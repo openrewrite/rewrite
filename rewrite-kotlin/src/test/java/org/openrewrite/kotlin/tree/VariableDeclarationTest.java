@@ -825,4 +825,17 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dynamicType() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(x: dynamic, y:  dynamic) {
+                  val z: dynamic = x
+              }
+              """
+          )
+        );
+    }
 }

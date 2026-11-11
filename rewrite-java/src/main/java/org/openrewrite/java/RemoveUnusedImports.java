@@ -75,9 +75,7 @@ public class RemoveUnusedImports extends Recipe {
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
 
-            // Collect all identifier simple names from source (excluding imports) to detect
-            // types that only appear in type attribution but not in actual source references
-            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
+            Set<String> sourceIdentifierNames = RemoveImport.namesInSource(cu);
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -97,25 +95,15 @@ public class RemoveUnusedImports extends Recipe {
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.Parameterized) {
                     JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
-                    typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
-                            .add(parameterized.getType());
+                    addByImportTarget(typesByPackage, parameterized.getType());
                     for (JavaType typeParameter : parameterized.getTypeParameters()) {
                         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
                         if (fq != null) {
-                            typesByPackage.computeIfAbsent(
-                                    fq.getOwningClass() == null ?
-                                            fq.getPackageName() :
-                                            toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                                    f -> new HashSet<>()).add(fq);
+                            addByImportTarget(typesByPackage, fq);
                         }
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
-                    JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(
-                            fq.getOwningClass() == null ?
-                                    fq.getPackageName() :
-                                    toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                            f -> new HashSet<>()).add(fq);
+                    addByImportTarget(typesByPackage, (JavaType.FullyQualified) javaType);
                 }
             }
 
@@ -336,6 +324,14 @@ public class RemoveUnusedImports extends Recipe {
             starImport.imports.addAll(unfolded);
         }
 
+        private static void addByImportTarget(Map<String, Set<JavaType.FullyQualified>> typesByPackage, JavaType.FullyQualified fq) {
+            typesByPackage.computeIfAbsent(
+                    fq.getOwningClass() == null ?
+                            fq.getPackageName() :
+                            toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                    f -> new HashSet<>()).add(fq);
+        }
+
         private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
             Set<String> typesWithWildcardImport = new HashSet<>();
             for (J.Import elem : cu.getImports()) {
@@ -487,13 +483,11 @@ public class RemoveUnusedImports extends Recipe {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> unqualifiedTypeNames) {
                     JavaType type = identifier.getType();
-                    // Check for unqualified type references (not field references)
-                    if (type instanceof JavaType.FullyQualified && identifier.getFieldType() == null) {
-                        // Check if this identifier is part of a fully qualified reference
-                        // If it's part of a J.FieldAccess chain, it's qualified
-                        if (!isPartOfQualifiedReference(identifier)) {
-                            unqualifiedTypeNames.add(((JavaType.FullyQualified) type).getFullyQualifiedName());
-                        }
+                    // Check for unqualified type references (not field references), skipping `var`'s inferred type
+                    if (type instanceof JavaType.FullyQualified && identifier.getFieldType() == null &&
+                            !identifier.getMarkers().findFirst(JavaVarKeyword.class).isPresent() &&
+                            !isQualified(identifier)) {
+                        unqualifiedTypeNames.add(((JavaType.FullyQualified) type).getFullyQualifiedName());
                     }
                     return identifier;
                 }
@@ -504,41 +498,9 @@ public class RemoveUnusedImports extends Recipe {
                     return import_;
                 }
 
-                private boolean isPartOfQualifiedReference(J.Identifier identifier) {
-                    // Walk up the cursor to see if this identifier is part of a J.FieldAccess chain
-                    Cursor cursor = getCursor();
-                    while (cursor != null) {
-                        Object value = cursor.getValue();
-                        // This identifier is the name part of a field access
-                        // Check if the target is a package/class reference (not a field)
-                        if (value instanceof J.FieldAccess &&
-                                ((J.FieldAccess) value).getName() == identifier &&
-                                ((J.FieldAccess) value).getTarget() instanceof J.FieldAccess &&
-                                ((J.FieldAccess) value).getTarget().getType() instanceof JavaType.FullyQualified) {
-                            return true; // This is a qualified reference
-                        }
-                        cursor = cursor.getParent();
-                    }
-                    return false;
-                }
-            }.reduce(cu, new HashSet<>());
-        }
-
-        /**
-         * Collect all identifier simple names appearing in source code, excluding import statements.
-         * Used to detect imports whose type name doesn't actually appear in the source.
-         */
-        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
-            return new JavaIsoVisitor<Set<String>>() {
-                @Override
-                public J.Import visitImport(J.Import import_, Set<String> names) {
-                    return import_;
-                }
-
-                @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
-                    names.add(identifier.getSimpleName());
-                    return super.visitIdentifier(identifier, names);
+                private boolean isQualified(J.Identifier identifier) {
+                    Object parent = getCursor().getParentTreeCursor().getValue();
+                    return parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier;
                 }
             }.reduce(cu, new HashSet<>());
         }

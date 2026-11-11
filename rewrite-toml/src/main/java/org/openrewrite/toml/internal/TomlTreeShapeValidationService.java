@@ -54,13 +54,21 @@ public class TomlTreeShapeValidationService implements TreeShapeValidationServic
         Set<String> tables = new HashSet<>();
         List<Toml> root = new ArrayList<>();
         for (Toml value : ((Toml.Document) sourceFile).getValues()) {
-            if (value instanceof Toml.Table && ((Toml.Table) value).getName() != null &&
-                !tables.add(((Toml.Table) value).getName().getName()) &&
-                !isArrayOfTables((Toml.Table) value)) {
-                invalid.add("the table `" + ((Toml.Table) value).getName().getName() +
-                            "` appears twice, which TOML doesn't allow");
-            } else if (!(value instanceof Toml.Table)) {
+            if (!(value instanceof Toml.Table)) {
                 root.add(value);
+                continue;
+            }
+            Toml.Table table = (Toml.Table) value;
+            if (table.getName() == null) {
+                continue;
+            }
+            String name = table.getName().getName();
+            if (isArrayOfTables(table)) {
+                // each [[name]] starts a new element, whose subtables may repeat those of the element before it
+                tables.removeIf(seen -> seen.startsWith(name + "."));
+                tables.add(name);
+            } else if (!tables.add(name)) {
+                invalid.add("the table `" + name + "` appears twice, which TOML doesn't allow");
             }
         }
         duplicateKeys(root, invalid);

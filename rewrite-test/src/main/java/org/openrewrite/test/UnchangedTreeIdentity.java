@@ -21,12 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
-import org.openrewrite.scheduling.RecipeRunCycle;
-import org.openrewrite.scheduling.WatchableExecutionContext;
-import org.openrewrite.table.RecipeRunStats;
-import org.openrewrite.table.SearchResults;
-import org.openrewrite.table.SourcesFileErrors;
-import org.openrewrite.table.SourcesFileResults;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -110,15 +104,7 @@ final class UnchangedTreeIdentity {
 
     private final List<Finding> findings = new ArrayList<>();
 
-    /**
-     * The scheduler for an in-process run of these sources, which records each recipe's edits when the sources
-     * come from {@link RewriteTest} with this check on.
-     */
-    static RecipeScheduler schedulerFor(LargeSourceSet sources) {
-        UnchangedTreeIdentity check = sources instanceof LargeSourceSetCheckingExpectedCycles ?
-                ((LargeSourceSetCheckingExpectedCycles) sources).getUnchangedTreeIdentity() : null;
-        return check == null ? new RecipeScheduler() : check.scheduler();
-    }
+    private final Set<UUID> generatedInThisCycle = new HashSet<>();
 
     void assertNoneFound() {
         if (!findings.isEmpty()) {
@@ -126,36 +112,22 @@ final class UnchangedTreeIdentity {
         }
     }
 
-    private RecipeScheduler scheduler() {
-        return new RecipeScheduler() {
-            @Override
-            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(Recipe recipe, int cycle, Cursor rootCursor,
-                                                                          WatchableExecutionContext ctxWithWatch,
-                                                                          RecipeRunStats recipeRunStats,
-                                                                          SearchResults searchResults,
-                                                                          SourcesFileResults sourceFileResults,
-                                                                          SourcesFileErrors errorsTable) {
-                Set<UUID> generatedInThisCycle = new HashSet<>();
-                return new RecipeRunCycle<LargeSourceSet>(recipe, cycle, rootCursor, ctxWithWatch, recipeRunStats,
-                        searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit) {
-                    @Override
-                    protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before,
-                                                                          @Nullable SourceFile after,
-                                                                          List<Recipe> recipeStack,
-                                                                          ExecutionContext ctx) {
-                        if (before == null) {
-                            if (after != null) {
-                                generatedInThisCycle.add(after.getId());
-                            }
-                        } else if (after != null && !generatedInThisCycle.contains(before.getId())) {
-                            // a file generated earlier in this cycle is new anyway, so a copy of it costs nothing
-                            compare(before, after, recipeStack.get(recipeStack.size() - 1), getCycle());
-                        }
-                        super.recordSourceFileResultAndSearchResults(before, after, recipeStack, ctx);
-                    }
-                };
+    void startCycle() {
+        generatedInThisCycle.clear();
+    }
+
+    /**
+     * Compares a recipe's edit of a source file with what the recipe was given.
+     */
+    void record(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, int cycle) {
+        if (before == null) {
+            if (after != null) {
+                generatedInThisCycle.add(after.getId());
             }
-        };
+        } else if (after != null && !generatedInThisCycle.contains(before.getId())) {
+            // a file generated earlier in this cycle is new anyway, so a copy of it costs nothing
+            compare(before, after, recipeStack.get(recipeStack.size() - 1), cycle);
+        }
     }
 
     private void compare(SourceFile before, SourceFile after, Recipe recipe, int cycle) {
@@ -374,7 +346,7 @@ final class UnchangedTreeIdentity {
         return markers;
     }
 
-    private static boolean isJavaType(@Nullable Class<?> type) {
+    static boolean isJavaType(@Nullable Class<?> type) {
         for (Class<?> c = type; c != null; c = c.getSuperclass()) {
             if ("org.openrewrite.java.tree.JavaType".equals(c.getName())) {
                 return true;

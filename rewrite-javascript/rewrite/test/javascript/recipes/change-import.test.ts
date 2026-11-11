@@ -338,6 +338,61 @@ describe("change-import", () => {
         });
     });
 
+    describe("spellings through the module", () => {
+        test("a renamed namespace call keeps its method attribution in sync", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({oldModule: "lodash", oldMember: "extend", newModule: "lodash", newMember: "assign"});
+            const names: (string | undefined)[][] = [];
+            await withDir(async repo => {
+                await spec.rewriteRun(npm(repo.path, {
+                    //language=typescript
+                    ...typescript(
+                        `
+                        import * as NS from "lodash";
+                        NS.extend({}, {});
+                        NS.flatten([[1]]);
+                        `,
+                        `
+                        import * as NS from "lodash";
+                        NS.assign({}, {});
+                        NS.flatten([[1]]);
+                        `
+                    ),
+                    afterRecipe: async (cu: any) => {
+                        await new class extends JavaScriptVisitor<any> {
+                            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                                names.push([method.name.simpleName, method.methodType?.name]);
+                                return method;
+                            }
+                        }().visit(cu, undefined);
+                    }
+                } as any, packageJson(`{
+                    "name": "test",
+                    "dependencies": {"lodash": "^4.17.21", "@types/lodash": "^4.14.202"}
+                }`)));
+            }, {unsafeCleanup: true});
+            expect(names).toEqual([["assign", "assign"], ["flatten", "flatten"]]);
+        });
+
+        test("renames a member read through a namespace import", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({oldModule: "react", oldMember: "SFC", newModule: "react", newMember: "FC"});
+            //language=typescript
+            await spec.rewriteRun(typescript(
+                `
+                    import * as React from "react";
+
+                    export const Greeting: React.SFC<{name: string}> = ({name}) => null;
+                `,
+                `
+                    import * as React from "react";
+
+                    export const Greeting: React.FC<{name: string}> = ({name}) => null;
+                `
+            ));
+        });
+    });
+
     describe("member renaming", () => {
         test("renames aliased member when changing import", async () => {
             const spec = new RecipeSpec();
@@ -609,9 +664,21 @@ describe("change-import", () => {
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(repo.path, {
+                    //language=typescript
                     ...typescript(
-                        `import { extend, flatten } from 'lodash';\n\nextend({}, {});\nflatten([[1]]);\n`,
-                        `import { flatten } from 'lodash';\nimport { assign } from 'lodash-es';\n\nassign({}, {});\nflatten([[1]]);\n`),
+                        `
+                        import { extend, flatten } from 'lodash';
+
+                        extend({}, {});
+                        flatten([[1]]);
+                        `,
+                        `
+                        import { flatten } from 'lodash';
+                        import { assign } from 'lodash-es';
+
+                        assign({}, {});
+                        flatten([[1]]);
+                        `),
                     afterRecipe: async (cu: any) => {
                         await new class extends JavaScriptVisitor<any> {
                             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -653,9 +720,20 @@ describe("change-import", () => {
                 npm(
                     repo.path,
                     {
+                        //language=typescript
                         ...typescript(
-                            `import { documentToken } from './token';\n\nconst d = documentToken;\nconsole.log(d);\n`,
-                            `import { documentToken } from './core-token';\n\nconst d = documentToken;\nconsole.log(d);\n`),
+                            `
+                            import { documentToken } from './token';
+
+                            const d = documentToken;
+                            console.log(d);
+                            `,
+                            `
+                            import { documentToken } from './core-token';
+
+                            const d = documentToken;
+                            console.log(d);
+                            `),
                         path: "main.ts",
                         afterRecipe: async (cu: any) => {
                             await new class extends JavaScriptVisitor<any> {

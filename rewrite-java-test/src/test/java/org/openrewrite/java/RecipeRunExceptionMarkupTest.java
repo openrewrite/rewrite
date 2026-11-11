@@ -71,9 +71,8 @@ class RecipeRunExceptionMarkupTest implements RewriteTest {
                     return (J.MethodDeclaration) THROW_ON_METHOD.visitNonNull(synthesized, ctx, getCursor().getParentOrThrow());
                 }
             }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
-            .dataTable(SourcesFileErrors.Row.class, rows -> assertThat(rows).hasSize(1)),
+            // the recipe throws in both cycles, and each cycle records its error once
+            .dataTable(SourcesFileErrors.Row.class, rows -> assertThat(rows).hasSize(2)),
           // when the nested visit throws
           // then the error lands on the nearest enclosing tree of the original source file
           java(

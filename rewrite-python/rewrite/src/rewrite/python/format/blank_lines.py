@@ -1,20 +1,26 @@
 from __future__ import annotations
 
+import sys
 from typing import Optional, TypeVar, cast
 
 from rewrite import Tree, P, Cursor
 from rewrite.java import J, Space, Statement, JRightPadded, Block, ClassDeclaration, MethodDeclaration, Import
-from rewrite.python import PythonVisitor, BlankLinesStyle, CompilationUnit, MultiImport
+from rewrite.python import (PythonVisitor, BlankLinesStyle, CompilationUnit, ExpressionStatement, MultiImport,
+                            StatementExpression)
 from rewrite.visitor import T
 
 J2 = TypeVar('J2', bound=J)
 
 
 class BlankLinesVisitor(PythonVisitor):
-    def __init__(self, style: BlankLinesStyle, stop_after: Optional[Tree] = None):
+    def __init__(self, style: BlankLinesStyle, stop_after: Optional[Tree] = None, replaced: Optional[Tree] = None):
+        """With ``replaced``, a tree visited with a parent cursor takes its place, keeping the blank lines before it
+        and gaining any more the style asks for where ``replaced`` stands."""
         self._style = style
         self._stop_after = stop_after
         self._stop = False
+        self._replaced = replaced
+        self._kept: Optional[Tree] = None
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:
         if not cu.prefix.comments:
@@ -35,19 +41,27 @@ class BlankLinesVisitor(PythonVisitor):
             if prev_import:
                 parent_cursor.put_message('prev_import', False)
 
+        kept = self._starts_kept_tree()
+        if kept and self.cursor.value is not self._kept:
+            return stmt
+        # The kept tree stands where the tree it replaced does, and gains the blank lines its own kind asks for there
+        # without losing any it has.
+        here = self._replaced if kept else stmt
         if top_level:
-            if stmt == parent_cursor.value.statements[0]:
-                stmt = stmt.replace(prefix=stmt.prefix.replace(whitespace=''))
+            if here == parent_cursor.value.statements[0]:
+                if not kept:
+                    stmt = stmt.replace(prefix=stmt.prefix.replace(whitespace=''))
             else:
                 min_lines = max(self._style.minimum.around_top_level_classes_functions if isinstance(stmt, (ClassDeclaration, MethodDeclaration)) else 0,
                                 self._style.minimum.after_top_level_imports if prev_import else 0)
-                stmt = _adjusted_lines_for_tree(stmt, min_lines, self._style.keep_maximum.in_declarations)  # ty: ignore[invalid-assignment]  # visitor covariance
+                max_lines = sys.maxsize if kept else self._style.keep_maximum.in_declarations
+                stmt = _adjusted_lines_for_tree(stmt, min_lines, max_lines)  # ty: ignore[invalid-assignment]  # visitor covariance
         else:
             in_block = isinstance(parent_cursor.value, Block)
             in_class = in_block and isinstance(parent_cursor.parent_tree_cursor().value, ClassDeclaration)
             min_lines = 0
             if in_class:
-                is_first = cast(Block, parent_cursor.value).statements[0] is stmt
+                is_first = cast(Block, parent_cursor.value).statements[0] == here
                 if not is_first and isinstance(stmt, MethodDeclaration):
                     min_lines = max(min_lines, self._style.minimum.around_method)
                 elif not is_first and isinstance(stmt, ClassDeclaration):
@@ -62,9 +76,22 @@ class BlankLinesVisitor(PythonVisitor):
 
             if prev_import:
                 min_lines = max(min_lines, self._style.minimum.after_local_imports)
+            if kept:
+                max_lines = sys.maxsize
 
             stmt = _adjusted_lines_for_tree(stmt, min_lines, max_lines)  # ty: ignore[invalid-assignment]  # visitor covariance
         return stmt
+
+    def _starts_kept_tree(self) -> bool:
+        """Whether the cursor is at the tree whose blank lines are kept, or at what that tree's prefix belongs to."""
+        if self._kept is None:
+            return False
+        cursor = self.cursor
+        while cursor.value is not self._kept:
+            cursor = cursor.parent_tree_cursor()
+            if not isinstance(cursor.value, (ExpressionStatement, StatementExpression)):
+                return False
+        return True
 
     def post_visit(self, tree: T, p: P) -> Optional[T]:
         if self._stop_after and tree == self._stop_after:
@@ -72,6 +99,8 @@ class BlankLinesVisitor(PythonVisitor):
         return tree
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
+        if parent is not None and self._replaced is not None:
+            self._kept = tree
         return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
 
 

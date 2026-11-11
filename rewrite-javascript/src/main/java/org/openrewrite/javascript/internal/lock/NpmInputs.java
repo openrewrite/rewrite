@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
 import org.openrewrite.javascript.internal.lock.npm.NpmReleases;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.internal.registry.RegistryTransport;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.Arrays;
@@ -66,13 +67,20 @@ final class NpmInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
+        return regenerate(dir, host, client, false);
+    }
+
+    Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client,
+                      boolean reconcileNpmPeerDependencies) {
         Inputs inputs;
         try {
             inputs = from(dir, host);
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new NpmLockRegenerator(inputs, new NpmRegistryPackuments(host.transport(), client)).regenerate();
+        NpmLockRegenerator regeneration = new NpmLockRegenerator(inputs,
+                new NpmRegistryPackuments(host.transport(), client, RegistryTransport.environment(host.getSystem())));
+        return reconcileNpmPeerDependencies ? regeneration.regenerateForUpdate() : regeneration.regenerate();
     }
 
     /**
@@ -88,7 +96,7 @@ final class NpmInputs implements Port {
                 .lock(dir.getLock())
                 .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
-                .userNpmrc(host.userNpmrc(HostInputs.GLOBAL_AND_USER))
+                .userNpmrc(host.userNpmrcWithNetwork(HostInputs.GLOBAL_AND_USER))
                 .paths(dir.getPaths())
                 .directory(dir.getPaths() == null ? null : dir.getPath())
                 .host(host.getHost())

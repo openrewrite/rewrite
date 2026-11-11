@@ -22,6 +22,7 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -34,6 +35,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,7 +51,12 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
+@CheckReturnValue
 public class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+    }
+
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
     private static final Map<String, JavaSourceSet> javaSourceSets = new ConcurrentHashMap<>();
@@ -60,6 +67,9 @@ public class Assertions {
     static void customizeExecutionContext(ExecutionContext ctx) {
         if (ctx.getMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
             ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+        if (ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX) == null) {
+            ctx.putMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX, true);
         }
     }
 
@@ -182,7 +192,7 @@ public class Assertions {
     }
 
     public static SourceSpecs mavenProject(String project, SourceSpecs... sources) {
-        return mavenProject(project, spec -> project(spec, project), sources);
+        return mavenProject(project, spec -> spec.markers(javaProject(project)), sources);
     }
 
     public static SourceSpecs srcMainJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -190,7 +200,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainJava(SourceSpecs... javaSources) {
-        return srcMainJava(spec -> sourceSet(spec, "main"), javaSources);
+        return srcMainJava(spec -> spec.markers(javaSourceSet("main")), javaSources);
     }
 
     public static SourceSpecs srcMainResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -198,7 +208,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainResources(SourceSpecs... resources) {
-        return srcMainResources(spec -> sourceSet(spec, "main"), resources);
+        return srcMainResources(spec -> spec.markers(javaSourceSet("main")), resources);
     }
 
     public static SourceSpecs srcTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -206,7 +216,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestJava(SourceSpecs... javaSources) {
-        return srcTestJava(spec -> sourceSet(spec, "test"), javaSources);
+        return srcTestJava(spec -> spec.markers(javaSourceSet("test")), javaSources);
     }
 
     public static SourceSpecs srcTestResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -214,7 +224,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestResources(SourceSpecs... resources) {
-        return srcTestResources(spec -> sourceSet(spec, "test"), resources);
+        return srcTestResources(spec -> spec.markers(javaSourceSet("test")), resources);
     }
 
     public static SourceSpecs srcSmokeTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -222,7 +232,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcSmokeTestJava(SourceSpecs... javaSources) {
-        return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
+        return srcSmokeTestJava(spec -> spec.markers(javaSourceSet("smokeTest")), javaSources);
     }
 
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {

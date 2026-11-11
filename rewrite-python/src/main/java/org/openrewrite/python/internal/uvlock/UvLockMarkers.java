@@ -15,6 +15,9 @@
  */
 package org.openrewrite.python.internal.uvlock;
 
+import org.openrewrite.python.internal.uvlock.marker.MarkerInterner;
+import org.openrewrite.python.internal.uvlock.marker.MarkerParser;
+import org.openrewrite.python.internal.uvlock.marker.MarkerTree;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.pep440.PythonVersion;
 
@@ -41,9 +44,6 @@ final class UvLockMarkers {
             "\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(===|==|!=|<=|>=|<|>|~=|not\\s+in|in)\\s*(['\"])([^'\"]*)\\3\\s*");
     private static final Set<String> VERSION_VARS = new HashSet<>(Arrays.asList(
             "python_version", "python_full_version"));
-    // a clause with one of these cuts the requires-python range into environments uv forks on
-    private static final Set<String> FORKING_OPERATORS = new HashSet<>(Arrays.asList(
-            ">=", ">", "==", "===", "~=", "!="));
 
     private UvLockMarkers() {
     }
@@ -57,58 +57,35 @@ final class UvLockMarkers {
     }
 
     /**
-     * uv's recorded marker form for the cataloged subset: normalized spacing, single
-     * quotes, {@code python_version} to {@code python_full_version} for order-preserving
-     * comparisons, and and-chain clauses sorted by variable. Null when the marker is
-     * outside the subset.
+     * The marker as uv records it, by uv's own marker algebra. Null for a marker uv cannot parse, or one it ignores
+     * entirely, which records no marker.
      */
-    static @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
-        List<String[]> clauses = parseSimpleAndChain(rawMarker);
-        if (clauses == null) {
+    /**
+     * The marker as uv records it where the lock already recorded it. A conjunction of values that never hold
+     * together is pruned by the algebra, so a marker only that pruning would change stands as the lock has it.
+     */
+    static @Nullable String recordMarkerAsRecorded(String recorded) {
+        try {
+            if (recorded.equals(MarkerTree.parse(new MarkerInterner(false), recorded).tryToString())) {
+                return recorded;
+            }
+        } catch (MarkerParser.MarkerSyntaxException e) {
             return null;
         }
-        List<String[]> mapped = new ArrayList<>();
-        for (String[] clause : clauses) {
-            String var = clause[0];
-            String op = clause[1];
-            String value = clause[2];
-            if (value.indexOf('\'') >= 0 || value.indexOf('"') >= 0) {
-                return null;
+        return recordMarker(recorded, null);
+    }
+
+    static @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
+        try {
+            MarkerInterner interner = new MarkerInterner();
+            MarkerTree tree = MarkerTree.parse(interner, rawMarker);
+            if (extraClause != null) {
+                tree = tree.and(MarkerTree.parse(interner, extraClause));
             }
-            if (VERSION_VARS.contains(var)) {
-                String[] lowered = lowerVersionClause(var, op, value);
-                if (lowered == null) {
-                    return null;
-                }
-                mapped.add(lowered);
-            } else if ("platform_system".equals(var) && ("==".equals(op) || "!=".equals(op))) {
-                // uv rewrites platform_system to sys_platform for the three OSes it maps;
-                // other values have no sys_platform equivalent, so fail loud (verified subset)
-                String sysPlatform = platformSystemToSysPlatform(value);
-                if (sysPlatform == null) {
-                    return null;
-                }
-                mapped.add(new String[]{"sys_platform", op, sysPlatform});
-            } else if ("==".equals(op) || "!=".equals(op)) {
-                mapped.add(clause);
-            } else {
-                return null;
-            }
+            return tree.tryToString();
+        } catch (MarkerParser.MarkerSyntaxException e) {
+            return null;
         }
-        if (extraClause != null) {
-            List<String[]> extra = parseSimpleAndChain(extraClause);
-            if (extra == null) {
-                return null;
-            }
-            mapped.addAll(extra);
-        }
-        // stable sort: uv orders and-chains alphabetically by variable
-        mapped.sort(Comparator.comparing(a -> a[0]));
-        List<String> parts = new ArrayList<>(mapped.size());
-        for (String[] clause : mapped) {
-            parts.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");
-        }
-        return String.join(" and ", parts);
     }
 
     /**
@@ -209,21 +186,37 @@ final class UvLockMarkers {
         }
         List<List<String[]>> result = new ArrayList<>(terms.size());
         for (String term : terms) {
-            List<String> parts = splitTopLevel(stripWrappingParens(term), "and");
-            if (parts == null) {
+            List<String[]> clauses = new ArrayList<>();
+            if (!addConjunction(term, clauses)) {
                 return null;
-            }
-            List<String[]> clauses = new ArrayList<>(parts.size());
-            for (String part : parts) {
-                Matcher m = SIMPLE_CLAUSE.matcher(stripWrappingParens(part));
-                if (!m.matches()) {
-                    return null;
-                }
-                clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
             }
             result.add(clauses);
         }
         return result;
+    }
+
+    // a parenthesized conjunction inside a conjunction flattens into it, and a nested disjunction yields no parse
+    private static boolean addConjunction(String text, List<String[]> clauses) {
+        String inner = stripWrappingParens(text);
+        List<String> ors = splitTopLevel(inner, "or");
+        List<String> parts = splitTopLevel(inner, "and");
+        if (ors == null || ors.size() > 1 || parts == null) {
+            return false;
+        }
+        if (parts.size() == 1) {
+            Matcher m = SIMPLE_CLAUSE.matcher(inner);
+            if (!m.matches()) {
+                return false;
+            }
+            clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
+            return true;
+        }
+        for (String part : parts) {
+            if (!addConjunction(part, clauses)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // splits at the operator word outside quotes and parentheses; null when parentheses do not balance
@@ -280,19 +273,6 @@ final class UvLockMarkers {
                 depth++;
             } else if (quote == 0 && ch == ')' && --depth == 0) {
                 return i == t.length() - 1;
-            }
-        }
-        return false;
-    }
-
-    /** Whether any clause splits the requires-python range, which uv forks on. */
-    static boolean splitsPythonRange(@Nullable List<String[]> clauses) {
-        if (clauses == null) {
-            return false;
-        }
-        for (String[] clause : clauses) {
-            if (VERSION_VARS.contains(clause[0]) && FORKING_OPERATORS.contains(clause[1])) {
-                return true;
             }
         }
         return false;

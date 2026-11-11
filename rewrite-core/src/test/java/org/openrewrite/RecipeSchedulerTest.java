@@ -22,7 +22,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Markup;
@@ -34,10 +37,13 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -45,12 +51,14 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -97,9 +105,8 @@ class RecipeSchedulerTest implements RewriteTest {
                     return (PlainText) new BoomRecipe().getVisitor().visitNonNull(text.withText("synthesized"), ctx);
                 }
             }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
-            .dataTable(SourcesFileErrors.Row.class, rows -> assertThat(rows).hasSize(1)),
+            // the recipe throws in both cycles, and each cycle records its error once
+            .dataTable(SourcesFileErrors.Row.class, rows -> assertThat(rows).hasSize(2)),
           // when the nested visit throws
           // then the error is still visible on the source file
           text(
@@ -393,6 +400,143 @@ class RecipeSchedulerTest implements RewriteTest {
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("generated a source file with an invalid path");
     }
+
+    @Test
+    void markupIsAttributedToTheRecipeThatAddedIt() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarnRecipe(), new ChangeText("goodbye"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(warn -> assertThat(warn.getRecipeName()).isEqualTo(WarnRecipe.class.getName()));
+    }
+
+    @Test
+    void errorMarkupIsAttributedToTheFailingRecipe() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new BoomRecipe(), new ChangeText("goodbye"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findFirst(Markup.Error.class))
+          .hasValueSatisfying(err -> assertThat(err.getRecipeName()).isEqualTo(BoomRecipe.class.getName()));
+    }
+
+    @Test
+    void markupIsAttributedThroughNestedDeclarativeRecipesWithPreconditions() {
+        Recipe recipe = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.WarnThenChange
+            displayName: Warn then change
+            description: Warns, then changes the text.
+            preconditions:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/*.txt"
+            recipeList:
+              - org.openrewrite.WarnRecipe
+              - org.openrewrite.text.ChangeText:
+                  toText: goodbye
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.Outer
+            displayName: Outer
+            description: Nests the declarative recipe.
+            recipeList:
+              - org.openrewrite.WarnThenChange
+            """.getBytes(StandardCharsets.UTF_8)), URI.create("rewrite.yml"), new Properties()))
+          .build()
+          .activateRecipes("org.openrewrite.Outer");
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(recipe,
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(warn -> assertThat(warn.getRecipeName()).isEqualTo(WarnRecipe.class.getName()));
+    }
+
+    @Test
+    void scanningRecipeMarkupIsAttributedInGenerateAndEditPhases() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new ScanningWarnRecipe(), new ChangeText("goodbye"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        assertThat(run.getChangeset().getAllResults())
+          .extracting(Result::getAfter)
+          .hasSize(2)
+          .allSatisfy(after -> assertThat(after.getMarkers().findFirst(Markup.class))
+            .hasValueSatisfying(markup -> assertThat(markup.getRecipeName()).isEqualTo(ScanningWarnRecipe.class.getName())));
+    }
+
+    @Test
+    void currentContextIsSetDuringARunAndClearedAfter() {
+        AtomicReference<ExecutionContext> duringRun = new AtomicReference<>();
+        Recipe capturing = toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                duringRun.set(RecipeScheduler.currentContext());
+                return text;
+            }
+        });
+
+        new RecipeScheduler().scheduleRun(capturing,
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(duringRun.get()).isNotNull();
+        assertThat(RecipeScheduler.currentContext()).isNull();
+    }
+
+    @Test
+    void instancesOfTheSameRecipeAreToldApartByInstanceName() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarnWithMessage("first"), new WarnWithMessage("second"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findAll(Markup.Warn.class))
+          .extracting(Markup::getMessage, Markup::getRecipeName, Markup::getRecipeInstanceName)
+          .containsExactlyInAnyOrder(
+            tuple("first", WarnWithMessage.class.getName(), "Warn with message `first`"),
+            tuple("second", WarnWithMessage.class.getName(), "Warn with message `second`"));
+    }
+
+    @Test
+    void markupOutsideARecipeRunIsUnattributed() {
+        PlainText text = Markup.warn(PlainText.builder().text("hello").build(), new IllegalStateException("careful"));
+        assertThat(text.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(warn -> assertThat(warn.getRecipeName()).isNull());
+    }
+}
+
+class WarnRecipe extends Recipe {
+    @Getter
+    final String displayName = "Warn";
+
+    @Getter
+    final String description = "Adds a warning to every text file.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return Markup.warn(text, new IllegalStateException("careful"));
+            }
+        };
+    }
 }
 
 @AllArgsConstructor
@@ -590,5 +734,60 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
     }
 
     public record Accumulator(Path workingDirectory) {
+    }
+}
+
+class ScanningWarnRecipe extends ScanningRecipe<AtomicInteger> {
+    @Getter
+    final String displayName = "Scanning warn";
+
+    @Getter
+    final String description = "Generates a file with an info markup and warns on existing text files.";
+
+    @Override
+    public AtomicInteger getInitialValue(ExecutionContext ctx) {
+        return new AtomicInteger(0);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicInteger acc, ExecutionContext ctx) {
+        return List.of(Markup.info(PlainText.builder().text("generated").sourcePath(Path.of("generated.txt")).build(), "generated"));
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicInteger acc) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return "hello.txt".equals(text.getSourcePath().toString()) ?
+                  Markup.warn(text, new IllegalStateException("careful")) : text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class WarnWithMessage extends Recipe {
+    @Option(displayName = "Message", description = "The warning message.", example = "careful")
+    String message;
+
+    String displayName = "Warn with message";
+
+    String description = "Adds a warning with the given message to every text file.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return Markup.warn(text, new IllegalStateException(message));
+            }
+        };
     }
 }

@@ -62,11 +62,13 @@ function ensureCapacity(buffer: GrowableSharedArrayBuffer, length: number): void
 export class PageAbortedError extends Error {
 }
 
+// The outbound buffer holds the JSON of a GetObject response's result or error
+type Answer = { t: "answer", member: "result" | "error", last: boolean };
+
 type ToMain =
     { t: "frame", bytes: Uint8Array } |
     { t: "pull", id: string, sourceFileType?: string } |
-    { t: "page" } |
-    { t: "serveError", message: string } |
+    Answer |
     { t: "served" };
 
 type ToWorker = { t: "serve", params: { id: string, sourceFileType?: string } };
@@ -74,6 +76,12 @@ type ToWorker = { t: "serve", params: { id: string, sourceFileType?: string } };
 function frame(body: Uint8Array): Buffer {
     const header = Buffer.from(`Content-Length: ${body.byteLength}\r\n\r\n`, "ascii");
     return Buffer.concat([header, body]);
+}
+
+// No page follows one ending in END_OF_OBJECT. The remote drops its transfer state when it sends
+// that page, so asking again would start the transfer over.
+export function endsTransfer(page: readonly RpcObjectData[]): boolean {
+    return page.length === 0 || page[page.length - 1].state === RpcObjectState.END_OF_OBJECT;
 }
 
 /**
@@ -128,7 +136,7 @@ export class WorkerPageChannel {
                 this.requestPage(id, sourceFileType);
             }
             const page = this.awaitPage();
-            if (page.length > 0 && page[page.length - 1].state !== RpcObjectState.END_OF_OBJECT) {
+            if (!endsTransfer(page)) {
                 this.requestPage(id, sourceFileType);
             }
             return page;
@@ -168,7 +176,8 @@ export class WorkerPageChannel {
 
     /**
      * Runs `serve` for each object the remote asks for. Its sink blocks until the main thread has
-     * taken the previous page, and throws {@link PageAbortedError} once the remote aborts.
+     * taken the previous page, and throws {@link PageAbortedError} once the remote aborts. An error
+     * `serve` throws before its last page answers the remote's next request for the object.
      */
     onServe(serve: (params: { id: string, sourceFileType?: string },
                     sink: (page: RpcObjectData[]) => void) => Promise<void>): void {
@@ -176,33 +185,38 @@ export class WorkerPageChannel {
             if (m.t !== "serve") {
                 return;
             }
-            serve(m.params, page => this.sendPage(page))
+            let ended = false;
+            serve(m.params, page => {
+                ended = endsTransfer(page);
+                this.handOver("result", page, ended);
+            })
                 .catch(e => {
-                    if (!(e instanceof PageAbortedError)) {
-                        this.port.postMessage({t: "serveError", message: String(e?.message ?? e)} satisfies ToMain);
+                    // No request follows the last page, so an error after it has nothing to answer
+                    if (!(e instanceof PageAbortedError) && !ended) {
+                        this.handOver("error", {code: -32603, message: String(e?.message ?? e)}, true);
                     }
                 })
-                .finally(() => {
-                    try {
-                        this.awaitTaken();
-                    } catch {
-                        // aborted after its last page
+                // The main thread forgets the serve on "served", so this waits until the remote has the last answer
+                .then(() => this.awaitTaken())
+                .catch(e => {
+                    if (!(e instanceof PageAbortedError)) {
+                        throw e;
                     }
-                    this.port.postMessage({t: "served"} satisfies ToMain);
-                });
+                })
+                .finally(() => this.port.postMessage({t: "served"} satisfies ToMain));
         });
     }
 
-    private sendPage(page: RpcObjectData[]): void {
+    private handOver(member: Answer["member"], value: unknown, last: boolean): void {
         this.awaitTaken();
         let text: string | Buffer;
         try {
-            text = JSON.stringify(page);
+            text = JSON.stringify(value);
         } catch (err) {
             if (!(err instanceof RangeError)) {
                 throw err;
             }
-            text = encodeFragmented(page, "utf8");
+            text = encodeFragmented(value, "utf8");
         }
         const length = typeof text === "string" ? Buffer.byteLength(text, "utf8") : text.byteLength;
         ensureCapacity(this.buffers.outbound, length);
@@ -213,13 +227,18 @@ export class WorkerPageChannel {
             text.copy(view);
         }
         this.control[OUT_LEN] = length;
-        Atomics.store(this.control, OUT_STATE, FULL);
-        this.port.postMessage({t: "page"} satisfies ToMain);
+        // the remote may have aborted while the answer was written
+        this.throwIfAborted(Atomics.compareExchange(this.control, OUT_STATE, EMPTY, FULL));
+        this.port.postMessage({t: "answer", member, last} satisfies ToMain);
     }
 
     private awaitTaken(): void {
         Atomics.wait(this.control, OUT_STATE, FULL);
-        if (Atomics.load(this.control, OUT_STATE) === ABORTED) {
+        this.throwIfAborted(Atomics.load(this.control, OUT_STATE));
+    }
+
+    private throwIfAborted(state: number): void {
+        if (state === ABORTED) {
             Atomics.store(this.control, OUT_STATE, EMPTY);
             throw new PageAbortedError("The remote aborted the transfer");
         }
@@ -236,7 +255,10 @@ interface Serving {
     objectId: string;
     // JSON of the ids of GetObject requests not yet answered
     waiting: string[];
-    pageReady: boolean;
+    // the answer in the outbound buffer, until a request takes it
+    ready?: Answer;
+    // The remote has the transfer's last answer, so its next GetObject of the object starts another transfer
+    complete: boolean;
 }
 
 /**
@@ -311,7 +333,7 @@ export class StdioRelay {
                 this.onGetObject(JSON.stringify(message.id), message.params);
                 return;
             }
-            if (message.method === "AbortGetObject" && this.serving?.objectId === message.params?.id) {
+            if (message.method === "AbortGetObject" && this.transferring(message.params?.id)) {
                 // the worker's traversal stops at its next page, then the abort reaches its handler
                 Atomics.store(this.control, OUT_STATE, ABORTED);
                 Atomics.notify(this.control, OUT_STATE);
@@ -350,10 +372,14 @@ export class StdioRelay {
         Atomics.notify(this.control, IN_STATE);
     }
 
+    private transferring(objectId: string): boolean {
+        return this.serving?.objectId === objectId && !this.serving.complete;
+    }
+
     private onGetObject(id: string, params: { id: string, sourceFileType?: string }): void {
-        if (this.serving?.objectId === params.id) {
-            this.serving.waiting.push(id);
-            this.respondWithPage();
+        if (this.transferring(params.id)) {
+            this.serving!.waiting.push(id);
+            this.respond();
         } else if (this.serving) {
             this.queuedServes.push({id, params});
         } else {
@@ -362,20 +388,22 @@ export class StdioRelay {
     }
 
     private startServe(id: string, params: { id: string, sourceFileType?: string }): void {
-        this.serving = {objectId: params.id, waiting: [id], pageReady: false};
+        this.serving = {objectId: params.id, waiting: [id], complete: false};
         this.port.postMessage({t: "serve", params} satisfies ToWorker);
     }
 
-    private respondWithPage(): void {
+    private respond(): void {
         const serving = this.serving!;
-        if (!serving.pageReady || serving.waiting.length === 0) {
+        if (!serving.ready || serving.waiting.length === 0) {
             return;
         }
-        const prefix = Buffer.from(`{"jsonrpc":"2.0","id":${serving.waiting.shift()},"result":`, "utf8");
-        const page = Buffer.from(this.buffers.outbound, 0, this.control[OUT_LEN]);
+        const id = serving.waiting.shift();
+        const prefix = Buffer.from(`{"jsonrpc":"2.0","id":${id},"${serving.ready.member}":`, "utf8");
+        const answer = Buffer.from(this.buffers.outbound, 0, this.control[OUT_LEN]);
         // copied out before the worker may overwrite the buffer with its next page
-        const body = Buffer.concat([prefix, page, Buffer.from("}")]);
-        serving.pageReady = false;
+        const body = Buffer.concat([prefix, answer, Buffer.from("}")]);
+        serving.complete = serving.ready.last;
+        serving.ready = undefined;
         Atomics.store(this.control, OUT_STATE, EMPTY);
         Atomics.notify(this.control, OUT_STATE);
         this.output.write(frame(body));
@@ -397,18 +425,10 @@ export class StdioRelay {
                 }), "utf8")));
                 break;
             }
-            case "page":
-                this.serving!.pageReady = true;
-                this.respondWithPage();
+            case "answer":
+                this.serving!.ready = m;
+                this.respond();
                 break;
-            case "serveError": {
-                const id = this.serving!.waiting.shift();
-                if (id !== undefined) {
-                    this.output.write(frame(Buffer.from(
-                        `{"jsonrpc":"2.0","id":${id},"error":${JSON.stringify({code: -32603, message: m.message})}}`, "utf8")));
-                }
-                break;
-            }
             case "served": {
                 this.serving = undefined;
                 const next = this.queuedServes.shift();

@@ -27,6 +27,7 @@ import {
     NodeRuntimeKind,
     PackageManager,
     prettierStyle,
+    sourceFileCache,
     StyleKind
 } from "../../src/javascript";
 import {Marker, marker, MarkersKind} from "../../src/markers";
@@ -87,6 +88,14 @@ const samples: { [kind: string]: () => Marker } = {
     [JS.Markers.DelegatedYield]: () => ({kind: JS.Markers.DelegatedYield, id: randomId(), prefix: emptySpace} as Marker),
     [JS.Markers.FunctionDeclaration]: () => ({kind: JS.Markers.FunctionDeclaration, id: randomId(), prefix: emptySpace} as Marker),
     [JS.Markers.Computed]: () => ({kind: JS.Markers.Computed, id: randomId(), suffix: emptySpace} as Marker),
+    [JS.Markers.ResolvedNames]: () => ({
+        kind: JS.Markers.ResolvedNames,
+        id: randomId(),
+        names: ["lib/view.render", "path.join"],
+        packages: [null, "@types/node"],
+        kinds: ["method", "method-call"],
+        spans: [6, 10, 0, 0, 20, 24, 1, 1]
+    } as Marker),
     [NodeResolutionResultKind]: () => createNodeResolutionResultMarker("package.json", {
         name: "example",
         version: "1.0.0",
@@ -128,6 +137,7 @@ const kinds: string[] = [
 ];
 
 describeJavaRpc("markers attached here reach Java and come back", () => {
+    const parser = new JavaScriptParser({sourceFileCache});
 
     test("every marker type has a sample", () => {
         expect(kinds.filter(kind => !samples[kind])).toEqual([]);
@@ -139,7 +149,7 @@ describeJavaRpc("markers attached here reach Java and come back", () => {
         const sample = samples[kind]();
         // sending tags what it sends, so what comes back is compared with a copy taken first
         const expected = structuredClone(sample);
-        const cu = (await new JavaScriptParser().parse({
+        const cu = (await parser.parse({
             text: "function f(b: boolean) {\n    const c = b || false;\n}",
             sourcePath: "markers.ts"
         }).next()).value as JS.CompilationUnit;

@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.HashSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +30,56 @@ import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("ConstantConditions")
 class JavaTypeTest implements RewriteTest {
+
+    @Test
+    void recursiveGenericEqualityContract() {
+        var first = recursiveGeneric("T", "example.Left");
+        var second = recursiveGeneric("T", "example.Left");
+        var third = recursiveGeneric("T", "example.Left");
+
+        assertThat(first).isEqualTo(first).isEqualTo(second);
+        assertThat(second).isEqualTo(first).isEqualTo(third);
+        assertThat(first).isEqualTo(third);
+        assertThat(first.hashCode()).isEqualTo(second.hashCode());
+        assertThat(new HashSet<>(List.of(first))).contains(second);
+        assertThat(first).isNotEqualTo(recursiveGeneric("U", "example.Left"));
+        assertThat(first).isNotEqualTo(second.withVariance(JavaType.GenericTypeVariable.Variance.CONTRAVARIANT));
+        // The recursive edge is equal; a later bound must still be checked.
+        assertThat(first).isNotEqualTo(recursiveGeneric("T", "example.Right"));
+        assertThat(first).isNotEqualTo(second.withBounds(second.getBounds().subList(0, 1)));
+        assertThat(first).isEqualTo(second);
+    }
+
+    @Test
+    void genericEqualityPreservesEmptyBoundAndVarianceSemantics() {
+        for (var variance : JavaType.GenericTypeVariable.Variance.values()) {
+            var first = new JavaType.GenericTypeVariable(null, "T", variance, List.of());
+            var second = new JavaType.GenericTypeVariable(null, "T", variance, List.of());
+            assertThat(first.equals(second)).isEqualTo(variance == JavaType.GenericTypeVariable.Variance.INVARIANT);
+            assertThat(first).isEqualTo(first);
+            assertThat(first).isNotEqualTo(second.withName("U"));
+        }
+    }
+
+    @Test
+    void genericEqualityComparesClassBoundTypeParameters() {
+        var leftBound = JavaType.ShallowClass.build("example.Bound").withTypeParameters(List.of(JavaType.Primitive.Int));
+        var rightBound = JavaType.ShallowClass.build("example.Bound").withTypeParameters(List.of(JavaType.Primitive.Long));
+        var left = new JavaType.GenericTypeVariable(null, "T",
+          JavaType.GenericTypeVariable.Variance.COVARIANT, List.of(leftBound));
+        var right = new JavaType.GenericTypeVariable(null, "T",
+          JavaType.GenericTypeVariable.Variance.COVARIANT, List.of(rightBound));
+        assertThat(left).isNotEqualTo(right);
+        assertThat(right).isNotEqualTo(left);
+    }
+
+    private static JavaType.GenericTypeVariable recursiveGeneric(String name, String leaf) {
+        var variable = new JavaType.GenericTypeVariable(null, name,
+          JavaType.GenericTypeVariable.Variance.COVARIANT, List.of());
+        var bound = new JavaType.Parameterized(null, JavaType.ShallowClass.build("example.Recursive"), List.of(variable));
+        return variable.unsafeSet(name, JavaType.GenericTypeVariable.Variance.COVARIANT,
+          List.of(bound, JavaType.ShallowClass.build(leaf)));
+    }
 
     @Test
     void methodOverridesOfGenericParameters() {

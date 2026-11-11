@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.CSharpParser;
+import org.openrewrite.csharp.CSharpServer;
 import org.openrewrite.csharp.marker.MSBuildProject;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
@@ -47,23 +48,11 @@ class CSharpParseProjectTest implements RewriteTest {
 
     @BeforeAll
     static void setUpFactory() {
-        Path basePath = Paths.get(System.getProperty("user.dir"));
-        Path[] searchPaths = {
-          basePath.resolve("csharp"),
-          basePath.resolve("rewrite-csharp/csharp"),
-        };
-        for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-            if (csproj.toFile().exists()) {
-                CSharpRewriteRpc.setFactory(
-                  CSharpRewriteRpc.builder()
-                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
-                    .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
-                );
-                return;
-            }
-        }
-        throw new IllegalStateException("Could not find C# Rewrite project");
+        CSharpRewriteRpc.setFactory(
+          CSharpRewriteRpc.builder()
+            .csharpServerEntry(CSharpServer.entry())
+            .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
+        );
     }
 
     // ---- Round-trip tests via rewriteRun ----

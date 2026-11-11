@@ -281,7 +281,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                     insertionIndex(children(result), first, firstGroupId)));
         } else if (!firstHasGroupId && resultGroupId != null &&
                    PLUGIN_DEFAULT_GROUPID.equals(trimmedChildValue(result, "groupId", null))) {
-            return result.withContent(ListUtils.map(children(result), c -> c == resultGroupId ? null : c));
+            return result.withContent(ListUtils.filter(children(result), c -> c != resultGroupId));
         }
         return result;
     }

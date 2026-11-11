@@ -22,9 +22,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -69,9 +73,28 @@ public final class PackageManagerExecutor {
      * Run the package manager in the given directory with additional environment variables.
      */
     public RunResult run(Path workDir, String executablePath, Map<String, String> environment, String... args) throws IOException, InterruptedException {
+        return run(workDir, executablePath, environment, null, null, args);
+    }
+
+    /**
+     * Run the package manager until {@code deadline}, or for this manager's default timeout when there
+     * is none, appending the command and its output to {@code log}. The environment is not logged, so
+     * credentials belong there rather than in {@code args}.
+     */
+    public RunResult run(Path workDir, String executablePath, Map<String, String> environment,
+                         @Nullable Instant deadline, @Nullable Path log, String... args)
+            throws IOException, InterruptedException {
         String[] command = new String[args.length + 1];
         command[0] = executablePath;
         System.arraycopy(args, 0, command, 1, args.length);
+
+        long timeoutMillis = deadline == null ? TimeUnit.SECONDS.toMillis(timeoutSeconds) :
+                Duration.between(Instant.now(), deadline).toMillis();
+        if (timeoutMillis <= 0) {
+            RunResult result = new RunResult(false, -1, "", "The deadline passed before " + name + " could start");
+            appendToLog(log, command, result);
+            return result;
+        }
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(workDir.toFile());
@@ -88,17 +111,37 @@ public final class PackageManagerExecutor {
         stdoutReader.start();
         stderrReader.start();
 
-        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
+        RunResult result;
         if (!finished) {
             process.destroyForcibly();
-            return new RunResult(false, -1, stdout.toString(), "Process timed out after " + timeoutSeconds + "s");
+            result = new RunResult(false, -1, stdout.toString(), "Process timed out after " +
+                                                                 TimeUnit.MILLISECONDS.toSeconds(timeoutMillis) + "s");
+        } else {
+            stdoutReader.join(5000);
+            stderrReader.join(5000);
+            int exitCode = process.exitValue();
+            result = new RunResult(exitCode == 0, exitCode, stdout.toString(), stderr.toString());
         }
+        appendToLog(log, command, result);
+        return result;
+    }
 
-        stdoutReader.join(5000);
-        stderrReader.join(5000);
+    private static void appendToLog(@Nullable Path log, String[] command, RunResult result) {
+        appendToLog(log, "$ " + String.join(" ", command) + "\n" + result.getStdout() + result.getStderr() +
+                         (result.isSuccess() ? "" : "(exit code " + result.getExitCode() + ")\n"));
+    }
 
-        int exitCode = process.exitValue();
-        return new RunResult(exitCode == 0, exitCode, stdout.toString(), stderr.toString());
+    public static void appendToLog(@Nullable Path log, String text) {
+        if (log == null) {
+            return;
+        }
+        try {
+            Files.write(log, text.getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException ignored) {
+            // An unwritable log loses the text, not the command's result
+        }
     }
 
     /**

@@ -74,8 +74,8 @@ public class ExtractInterface {
             J.ClassDeclaration c = classDecl;
 
             c = c.withKind(J.ClassDeclaration.Kind.Type.Interface);
-            c = c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(), s ->
-                    s instanceof J.MethodDeclaration ? s : null)));
+            c = c.withBody(c.getBody().withStatements(ListUtils.filter(c.getBody().getStatements(), s ->
+                    s instanceof J.MethodDeclaration)));
             c = c.withName(c.getName().withSimpleName(fullyQualifiedInterfaceName.substring(
                     fullyQualifiedInterfaceName.lastIndexOf('.') + 1
             )));
@@ -94,10 +94,10 @@ public class ExtractInterface {
             }
 
             return method
-                    .withModifiers(ListUtils.map(method.getModifiers(), m ->
-                            m.getType() == J.Modifier.Type.Public ||
+                    .withModifiers(ListUtils.filter(method.getModifiers(), m ->
+                            !(m.getType() == J.Modifier.Type.Public ||
                             m.getType() == J.Modifier.Type.Final ||
-                            m.getType() == J.Modifier.Type.Native ? null : m))
+                            m.getType() == J.Modifier.Type.Native)))
                     .withBody(null);
         }
     }

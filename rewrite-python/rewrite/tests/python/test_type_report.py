@@ -266,3 +266,16 @@ def test_diff_ty_separates_the_import_resolved_call_from_the_instance_receiver(t
     listing = out.getvalue()
     assert listing.index("def probe") < listing.index("return type only") < listing.index("socket.getfqdn()")
     assert "4 of 4 nodes differ, 2 of them before `->`" in listing
+
+
+@requires_ty_types_cli
+def test_a_file_with_crlf_line_endings_is_attributed_as_its_lf_copy(tmp_path):
+    def missing(path):
+        cu = parse_for_types(str(path), with_types=True, project_root=str(tmp_path))
+        return [entry.source for entry in build_type_report(cu, only_missing=True).missing]
+
+    lf = tmp_path / "lf.py"
+    lf.write_bytes(SAMPLE.encode())
+    crlf = tmp_path / "crlf.py"
+    crlf.write_bytes(SAMPLE.replace("\n", "\r\n").encode())
+    assert missing(crlf) == missing(lf)

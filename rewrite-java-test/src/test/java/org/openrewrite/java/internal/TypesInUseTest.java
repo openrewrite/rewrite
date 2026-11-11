@@ -97,6 +97,8 @@ class TypesInUseTest implements RewriteTest {
                 assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", false)).isFalse();
                 assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", true)).isTrue();
                 assertThat(tiu.hasDocReferenceInPackage("com.other", true)).isFalse();
+                assertThat(tiu.hasDocReference("org.openrewrite.other.Target")).isTrue();
+                assertThat(tiu.hasDocReference("org.openrewrite.other.Other")).isFalse();
             })
           )
         );

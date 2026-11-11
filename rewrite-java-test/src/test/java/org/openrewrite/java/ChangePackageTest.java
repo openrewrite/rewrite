@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -2390,6 +2391,227 @@ class ChangePackageTest implements RewriteTest {
             "org.foo.MyImpl\n",
             "org.bar.MyImpl\n",
             spec -> spec.path("META-INF/services/org.other.SomeInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", null)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+              import somepkg.sub.Other;
+
+              /**
+               * {@link somepkg.Test}
+               */
+              class A {
+                  Test a;
+                  somepkg.Test b;
+                  Other c;
+
+                  void test(String somepkg) {
+                      int len = somepkg.length();
+                  }
+
+                  void test(Integer somepkg) {
+                      int max = somepkg.MAX_VALUE;
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.Test;
+              import somepkg.sub.Other;
+
+              /**
+               * {@link org.openrewrite.somepkg.Test}
+               */
+              class A {
+                  Test a;
+                  org.openrewrite.somepkg.Test b;
+                  Other c;
+
+                  void test(String somepkg) {
+                      int len = somepkg.length();
+                  }
+
+                  void test(Integer somepkg) {
+                      int max = somepkg.MAX_VALUE;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.*;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.*;
+              import org.openrewrite.somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameToSubpackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "somepkg.sub", false)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package somepkg.sub;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """,
+            """
+              import somepkg.sub.Test;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameRecursiveKeepsUnresolvedFieldAccess() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+
+              class A extends Missing {
+                  Test a;
+                  int b = somepkg.count;
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.Test;
+
+              class A extends Missing {
+                  Test a;
+                  int b = somepkg.count;
+              }
+              """
           )
         );
     }

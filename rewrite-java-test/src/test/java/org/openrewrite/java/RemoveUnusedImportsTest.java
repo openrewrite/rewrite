@@ -433,6 +433,135 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void unfoldDoesNotImportInheritedParameterizedNestedType() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              class A<K, V> extends HashMap<K, V> {
+                  Entry<K, V> e;
+              }
+              """,
+            """
+              import java.util.HashMap;
+              class A<K, V> extends HashMap<K, V> {
+                  Entry<K, V> e;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldDoesNotImportNestedTypeNamedThroughItsOwner() {
+        rewriteRun(
+          java(
+            """
+              package com.foo;
+              public class Entry {
+              }
+              """
+          ),
+          java(
+            """
+              package com.foo;
+              import java.util.*;
+              import java.util.Map.*;
+              class A {
+                  Map.Entry<String, String> e;
+                  Entry mine = new Entry();
+              }
+              """,
+            """
+              package com.foo;
+              import java.util.Map;
+              class A {
+                  Map.Entry<String, String> e;
+                  Entry mine = new Entry();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldDoesNotImportTypeNamedThroughItsPackage() {
+        rewriteRun(
+          java(
+            """
+              package bar;
+              public class Widget {
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              public class Gadget {
+              }
+              """
+          ),
+          java(
+            """
+              package com.foo;
+              import bar.*;
+              class A {
+                  bar.Widget w;
+                  Gadget g;
+              }
+              class Widget {
+              }
+              """,
+            """
+              package com.foo;
+              import bar.Gadget;
+              class A {
+                  bar.Widget w;
+                  Gadget g;
+              }
+              class Widget {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldDoesNotImportTypeInferredByVar() {
+        rewriteRun(
+          java(
+            """
+              package com.foo;
+              public class Node {
+              }
+              """
+          ),
+          java(
+            """
+              package com.foo;
+              import org.w3c.dom.*;
+              class A {
+                  Node own;
+                  void f(Document d) {
+                      var child = d.getFirstChild();
+                  }
+              }
+              """,
+            """
+              package com.foo;
+              import org.w3c.dom.Document;
+              class A {
+                  Node own;
+                  void f(Document d) {
+                      var child = d.getFirstChild();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void leaveStarImportInPlaceIfMoreThanStarCount() {
         rewriteRun(
           java(
@@ -1759,6 +1888,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Set<Integer> s = emptySet();
                  List<String> l = List.of("c","b","a");
                  Iterator<Short> i = emptyIterator();
+                 Queue<Long> q;
                  Entry<String, Integer> entry;
               }
               """

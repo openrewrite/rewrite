@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -29,6 +30,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
@@ -893,6 +895,70 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void staticStarImportNextToImportOfTheType() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import static a.A1.*;
+
+              public class B {
+                  public void test() {
+                      new A1().foo();
+                      stat();
+                  }
+              }
+              """,
+            """
+              import a.A2;
+
+              import static a.A2.*;
+
+              public class B {
+                  public void test() {
+                      new A2().foo();
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticStarImportNextToUnusedImportOfTheType() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import static a.A1.*;
+
+              public class B {
+                  public void test() {
+                      stat();
+                  }
+              }
+              """,
+            """
+              import static a.A2.*;
+
+              public class B {
+                  public void test() {
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void staticImports2() {
         rewriteRun(spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
           java(
@@ -1370,6 +1436,99 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void fullyQualifiedJavadocLink() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * {@link a.A1} here
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * {@link a.A2} here
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocSee() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * @see a.A1
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * @see a.A2
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocMemberLink() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * {@link a.A1#m()} here
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * {@link a.A2#m()} here
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/978")
     @Test
     void onlyUpdateApplicableImport() {
@@ -1539,6 +1698,37 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               class Target {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void targetInDefaultPackageIsNeverImported() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "Target", true)),
+          java(a1),
+          java(
+            """
+              class Test {
+                  a.A1 a;
+              }
+              """,
+            """
+              class Test {
+                  Target a;
+              }
+              """
+          ),
+          java(
+            """
+              import static a.A1.stat;
+
+              class StaticImport {
+                  void m() {
+                      stat();
+                  }
               }
               """
           )
@@ -2722,6 +2912,170 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void changeTypeAddsExplicitImportWhenStarImportCollidesWithJavaLang() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Number", "b.Number", true))
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          java(
+            """
+              package a;
+              public class Number {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Number {}
+              """
+          ),
+          java(
+            """
+              import a.Number;
+              import b.*;
+
+              class Test {
+                  Number n;
+              }
+              """,
+            """
+              import b.Number;
+              import b.*;
+
+              class Test {
+                  Number n;
+              }
+              """,
+            spec -> spec.markers(JavaSourceSet.build("main", emptyList()))
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyWhenTargetSimpleNameMeansAnotherTypeInFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),
+          java(a1),
+          java(
+            """
+              package c;
+              public class Bar {
+              }
+              """
+          ),
+          java(
+            """
+              package c;
+
+              import a.A1;
+
+              class SamePackage {
+                  A1 a;
+                  Bar bar;
+              }
+              """,
+            """
+              package c;
+
+              class SamePackage {
+                  b.Bar a;
+                  Bar bar;
+              }
+              """
+          ),
+          java(
+            """
+              import a.A1;
+
+              class TypeParameter<Bar> {
+                  A1 a;
+              }
+              """,
+            """
+              class TypeParameter<Bar> {
+                  b.Bar a;
+              }
+              """
+          ),
+          java(
+            """
+              import a.A1;
+
+              class NestedClass {
+                  A1 a;
+
+                  class Bar {
+                  }
+              }
+              """,
+            """
+              class NestedClass {
+                  b.Bar a;
+
+                  class Bar {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shortenWhenFileOnlyQualifiesAnotherTypeOfTheSameName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),
+          java(a1),
+          java(
+            """
+              package c;
+              public class Bar {
+              }
+              """
+          ),
+          java(
+            """
+              import a.A1;
+
+              class Test {
+                  A1 a;
+                  c.Bar bar;
+              }
+              """,
+            """
+              import b.Bar;
+
+              class Test {
+                  Bar a;
+                  c.Bar bar;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyInFileThatKeepsOriginalDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "b.Foo", true)),
+          java(
+            """
+              package a;
+
+              public class Foo {
+                  Foo self;
+              }
+              """,
+            """
+              package a;
+
+              public class Foo {
+                  b.Foo self;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotFailOnClassDeclarationWithNullType() {
         // Non-Java (e.g. Python) sources may produce a J.ClassDeclaration whose type is null.
         // When such a file also references the type being changed, the precondition passes and
@@ -2752,6 +3106,186 @@ class ChangeTypeTest implements RewriteTest {
                     return classDecl.withType(null);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9291")
+    @Test
+    void preserveOuterClassTypeArgumentsWhenChangingInnerType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "com.example.OldOuter.Registry",
+            "com.example.NewOuter.Registry2",
+            true
+          )),
+          java(
+            """
+              package com.example;
+
+              public class OldOuter<T> {
+                  public class Registry {
+                      public T get() {
+                          return null;
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              public class NewOuter<T> {
+                  public class Registry2 {
+                      public T get() {
+                          return null;
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              class SecurityConfig {
+                  void configure(OldOuter<String>.Registry r) {
+                      String s = r.get().trim();
+                  }
+              }
+              """,
+            """
+              package com.example;
+
+              class SecurityConfig {
+                  void configure(NewOuter<String>.Registry2 r) {
+                      String s = r.get().trim();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9291")
+    @Test
+    void preserveOuterClassTypeArgumentsAcrossPackages() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "org.springframework.security.config.annotation.web.configurers.ExpressionUrlAuthorizationConfigurer$ExpressionInterceptUrlRegistry",
+            "org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer$AuthorizationManagerRequestMatcherRegistry",
+            true
+          )),
+          java(
+            """
+              package org.springframework.security.config.annotation.web.builders;
+
+              public class HttpSecurity {
+              }
+              """
+          ),
+          java(
+            """
+              package org.springframework.security.config.annotation.web.configurers;
+
+              public class ExpressionUrlAuthorizationConfigurer<H> {
+                  public class ExpressionInterceptUrlRegistry {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package org.springframework.security.config.annotation.web.configurers;
+
+              public class AuthorizeHttpRequestsConfigurer<H> {
+                  public class AuthorizationManagerRequestMatcherRegistry {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.macro.mall.tiny.security.config;
+
+              import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+              import org.springframework.security.config.annotation.web.configurers.ExpressionUrlAuthorizationConfigurer;
+
+              public class SecurityConfig {
+                  void configure(ExpressionUrlAuthorizationConfigurer<HttpSecurity>.ExpressionInterceptUrlRegistry registry) {
+                  }
+              }
+              """,
+            """
+              package com.macro.mall.tiny.security.config;
+
+              import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+              import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
+
+              public class SecurityConfig {
+                  void configure(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9291")
+    @Test
+    void preserveMultiLevelOuterClassTypeArgumentsWhenChangingInnerType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "com.example.oldpkg.OldOuter$Middle$Registry",
+            "com.example.newpkg.NewOuter$NewMiddle$Registry2",
+            true
+          )),
+          java(
+            """
+              package com.example.oldpkg;
+
+              public class OldOuter<T> {
+                  public class Middle<U> {
+                      public class Registry {
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.newpkg;
+
+              public class NewOuter<T> {
+                  public class NewMiddle<U> {
+                      public class Registry2 {
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.app;
+
+              import com.example.oldpkg.OldOuter;
+
+              class Config {
+                  void configure(OldOuter<String>.Middle<Integer>.Registry r) {
+                  }
+              }
+              """,
+            """
+              package com.example.app;
+
+              import com.example.newpkg.NewOuter;
+
+              class Config {
+                  void configure(NewOuter<String>.NewMiddle<Integer>.Registry2 r) {
+                  }
+              }
+              """
           )
         );
     }

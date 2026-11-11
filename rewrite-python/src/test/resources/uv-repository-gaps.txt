@@ -1,12 +1,7 @@
 # Corpus scenarios under lock/repository/uv/ the engine does not reproduce yet, with what it does instead.
-apache__airflow__dev_breeze__removal	writes another lock
 apache__gravitino__mcp-server__upgrade	refuses: RESOLUTION_REQUIRED
-apache__infrastructure-actions__add-closure	refuses: RESOLUTION_REQUIRED
-apache__infrastructure-actions__pelican__transitive	refuses: RESOLUTION_REQUIRED
-apache__infrastructure-actions__pelican__upgrade	refuses: RESOLUTION_REQUIRED
-apache__infrastructure-actions__utils__add-closure	refuses: RESOLUTION_REQUIRED
-apache__infrastructure-actions__utils__add-leaf	refuses: RESOLUTION_REQUIRED
-apache__infrastructure-actions__utils__upgrade	refuses: RESOLUTION_REQUIRED
 apache__polaris-tools__mcp-server__upgrade	refuses: RESOLUTION_REQUIRED
-astral-sh__attest-action__add-closure	refuses: RESOLUTION_REQUIRED
-astral-sh__attest-action__transitive	refuses: RESOLUTION_REQUIRED
+huggingface__carbon__upgrade	refuses: DYNAMIC_SDIST_METADATA
+langchain-ai__langgraph-cua-py__upgrade	refuses: RESOLUTION_REQUIRED
+pydantic__talks__2026-02-monty__removal	refuses: RESOLUTION_REQUIRED
+pydantic__talks__2026-02-monty__upgrade	refuses: RESOLUTION_REQUIRED

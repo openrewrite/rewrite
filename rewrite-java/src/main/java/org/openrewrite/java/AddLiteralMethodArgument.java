@@ -109,13 +109,11 @@ public class AddLiteralMethodArgument extends Recipe {
 
         private MethodCall visitMethodCall(MethodCall methodCall) {
             MethodCall m = methodCall;
-            List<Expression> originalArgs = m.getArguments();
-            if (methodMatcher.matches(m) && (long) originalArgs.size() >= argumentIndex) {
-                List<Expression> args = new ArrayList<>(originalArgs);
-
-                if (args.size() == 1 && args.get(0) instanceof J.Empty) {
-                    args.remove(0);
-                }
+            List<Expression> args = new ArrayList<>(m.getArguments());
+            if (args.size() == 1 && args.get(0) instanceof J.Empty) {
+                args.remove(0);
+            }
+            if (methodMatcher.matches(m) && (long) args.size() >= argumentIndex) {
                 JavaType.Primitive primitive;
                 String valueSource;
                 Object value;
@@ -140,11 +138,16 @@ public class AddLiteralMethodArgument extends Recipe {
                     literalType = parsed == null ? primitive : (JavaType.Primitive) parsed[1];
                 }
 
-                Expression literal = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, value, valueSource, null, literalType);
+                Space prefix = args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE;
+                if (argumentIndex < args.size()) {
+                    prefix = args.get(argumentIndex).getPrefix();
+                    args.set(argumentIndex, args.get(argumentIndex).withPrefix(Space.SINGLE_SPACE));
+                }
+                Expression literal = new J.Literal(randomId(), prefix, Markers.EMPTY, value, valueSource, null, literalType);
                 m = m.withArguments(ListUtils.insert(args, literal, argumentIndex));
 
                 JavaType.Method methodType = m.getMethodType();
-                if (methodType != null) {
+                if (methodType != null && declaresOwnParameter(methodType)) {
                     m = m.withMethodType(methodType
                             .withParameterNames(ListUtils.insert(methodType.getParameterNames(), "arg" + argumentIndex, argumentIndex))
                             .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), primitive, argumentIndex)));
@@ -154,6 +157,15 @@ public class AddLiteralMethodArgument extends Recipe {
                 }
             }
             return m;
+        }
+
+        /**
+         * Arguments beyond the declared parameters, or passed to a varargs parameter, leave the signature as it is.
+         */
+        private boolean declaresOwnParameter(JavaType.Method methodType) {
+            int parameters = Math.min(methodType.getParameterNames().size(), methodType.getParameterTypes().size());
+            int lastOwn = methodType.hasFlags(Flag.Varargs) ? parameters - 1 : parameters;
+            return argumentIndex <= lastOwn;
         }
 
         /**

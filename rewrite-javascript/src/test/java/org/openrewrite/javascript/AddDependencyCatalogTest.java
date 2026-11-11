@@ -245,6 +245,7 @@ class AddDependencyCatalogTest implements RewriteTest {
     void anAdditionAnEarlierRecipeMadeRoomForInTheSameCycle() {
         rewriteRun(
           spec -> spec.recipes(new RemoveDependency("left-pad", null), new AddDependency("left-pad", "^2.0.0", null))
+            // the removal undoes the addition of the previous cycle
             .cycles(1).expectedCyclesThatMakeChanges(1),
           packageJson("""
             {

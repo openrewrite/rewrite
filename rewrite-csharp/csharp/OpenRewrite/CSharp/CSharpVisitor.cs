@@ -165,6 +165,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         {
             return trailingComma.WithSuffix(VisitSpace(trailingComma.Suffix, p));
         }
+        if (marker is Struct structMarker)
+        {
+            return structMarker.WithPrefix(VisitSpace(structMarker.Prefix, p));
+        }
+        if (marker is RecordClass recordClass)
+        {
+            return recordClass.WithPrefix(VisitSpace(recordClass.Prefix, p));
+        }
 
         return base.VisitMarker(marker, p);
     }
@@ -1224,7 +1232,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithReturnType(VisitLeftPadded(node.ReturnType, p)!)
             .WithParameters(VisitContainer(node.Parameters, p)!)
             .WithExpressionBody(VisitLeftPadded(node.ExpressionBody, p))
-            .WithBody((Block?)Visit(node.Body, p));
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
     public virtual J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
@@ -1573,13 +1582,20 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
+        FormattingListener.BeforeFormat(tree, null, cursor);
+
         // Full CU formatting — do it immediately, no benefit to deferring
         if (tree is CompilationUnit cu)
             return (T)(J)RoslynFormatter.Format(cu);
 
-        _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
-        _deferredFormat.Add(tree);
-        MaybeDoAfterVisit(_deferredFormat);
+        // One per source file: what an earlier file registered must not format or restore nodes of this one
+        var deferredFormat = GetAfterVisit().OfType<RoslynFormatter.DeferredFormatVisitor<P>>().FirstOrDefault();
+        if (deferredFormat == null)
+        {
+            deferredFormat = new RoslynFormatter.DeferredFormatVisitor<P>();
+            DoAfterVisit(deferredFormat);
+        }
+        deferredFormat.Add(tree, cursor);
         return tree;
     }
 
@@ -1603,8 +1619,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var visitor = new AutoFormatVisitor<int>(stopAfter);
         return visitor.Format(after, cursor) as T ?? after;
     }
-
-    private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
 }
 
 /// <summary>

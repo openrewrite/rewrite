@@ -56,6 +56,7 @@ final class TextLockfileReader {
      * ({@link BunRelease#bundlesADependencyByItsOwnKey()}).
      */
     private final Set<String> bundledEntries = new HashSet<>();
+    private final Set<Integer> unresolvedRows = new HashSet<>();
 
     private TextLockfileReader(BunOptions options) {
         this.options = options;
@@ -82,6 +83,15 @@ final class TextLockfileReader {
             throw new ParseError(e.error, e.getMessage());
         }
         return new TextLockfileReader(options).parseIntoBinaryLockfile(root);
+    }
+
+    private Integrity parseIntegrity(String text, int version) {
+        Integrity integrity = Integrity.parse(text, options.getRelease());
+        if (options.getRelease().validatesEveryLockIntegrity() &&
+                version >= Lockfile.TEXT_LOCKFILE_VERSION_STRICT && !text.isEmpty() && !integrity.tag.isSupported()) {
+            throw error("InvalidPackageInfo", "Unsupported or malformed integrity hash");
+        }
+        return integrity;
     }
 
     private ParseError error(String error, String message) {
@@ -161,6 +171,11 @@ final class TextLockfileReader {
                 throw error("InvalidConfigVersion", "Invalid \"configVersion\". Expected a number");
             }
             lockfile.savedConfigVersion = configVersion;
+        }
+
+        Json.Expr packageExtensions = root.get("packageExtensions");
+        if (options.getRelease().readsPackageExtensions() && packageExtensions != null) {
+            lockfile.packageExtensions.readApplied(packageExtensions);
         }
 
         Json.Expr trustedDependenciesExpr = root.get("trustedDependencies");
@@ -515,6 +530,14 @@ final class TextLockfileReader {
                             res.tag == Resolution.Tag.WORKSPACE);
                     pkg.dependenciesOff = offLen[0];
                     pkg.dependenciesLen = offLen[1];
+                    if (options.getRelease().carriesPackageInstallMetadata()) {
+                        Json.Expr libc = infoObj.get("libc");
+                        if (libc != null) {
+                            pkg.meta.libc = Negatable.fromJson(Negatable.LIBC, libc);
+                        }
+                        Json.Expr script = infoObj.get("hasInstallScript");
+                        pkg.meta.hasInstallScript = script != null && Boolean.TRUE.equals(script.asBool());
+                    }
                     Json.Expr binExpr = infoObj.get("bin");
                     Json.Expr binDirExpr = infoObj.get("binDir");
                     if (binExpr != null) {
@@ -564,7 +587,7 @@ final class TextLockfileReader {
                     if (integrityStr == null) {
                         throw error("InvalidPackageInfo", "Expected a string");
                     }
-                    pkg.meta.integrity = Integrity.parse(integrityStr, options.getRelease());
+                    pkg.meta.integrity = parseIntegrity(integrityStr, lockfileVersion);
                     if (lockfileVersion >= Lockfile.TEXT_LOCKFILE_VERSION_STRICT && npmUrlNeedsIntegrity &&
                         !pkg.meta.integrity.tag.isSupported()) {
                         throw error("InvalidPackageInfo", "Missing integrity hash for npm package resolved to a " +
@@ -577,7 +600,7 @@ final class TextLockfileReader {
                     if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
                         String integrityStr = pkgInfo.get(i).asString();
                         if (integrityStr != null) {
-                            pkg.meta.integrity = Integrity.parse(integrityStr, options.getRelease());
+                            pkg.meta.integrity = parseIntegrity(integrityStr, lockfileVersion);
                             i++;
                         }
                     }
@@ -601,7 +624,7 @@ final class TextLockfileReader {
                     if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
                         String integrityStr = pkgInfo.get(i).asString();
                         if (integrityStr != null) {
-                            pkg.meta.integrity = Integrity.parse(integrityStr, options.getRelease());
+                            pkg.meta.integrity = parseIntegrity(integrityStr, lockfileVersion);
                             i++;
                         }
                     }
@@ -729,6 +752,9 @@ final class TextLockfileReader {
             }
         }
 
+        for (int row : unresolvedRows) {
+            lockfile.resolutions.set(row, INVALID_PACKAGE_ID);
+        }
         if (tagsLinks) {
             lockfile.tagWorkspaceLinks(options.isLinkWorkspacePackages());
         }
@@ -1062,6 +1088,25 @@ final class TextLockfileReader {
         if (!membersSorted) {
             lockfile.dependencies.addAll(members);
             end = lockfile.dependencies.size();
+        }
+        Json.Expr unresolved = options.getRelease().carriesUnresolvedOptionalNames() ? obj.get("unresolved") : null;
+        if (unresolved != null) {
+            if (!unresolved.isArray()) {
+                throw error("InvalidPackageInfo", "Expected an array");
+            }
+            Set<String> names = new HashSet<>();
+            for (Json.Expr name : unresolved.items()) {
+                if (!name.isString()) {
+                    throw error("InvalidPackageInfo", "Expected a string");
+                }
+                names.add(name.asString());
+            }
+            for (int row = off; row < end; row++) {
+                Dependency dep = lockfile.dependencies.get(row);
+                if (dep.behavior.isOptional() && names.contains(dep.name)) {
+                    unresolvedRows.add(row);
+                }
+            }
         }
         return new int[]{off, end - off};
     }

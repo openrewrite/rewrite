@@ -23,6 +23,8 @@ recipeList:
   - org.openrewrite.gradle.UpdateGradleWrapper:
       version: 9.x
       addIfMissing: false
+  # Legacy Shadow versions use APIs removed in Gradle 9.
+  - org.openrewrite.gradle.gradle9.UpgradeShadowPlugin
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.gradle9.OneDependencyDeclarationPerStatement
@@ -31,6 +33,10 @@ recipeList:
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.gradle9.UseJavaExtensionBlock
   - org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
+  # Manifest.attributes is read-only in Gradle 9; use the merging method instead of +=
+  - org.openrewrite.gradle.gradle9.UseManifestAttributes
+  # ProjectDependency no longer delegates Project properties in Gradle 9
+  - org.openrewrite.gradle.gradle9.UseProjectForSourceSets
   # version = { } is invalid Gradle DSL; the closure form version { } must be used
   - org.openrewrite.gradle.gradle9.UseVersionClosure
   # Depending on the current project by its own module coordinates is deprecated in 9.3
@@ -41,6 +47,10 @@ recipeList:
   - org.openrewrite.gradle.plugins.UpgradePluginVersion:
       pluginIdPattern: com.gradle.develocity
       newVersion: 4.x
+  # Earlier versions use dependency-resolution APIs removed in Gradle 9
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: io.spring.dependency-management
+      newVersion: 1.1.7
   # PMD's targetJdk is deprecated in 9.6 and has no replacement
   - org.openrewrite.gradle.gradle9.RemovePmdTargetJdk
   # CreateStartScripts.exitEnvironmentVar became a no-op and is deprecated in 9.6

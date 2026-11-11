@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import cast, Optional
 
 from rewrite import Tree, P, Cursor, PrintOutputCapture, list_find
-from rewrite.java import Assert, Binary, Expression, Return, Statement, Block, Semicolon, Ternary, Unary
+from rewrite.java import Assert, Binary, Expression, JavaSourceFile, Return, Statement, Block, Semicolon, Ternary, Unary
 from rewrite.python import Binary as PyBinary, PythonVisitor, ExpressionStatement
+from rewrite.python.format.line_breaks import line_break
 from rewrite.visitor import T
 
 
@@ -22,13 +23,17 @@ class MinimumViableSpacingVisitor(PythonVisitor):
             statement_index = list_find(owner.statements, tree)
             previous_statement = owner.padding.statements[statement_index - 1] if statement_index > 0 else None
             if not previous_statement or not previous_statement.markers.find_first(Semicolon):
-                new_prefix = tree.prefix.replace(whitespace='\n' + tree.prefix.whitespace)
+                new_prefix = tree.prefix.replace(whitespace=self._line_break() + tree.prefix.whitespace)
                 if isinstance(tree, ExpressionStatement):
                     tree = tree.replace(expression=tree.expression.replace(prefix=new_prefix))
                 else:
                     tree = tree.replace(prefix=new_prefix)
 
         return tree
+
+    def _line_break(self) -> str:
+        cu = self.cursor.first_enclosing(JavaSourceFile)
+        return line_break(cu) if cu is not None else '\n'
 
     def visit_assert(self, assert_: Assert, p: P) -> Optional[T]:
         a = cast(Assert, super().visit_assert(assert_, p))

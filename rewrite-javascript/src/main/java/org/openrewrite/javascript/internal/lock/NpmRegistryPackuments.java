@@ -19,10 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.npm.JsonParseEvenBetterErrors;
 import org.openrewrite.javascript.internal.lock.npm.NpmRejection;
+import org.openrewrite.javascript.internal.lock.npm.NpmOptions;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.internal.registry.RegistryTransport;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,11 +38,35 @@ public final class NpmRegistryPackuments implements PackumentSource {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
+    private final NpmRegistryClient unbound;
+    private final Map<String, String> environment;
     private final Map<String, Map<String, Object>> parsed = new HashMap<>();
 
     public NpmRegistryPackuments(NodeRegistries registries, NpmRegistryClient client) {
+        this(registries, client, java.util.Collections.emptyMap());
+    }
+
+    NpmRegistryPackuments(NodeRegistries registries, NpmRegistryClient client, Map<String, String> environment) {
+        this.environment = environment;
+        this.unbound = client;
         this.registries = registries;
-        this.client = client;
+        this.client = client.withTransport(new RegistryTransport(
+                registries.getHttpsProxy() != null ? registries.getHttpsProxy() : registries.getProxy(),
+                registries.getHttpsProxy() != null ? registries.getHttpsProxy() : registries.getProxy(),
+                registries.getNoProxy()));
+    }
+
+    private NpmRegistryPackuments(NodeRegistries registries, NpmRegistryClient unbound,
+                                  Map<String, String> environment, RegistryTransport transport) {
+        this.registries = registries;
+        this.unbound = unbound;
+        this.environment = environment;
+        this.client = unbound.withTransport(transport);
+    }
+
+    @Override
+    public PackumentSource withOptions(NpmOptions options) {
+        return new NpmRegistryPackuments(registries, unbound, environment, options.transport(environment));
     }
 
     @Override

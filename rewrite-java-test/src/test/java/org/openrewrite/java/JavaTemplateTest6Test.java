@@ -17,6 +17,8 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -168,6 +170,54 @@ class JavaTemplateTest6Test implements RewriteTest {
               class Test {
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9520")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "interface Wrapper<T>",
+      "class Wrapper<T>",
+      "interface Wrapper",
+      "class Wrapper",
+      "interface Wrapper<T> extends java.util.function.Supplier<T>",
+      "abstract class Wrapper<T> extends java.util.AbstractList<T> implements java.util.function.Supplier<T>",
+      "interface Wrapper extends java.util.function.Supplier<String>",
+      "abstract class Wrapper extends java.util.AbstractList<String> implements java.util.function.Supplier<String>"
+    })
+    void addImplementsClause(String declaration) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if (TypeUtils.isAssignableTo("java.io.Serializable", classDecl.getType())) {
+                      return classDecl;
+                  }
+                  JavaType.FullyQualified original = classDecl.getType();
+                  J.ClassDeclaration result = JavaTemplate.builder("java.io.Serializable")
+                    .build()
+                    .apply(getCursor(), classDecl.getCoordinates().addImplementsClause());
+                  JavaType.FullyQualified updated = result.getType();
+                  assertThat(updated.getFullyQualifiedName()).isEqualTo(original.getFullyQualifiedName());
+                  assertThat(updated.getKind()).isEqualTo(original.getKind());
+                  assertThat(updated.getSupertype()).isSameAs(original.getSupertype());
+                  assertThat(updated.getTypeParameters()).containsExactlyElementsOf(original.getTypeParameters());
+                  assertThat(updated.getInterfaces()).hasSize(original.getInterfaces().size() + 1);
+                  assertThat(updated.getInterfaces().subList(0, original.getInterfaces().size()))
+                    .containsExactlyElementsOf(original.getInterfaces());
+                  assertThat(TypeUtils.isOfClassType(updated.getInterfaces().getLast(), "java.io.Serializable")).isTrue();
+                  if (original instanceof JavaType.Parameterized) {
+                      assertThat(updated).isInstanceOf(JavaType.Parameterized.class);
+                  }
+                  assertThat(result.getName()).isSameAs(classDecl.getName());
+                  return result;
+              }
+          })),
+          java(
+            declaration + " {\n}",
+            declaration + (declaration.contains(" extends ") || declaration.contains(" implements ") ? ", " :
+              declaration.startsWith("interface") ? " extends " : " implements ") + "java.io.Serializable {\n}"
           )
         );
     }

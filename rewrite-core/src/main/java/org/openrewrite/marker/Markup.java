@@ -22,6 +22,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.Recipe;
 import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ExceptionUtils;
@@ -42,6 +43,27 @@ public interface Markup extends Marker {
 
     @Nullable
     String getDetail();
+
+    /**
+     * The {@link Recipe#getName() name} of the recipe that added this markup, or {@code null} when unknown.
+     */
+    @Incubating(since = "8.94.0")
+    @Nullable
+    String getRecipeName();
+
+    @Incubating(since = "8.94.0")
+    Markup withRecipeName(@Nullable String recipeName);
+
+    /**
+     * The {@link Recipe#getInstanceName() instance name} of the recipe that added this markup, which tells apart
+     * instances of the same recipe with different options, or {@code null} when unknown.
+     */
+    @Incubating(since = "8.94.0")
+    @Nullable
+    String getRecipeInstanceName();
+
+    @Incubating(since = "8.94.0")
+    Markup withRecipeInstanceName(@Nullable String recipeInstanceName);
 
     @Override
     default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
@@ -85,7 +107,8 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T markup(T t, Markup markup) {
-        return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
+        Markup attributed = MarkupAttribution.attribute(markup);
+        return t.withMarkers(t.getMarkers().compute(attributed, (s1, s2) -> s1 == null ? s2 : s1));
     }
 
     @Value
@@ -100,18 +123,32 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         String detail;
 
+        @Nullable
+        String recipeName;
+
+        @Nullable
+        String recipeInstanceName;
+
         public Error(UUID id, Throwable exception) {
             this.id = id;
             Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
             this.message = cause.getMessage();
             this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
+            this.recipeName = null;
+            this.recipeInstanceName = null;
+        }
+
+        public Error(UUID id, String message, String detail) {
+            this(id, message, detail, null, null);
         }
 
         @JsonCreator
-        public Error(UUID id, String message, String detail) {
+        public Error(UUID id, String message, String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
+            this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
         }
 
         @Override
@@ -123,10 +160,12 @@ public interface Markup extends Marker {
 
         @Override
         public Error rpcReceive(Error before, RpcReceiveQueue q) {
-            return before
+            Error after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Error) MarkupAttribution.attribute(after) : after;
         }
     }
 
@@ -142,18 +181,32 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         String detail;
 
+        @Nullable
+        String recipeName;
+
+        @Nullable
+        String recipeInstanceName;
+
         public Warn(UUID id, Throwable exception) {
             this.id = id;
             Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
             this.message = cause.getMessage();
             this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
+            this.recipeName = null;
+            this.recipeInstanceName = null;
+        }
+
+        public Warn(UUID id, String message, String detail) {
+            this(id, message, detail, null, null);
         }
 
         @JsonCreator
-        public Warn(UUID id, String message, String detail) {
+        public Warn(UUID id, String message, String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
+            this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
         }
 
         @Override
@@ -165,10 +218,12 @@ public interface Markup extends Marker {
 
         @Override
         public Warn rpcReceive(Warn before, RpcReceiveQueue q) {
-            return before
+            Warn after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Warn) MarkupAttribution.attribute(after) : after;
         }
     }
 
@@ -184,6 +239,25 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         @Nullable
         String detail;
+
+        @Nullable
+        String recipeName;
+
+        @Nullable
+        String recipeInstanceName;
+
+        public Info(UUID id, String message, @Nullable String detail) {
+            this(id, message, detail, null, null);
+        }
+
+        @JsonCreator
+        public Info(UUID id, String message, @Nullable String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
+            this.id = id;
+            this.message = message;
+            this.detail = detail;
+            this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
+        }
 
         @Override
         public String getMessage() {
@@ -204,10 +278,12 @@ public interface Markup extends Marker {
 
         @Override
         public Info rpcReceive(Info before, RpcReceiveQueue q) {
-            return before
+            Info after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Info) MarkupAttribution.attribute(after) : after;
         }
     }
 
@@ -223,6 +299,25 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         @Nullable
         String detail;
+
+        @Nullable
+        String recipeName;
+
+        @Nullable
+        String recipeInstanceName;
+
+        public Debug(UUID id, String message, @Nullable String detail) {
+            this(id, message, detail, null, null);
+        }
+
+        @JsonCreator
+        public Debug(UUID id, String message, @Nullable String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
+            this.id = id;
+            this.message = message;
+            this.detail = detail;
+            this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
+        }
 
         @Override
         public String getMessage() {
@@ -243,10 +338,12 @@ public interface Markup extends Marker {
 
         @Override
         public Debug rpcReceive(Debug before, RpcReceiveQueue q) {
-            return before
+            Debug after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Debug) MarkupAttribution.attribute(after) : after;
         }
     }
 }

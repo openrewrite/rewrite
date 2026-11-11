@@ -160,15 +160,13 @@ public class ChangeValue extends Recipe {
     }
 
     private static boolean containsHeredoc(Expression expression) {
-        AtomicBoolean found = new AtomicBoolean();
-        new HclIsoVisitor<AtomicBoolean>() {
+        return new HclIsoVisitor<AtomicBoolean>() {
             @Override
             public Hcl.HeredocTemplate visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, AtomicBoolean found) {
                 found.set(true);
                 return heredocTemplate;
             }
-        }.visit(expression, found);
-        return found.get();
+        }.reduce(expression, new AtomicBoolean()).get();
     }
 
     private static @Nullable Expression parse(String value) {

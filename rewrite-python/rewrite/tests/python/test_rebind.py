@@ -19,7 +19,7 @@ import dataclasses
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import pytest
 
@@ -215,6 +215,25 @@ def test_a_member_read_through_its_module_is_attributed_as_a_parse_of_the_result
         '''
         import acme_common.http as h
         client = h.HttpClient()
+        ''',
+    )
+
+
+@requires_ty
+def test_a_function_local_move_renames_the_class_its_import_names():
+    # A parse names `HttpClient` after the private module the package re-exports it from.
+    _assert_attributed_as_parsed(
+        [ChangeImport(old_module='acme_common.http', old_name='HttpClient', new_module='legacy_http',
+                      new_name='Http')],
+        '''
+        def send(c) -> None:
+            from acme_common.http import HttpClient
+            x: HttpClient = c
+        ''',
+        '''
+        def send(c) -> None:
+            from legacy_http import Http
+            x: Http = c
         ''',
     )
 
@@ -417,9 +436,14 @@ def test_a_second_binding_of_the_member_stays_and_keeps_its_types():
 def _visiting(record: List[Optional[str]], *calls: Any) -> RecipeSpec:
     """A spec whose recipe makes ``calls`` on visiting a file, recording what each answers."""
 
+    visited: Set[Path] = set()
+
     class Calls(PythonVisitor[Any]):
         def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
-            record.extend(call(self) for call in calls)
+            answers = [call(self) for call in calls]
+            if cu.source_path not in visited:
+                visited.add(cu.source_path)
+                record.extend(answers)
             return cu
 
     return RecipeSpec(recipe=from_visitor(Calls()), type_attribution=False)
@@ -468,11 +492,12 @@ def test_the_moved_binding_keeps_its_name_where_the_new_one_is_spelled():
             def f(HttpClient):
                 return Http(HttpClient)
             '''))
-    # Nor is it one where a rebind queued earlier in the visit moves that import away.
-    _visiting(answers,
-              lambda v: maybe_rebind(v, 'acme', 'other', from_member='HttpClient'),
-              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
-                                     to_member='HttpClient')).rewrite_run(
+    # Nor is it one where a rebind queued earlier in the visit moves that import away. A second run
+    # moves the import the first run bound on to `other` too, so this checks the first run alone.
+    dataclasses.replace(_visiting(answers,
+                                  lambda v: maybe_rebind(v, 'acme', 'other', from_member='HttpClient'),
+                                  lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
+                                                         to_member='HttpClient')), cycles=1).rewrite_run(
         python(
             '''
             from acme import HttpClient
@@ -564,9 +589,11 @@ def test_a_queued_module_import_claims_its_name():
 
 
 def test_the_answered_module_is_imported_where_the_caller_writes_the_reference():
+    answers: List[Optional[str]] = []
+
     class WritesTheAnswer(PythonVisitor[Any]):
         def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
-            assert maybe_rebind(self, 'legacy', 'acme', from_member='Http') == 'acme.Http'
+            answers.append(maybe_rebind(self, 'legacy', 'acme', from_member='Http'))
             return super().visit_compilation_unit(cu, p)
 
         def visit_method_invocation(self, method: Any, p: Any) -> Any:
@@ -585,6 +612,7 @@ def test_the_answered_module_is_imported_where_the_caller_writes_the_reference()
             import acme
             h = acme.Http()
             '''))
+    assert answers[0] == 'acme.Http'
 
 
 def test_the_import_a_move_rewrites_is_the_one_binding_it():

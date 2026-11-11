@@ -84,7 +84,7 @@ public class TypeValidation {
     private boolean dependencyModel = true;
 
     /**
-     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
      */
     @Deprecated
     @Builder.Default

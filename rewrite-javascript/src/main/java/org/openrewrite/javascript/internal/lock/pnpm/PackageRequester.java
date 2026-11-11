@@ -148,11 +148,16 @@ final class PackageRequester {
 
     PackageResponse requestPackage(ResolveDependencies.WantedDependency wantedDependency,
                                    RequestPackageOptions options) {
+        if (!npmResolver.getRelease().atLeast(11, 0, 0) &&
+            Pnpm10Profile.unsupportedSpecifier(wantedDependency.getBareSpecifier())) {
+            throw new CannotKnow(Pnpm10Profile.reason("dependency protocol " + wantedDependency.getBareSpecifier()));
+        }
         ResolveDependencies.InfoFromLockfile currentPkg = options.currentPkg;
         Map<String, @Nullable Object> resolution = currentPkg == null ? null : currentPkg.getResolution();
         String pkgId = currentPkg == null ? null : currentPkg.getPkgId();
         PreferredVersions.ByName preferredVersions = options.preferredVersions;
         if (resolution != null && options.update == null && currentPkg.getName() != null &&
+            npmResolver.getRelease().prefersTheCurrentPackageVersion() &&
             currentPkg.getVersion() != null) {
             Map<String, Map<String, PreferredVersions.Selector>> own = preferredVersions == null ?
                     new LinkedHashMap<>() : preferredVersions.spreadOwn();
@@ -254,7 +259,11 @@ final class PackageRequester {
             putIfPresent(manifest, "engines", snapshot.getEngines());
             putIfPresent(manifest, "cpu", snapshot.getCpu());
             putIfPresent(manifest, "os", snapshot.getOs());
-            putIfPresent(manifest, "libc", snapshot.getLibc());
+            // Older pnpm's normalizeBundledManifest omits libc. A locked optional package is re-resolved
+            // against abbreviated metadata before 10.28.2, so its old libc is not carried into the new snapshot.
+            if (npmResolver.getRelease().fetchesFullMetadataForOptionalDependencies()) {
+                putIfPresent(manifest, "libc", snapshot.getLibc());
+            }
             putIfPresent(manifest, "deprecated", snapshot.getDeprecated());
             putIfPresent(manifest, "bundledDependencies", snapshot.getBundledDependencies());
             putIfPresent(manifest, "peerDependencies", snapshot.getPeerDependencies());

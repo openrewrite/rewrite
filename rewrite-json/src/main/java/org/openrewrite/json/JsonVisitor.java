@@ -27,6 +27,8 @@ import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 
+import javax.annotation.CheckReturnValue;
+
 public class JsonVisitor<P> extends TreeVisitor<Json, P> {
 
     @Override
@@ -39,15 +41,18 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         return "json";
     }
 
+    @CheckReturnValue
     public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, P p) {
         return maybeAutoFormat(before, after, p, getCursor());
     }
 
+    @CheckReturnValue
     public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, P p, Cursor cursor) {
         return maybeAutoFormat(before, after, null, p, cursor);
     }
 
     @SuppressWarnings({"unchecked", "ConstantConditions"})
+    @CheckReturnValue
     public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, @Nullable Json stopAfter, P p, Cursor cursor) {
         if (before != after) {
             FormattingListener.beforeFormat(after, stopAfter, cursor);
@@ -56,15 +61,18 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         return after;
     }
 
+    @CheckReturnValue
     public <Y2 extends Json> Y2 autoFormat(Y2 y, P p) {
         return autoFormat(y, p, getCursor());
     }
 
+    @CheckReturnValue
     public <Y2 extends Json> Y2 autoFormat(Y2 y, P p, Cursor cursor) {
         return autoFormat(y, null, p, cursor);
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @CheckReturnValue
     public <Y2 extends Json> Y2 autoFormat(Y2 y, @Nullable Json stopAfter, P p, Cursor cursor) {
         FormattingListener.beforeFormat(y, stopAfter, cursor);
         return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);

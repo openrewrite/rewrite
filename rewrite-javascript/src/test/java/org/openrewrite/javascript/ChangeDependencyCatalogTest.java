@@ -84,7 +84,6 @@ class ChangeDependencyCatalogTest implements RewriteTest {
     void declinedAndMarkedUntilItSettles(String value, String protocol, @Nullable String newVersion, String remedy) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("acme-logger", "acme-log", newVersion, null))
-            .cycles(2).expectedCyclesThatMakeChanges(1)
             .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
                 assertThat(rows.get(0).getProtocol()).isEqualTo(protocol);
@@ -213,6 +212,7 @@ class ChangeDependencyCatalogTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
               new ChangeDependency("left-pad", "pad-left", "^2.0.0", null))
+            // the addition restores what the change of the previous cycle renamed away
             .cycles(1).expectedCyclesThatMakeChanges(1),
           packageJson("""
             {

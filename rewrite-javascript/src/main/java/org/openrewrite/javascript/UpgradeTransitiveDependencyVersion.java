@@ -31,9 +31,7 @@ import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
-import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -86,7 +84,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined, packageName));
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined, packageName),
+                packageName);
     }
 
     @Override
@@ -118,10 +117,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         try {
             pm = decision.getPackageManager();
         } catch (Rejected e) {
-            decision.decline(String.valueOf(e.getMessage()));
+            decision.decline(ctx, String.valueOf(e.getMessage()));
             return;
         }
-        if (pm == null || !resolves(decision.getManifest())) {
+        if (pm == null || !decision.resolves()) {
             return;
         }
         Path path = decision.getPath();
@@ -130,13 +129,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         try {
             root = workspaceRoot(acc.scan, path, pm, rules);
         } catch (Rejected e) {
-            decision.decline(String.valueOf(e.getMessage()));
+            decision.decline(ctx, String.valueOf(e.getMessage()));
             return;
         }
         if (!root.equals(path)) {
             if (!acc.holds(root)) {
-                decision.decline("the override belongs in the workspace root's " + root +
-                                 ", which is not a package.json the recipe edits");
+                decision.decline(ctx, "the override belongs in the workspace root's " + root +
+                                      ", which is not a package.json the recipe edits");
             }
             return;
         }
@@ -148,7 +147,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             if (catalogs != null && catalogs.getPath().equals(workspaceManifest)) {
                 workspace = catalogs.print();
             } else if (acc.scan.paths.contains(workspaceManifest)) {
-                decision.cannotKnow(CannotKnow.unread(settingsFile));
+                decision.cannotKnow(ctx, CannotKnow.unread(settingsFile));
                 return;
             }
         }
@@ -158,7 +157,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         decision.describe(override.toString());
         String declined = override.declined();
         if (declined != null) {
-            decision.decline(declined);
+            decision.decline(ctx, declined);
             return;
         }
         boolean inWorkspace = override.getPlace() == OverridePlace.WORKSPACE_MANIFEST;
@@ -175,28 +174,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         }
         String outranked = override.outranked();
         if (outranked != null) {
-            decision.decline(outranked);
+            decision.decline(ctx, outranked);
         }
         if (inWorkspace) {
-            decision.editFileBeside(requireNonNull(settingsFile), c -> c instanceof NodeCatalogs.Pnpm ?
-                    override.from(manifest, c.print()).applyTo((NodeCatalogs.Pnpm) c) : null);
+            decision.editFileBeside(ctx, requireNonNull(settingsFile), c -> c instanceof NodeCatalogs.Pnpm ?
+                    override.from(c.print()).applyTo((NodeCatalogs.Pnpm) c) : null);
         } else {
             decision.editManifest(override::apply);
         }
-    }
-
-    // whether the lock the manifest's marker records resolves packageName; true when it records no resolutions at all
-    private boolean resolves(Json.Document manifest) {
-        NodeResolutionResult marker = manifest.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null || marker.getResolvedDependencies().isEmpty()) {
-            return true;
-        }
-        for (ResolvedDependency resolved : marker.getResolvedDependencies()) {
-            if (packageName.equals(resolved.getName())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // the declarations the override would win over unnamed: packageName through a value that is no version range,

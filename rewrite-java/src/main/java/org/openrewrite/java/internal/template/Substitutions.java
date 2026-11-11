@@ -19,10 +19,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.ParenthesizeVisitor;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
@@ -34,8 +36,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
-import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
 
 @RequiredArgsConstructor
 @ToString
@@ -50,6 +52,7 @@ public class Substitutions {
             "#{", "}", null);
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
+    private Collection<JavaType.GenericTypeVariable> genericTypeVariables = emptyList();
     private final Set<UUID> splicedParameterIds = new HashSet<>();
 
     /**
@@ -63,8 +66,18 @@ public class Substitutions {
                 new RandomizeIdVisitor<Integer>().visitNonNull(parameter, 0);
     }
 
+    public boolean isParameter(J j) {
+        for (Object parameter : parameters) {
+            if (parameter instanceof J && ((J) parameter).getId().equals(j.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
+        genericTypeVariables = generics.values();
         typeVariables.addAll(generics.values());
         AtomicInteger requiredParameters = new AtomicInteger(0);
         AtomicInteger index = new AtomicInteger(0);
@@ -154,7 +167,9 @@ public class Substitutions {
                 newObjectParameter(fqn, index) :
                 newPrimitiveParameter(fqn, index);
 
-        parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
+        // A spliced parameter takes the placeholder's whitespace and keeps its own comments
+        Space prefix = ((J) parameter).getPrefix();
+        parameters[index] = ((J) parameter).withPrefix(prefix.withWhitespace(""));
         return s;
     }
 
@@ -177,7 +192,7 @@ public class Substitutions {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
             } else {
-                return TypeUtils.toString(genericType.getBounds().get(0));
+                return toDenotableTypeName(genericType.getBounds().get(0));
             }
         }
         if (type instanceof JavaType.FullyQualified) {
@@ -191,13 +206,54 @@ public class Substitutions {
                 }
             }
         }
-        String typeName = TypeUtils.toString(type).replace("$", ".");
+        String typeName = toDenotableTypeName(type).replace("$", ".");
         if (containsLocalOrAnonymousClassName(typeName)) {
             // The type string contains a local or anonymous class name (e.g., "Map<String, Test.1Inner>")
             // which is not valid Java source code. Fall back to java.lang.Object for the entire type.
             return "java.lang.Object";
         }
         return typeName;
+    }
+
+    /**
+     * Like {@link TypeUtils#toString(JavaType)}, but writes each intersection type as its first bound,
+     * since an inferred intersection such as {@code Number & Comparable<...>} is not denotable as a
+     * type argument or wildcard bound.
+     */
+    private static String toDenotableTypeName(JavaType type) {
+        return toDenotableTypeName(type, new IdentityHashMap<>());
+    }
+
+    private static String toDenotableTypeName(JavaType type, IdentityHashMap<JavaType, Boolean> recursiveTypes) {
+        if (type instanceof JavaType.Intersection) {
+            List<JavaType> bounds = ((JavaType.Intersection) type).getBounds();
+            return bounds.isEmpty() ? "java.lang.Object" : toDenotableTypeName(bounds.get(0), recursiveTypes);
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            StringJoiner joiner = new StringJoiner(", ", "<", ">");
+            for (JavaType parameter : parameterized.getTypeParameters()) {
+                joiner.add(toDenotableTypeName(parameter, recursiveTypes));
+            }
+            return toDenotableTypeName(parameterized.getType(), recursiveTypes) + joiner;
+        } else if (type instanceof JavaType.Array) {
+            return toDenotableTypeName(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
+            if (!"?".equals(genericType.getName()) ||
+                genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT ||
+                genericType.getBounds().size() != 1) {
+                return TypeUtils.toString(genericType);
+            } else if (recursiveTypes.containsKey(genericType)) {
+                recursiveTypes.put(genericType, true);
+                return "?";
+            }
+            recursiveTypes.put(genericType, false);
+            String variance = genericType.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT ? "? extends " : "? super ";
+            String bound = toDenotableTypeName(genericType.getBounds().get(0), recursiveTypes);
+            boolean recursive = recursiveTypes.remove(genericType);
+            return recursive ? "?" : variance + bound;
+        }
+        return TypeUtils.toString(type);
     }
 
     private static boolean containsLocalOrAnonymousClassName(String typeName) {
@@ -302,13 +358,36 @@ public class Substitutions {
         return ListUtils.map(js, this::unsubstitute);
     }
 
+    @SuppressWarnings("unchecked")
+    public <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
+        return ListUtils.map(js, j -> (J2) toStatement(unsubstitute(j)));
+    }
+
     /**
-     * Resolve generic type variable identifiers in the template AST to their erasure.
+     * The tree that takes a statement's place. In Kotlin an expression stands as a statement only inside a
+     * wrapper the parser adds, and a substituted expression needs the same wrapper.
+     */
+    public J toStatement(J j) {
+        return j;
+    }
+
+    /**
+     * Parenthesizes a parameter or template result that takes the place of the tree at {@code cursor} where the
+     * template's language would otherwise group it differently.
+     */
+    public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
+        return ParenthesizeVisitor.maybeParenthesize(newTree, cursor);
+    }
+
+    /**
+     * Resolve identifiers of the type variables declared with {@code genericTypes()} to their erasure.
      * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
      * when T is unbounded, or the first bound's simple name when bounded.
+     * Type variables taken from a parameter's type belong to the code the template is applied to,
+     * so a template naming one keeps it.
      */
     public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
-        if (typeVariables.isEmpty()) {
+        if (genericTypeVariables.isEmpty()) {
             return j;
         }
         //noinspection unchecked
@@ -317,7 +396,7 @@ public class Substitutions {
             public J visitIdentifier(J.Identifier ident, Integer integer) {
                 if (ident.getType() instanceof JavaType.GenericTypeVariable) {
                     JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) ident.getType();
-                    for (JavaType.GenericTypeVariable tv : typeVariables) {
+                    for (JavaType.GenericTypeVariable tv : genericTypeVariables) {
                         // Only resolve when the identifier name matches the type variable name,
                         // i.e. the identifier IS the type reference (like T in T::toString),
                         // not a variable that happens to have type T (like e in e -> e.toString())
@@ -362,6 +441,16 @@ public class Substitutions {
                     return param;
                 }
                 return super.visitBlock(block, integer);
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Integer integer) {
+                JRightPadded<T> r = super.visitRightPadded(right, loc, integer);
+                if (r != null && loc == JRightPadded.Location.BLOCK_STATEMENT && r.getElement() instanceof J) {
+                    return r.withElement((T) toStatement((J) r.getElement()));
+                }
+                return r;
             }
 
             @Override

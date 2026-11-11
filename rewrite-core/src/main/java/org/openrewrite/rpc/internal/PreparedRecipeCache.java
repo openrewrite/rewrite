@@ -49,6 +49,38 @@ public class PreparedRecipeCache {
             };
         } else if (visitorName.startsWith("edit:")) {
             Recipe recipe = instantiated.get(visitorName.substring("edit:".length()));
+            if (recipe instanceof ScanningRecipe) {
+                ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
+                return (TreeVisitor<?, P>) new TreeVisitor<Tree, ExecutionContext>() {
+                    private @Nullable TreeVisitor<?, ExecutionContext> delegate;
+
+                    private TreeVisitor<?, ExecutionContext> delegate(ExecutionContext ctx) {
+                        if (delegate == null) {
+                            // Scan and generate store the accumulator on this recipe's cached root,
+                            // not on the edit visitor's cursor supplied by the remote scheduler.
+                            Object acc = scanningRecipe.getAccumulator(recipeCursors.computeIfAbsent(recipe,
+                                    r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
+                            delegate = scanningRecipe.getVisitor(acc);
+                        }
+                        return delegate;
+                    }
+
+                    @Override
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        return delegate(ctx).isAcceptable(sourceFile, ctx);
+                    }
+
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+                        return delegate(ctx).visit(tree, ctx, parent);
+                    }
+
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        return delegate(ctx).visit(tree, ctx);
+                    }
+                };
+            }
             return (TreeVisitor<?, P>) recipe.getVisitor();
         }
 

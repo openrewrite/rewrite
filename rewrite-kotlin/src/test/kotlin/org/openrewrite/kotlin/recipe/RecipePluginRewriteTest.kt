@@ -47,20 +47,7 @@ import org.openrewrite.java.Assertions.java
 class RecipePluginRewriteTest : RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(loadCompiledRecipe(
-            source = """
-                import org.openrewrite.recipe
-                val UseUppercase = recipe(
-                    displayName = "Replace lowercase with uppercase",
-                    description = "..."
-                ) {
-                    edit {
-                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
-                    }
-                }
-            """.trimIndent(),
-            propertyName = "UseUppercase",
-        ))
+        spec.recipe(useUppercase)
         // The synthesized `<Name>$KtRecipe` class lives in the
         // kotlin-compile-testing classloader, not the test's. Jackson's
         // class-id deserializer can't resolve it. The recipe still executes
@@ -1270,7 +1257,6 @@ class RecipePluginRewriteTest : RewriteTest {
                 }
                 """.trimIndent(),
                 """
-                import java.util.Arrays;
                 import java.util.List;
                 class A {
                     List<Object> two = List.of(1, 2);
@@ -1342,7 +1328,6 @@ class RecipePluginRewriteTest : RewriteTest {
                 }
                 """.trimIndent(),
                 """
-                import java.util.Arrays;
                 import java.util.List;
                 class A {
                     List<Object> xs = List.of(1, 2, 3);
@@ -1771,14 +1756,34 @@ class RecipePluginRewriteTest : RewriteTest {
         )
     }
 
-    private fun loadCompiledRecipe(source: String, propertyName: String, packageName: String = ""): Recipe {
-        val result = RecipePluginCompileFixture.compile(source)
-        check(result.exitOk()) { "compile failed:\n${result.messages}" }
-        val topLevelClass = result.classLoader.loadClass(
-            if (packageName.isEmpty()) "RecipesKt" else "$packageName.RecipesKt"
-        )
-        val getter = topLevelClass.getDeclaredMethod("get" + propertyName.replaceFirstChar { it.uppercase() })
-        getter.isAccessible = true
-        return getter.invoke(null) as Recipe
+    companion object {
+        // defaults(spec) runs for every rewriteRun, including those that bring their own recipe, so compile this once
+        private val useUppercase: Recipe by lazy {
+            loadCompiledRecipe(
+                source = """
+                    import org.openrewrite.recipe
+                    val UseUppercase = recipe(
+                        displayName = "Replace lowercase with uppercase",
+                        description = "..."
+                    ) {
+                        edit {
+                            rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                        }
+                    }
+                """.trimIndent(),
+                propertyName = "UseUppercase",
+            )
+        }
+
+        private fun loadCompiledRecipe(source: String, propertyName: String, packageName: String = ""): Recipe {
+            val result = RecipePluginCompileFixture.compile(source)
+            check(result.exitOk()) { "compile failed:\n${result.messages}" }
+            val topLevelClass = result.classLoader.loadClass(
+                if (packageName.isEmpty()) "RecipesKt" else "$packageName.RecipesKt"
+            )
+            val getter = topLevelClass.getDeclaredMethod("get" + propertyName.replaceFirstChar { it.uppercase() })
+            getter.isAccessible = true
+            return getter.invoke(null) as Recipe
+        }
     }
 }

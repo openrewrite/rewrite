@@ -35,5 +35,8 @@ public class UvLockManifest {
     List<UvLockRequirement> constraints;
 
     @Nullable
+    List<UvLockRequirement> overrides;
+
+    @Nullable
     List<UvLockRequirement> buildConstraints;
 }

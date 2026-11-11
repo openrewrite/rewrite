@@ -176,7 +176,7 @@ public class RemoveNjsprojFromSolution extends Recipe {
             if (t.getContent() == null) {
                 return t;
             }
-            return t.withContent(ListUtils.map(t.getContent(), c -> isNjsprojProject(c) ? null : c));
+            return t.withContent(ListUtils.filter(t.getContent(), c -> !isNjsprojProject(c)));
         }
 
         private static boolean isNjsprojProject(Content content) {
