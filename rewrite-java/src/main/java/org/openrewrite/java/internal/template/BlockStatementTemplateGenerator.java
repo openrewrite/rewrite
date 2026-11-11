@@ -851,18 +851,11 @@ public class BlockStatementTemplateGenerator {
                 if (variable.getTypeExpression() != null) {
                     varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
-                if (nv.getType() instanceof JavaType.Array) {
-                    if (nv.getInitializer() instanceof J.NewArray && !((J.NewArray) nv.getInitializer()).getDimensions().isEmpty()) {
-                        J.NewArray na = (J.NewArray) nv.getInitializer();
-                        na.getDimensions().forEach(d -> varBuilder.append("[]"));
-                    } else {
-                        varBuilder.append("[]");
-                    }
-                }
                 varBuilder.append(" ");
             }
 
             varBuilder.append(nv.getSimpleName());
+            nv.getDimensionsAfterName().forEach(d -> varBuilder.append("[]"));
 
             JavaType type = nv.getType();
             if (initializer && type != null) {

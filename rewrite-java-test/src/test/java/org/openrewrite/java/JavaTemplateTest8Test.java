@@ -911,4 +911,48 @@ class JavaTemplateTest8Test implements RewriteTest {
           .hasMessageContaining("requires a template that produces an `if`");
     }
 
+    @Test
+    void contextSensitiveTemplateGivesArrayVariablesTheirDeclaredDimensions() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("clear")) {
+                      return JavaTemplate.builder("reset(a, b, c, d)")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  private int[] a, b[];
+                  private int c[];
+                  void reset(int[] a, int[][] b, int[] c, int[][] d) {}
+                  void clear() {}
+                  void test() {
+                      int[][] d = new int[2][3];
+                      clear();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private int[] a, b[];
+                  private int c[];
+                  void reset(int[] a, int[][] b, int[] c, int[][] d) {}
+                  void clear() {}
+                  void test() {
+                      int[][] d = new int[2][3];
+                      reset(a, b, c, d);
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }
