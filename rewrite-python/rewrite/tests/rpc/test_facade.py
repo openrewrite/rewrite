@@ -31,6 +31,9 @@ class _FakeChildren:
     def hosting(self):
         return False
 
+    def hosts_every_bundle(self):
+        return False
+
     def request(self, bundle, method, params):
         self.calls.append(("request", bundle, method))
         if method == "PrepareRecipe":
@@ -428,6 +431,7 @@ def _isolated_hub(monkeypatch, server):
                  "_hub_send_checkpoint", "_hub_recv_checkpoint", "_hub_last_served", "local_objects",
                  "_ref_checkpoints", "_local_ref_checkpoints"):
         monkeypatch.setattr(server, name, {})
+    monkeypatch.setattr(server, "_hub_deleted", set())
 
 
 def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_child(monkeypatch):
@@ -712,9 +716,11 @@ def test_reset_clears_the_hub_tables_too(monkeypatch):
     server._hub_recv_refs["A"] = {1: object()}
     server._hub_send_checkpoint[("A", "T")] = 0
     server._hub_recv_checkpoint[("A", "T")] = -1
+    server._hub_deleted.add("D")
 
     server.handle_reset({})
 
+    assert not server._hub_deleted
     assert not server._hub_tree
     assert not server._hub_served
     assert not server._hub_send_refs
@@ -978,3 +984,56 @@ def test_the_data_table_store_reaches_a_bundle_hosted_in_this_process(monkeypatc
     assert server.handle_request(
         "SetDataTableStore", {"kind": "CSV", "outputDir": str(tmp_path / "tables")}) is True
     assert isinstance(server._configured_data_table_store, CsvDataTableStore)
+
+
+class _DeletingVisitChild(_FakeChildren):
+    def request(self, bundle, method, params):
+        if method == "Visit":
+            return {"modified": True}
+        if method == "GetObject":
+            return [{"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+        return super().request(bundle, method, params)
+
+    def broadcast_evict(self, params): ...
+
+
+@pytest.mark.parametrize("visitor", ["edit:delete", "Delete"], ids=["child", "built-in"])
+def test_a_single_visit_deletion_reaches_the_host_until_its_evict(monkeypatch, tmp_path, visitor):
+    import rewrite.rpc.server as server
+    from rewrite.python.visitor import PythonVisitor
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _Delete(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            return None
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+    fetched = []
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "remote_objects", {})
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    # Java goes on holding the undeleted file until its Evict.
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: fetched.append(obj_id) or cu)
+    monkeypatch.setattr(server, "_VISITOR_REGISTRY", {"Delete": lambda options: _Delete()})
+    facade = Facade(_DeletingVisitChild(), hub_pull=server._hub_pull_child_edit,
+                    hub_drop=server._hub_forget, local_visit=server._hub_local_visit,
+                    is_local_visitor=server._hub_is_local_visitor)
+    facade._bundle_by_visitor["edit:delete"] = "pkg"
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", facade)
+
+    visit = {"treeId": tree_id, "sourceFileType": sft, "visitor": visitor}
+    assert server.handle_request("Visit", visit) == {"modified": True}
+    assert server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft}) == [
+        {"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+    # Once Java has evicted the file, an id the facade does not hold is a lost tree, not a deletion.
+    server.handle_request("Evict", {"id": tree_id})
+    fetched.clear()
+    server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft})
+    assert fetched == [tree_id]
