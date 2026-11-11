@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -115,7 +116,8 @@ class ReorderMethodArgumentsTest implements RewriteTest {
               package a;
               public class A {
                  public void foo(String s, Integer n, Object... o) {}
-                 public void foo(String s, Object... o) {}
+                 // what the reordered call invokes, as no method takes varargs before another parameter
+                 public void foo(String s, Object o1, Object o2, Integer n) {}
               }
               """
           ),
@@ -135,6 +137,119 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  A a;
                  public void test() {
                      a.foo("mystring", "a", "b", 0);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void reorderASingleVarargsArgumentBeforeAnother() {
+        rewriteRun(
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,..)",
+            new String[]{"o", "s"}, null, null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                 public void foo(String s, Object... o) {}
+                 public void foo(Object o, String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo("mystring", 0);
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo(0, "mystring");
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void reorderArgumentsBeforeVarargs() {
+        rewriteRun(
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(Integer,String,..)",
+            new String[]{"s", "n", "o"}, null, null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                 public void foo(Integer n, String s, Object... o) {}
+                 public void foo(String s, Integer n, Object... o) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo(0, "mystring", "a", "b");
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo("mystring", 0, "a", "b");
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void reorderWithFewerOldParameterNamesThanTheVarargsMethodHas() {
+        rewriteRun(
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(Integer,String,..)",
+              new String[]{"s", "n"}, new String[]{"n", "s"}, null, null))
+            // the reordered call's type leaves out the parameter that the old parameter names don't name
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+          java(
+            """
+              package a;
+              public class A {
+                 public void foo(Integer n, String s, Object... o) {}
+                 public void foo(String s, Integer n, Object... o) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo(0, "mystring");
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo("mystring", 0);
                  }
               }
               """

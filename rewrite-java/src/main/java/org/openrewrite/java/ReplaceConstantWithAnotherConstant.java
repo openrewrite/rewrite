@@ -53,6 +53,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private final String constantName;
         private final JavaType.FullyQualified existingOwningTypeFqn;
         private final JavaType.FullyQualified newOwningType;
+        private final JavaType.FullyQualified newOwningEnumType;
         private final JavaType.FullyQualified newTargetType;
         private final String newConstantName;
 
@@ -61,6 +62,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             this.constantName = existingFullyQualifiedConstantName.substring(existingFullyQualifiedConstantName.lastIndexOf('.') + 1);
             this.existingOwningTypeFqn = JavaType.ShallowClass.build(existingOwningType);
             this.newOwningType = JavaType.ShallowClass.build(fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.')));
+            this.newOwningEnumType = new JavaType.ShallowClass(null, 1, newOwningType.getFullyQualifiedName(),
+                    JavaType.FullyQualified.Kind.Enum, null, null, newOwningType.getOwningClass(), null, null, null, null);
             this.newTargetType = JavaType.ShallowClass.build(fullyQualifiedConstantName);
             this.newConstantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         }
@@ -94,17 +97,17 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
             if (expression instanceof J.Identifier) {
                 J.Identifier identifier = (J.Identifier) expression;
+                identifier = identifier
+                        .withSimpleName(newConstantName)
+                        .withFieldType(newFieldType(fieldType))
+                        .withType(newType(identifier.getType()));
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
-                    return identifier
-                            .withSimpleName(newConstantName)
-                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName));
+                    return identifier;
                 }
                 return new J.FieldAccess(Tree.randomId(), identifier.getPrefix(), Markers.EMPTY,
                         FullyQualifyTypeReference.qualifiedName(newOwningType, Space.EMPTY, emptyList()),
-                        JLeftPadded.build(identifier.withPrefix(Space.EMPTY)
-                                .withSimpleName(newConstantName)
-                                .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))),
+                        JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
                 if (hasNoConflictingImport) {
@@ -121,20 +124,31 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     target = (((J.FieldAccess) target).getName()).withType(newOwningType)
                             .withSimpleName(newOwningType.getClassName());
                 }
-                JavaType nameType = name.getType();
                 name = name
-                        .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
+                        .withFieldType(newFieldType(fieldType))
                         .withSimpleName(newConstantName)
-                        .withType(TypeUtils.isOfClassType(nameType, existingOwningType) ? newOwningType : nameType);
-                // manipulate the fieldAccess type to also handle enums
-                if (TypeUtils.isOfClassType(fieldAccess.getType(), existingOwningType)) {
-                    fieldAccess = fieldAccess.withType(newOwningType);
-                }
+                        .withType(newType(name.getType()));
                 return fieldAccess
+                        .withType(newType(fieldAccess.getType()))
                         .withTarget(target)
                         .withName(name);
             }
             return expression;
+        }
+
+        private JavaType.Variable newFieldType(JavaType.Variable fieldType) {
+            return fieldType.withOwner(newOwningType).withName(newConstantName).withType(newType(fieldType.getType()));
+        }
+
+        /**
+         * An enum constant's type is its enum, so the one replacing it has the new enum's type. Other constants keep
+         * theirs, as one of a class's own type may be replaced with one of that type held elsewhere.
+         * The new type is of kind enum, which is how a later replacement of the new constant recognizes it as one.
+         */
+        private @Nullable JavaType newType(@Nullable JavaType type) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+            return fq != null && fq.getKind() == JavaType.FullyQualified.Kind.Enum &&
+                   TypeUtils.isOfClassType(type, existingOwningType) ? newOwningEnumType : type;
         }
 
         private boolean isConstant(JavaType.@Nullable Variable varType) {

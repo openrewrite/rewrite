@@ -28,6 +28,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -88,6 +89,14 @@ public class JavaTemplateParser {
         this.contextSensitive = contextSensitive;
         this.statementTemplateGenerator = statementTemplateGenerator;
         this.annotationTemplateGenerator = annotationTemplateGenerator;
+    }
+
+    public String getBindType() {
+        return statementTemplateGenerator.getBindType();
+    }
+
+    public boolean isContextSensitive() {
+        return contextSensitive;
     }
 
     /**
@@ -198,16 +207,45 @@ public class JavaTemplateParser {
                                                         Collection<JavaType.GenericTypeVariable> typeVariables,
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
-        return cacheIfContextFree(cursor,
+        List<J2> templated = cacheIfContextFree(cursor,
                 new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(cursor, stub);
-                    List<J2> templated = statementTemplateGenerator.listTemplatedTrees(cu, expected);
-                    UndeclaredTemplateReferences.check(cu, templated, imports);
-                    return templated;
+                    List<J2> trees = statementTemplateGenerator.listTemplatedTrees(cu, expected);
+                    UndeclaredTemplateReferences.check(cu, trees, imports);
+                    return trees;
                 });
+        return contextSensitive ? templated : ownedByEnclosingClass(cursor, templated);
+    }
+
+    /**
+     * A context-free stub declares the template's methods in a class {@code Template} of its own, but once they land
+     * in a class, that class declares them.
+     */
+    private static <J2 extends J> List<J2> ownedByEnclosingClass(Cursor cursor, List<J2> templated) {
+        Iterator<Object> classes = cursor.getPath(v -> v instanceof J.ClassDeclaration ||
+                                                       v instanceof J.NewClass && ((J.NewClass) v).getBody() != null);
+        Object enclosing = classes.hasNext() ? classes.next() : null;
+        // an anonymous class has no declaration whose type to take
+        JavaType.FullyQualified owner = enclosing instanceof J.ClassDeclaration ?
+                ((J.ClassDeclaration) enclosing).getType() : null;
+        if (owner == null) {
+            return templated;
+        }
+        JavaVisitor<Integer> reowner = new JavaVisitor<Integer>() {
+            @Override
+            public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
+                if (javaType instanceof JavaType.Method &&
+                    "Template".equals(((JavaType.Method) javaType).getDeclaringType().getFullyQualifiedName())) {
+                    return ((JavaType.Method) javaType).withDeclaringType(owner);
+                }
+                return javaType;
+            }
+        };
+        //noinspection unchecked
+        return ListUtils.map(templated, j -> (J2) reowner.visitNonNull(j, 0));
     }
 
     public J.MethodInvocation parseMethod(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {

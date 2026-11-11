@@ -20,7 +20,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Objects;
@@ -48,7 +51,9 @@ class JavaTemplateGenericsTest implements RewriteTest {
           .build();
 
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template types an argument by the position it is moved from
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().getFirst();
@@ -556,6 +561,452 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableTakesTheTypeOfTheArgumentDeclaredWithIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate first = JavaTemplate.builder("#{any(java.util.List<T>)}.get(0)")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("next".equals(method.getSimpleName()) && method.getSelect() instanceof J.MethodInvocation iterator) {
+                      return first.apply(getCursor(), method.getCoordinates().replace(), iterator.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  String first(List<String> list) {
+                      return list.iterator().next();
+                  }
+
+                  <T extends Number> int firstInt(List<T> list) {
+                      return list.iterator().next().intValue();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  String first(List<String> list) {
+                      return list.get(0);
+                  }
+
+                  <T extends Number> int firstInt(List<T> list) {
+                      return list.get(0).intValue();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeVariableThatArgumentsBindToDifferentTypesStaysUnbound() {
+        rewriteRun(
+          spec -> spec
+            // javac infers a common supertype of the arguments, which the template doesn't
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate both = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(T)})")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate first = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(java.util.List<? extends T>)}.get(0))")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("of".equals(method.getSimpleName())) {
+                        JavaTemplate template = method.getArguments().get(1).getType() instanceof JavaType.Parameterized ? first : both;
+                        return template.apply(getCursor(), method.getCoordinates().replace(),
+                          method.getArguments().get(0), method.getArguments().get(1));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> both(Integer i, Long l) {
+                      return List.of(i, l);
+                  }
+
+                  List<?> literal(Integer i) {
+                      return List.of("a", i);
+                  }
+
+                  List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
+                      return List.of(i, numbers);
+                  }
+
+                  List<?> wildcard(Integer i, List<Long> longs) {
+                      return List.of(i, longs);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> both(Integer i, Long l) {
+                      return java.util.Arrays.asList(i, l);
+                  }
+
+                  List<?> literal(Integer i) {
+                      return java.util.Arrays.asList("a", i);
+                  }
+
+                  List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
+                      return java.util.Arrays.asList(i, numbers.get(0));
+                  }
+
+                  List<?> wildcard(Integer i, List<Long> longs) {
+                      return java.util.Arrays.asList(i, longs.get(0));
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                for (Statement method : cu.getClasses().get(0).getBody().getStatements()) {
+                    J.Return asList = (J.Return) Objects.requireNonNull(((J.MethodDeclaration) method).getBody()).getStatements().get(0);
+                    JavaType.Parameterized list = (JavaType.Parameterized) ((J.MethodInvocation) asList.getExpression()).getType();
+                    assertThat(Objects.requireNonNull(list).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                }
+            })
+          )
+        );
+    }
+
+    @Test
+    void typeVariableTakesTheTypeOfAnExceptionTheMethodThrows() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate orElseThrow = JavaTemplate.builder(
+                  "java.util.Objects.requireNonNull(#{any(java.util.OptionalInt)}).orElseThrow(#{any(java.util.function.Supplier<X>)})")
+                .genericTypes("X extends java.lang.Throwable")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orElseThrow".equals(method.getSimpleName()) && method.getSelect() instanceof J.Identifier) {
+                      return orElseThrow.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.OptionalInt;
+              import java.util.function.Supplier;
+
+              class Test {
+                  int get(OptionalInt optional, Supplier<IllegalStateException> error) {
+                      return optional.orElseThrow(error);
+                  }
+              }
+              """,
+            """
+              import java.util.OptionalInt;
+              import java.util.function.Supplier;
+
+              class Test {
+                  int get(OptionalInt optional, Supplier<IllegalStateException> error) {
+                      return java.util.Objects.requireNonNull(optional).orElseThrow(error);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateKeepsTheTypeOfTheCodesTypeVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate valueUnlessEmpty = JavaTemplate.builder("#{any(java.util.List<T>)}.isEmpty() ? null : value")
+                .contextSensitive()
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("next".equals(method.getSimpleName()) && method.getSelect() instanceof J.MethodInvocation iterator) {
+                      return valueUnlessEmpty.apply(getCursor(), method.getCoordinates().replace(), iterator.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Box<T> {
+                  T value;
+
+                  Object valueUnlessEmpty(List<String> strings) {
+                      return strings.iterator().next();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Box<T> {
+                  T value;
+
+                  Object valueUnlessEmpty(List<String> strings) {
+                      return strings.isEmpty() ? null : value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldOfAClassTheTemplateReferencesKeepsItsOwnType() {
+        String box = "package com.example; public class Box<T> { public T value; }";
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(box))
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate value = JavaTemplate.builder("#{any(com.example.Box<T>)}.value")
+                  .genericTypes("T")
+                  .javaParser(JavaParser.fromJavaVersion().dependsOn(box))
+                  .build();
+
+                @Override
+                public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    if (fieldAccess.getTarget() instanceof J.MethodInvocation requireNonNull) {
+                        return value.apply(getCursor(), fieldAccess.getCoordinates().replace(), requireNonNull.getArguments().get(0));
+                    }
+                    return super.visitFieldAccess(fieldAccess, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import com.example.Box;
+
+              import java.util.Objects;
+
+              class Test {
+                  String value(Box<String> box) {
+                      return Objects.requireNonNull(box).value;
+                  }
+              }
+              """,
+            """
+              import com.example.Box;
+
+              import java.util.Objects;
+
+              class Test {
+                  String value(Box<String> box) {
+                      return box.value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeVariableTheTemplateNamesAsATypeStaysUnbound() {
+        rewriteRun(
+          spec -> spec
+            // the template prints its variable as its erasure, which the parser types the code with
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate copy = JavaTemplate.builder("new java.util.ArrayList<T>(#{any(java.util.List<T>)})")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("copyOf".equals(method.getSimpleName())) {
+                        return copy.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> copy(List<String> list) {
+                      return List.copyOf(list);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> copy(List<String> list) {
+                      return new java.util.ArrayList<Object>(list);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration copy = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.Return arrayList = (J.Return) Objects.requireNonNull(copy.getBody()).getStatements().get(0);
+                JavaType.Parameterized type = (JavaType.Parameterized) ((J.NewClass) Objects.requireNonNull(arrayList.getExpression())).getType();
+                assertThat(Objects.requireNonNull(type).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void typeVariableAStatementOfTheTemplateNamesAsATypeStaysUnboundInTheOthers() {
+        rewriteRun(
+          spec -> spec
+            // the template prints its variable as its erasure, which the parser types the code with
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate clearAndDeclare = JavaTemplate.builder(
+                    "java.util.Objects.requireNonNull(#{any(java.util.List<T>)}).clear();\njava.util.List<T> copy = null;")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    J.Block body = method.getBody();
+                    if (body == null || !body.getStatements().isEmpty()) {
+                        return method;
+                    }
+                    J.Identifier list = ((J.VariableDeclarations) method.getParameters().getFirst()).getVariables().getFirst().getName();
+                    return clearAndDeclare.apply(getCursor(), body.getCoordinates().firstStatement(), list);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  void clear(List<String> list) {
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  void clear(List<String> list) {
+                      java.util.Objects.requireNonNull(list).clear();
+                      java.util.List<Object> copy = null;
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration clear = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodInvocation clearCall = (J.MethodInvocation) Objects.requireNonNull(clear.getBody()).getStatements().get(0);
+                JavaType.Parameterized list = (JavaType.Parameterized) Objects.requireNonNull(clearCall.getSelect()).getType();
+                assertThat(Objects.requireNonNull(list).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void lambdaParameterOfAStatementTakesTheBoundType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate sort = JavaTemplate.builder("java.util.Collections.sort(#{any(java.util.List<T>)}, (a, b) -> 0);")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.Block body = method.getBody();
+                  if (body == null || !body.getStatements().isEmpty()) {
+                      return method;
+                  }
+                  J.Identifier list = ((J.VariableDeclarations) method.getParameters().getFirst()).getVariables().getFirst().getName();
+                  return sort.apply(getCursor(), body.getCoordinates().firstStatement(), list);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  void sort(List<String> list) {
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  void sort(List<String> list) {
+                      java.util.Collections.sort(list, (a, b) -> 0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeVariableOfAMethodTheTemplateReferencesKeepsItsOwnType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate nonNull = JavaTemplate.builder("#{any(java.util.List<T>)}.stream().map(java.util.Objects::requireNonNull)")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("stream".equals(method.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.Return) {
+                      return nonNull.apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+
+              class Test {
+                  Stream<String> nonNull(List<String> list) {
+                      return list.stream();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+
+              class Test {
+                  Stream<String> nonNull(List<String> list) {
+                      return list.stream().map(java.util.Objects::requireNonNull);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void memberReferenceToLambda() {
         //noinspection Convert2MethodRef
         rewriteRun(
@@ -616,7 +1067,9 @@ class JavaTemplateGenericsTest implements RewriteTest {
     void templateGenericDoesNotClobberCallSiteTypeVariable() {
         //noinspection unchecked
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the parser gives Optional's method a declaring type that depends on what it mapped before
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               final JavaTemplate before = JavaTemplate.builder("#{optional:any(java.util.Optional<T>)}.get()")
                 .bindType("T")
                 .genericTypes("T")

@@ -27,8 +27,10 @@ import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -286,7 +288,32 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
-                            return classDecl.withTypeParameters(typeParameters);
+                            J.ClassDeclaration c = classDecl.withTypeParameters(typeParameters);
+                            JavaType.Parameterized parameterized = TypeUtils.asParameterized(c.getType());
+                            JavaType.Class classType = TypeUtils.asClass(parameterized == null ? c.getType() : parameterized.getType());
+                            // A type parameter's name is untyped, so its variable is built from its bounds, without
+                            // an Object bound as the parser leaves that out
+                            List<JavaType> typeVariables = typeParameters.stream()
+                                    .filter(tp -> tp.getName() instanceof J.Identifier)
+                                    .map(tp -> {
+                                        List<JavaType> bounds = tp.getBounds() == null ? emptyList() :
+                                                tp.getBounds().stream().map(TypedTree::getType)
+                                                        .filter(b -> b != null && !TypeUtils.isObject(b))
+                                                        .collect(toList());
+                                        return new JavaType.GenericTypeVariable(null,
+                                                ((J.Identifier) tp.getName()).getSimpleName(), bounds.isEmpty() ?
+                                                JavaType.GenericTypeVariable.Variance.INVARIANT :
+                                                JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+                                    })
+                                    .collect(toList());
+                            if (classType != null && typeVariables.size() == typeParameters.size()) {
+                                // a generic class is typed with its type variables as its own type arguments
+                                classType = classType.withTypeParameters(typeVariables);
+                                JavaType.FullyQualified type = typeVariables.isEmpty() ? classType :
+                                        new JavaType.Parameterized(null, classType, typeVariables);
+                                c = c.withType(type).withName(c.getName().withType(type));
+                            }
+                            return c;
                         }
                     }
                 }
@@ -476,7 +503,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     }
                                 }
 
-                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes);
+                                Statement last = parameters.isEmpty() ? null : parameters.get(parameters.size() - 1);
+                                Set<Flag> flags = EnumSet.noneOf(Flag.class);
+                                flags.addAll(type.getFlags());
+                                if (last instanceof J.VariableDeclarations && ((J.VariableDeclarations) last).getVarargs() != null) {
+                                    flags.add(Flag.Varargs);
+                                } else {
+                                    flags.remove(Flag.Varargs);
+                                }
+                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes).withFlags(flags);
                             }
 
                             return method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
@@ -539,8 +574,17 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
+                    // The exception is a varargs method that still takes the new arguments, unless an overload takes
+                    // them by fixed arity, as javac only falls back on varargs when none does
                     JavaType.Method mt = method.getMethodType();
-                    if (m.getMethodType() == null && mt != null) {
+                    if (m.getMethodType() == null && mt != null && loc == METHOD_INVOCATION_ARGUMENTS &&
+                        varargsTakes(mt, m.getArguments())) {
+                        JavaType.Method overload = fixedArityOverload(mt, m.getArguments());
+                        // A listed overload lacks the generic declaring type and the receiver's type arguments that
+                        // the parser gives the call. Overloads are taken to return the same type.
+                        m = m.withMethodType(overload == null ? mt :
+                                overload.withDeclaringType(mt.getDeclaringType()).withReturnType(mt.getReturnType()));
+                    } else if (m.getMethodType() == null && mt != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
@@ -552,6 +596,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 })
                                 .collect(toList());
                         mt = mt.withParameterTypes(argTypes);
+                        if (mt.hasFlags(Flag.Varargs)) {
+                            // the patched method takes a parameter per argument
+                            Set<Flag> flags = EnumSet.copyOf(mt.getFlags());
+                            flags.remove(Flag.Varargs);
+                            mt = mt.withFlags(flags);
+                        }
                         m = m.withMethodType(mt);
                     }
                     if (m.getName().getType() != null) {
@@ -688,7 +738,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
                 try {
-                    return substitutions.unsubstituteStatements(ListUtils.map(js, substitutions::resolveTypeVariables));
+                    return substitutions.unsubstituteStatements(substitutions.resolveTypeVariables(js));
                 } finally {
                     substituted = true;
                 }
@@ -696,12 +746,61 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstitute(List<J2> js) {
                 try {
-                    return substitutions.unsubstitute(ListUtils.map(js, substitutions::resolveTypeVariables));
+                    return substitutions.unsubstitute(substitutions.resolveTypeVariables(js));
                 } finally {
                     substituted = true;
                 }
             }
         };
+    }
+
+    private static boolean varargsTakes(JavaType.Method method, List<Expression> arguments) {
+        List<JavaType> parameters = method.getParameterTypes();
+        JavaType.Array varargs = parameters.isEmpty() ? null : TypeUtils.asArray(parameters.get(parameters.size() - 1));
+        List<Expression> args = ListUtils.filter(arguments, a -> !(a instanceof J.Empty));
+        if (!method.hasFlags(Flag.Varargs) || varargs == null || args.size() < parameters.size() - 1) {
+            return false;
+        }
+        for (int i = 0; i < args.size(); i++) {
+            JavaType parameter = i < parameters.size() - 1 ? parameters.get(i) : varargs.getElemType();
+            if (!TypeUtils.isAssignableTo(parameter, args.get(i).getType())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The most specific overload of {@code varargs} that takes the arguments without varargs.
+     */
+    private static JavaType.@Nullable Method fixedArityOverload(JavaType.Method varargs, List<Expression> arguments) {
+        List<@Nullable JavaType> argumentTypes = new ArrayList<>(arguments.size());
+        for (Expression argument : arguments) {
+            if (!(argument instanceof J.Empty)) {
+                argumentTypes.add(argument.getType());
+            }
+        }
+        JavaType.Method overload = null;
+        for (JavaType.Method candidate : varargs.getDeclaringType().getMethods()) {
+            if (candidate.getName().equals(varargs.getName()) &&
+                takes(candidate.getParameterTypes(), argumentTypes) &&
+                (overload == null || takes(overload.getParameterTypes(), candidate.getParameterTypes()))) {
+                overload = candidate;
+            }
+        }
+        return overload;
+    }
+
+    private static boolean takes(List<JavaType> parameters, List<? extends @Nullable JavaType> types) {
+        if (parameters.size() != types.size()) {
+            return false;
+        }
+        for (int i = 0; i < parameters.size(); i++) {
+            if (!TypeUtils.isAssignableTo(parameters.get(i), types.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {

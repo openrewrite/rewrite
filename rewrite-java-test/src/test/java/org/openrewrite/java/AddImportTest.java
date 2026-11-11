@@ -1109,7 +1109,7 @@ class AddImportTest implements RewriteTest {
     @Test
     void doNotFoldNormalImportWithNamespaceConflict() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Iterator", null, false)))
             .beforeRecipe(addTypesToSourceSet("main")),
           srcMainJava(
             java(
@@ -1129,7 +1129,7 @@ class AddImportTest implements RewriteTest {
                 import java.awt.*; // contains a List class
                 import java.util.Collection;
                 import java.util.Collections;
-                import java.util.List;
+                import java.util.Iterator;
                 import java.util.Map;
                 import java.util.Set;
 

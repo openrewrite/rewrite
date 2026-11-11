@@ -22,12 +22,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -496,9 +500,16 @@ class JavaTemplateTest6Test implements RewriteTest {
                   if (!method.isAbstract()) {
                       return method;
                   }
-                  return JavaTemplate.<J.MethodDeclaration>apply("", getCursor(), method.getCoordinates().replaceBody())
+                  J.MethodDeclaration m = JavaTemplate.<J.MethodDeclaration>apply("", getCursor(), method.getCoordinates().replaceBody())
                     .withModifiers(emptyList())
                     .withReturnTypeExpression(method.getReturnTypeExpression().withPrefix(Space.EMPTY));
+                  JavaType.Method type = m.getMethodType();
+                  if (type == null) {
+                      return m;
+                  }
+                  Set<Flag> flags = EnumSet.copyOf(type.getFlags());
+                  flags.remove(Flag.Abstract);
+                  return m.withMethodType(type.withFlags(flags));
               }
           })),
           java(

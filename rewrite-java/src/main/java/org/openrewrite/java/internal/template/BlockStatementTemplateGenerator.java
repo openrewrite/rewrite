@@ -18,6 +18,7 @@ package org.openrewrite.java.internal.template;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
@@ -51,6 +52,7 @@ public class BlockStatementTemplateGenerator {
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
+    @Getter
     private final String bindType;
 
     public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
@@ -258,7 +260,10 @@ public class BlockStatementTemplateGenerator {
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
                    (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
+            // javac gives a member of an interface the modifiers the interface implies
+            boolean inInterface = cursor.getParent().getValue() instanceof J.ClassDeclaration &&
+                                  ((J.ClassDeclaration) cursor.getParent().getValue()).getKind() == J.ClassDeclaration.Kind.Type.Interface;
+            before.insert(0, String.format("%s %s {\n", inInterface ? "interface" : "class", classDeclaration));
             after.append("\n}");
         } else if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
@@ -461,7 +466,9 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor));
+                // a `var` the loop declares takes the iterable's element type
+                before.insert(0, "for (");
+                after.append(" : /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor)).append(") {}");
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
