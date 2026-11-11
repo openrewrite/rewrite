@@ -45,7 +45,7 @@ class ScalaParserErrorHandlingTest {
     private static final String GOOD_SOURCE = "object Good { val x = 1 }";
 
     @Test
-    void unparseableInputProducesParseErrorAndOtherInputsStillParse() {
+    void unparseableInputProducesParseErrorAndOtherInputsKeepTheirTypes() {
         // Expression nesting deep enough to overflow the stack of dotty's
         // recursive descent parser, making this single input "throw" to parse.
         StringBuilder bad = new StringBuilder("object Bad { val x = ");
@@ -63,7 +63,12 @@ class ScalaParserErrorHandlingTest {
         List<SourceFile> parsed = parser.parse(GOOD_SOURCE, bad.toString()).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(2);
-        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        // If the overflow escaped the batch, every input would fall back to a per-file parse without types.
+        assertThat(parsed.get(0)).isInstanceOfSatisfying(S.CompilationUnit.class, good ->
+          assertThat(good.getTypesInUse().getVariables()).anySatisfy(x -> {
+              assertThat(x.getName()).isEqualTo("x");
+              assertThat(x.getType()).isEqualTo(JavaType.Primitive.Int);
+          }));
         assertThat(parsed.get(1)).isInstanceOf(ParseError.class);
     }
 

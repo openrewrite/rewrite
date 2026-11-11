@@ -31,7 +31,9 @@ import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
+import scala.annotation.nowarn
 import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 import java.io.File
 import java.nio.file.Paths
 import java.util.{ArrayList, Collections, HashMap, IdentityHashMap, LinkedHashSet, List => JList, Map => JMap, Set => JSet}
@@ -91,6 +93,8 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
    *
    * On per-unit typer failure, that unit gets typedTree=None while others succeed.
    */
+  // Any failure leaves the compiler unfit for reuse, a fatal one included, and the catch rethrows it.
+  @nowarn("id=E235")
   def compileAll(sources: JList[SourceEntry], classpath: JList[String], outputDir: String = null): JMap[String, ScalaParseResult] = {
     val cpString = ScalaCompilerBridge.buildClasspath(classpath)
     val comp = if (compilers == null) new ScalaCompiler(cpString, reuse = false) else compilers.acquire(cpString)
@@ -137,7 +141,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
         comp.ran(r)
         (Some(r), r.runContext)
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
           comp.reusable = false
           (None, configuredCtx)
       }
@@ -169,7 +173,8 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
         sourceEntries.add(entry)
         parsedTrees.put(entry.path, parsed.rawTree)
       } catch {
-        case _: Throwable =>
+        // Dotty's recursive descent parser runs out of stack on deeply nested source.
+        case NonFatal(_) | _: StackOverflowError =>
           // Leave this entry out of the results so the caller falls back to a
           // single-file parse, surfacing the failure as a ParseError for this
           // file only instead of aborting the whole batch.
@@ -210,13 +215,13 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
               results.put(path, existing.copy(typedTree = Some(typedTree), typedNodes = typedNodes, context = runCtx))
             }
           } catch {
-            case _: Throwable =>
+            case NonFatal(_) =>
               comp.reusable = false
           }
         }
         typedRecorder.clear()
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
           // Batch compilation failed entirely; all units keep typedTree=None
           comp.reusable = false
       } finally {
@@ -271,7 +276,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
           }
         }.traverse(Option(typerTrees.get(unit)).getOrElse(unit.tpdTree))
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
       }
       if (spans.nonEmpty) found += unit.source.path -> spans.toSet
     }
@@ -318,7 +323,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
       typing.run.compileUnits(toScalaList(typing.units))
       Some(typing)
     } catch {
-      case _: Throwable =>
+      case NonFatal(_) =>
         comp.reusable = false
         None
     }
@@ -397,7 +402,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     given Context = try {
       (new Compiler()).newRun(using configuredCtx).runContext
     } catch {
-      case _: Throwable => configuredCtx
+      case NonFatal(_) => configuredCtx
     }
 
     val parsed = parseOne(path, content)
@@ -592,7 +597,7 @@ object ScalaCompilerBridge {
     val url = cs.getLocation
     if (url == null) return None
     try Some(Paths.get(url.toURI).toString)
-    catch { case _: Throwable => None }
+    catch { case NonFatal(_) => None }
   }
 }
 
@@ -747,7 +752,7 @@ private[internal] final class ScalaCompiler(val classpath: String, reuse: Boolea
           pkg.asClass.classDenot.invalidateMemberCaches()
         }
       } catch {
-        case _: Throwable => reusable = false
+        case NonFatal(_) => reusable = false
       }
     }
     packages = Nil

@@ -64,6 +64,7 @@ import org.openrewrite.scala.tree.S
 import java.util
 import java.util.{Collections, Arrays}
 import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
 
 /**
  * Visitor that traverses the Scala compiler AST and builds OpenRewrite LST nodes.
@@ -168,7 +169,7 @@ class ScalaTreeVisitor(
         if (result != null) return result
       }
     } catch {
-      case _: Throwable =>
+      case NonFatal(_) =>
     }
     // 3. Name-based fallback
     tree match {
@@ -212,7 +213,7 @@ class ScalaTreeVisitor(
         if (result != null) return result
       }
     } catch {
-      case _: Throwable =>
+      case NonFatal(_) =>
     }
     // 3. Name-based fallback — try to resolve method name from tree structure
     tree match {
@@ -247,7 +248,7 @@ class ScalaTreeVisitor(
         if (result != null) return result
       }
     } catch {
-      case _: Throwable => // fall through to name-based lookup
+      case NonFatal(_) => // fall through to name-based lookup
     }
     // Fallback: try name-based lookup for untyped trees
     tree match {
