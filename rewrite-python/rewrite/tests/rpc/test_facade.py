@@ -609,16 +609,6 @@ def test_a_local_visit_reports_the_search_results_it_adds(monkeypatch):
     assert [r["searchResultIds"] for r in results] == [[str(marker.id)], []]
 
 
-def test_the_servers_own_handlers_serve_a_hosted_bundle_only_while_no_child_exists():
-    children = _FakeChildren()
-    children.has_children = lambda: False
-    children.hosting = lambda: True
-    assert Facade(children).routes_to_children() is False
-
-    children.hosting = lambda: False   # an uninstalled bundle's recipes stay in this process
-    assert Facade(children).routes_to_children() is True
-
-
 class _RefUsingChild:
     """A child bundle as a real RPC peer: one persistent send ref map toward the hub, so the second
     edit that reuses a type the first edit already sent cites it as a bare ref."""
@@ -800,7 +790,7 @@ def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypat
     assert len(refs) == 1 and server._hub_recv_refs[bundle] == {1: server._hub_recv_refs[bundle][1]}
 
 
-def test_a_batch_stops_after_a_child_deletes_the_file():
+def test_a_batch_stops_after_a_bundle_deletes_the_file():
     """Once a bundle deletes the file there is nothing left for a later bundle to visit, and
     _hub_serve_child would answer it DELETE anyway."""
     ran = []
@@ -823,6 +813,16 @@ def test_a_batch_stops_after_a_child_deletes_the_file():
 
     assert [r.get("visitor") for r in resp["results"]] == ["del:a"]
     assert ran == [("A", ["del:a"])]
+
+    ran.clear()
+    f = Facade(children, is_local_visitor=lambda name: name == "del:here",
+               local_visit=lambda items, params: [{"modified": True, "deleted": True} for _ in items])
+    f._bundle_by_visitor.update({"edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "del:here"}, {"visitor": "edit:b"}]})
+
+    assert len(resp["results"]) == 1 and ran == []
 
 
 def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():

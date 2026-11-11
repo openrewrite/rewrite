@@ -429,7 +429,7 @@ def test_a_lone_bundle_runs_in_the_facades_own_process(tmp_path):
     assert hosted == [(tmp_path / "venvs" / "pkga", "pkga", None)]
     assert rows == [{"descriptor": {"name": "pkga.R"}}]
     assert bc.owner("pkga.R") == "pkga"      # ownership still resolves...
-    assert bc.has_children() is False        # ...but to this process, so nothing is routed
+    assert bc.hosts_every_bundle()           # ...but to this process, so nothing is routed
 
 
 def test_a_second_bundle_runs_behind_a_child_beside_the_hosted_one(tmp_path):
@@ -450,7 +450,7 @@ def test_a_second_bundle_runs_behind_a_child_beside_the_hosted_one(tmp_path):
 
     assert set(spawned) == {"pkgb"}           # pkga's recipes may already be prepared here
     assert bc.hosts("pkga") and not bc.hosts("pkgb")
-    assert bc.has_children() is True
+    assert not bc.hosts_every_bundle()
     assert bc.request("pkgb", "Visit", {}) == {"ran": "Visit"}
 
 
@@ -470,15 +470,15 @@ def test_a_venv_built_by_another_python_is_left_to_a_child(tmp_path):
     assert spawned == ["pkg"]
 
 
-def _hosting_then_spawning(tmp_path, spawned):
+def _hosting_then_spawning(tmp_path, spawned, activate=None, venv_ops=None):
     def fake_spawn(cmd, upstream=None, exclude_paths=()):
         bundle = cmd[cmd.index("--child-bundle") + 1]
         spawned.append(bundle)
         return _FakeChild([{"descriptor": {"name": f"{bundle}.R"}}])
 
     return BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None, spawn=fake_spawn,
-                          venv_ops=_ops_recording([], []),
-                          activate=lambda venv, dist, name: [{"descriptor": {"name": f"{dist}.R"}}])
+                          venv_ops=venv_ops or _ops_recording([], []),
+                          activate=activate or (lambda venv, dist, name: [{"descriptor": {"name": f"{dist}.R"}}]))
 
 
 def test_a_process_hosts_one_bundles_packages_once(tmp_path):
@@ -506,6 +506,38 @@ def test_a_hosted_bundle_whose_modules_may_be_stale_goes_to_a_child(tmp_path):
     shutil.rmtree(tmp_path / "rebuilt" / "venvs" / "pkga")
     bc.install("pkga", "pkga")
     assert spawned == ["pkga"] and not bc.hosts("pkga")
+
+
+def test_a_bundle_that_fails_to_activate_here_is_retried_behind_a_child(tmp_path):
+    def broken(venv_dir, bundle_dist, attribution_name):
+        raise RuntimeError("bad descriptor")
+
+    spawned = []
+    bc = _hosting_then_spawning(tmp_path, spawned, activate=broken)
+    with pytest.raises(RuntimeError, match="bad descriptor"):
+        bc.install("pkga", "pkga")
+    assert not bc.hosting()
+
+    bc.install("pkga", "pkga")
+    assert spawned == ["pkga"]
+
+
+def test_every_installed_bundle_must_be_hosted_for_this_process_to_serve_them_itself(tmp_path):
+    ops = _ops_recording([], [])
+    spawned = []
+    bc = _hosting_then_spawning(tmp_path, spawned, venv_ops=ops)
+    bc.install("pkga", "pkga")
+    bc.install("pkgb", "pkgb")
+
+    shutil.rmtree(tmp_path / "venvs" / "pkgb")
+    ops.create_venv = lambda py, d, clear=False: (_ for _ in ()).throw(OSError("disk full"))
+    with pytest.raises(OSError):
+        bc.install("pkgb", "pkgb")
+    assert not bc.hosts_every_bundle()   # pkgb is still installed though its child is gone
+
+    bc.uninstall("pkgb")
+    bc.uninstall("pkga")
+    assert not bc.hosts_every_bundle()
 
 
 def _never_hosted(venv_dir, bundle_dist, attribution_name):

@@ -143,8 +143,10 @@ class BundleChildren:
         if (self._activate is not None and key not in self._attached
                 and (self._hosted == key or (self._imported is None and not self._children))
                 and self._venv_ops.built_by_running_interpreter(venv_dir)):
-            self._hosted = self._imported = key
-            return self._activate(venv_dir, key, self._attribution.get(key))
+            self._imported = key  # even an activation that fails may have imported part of it
+            rows = self._activate(venv_dir, key, self._attribution.get(key))
+            self._hosted = key
+            return rows
         return self._ensure_child(key).request("GetMarketplace", {})
 
     def hosts(self, bundle: str) -> bool:
@@ -153,8 +155,9 @@ class BundleChildren:
     def hosting(self) -> bool:
         return self._hosted is not None
 
-    def has_children(self) -> bool:
-        return bool(self._children)
+    def hosts_every_bundle(self) -> bool:
+        """True when the hosted bundle is the only one installed, so no request needs routing."""
+        return self._descriptors.keys() == {self._hosted}
 
     def _claim_owners(self) -> None:
         self._owner = {}
