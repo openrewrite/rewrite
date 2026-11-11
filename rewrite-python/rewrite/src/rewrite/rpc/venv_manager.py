@@ -45,6 +45,16 @@ def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
     return None
 
 
+def path_without(exclude) -> list:
+    """``sys.path`` less every entry at or under one of ``exclude``."""
+    roots = [os.path.join(path_key(root), "") for root in exclude]
+    return [p for p in sys.path if not os.path.join(path_key(p), "").startswith(tuple(roots))]
+
+
+def path_key(path: str) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+
 def create_venv(python_executable: str, venv_dir: Path, clear: bool = False) -> None:
     """Create a venv at ``venv_dir``; ``clear`` empties the directory first."""
     cmd = [python_executable, "-m", "venv"]
