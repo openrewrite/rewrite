@@ -86,13 +86,15 @@ class BundleChildren:
             self._hosted = None  # activation attributes only the recipes new to the marketplace
         self._attribution[bundle_dist] = attribution_name   # None for a registry spec
         venv_dir = self._venv_dir(bundle_dist)
+        # A running child keeps the modules it imported and the attribution it was started with,
+        # whatever the install changes, even when the version stays the same.
+        stale = self._children.pop(bundle_dist, None)
+        if stale is not None:
+            stale.close()
+            self._on_child_replaced(bundle_dist)
         if not self._venv_ops.is_usable_venv(venv_dir):
             if self._hosted == bundle_dist:
                 self._hosted = None  # its modules were imported from the venv being replaced
-            stale = self._children.pop(bundle_dist, None)
-            if stale is not None:
-                stale.close()
-            self._on_child_replaced(bundle_dist)
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
         self._venv_ops.install_into_venv(venv_dir, spec, force=force)
         return self._load(bundle_dist, self._venv_ops.installed_version(venv_dir, bundle_dist))

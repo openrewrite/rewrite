@@ -261,7 +261,7 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
     bc.install("foo_bar", "foo_bar")
 
     assert ops.created == [tmp_path / "venvs" / "foo_bar"]        # created once, normalized dir
-    assert spawned == ["foo_bar"]                                 # one child, spawned once
+    assert spawned == ["foo_bar", "foo_bar"]                      # one key, its child restarted
     assert bc.request("FOO.BAR", "Visit", {}) == {"ran": "Visit"}  # any spelling routes to it
 
 
@@ -358,13 +358,13 @@ def test_a_failed_reinstall_keeps_the_installed_bundle_serving(tmp_path):
     spawned = []
     bc, _, _ = _spawning_children(tmp_path, spawned)
     bc.install("pkg", "pkg==1.0")
-    child = spawned[0]
-    child.request = lambda method, params: (_ for _ in ()).throw(RuntimeError("transient"))
+    bc._venv_ops.install_into_venv = lambda d, spec, force=False: (_ for _ in ()).throw(RuntimeError("transient"))
 
     with pytest.raises(RuntimeError, match="transient"):
         bc.install("pkg", "pkg==1.1")
 
-    assert bc.owner("pkg.R") == "pkg" and not child.closed
+    assert bc.owner("pkg.R") == "pkg"
+    assert bc.request("pkg", "Visit", {}) == {"ran": "Visit"}
 
 
 def test_attach_rejects_a_venv_without_the_distribution_and_keeps_the_current_one(tmp_path):
