@@ -618,7 +618,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
                 final JavaTemplate both = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(T)})")
                   .genericTypes("T")
                   .build();
-                final JavaTemplate first = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(java.util.List<T>)}.get(0))")
+                final JavaTemplate first = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(java.util.List<? extends T>)}.get(0))")
                   .genericTypes("T")
                   .build();
 
@@ -649,6 +649,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
                       return List.of(i, numbers);
                   }
+
+                  List<?> wildcard(Integer i, List<Long> longs) {
+                      return List.of(i, longs);
+                  }
               }
               """,
             """
@@ -665,6 +669,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
 
                   List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
                       return java.util.Arrays.asList(i, numbers.get(0));
+                  }
+
+                  List<?> wildcard(Integer i, List<Long> longs) {
+                      return java.util.Arrays.asList(i, longs.get(0));
                   }
               }
               """,

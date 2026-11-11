@@ -330,6 +330,10 @@ public class Substitutions {
     private void bindTypeVariables(@Nullable JavaType declared, @Nullable JavaType actual) {
         if (declared instanceof JavaType.GenericTypeVariable) {
             String name = ((JavaType.GenericTypeVariable) declared).getName();
+            if ("?".equals(name)) {
+                unbindTypeVariables(declared);
+                return;
+            }
             // A matched template parameter can carry the matcher template's own variable, which is this one.
             if (generics.get(name) != declared || TypeUtils.isOfType(declared, actual)) {
                 return;
@@ -363,14 +367,16 @@ public class Substitutions {
     }
 
     /**
-     * Leaves the variables in a type unbound where its argument is of another class, which javac matches through
-     * supertypes that this doesn't follow.
+     * Leaves the variables in a declared type unbound where javac infers them in a way this matching doesn't follow,
+     * through an argument's supertypes or a wildcard's bound.
      */
     private void unbindTypeVariables(JavaType declared) {
         if (declared instanceof JavaType.GenericTypeVariable) {
-            String name = ((JavaType.GenericTypeVariable) declared).getName();
-            if (generics.get(name) == declared) {
-                typeVariableBindings.put(name, null);
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) declared;
+            if ("?".equals(variable.getName())) {
+                variable.getBounds().forEach(this::unbindTypeVariables);
+            } else if (generics.get(variable.getName()) == declared) {
+                typeVariableBindings.put(variable.getName(), null);
             }
         } else if (declared instanceof JavaType.Parameterized) {
             ((JavaType.Parameterized) declared).getTypeParameters().forEach(this::unbindTypeVariables);
