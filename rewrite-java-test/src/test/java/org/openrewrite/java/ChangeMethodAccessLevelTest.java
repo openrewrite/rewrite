@@ -16,13 +16,184 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ChangeMethodAccessLevelTest implements RewriteTest {
+
+    @Test
+    void callsOfAMethodDeclaredElsewhereKeepItsAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("*..* run()", "private", null)),
+          java(
+            """
+              class A {
+                  public void run() {
+                  }
+
+                  void caller(Thread t) {
+                      t.run();
+                  }
+              }
+              """,
+            """
+              class A {
+                  private void run() {
+                  }
+
+                  void caller(Thread t) {
+                      t.run();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callsOfAMethodWhoseDeclarationKeepsItsAccessLevelKeepTheirs() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.I run()", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              interface I {
+                  void run();
+
+                  default void caller() {
+                      run();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void visitorsUnderOneCursorEachRetypeTheCallsOfTheirOwnMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  Cursor parent = getCursor().getParentOrThrow();
+                  J.ClassDeclaration c = (J.ClassDeclaration) new ChangeMethodAccessLevelVisitor<ExecutionContext>(
+                    new MethodMatcher("com.abc.A a()"), J.Modifier.Type.Public).visitNonNull(classDecl, ctx, parent);
+                  return (J.ClassDeclaration) new ChangeMethodAccessLevelVisitor<ExecutionContext>(
+                    new MethodMatcher("com.abc.A b()"), J.Modifier.Type.Public).visitNonNull(c, ctx, parent);
+              }
+          })),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  private void a() {
+                  }
+
+                  private void b() {
+                  }
+
+                  void caller() {
+                      a();
+                      b();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  public void a() {
+                  }
+
+                  public void b() {
+                  }
+
+                  void caller() {
+                      a();
+                      b();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callsInTheSameFileHaveTheNewAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod()", "public", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  private void aMethod() {
+                  }
+
+                  void caller() {
+                      aMethod();
+                      Runnable r = this::aMethod;
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  public void aMethod() {
+                  }
+
+                  void caller() {
+                      aMethod();
+                      Runnable r = this::aMethod;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorCallsInTheSameFileHaveTheNewAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A <constructor>()", "public", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  private A() {
+                  }
+
+                  static A create() {
+                      return new A();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  public A() {
+                  }
+
+                  static A create() {
+                      return new A();
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @DocumentExample
     @Test

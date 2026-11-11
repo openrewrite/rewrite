@@ -22,6 +22,7 @@ import org.openrewrite.Preconditions
 import org.openrewrite.Recipe
 import org.openrewrite.java.search.UsesField
 import org.openrewrite.java.search.UsesMethod
+import org.openrewrite.test.RecipeQualityValidation
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.TypeValidation
@@ -1245,7 +1246,11 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseListOf",
         )
         rewriteRun(
-            { spec -> spec.recipe(r) },
+            // the recipe types List.of by its arguments, the parser by the variable it is assigned to
+            { spec ->
+                spec.recipe(r)
+                    .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            },
             java(
                 """
                 import java.util.Arrays;
@@ -1318,7 +1323,11 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseListOf",
         )
         rewriteRun(
-            { spec -> spec.recipe(r) },
+            // the recipe types List.of by its arguments, the parser by the variable it is assigned to
+            { spec ->
+                spec.recipe(r)
+                    .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            },
             java(
                 """
                 import java.util.Arrays;

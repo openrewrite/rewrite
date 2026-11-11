@@ -726,7 +726,9 @@ public interface RewriteTest extends SourceSpecs {
         }
         formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
         importedNames.assertImports(recipeRun.getChangeset().getAllResults());
-        new TreeShapes(quality.parserShapedTrees(), parsersFor, relativeTo, ctx)
+        new TreeShapes(quality.parserShapedTrees(),
+                quality.parserTypedTrees() && TypeValidation.validatesTypes(testMethodSpec, testClassSpec),
+                parsersFor, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         if (quality.orderStepsForEarlierChanges()) {
             CompositeOrder.assertOrdered(recipe);

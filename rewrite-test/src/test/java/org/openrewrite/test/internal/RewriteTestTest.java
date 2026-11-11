@@ -48,6 +48,8 @@ import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -2134,6 +2136,132 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class ParserTypedTrees {
+
+        @Test
+        void rejectTypeTheParserGivesDifferently() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Give the code the recipe writes the types its parser gives that code")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.DeclareLongByHand):\n" +
+                                    "    `x = 1` has the variable int x where the parser gives long x")
+              .hasMessageContaining("parserTypedTrees(false)");
+        }
+
+        @Test
+        void acceptStringTypedAsThePrimitiveString() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareStringAsPrimitiveByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          String o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipTypeTheParserCannotResolve() {
+            // a recipe can write code that uses a library the test's parser doesn't have on its classpath
+            rewriteRun(
+              spec -> spec.recipe(new DeclareUnresolvedTypeByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          Missing o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipWhenTheTestDoesNotValidateTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .typeValidationOptions(TypeValidation.all().identifiers(false)),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class NoStaticVisitors {
 
         @Test
@@ -2767,6 +2895,85 @@ class ReturnNullByHand extends Recipe {
                 }
                 return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
                   Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareLongByHand extends Recipe {
+
+    String displayName = "Declare `long`";
+
+    String description = "Replaces the `int` of a variable declaration by `long`, leaving the variable typed `int`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Primitive visitPrimitive(J.Primitive primitive, ExecutionContext ctx) {
+                return primitive.getType() == JavaType.Primitive.Int &&
+                       getCursor().getParentTreeCursor().getValue() instanceof J.VariableDeclarations ?
+                  primitive.withType(JavaType.Primitive.Long) : primitive;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareStringAsPrimitiveByHand extends Recipe {
+
+    String displayName = "Declare `String`";
+
+    String description = "Replaces the `Object` of a variable declaration by `String`, typed as the primitive `String`, " +
+                         "which `TypeUtils.isOfType` takes to be the class `java.lang.String`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                if (type == null || !TypeUtils.isOfClassType(type.getType(), "java.lang.Object")) {
+                    return multiVariable;
+                }
+                return multiVariable
+                  .withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY, emptyList(),
+                    "String", JavaType.Primitive.String, null))
+                  .withVariables(ListUtils.map(multiVariable.getVariables(), v -> {
+                      J.VariableDeclarations.NamedVariable typed = v.withType(JavaType.Primitive.String);
+                      return typed.withName(typed.getName().withType(JavaType.Primitive.String)
+                        .withFieldType(typed.getVariableType()));
+                  }));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareUnresolvedTypeByHand extends Recipe {
+
+    String displayName = "Declare `Missing`";
+
+    String description = "Replaces the `Object` of a variable declaration by `Missing`, a class the parser can't resolve.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                return type != null && TypeUtils.isOfClassType(type.getType(), "java.lang.Object") ?
+                  multiVariable.withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY,
+                    emptyList(), "Missing", JavaType.ShallowClass.build("Missing"), null)) : multiVariable;
             }
         };
     }

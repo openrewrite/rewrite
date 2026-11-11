@@ -1682,7 +1682,8 @@ public interface JavaType {
         }
 
         public Method withFlags(Set<Flag> flags) {
-            return withFlagsBitMap(Flag.flagsToBitMap(flags));
+            // the mark of a C# extension method isn't one of the flags
+            return withFlagsBitMap(Flag.flagsToBitMap(flags) | flagsBitMap & EXTENSION_METHOD_FLAG);
         }
 
         /**

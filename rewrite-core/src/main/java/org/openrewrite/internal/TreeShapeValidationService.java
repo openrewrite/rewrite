@@ -77,11 +77,30 @@ public interface TreeShapeValidationService {
     }
 
     /**
-     * @return A parser that builds the same tree as {@code parser}, which may leave out type attribution, as the
+     * @return A parser that builds the same tree as {@code parser}, which may leave out type attribution, for when the
      * check compares no types.
      */
     default Parser.Builder untypedParser(Parser.Builder parser) {
         return parser;
+    }
+
+    /**
+     * @param sources The sources the test parsed and the recipe's output, whose classes the recipe may have changed
+     *                since {@code parser} typed them.
+     * @return A parser for when the check compares types, which types text as {@code parser} does. Where it can, it
+     * reuses the types {@code parser} holds, except those of the classes {@code sources} declare, and adds none to it.
+     */
+    default Parser.Builder typedParser(Parser.Builder parser, List<SourceFile> sources) {
+        return parser;
+    }
+
+    /**
+     * @return How the types of {@code tree} differ from those of {@code parsed}, the same node in a parse of the text
+     * it prints, each such as "the variable int x where the parser gives long x". A type either of them doesn't
+     * resolve isn't compared.
+     */
+    default List<String> typeDifferences(Tree tree, Tree parsed) {
+        return emptyList();
     }
 
     /**
