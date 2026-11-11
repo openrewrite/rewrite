@@ -116,27 +116,23 @@ def _pyvenv_cfg(venv_dir: Path) -> dict:
     return entries
 
 
-def install_into_venv(venv_dir: Path, spec: str, force: bool = False, prefer: Optional[dict] = None) -> None:
+def install_into_venv(venv_dir: Path, spec: str, force: bool = False, constraints: Optional[dict] = None) -> None:
     """Install/upgrade ``spec`` (a PEP 440 requirement or a local path) into the venv.
 
-    ``force`` re-copies a mutable local source whose version is unchanged. ``prefer`` maps
-    distributions to the versions pip should settle on wherever ``spec`` allows them, including
-    one the venv already holds at another version. When they cannot all hold, the install goes
-    ahead without them.
+    ``force`` re-copies a mutable local source whose version is unchanged. ``constraints`` maps
+    distributions to the versions pip must settle on wherever ``spec`` installs them, including one
+    the venv already holds at another version.
     """
     cmd = [str(venv_python(venv_dir)), "-m", "pip", "install", "--upgrade"]
     if force:
         cmd.append("--force-reinstall")
-    if prefer:
-        with tempfile.TemporaryDirectory() as scratch:
-            constraints = Path(scratch) / "constraints.txt"
-            constraints.write_text("".join(f"{name}=={version}\n" for name, version in sorted(prefer.items())))
-            try:
-                _run([*cmd, "--constraint", str(constraints), spec])
-                return
-            except RuntimeError:
-                pass  # any other failure recurs below, without the constraints
-    _run([*cmd, spec])
+    if not constraints:
+        _run([*cmd, spec])
+        return
+    with tempfile.TemporaryDirectory() as scratch:
+        pins = Path(scratch) / "constraints.txt"
+        pins.write_text("".join(f"{name}=={version}\n" for name, version in sorted(constraints.items())))
+        _run([*cmd, "--constraint", str(pins), spec])
 
 
 def remove_venv(venv_dir: Path) -> None:

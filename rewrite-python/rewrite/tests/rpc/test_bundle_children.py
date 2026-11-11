@@ -40,7 +40,7 @@ def test_install_marketplace_owner_route_uninstall_and_shutdown(tmp_path):
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = _fake_is_usable_venv
     ops.create_venv = lambda py, d, clear=False: (ops.created.append((py, d)), _make_venv(d))
-    ops.install_into_venv = lambda d, spec, force=False, prefer=None: ops.installed.append((d, spec, force))
+    ops.install_into_venv = lambda d, spec, force=False, constraints=None: ops.installed.append((d, spec, force))
     ops.installed_version = lambda d, dist: f"{dist}-1.0"
     ops.remove_venv = lambda d: ops.removed.append(d)
 
@@ -89,7 +89,7 @@ def _ops_recording(created, installed):
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = _fake_is_usable_venv
     ops.create_venv = lambda py, d, clear=False: (created.append(d), _make_venv(d))
-    ops.install_into_venv = lambda d, spec, force=False, prefer=None: installed.append(d)
+    ops.install_into_venv = lambda d, spec, force=False, constraints=None: installed.append(d)
     ops.installed_version = lambda d, dist: "1.0.0"
     ops.built_by_running_interpreter = lambda d: True
     ops.installed_distributions = lambda d: {}
@@ -178,7 +178,7 @@ def test_install_rebuilds_a_venv_orphaned_by_a_python_upgrade(tmp_path):
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = lambda d: False          # base interpreter pruned away
     ops.create_venv = lambda py, d, clear=False: (ops.created.append((d, clear)), _make_venv(d))
-    ops.install_into_venv = lambda d, spec, force=False, prefer=None: ops.installed.append(d)
+    ops.install_into_venv = lambda d, spec, force=False, constraints=None: ops.installed.append(d)
     ops.installed_version = lambda d, dist: "2.0"
 
     def fake_spawn(cmd, upstream=None, exclude_paths=()):
@@ -246,7 +246,7 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
         _make_venv(d)  # so the second install sees a real venv and skips creation
 
     ops.create_venv = _create
-    ops.install_into_venv = lambda d, spec, force=False, prefer=None: ops.installed.append(d)
+    ops.install_into_venv = lambda d, spec, force=False, constraints=None: ops.installed.append(d)
     ops.installed_version = lambda d, dist: "9.9"
 
     spawned = []
@@ -434,20 +434,20 @@ def test_a_lone_bundle_runs_in_the_facades_own_process(tmp_path):
     assert bc.hosts_every_bundle()           # ...but to this process, so nothing is routed
 
 
-def _versioned(versions, prefers=None):
+def _versioned(versions, held=None):
     """Recording ops whose venvs hold ``versions[bundle]``. The facade provides ``parso`` itself."""
     ops = _ops_recording([], [])
     ops.installed_distributions = lambda d: dict(versions[d.name])
     ops.shared_distributions = lambda exclude: {"parso"}
-    if prefers is not None:
-        ops.install_into_venv = lambda d, spec, force=False, prefer=None: prefers.append((d.name, prefer))
+    if held is not None:
+        ops.install_into_venv = lambda d, spec, force=False, constraints=None: held.append((d.name, constraints))
     return ops
 
 
 def test_bundles_agreeing_on_every_version_they_share_are_hosted_together(tmp_path):
-    prefers = []
+    held = []
     ops = _versioned({"pkga": {"pkga": "1", "attrs": "23.1", "idna": "3.4", "parso": "0.7"},
-                      "pkgb": {"pkgb": "1", "attrs": "23.1", "parso": "0.8"}}, prefers)
+                      "pkgb": {"pkgb": "1", "attrs": "23.1", "parso": "0.8"}}, held)
     spawned = []
     bc = _hosting_then_spawning(tmp_path, spawned, venv_ops=ops)
 
@@ -456,11 +456,11 @@ def test_bundles_agreeing_on_every_version_they_share_are_hosted_together(tmp_pa
 
     assert spawned == [] and bc.hosts("pkga") and bc.hosts("pkgb")
     assert bc.hosts_every_bundle()
-    # the facade's own parso shadows either venv's, so only what the venvs supply is preferred
-    assert prefers == [("pkga", {}), ("pkgb", {"pkga": "1", "attrs": "23.1", "idna": "3.4"})]
+    # the facade's own parso shadows either venv's, so only what the venvs supply is held
+    assert held == [("pkga", {}), ("pkgb", {"pkga": "1", "attrs": "23.1", "idna": "3.4"})]
 
     bc.install("pkga", "pkga")
-    assert prefers[-1] == ("pkga", {"pkgb": "1", "attrs": "23.1"})   # never its own earlier versions
+    assert held[-1] == ("pkga", {"pkgb": "1", "attrs": "23.1"})   # never its own earlier versions
 
 
 def test_a_bundle_disagreeing_on_a_shared_version_runs_behind_a_child(tmp_path):
@@ -477,6 +477,28 @@ def test_a_bundle_disagreeing_on_a_shared_version_runs_behind_a_child(tmp_path):
     assert bc.hosts("pkga") and not bc.hosts("pkgb")
     assert not bc.hosts_every_bundle()
     assert bc.request("pkgb", "Visit", {}) == {"ran": "Visit"}
+
+
+def test_only_a_bundle_new_to_this_process_installs_without_the_versions_imported_here(tmp_path):
+    installs = []
+
+    def install(d, spec, force=False, constraints=None):
+        installs.append((spec, constraints))
+        if constraints and spec.endswith("==2"):
+            raise RuntimeError("ResolutionImpossible")
+
+    ops = _versioned({"pkga": {"pkga": "1", "attrs": "23.1"},
+                      "pkgb": {"pkgb": "1", "attrs": "23.1"}})
+    ops.install_into_venv = install
+    bc = _hosting_then_spawning(tmp_path, [], venv_ops=ops)
+    bc.install("pkga", "pkga")
+
+    bc.install("pkgb", "pkgb==2")
+    assert installs[-2:] == [("pkgb==2", {"pkga": "1", "attrs": "23.1"}), ("pkgb==2", None)]
+
+    with pytest.raises(RuntimeError, match="Restart"):
+        bc.install("pkga", "pkga==2")
+    assert installs[-1] == ("pkga==2", {"pkgb": "1", "attrs": "23.1"})
 
 
 def test_a_venv_built_by_another_python_is_left_to_a_child(tmp_path):

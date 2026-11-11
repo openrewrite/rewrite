@@ -102,8 +102,17 @@ class BundleChildren:
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
         # Venvs built at different times can hold different versions both bundles' ranges allow.
         # Settling on the ones other bundles imported lets this bundle be hosted beside them.
-        prefer = self._imported(excluding=bundle_dist)
-        self._venv_ops.install_into_venv(venv_dir, spec, force=force, prefer=prefer)
+        held = self._imported(excluding=bundle_dist)
+        try:
+            self._venv_ops.install_into_venv(venv_dir, spec, force=force, constraints=held)
+        except RuntimeError as failure:
+            if not held:
+                raise
+            if bundle_dist in self._joined:
+                # Its venv is on this process's path, so other bundles may import from it.
+                raise RuntimeError(f"Installing '{spec}' would change distributions that recipe bundles loaded "
+                                   f"in this process use. Restart the process to install it.\n{failure}") from failure
+            self._venv_ops.install_into_venv(venv_dir, spec, force=force)
         return self._load(bundle_dist, self._venv_ops.installed_version(venv_dir, bundle_dist))
 
     def attach(self, bundle_dist: str, venv: str, attribution_name: str):

@@ -52,18 +52,17 @@ def test_install_into_venv_force_reinstalls_mutable_local_sources(monkeypatch, t
     assert calls == [[py, "-m", "pip", "install", "--upgrade", "--force-reinstall", "./local-recipes"]]
 
 
-def test_install_into_venv_prefers_versions_it_drops_when_they_cannot_all_hold(monkeypatch, tmp_path):
+def test_install_into_venv_constrains_pip_to_the_given_versions(monkeypatch, tmp_path):
     runs = []
 
     def fake_run(cmd, capture_output=False, text=False):
-        constraints = cmd[cmd.index("--constraint") + 1] if "--constraint" in cmd else None
-        runs.append((cmd[-1], Path(constraints).read_text() if constraints else None))
-        return SimpleNamespace(returncode=1 if constraints else 0, stdout="", stderr="ResolutionImpossible")
+        runs.append((cmd[-1], Path(cmd[cmd.index("--constraint") + 1]).read_text()))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    venv_manager.install_into_venv(tmp_path / "b1", "pkgb", prefer={"attrs": "23.1"})
+    venv_manager.install_into_venv(tmp_path / "b1", "pkgb", constraints={"attrs": "23.1"})
 
-    assert runs == [("pkgb", "attrs==23.1\n"), ("pkgb", None)]
+    assert runs == [("pkgb", "attrs==23.1\n")]
 
 
 def test_remove_venv_deletes_the_directory(tmp_path):
