@@ -41,11 +41,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * A tree visited by two recipe bundles in one BatchVisit.
  * <p>
- * The first bundle runs in the peer's own process and the second behind a child, so the two visitors
- * here execute in different interpreters. The first one's recipe is prepared before the second
- * bundle is installed, as a host resolving bundles one at a time does. The renames chain — {@code alpha} to
- * {@code beta} in one bundle, {@code beta} to {@code gamma} in the other — so the result is
- * {@code gamma} only if the first bundle's edit reached the second bundle's input.
+ * The bundles depend on different versions of one distribution, so the first runs in the peer's own
+ * process and the second behind a child, and the two visitors here execute in different interpreters.
+ * Each recipe edits only while it sees its own bundle's version. The first one's recipe is prepared
+ * before the second bundle is installed, as a host resolving bundles one at a time does. The renames
+ * chain — {@code alpha} to {@code beta} in one bundle, {@code beta} to {@code gamma} in the other — so
+ * the result is {@code gamma} only if the first bundle's edit reached the second bundle's input.
  */
 class CrossBundleBatchVisitIntegTest {
 
@@ -74,8 +75,8 @@ class CrossBundleBatchVisitIntegTest {
     @Timeout(value = 300, unit = TimeUnit.SECONDS)
     void oneBatchVisitSpansTwoBundles() throws IOException {
         PythonRewriteRpc rpc = PythonRewriteRpc.getOrStart();
-        String editAlphaToBeta = install(rpc, "alpha_pkg", "AlphaToBeta", "alpha", "beta");
-        String editBetaToGamma = install(rpc, "beta_pkg", "BetaToGamma", "beta", "gamma");
+        String editAlphaToBeta = install(rpc, "alpha_pkg", "1.0.0", "AlphaToBeta", "alpha", "beta");
+        String editBetaToGamma = install(rpc, "beta_pkg", "2.0.0", "BetaToGamma", "beta", "gamma");
 
         ExecutionContext ctx = new InMemoryExecutionContext();
         SourceFile cu = PythonParser.builder().build()
@@ -94,11 +95,12 @@ class CrossBundleBatchVisitIntegTest {
     }
 
     /**
-     * Install a bundle holding one identifier-renaming recipe and return its edit visitor.
-     * The entry point is what scopes discovery to this distribution once it is behind a child.
+     * Install a bundle holding one identifier-renaming recipe, depending on {@code shared_dep} at
+     * {@code depVersion}, and return its edit visitor. The entry point is what scopes discovery to this
+     * distribution once it is behind a child.
      */
-    private String install(PythonRewriteRpc rpc, String dist, String recipe, String from, String to)
-            throws IOException {
+    private String install(PythonRewriteRpc rpc, String dist, String depVersion, String recipe, String from,
+                           String to) throws IOException {
         Path pkgRoot = tempDir.resolve(dist);
         Path module = pkgRoot.resolve(dist);
         Files.createDirectories(module);
@@ -106,11 +108,13 @@ class CrossBundleBatchVisitIntegTest {
                 [project]
                 name = "%s"
                 version = "0.0.0"
+                dependencies = ["shared_dep @ %s"]
 
                 [project.entry-points."openrewrite.recipes"]
                 %s = "%s:activate"
-                """.formatted(dist, dist, dist));
+                """.formatted(dist, sharedDep(depVersion), dist, dist));
         Files.writeString(module.resolve("__init__.py"), """
+                import shared_dep
                 from rewrite import CategoryDescriptor, Recipe
                 from rewrite.python.visitor import PythonVisitor
 
@@ -128,7 +132,7 @@ class CrossBundleBatchVisitIntegTest {
                     def editor(self):
                         class _V(PythonVisitor):
                             def visit_identifier(self, ident, p):
-                                if ident.simple_name == "%s":
+                                if ident.simple_name == "%s" and shared_dep.VERSION == "%s":
                                     return ident.replace(_simple_name="%s")
                                 return ident
                         return _V()
@@ -136,9 +140,21 @@ class CrossBundleBatchVisitIntegTest {
 
                 def activate(marketplace):
                     marketplace.install(%s, [CategoryDescriptor(display_name="Test")])
-                """.formatted(recipe, recipe, recipe, from, to, from, to, recipe));
+                """.formatted(recipe, recipe, recipe, from, to, from, depVersion, to, recipe));
         rpc.installRecipes(pkgRoot.toFile());
         return ((RpcRecipe) rpc.prepareRecipe("org.openrewrite.python.test." + recipe, Map.of()))
                 .getEditVisitor();
+    }
+
+    private String sharedDep(String version) throws IOException {
+        Path root = tempDir.resolve("shared_dep-" + version);
+        Files.createDirectories(root.resolve("shared_dep"));
+        Files.writeString(root.resolve("pyproject.toml"), """
+                [project]
+                name = "shared_dep"
+                version = "%s"
+                """.formatted(version));
+        Files.writeString(root.resolve("shared_dep").resolve("__init__.py"), "VERSION = \"%s\"\n".formatted(version));
+        return root.toUri().toString();
     }
 }

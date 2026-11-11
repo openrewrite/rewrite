@@ -1,8 +1,9 @@
 """Facade orchestration: bundles isolated from each other.
 
 Installed bundles are keyed by distribution name, attached ones by the path of the venv their caller
-built. The first installed bundle is hosted in the facade's own process when nothing else is loaded.
-Every other bundle runs behind its own child, spawned on demand. Recipe ownership is first-wins across installed bundles,
+built. An installed bundle is hosted in the facade's own process when it agrees on the version of
+every distribution it shares with what this process has already imported. Every other bundle runs
+behind its own child, spawned on demand. Recipe ownership is first-wins across installed bundles,
 and an attached bundle overrides it.
 
 ``activate`` hosts a bundle in this process, and ``None`` gives every bundle a child. It is
@@ -29,8 +30,11 @@ class BundleChildren:
         self._spawn = spawn or ChildConnection.spawn
         self._venv_ops = venv_ops or venv_manager
         self._activate = activate
-        self._hosted = None     # the bundle this process runs itself, if any
-        self._imported = None   # the bundle whose packages it has imported, after which it takes no other
+        self._hosted = set()    # the bundles this process runs itself
+        # bundle -> version of each distribution it brought into this process. An entry outlives the
+        # bundle's hosting, since its modules stay imported.
+        self._joined = {}
+        self._shared = None     # names of the distributions this process's own path provides
         # A bundle is a distribution name or an attached venv's path.
         self._children = {}     # bundle -> child connection
         self._descriptors = {}  # bundle -> list[marketplace row]
@@ -82,19 +86,33 @@ class BundleChildren:
         bundle_dist = _normalize_package_name(bundle_dist)
         if attribution_name:
             self._forget_attached(attribution_name)
-        if self._hosted == bundle_dist and self._attribution.get(bundle_dist) != attribution_name:
-            self._hosted = None  # activation attributes only the recipes new to the marketplace
+        if force or self._attribution.get(bundle_dist) != attribution_name:
+            # A forced re-install may change files under modules already imported. Activation
+            # attributes only the recipes new to the marketplace.
+            self._hosted.discard(bundle_dist)
         self._attribution[bundle_dist] = attribution_name   # None for a registry spec
         venv_dir = self._venv_dir(bundle_dist)
         if not self._venv_ops.is_usable_venv(venv_dir):
-            if self._hosted == bundle_dist:
-                self._hosted = None  # its modules were imported from the venv being replaced
+            # its modules were imported from the venv being replaced
+            self._hosted.discard(bundle_dist)
             stale = self._children.pop(bundle_dist, None)
             if stale is not None:
                 stale.close()
             self._on_child_replaced(bundle_dist)
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
-        self._venv_ops.install_into_venv(venv_dir, spec, force=force)
+        # Venvs built at different times can hold different versions both bundles' ranges allow.
+        # Settling on the ones other bundles imported lets this bundle be hosted beside them.
+        held = self._imported(excluding=bundle_dist)
+        try:
+            self._venv_ops.install_into_venv(venv_dir, spec, force=force, constraints=held)
+        except RuntimeError as failure:
+            if not held:
+                raise
+            if bundle_dist in self._joined:
+                # Its venv is on this process's path, so other bundles may import from it.
+                raise RuntimeError(f"Installing '{spec}' would change distributions that recipe bundles loaded "
+                                   f"in this process use. Restart the process to install it.\n{failure}") from failure
+            self._venv_ops.install_into_venv(venv_dir, spec, force=force)
         return self._load(bundle_dist, self._venv_ops.installed_version(venv_dir, bundle_dist))
 
     def attach(self, bundle_dist: str, venv: str, attribution_name: str):
@@ -133,31 +151,51 @@ class BundleChildren:
     def _discover(self, key: str):
         """Bring a bundle's recipes within reach and return its marketplace rows.
 
-        A bundle installed on its own has nothing to conflict with, so it is hosted here rather
-        than behind a child of its own. It stays hosted when more bundles arrive, since the host may
-        already hold recipes prepared here. Imports are permanent, so a process hosts one bundle,
-        and only while the modules it imported are current. An attached venv may be rebuilt in place,
-        so an attached bundle is never hosted.
+        A bundle is hosted here while every distribution it shares with what this process imported
+        is at one version. Joining its venv to the path then equals installing it beside what is here.
+
+        Imports are permanent, so a process hosts a bundle once, and only while the modules it
+        imported are current. A hosted bundle stays hosted when more bundles arrive, since the host
+        may already hold recipes prepared here. An attached venv may be rebuilt in place, so an
+        attached bundle is never hosted.
         """
         venv_dir = self._venv_dir(key)
         if (self._activate is not None and key not in self._attached
-                and (self._hosted == key or (self._imported is None and not self._children))
                 and self._venv_ops.built_by_running_interpreter(venv_dir)):
-            self._imported = key  # even an activation that fails may have imported part of it
-            rows = self._activate(venv_dir, key, self._attribution.get(key))
-            self._hosted = key
-            return rows
+            versions = self._own_distributions(venv_dir)
+            current = key in self._hosted and self._joined[key] == versions
+            if current or (key not in self._joined and self._agrees(versions)):
+                self._joined[key] = versions  # even an activation that fails may have imported part of it
+                rows = self._activate(venv_dir, key, self._attribution.get(key))
+                self._hosted.add(key)
+                return rows
+        self._hosted.discard(key)
         return self._ensure_child(key).request("GetMarketplace", {})
 
+    def _own_distributions(self, venv_dir: Path) -> dict:
+        """The venv's distributions this process would import from the venv rather than its own path."""
+        if self._shared is None:
+            self._shared = self._venv_ops.shared_distributions(exclude=(str(self._venvs_root),))
+        return {name: version for name, version in self._venv_ops.installed_distributions(venv_dir).items()
+                if name not in self._shared}
+
+    def _imported(self, excluding=None) -> dict:
+        return {name: version for key, versions in self._joined.items() if key != excluding
+                for name, version in versions.items()}
+
+    def _agrees(self, versions: dict) -> bool:
+        imported = self._imported()
+        return all(imported.get(name, version) == version for name, version in versions.items())
+
     def hosts(self, bundle: str) -> bool:
-        return self._hosted == self._key(bundle)
+        return self._key(bundle) in self._hosted
 
     def hosting(self) -> bool:
-        return self._hosted is not None
+        return bool(self._hosted)
 
     def hosts_every_bundle(self) -> bool:
-        """True when the hosted bundle is the only one installed, so no request needs routing."""
-        return self._descriptors.keys() == {self._hosted}
+        """True when every installed bundle is hosted, so no request needs routing."""
+        return bool(self._hosted) and self._descriptors.keys() == self._hosted
 
     def _claim_owners(self) -> None:
         self._owner = {}
@@ -170,8 +208,7 @@ class BundleChildren:
                     self._owner.setdefault(name, key)
 
     def _forget(self, key: str) -> None:
-        if self._hosted == key:
-            self._hosted = None  # _imported still names it, since its modules stay here
+        self._hosted.discard(key)  # _joined keeps it, since its modules stay here
         child = self._children.pop(key, None)
         if child is not None:
             child.close()

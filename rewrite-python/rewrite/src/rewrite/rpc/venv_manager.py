@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from importlib import metadata
 from pathlib import Path
 from typing import Optional
@@ -34,15 +35,19 @@ def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
 
     Read off disk, so the recipe is never imported.
     """
+    return installed_distributions(venv_dir).get(_normalize_package_name(dist))
+
+
+def installed_distributions(venv_dir: Path) -> dict:
+    """The version of each distribution installed in the venv, by normalized name, read off disk."""
     packages = site_packages(venv_dir)
-    if packages is None:
-        return None
-    target = _normalize_package_name(dist)
-    for distribution in metadata.distributions(path=[str(packages)]):
-        name = distribution.metadata["Name"]
-        if name and _normalize_package_name(name) == target:
-            return distribution.version
-    return None
+    return {} if packages is None else _distributions([str(packages)])
+
+
+def shared_distributions(exclude=()) -> set:
+    """The normalized names of the distributions on this interpreter's path, leaving out every
+    entry under one of ``exclude``."""
+    return set(_distributions(path_without(exclude)))
 
 
 def path_without(exclude) -> list:
@@ -53,6 +58,15 @@ def path_without(exclude) -> list:
 
 def path_key(path: str) -> str:
     return os.path.normcase(os.path.abspath(path))
+
+
+def _distributions(paths) -> dict:
+    found = {}
+    for distribution in metadata.distributions(path=paths):
+        name = distribution.metadata["Name"]
+        if name:
+            found.setdefault(_normalize_package_name(name), distribution.version)
+    return found
 
 
 def create_venv(python_executable: str, venv_dir: Path, clear: bool = False) -> None:
@@ -102,16 +116,23 @@ def _pyvenv_cfg(venv_dir: Path) -> dict:
     return entries
 
 
-def install_into_venv(venv_dir: Path, spec: str, force: bool = False) -> None:
+def install_into_venv(venv_dir: Path, spec: str, force: bool = False, constraints: Optional[dict] = None) -> None:
     """Install/upgrade ``spec`` (a PEP 440 requirement or a local path) into the venv.
 
-    ``force`` re-copies a mutable local source whose version is unchanged.
+    ``force`` re-copies a mutable local source whose version is unchanged. ``constraints`` maps
+    distributions to the versions pip must settle on wherever ``spec`` installs them, including one
+    the venv already holds at another version.
     """
     cmd = [str(venv_python(venv_dir)), "-m", "pip", "install", "--upgrade"]
     if force:
         cmd.append("--force-reinstall")
-    cmd.append(spec)
-    _run(cmd)
+    if not constraints:
+        _run([*cmd, spec])
+        return
+    with tempfile.TemporaryDirectory() as scratch:
+        pins = Path(scratch) / "constraints.txt"
+        pins.write_text("".join(f"{name}=={version}\n" for name, version in sorted(constraints.items())))
+        _run([*cmd, "--constraint", str(pins), spec])
 
 
 def remove_venv(venv_dir: Path) -> None:
