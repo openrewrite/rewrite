@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import ast
-import functools
 import os
 import textwrap
 from collections import OrderedDict
@@ -43,22 +42,28 @@ from .replacement import substitution_marker
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 
 
-@functools.cache
+_stdlib_venv: Optional[str] = None
+
+
 def _stdlib_only_venv() -> str:
     """An empty venv of the running interpreter, for templates that declare no dependencies.
 
     Given no venv, ty resolves against an inherited ``VIRTUAL_ENV``, the parser's own venv or the
-    ``python3`` on ``PATH``, whose packages vary with where the recipe runs.
+    ``python3`` on ``PATH``, whose packages vary with where the recipe runs. ty fails to start on
+    a venv without its ``pyvenv.cfg``, which a temp cleaner can remove while the process runs.
     """
-    import atexit
-    import shutil
-    import tempfile
-    import venv
+    global _stdlib_venv
+    if _stdlib_venv is None or not os.path.isfile(os.path.join(_stdlib_venv, "pyvenv.cfg")):
+        import atexit
+        import shutil
+        import tempfile
+        import venv
 
-    path = tempfile.mkdtemp(prefix="openrewrite-template-stdlib-")
-    atexit.register(shutil.rmtree, path, ignore_errors=True)
-    venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(path)
-    return path
+        path = tempfile.mkdtemp(prefix="openrewrite-template-stdlib-")
+        atexit.register(shutil.rmtree, path, ignore_errors=True)
+        venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(path)
+        _stdlib_venv = path
+    return _stdlib_venv
 
 
 @dataclass(frozen=True)

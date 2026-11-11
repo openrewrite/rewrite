@@ -21,7 +21,7 @@ import pytest
 
 from rewrite.java import JavaType, tree as j
 from rewrite.python.template import capture, TemplateEngine
-from rewrite.python.template.engine import TemplateOptions
+from rewrite.python.template.engine import TemplateOptions, _stdlib_only_venv
 
 
 class TestTemplateEngine:
@@ -310,6 +310,14 @@ class TestEngineContextAndDependencies:
 
         assert isinstance(third_party.type, JavaType.Unknown)
         assert stdlib.type == JavaType.Primitive.String
+
+    def test_a_removed_stdlib_venv_is_rebuilt(self):
+        shutil.rmtree(_stdlib_only_venv())
+
+        tree = TemplateEngine.get_template_tree(
+            "os.getcwd()", {}, TemplateOptions(context=("import os",)))
+
+        assert tree.type == JavaType.Primitive.String
 
 
 class TestAutoFormatIntegration:
