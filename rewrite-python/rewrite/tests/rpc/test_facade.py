@@ -922,9 +922,9 @@ def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
                               spawn=lambda *a, **k: _Child(), venv_ops=_Venvs(),
                               on_child_replaced=dropped.append, activate=None)
     children.install("pkg", "pkg==1.0")
-    children.install("pkg", "pkg==1.1")   # venv unusable again -> stale child closed, fresh one spawned
+    children.install("pkg", "pkg==1.1")   # stale child closed, fresh one spawned
 
-    assert dropped == ["pkg", "pkg"]
+    assert dropped == ["pkg"]
 
     # and the server's hook is what clears the tables
     server._hub_send_refs["pkg"] = ReferenceMap()

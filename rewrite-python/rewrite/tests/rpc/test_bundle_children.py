@@ -338,6 +338,27 @@ def test_every_attach_restarts_the_bundles_child(tmp_path):
         bc.request(str(first), "Visit", {})                      # never respawned on the old venv
 
 
+def test_a_reinstall_that_changes_the_bundle_restarts_its_child(tmp_path):
+    spawned, replaced = [], []
+    bc, _, _ = _spawning_children(tmp_path, spawned, replaced)
+    installed_version = "1.0"
+    bc._venv_ops.installed_version = lambda d, dist: installed_version
+    bc.install("pkg", "pkg")
+
+    bc.install("pkg", "pkg")                                   # nothing changed
+    assert len(spawned) == 1 and replaced == []
+
+    installed_version = "1.1"
+    bc.install("pkg", "pkg")                                   # upgraded
+    assert spawned[0].closed and len(spawned) == 2 and replaced == ["pkg"]
+
+    bc.install("pkg", "/src/pkg", attribution_name="/src/pkg")  # same version under another name
+    assert spawned[1].closed and "/src/pkg" in spawned[2].cmd
+
+    bc.install("pkg", "/src/pkg", force=True, attribution_name="/src/pkg")  # same version re-copied
+    assert spawned[2].closed and not spawned[3].closed
+
+
 def test_a_source_path_is_either_installed_or_attached_never_both(tmp_path):
     spawned = []
     bc, _, _ = _spawning_children(tmp_path, spawned)
