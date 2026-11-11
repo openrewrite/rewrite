@@ -260,6 +260,42 @@ def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path)
     assert acquired == ["tree-1"]
 
 
+def test_each_visit_starts_from_the_tree_java_holds_now(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    visited = []
+
+    class _FakeFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def generate(self, params): ...
+
+        def visit(self, params):
+            visited.append(server._hub_tree[params["treeId"]])
+            return {"modified": False}
+
+        def batch_visit(self, params):
+            visited.append(server._hub_tree[params["treeId"]])
+            return {"results": []}
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+    _isolated_hub(monkeypatch, server)
+
+    # A Java recipe edits the file between the two requests.
+    java_versions = [object(), object()]
+    from_java = iter(java_versions)
+    monkeypatch.setattr(server, "get_object_from_java", lambda obj_id, source_file_type=None: next(from_java))
+
+    server.handle_request("Visit", {"treeId": "T", "sourceFileType": "py", "visitor": "edit:a"})
+    server.handle_request("BatchVisit", {"treeId": "T", "sourceFileType": "py", "visitors": [{"visitor": "edit:b"}]})
+
+    assert visited == java_versions
+
+
 def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
     import rewrite.rpc.server as server
 
@@ -436,7 +472,6 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
     monkeypatch.setattr(server, "get_object_from_java",
                         lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
 
-    # The facade fetches the tree from Java once and owns it from then on.
     assert server._hub_acquire(tree_id, sft) is cu
 
     # The child is served the pre-edit tree in full.

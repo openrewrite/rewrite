@@ -36,9 +36,7 @@ import java.util.concurrent.TimeUnit;
 import static org.openrewrite.python.Assertions.python;
 
 /**
- * A Java recipe edits the file between two Python recipes in one cycle. The peer is sent no Evict until
- * every recipe has run on the file, so the second Python visit sees the Java edit only if the peer
- * fetches the tree again for it.
+ * A Java recipe edits the file between two Python recipes in one cycle.
  */
 class JavaEditBetweenPythonVisitsIntegTest implements RewriteTest {
 

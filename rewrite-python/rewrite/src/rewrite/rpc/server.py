@@ -2575,15 +2575,16 @@ _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref coun
 _hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
 _hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
 
-def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
-    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
-    first time it is needed and owned by the facade from then on."""
+def _hub_acquire(obj_id: str, source_file_type: Optional[str], refresh: bool = False):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) when
+    the facade holds none or ``refresh`` asks for Java's current one. Between fetches the facade's
+    copy is authoritative, as a child's pulled edit puts it ahead of Java."""
     if obj_id is None:
         return None
     # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
     # it sees a file early enough to checkpoint the facade<->Java tables.
     _checkpoint_refs(obj_id)
-    tree = _hub_tree.get(obj_id)
+    tree = None if refresh else _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
         if tree is not None:
@@ -2828,8 +2829,10 @@ def handle_request(method: str, params: dict) -> Any:
         if facade_handler:
             # Acquire at the top level, before any child runs — acquiring inside a child's
             # GetObject callback would deadlock (the child waits on us, Java on this request).
+            # Refreshed on every request, as a Java recipe may have edited the file since the last
+            # one and Java evicts a file only after the cycle has run every recipe on it.
             if method in ('Visit', 'BatchVisit'):
-                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
+                _hub_acquire(params.get('treeId'), params.get('sourceFileType'), refresh=True)
             return facade_handler(params)
         if method in ('Print', 'GetObject'):
             obj_id = params.get('treeId') or params.get('id')
