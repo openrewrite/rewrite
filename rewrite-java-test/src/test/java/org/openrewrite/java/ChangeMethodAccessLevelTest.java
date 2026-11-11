@@ -195,6 +195,41 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
+    @Test
+    void aTypedDeclarationNameHasTheNewAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipes(
+            // the parser leaves a declaration's name untyped, and other recipes, such as ChangeType, type it
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    return method.getName().getType() != null ? method :
+                      method.withName(method.getName().withType(method.getMethodType()));
+                }
+            }),
+            new ChangeMethodAccessLevel("com.abc.A aMethod()", "private", null)
+          ),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  public void aMethod() {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  private void aMethod() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void publicToPrivate() {
