@@ -124,17 +124,17 @@ class Facade:
         results = []
         for owner, sub_visitors in groups:
             if owner is _LOCAL:
-                results.extend(self._local_visit(sub_visitors, params))
-                continue
-            response = self._children.request(owner, "BatchVisit", {**params, "visitors": sub_visitors})
-            sub_results = response.get("results", [])
+                sub_results = self._local_visit(sub_visitors, params)
+            else:
+                sub_results = self._children.request(
+                    owner, "BatchVisit", {**params, "visitors": sub_visitors}).get("results", [])
             results.extend(sub_results)
             if any(r.get("deleted") for r in sub_results):
                 # The result already says so; pulling would get DELETE, which a lost tree also answers.
                 if self._hub_drop is not None and tree_id is not None:
                     self._hub_drop(tree_id)
                 break
-            if (self._hub_pull is not None and tree_id is not None and
+            if (owner is not _LOCAL and self._hub_pull is not None and tree_id is not None and
                     any(r.get("modified") for r in sub_results)):
                 self._hub_pull(self._children, owner, tree_id, source_file_type)
         return {"results": results}

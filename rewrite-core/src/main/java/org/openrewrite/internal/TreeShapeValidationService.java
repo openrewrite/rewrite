@@ -85,10 +85,12 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @param sources The sources the test parsed and the recipe's output, whose classes the recipe may have changed
+     *                since {@code parser} typed them.
      * @return A parser for when the check compares types, which types text as {@code parser} does. Where it can, it
-     * has a type cache of its own, so it types text as if it had parsed nothing before.
+     * reuses the types {@code parser} holds, except those of the classes {@code sources} declare, and adds none to it.
      */
-    default Parser.Builder typedParser(Parser.Builder parser) {
+    default Parser.Builder typedParser(Parser.Builder parser, List<SourceFile> sources) {
         return parser;
     }
 

@@ -1830,7 +1830,7 @@ function isRequireStatement(statement: J | undefined): boolean {
         : declarationsOf(statement).some(d => d.variables.some(v => requiredModule(v.element.initializer?.element) !== undefined));
 }
 
-function newIdentifier(name: string): J.Identifier {
+export function newIdentifier(name: string): J.Identifier {
     return {
         kind: J.Kind.Identifier,
         id: randomId(),
@@ -2197,9 +2197,9 @@ export function existingImportBinding(
  * The `member as local` specifier, for an import binding `member` under `local` or an export
  * publishing `local`'s binding under that name. `local` itself becomes the alias, keeping the type
  * attribution it holds, and the alias takes its prefix: that whitespace separates the specifier
- * from a `type` keyword before it.
+ * from a `type` keyword before it. An export may publish a string literal: `New as "Old"`.
  */
-function aliasing(local: J.Identifier, member: string): JS.Alias {
+export function aliasing(local: J.Identifier | J.Literal, member: string): JS.Alias {
     const propertyName: J.Identifier = {
         id: randomId(),
         kind: J.Kind.Identifier,
@@ -2294,7 +2294,7 @@ function removeBinding(jsImport: JS.Import, member: string | undefined, localNam
 }
 
 /** `cu` without the statement `id`, its prefix carried onto the next one so a file header survives. */
-function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
+export function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
     const formatter = new ElementRemovalFormatter<J>(true);
     const statements: J.RightPadded<Statement>[] = [];
     for (const stmt of cu.statements) {
@@ -2361,30 +2361,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         this.cu = cu;
-        const imports = cu.statements
-            .filter(s => s.element?.kind === JS.Kind.Import)
-            .map(s => s.element as JS.Import);
-        const requires = cu.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
-        const ofModule = imports.filter(imp => {
-            const module = importedModule(imp);
-            return module !== undefined && sameModule(module, this.from.module);
-        });
-        const requiresOfModule = requires.filter(d => sameModule(requiredModuleOfDeclaration(d)!, this.from.module));
-        const fromPackage = packageOf(this.from.module);
-        const member = declaredMember(this.from);
-        this.movedTypes = new MovedTypes(this.from, this.to, {
-            module: ofModule.length + requiresOfModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)) ||
-                requiresOfModule.some(d => !isOnlyRequired(d)),
-            // Same-named classes from two subpaths of one package share a name.
-            className: member !== undefined && imports.filter(imp => {
-                const module = importedModule(imp);
-                return module !== undefined && packageOf(module) === fromPackage &&
-                    importBinds(imp, module, member) !== undefined;
-            }).length + requires.filter(d => {
-                const module = requiredModuleOfDeclaration(d)!;
-                return packageOf(module) === fromPackage && requireBinds(d, module, member) !== undefined;
-            }).length > 1
-        });
+        this.movedTypes = movedTypesIn(cu, this.from, this.to, true);
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         if (this.dropped !== undefined) {
             visited = withoutStatement(visited, this.dropped);
@@ -2601,7 +2578,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 }
 
 /** Points `literal` at `name`, keeping its quotes. */
-function respecify(literal: Draft<J.Literal>, name: string): void {
+export function respecify(literal: Draft<J.Literal>, name: string): void {
     literal.value = name;
     literal.valueSource = quoted(name, literal.valueSource);
     literal.unicodeEscapes = undefined;
@@ -2646,7 +2623,7 @@ function withRequire(declaration: J.VariableDeclarations, module: string, patter
  * A whole module binds as a name and a member as a destructured element.
  * An element keeps a default it has.
  */
-function movedBinding(
+export function movedBinding(
     pattern: J,
     index: number,
     member: string | undefined,
@@ -2784,6 +2761,57 @@ function joinedRequire(
     const pattern = requirePattern(target) as JS.ObjectBindingPattern;
     const joined = withPattern(target, withElement(pattern, binding, detectBraceSpacing(cu)));
     return {...cu, statements: cu.statements.map(s => s.element === target ? {...s, element: joined} : s)};
+}
+
+/**
+ * The type rename for a move of `from` to `to` in `cu`. A name another binding still uses stays:
+ * the module on a whole-module move, with `import {X} from "m"` beside the moved `import * as NS from "m"`,
+ * or a class's package name, with `Button` imported from both `@acme/ui` and `@acme/ui/button`.
+ * `bindingMoves`: one of the bindings counted is the moving one, so it doesn't count as another.
+ */
+function movedTypesIn(
+    cu: JS.CompilationUnit,
+    from: {module: string; member?: string},
+    to: {module: string; member?: string},
+    bindingMoves: boolean
+): MovedTypes {
+    const imports = cu.statements
+        .filter(s => s.element?.kind === JS.Kind.Import)
+        .map(s => s.element as JS.Import);
+    const requires = cu.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
+    const ofModule = imports.filter(imp => {
+        const module = importedModule(imp);
+        return module !== undefined && sameModule(module, from.module);
+    });
+    const requiresOfModule = requires.filter(d => sameModule(requiredModuleOfDeclaration(d)!, from.module));
+    const fromPackage = packageOf(from.module);
+    const member = declaredMember(from);
+    return new MovedTypes(from, to, {
+        module: ofModule.length + requiresOfModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)) ||
+            requiresOfModule.some(d => !isOnlyRequired(d)),
+        className: member !== undefined && imports.filter(imp => {
+            const module = importedModule(imp);
+            return module !== undefined && packageOf(module) === fromPackage &&
+                importBinds(imp, module, member) !== undefined;
+        }).length + requires.filter(d => {
+            const module = requiredModuleOfDeclaration(d)!;
+            return packageOf(module) === fromPackage && requireBinds(d, module, member) !== undefined;
+        }).length > (bindingMoves ? 1 : 0)
+    });
+}
+
+/** `cu` with its types renamed from `from` to `to`, for a move only spellings made (`NS.Old` → `NS.New`). */
+export async function withMovedTypes(
+    cu: JS.CompilationUnit,
+    from: {module: string; member?: string},
+    to: {module: string; member?: string}
+): Promise<JS.CompilationUnit> {
+    const movedTypes = movedTypesIn(cu, from, to, false);
+    return await new class extends JavaScriptVisitor<undefined> {
+        protected override async visitType(javaType: Type | undefined): Promise<Type | undefined> {
+            return movedTypes.visit(javaType, undefined);
+        }
+    }().visit(cu, undefined) as JS.CompilationUnit;
 }
 
 /** Rewrites a file's attribution onto the module and member a binding moved to. */

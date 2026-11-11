@@ -278,10 +278,37 @@ A caller that renames references itself defeats this: the name it writes in is t
 wants, so the collision check sees it as taken and the binding keeps an alias instead. Drop such a
 pass rather than run it alongside.
 
+### The member's other spellings
+
+A member is also read through its module rather than an import of it. Those spellings move with it.
+`NS` is a module object: `import * as NS`, `import NS = require`, `const NS = require` or
+`const NS = await import`.
+
+```ts
+// m.Old → m.New
+NS.Old()                     →  NS.New()               // also as a type, `new`, `typeof` or a JSX tag
+NS["Old"]                    →  NS["New"]
+const {Old} = NS             →  const {New: Old} = NS
+import("m").Old              →  import("m").New
+export {Old} from "m"        →  export {New as Old} from "m"
+export {Old as X} from "m"   →  export {New as X} from "m"
+
+// m.Old → m2.New: NS still reads "m", so NS.Old stays
+import("m").Old              →  import("m2").New
+export {Old, X} from "m"     →  export {X} from "m"; export {New as Old} from "m2"
+export {Old} from "m";       →  export {Y, New as Old} from "m2"   // joins a re-export of the same kind
+export {Y} from "m2";
+```
+
+They move even where nothing binds `from`, and `maybeRebind` still returns `undefined`. Where the
+move is refused, none of them move. Left alone: `D.Old` after `import D from "m"`, since the default
+export is the module only with `export =`, and `NS.Old` where the file reassigns a `let` or `var` `NS`.
+
 ### What a rebind's attribution follows
 
 Moving an ES import renames every type in the file that names what moved, following each type's
-signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+signature but not a class's members. So does a move that only renames spellings (`NS.Old` → `NS.New`),
+where it renamed one. An AMD dependency swap rewrites no attribution. Names follow
 the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
 function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
 declared beside a moved member keeps the old name.
@@ -352,7 +379,7 @@ rest element, or else gets `const {m} = require('mod')` at the end of the run. A
 
 The four above that still apply, plus these:
 
-- nothing binds `from`
+- nothing binds `from` (spellings like `NS.Old` still move)
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out

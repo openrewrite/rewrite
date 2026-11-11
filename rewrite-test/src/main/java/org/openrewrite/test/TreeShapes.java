@@ -71,6 +71,8 @@ final class TreeShapes {
                 changed.add(result.getBefore().getId());
             }
         }
+        List<SourceFile> parsedAndOutput = new ArrayList<>(sources);
+        parsedAndOutput.addAll(current);
         for (SourceFile source : sources) {
             if (!changed.contains(source.getId())) {
                 current.add(source);
@@ -93,7 +95,7 @@ final class TreeShapes {
         StringBuilder foundShapes = new StringBuilder();
         StringBuilder foundTypes = new StringBuilder();
         for (Map.Entry<Parser.Builder, List<Result>> group : byParser.entrySet()) {
-            Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current);
+            Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current, parsedAndOutput);
             for (Result result : group.getValue()) {
                 SourceFile after = Objects.requireNonNull(result.getAfter());
                 Reparsed parse = reparsed.get(after.getId());
@@ -247,7 +249,8 @@ final class TreeShapes {
      * A fresh parse, by {@code builder}, of the printed text of each of the {@code current} sources that it parses,
      * by the id of the source, leaving out the ones it doesn't parse back to the same kind of source.
      */
-    private Map<UUID, Reparsed> reparse(Parser.Builder builder, List<SourceFile> current) {
+    private Map<UUID, Reparsed> reparse(Parser.Builder builder, List<SourceFile> current,
+                                        List<SourceFile> parsedAndOutput) {
         List<SourceFile> sources = new ArrayList<>();
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
@@ -265,7 +268,7 @@ final class TreeShapes {
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
         // types need the test's own parser, with its classpath, and shapes alone parse faster without types
         Parser.Builder reparser = service == null ? builder :
-                types ? service.typedParser(builder) : service.untypedParser(builder);
+                types ? service.typedParser(builder, parsedAndOutput) : service.untypedParser(builder);
         List<SourceFile> parsed = parse(reparser, inputs, errors);
         if (parsed == null) {
             return reparsed;

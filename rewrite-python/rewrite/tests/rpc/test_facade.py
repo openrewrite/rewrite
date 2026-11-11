@@ -260,6 +260,42 @@ def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path)
     assert acquired == ["tree-1"]
 
 
+def test_each_visit_starts_from_the_tree_java_holds_now(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    visited = []
+
+    class _FakeFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def generate(self, params): ...
+
+        def visit(self, params):
+            visited.append(server._hub_tree[params["treeId"]])
+            return {"modified": False}
+
+        def batch_visit(self, params):
+            visited.append(server._hub_tree[params["treeId"]])
+            return {"results": []}
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+    _isolated_hub(monkeypatch, server)
+
+    # A Java recipe edits the file between the two requests.
+    java_versions = [object(), object()]
+    from_java = iter(java_versions)
+    monkeypatch.setattr(server, "get_object_from_java", lambda obj_id, source_file_type=None: next(from_java))
+
+    server.handle_request("Visit", {"treeId": "T", "sourceFileType": "py", "visitor": "edit:a"})
+    server.handle_request("BatchVisit", {"treeId": "T", "sourceFileType": "py", "visitors": [{"visitor": "edit:b"}]})
+
+    assert visited == java_versions
+
+
 def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
     import rewrite.rpc.server as server
 
@@ -418,6 +454,7 @@ def _isolated_hub(monkeypatch, server):
                  "_hub_send_checkpoint", "_hub_recv_checkpoint", "_hub_last_served", "local_objects",
                  "_ref_checkpoints", "_local_ref_checkpoints"):
         monkeypatch.setattr(server, name, {})
+    monkeypatch.setattr(server, "_hub_deleted", set())
 
 
 def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_child(monkeypatch):
@@ -436,7 +473,6 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
     monkeypatch.setattr(server, "get_object_from_java",
                         lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
 
-    # The facade fetches the tree from Java once and owns it from then on.
     assert server._hub_acquire(tree_id, sft) is cu
 
     # The child is served the pre-edit tree in full.
@@ -474,6 +510,37 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
     # assertions above would degrade into if _hub_served were advanced by the local visit.
     noop = server._hub_serve_child(bundle, tree_id, sft)
     assert {d["state"] for d in noop} == {"NO_CHANGE", "END_OF_OBJECT"}
+
+
+def test_an_edit_java_fetched_from_the_facade_survives_the_next_refetch(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", Facade(_FakeChildren(), local_visit=server._hub_local_visit,
+                                                  is_local_visitor=server._hub_is_builtin_visitor))
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "remote_objects", {tree_id: cu})  # Java holds this side's parse
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "_last_sent", [])
+    # Java makes no edit of its own.
+    monkeypatch.setattr(server, "send_request",
+                        lambda method, params: [{"state": "NO_CHANGE"}, {"state": "END_OF_OBJECT"}])
+
+    visit = {"treeId": tree_id, "sourceFileType": sft, "visitor": _ADD_IMPORT,
+             "visitorOptions": {"module": "collections.abc", "name": "Iterable", "only_if_referenced": False}}
+    assert server.handle_request("Visit", visit) == {"modified": True}
+    edited = server._hub_tree[tree_id]
+    server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft})
+
+    server.handle_request("Visit", visit)
+
+    assert server._hub_tree[tree_id] is edited
 
 
 def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
@@ -639,9 +706,11 @@ def test_reset_clears_the_hub_tables_too(monkeypatch):
     server._hub_recv_refs["A"] = {1: object()}
     server._hub_send_checkpoint[("A", "T")] = 0
     server._hub_recv_checkpoint[("A", "T")] = -1
+    server._hub_deleted.add("D")
 
     server.handle_reset({})
 
+    assert not server._hub_deleted
     assert not server._hub_tree
     assert not server._hub_served
     assert not server._hub_send_refs
@@ -717,7 +786,7 @@ def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypat
     assert len(refs) == 1 and server._hub_recv_refs[bundle] == {1: server._hub_recv_refs[bundle][1]}
 
 
-def test_a_batch_stops_after_a_child_deletes_the_file():
+def test_a_batch_stops_after_a_bundle_deletes_the_file():
     """Once a bundle deletes the file there is nothing left for a later bundle to visit, and
     _hub_serve_child would answer it DELETE anyway."""
     ran = []
@@ -740,6 +809,16 @@ def test_a_batch_stops_after_a_child_deletes_the_file():
 
     assert [r.get("visitor") for r in resp["results"]] == ["del:a"]
     assert ran == [("A", ["del:a"])]
+
+    ran.clear()
+    f = Facade(children, is_local_visitor=lambda name: name == "del:here",
+               local_visit=lambda items, params: [{"modified": True, "deleted": True} for _ in items])
+    f._bundle_by_visitor.update({"edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "del:here"}, {"visitor": "edit:b"}]})
+
+    assert len(resp["results"]) == 1 and ran == []
 
 
 def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
@@ -843,3 +922,56 @@ def test_hub_pull_refuses_a_child_that_lost_the_tree(monkeypatch):
     server._hub_pull_child_edit(_LostTreeChild(), bundle, tree_id, sft, may_delete=True)
     assert tree_id not in server._hub_tree
     assert tree_id not in server.local_objects
+
+
+class _DeletingVisitChild(_FakeChildren):
+    def request(self, bundle, method, params):
+        if method == "Visit":
+            return {"modified": True}
+        if method == "GetObject":
+            return [{"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+        return super().request(bundle, method, params)
+
+    def broadcast_evict(self, params): ...
+
+
+@pytest.mark.parametrize("visitor", ["edit:delete", "Delete"], ids=["child", "built-in"])
+def test_a_single_visit_deletion_reaches_the_host_until_its_evict(monkeypatch, tmp_path, visitor):
+    import rewrite.rpc.server as server
+    from rewrite.python.visitor import PythonVisitor
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _Delete(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            return None
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+    fetched = []
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "remote_objects", {})
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    # Java goes on holding the undeleted file until its Evict.
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: fetched.append(obj_id) or cu)
+    monkeypatch.setattr(server, "_VISITOR_REGISTRY", {"Delete": lambda options: _Delete()})
+    facade = Facade(_DeletingVisitChild(), hub_pull=server._hub_pull_child_edit,
+                    hub_drop=server._hub_forget, local_visit=server._hub_local_visit,
+                    is_local_visitor=server._hub_is_builtin_visitor)
+    facade._bundle_by_visitor["edit:delete"] = "pkg"
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", facade)
+
+    visit = {"treeId": tree_id, "sourceFileType": sft, "visitor": visitor}
+    assert server.handle_request("Visit", visit) == {"modified": True}
+    assert server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft}) == [
+        {"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+    # Once Java has evicted the file, an id the facade does not hold is a lost tree, not a deletion.
+    server.handle_request("Evict", {"id": tree_id})
+    fetched.clear()
+    server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft})
+    assert fetched == [tree_id]

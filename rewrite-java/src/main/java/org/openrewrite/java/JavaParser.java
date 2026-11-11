@@ -288,6 +288,14 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * @return The cache that the parsers this builder builds keep their types in, when it has no type factory.
+         * Building a parser can replace it with a cache that reads through to it.
+         */
+        public JavaTypeCache getTypeCache() {
+            return javaTypeCache;
+        }
+
         public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
             this.javaTypeFactory = javaTypeFactory;
             return (B) this;

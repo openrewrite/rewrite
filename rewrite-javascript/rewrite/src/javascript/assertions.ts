@@ -22,11 +22,12 @@ import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
 import {setTemplateSourceFileCache} from "./templating/engine";
 import {PrettierConfigLoader} from "./format/prettier-config-loader";
+import {PrettierStyle} from "./style";
 import {create as produce} from "mutative";
 import * as fs from "fs";
 import * as path from "path";
 import {Autodetect} from "./autodetect";
-import {Marker, replaceMarkerByKind} from "../markers";
+import {replaceMarkerByKind} from "../markers";
 import {Parser, ParserInput} from "../parser";
 import {SourceFile} from "../tree";
 
@@ -39,7 +40,7 @@ export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 // Pooled so a spec reuses the program the previous spec left behind; see `JavaScriptParser.parse`.
 const parserPool: Map<string, Parser> = new Map();
 
-function pooledParser(relativeTo?: string, detectStyle = false): Parser {
+function pooledParser(relativeTo?: string, detectStyle = false, prettierLoader?: PrettierConfigLoader): Parser {
     const key = relativeTo ?? "";
     let parser = parserPool.get(key);
     if (!parser || (parser instanceof StyleDetectingParser) !== detectStyle) {
@@ -53,6 +54,9 @@ function pooledParser(relativeTo?: string, detectStyle = false): Parser {
         parser = detectStyle ? new StyleDetectingParser(javaScriptParser) : javaScriptParser;
         parserPool.set(key, parser);
     }
+    if (parser instanceof StyleDetectingParser) {
+        parser.prettierLoader = prettierLoader;
+    }
     return parser;
 }
 
@@ -62,23 +66,24 @@ function pooledParser(relativeTo?: string, detectStyle = false): Parser {
 class StyleDetectingParser extends Parser {
     // Wraps `JavaScriptParser` rather than extending it. Loading the package from some of its internal
     // modules runs this module before `parser.ts` has finished.
-    constructor(private readonly parser: JavaScriptParser) {
+    constructor(private readonly parser: JavaScriptParser, public prettierLoader?: PrettierConfigLoader) {
         super();
     }
 
     async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
-        const parsed: SourceFile[] = [];
-        for await (const sourceFile of this.parser.parse(...inputs)) {
-            parsed.push(sourceFile);
-        }
+        const parsed: {sourceFile: SourceFile, prettierMarker?: PrettierStyle}[] = [];
         const detector = Autodetect.detector();
-        for (const sourceFile of parsed) {
-            await detector.sample(sourceFile);
+        for await (const sourceFile of this.parser.parse(...inputs)) {
+            const prettierMarker = await this.prettierLoader?.getConfigMarker(sourceFile.sourcePath);
+            parsed.push({sourceFile, prettierMarker});
+            if (!prettierMarker) {
+                await detector.sample(sourceFile);
+            }
         }
         const style = detector.build();
-        for (const sourceFile of parsed) {
+        for (const {sourceFile, prettierMarker} of parsed) {
             yield sourceFile.kind === JS.Kind.CompilationUnit ? produce(sourceFile, draft => {
-                draft.markers = replaceMarkerByKind(draft.markers, style);
+                draft.markers = replaceMarkerByKind(draft.markers, prettierMarker ?? style);
             }) : sourceFile;
         }
     }
@@ -210,33 +215,16 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
 
     // Detect Prettier configuration for the project
     const prettierLoader = new PrettierConfigLoader(relativeTo);
-    const detection = await prettierLoader.detectPrettier();
-    const detectStyle = !detection.available;
+    await prettierLoader.detectPrettier();
 
     for (const spec of sourceSpecs) {
         const isPackageJson = spec.path?.endsWith('package.json');
         const isPackageLock = spec.path === 'package-lock.json';
         if (!isPackageJson && !isPackageLock) {
             if (spec.kind === JS.Kind.CompilationUnit) {
-                // For JS/TS files, use a parser that adds style marker if available
-                // spec.path may be undefined, so generate a reasonable path from the extension
-                const fileName = spec.path ?? `file.${spec.ext}`;
-                const filePath = path.join(relativeTo, fileName);
-
-                const styleMarker: Marker | undefined = detection.available ?
-                    await prettierLoader.getConfigMarker(filePath) : undefined;
-
                 yield {
                     ...spec,
-                    parser: () => pooledParser(relativeTo, detectStyle),
-                    // Add style marker before recipe runs if available
-                    // Compose with existing beforeRecipe if present
-                    beforeRecipe: styleMarker ? (sf: JS.CompilationUnit) => {
-                        const withMarker = produce(sf, draft => {
-                            draft.markers = replaceMarkerByKind(draft.markers, styleMarker);
-                        });
-                        return spec.beforeRecipe ? spec.beforeRecipe(withMarker) : withMarker;
-                    } : spec.beforeRecipe
+                    parser: () => pooledParser(relativeTo, true, prettierLoader)
                 }
             } else {
                 // Non-JS/TS files were already written to disk above

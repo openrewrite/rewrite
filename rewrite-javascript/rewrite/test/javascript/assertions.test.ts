@@ -49,14 +49,25 @@ describe("npm", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("stops detecting a directory's style once its project has Prettier", async () => {
+    test.each([false, true])("refreshes formatter selection on a pooled parser with config=%s", async configured => {
+        // given
         await withDir(async repo => {
-            const detecting = (await parserIn(repo.path))();
+            const pooled = (await parserIn(repo.path))();
             const prettier = path.join(repo.path, "node_modules", "prettier");
             fs.mkdirSync(prettier, {recursive: true});
             fs.writeFileSync(path.join(prettier, "package.json"), `{"version": "3.7.4"}`);
+            if (configured) {
+                fs.writeFileSync(path.join(repo.path, ".prettierrc"), '{}');
+            }
 
-            expect((await parserIn(repo.path))()).not.toBe(detecting);
+            // when
+            const parser = (await parserIn(repo.path))();
+            const sourceFile = await parser.parseOne({text: 'const a = 1;', sourcePath: 'source.ts'});
+
+            // then
+            expect(parser).toBe(pooled);
+            expect(!!findMarker(sourceFile, StyleKind.PrettierStyle)).toBe(configured);
+            expect(!!findMarker(sourceFile, StyleKind.Autodetect)).toBe(!configured);
         }, {unsafeCleanup: true});
     });
 

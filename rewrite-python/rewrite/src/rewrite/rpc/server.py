@@ -1331,6 +1331,7 @@ def handle_reset(params: dict) -> bool:
     _hub_send_checkpoint.clear()
     _hub_recv_checkpoint.clear()
     _hub_last_served.clear()
+    _hub_deleted.clear()
     # A half-drained page would resume mid-list for a host that expects to start over.
     _dependency_types_pending.clear()
 
@@ -2574,16 +2575,18 @@ _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that chil
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
 _hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
 _hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
+_hub_deleted: Set[str] = set()              # obj_ids a visit deleted, which Java holds until their Evict
 
-def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
-    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
-    first time it is needed and owned by the facade from then on."""
+def _hub_acquire(obj_id: str, source_file_type: Optional[str], refresh: bool = False):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) when
+    the facade holds none or ``refresh`` asks for Java's current one. Between fetches the facade's
+    copy is authoritative, as a child's pulled edit puts it ahead of Java."""
     if obj_id is None:
         return None
     # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
     # it sees a file early enough to checkpoint the facade<->Java tables.
     _checkpoint_refs(obj_id)
-    tree = _hub_tree.get(obj_id)
+    tree = None if refresh else _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
         if tree is not None:
@@ -2687,13 +2690,14 @@ def _hub_drop_bundle(bundle: str) -> None:
 
 
 def _hub_forget(obj_id: str) -> None:
-    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
-    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
-    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
+    """Let go of a file a visit deleted while leaving every child's ref numbering where it stands.
+    This is the half of _hub_release that is safe without an Evict: a child that has not been told to
+    roll back still holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
     _hub_tree.pop(obj_id, None)
     local_objects.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
+    _hub_deleted.add(obj_id)
 
 
 def _hub_release(obj_id: str) -> None:
@@ -2702,6 +2706,7 @@ def _hub_release(obj_id: str) -> None:
     holds ("Received reference to unknown object").
     """
     _hub_forget(obj_id)
+    _hub_deleted.discard(obj_id)
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
         checkpoint = _hub_send_checkpoint.pop(key)
         refs = _hub_send_refs.get(key[0])
@@ -2828,8 +2833,10 @@ def handle_request(method: str, params: dict) -> Any:
         if facade_handler:
             # Acquire at the top level, before any child runs — acquiring inside a child's
             # GetObject callback would deadlock (the child waits on us, Java on this request).
+            # Refreshed on every request, as a Java recipe may have edited the file since the last
+            # one and Java evicts a file only after the cycle has run every recipe on it.
             if method in ('Visit', 'BatchVisit'):
-                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
+                _hub_acquire(params.get('treeId'), params.get('sourceFileType'), refresh=True)
             return facade_handler(params)
         if method in ('Print', 'GetObject'):
             obj_id = params.get('treeId') or params.get('id')
@@ -2838,7 +2845,9 @@ def handle_request(method: str, params: dict) -> Any:
             # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
             # the two apart. Acquiring a non-tree would hand its property messages to a receiver
             # that has no codec for them, desynchronizing the queue for every later object.
-            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
+            # Acquiring a deleted file would hand Java back its own copy and undo the deletion.
+            if (obj_id is not None and source_file_type and obj_id not in _hub_tree
+                    and obj_id not in _hub_deleted):
                 _hub_acquire(obj_id, source_file_type)
 
     handlers = {
