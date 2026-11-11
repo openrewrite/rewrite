@@ -335,7 +335,7 @@ public class Substitutions {
                 return;
             }
             // A matched template parameter can carry the matcher template's own variable, which is this one.
-            if (generics.get(name) != declared || TypeUtils.isOfType(declared, actual)) {
+            if (TypeUtils.isOfType(declared, actual)) {
                 return;
             }
             boolean wildcard = actual instanceof JavaType.GenericTypeVariable &&
@@ -375,7 +375,7 @@ public class Substitutions {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) declared;
             if ("?".equals(variable.getName())) {
                 variable.getBounds().forEach(this::unbindTypeVariables);
-            } else if (generics.get(variable.getName()) == declared) {
+            } else {
                 typeVariableBindings.put(variable.getName(), null);
             }
         } else if (declared instanceof JavaType.Parameterized) {
@@ -419,7 +419,9 @@ public class Substitutions {
                         .withThrownExceptions(
                                 ListUtils.map(method.getThrownExceptions(), t -> withBoundTypeVariables(t, visiting)));
             } else if (type instanceof JavaType.Variable &&
-                       !(((JavaType.Variable) type).getOwner() instanceof JavaType.FullyQualified)) {
+                       // the parser gives a local of an initializer block an unknown owner
+                       (!(((JavaType.Variable) type).getOwner() instanceof JavaType.FullyQualified) ||
+                        ((JavaType.Variable) type).getOwner() instanceof JavaType.Unknown)) {
                 JavaType.Variable variable = (JavaType.Variable) type;
                 return variable.withType(withBoundTypeVariables(variable.getType(), visiting));
             }

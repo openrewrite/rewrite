@@ -924,6 +924,47 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void lambdaParameterOfAStatementTakesTheBoundType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate sort = JavaTemplate.builder("java.util.Collections.sort(#{any(java.util.List<T>)}, (a, b) -> 0);")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.Block body = method.getBody();
+                  if (body == null || !body.getStatements().isEmpty()) {
+                      return method;
+                  }
+                  J.Identifier list = ((J.VariableDeclarations) method.getParameters().getFirst()).getVariables().getFirst().getName();
+                  return sort.apply(getCursor(), body.getCoordinates().firstStatement(), list);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  void sort(List<String> list) {
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  void sort(List<String> list) {
+                      java.util.Collections.sort(list, (a, b) -> 0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeVariableOfAMethodTheTemplateReferencesKeepsItsOwnType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
