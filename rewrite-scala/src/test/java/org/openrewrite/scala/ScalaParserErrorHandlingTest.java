@@ -64,11 +64,7 @@ class ScalaParserErrorHandlingTest {
 
         assertThat(parsed).hasSize(2);
         // If the overflow escaped the batch, every input would fall back to a per-file parse without types.
-        assertThat(parsed.get(0)).isInstanceOfSatisfying(S.CompilationUnit.class, good ->
-          assertThat(good.getTypesInUse().getVariables()).anySatisfy(x -> {
-              assertThat(x.getName()).isEqualTo("x");
-              assertThat(x.getType()).isEqualTo(JavaType.Primitive.Int);
-          }));
+        assertGoodIsTyped(parsed.get(0));
         assertThat(parsed.get(1)).isInstanceOf(ParseError.class);
     }
 
