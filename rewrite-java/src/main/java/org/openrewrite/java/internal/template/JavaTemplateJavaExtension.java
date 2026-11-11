@@ -31,6 +31,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -574,16 +575,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
-                    // The exception is a varargs method that still takes the new arguments, unless an overload takes
-                    // them by fixed arity, as javac only falls back on varargs when none does
+                    // The call takes a listed overload's type instead, if one takes the new arguments
                     JavaType.Method mt = method.getMethodType();
-                    if (m.getMethodType() == null && mt != null && loc == METHOD_INVOCATION_ARGUMENTS &&
-                        varargsTakes(mt, m.getArguments())) {
-                        JavaType.Method overload = fixedArityOverload(mt, m.getArguments());
-                        // A listed overload lacks the generic declaring type and the receiver's type arguments that
-                        // the parser gives the call. Overloads are taken to return the same type.
-                        m = m.withMethodType(overload == null ? mt :
-                                overload.withDeclaringType(mt.getDeclaringType()).withReturnType(mt.getReturnType()));
+                    JavaType.Method overload = null;
+                    if (m.getMethodType() == null && mt != null && loc == METHOD_INVOCATION_ARGUMENTS) {
+                        overload = overloadTaking(mt, m.getArguments());
+                    }
+                    if (overload != null) {
+                        m = m.withMethodType(overload);
                     } else if (m.getMethodType() == null && mt != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
@@ -754,16 +753,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
         };
     }
 
-    private static boolean varargsTakes(JavaType.Method method, List<Expression> arguments) {
+    private static boolean varargsTakes(JavaType.Method method, List<@Nullable JavaType> argumentTypes) {
         List<JavaType> parameters = method.getParameterTypes();
         JavaType.Array varargs = parameters.isEmpty() ? null : TypeUtils.asArray(parameters.get(parameters.size() - 1));
-        List<Expression> args = ListUtils.filter(arguments, a -> !(a instanceof J.Empty));
-        if (!method.hasFlags(Flag.Varargs) || varargs == null || args.size() < parameters.size() - 1) {
+        if (!method.hasFlags(Flag.Varargs) || varargs == null || argumentTypes.size() < parameters.size() - 1) {
             return false;
         }
-        for (int i = 0; i < args.size(); i++) {
+        for (int i = 0; i < argumentTypes.size(); i++) {
             JavaType parameter = i < parameters.size() - 1 ? parameters.get(i) : varargs.getElemType();
-            if (!TypeUtils.isAssignableTo(parameter, args.get(i).getType())) {
+            if (!TypeUtils.isAssignableTo(parameter, argumentTypes.get(i))) {
                 return false;
             }
         }
@@ -771,36 +769,88 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
     }
 
     /**
-     * The most specific overload of {@code varargs} that takes the arguments without varargs.
+     * The overload of {@code method}, or {@code method} itself, that takes the arguments. As in javac, one that takes
+     * them by fixed arity without boxing comes first, then one that boxes or unboxes them, then one that takes varargs.
+     * A listed overload lacks what javac substitutes for a type variable. So when the declaring type or an overload
+     * names one, the result is null unless {@code method} itself takes the arguments by varargs, as in #9825.
      */
-    private static JavaType.@Nullable Method fixedArityOverload(JavaType.Method varargs, List<Expression> arguments) {
+    private static JavaType.@Nullable Method overloadTaking(JavaType.Method method, List<Expression> arguments) {
         List<@Nullable JavaType> argumentTypes = new ArrayList<>(arguments.size());
         for (Expression argument : arguments) {
             if (!(argument instanceof J.Empty)) {
                 argumentTypes.add(argument.getType());
             }
         }
+        boolean ownVarargs = varargsTakes(method, argumentTypes);
+        boolean generic = !method.getDeclaringType().getTypeParameters().isEmpty() ||
+                          method.getDeclaringType().getMethods().stream().anyMatch(candidate ->
+                                  candidate.getName().equals(method.getName()) && namesTypeVariable(candidate));
+        if (generic && !ownVarargs) {
+            return null;
+        }
+        JavaType.Method overload = mostSpecific(method, c -> takes(c.getParameterTypes(), argumentTypes, false));
+        if (overload == null) {
+            overload = mostSpecific(method, c -> takes(c.getParameterTypes(), argumentTypes, true));
+        }
+        if (overload == null) {
+            overload = ownVarargs ? method : mostSpecific(method, c -> varargsTakes(c, argumentTypes));
+        }
+        if (overload == null || overload == method) {
+            return overload;
+        }
+        // A listed overload lacks the generic declaring type that the parser gives the call, and the receiver's
+        // type arguments that a generic declaring type substitutes in the return type
+        overload = overload.withDeclaringType(method.getDeclaringType());
+        return generic ? overload.withReturnType(method.getReturnType()) : overload;
+    }
+
+    private static JavaType.@Nullable Method mostSpecific(JavaType.Method method,
+                                                         Predicate<JavaType.Method> takesArguments) {
         JavaType.Method overload = null;
-        for (JavaType.Method candidate : varargs.getDeclaringType().getMethods()) {
-            if (candidate.getName().equals(varargs.getName()) &&
-                takes(candidate.getParameterTypes(), argumentTypes) &&
-                (overload == null || takes(overload.getParameterTypes(), candidate.getParameterTypes()))) {
+        for (JavaType.Method candidate : method.getDeclaringType().getMethods()) {
+            if (candidate.getName().equals(method.getName()) && takesArguments.test(candidate) &&
+                (overload == null || takes(overload.getParameterTypes(), candidate.getParameterTypes(), false))) {
                 overload = candidate;
             }
         }
         return overload;
     }
 
-    private static boolean takes(List<JavaType> parameters, List<? extends @Nullable JavaType> types) {
+    private static boolean takes(List<JavaType> parameters, List<? extends @Nullable JavaType> types, boolean boxing) {
         if (parameters.size() != types.size()) {
             return false;
         }
         for (int i = 0; i < parameters.size(); i++) {
-            if (!TypeUtils.isAssignableTo(parameters.get(i), types.get(i))) {
+            if (!boxing && isPrimitive(parameters.get(i)) != isPrimitive(types.get(i)) ||
+                !TypeUtils.isAssignableTo(parameters.get(i), types.get(i))) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean isPrimitive(@Nullable JavaType type) {
+        return type instanceof JavaType.Primitive &&
+               type != JavaType.Primitive.String && type != JavaType.Primitive.Null;
+    }
+
+    private static boolean namesTypeVariable(JavaType.Method method) {
+        return namesTypeVariable(method.getReturnType()) ||
+               method.getParameterTypes().stream().anyMatch(JavaTemplateJavaExtension::namesTypeVariable) ||
+               method.getThrownExceptions().stream().anyMatch(JavaTemplateJavaExtension::namesTypeVariable);
+    }
+
+    private static boolean namesTypeVariable(@Nullable JavaType type) {
+        if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            return !"?".equals(variable.getName()) ||
+                   variable.getBounds().stream().anyMatch(JavaTemplateJavaExtension::namesTypeVariable);
+        }
+        if (type instanceof JavaType.Parameterized) {
+            return ((JavaType.Parameterized) type).getTypeParameters().stream()
+                    .anyMatch(JavaTemplateJavaExtension::namesTypeVariable);
+        }
+        return type instanceof JavaType.Array && namesTypeVariable(((JavaType.Array) type).getElemType());
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {
