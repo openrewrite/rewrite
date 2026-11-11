@@ -126,9 +126,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = substitutions(withoutCommentsOfReplacedTree(coordinates, parameters));
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
-        if (coordinates.getMode() == JavaCoordinates.Mode.REPLACEMENT && coordinates.getTree() instanceof Expression) {
+        // A context-sensitive stub doesn't declare the template's type variables, so those in its types are the
+        // code's own.
+        if (!templateParser.isContextSensitive()) {
             // the replacement takes the replaced expression's place, so its bind type is that expression's type
-            substitutions.bindTypeVariables(templateParser.getBindType(), ((Expression) coordinates.getTree()).getType());
+            Expression replaced = coordinates.getMode() == JavaCoordinates.Mode.REPLACEMENT &&
+                                  coordinates.getTree() instanceof Expression ? (Expression) coordinates.getTree() : null;
+            substitutions.bindTypeVariables(templateParser.getBindType(), replaced);
         }
 
         JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,

@@ -711,6 +711,51 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void contextSensitiveTemplateKeepsTheTypeOfTheCodesTypeVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate valueUnlessEmpty = JavaTemplate.builder("#{any(java.util.List<T>)}.isEmpty() ? null : value")
+                .contextSensitive()
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("next".equals(method.getSimpleName()) && method.getSelect() instanceof J.MethodInvocation iterator) {
+                      return valueUnlessEmpty.apply(getCursor(), method.getCoordinates().replace(), iterator.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Box<T> {
+                  T value;
+
+                  Object valueUnlessEmpty(List<String> strings) {
+                      return strings.iterator().next();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Box<T> {
+                  T value;
+
+                  Object valueUnlessEmpty(List<String> strings) {
+                      return strings.isEmpty() ? null : value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeVariableOfAMethodTheTemplateReferencesKeepsItsOwnType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

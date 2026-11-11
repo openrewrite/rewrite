@@ -54,6 +54,7 @@ public class Substitutions {
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
     private Map<String, JavaType.GenericTypeVariable> generics = emptyMap();
+    private final Map<Integer, JavaType> declaredParameterTypes = new HashMap<>();
     private final Map<String, @Nullable JavaType> typeVariableBindings = new HashMap<>();
     private final Set<UUID> splicedParameterIds = new HashSet<>();
 
@@ -145,7 +146,7 @@ public class Substitutions {
             if ("anyArray".equals(matcherName)) {
                 type = new JavaType.Array(null, type, null);
             }
-            bindTypeVariables(type, parameter instanceof TypedTree ? ((TypedTree) parameter).getType() : null);
+            declaredParameterTypes.put(index, type);
         } else {
             if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
                     ((J.NewClass) parameter).getClazz() != null) {
@@ -304,20 +305,23 @@ public class Substitutions {
 
     /**
      * Records what the type variables declared with {@code genericTypes()} stand for where the template is applied,
-     * by matching a type the template writes with them against the type found in the same place.
+     * by matching the types its typed parameters declare against their arguments' types, and its bind type against
+     * the type of the expression it replaces.
      */
-    public void bindTypeVariables(String declaredType, @Nullable JavaType actual) {
+    public void bindTypeVariables(String bindType, @Nullable Expression replaced) {
         if (generics.isEmpty()) {
             return;
         }
-        JavaType declared;
-        try {
-            declared = TypeParameter.toJavaType(TypeParameter.parser(declaredType).type(), generics);
-        } catch (IllegalArgumentException e) {
-            // a simple name needs the template's imports to resolve, so it binds nothing
-            return;
+        declaredParameterTypes.forEach((index, declared) -> bindTypeVariables(declared,
+                parameters[index] instanceof TypedTree ? ((TypedTree) parameters[index]).getType() : null));
+        if (replaced != null) {
+            try {
+                JavaType declared = TypeParameter.toJavaType(TypeParameter.parser(bindType).type(), generics);
+                bindTypeVariables(declared, replaced.getType());
+            } catch (IllegalArgumentException e) {
+                // a bind type this can't read, such as a simple name that needs the template's imports, binds nothing
+            }
         }
-        bindTypeVariables(declared, actual);
     }
 
     private void bindTypeVariables(@Nullable JavaType declared, @Nullable JavaType actual) {
