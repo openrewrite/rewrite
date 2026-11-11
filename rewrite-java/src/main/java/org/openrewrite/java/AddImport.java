@@ -263,12 +263,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private Optional<JavaType> getTypeReference(NameTree t) {
-        if (!(t instanceof J.FieldAccess)) {
-           return Optional.ofNullable(t.getType());
-
-        }
         // Only the type's simple name, as in `RoundingMode.HALF_EVEN`, needs the type imported, not a qualified
-        // name like `Outer.Nested.CONST` or a variable like `node.next`.
+        // name like `Outer.Nested.CONST`, a variable like `node.next`, or a `var` that infers the type.
+        if (!(t instanceof J.FieldAccess)) {
+            return t.getMarkers().findFirst(JavaVarKeyword.class).isPresent() ?
+                    Optional.empty() : Optional.ofNullable(t.getType());
+        }
         Expression target = ((J.FieldAccess) t).getTarget();
         if (target instanceof J.Identifier && ((J.Identifier) target).getFieldType() == null &&
                 isOfClassType(target.getType(), fullyQualifiedName)) {

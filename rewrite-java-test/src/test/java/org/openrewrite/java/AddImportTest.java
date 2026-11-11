@@ -443,7 +443,7 @@ class AddImportTest implements RewriteTest {
               package a;
 
               public class Base {
-                  protected Node node;
+                  public Node node;
               }
               """
           ),
@@ -454,6 +454,18 @@ class AddImportTest implements RewriteTest {
               class B extends a.Base {
                   Object next() {
                       return node.next;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              class C {
+                  Object node(a.Base base) {
+                      var node = base.node;
+                      return node;
                   }
               }
               """
