@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Objects;
@@ -200,7 +201,9 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     @Test
     void contextFreeTypeParameterConflictNames() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template merges the method's and the class's type variables of the same name
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if ("printf".equals(method.getSimpleName())) {
@@ -309,7 +312,9 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     @Test
     void contextFreeSequenceTypeParameters() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true))
+          // the template types an argument by the position it is moved from
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .parser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true))
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {

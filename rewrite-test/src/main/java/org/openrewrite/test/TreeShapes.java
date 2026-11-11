@@ -30,21 +30,23 @@ import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * Finds nodes in a recipe's output that its parser builds differently from the text they print, which recipes that
- * run after it don't match the way they match parsed code.
+ * Finds nodes in a recipe's output that its parser builds or types differently from the text they print, which recipes
+ * that run after it don't match the way they match parsed code.
  */
 final class TreeShapes {
     private static final int MAX_PER_FILE = 5;
     private static final int SNIPPET_LENGTH = 60;
 
-    private final boolean enabled;
+    private final boolean shapes;
+    private final boolean types;
     private final Function<SourceFile, List<Parser.Builder>> parsersFor;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
 
-    TreeShapes(boolean enabled, Function<SourceFile, List<Parser.Builder>> parsersFor, @Nullable Path relativeTo,
-               ExecutionContext parseCtx) {
-        this.enabled = enabled;
+    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> parsersFor,
+               @Nullable Path relativeTo, ExecutionContext parseCtx) {
+        this.shapes = shapes;
+        this.types = types;
         this.parsersFor = parsersFor;
         this.relativeTo = relativeTo;
         this.parseCtx = parseCtx;
@@ -55,7 +57,7 @@ final class TreeShapes {
      *                can refer to the others, as a Maven module does to its parent.
      */
     void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
-        if (!enabled) {
+        if (!shapes && !types) {
             return;
         }
         // each source as the recipe left it
@@ -69,6 +71,8 @@ final class TreeShapes {
                 changed.add(result.getBefore().getId());
             }
         }
+        List<SourceFile> parsedAndOutput = new ArrayList<>(sources);
+        parsedAndOutput.addAll(current);
         for (SourceFile source : sources) {
             if (!changed.contains(source.getId())) {
                 current.add(source);
@@ -88,80 +92,116 @@ final class TreeShapes {
                 byParser.computeIfAbsent(parsers.get(0), p -> new ArrayList<>()).add(result);
             }
         }
-        StringBuilder found = new StringBuilder();
+        StringBuilder foundShapes = new StringBuilder();
+        StringBuilder foundTypes = new StringBuilder();
         for (Map.Entry<Parser.Builder, List<Result>> group : byParser.entrySet()) {
-            Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current);
+            Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current, parsedAndOutput);
             for (Result result : group.getValue()) {
                 SourceFile after = Objects.requireNonNull(result.getAfter());
                 Reparsed parse = reparsed.get(after.getId());
-                List<String> problems = parse == null ? Collections.emptyList() :
-                        problems(Objects.requireNonNull(service(after)), after, result.getBefore(), parse);
-                if (!problems.isEmpty()) {
-                    found.append("  ").append(after.getSourcePath()).append(NameMatching.changedBy(result))
-                            .append(":\n");
-                    for (String problem : problems) {
-                        found.append("    ").append(problem).append('\n');
-                    }
+                if (parse == null) {
+                    continue;
                 }
+                List<String> shapeProblems = new ArrayList<>();
+                Set<String> typeProblems = new LinkedHashSet<>();
+                problems(Objects.requireNonNull(service(after)), after, result.getBefore(), parse, shapeProblems,
+                        typeProblems);
+                append(foundShapes, result, shapeProblems);
+                append(foundTypes, result, typeProblems);
             }
         }
-        if (found.length() > 0) {
+        if (foundShapes.length() > 0) {
             fail("Write code with a template or the format's own parser, or build the nodes the way its parser builds " +
                  "the text they print. The recipe's output holds nodes that its parser makes differently of the " +
-                 "same text:\n" + found +
+                 "same text:\n" + foundShapes +
                  "A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that " +
                  "parsed code never holds. If the output is meant to differ from parsed code, add " +
                  "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()).");
         }
+        if (foundTypes.length() > 0) {
+            fail("Give the code the recipe writes the types its parser gives that code. The recipe's output holds " +
+                 "types that a parse of the text it prints doesn't:\n" + foundTypes +
+                 "A recipe that runs after it matches code by its types, so it misses or mistakes code whose types " +
+                 "are wrong. If the output is meant to differ from parsed code, add " +
+                 "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()).");
+        }
     }
 
-    private List<String> problems(TreeShapeValidationService service, SourceFile after, @Nullable SourceFile before,
-                                  Reparsed reparsed) {
-        List<String> problems = new ArrayList<>();
+    private static void append(StringBuilder found, Result result, Collection<String> problems) {
+        if (problems.isEmpty()) {
+            return;
+        }
+        found.append("  ").append(Objects.requireNonNull(result.getAfter()).getSourcePath())
+                .append(NameMatching.changedBy(result)).append(":\n");
+        for (String problem : problems) {
+            found.append("    ").append(problem).append('\n');
+        }
+    }
+
+    private void problems(TreeShapeValidationService service, SourceFile after, @Nullable SourceFile before,
+                          Reparsed reparsed, List<String> shapeProblems, Set<String> typeProblems) {
         if (reparsed.error != null) {
-            problems.add("the text it prints doesn't parse: " + reparsed.error);
-            return problems;
+            if (shapes) {
+                shapeProblems.add("the text it prints doesn't parse: " + reparsed.error);
+            }
+            return;
         }
         compare(service, skeleton(service, after), skeleton(service, Objects.requireNonNull(reparsed.sourceFile)),
-                problems);
+                shapes ? shapeProblems : null, types ? typeProblems : null);
         // a file that already broke its language's rules, such as JSON5 in a .json file, follows other ones
         TreeShapeValidationService beforeService = before == null ? null : service(before);
-        if (before == null || beforeService == null || beforeService.invalid(before).isEmpty()) {
+        if (shapes && (before == null || beforeService == null || beforeService.invalid(before).isEmpty())) {
             for (String problem : service.invalid(after)) {
-                if (problems.size() < MAX_PER_FILE) {
-                    problems.add(problem);
+                if (shapeProblems.size() < MAX_PER_FILE) {
+                    shapeProblems.add(problem);
                 }
             }
         }
-        return problems;
     }
 
-    private static void compare(TreeShapeValidationService service, Node node, Node parsed, List<String> problems) {
-        if (problems.size() >= MAX_PER_FILE) {
+    /**
+     * Types are compared only between nodes of the same shape, as a node the parser builds differently has no
+     * counterpart to compare with.
+     */
+    private static void compare(TreeShapeValidationService service, Node node, Node parsed,
+                                @Nullable List<String> shapeProblems, @Nullable Set<String> typeProblems) {
+        if (full(shapeProblems) && full(typeProblems)) {
             return;
         }
         if (node.tree.getClass() != parsed.tree.getClass()) {
-            if (!service.equivalent(node.tree, parsed.tree)) {
-                problems.add(node + " is a " + Probes.typeName(node.tree.getClass()) + " where the parser makes a " +
-                             Probes.typeName(parsed.tree.getClass()));
+            if (!full(shapeProblems) && !service.equivalent(node.tree, parsed.tree)) {
+                shapeProblems.add(node + " is a " + Probes.typeName(node.tree.getClass()) +
+                                  " where the parser makes a " + Probes.typeName(parsed.tree.getClass()));
             }
             return;
         }
         Object value = service.value(node.tree);
         Object parsedValue = service.value(parsed.tree);
-        if (!Objects.equals(value, parsedValue)) {
-            problems.add(node + " has " + value + " where the parser makes " + parsedValue);
+        if (!full(shapeProblems) && !Objects.equals(value, parsedValue)) {
+            shapeProblems.add(node + " has " + value + " where the parser makes " + parsedValue);
+        }
+        if (!full(typeProblems)) {
+            for (String difference : service.typeDifferences(node.tree, parsed.tree)) {
+                if (full(typeProblems)) {
+                    break;
+                }
+                typeProblems.add(node + " has " + difference);
+            }
         }
         if (node.children.size() != parsed.children.size()) {
-            if (!service.equivalent(node.tree, parsed.tree)) {
-                problems.add(node + " holds " + kinds(node.children) + " where the parser makes " +
-                             kinds(parsed.children));
+            if (!full(shapeProblems) && !service.equivalent(node.tree, parsed.tree)) {
+                shapeProblems.add(node + " holds " + kinds(node.children) + " where the parser makes " +
+                                  kinds(parsed.children));
             }
             return;
         }
         for (int i = 0; i < node.children.size(); i++) {
-            compare(service, node.children.get(i), parsed.children.get(i), problems);
+            compare(service, node.children.get(i), parsed.children.get(i), shapeProblems, typeProblems);
         }
+    }
+
+    private static boolean full(@Nullable Collection<String> problems) {
+        return problems == null || problems.size() >= MAX_PER_FILE;
     }
 
     private static String kinds(List<Node> nodes) {
@@ -209,7 +249,8 @@ final class TreeShapes {
      * A fresh parse, by {@code builder}, of the printed text of each of the {@code current} sources that it parses,
      * by the id of the source, leaving out the ones it doesn't parse back to the same kind of source.
      */
-    private Map<UUID, Reparsed> reparse(Parser.Builder builder, List<SourceFile> current) {
+    private Map<UUID, Reparsed> reparse(Parser.Builder builder, List<SourceFile> current,
+                                        List<SourceFile> parsedAndOutput) {
         List<SourceFile> sources = new ArrayList<>();
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
@@ -225,7 +266,10 @@ final class TreeShapes {
         Map<UUID, Reparsed> reparsed = new HashMap<>();
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
-        List<SourceFile> parsed = parse(service == null ? builder : service.untypedParser(builder), inputs, errors);
+        // types need the test's own parser, with its classpath, and shapes alone parse faster without types
+        Parser.Builder reparser = service == null ? builder :
+                types ? service.typedParser(builder, parsedAndOutput) : service.untypedParser(builder);
+        List<SourceFile> parsed = parse(reparser, inputs, errors);
         if (parsed == null) {
             return reparsed;
         }

@@ -33,6 +33,26 @@ class RecipeQualityValidationTest {
     }
 
     @Test
+    void parserTypedTreesOnlyWhenItsSystemPropertyTurnsThemOn() {
+        String property = "org.openrewrite.test.parserTypedTrees";
+        String set = System.getProperty(property);
+        try {
+            System.clearProperty(property);
+            assertThat(RecipeQualityValidation.all().parserTypedTrees()).isFalse();
+            assertThat(RecipeQualityValidation.builder().build().parserTypedTrees()).isFalse();
+            System.setProperty(property, "true");
+            assertThat(RecipeQualityValidation.all().parserTypedTrees()).isTrue();
+            assertThat(RecipeQualityValidation.builder().build().parserTypedTrees()).isTrue();
+        } finally {
+            if (set == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, set);
+            }
+        }
+    }
+
+    @Test
     void deprecatedTypeValidationOptionsStillTurnChecksOff() {
         RecipeQualityValidation quality = RecipeQualityValidation.of(
           RecipeSpec.defaults().typeValidationOptions(TypeValidation.none()), RecipeSpec.defaults());

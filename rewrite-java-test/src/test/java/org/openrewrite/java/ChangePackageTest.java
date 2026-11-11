@@ -293,6 +293,52 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void updateThrownExceptionType() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateThrownTypeVariableBound() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  <E extends Test> void m() throws E {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  <E extends Test> void m() throws E {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVariableType() {
         rewriteRun(
           java(testClassBefore, testClassAfter),
@@ -1523,6 +1569,44 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(cu.findType("org.openrewrite.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void typeVariableBoundThatRefersToTheVariable() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite;
+              public class Node<T extends Node<T>> {
+              }
+              """,
+            """
+              package org.openrewrite.test;
+              public class Node<T extends Node<T>> {
+              }
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """
           )
         );
     }

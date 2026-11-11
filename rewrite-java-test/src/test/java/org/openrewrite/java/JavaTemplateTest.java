@@ -629,7 +629,9 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void replaceAnonymousClassObject() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template writes a local or anonymous class as its supertype, so it infers that type
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("asList".equals(method.getSimpleName())) {
@@ -1615,6 +1617,43 @@ class JavaTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceVarargsArgumentsWithAnotherOverloadsArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Foo bar(String...)").matches(mi)) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}.length()", new Cursor(getCursor().getParent(), mi),
+                        mi.getCoordinates().replaceArguments(), mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              class Foo {
+                  void foo() {
+                      bar("Hello");
+                  }
+                  void bar(String... arg) {}
+                  void bar(int length) {}
+              }
+              """,
+            """
+              class Foo {
+                  void foo() {
+                      bar("Hello".length());
+                  }
+                  void bar(String... arg) {}
+                  void bar(int length) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableDeclarationWithFinalVar() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -1660,7 +1699,8 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void recursiveType() {
         rewriteRun(
-          spec -> spec
+          // a context-sensitive template types a lambda argument by a placeholder method's parameter
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {

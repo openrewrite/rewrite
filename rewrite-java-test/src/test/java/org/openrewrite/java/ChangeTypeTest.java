@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -652,6 +653,47 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeVariableBoundThatRefersToTheVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Node", "a.Node2", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public interface Node<T extends Node<T>> {
+                }
+                """,
+              """
+                package a;
+                public interface Node2<T extends Node2<T>> {
+                }
+                """
+            )),
+          java(
+            """
+              import a.Node;
+
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """,
+            """
+              import a.Node2;
+
+              import java.util.List;
+
+              class Test {
+                  <T extends Node2<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"EmptyTryBlock", "CatchMayIgnoreException"})
     @Test
     void multiCatch() {
@@ -1068,7 +1110,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void classToPrimitive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true)),
+          // ChangeType keeps the original class as the type of what it changes to a primitive or `String`
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           java(
             """
               class A {
@@ -1093,7 +1137,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void classToStringKeyword() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
+          // ChangeType keeps the original class as the type of what it changes to a primitive or `String`
+          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           java(
             """
               class A {
@@ -1552,6 +1598,17 @@ class ChangeTypeTest implements RewriteTest {
               public class V2Factory {
                   public static String getItem() {
                       return "V2Factory";
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.acme.product.factory;
+
+              public class V1FactoryA {
+                  public static String getItem() {
+                      return "V1FactoryA";
                   }
               }
               """
@@ -2260,6 +2317,45 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void thrownTypeVariableBoundedByTheChangedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.OldException", "b.NewException", true)),
+          java(
+            """
+              package a;
+              public class OldException extends Exception {
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class NewException extends Exception {
+              }
+              """
+          ),
+          java(
+            """
+              import a.OldException;
+
+              class A {
+                  <E extends OldException> void m() throws E {
+                  }
+              }
+              """,
+            """
+              import b.NewException;
+
+              class A {
+                  <E extends NewException> void m() throws E {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotModifyInnerClassesIfIgnoreDefinitionTrue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
@@ -2267,9 +2363,13 @@ class ChangeTypeTest implements RewriteTest {
             """
               public class Test {
                   private class InnerA {
+                      InnerA() {}
+                      void m() {}
+                      class Nested {}
                   }
 
                   private class InnerB {
+                      InnerB() {}
                   }
 
                   public void test(String s) {
@@ -2280,9 +2380,13 @@ class ChangeTypeTest implements RewriteTest {
             """
               public class Test {
                   private class InnerA {
+                      InnerA() {}
+                      void m() {}
+                      class Nested {}
                   }
 
                   private class InnerB {
+                      InnerB() {}
                   }
 
                   public void test(String s) {
@@ -2713,20 +2817,16 @@ class ChangeTypeTest implements RewriteTest {
               import foo.A.Builder;
 
               class Test {
-                A test() {
-                    A.Builder b = A.builder();
-                    return b.build();
-                }
+                A a;
+                A.Builder b;
               }
               """,
                 """
               import foo.A;
 
               class Test {
-                A test() {
-                    bar.A.Builder b = A.builder();
-                    return b.build();
-                }
+                A a;
+                bar.A.Builder b;
               }
               """
           )

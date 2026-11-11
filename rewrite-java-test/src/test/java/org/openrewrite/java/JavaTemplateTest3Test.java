@@ -49,7 +49,8 @@ class JavaTemplateTest3Test implements RewriteTest {
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   var cd = super.visitClassDeclaration(classDecl, p);
                   if ("a".equals(classDecl.getType().getPackageName())) {
-                      cd = cd.withType(cd.getType().withFullyQualifiedName("b.${cd.getSimpleName()}"));
+                      var type = cd.getType().withFullyQualifiedName("b." + cd.getSimpleName());
+                      cd = cd.withType(type).withName(cd.getName().withType(type));
                   }
                   return cd;
               }
