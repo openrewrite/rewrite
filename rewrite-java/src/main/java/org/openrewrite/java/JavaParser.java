@@ -23,6 +23,7 @@ import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -397,15 +398,21 @@ public interface JavaParser extends Parser {
 
         /**
          * Resolve the {@link JavaTypeFactory} to use for this parser. Returns the explicit
-         * factory set via {@link #typeFactory}, or {@code null} when none is configured —
-         * the caller falls back to a default factory.
+         * factory set via {@link #typeFactory}. When neither a factory nor a type cache is configured,
+         * returns the one {@link JdkClassSharingTypeFactory#forParser} gives in tests, or {@code null}
+         * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            return javaTypeFactory;
+            if (javaTypeFactory != null || typeCacheConfigured) {
+                return javaTypeFactory;
+            }
+            return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            javaTypeCache = HashMapJavaTypeCache.forParser(javaTypeCache, typeCacheConfigured || javaTypeFactory != null);
+            boolean configured = typeCacheConfigured || javaTypeFactory != null;
+            javaTypeCache = HashMapJavaTypeCache.forParser(
+                    JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;
         }
 

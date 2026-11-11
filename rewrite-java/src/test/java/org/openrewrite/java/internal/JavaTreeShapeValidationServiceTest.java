@@ -32,6 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTreeShapeValidationServiceTest {
 
+    static {
+        JdkClassSharingTypeFactory.useForParsers();
+    }
+
     private static final String SOURCE = "class A { org.jspecify.annotations.NullMarked m; b.B d; " +
                                          "Object o = java.util.Collections.emptyList(); }";
 
@@ -62,6 +66,23 @@ class JavaTreeShapeValidationServiceTest {
         assertThat(fieldType(reparsed, 0)).isSameAs(fieldType(original.getClasses().get(0), 0));
 
         assertThat(methods(parse(typed, source))).containsExactly("m");
+    }
+
+    @Test
+    void typedParserGivesACallOfASharedClassTheMethodTheClassDeclares() {
+        parse(JavaParser.fromJavaVersion(), "class P { java.util.List<String> l; }");
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
+        J.CompilationUnit original = compilationUnit(typed,
+                "class A { boolean m(java.util.List<String> l) { return l.size() > 0; } }");
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(typed, List.of(original));
+
+        J.ClassDeclaration reparsed = parse(reparser,
+                "class A { boolean m(java.util.List<String> l) { return l.isEmpty(); } }");
+        J.MethodDeclaration m = (J.MethodDeclaration) reparsed.getBody().getStatements().get(0);
+        J.Return returned = (J.Return) requireNonNull(m.getBody()).getStatements().get(0);
+        J.MethodInvocation call = (J.MethodInvocation) requireNonNull(returned.getExpression());
+        JavaType.Method isEmpty = requireNonNull(call.getMethodType());
+        assertThat(isEmpty.getDeclaringType().getMethods()).anyMatch(method -> method == isEmpty);
     }
 
     @Test
