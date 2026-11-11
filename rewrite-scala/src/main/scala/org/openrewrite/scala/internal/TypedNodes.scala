@@ -23,6 +23,7 @@ import dotty.tools.dotc.typer.{Typer, TyperPhase}
 
 import java.util.{Collections, IdentityHashMap}
 import scala.collection.mutable
+import scala.util.control.NonFatal
 
 /**
  * What the typer made of a node of the untyped tree: `own` is the node typed on its own,
@@ -104,7 +105,9 @@ private[internal] object UntypedNodeIndex {
         }
       }.traverse(tree)
     } catch {
-      case _: Throwable =>
+      // A long infix chain parses fine but can be too deep to traverse. compileAll keeps each
+      // source's unit, entry and tree in parallel lists, which a throw here would put out of step.
+      case NonFatal(_) | _: StackOverflowError =>
     }
     new UntypedNodeIndex(nodes)
   }
