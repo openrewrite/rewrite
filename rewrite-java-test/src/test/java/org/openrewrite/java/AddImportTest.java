@@ -443,7 +443,7 @@ class AddImportTest implements RewriteTest {
               package a;
 
               public class Base {
-                  public Node node;
+                  protected Node node;
               }
               """
           ),
@@ -457,14 +457,40 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddImportIfOnlyReferencedByVar() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.Node", null, true))),
+          java(
+            """
+              package a;
+
+              public class Node {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Base {
+                  public Node node() {
+                      return new Node();
+                  }
+              }
+              """
           ),
           java(
             """
               package b;
 
-              class C {
+              class B {
                   Object node(a.Base base) {
-                      var node = base.node;
+                      var node = base.node();
                       return node;
                   }
               }
