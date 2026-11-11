@@ -512,6 +512,37 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
     assert {d["state"] for d in noop} == {"NO_CHANGE", "END_OF_OBJECT"}
 
 
+def test_an_edit_java_fetched_from_the_facade_survives_the_next_refetch(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", Facade(_FakeChildren(), local_visit=server._hub_local_visit,
+                                                  is_local_visitor=server._hub_is_builtin_visitor))
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "remote_objects", {tree_id: cu})  # Java holds this side's parse
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "_last_sent", [])
+    # Java makes no edit of its own.
+    monkeypatch.setattr(server, "send_request",
+                        lambda method, params: [{"state": "NO_CHANGE"}, {"state": "END_OF_OBJECT"}])
+
+    visit = {"treeId": tree_id, "sourceFileType": sft, "visitor": _ADD_IMPORT,
+             "visitorOptions": {"module": "collections.abc", "name": "Iterable", "only_if_referenced": False}}
+    assert server.handle_request("Visit", visit) == {"modified": True}
+    edited = server._hub_tree[tree_id]
+    server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft})
+
+    server.handle_request("Visit", visit)
+
+    assert server._hub_tree[tree_id] is edited
+
+
 def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
     """A built-in visitor may delete the file outright. The facade drops the tree and forgets what
     each child was served, but leaves ref numbering alone: no Evict was broadcast, so each child
