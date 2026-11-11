@@ -720,7 +720,7 @@ def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypat
     assert len(refs) == 1 and server._hub_recv_refs[bundle] == {1: server._hub_recv_refs[bundle][1]}
 
 
-def test_a_batch_stops_after_a_child_deletes_the_file():
+def test_a_batch_stops_after_a_bundle_deletes_the_file():
     """Once a bundle deletes the file there is nothing left for a later bundle to visit, and
     _hub_serve_child would answer it DELETE anyway."""
     ran = []
@@ -743,6 +743,16 @@ def test_a_batch_stops_after_a_child_deletes_the_file():
 
     assert [r.get("visitor") for r in resp["results"]] == ["del:a"]
     assert ran == [("A", ["del:a"])]
+
+    ran.clear()
+    f = Facade(children, is_local_visitor=lambda name: name == "del:here",
+               local_visit=lambda items, params: [{"modified": True, "deleted": True} for _ in items])
+    f._bundle_by_visitor.update({"edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "del:here"}, {"visitor": "edit:b"}]})
+
+    assert len(resp["results"]) == 1 and ran == []
 
 
 def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
