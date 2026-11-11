@@ -298,8 +298,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     void replaceMemberReferenceToLambda() {
         //noinspection Convert2MethodRef
         rewriteRun(
-          // the template leaves its own type variables where the parser infers the call site's types
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
                   .bindType("java.util.function.Function<T, String>")
@@ -354,8 +353,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     void replaceLambdaToMemberReference() {
         //noinspection Convert2MethodRef
         rewriteRun(
-          // the template leaves its own type variables where the parser infers the call site's types
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
                   .bindType("java.util.function.Function<T, String>")
@@ -412,8 +410,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
         // so its erasure is Object. Object::toString is valid in any Function<X, String> context.
         //noinspection Convert2MethodRef
         rewriteRun(
-          // the template leaves its own type variables where the parser infers the call site's types
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
                   .bindType("java.util.function.Function<T, String>")
@@ -469,8 +466,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
         // When T has a bound (T extends Number), the erasure is Number.
         //noinspection Convert2MethodRef
         rewriteRun(
-          // the template leaves its own type variables where the parser infers the call site's types
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.intValue()")
                   .bindType("java.util.function.ToIntFunction<T>")
@@ -563,11 +559,50 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableTakesTheTypeOfTheArgumentDeclaredWithIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate first = JavaTemplate.builder("#{any(java.util.List<T>)}.get(0)")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("next".equals(method.getSimpleName()) && method.getSelect() instanceof J.MethodInvocation iterator) {
+                      return first.apply(getCursor(), method.getCoordinates().replace(), iterator.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  String first(List<String> list) {
+                      return list.iterator().next();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  String first(List<String> list) {
+                      return list.get(0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void memberReferenceToLambda() {
         //noinspection Convert2MethodRef
         rewriteRun(
-          // the template leaves its own type variables where the parser infers the call site's types
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("#{any(java.util.Set<T>)}::contains")
                   .bindType("java.util.function.Predicate<T>")
@@ -624,7 +659,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
     void templateGenericDoesNotClobberCallSiteTypeVariable() {
         //noinspection unchecked
         rewriteRun(
-          // the template leaves its own type variables where the parser infers the call site's types
+          // the parser gives Optional's method a declaring type that depends on what it mapped before
           spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
             .recipe(toRecipe(() -> new JavaVisitor<>() {
               final JavaTemplate before = JavaTemplate.builder("#{optional:any(java.util.Optional<T>)}.get()")

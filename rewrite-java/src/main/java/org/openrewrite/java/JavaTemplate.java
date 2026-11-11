@@ -126,6 +126,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = substitutions(withoutCommentsOfReplacedTree(coordinates, parameters));
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
+        if (coordinates.getMode() == JavaCoordinates.Mode.REPLACEMENT && coordinates.getTree() instanceof Expression) {
+            // the replacement takes the replaced expression's place, so its bind type is that expression's type
+            substitutions.bindTypeVariables(templateParser.getBindType(), ((Expression) coordinates.getTree()).getType());
+        }
 
         JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,
                 substitutedTemplate, coordinates, autoFormat);
