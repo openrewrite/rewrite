@@ -261,7 +261,7 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
     bc.install("foo_bar", "foo_bar")
 
     assert ops.created == [tmp_path / "venvs" / "foo_bar"]        # created once, normalized dir
-    assert spawned == ["foo_bar", "foo_bar"]                      # one key, its child restarted
+    assert spawned == ["foo_bar"]                                 # one child, spawned once
     assert bc.request("FOO.BAR", "Visit", {}) == {"ran": "Visit"}  # any spelling routes to it
 
 
@@ -338,6 +338,27 @@ def test_every_attach_restarts_the_bundles_child(tmp_path):
         bc.request(str(first), "Visit", {})                      # never respawned on the old venv
 
 
+def test_a_reinstall_that_changes_the_bundle_restarts_its_child(tmp_path):
+    spawned, replaced = [], []
+    bc, _, _ = _spawning_children(tmp_path, spawned, replaced)
+    installed_version = "1.0"
+    bc._venv_ops.installed_version = lambda d, dist: installed_version
+    bc.install("pkg", "pkg")
+
+    bc.install("pkg", "pkg")                                   # nothing changed
+    assert len(spawned) == 1 and replaced == []
+
+    installed_version = "1.1"
+    bc.install("pkg", "pkg")                                   # upgraded
+    assert spawned[0].closed and len(spawned) == 2 and replaced == ["pkg"]
+
+    bc.install("pkg", "/src/pkg", attribution_name="/src/pkg")  # same version under another name
+    assert spawned[1].closed and "/src/pkg" in spawned[2].cmd
+
+    bc.install("pkg", "/src/pkg", force=True, attribution_name="/src/pkg")  # same version re-copied
+    assert spawned[2].closed and not spawned[3].closed
+
+
 def test_a_source_path_is_either_installed_or_attached_never_both(tmp_path):
     spawned = []
     bc, _, _ = _spawning_children(tmp_path, spawned)
@@ -358,13 +379,13 @@ def test_a_failed_reinstall_keeps_the_installed_bundle_serving(tmp_path):
     spawned = []
     bc, _, _ = _spawning_children(tmp_path, spawned)
     bc.install("pkg", "pkg==1.0")
-    bc._venv_ops.install_into_venv = lambda d, spec, force=False: (_ for _ in ()).throw(RuntimeError("transient"))
+    child = spawned[0]
+    child.request = lambda method, params: (_ for _ in ()).throw(RuntimeError("transient"))
 
     with pytest.raises(RuntimeError, match="transient"):
         bc.install("pkg", "pkg==1.1")
 
-    assert bc.owner("pkg.R") == "pkg"
-    assert bc.request("pkg", "Visit", {}) == {"ran": "Visit"}
+    assert bc.owner("pkg.R") == "pkg" and not child.closed
 
 
 def test_attach_rejects_a_venv_without_the_distribution_and_keeps_the_current_one(tmp_path):
