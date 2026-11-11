@@ -688,6 +688,62 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableTakesTheTypeThatTheArgumentsSupertypeGivesIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate unmodifiable = JavaTemplate.builder("java.util.Collections.unmodifiableList(#{any(java.util.List<T>)})")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("copyOf".equals(method.getSimpleName())) {
+                      return unmodifiable.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Test {
+                  static class Names extends ArrayList<String> {
+                  }
+
+                  List<String> copy(ArrayList<String> list) {
+                      return List.copyOf(list);
+                  }
+
+                  List<String> copy(Names names) {
+                      return List.copyOf(names);
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Test {
+                  static class Names extends ArrayList<String> {
+                  }
+
+                  List<String> copy(ArrayList<String> list) {
+                      return java.util.Collections.unmodifiableList(list);
+                  }
+
+                  List<String> copy(Names names) {
+                      return java.util.Collections.unmodifiableList(names);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeVariableTakesTheTypeOfAnExceptionTheMethodThrows() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

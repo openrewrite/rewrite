@@ -350,10 +350,8 @@ public class Substitutions {
         } else if (declared instanceof JavaType.Parameterized) {
             JavaType.Parameterized declaredParameterized = (JavaType.Parameterized) declared;
             List<JavaType> declaredArguments = declaredParameterized.getTypeParameters();
-            List<JavaType> actualArguments = actual instanceof JavaType.Parameterized &&
-                    TypeUtils.fullyQualifiedNamesAreEqual(declaredParameterized.getFullyQualifiedName(),
-                            ((JavaType.Parameterized) actual).getFullyQualifiedName()) ?
-                    ((JavaType.Parameterized) actual).getTypeParameters() : emptyList();
+            JavaType.Parameterized supertype = asSupertype(actual, declaredParameterized.getFullyQualifiedName());
+            List<JavaType> actualArguments = supertype == null ? emptyList() : supertype.getTypeParameters();
             if (declaredArguments.size() == actualArguments.size()) {
                 for (int i = 0; i < declaredArguments.size(); i++) {
                     bindTypeVariables(declaredArguments.get(i), actualArguments.get(i));
@@ -367,8 +365,71 @@ public class Substitutions {
     }
 
     /**
-     * Leaves the variables in a declared type unbound where javac infers them in a way this matching doesn't follow,
-     * through an argument's supertypes or a wildcard's bound.
+     * The supertype of a type that is the class with the given name, with the type arguments the type gives it, as
+     * javac matches an argument to a parameter. A raw type has none.
+     */
+    private static JavaType.@Nullable Parameterized asSupertype(@Nullable JavaType type, String fqn) {
+        if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            if (TypeUtils.fullyQualifiedNamesAreEqual(parameterized.getFullyQualifiedName(), fqn)) {
+                return parameterized;
+            }
+            List<JavaType> variables = parameterized.getType().getTypeParameters();
+            List<JavaType> arguments = parameterized.getTypeParameters();
+            if (variables.size() != arguments.size()) {
+                return null;
+            }
+            Map<String, JavaType> argumentsByVariable = new HashMap<>();
+            for (int i = 0; i < variables.size(); i++) {
+                if (variables.get(i) instanceof JavaType.GenericTypeVariable) {
+                    String name = ((JavaType.GenericTypeVariable) variables.get(i)).getName();
+                    argumentsByVariable.put(name, arguments.get(i));
+                }
+            }
+            return asSupertype(parameterized.getType(), fqn, argumentsByVariable);
+        } else if (type instanceof JavaType.Class && ((JavaType.Class) type).getTypeParameters().isEmpty()) {
+            return asSupertype((JavaType.Class) type, fqn, emptyMap());
+        }
+        return null;
+    }
+
+    private static JavaType.@Nullable Parameterized asSupertype(JavaType.FullyQualified type, String fqn,
+                                                                 Map<String, JavaType> argumentsByVariable) {
+        List<JavaType.FullyQualified> supertypes = new ArrayList<>(type.getInterfaces());
+        if (type.getSupertype() != null) {
+            supertypes.add(type.getSupertype());
+        }
+        for (JavaType.FullyQualified supertype : supertypes) {
+            JavaType.Parameterized found = asSupertype(withArguments(supertype, argumentsByVariable), fqn);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private static JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
+        if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            if ("?".equals(variable.getName())) {
+                return variable.withBounds(
+                        ListUtils.map(variable.getBounds(), b -> withArguments(b, argumentsByVariable)));
+            }
+            return argumentsByVariable.getOrDefault(variable.getName(), variable);
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            return parameterized.withTypeParameters(
+                    ListUtils.map(parameterized.getTypeParameters(), t -> withArguments(t, argumentsByVariable)));
+        } else if (type instanceof JavaType.Array) {
+            JavaType.Array array = (JavaType.Array) type;
+            return array.withElemType(withArguments(array.getElemType(), argumentsByVariable));
+        }
+        return type;
+    }
+
+    /**
+     * Leaves the variables in a declared type unbound where the argument says nothing sure about them, such as a raw
+     * argument or a wildcard's bound.
      */
     private void unbindTypeVariables(JavaType declared) {
         if (declared instanceof JavaType.GenericTypeVariable) {
