@@ -1745,6 +1745,45 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "${property(\"guavaVersion\")}",
+      "${project.property(\"guavaVersion\")}",
+      "${findProperty(\"guavaVersion\")}"
+    })
+    void kotlinDslVersionInPropertiesFileUsingPropertyMethod(
+      String propertyNotation
+    ) {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+    
+              dependencies {
+                  implementation("com.google.guava:guava:${property("guavaVersion")}")
+              }
+              """
+          )
+        );
+    }
+
+
     @Test
     void versionInPropertiesFileNotUpdatedIfNoDependencyVariable() {
         rewriteRun(
