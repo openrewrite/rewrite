@@ -756,6 +756,53 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void fieldOfAClassTheTemplateReferencesKeepsItsOwnType() {
+        String box = "package com.example; public class Box<T> { public T value; }";
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(box))
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate value = JavaTemplate.builder("#{any(com.example.Box<T>)}.value")
+                  .genericTypes("T")
+                  .javaParser(JavaParser.fromJavaVersion().dependsOn(box))
+                  .build();
+
+                @Override
+                public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    if (fieldAccess.getTarget() instanceof J.MethodInvocation requireNonNull) {
+                        return value.apply(getCursor(), fieldAccess.getCoordinates().replace(), requireNonNull.getArguments().get(0));
+                    }
+                    return super.visitFieldAccess(fieldAccess, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import com.example.Box;
+
+              import java.util.Objects;
+
+              class Test {
+                  String value(Box<String> box) {
+                      return Objects.requireNonNull(box).value;
+                  }
+              }
+              """,
+            """
+              import com.example.Box;
+
+              import java.util.Objects;
+
+              class Test {
+                  String value(Box<String> box) {
+                      return box.value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeVariableOfAMethodTheTemplateReferencesKeepsItsOwnType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

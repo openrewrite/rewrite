@@ -131,7 +131,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         if (!templateParser.isContextSensitive()) {
             // the replacement takes the replaced expression's place, so its bind type is that expression's type
             Expression replaced = coordinates.getMode() == JavaCoordinates.Mode.REPLACEMENT &&
-                                  coordinates.getTree() instanceof Expression ? (Expression) coordinates.getTree() : null;
+                                  coordinates.getTree() instanceof Expression ?
+                    (Expression) coordinates.getTree() : null;
             substitutions.bindTypeVariables(templateParser.getBindType(), replaced);
         }
 

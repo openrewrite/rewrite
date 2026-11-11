@@ -128,7 +128,8 @@ public class Substitutions {
         return substituted;
     }
 
-    private String substituteTypedPattern(String key, int index, TemplateParameterParser.TypedPatternContext typedPattern) {
+    private String substituteTypedPattern(String key, int index,
+                                          TemplateParameterParser.TypedPatternContext typedPattern) {
         if (index >= parameters.length) {
             throw new IllegalArgumentException("This template requires more parameters.");
         }
@@ -331,9 +332,12 @@ public class Substitutions {
             if (generics.get(name) != declared || TypeUtils.isOfType(declared, actual)) {
                 return;
             }
-            boolean wildcard = actual instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) actual).getName());
-            boolean sure = actual != null && !(actual instanceof JavaType.Unknown) && !(actual instanceof JavaType.Primitive) && !wildcard &&
-                           (!typeVariableBindings.containsKey(name) || TypeUtils.isOfType(typeVariableBindings.get(name), actual));
+            boolean wildcard = actual instanceof JavaType.GenericTypeVariable &&
+                               "?".equals(((JavaType.GenericTypeVariable) actual).getName());
+            boolean sure = actual != null && !(actual instanceof JavaType.Unknown) &&
+                           !(actual instanceof JavaType.Primitive) && !wildcard &&
+                           (!typeVariableBindings.containsKey(name) ||
+                            TypeUtils.isOfType(typeVariableBindings.get(name), actual));
             // The variable stays unbound where javac infers its type, such as from a primitive, a wildcard or
             // arguments of different types.
             typeVariableBindings.put(name, sure ? actual : null);
@@ -342,7 +346,8 @@ public class Substitutions {
             JavaType.Parameterized actualParameterized = (JavaType.Parameterized) actual;
             List<JavaType> declaredArguments = declaredParameterized.getTypeParameters();
             List<JavaType> actualArguments = actualParameterized.getTypeParameters();
-            if (TypeUtils.fullyQualifiedNamesAreEqual(declaredParameterized.getFullyQualifiedName(), actualParameterized.getFullyQualifiedName()) &&
+            if (TypeUtils.fullyQualifiedNamesAreEqual(declaredParameterized.getFullyQualifiedName(),
+                    actualParameterized.getFullyQualifiedName()) &&
                 declaredArguments.size() == actualArguments.size()) {
                 for (int i = 0; i < declaredArguments.size(); i++) {
                     bindTypeVariables(declaredArguments.get(i), actualArguments.get(i));
@@ -354,7 +359,8 @@ public class Substitutions {
     }
 
     /**
-     * A method's declaring type is left alone, because a type variable there is the declaring class's own.
+     * A method's declaring type, and a field's type as its class declares it, are left alone, because a type variable
+     * there is the class's own.
      */
     private @Nullable JavaType withBoundTypeVariables(@Nullable JavaType type, Set<JavaType> visiting) {
         if (type == null || !visiting.add(type)) {
@@ -367,20 +373,25 @@ public class Substitutions {
                 if (bound != null) {
                     return bound;
                 } else if ("?".equals(generic.getName())) {
-                    return generic.withBounds(ListUtils.map(generic.getBounds(), b -> withBoundTypeVariables(b, visiting)));
+                    return generic.withBounds(
+                            ListUtils.map(generic.getBounds(), b -> withBoundTypeVariables(b, visiting)));
                 }
             } else if (type instanceof JavaType.Parameterized) {
                 JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-                return parameterized.withTypeParameters(ListUtils.map(parameterized.getTypeParameters(), t -> withBoundTypeVariables(t, visiting)));
+                return parameterized.withTypeParameters(
+                        ListUtils.map(parameterized.getTypeParameters(), t -> withBoundTypeVariables(t, visiting)));
             } else if (type instanceof JavaType.Array) {
                 JavaType.Array array = (JavaType.Array) type;
                 return array.withElemType(withBoundTypeVariables(array.getElemType(), visiting));
             } else if (type instanceof JavaType.Method) {
                 JavaType.Method method = (JavaType.Method) type;
                 return method.withReturnType(withBoundTypeVariables(method.getReturnType(), visiting))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), t -> withBoundTypeVariables(t, visiting)))
-                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), t -> withBoundTypeVariables(t, visiting)));
-            } else if (type instanceof JavaType.Variable) {
+                        .withParameterTypes(
+                                ListUtils.map(method.getParameterTypes(), t -> withBoundTypeVariables(t, visiting)))
+                        .withThrownExceptions(
+                                ListUtils.map(method.getThrownExceptions(), t -> withBoundTypeVariables(t, visiting)));
+            } else if (type instanceof JavaType.Variable &&
+                       !(((JavaType.Variable) type).getOwner() instanceof JavaType.FullyQualified)) {
                 JavaType.Variable variable = (JavaType.Variable) type;
                 return variable.withType(withBoundTypeVariables(variable.getType(), visiting));
             }
@@ -509,7 +520,8 @@ public class Substitutions {
             public J visitMemberReference(J.MemberReference memberRef, Integer integer) {
                 J j = super.visitMemberReference(memberRef, integer);
                 // the parser gives a member reference the method as declared, whose type variables are its own
-                return j instanceof J.MemberReference ? ((J.MemberReference) j).withMethodType(memberRef.getMethodType()) : j;
+                return j instanceof J.MemberReference ?
+                        ((J.MemberReference) j).withMethodType(memberRef.getMethodType()) : j;
             }
 
             @Override
