@@ -740,9 +740,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return ((J.Identifier) versionTree).getSimpleName();
                 }
                 if (versionTree instanceof J.MethodInvocation) {
-                    String propName = extractPropertyNameFromMethodInvocation(
-                            (J.MethodInvocation) versionTree
-                    );
+                    String propName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
                     if (propName != null) {
                         return propName;
                     }
