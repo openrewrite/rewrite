@@ -224,6 +224,50 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replacedEnumConstantIsAnEnumConstantToTheNextReplacement() {
+        rewriteRun(
+          spec -> spec.recipes(
+              new ReplaceConstantWithAnotherConstant("old.core.GeneratorFeature.QUOTE_FIELD_NAMES", "old.core.json.WriteFeature.QUOTE_FIELD_NAMES"),
+              new ReplaceConstantWithAnotherConstant("old.core.json.WriteFeature.QUOTE_FIELD_NAMES", "neu.core.json.WriteFeature.QUOTE_PROPERTY_NAMES"),
+              new ChangePackage("old.core", "neu.core", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package old.core;
+                public enum GeneratorFeature {
+                    QUOTE_FIELD_NAMES
+                }
+                """,
+              """
+                package old.core.json;
+                public enum WriteFeature {
+                    QUOTE_FIELD_NAMES
+                }
+                """,
+              """
+                package neu.core.json;
+                public enum WriteFeature {
+                    QUOTE_PROPERTY_NAMES
+                }
+                """
+            )),
+          java(
+            """
+              import old.core.GeneratorFeature;
+
+              class Test {
+                  Object o = GeneratorFeature.QUOTE_FIELD_NAMES;
+              }
+              """,
+            """
+              class Test {
+                  Object o = neu.core.json.WriteFeature.QUOTE_PROPERTY_NAMES;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/pull/3448")
     @Test
     void replaceConstantInCurlyBracesInAnnotation() {
