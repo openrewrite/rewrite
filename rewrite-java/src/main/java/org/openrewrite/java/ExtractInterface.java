@@ -94,13 +94,14 @@ public class ExtractInterface {
                 return null;
             }
 
-            return method
-                    .withModifiers(ListUtils.filter(method.getModifiers(), m ->
-                            !(m.getType() == J.Modifier.Type.Public ||
-                            m.getType() == J.Modifier.Type.Final ||
-                            m.getType() == J.Modifier.Type.Native)))
+            J.MethodDeclaration m = method
+                    .withModifiers(ListUtils.filter(method.getModifiers(), mod ->
+                            !(mod.getType() == J.Modifier.Type.Public ||
+                            mod.getType() == J.Modifier.Type.Final ||
+                            mod.getType() == J.Modifier.Type.Native)))
                     .withBody(null)
                     .withMethodType(method.getMethodType() == null ? null : interfaceMethodType(method.getMethodType()));
+            return m.getName().getType() == null ? m : m.withName(m.getName().withType(m.getMethodType()));
         }
 
         private JavaType.Method interfaceMethodType(JavaType.Method methodType) {

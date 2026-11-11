@@ -141,6 +141,9 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
             if (m.getMethodType() != null) {
                 m = m.withMethodType(withAccessLevel(m.getMethodType()));
+                if (m.getName().getType() != null) {
+                    m = m.withName(m.getName().withType(m.getMethodType()));
+                }
             }
         }
         return m;
