@@ -18,6 +18,7 @@ package org.openrewrite.java.internal.template;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
@@ -51,6 +52,7 @@ public class BlockStatementTemplateGenerator {
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
+    @Getter
     private final String bindType;
 
     public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {

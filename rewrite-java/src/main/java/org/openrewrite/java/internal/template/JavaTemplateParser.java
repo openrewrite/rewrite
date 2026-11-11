@@ -91,6 +91,14 @@ public class JavaTemplateParser {
         this.annotationTemplateGenerator = annotationTemplateGenerator;
     }
 
+    public String getBindType() {
+        return statementTemplateGenerator.getBindType();
+    }
+
+    public boolean isContextSensitive() {
+        return contextSensitive;
+    }
+
     /**
      * A source file with a single class whose first member is a method declaring the parameters at `#{}`.
      */

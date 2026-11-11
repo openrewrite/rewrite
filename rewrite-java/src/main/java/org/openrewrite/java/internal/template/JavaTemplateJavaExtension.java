@@ -733,7 +733,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
                 try {
-                    return substitutions.unsubstituteStatements(ListUtils.map(js, substitutions::resolveTypeVariables));
+                    return substitutions.unsubstituteStatements(substitutions.resolveTypeVariables(js));
                 } finally {
                     substituted = true;
                 }
@@ -741,7 +741,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstitute(List<J2> js) {
                 try {
-                    return substitutions.unsubstitute(ListUtils.map(js, substitutions::resolveTypeVariables));
+                    return substitutions.unsubstitute(substitutions.resolveTypeVariables(js));
                 } finally {
                     substituted = true;
                 }
