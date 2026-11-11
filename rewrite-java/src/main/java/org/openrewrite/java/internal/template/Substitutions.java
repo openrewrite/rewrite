@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 @ToString
@@ -360,8 +361,9 @@ public class Substitutions {
     }
 
     /**
-     * A method's declaring type, and a field's type as its class declares it, are left alone, because a type variable
-     * there is the class's own.
+     * Replaces the type variables that {@link #bindTypeVariables} bound, found by name, with their types, in a type and
+     * the types it is made of. A method's declaring type, and a field's type as its class declares it, are left alone,
+     * because a type variable there is the class's own.
      */
     private @Nullable JavaType withBoundTypeVariables(@Nullable JavaType type, Set<JavaType> visiting) {
         if (type == null || !visiting.add(type)) {
@@ -481,21 +483,26 @@ public class Substitutions {
         return ParenthesizeVisitor.maybeParenthesize(newTree, cursor);
     }
 
+    public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
+        return resolveTypeVariables(singletonList(j)).get(0);
+    }
+
     /**
      * Resolve identifiers of the type variables declared with {@code genericTypes()} to their erasure.
      * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
      * when T is unbounded, or the first bound's simple name when bounded.
      * Type variables taken from a parameter's type belong to the code the template is applied to,
      * so a template naming one keeps it.
-     * In the types of the generated code, a type variable that {@link #bindTypeVariables} bound gives way to its type.
+     * In the types of the generated code, a type variable that {@link #bindTypeVariables} bound gives way to its type,
+     * unless one of the trees names it as a type.
      */
-    public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
+    public <J2 extends J> List<J2> resolveTypeVariables(List<J2> js) {
         if (generics.isEmpty()) {
-            return j;
+            return js;
         }
         // A variable the template names as a type prints as its erasure, which javac types the code with, except as
         // a member reference's qualifier, which javac types from its target.
-        new JavaIsoVisitor<Integer>() {
+        JavaIsoVisitor<Integer> unbindNamed = new JavaIsoVisitor<Integer>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
                 // a placeholder names the variable in the type it declares, which its parameter replaces
@@ -513,11 +520,14 @@ public class Substitutions {
                 }
                 return ident;
             }
-        }.visit(j, 0);
+        };
+        if (typeVariableBindings.values().stream().anyMatch(Objects::nonNull)) {
+            js.forEach(j -> unbindNamed.visit(j, 0));
+        }
 
+        boolean bound = typeVariableBindings.values().stream().anyMatch(Objects::nonNull);
         Set<JavaType> visiting = newSetFromMap(new IdentityHashMap<>());
-        //noinspection unchecked
-        return (J2) new JavaVisitor<Integer>() {
+        JavaVisitor<Integer> resolve = new JavaVisitor<Integer>() {
             @Override
             public J visitIdentifier(J.Identifier ident, Integer integer) {
                 if (ident.getType() instanceof JavaType.GenericTypeVariable) {
@@ -549,9 +559,11 @@ public class Substitutions {
 
             @Override
             public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
-                return typeVariableBindings.isEmpty() ? javaType : withBoundTypeVariables(javaType, visiting);
+                return bound ? withBoundTypeVariables(javaType, visiting) : javaType;
             }
-        }.visitNonNull(j, 0);
+        };
+        //noinspection unchecked
+        return ListUtils.map(js, j -> (J2) resolve.visitNonNull(j, 0));
     }
 
     @SuppressWarnings("SpellCheckingInspection")
