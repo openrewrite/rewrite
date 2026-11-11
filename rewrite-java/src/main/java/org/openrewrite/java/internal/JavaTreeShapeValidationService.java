@@ -120,8 +120,11 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
         JavaParser.Builder<?, ?> java = (JavaParser.Builder<?, ?>) parser;
         // The test's cache holds its classes as they were before the recipe ran, such as with a method it renamed, so
         // those are typed afresh. Writing to a cache of its own keeps the types of the reparse out of the test's cache.
-        return java.clone().typeFactory(new DefaultJavaTypeFactory(
-                new HashMapJavaTypeCache(new WithoutClassesOf(sources, java.getTypeCache()))));
+        JavaTypeCache cache = new HashMapJavaTypeCache(new WithoutClassesOf(sources, java.getTypeCache()));
+        // The test's cache holds a JDK class the test's parser took from a shared map, but not all of the class's
+        // methods, so the reparse reads that map too.
+        JavaTypeFactory sharing = JdkClassSharingTypeFactory.forParser(cache, java.getClass());
+        return java.clone().typeFactory(sharing == null ? new DefaultJavaTypeFactory(cache) : sharing);
     }
 
     /**

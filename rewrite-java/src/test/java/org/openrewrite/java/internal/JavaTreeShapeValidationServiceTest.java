@@ -65,6 +65,24 @@ class JavaTreeShapeValidationServiceTest {
     }
 
     @Test
+    void typedParserGivesACallOfASharedClassTheMethodTheClassDeclares() {
+        JdkClassSharingTypeFactory.useForParsers();
+        parse(JavaParser.fromJavaVersion(), "class P { java.util.List<String> l; }");
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
+        J.CompilationUnit original = compilationUnit(typed,
+                "class A { boolean m(java.util.List<String> l) { return l.size() > 0; } }");
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(typed, List.of(original));
+
+        J.ClassDeclaration reparsed = parse(reparser,
+                "class A { boolean m(java.util.List<String> l) { return l.isEmpty(); } }");
+        J.MethodDeclaration m = (J.MethodDeclaration) reparsed.getBody().getStatements().get(0);
+        J.Return returned = (J.Return) requireNonNull(m.getBody()).getStatements().get(0);
+        J.MethodInvocation call = (J.MethodInvocation) requireNonNull(returned.getExpression());
+        JavaType.Method isEmpty = requireNonNull(call.getMethodType());
+        assertThat(isEmpty.getDeclaringType().getMethods()).anyMatch(method -> method == isEmpty);
+    }
+
+    @Test
     void comparesTheRestOfAMethodThatThrowsAnExceptionTheParserCannotResolve() {
         J.MethodDeclaration parsed = method("class A { int m() throws Missing { return 1; } }");
         J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
