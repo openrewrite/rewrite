@@ -33,13 +33,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 
 public class JavaTreeShapeValidationService implements TreeShapeValidationService {
     private static final Pattern PARSER_VERSION = Pattern.compile("\\.Java(\\d+)Parser\\b");
@@ -110,14 +113,46 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
-    public Parser.Builder typedParser(Parser.Builder parser) {
+    public Parser.Builder typedParser(Parser.Builder parser, List<SourceFile> sources) {
         if (!(parser instanceof JavaParser.Builder)) {
             return parser;
         }
-        // The test's cache holds its classes as they were before the recipe ran, such as with a method it renamed.
-        // A cache of its own also keeps the types of the reparse out of the test's later parses.
-        return ((JavaParser.Builder<?, ?>) parser.clone())
-                .typeFactory(new DefaultJavaTypeFactory(new JavaTypeCache()));
+        JavaParser.Builder<?, ?> java = (JavaParser.Builder<?, ?>) parser;
+        // The test's cache holds its classes as they were before the recipe ran, such as with a method it renamed, so
+        // those are typed afresh. Writing to a cache of its own keeps the types of the reparse out of the test's cache.
+        return java.clone().typeFactory(new DefaultJavaTypeFactory(
+                new HashMapJavaTypeCache(new WithoutClassesOf(sources, java.getTypeCache()))));
+    }
+
+    /**
+     * The types of a cache, but for those whose signature names a class that one of the sources declares.
+     */
+    private static class WithoutClassesOf extends JavaTypeCache {
+        private final JavaTypeCache cache;
+        private final @Nullable Pattern classes;
+
+        WithoutClassesOf(List<SourceFile> sources, JavaTypeCache cache) {
+            this.cache = cache;
+            Set<String> names = new TreeSet<>();
+            for (SourceFile source : sources) {
+                if (source instanceof J.CompilationUnit) {
+                    J.CompilationUnit cu = (J.CompilationUnit) source;
+                    String prefix = cu.getPackageDeclaration() == null ? "" :
+                            cu.getPackageDeclaration().getPackageName() + ".";
+                    for (J.ClassDeclaration classDecl : cu.getClasses()) {
+                        names.add(prefix + classDecl.getSimpleName());
+                    }
+                }
+            }
+            // the signature of a nested, local or anonymous class, such as a.A$1, starts with its top-level class's name
+            classes = names.isEmpty() ? null : Pattern.compile("(?<![\\w$.])(?:" +
+                    names.stream().map(Pattern::quote).collect(joining("|")) + ")(?!\\w)");
+        }
+
+        @Override
+        public <T> @Nullable T get(String signature) {
+            return classes != null && classes.matcher(signature).find() ? null : cache.get(signature);
+        }
     }
 
     @Override

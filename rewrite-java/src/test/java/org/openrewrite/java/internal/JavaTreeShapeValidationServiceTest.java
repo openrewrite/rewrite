@@ -50,15 +50,18 @@ class JavaTreeShapeValidationServiceTest {
     }
 
     @Test
-    void typedParserTypesTheTextAloneAndKeepsItsTypesOutOfTheParserItCopies() {
+    void typedParserTakesTypesFromTheParserItCopiesButNotTheSourcesClassesAndGivesItNone() {
         JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
-        JavaTreeShapeValidationService service = new JavaTreeShapeValidationService();
+        String source = "package a; class A { String s; void m() {} class B { void m() {} } }";
+        J.CompilationUnit original = compilationUnit(typed, source);
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(typed, List.of(original));
 
-        parse(service.typedParser(typed), "class A { void renamed() {} }");
-        assertThat(methods(parse(typed, "class A { void m() {} }"))).containsExactly("m");
+        J.ClassDeclaration reparsed = parse(reparser, source.replace("m()", "renamed()"));
+        assertThat(methods(reparsed)).containsExactly("renamed");
+        assertThat(methods((J.ClassDeclaration) reparsed.getBody().getStatements().get(2))).containsExactly("renamed");
+        assertThat(fieldType(reparsed, 0)).isSameAs(fieldType(original.getClasses().get(0), 0));
 
-        assertThat(methods(parse(service.typedParser(typed), "class A { void renamed() {} }")))
-                .containsExactly("renamed");
+        assertThat(methods(parse(typed, source))).containsExactly("m");
     }
 
     @Test
@@ -92,11 +95,14 @@ class JavaTreeShapeValidationServiceTest {
     }
 
     private static J.ClassDeclaration parse(Parser.Builder parser, String source) {
-        J.CompilationUnit cu = (J.CompilationUnit) parser.build()
+        return compilationUnit(parser, source).getClasses().get(0);
+    }
+
+    private static J.CompilationUnit compilationUnit(Parser.Builder parser, String source) {
+        return (J.CompilationUnit) parser.build()
                 .parse(new InMemoryExecutionContext(), source)
                 .findFirst()
                 .orElseThrow(IllegalStateException::new);
-        return cu.getClasses().get(0);
     }
 
     private static List<String> methods(J.ClassDeclaration a) {
