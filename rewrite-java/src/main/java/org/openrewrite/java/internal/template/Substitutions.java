@@ -381,10 +381,11 @@ public class Substitutions {
             }
             Map<String, JavaType> argumentsByVariable = new HashMap<>();
             for (int i = 0; i < variables.size(); i++) {
-                if (variables.get(i) instanceof JavaType.GenericTypeVariable) {
-                    String name = ((JavaType.GenericTypeVariable) variables.get(i)).getName();
-                    argumentsByVariable.put(name, arguments.get(i));
+                // javac captures a wildcard argument, so what it gives a supertype is a capture variable
+                if (!(variables.get(i) instanceof JavaType.GenericTypeVariable) || isWildcard(arguments.get(i))) {
+                    return null;
                 }
+                argumentsByVariable.put(((JavaType.GenericTypeVariable) variables.get(i)).getName(), arguments.get(i));
             }
             return asSupertype(parameterized.getType(), fqn, argumentsByVariable);
         } else if (type instanceof JavaType.Class && ((JavaType.Class) type).getTypeParameters().isEmpty()) {
@@ -395,36 +396,54 @@ public class Substitutions {
 
     private static JavaType.@Nullable Parameterized asSupertype(JavaType.FullyQualified type, String fqn,
                                                                  Map<String, JavaType> argumentsByVariable) {
-        List<JavaType.FullyQualified> supertypes = new ArrayList<>(type.getInterfaces());
-        if (type.getSupertype() != null) {
-            supertypes.add(type.getSupertype());
-        }
-        for (JavaType.FullyQualified supertype : supertypes) {
+        for (JavaType.FullyQualified supertype : type.getInterfaces()) {
             JavaType.Parameterized found = asSupertype(withArguments(supertype, argumentsByVariable), fqn);
             if (found != null) {
                 return found;
             }
         }
-        return null;
+        return type.getSupertype() == null ? null :
+                asSupertype(withArguments(type.getSupertype(), argumentsByVariable), fqn);
     }
 
-    private static JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
+    /**
+     * A supertype with the type's arguments in place of its class's variables, or null where it names a variable of an
+     * enclosing class, which those arguments don't give.
+     */
+    private static @Nullable JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
-            if ("?".equals(variable.getName())) {
-                return variable.withBounds(
-                        ListUtils.map(variable.getBounds(), b -> withArguments(b, argumentsByVariable)));
+            if (!"?".equals(variable.getName())) {
+                return argumentsByVariable.get(variable.getName());
             }
-            return argumentsByVariable.getOrDefault(variable.getName(), variable);
+            List<JavaType> bounds = withArguments(variable.getBounds(), argumentsByVariable);
+            return bounds == null ? null : variable.withBounds(bounds);
         } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            return parameterized.withTypeParameters(
-                    ListUtils.map(parameterized.getTypeParameters(), t -> withArguments(t, argumentsByVariable)));
+            List<JavaType> arguments = withArguments(parameterized.getTypeParameters(), argumentsByVariable);
+            return arguments == null ? null : parameterized.withTypeParameters(arguments);
         } else if (type instanceof JavaType.Array) {
             JavaType.Array array = (JavaType.Array) type;
-            return array.withElemType(withArguments(array.getElemType(), argumentsByVariable));
+            JavaType element = withArguments(array.getElemType(), argumentsByVariable);
+            return element == null ? null : array.withElemType(element);
         }
         return type;
+    }
+
+    private static @Nullable List<JavaType> withArguments(List<JavaType> types, Map<String, JavaType> argumentsByVariable) {
+        List<JavaType> mapped = new ArrayList<>(types.size());
+        for (JavaType type : types) {
+            JavaType withArguments = withArguments(type, argumentsByVariable);
+            if (withArguments == null) {
+                return null;
+            }
+            mapped.add(withArguments);
+        }
+        return mapped;
+    }
+
+    private static boolean isWildcard(JavaType type) {
+        return type instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) type).getName());
     }
 
     /**
