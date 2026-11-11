@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
@@ -583,6 +584,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   String first(List<String> list) {
                       return list.iterator().next();
                   }
+
+                  <T extends Number> int firstInt(List<T> list) {
+                      return list.iterator().next().intValue();
+                  }
               }
               """,
             """
@@ -591,6 +596,102 @@ class JavaTemplateGenericsTest implements RewriteTest {
               class Test {
                   String first(List<String> list) {
                       return list.get(0);
+                  }
+
+                  <T extends Number> int firstInt(List<T> list) {
+                      return list.get(0).intValue();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeVariableThatArgumentsBindToDifferentTypesStaysUnbound() {
+        rewriteRun(
+          spec -> spec
+            // javac infers a common supertype of the arguments, which the template doesn't
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate both = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(T)})")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("of".equals(method.getSimpleName())) {
+                        return both.apply(getCursor(), method.getCoordinates().replace(),
+                          method.getArguments().get(0), method.getArguments().get(1));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> both(Integer i, Long l) {
+                      return List.of(i, l);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> both(Integer i, Long l) {
+                      return java.util.Arrays.asList(i, l);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration both = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.Return asList = (J.Return) Objects.requireNonNull(both.getBody()).getStatements().get(0);
+                JavaType.Parameterized list = (JavaType.Parameterized) ((J.MethodInvocation) asList.getExpression()).getType();
+                assertThat(Objects.requireNonNull(list).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void typeVariableOfAMethodTheTemplateReferencesKeepsItsOwnType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate nonNull = JavaTemplate.builder("#{any(java.util.List<T>)}.stream().map(java.util.Objects::requireNonNull)")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("stream".equals(method.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.Return) {
+                      return nonNull.apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+
+              class Test {
+                  Stream<String> nonNull(List<String> list) {
+                      return list.stream();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+
+              class Test {
+                  Stream<String> nonNull(List<String> list) {
+                      return list.stream().map(java.util.Objects::requireNonNull);
                   }
               }
               """

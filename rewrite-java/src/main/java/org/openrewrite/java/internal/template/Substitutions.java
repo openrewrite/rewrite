@@ -54,7 +54,7 @@ public class Substitutions {
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
     private Map<String, JavaType.GenericTypeVariable> generics = emptyMap();
-    private final Map<String, JavaType> typeVariableBindings = new HashMap<>();
+    private final Map<String, @Nullable JavaType> typeVariableBindings = new HashMap<>();
     private final Set<UUID> splicedParameterIds = new HashSet<>();
 
     /**
@@ -326,11 +326,17 @@ public class Substitutions {
         }
         if (declared instanceof JavaType.GenericTypeVariable) {
             String name = ((JavaType.GenericTypeVariable) declared).getName();
-            String actualName = actual instanceof JavaType.GenericTypeVariable ? ((JavaType.GenericTypeVariable) actual).getName() : null;
-            // A wildcard binds nothing, since javac captures it. A matched template parameter carries the matcher
-            // template's own variable of the same name, which binds nothing either.
-            if (generics.get(name) == declared && !"?".equals(actualName) && !name.equals(actualName)) {
-                typeVariableBindings.putIfAbsent(name, actual);
+            boolean wildcard = actual instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) actual).getName());
+            // A wildcard binds nothing, since javac captures it. A matched template parameter can carry the matcher
+            // template's own variable, which is this one and binds nothing either.
+            if (generics.get(name) != declared || wildcard || TypeUtils.isOfType(declared, actual)) {
+                return;
+            }
+            if (!typeVariableBindings.containsKey(name)) {
+                typeVariableBindings.put(name, actual);
+            } else if (!TypeUtils.isOfType(typeVariableBindings.get(name), actual)) {
+                // javac infers a common supertype of arguments that differ, so the variable stays unbound
+                typeVariableBindings.put(name, null);
             }
         } else if (declared instanceof JavaType.Parameterized && actual instanceof JavaType.Parameterized) {
             JavaType.Parameterized declaredParameterized = (JavaType.Parameterized) declared;
@@ -499,8 +505,15 @@ public class Substitutions {
             }
 
             @Override
+            public J visitMemberReference(J.MemberReference memberRef, Integer integer) {
+                J j = super.visitMemberReference(memberRef, integer);
+                // the parser gives a member reference the method as declared, whose type variables are its own
+                return j instanceof J.MemberReference ? ((J.MemberReference) j).withMethodType(memberRef.getMethodType()) : j;
+            }
+
+            @Override
             public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
-                return withBoundTypeVariables(javaType, newSetFromMap(new IdentityHashMap<>()));
+                return typeVariableBindings.isEmpty() ? javaType : withBoundTypeVariables(javaType, newSetFromMap(new IdentityHashMap<>()));
             }
         }.visitNonNull(j, 0);
     }
