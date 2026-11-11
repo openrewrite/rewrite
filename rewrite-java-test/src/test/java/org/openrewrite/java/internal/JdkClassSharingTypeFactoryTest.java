@@ -24,6 +24,10 @@ import org.openrewrite.java.tree.JavaType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,6 +58,45 @@ class JdkClassSharingTypeFactoryTest {
         assertThat(Objects.requireNonNull(cu.getClasses().get(0).getType()).getMembers())
           .extracting(JavaType.Variable::getName)
           .containsExactly("x");
+    }
+
+    @Test
+    void parsersMappingTheSameClassesAtOnceGiveACallTheClassTheyShare() throws Exception {
+        String source = "class A { void m(String s, StringBuilder b) { " +
+                        "s.length(); b.append(s); Integer.parseInt(s); } }";
+        for (int round = 0; round < 5; round++) {
+            Object parserKind = new Object();
+            ExecutorService threads = Executors.newFixedThreadPool(8);
+            CyclicBarrier start = new CyclicBarrier(8);
+            List<Future<J.CompilationUnit>> parses = new ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                parses.add(threads.submit(() -> {
+                    start.await();
+                    return parse(cache(parserKind), source);
+                }));
+            }
+            for (Future<J.CompilationUnit> parse : parses) {
+                parse.get();
+            }
+            threads.shutdown();
+
+            JavaTypeCache cache = cache(parserKind);
+            for (JavaType.Method method : methodTypes(parse(cache, source))) {
+                JavaType.FullyQualified declaringType = method.getDeclaringType();
+                assertThat(declaringType).as(method.toString())
+                  .isSameAs(cache.get(declaringType.getFullyQualifiedName()));
+            }
+        }
+    }
+
+    private static JavaTypeCache cache(Object parserKind) {
+        return JdkClassSharingTypeFactory.cacheForParser(new JavaTypeCache(), parserKind, false);
+    }
+
+    private static J.CompilationUnit parse(JavaTypeCache cache, String source) {
+        return (J.CompilationUnit) JavaParser.fromJavaVersion()
+          .typeFactory(JdkClassSharingTypeFactory.forParser(cache))
+          .build().parse(source).findFirst().orElseThrow();
     }
 
     private static J.CompilationUnit parse(String source) {

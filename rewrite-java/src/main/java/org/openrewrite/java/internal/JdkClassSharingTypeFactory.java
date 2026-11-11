@@ -21,32 +21,36 @@ import org.openrewrite.java.tree.JavaType;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * A type factory that takes the classes of {@code java.*} packages from a map shared by every parser of the same kind
- * in the JVM, and adds the ones it maps to that map. Test support turns it on.
+ * A type factory that shares the classes of {@code java.*} packages it maps with every parser of the same kind in the
+ * JVM, which read them through the cache {@link #cacheForParser} gives. Test support turns it on.
  * <p>
  * A class is shared with every type keyed while mapping it, such as its methods, so a call of one of them has the
  * method the class declares. They are shared when the factory's outermost call returns, as none of them is a stub then,
- * and not at all if that call throws.
+ * and not at all if that call throws. One parser at a time maps classes that aren't shared yet, so each is shared once.
  */
 public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
     private static volatile boolean forParsers;
-    private static final Map<Object, Map<String, Object>> SHARED_BY_PARSER_KIND = new ConcurrentHashMap<>();
+    private static final Map<Object, Shared> SHARED_BY_PARSER_KIND = new ConcurrentHashMap<>();
 
-    private final SharingCache cache;
+    private final Shared shared;
+    private final RecordingCache cache;
     private int depth;
     private boolean failed;
+    private boolean locked;
 
-    private JdkClassSharingTypeFactory(SharingCache cache) {
+    private JdkClassSharingTypeFactory(Shared shared, RecordingCache cache) {
         super(cache);
+        this.shared = shared;
         this.cache = cache;
     }
 
     /**
-     * Makes {@link #forParser} return a factory. Test support calls it.
+     * Makes {@link #cacheForParser} and {@link #forParser} share JDK classes. Test support calls it.
      */
     public static void useForParsers() {
         forParsers = true;
@@ -54,15 +58,27 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
 
     /**
      * @param parserKind What tells apart parsers that map the same class differently, such as their builder's class.
-     * @return A factory that shares JDK classes with the parsers of the same kind, once {@link #useForParsers()} has
-     * been called, or else null.
+     * @param configured Whether the parser builder's caller gave it a type cache or a type factory.
+     * @return The cache a parser builder builds its parsers with: once {@link #useForParsers()} has been called, one
+     * that also reads the JDK classes parsers of the same kind have shared, unless the caller configured the builder's
+     * types.
      */
-    public static @Nullable JavaTypeFactory forParser(JavaTypeCache cache, Object parserKind) {
-        if (!forParsers) {
+    public static JavaTypeCache cacheForParser(JavaTypeCache cache, Object parserKind, boolean configured) {
+        return forParsers && !configured && !(cache instanceof ReadingCache) ?
+                new ReadingCache(cache, SHARED_BY_PARSER_KIND.computeIfAbsent(parserKind, k -> new Shared())) :
+                cache;
+    }
+
+    /**
+     * @return A factory that shares the JDK classes it maps, when the cache is one {@link #cacheForParser} gave, or
+     * else null.
+     */
+    public static @Nullable JavaTypeFactory forParser(JavaTypeCache cache) {
+        if (!(cache instanceof ReadingCache)) {
             return null;
         }
-        return new JdkClassSharingTypeFactory(new SharingCache(cache,
-                SHARED_BY_PARSER_KIND.computeIfAbsent(parserKind, k -> new ConcurrentHashMap<>())));
+        ReadingCache reading = (ReadingCache) cache;
+        return new JdkClassSharingTypeFactory(reading.shared, new RecordingCache(reading));
     }
 
     @Override
@@ -73,16 +89,23 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
             if (known != null) {
                 return known;
             }
-            boolean jdk = isJdkClass(fqn);
-            if (jdk) {
-                cache.jdkClassesBeingMapped++;
+            if (!isJdkClass(fqn)) {
+                return super.computeClass(fqn, flags, kind, initializer);
             }
+            if (!locked) {
+                shared.lock.lock();
+                locked = true;
+                // another parser may have shared the class while this one waited
+                known = cache.get(fqn);
+                if (known != null) {
+                    return known;
+                }
+            }
+            cache.jdkClassesBeingMapped++;
             try {
                 return super.computeClass(fqn, flags, kind, initializer);
             } finally {
-                if (jdk) {
-                    cache.jdkClassesBeingMapped--;
-                }
+                cache.jdkClassesBeingMapped--;
             }
         });
     }
@@ -141,38 +164,61 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
             throw e;
         } finally {
             if (--depth == 0) {
-                cache.share(!failed);
-                failed = false;
+                try {
+                    cache.share(shared.types, !failed);
+                } finally {
+                    failed = false;
+                    if (locked) {
+                        locked = false;
+                        shared.lock.unlock();
+                    }
+                }
             }
         }
     }
 
     /**
-     * A parser's cache that reads the types it doesn't hold from the shared map, and keeps what the parser keys while
-     * mapping a JDK class for the factory to share.
+     * The JDK classes parsers of one kind have shared, which one parser at a time adds to.
      */
-    private static class SharingCache extends JavaTypeCache {
-        private final JavaTypeCache cache;
-        private final Map<String, Object> shared;
-        private final Map<String, Object> mapped = new HashMap<>();
-        int jdkClassesBeingMapped;
+    private static class Shared {
+        final Map<String, Object> types = new ConcurrentHashMap<>();
+        final ReentrantLock lock = new ReentrantLock();
+    }
 
-        SharingCache(JavaTypeCache cache, Map<String, Object> shared) {
-            this.cache = cache;
+    /**
+     * A parser builder's cache that also reads the JDK classes parsers of its kind have shared.
+     */
+    private static class ReadingCache extends HashMapJavaTypeCache {
+        private final Shared shared;
+
+        ReadingCache(JavaTypeCache base, Shared shared) {
+            super(base);
             this.shared = shared;
         }
 
         @Override
         public <T> @Nullable T get(String signature) {
-            T type = cache.get(signature);
-            if (type == null) {
-                //noinspection unchecked
-                type = (T) shared.get(signature);
-                if (type != null) {
-                    cache.put(signature, type);
-                }
-            }
-            return type;
+            T type = super.get(signature);
+            //noinspection unchecked
+            return type != null ? type : (T) shared.types.get(signature);
+        }
+    }
+
+    /**
+     * A parser's cache that keeps what the parser puts while it maps a JDK class, for the factory to share.
+     */
+    private static class RecordingCache extends JavaTypeCache {
+        private final JavaTypeCache cache;
+        private final Map<String, Object> mapped = new HashMap<>();
+        int jdkClassesBeingMapped;
+
+        RecordingCache(JavaTypeCache cache) {
+            this.cache = cache;
+        }
+
+        @Override
+        public <T> @Nullable T get(String signature) {
+            return cache.get(signature);
         }
 
         @Override
@@ -189,11 +235,21 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
             mapped.clear();
         }
 
-        void share(boolean complete) {
+        /**
+         * Shares the classes after the other types, so that a parser that finds a class there also finds its methods.
+         */
+        void share(Map<String, Object> shared, boolean complete) {
             if (complete) {
-                for (Map.Entry<String, Object> type : mapped.entrySet()) {
-                    shared.putIfAbsent(type.getKey(), type.getValue());
-                }
+                mapped.forEach((signature, type) -> {
+                    if (!(type instanceof JavaType.Class)) {
+                        shared.put(signature, type);
+                    }
+                });
+                mapped.forEach((signature, type) -> {
+                    if (type instanceof JavaType.Class) {
+                        shared.put(signature, type);
+                    }
+                });
             }
             mapped.clear();
         }

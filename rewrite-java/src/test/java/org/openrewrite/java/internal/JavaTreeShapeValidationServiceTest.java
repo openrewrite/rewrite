@@ -32,6 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTreeShapeValidationServiceTest {
 
+    static {
+        JdkClassSharingTypeFactory.useForParsers();
+    }
+
     private static final String SOURCE = "class A { org.jspecify.annotations.NullMarked m; b.B d; " +
                                          "Object o = java.util.Collections.emptyList(); }";
 
@@ -66,7 +70,6 @@ class JavaTreeShapeValidationServiceTest {
 
     @Test
     void typedParserGivesACallOfASharedClassTheMethodTheClassDeclares() {
-        JdkClassSharingTypeFactory.useForParsers();
         parse(JavaParser.fromJavaVersion(), "class P { java.util.List<String> l; }");
         JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
         J.CompilationUnit original = compilationUnit(typed,

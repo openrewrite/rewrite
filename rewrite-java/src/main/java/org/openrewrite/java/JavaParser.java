@@ -406,11 +406,13 @@ public interface JavaParser extends Parser {
             if (javaTypeFactory != null || typeCacheConfigured) {
                 return javaTypeFactory;
             }
-            return JdkClassSharingTypeFactory.forParser(resolvedTypeCache(), getClass());
+            return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            javaTypeCache = HashMapJavaTypeCache.forParser(javaTypeCache, typeCacheConfigured || javaTypeFactory != null);
+            boolean configured = typeCacheConfigured || javaTypeFactory != null;
+            javaTypeCache = HashMapJavaTypeCache.forParser(
+                    JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;
         }
 
