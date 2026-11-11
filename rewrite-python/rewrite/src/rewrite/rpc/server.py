@@ -1760,12 +1760,14 @@ def activate_bundle_in_process(venv_dir: Path, bundle_dist: str,
     The bundle's venv joins this process's path, which is what ``--child-bundle`` on the venv
     interpreter buys a child. ``addsitedir`` appends, so the engine keeps the precedence
     ``_child_env`` gives it in a child, and it processes the venv's ``.pth`` files. The shared
-    recipe-install directory leaves the path, as ``_child_env`` keeps it off a child's.
+    recipe-install directory leaves the path, as ``_child_env`` keeps it off a child's. Templates
+    resolve their names against the venv, as a child's do with the venv as its interpreter.
     """
     import importlib
     import site
 
     from rewrite.discovery import discover_root_recipes
+    from rewrite.python.template import engine as template_engine
     from rewrite.rpc import venv_manager
 
     if _recipe_install_dir is not None:
@@ -1779,6 +1781,7 @@ def activate_bundle_in_process(venv_dir: Path, bundle_dist: str,
     marketplace = _get_marketplace()
     discover_root_recipes(bundle_dist, marketplace=marketplace, attribution=_attribution,
                           attribution_name=attribution_name)
+    template_engine.use_installed_packages_of(str(venv_dir))
     return _collect_marketplace_rows(
         marketplace, recipe_filter=_attribution.recipes_for(attribution_name or bundle_dist))
 
