@@ -50,13 +50,6 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext>, Heavyweigh
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
-    /**
-     * A {@code Collection<String>} that the scanning phase adds the recipe and path of each edit a scanner makes to, so
-     * that a test can find whether a scanner edits without {@link #SCANNING_MUTATION_VALIDATION} failing the run.
-     */
-    @Incubating(since = "8.106.0")
-    String SCANNING_MUTATIONS = "org.openrewrite.test.scanningMutations";
-
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,

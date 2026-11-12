@@ -24,7 +24,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -33,7 +32,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-import static org.openrewrite.ExecutionContext.SCANNING_MUTATIONS;
 
 /**
  * Fails a test that turns off checks that pass on its sources, when the system property {@value #PROPERTY} asks for
@@ -207,19 +205,6 @@ final class UnneededOptOuts {
         ExecutionContextChanges changes = new ExecutionContextChanges(ctx);
         checksOfTheRun.put("executionContextUnchanged", () -> assertThat(changes.keys).isEmpty());
         return changes;
-    }
-
-    /**
-     * Has the scanning phase report the edits of scanners when that check runs on the side.
-     */
-    void recordScanningMutations(ExecutionContext ctx) {
-        // a context that the tests of a class share may still hold an earlier test's collection
-        ctx.pollMessage(SCANNING_MUTATIONS);
-        if (runsOnTheSide("noEditsInScanningPhase")) {
-            Collection<String> mutations = new CopyOnWriteArrayList<>();
-            ctx.putMessage(SCANNING_MUTATIONS, mutations);
-            checksOfTheRun.put("noEditsInScanningPhase", () -> assertThat(mutations).isEmpty());
-        }
     }
 
     void assertNoneUnneeded() {

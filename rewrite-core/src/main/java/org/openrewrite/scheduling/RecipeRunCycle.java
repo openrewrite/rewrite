@@ -52,7 +52,6 @@ import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
-import static org.openrewrite.ExecutionContext.SCANNING_MUTATIONS;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
@@ -274,19 +273,15 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
                                     Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                    if (maybeMutated != source) {
+                                        recordScannerEdit(scanningRecipe, source);
+                                    }
                                     assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
                                             scanningRecipe.getName() + "'s scanner changed " + source.getSourcePath() +
                                             ", and the scanning phase discards edits. Record what the scanner finds " +
                                             "in the accumulator, and make the edits in getVisitor(acc). A scanner " +
                                             "that reuses an editing visitor opts out with " +
                                             "RecipeQualityValidation.builder().noEditsInScanningPhase(false).";
-                                    if (maybeMutated != source) {
-                                        Collection<String> mutations = ctx.getMessage(SCANNING_MUTATIONS);
-                                        if (mutations != null) {
-                                            mutations.add(scanningRecipe.getName() + "'s scanner changed " +
-                                                          source.getSourcePath());
-                                        }
-                                    }
                                 }
                                 return source;
                             });
@@ -840,6 +835,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // Use the attribution map: only include search results created by this recipe
         recordSourceFileResultAndSearchResults(before, after, recipeStack,
                 collectSearchResults(before, after, leaf(recipeStack).getName(), attributionMap), ctx);
+    }
+
+    /**
+     * Called when a recipe's scanner returns a tree other than the source file it visited. The scanning phase
+     * discards that tree.
+     */
+    @Incubating(since = "8.106.0")
+    protected void recordScannerEdit(Recipe recipe, SourceFile source) {
     }
 
     protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {

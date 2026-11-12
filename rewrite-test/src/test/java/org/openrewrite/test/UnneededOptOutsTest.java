@@ -24,6 +24,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -237,6 +238,17 @@ class UnneededOptOutsTest implements RewriteTest {
               .noEditsInScanningPhase(false)
               .reportingMarkersOnly(false)
               .build()),
+          text("a")
+        ));
+    }
+
+    @Test
+    void keepTheScanningOptOutOfARunThatDoesNotReportScannerEdits() {
+        withOptOutsChecked("noEditsInScanningPhase", () -> rewriteRun(
+          spec -> spec
+            .recipe(new EditsWhileScanning())
+            .sourceSet(InMemoryLargeSourceSet::new)
+            .recipeQualityValidation(RecipeQualityValidation.builder().noEditsInScanningPhase(false).build()),
           text("a")
         ));
     }

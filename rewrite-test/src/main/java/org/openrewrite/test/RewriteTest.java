@@ -396,8 +396,6 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        // where SCANNING_MUTATION_VALIDATION is, so that only the edits the real check would see are recorded
-        unneededOptOuts.recordScanningMutations(ctx);
         ExecutionContext recipeCtx = ctx;
         if (testMethodSpec.getRecipeExecutionContext() != null) {
             recipeCtx = testMethodSpec.getRecipeExecutionContext();
@@ -424,6 +422,8 @@ public interface RewriteTest extends SourceSpecs {
         AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ||
                                                   unneededOptOuts.runsOnTheSide("lightweightAccumulators") ?
                 new AccumulatorContents() : null;
+        Collection<String> scannerEdits = unneededOptOuts.runsOnTheSide("noEditsInScanningPhase") ?
+                new CopyOnWriteArrayList<>() : null;
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -432,7 +432,8 @@ public interface RewriteTest extends SourceSpecs {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles,
-                    quality.reportingMarkersOnly() ? addedMarkers : null, unchangedTreeIdentity, accumulatorContents);
+                    quality.reportingMarkersOnly() ? addedMarkers : null, unchangedTreeIdentity, accumulatorContents,
+                    scannerEdits);
         }
 
         recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
@@ -465,6 +466,11 @@ public interface RewriteTest extends SourceSpecs {
         unneededOptOuts.check("lightweightAccumulators", quality.lightweightAccumulators(), () ->
                 requireNonNull(accumulatorContents).assertNoneFound());
         boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
+        unneededOptOuts.checkOnTheSideLater("noEditsInScanningPhase", () -> {
+            // only an in-process run of this source set reports the edits of its scanners
+            assertThat(probed).isTrue();
+            assertThat(scannerEdits).isEmpty();
+        });
         EmptySources emptySources = probed ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
         UnparsedSources unparsedSources = probed ?
