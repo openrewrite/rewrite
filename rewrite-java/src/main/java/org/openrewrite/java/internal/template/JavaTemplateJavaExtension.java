@@ -26,11 +26,14 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -788,12 +791,23 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
         if (generic && !ownVarargs) {
             return null;
         }
-        JavaType.Method overload = mostSpecific(method, c -> takes(c.getParameterTypes(), argumentTypes, false));
+        BiPredicate<JavaType.Method, JavaType.Method> byParameters =
+                (candidate, other) -> takes(other.getParameterTypes(), candidate.getParameterTypes(), false);
+        JavaType.Method overload = mostSpecific(method,
+                c -> takes(c.getParameterTypes(), argumentTypes, false), byParameters);
         if (overload == null) {
-            overload = mostSpecific(method, c -> takes(c.getParameterTypes(), argumentTypes, true));
+            overload = mostSpecific(method, c -> takes(c.getParameterTypes(), argumentTypes, true), byParameters);
         }
-        if (overload == null) {
-            overload = ownVarargs ? method : mostSpecific(method, c -> varargsTakes(c, argumentTypes));
+        if (overload == null && !ownVarargs) {
+            // As in JLS 15.12.2.5, varargs methods compare by their parameter types expanded to the arguments
+            int arity = argumentTypes.size();
+            overload = mostSpecific(method, c -> varargsTakes(c, argumentTypes), (candidate, other) -> {
+                int length = other.getParameterTypes().size() == arity + 1 ? arity + 1 : arity;
+                return takes(expanded(other, length), expanded(candidate, length), false);
+            });
+        }
+        if (overload == null && ownVarargs) {
+            overload = method;
         }
         if (overload == null || overload == method) {
             return overload;
@@ -805,15 +819,27 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
     }
 
     private static JavaType.@Nullable Method mostSpecific(JavaType.Method method,
-                                                         Predicate<JavaType.Method> takesArguments) {
+                                                         Predicate<JavaType.Method> takesArguments,
+                                                         BiPredicate<JavaType.Method, JavaType.Method> moreSpecific) {
         JavaType.Method overload = null;
         for (JavaType.Method candidate : method.getDeclaringType().getMethods()) {
             if (candidate.getName().equals(method.getName()) && takesArguments.test(candidate) &&
-                (overload == null || takes(overload.getParameterTypes(), candidate.getParameterTypes(), false))) {
+                (overload == null || moreSpecific.test(candidate, overload))) {
                 overload = candidate;
             }
         }
         return overload;
+    }
+
+    private static List<JavaType> expanded(JavaType.Method varargs, int length) {
+        List<JavaType> parameters = varargs.getParameterTypes();
+        JavaType last = parameters.get(parameters.size() - 1);
+        JavaType.Array array = TypeUtils.asArray(last);
+        List<JavaType> types = new ArrayList<>(parameters.subList(0, Math.min(length, parameters.size() - 1)));
+        while (types.size() < length) {
+            types.add(array == null ? last : array.getElemType());
+        }
+        return types;
     }
 
     private static boolean takes(List<JavaType> parameters, List<? extends @Nullable JavaType> types, boolean boxing) {
@@ -835,22 +861,26 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
     }
 
     private static boolean namesTypeVariable(JavaType.Method method) {
-        return namesTypeVariable(method.getReturnType()) ||
-               method.getParameterTypes().stream().anyMatch(JavaTemplateJavaExtension::namesTypeVariable) ||
-               method.getThrownExceptions().stream().anyMatch(JavaTemplateJavaExtension::namesTypeVariable);
+        Set<JavaType> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        return namesTypeVariable(method.getReturnType(), visited) ||
+               method.getParameterTypes().stream().anyMatch(type -> namesTypeVariable(type, visited)) ||
+               method.getThrownExceptions().stream().anyMatch(type -> namesTypeVariable(type, visited));
     }
 
-    private static boolean namesTypeVariable(@Nullable JavaType type) {
+    private static boolean namesTypeVariable(@Nullable JavaType type, Set<JavaType> visited) {
+        if (type == null || !visited.add(type)) {
+            return false;
+        }
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
             return !"?".equals(variable.getName()) ||
-                   variable.getBounds().stream().anyMatch(JavaTemplateJavaExtension::namesTypeVariable);
+                   variable.getBounds().stream().anyMatch(bound -> namesTypeVariable(bound, visited));
         }
         if (type instanceof JavaType.Parameterized) {
             return ((JavaType.Parameterized) type).getTypeParameters().stream()
-                    .anyMatch(JavaTemplateJavaExtension::namesTypeVariable);
+                    .anyMatch(parameter -> namesTypeVariable(parameter, visited));
         }
-        return type instanceof JavaType.Array && namesTypeVariable(((JavaType.Array) type).getElemType());
+        return type instanceof JavaType.Array && namesTypeVariable(((JavaType.Array) type).getElemType(), visited);
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {

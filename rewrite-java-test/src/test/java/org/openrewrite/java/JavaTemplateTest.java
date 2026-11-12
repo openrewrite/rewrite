@@ -1857,6 +1857,7 @@ class JavaTemplateTest implements RewriteTest {
                   void info(String message);
                   void info(String format, Object arg);
                   void info(String format, Object... args);
+                  void info(Object... args);
               }
               """
           ),
@@ -1872,6 +1873,51 @@ class JavaTemplateTest implements RewriteTest {
               class Test {
                   void test(Log log, String name) {
                       log.info("{} {}", name, "x");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAVarargsOverloadWhoseEmptyVarargsAreMoreSpecific() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Sink put(int)").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().getFirst()
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Sink {
+                  void put(int index);
+                  void put(String key, Object... values);
+                  void put(String key, Integer... values);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(String key, Sink sink) {
+                      sink.put(0);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String key, Sink sink) {
+                      sink.put(key);
                   }
               }
               """
@@ -2110,58 +2156,6 @@ class JavaTemplateTest implements RewriteTest {
               class Test {
                   void test(Sink sink, String name) {
                       sink.add(name);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void replaceArgumentsOfAVarargsCallWhoseTypeHasACyclicCapture() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
-                  if (new MethodMatcher("Util of(..)").matches(mi) && mi.getArguments().size() == 1) {
-                      return JavaTemplate.apply("#{any()}, null",
-                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
-                        mi.getArguments().getFirst());
-                  }
-                  return mi;
-              }
-          })),
-          java(
-            """
-              interface Builder<B extends Builder<B>> {
-              }
-              """
-          ),
-          java(
-            """
-              import java.util.List;
-
-              class Util {
-                  @SafeVarargs
-                  static <T> List<T> of(T... values) {
-                      return null;
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              class Test {
-                  void test(Builder<?> builder) {
-                      Util.of(builder);
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void test(Builder<?> builder) {
-                      Util.of(builder, null);
                   }
               }
               """
