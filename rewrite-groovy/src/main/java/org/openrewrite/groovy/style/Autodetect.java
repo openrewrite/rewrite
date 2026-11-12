@@ -46,9 +46,6 @@ public class Autodetect extends NamedStyles {
         return new Detector();
     }
 
-    /**
-     * Serializable and mergeable in the same way as the {@link org.openrewrite.java.style.Autodetect.Detector} it wraps.
-     */
     @JsonAutoDetect(fieldVisibility = NONE, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     public static class Detector {
         @JsonProperty
