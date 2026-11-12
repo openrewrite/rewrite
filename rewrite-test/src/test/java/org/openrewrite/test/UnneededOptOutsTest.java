@@ -62,7 +62,8 @@ class UnneededOptOutsTest implements RewriteTest {
           .hasMessageContaining("typeValidationOptions(..) in the test's RecipeSpec turns off checks that pass: " +
                                 "classDeclarations, identifiers,")
           .hasMessageContaining("Replace typeValidationOptions(..) in the test's RecipeSpec with:\n" +
-                                "    spec.typeValidationOptions(TypeValidation.all().unknown(false))");
+                                "    spec.typeValidationOptions(TypeValidation.all().unknown(false))")
+          .hasMessageNotContaining("cursorAcyclic");
 
         AssertionError predicate = withOptOutsChecked("all", () -> assertThrows(AssertionError.class, () -> rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.all().allowMissingType(o -> true).identifiers(false)),
@@ -177,20 +178,20 @@ class UnneededOptOutsTest implements RewriteTest {
     @Test
     void checkEveryRecipeQualityCheckThatIsTurnedOff() throws IllegalAccessException {
         RecipeQualityValidation all = withParserTypedTrees(RecipeQualityValidation::all);
-        RecipeQualityValidation none = withParserTypedTrees(RecipeQualityValidation::all);
+        RecipeQualityValidation allOff = withParserTypedTrees(RecipeQualityValidation::all);
         StringBuilder turnedOff = new StringBuilder();
         for (Field field : RecipeQualityValidation.class.getDeclaredFields()) {
             if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers())) {
                 field.setAccessible(true);
                 if (field.getBoolean(all)) {
-                    field.setBoolean(none, false);
+                    field.setBoolean(allOff, false);
                     turnedOff.append(turnedOff.length() == 0 ? "" : ", ").append(field.getName());
                 }
             }
         }
         AssertionError e = withOptOutsChecked("all", () -> withParserTypedTrees(() ->
           assertThrows(AssertionError.class, () -> rewriteRun(
-            spec -> spec.recipe(toRecipe()).recipeQualityValidation(none),
+            spec -> spec.recipe(toRecipe()).recipeQualityValidation(allOff),
             text("a")
           ))));
         assertThat(e)

@@ -60,6 +60,11 @@ final class UnneededOptOuts {
     private static final Set<String> NEED_TYPES = new HashSet<>(asList("matchByTypeNotName", "parserTypedTrees"));
 
     /**
+     * The deprecated option of {@link TypeValidation} that has no effect, so turning it off is never reported.
+     */
+    private static final String NO_EFFECT = "cursorAcyclic";
+
+    /**
      * The deprecated options of {@link TypeValidation} that turn off a recipe quality check, by that check.
      */
     private static final Map<String, String> DEPRECATED_OPTIONS = new LinkedHashMap<>();
@@ -210,6 +215,8 @@ final class UnneededOptOuts {
      * Has the scanning phase report the edits of scanners when that check runs on the side.
      */
     void recordScanningMutations(ExecutionContext ctx) {
+        // a context that the tests of a class share may still hold an earlier test's collection
+        ctx.pollMessage(SCANNING_MUTATIONS);
         if (runsOnTheSide("noEditsInScanningPhase")) {
             Collection<String> mutations = new CopyOnWriteArrayList<>();
             ctx.putMessage(SCANNING_MUTATIONS, mutations);
@@ -431,8 +438,8 @@ final class UnneededOptOuts {
     private static @Nullable String render(TypeValidation typeValidation) {
         StringBuilder rendered = new StringBuilder("TypeValidation.all()");
         for (Field option : options(TypeValidation.class)) {
-            // the deprecated options are written as the recipe quality checks they turn off, or have no effect
-            if (!DEPRECATED_OPTIONS.containsValue(option.getName()) && !"cursorAcyclic".equals(option.getName()) &&
+            // the deprecated options are written as the recipe quality checks they turn off
+            if (!DEPRECATED_OPTIONS.containsValue(option.getName()) && !NO_EFFECT.equals(option.getName()) &&
                 !isDefault(typeValidation, option)) {
                 rendered.append('.').append(option.getName()).append('(').append(value(typeValidation, option))
                         .append(')');
@@ -495,7 +502,8 @@ final class UnneededOptOuts {
     private static List<String> turnedOff(Object options, Set<String> checked) {
         List<String> turnedOff = new ArrayList<>();
         for (Field option : options(options.getClass())) {
-            if (checked.contains(option.getName()) && !isDefault(options, option)) {
+            if (checked.contains(option.getName()) && !NO_EFFECT.equals(option.getName()) &&
+                !isDefault(options, option)) {
                 turnedOff.add(option.getName());
             }
         }
