@@ -1435,4 +1435,54 @@ class JavaTemplateGenericsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void untypedParameterWithAWildcardTypeArgumentTypesTheGenericCall() {
+        String util = """
+          package com.example;
+          public class Util {
+              public static <E, T extends E> int frequency(Iterable<E> iterable, T obj) { return 0; }
+              public static int cardinality(Object obj, Iterable<?> iterable) { return 0; }
+          }
+          """;
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().dependsOn(util))
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate frequency = JavaTemplate.builder("com.example.Util.frequency(#{any()}, #{any()})")
+                  .javaParser(JavaParser.fromJavaVersion().dependsOn(util))
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("cardinality".equals(method.getSimpleName())) {
+                        return frequency.apply(getCursor(), method.getCoordinates().replace(),
+                          method.getArguments().get(1), method.getArguments().get(0));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import com.example.Util;
+
+              class Test {
+                  int lowerBounded(Iterable<? super String> values, String e) {
+                      return Util.cardinality(e, values);
+                  }
+              }
+              """,
+            """
+              import com.example.Util;
+
+              class Test {
+                  int lowerBounded(Iterable<? super String> values, String e) {
+                      return com.example.Util.frequency(values, e);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

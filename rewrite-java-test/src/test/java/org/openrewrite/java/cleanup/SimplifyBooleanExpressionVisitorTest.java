@@ -1286,8 +1286,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     void doNotFailOnNumericComparisonWhenLiteralTypeMissing() {
         rewriteRun(
           spec -> spec.recipe(new StripLiteralTypesThenSimplify())
-            .expectedCyclesThatMakeChanges(1)
-            .typeValidationOptions(TypeValidation.none()),
+            .expectedCyclesThatMakeChanges(1),
           java(
             """
               class A {

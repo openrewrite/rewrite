@@ -69,7 +69,7 @@ public class JavaTemplateParser {
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
     public JavaTemplateParser(boolean contextSensitive, Parser.Builder parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports, String bindType) {
+                              Consumer<String> onBeforeParseTemplate, Set<String> imports, @Nullable String bindType) {
         this(
                 parser,
                 onAfterVariableSubstitution,
@@ -91,7 +91,7 @@ public class JavaTemplateParser {
         this.annotationTemplateGenerator = annotationTemplateGenerator;
     }
 
-    public String getBindType() {
+    public @Nullable String getBindType() {
         return statementTemplateGenerator.getBindType();
     }
 

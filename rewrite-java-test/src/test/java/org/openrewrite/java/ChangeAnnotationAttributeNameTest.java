@@ -72,6 +72,59 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
     }
 
     @Test
+    void renameToAnAttributeOnlyTheChangedTypeDeclares() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeAnnotationAttributeName("org.example.Old", "value", "name"),
+            new ChangeType("org.example.Old", "org.example.New", true)),
+          java(
+            """
+              package org.example;
+              public @interface Old {
+                  String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface New {
+                  String name() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Old;
+
+              @Old(value = "1.0")
+              class A {}
+              """,
+            """
+              import org.example.New;
+
+              @New(name = "1.0")
+              class A {}
+              """
+          ),
+          java(
+            """
+              import org.example.Old;
+
+              @Old("1.0")
+              class B {}
+              """,
+            """
+              import org.example.New;
+
+              @New(name = "1.0")
+              class B {}
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotChangeIdenticalAssignment() {
         rewriteRun(
           spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "value")),

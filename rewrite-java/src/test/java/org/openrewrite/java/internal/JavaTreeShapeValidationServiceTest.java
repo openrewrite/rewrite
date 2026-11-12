@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -83,6 +84,22 @@ class JavaTreeShapeValidationServiceTest {
         J.MethodInvocation call = (J.MethodInvocation) requireNonNull(returned.getExpression());
         JavaType.Method isEmpty = requireNonNull(call.getMethodType());
         assertThat(isEmpty.getDeclaringType().getMethods()).anyMatch(method -> method == isEmpty);
+    }
+
+    @Test
+    void typedParserOfItsOwnTypesTakesNoneFromTheParserItCopies() {
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion()
+                .dependsOn("package b; public class B { public void m() {} }");
+        parse(typed, "class A { void a(b.B b) { b.m(); } }");
+        // a clone's cache reads through to that of the builder it copies, which holds B as it parsed it
+        JavaParser.Builder<?, ?> next = typed.clone()
+                .dependsOn("package b; public class B { public static void m() {} }");
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(next);
+
+        J.ClassDeclaration reparsed = parse(reparser, "class A { void a() { b.B.m(); } }");
+        J.MethodDeclaration a = (J.MethodDeclaration) reparsed.getBody().getStatements().get(0);
+        J.MethodInvocation call = (J.MethodInvocation) requireNonNull(a.getBody()).getStatements().get(0);
+        assertThat(requireNonNull(call.getMethodType()).hasFlags(Flag.Static)).isTrue();
     }
 
     @Test

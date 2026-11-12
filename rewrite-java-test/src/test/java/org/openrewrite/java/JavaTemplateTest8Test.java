@@ -345,7 +345,6 @@ class JavaTemplateTest8Test implements RewriteTest {
         rewriteRun(
           spec -> spec
             .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
-            .typeValidationOptions(org.openrewrite.test.TypeValidation.builder().methodInvocations(false).build())
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

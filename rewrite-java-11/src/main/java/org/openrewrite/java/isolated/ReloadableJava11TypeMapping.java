@@ -192,6 +192,11 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             name = type.tsym.name.toString();
         }
         return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
+            if (type instanceof Type.CapturedType && !((Type.CapturedType) type).lower.hasTag(TypeTag.BOT)) {
+                // a capture of `? super String` is denoted by its lower bound, not by the declared bound it has above
+                gtv.unsafeSet(gtv.getName(), CONTRAVARIANT, singletonList(type(((Type.CapturedType) type).lower)));
+                return;
+            }
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();

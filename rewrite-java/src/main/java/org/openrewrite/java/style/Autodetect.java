@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
@@ -1007,27 +1006,63 @@ public class Autodetect extends NamedStyles {
         }
     }
 
-    @Value
-    @AllArgsConstructor(onConstructor_ = @JsonCreator)
-    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
-    private static class ImportAttributes {
-        boolean isStatic;
-        String packageName;
-        boolean blankLineBefore;
-    }
-
     /**
      * Raw per-file import observations. Block patterns depend on the packages imported across every file,
      * so files can only be grouped into blocks once all samples are in.
      */
     @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class ImportLayoutSamples {
-        List<List<ImportAttributes>> importsBySourceFile = new ArrayList<>();
+        // The only state that grows with the code base, so each import is packed into an int (see encode())
+        // that refers to a package in this dictionary
+        List<String> packages = new ArrayList<>();
+        List<int[]> importsBySourceFile = new ArrayList<>();
         int minimumFoldedImports = Integer.MAX_VALUE;
         int minimumFoldedStaticImports = Integer.MAX_VALUE;
 
+        @JsonIgnore
+        private @Nullable Map<String, Integer> packageIndices;
+
+        static int encode(int packageIndex, boolean isStatic, boolean blankLineBefore) {
+            return packageIndex << 2 | (isStatic ? 2 : 0) | (blankLineBefore ? 1 : 0);
+        }
+
+        static int packageIndex(int anImport) {
+            return anImport >>> 2;
+        }
+
+        static boolean isStatic(int anImport) {
+            return (anImport & 2) != 0;
+        }
+
+        static boolean isBlankLineBefore(int anImport) {
+            return (anImport & 1) != 0;
+        }
+
+        int indexOf(String packageName) {
+            if (packageIndices == null) {
+                packageIndices = new HashMap<>();
+                for (int i = 0; i < packages.size(); i++) {
+                    packageIndices.put(packages.get(i), i);
+                }
+            }
+            return packageIndices.computeIfAbsent(packageName, p -> {
+                packages.add(p);
+                return packages.size() - 1;
+            });
+        }
+
         void merge(ImportLayoutSamples other) {
-            importsBySourceFile.addAll(other.importsBySourceFile);
+            int[] remapped = new int[other.packages.size()];
+            for (int i = 0; i < remapped.length; i++) {
+                remapped[i] = indexOf(other.packages.get(i));
+            }
+            for (int[] imports : other.importsBySourceFile) {
+                int[] merged = new int[imports.length];
+                for (int i = 0; i < imports.length; i++) {
+                    merged[i] = encode(remapped[packageIndex(imports[i])], isStatic(imports[i]), isBlankLineBefore(imports[i]));
+                }
+                importsBySourceFile.add(merged);
+            }
             minimumFoldedImports = Math.min(minimumFoldedImports, other.minimumFoldedImports);
             minimumFoldedStaticImports = Math.min(minimumFoldedStaticImports, other.minimumFoldedStaticImports);
         }
@@ -1037,22 +1072,21 @@ public class Autodetect extends NamedStyles {
             importLayoutStatistics.minimumFoldedImports = minimumFoldedImports;
             importLayoutStatistics.minimumFoldedStaticImports = minimumFoldedStaticImports;
 
-            NavigableSet<String> importedPackages = new TreeSet<>();
-            for (List<ImportAttributes> imports : importsBySourceFile) {
-                for (ImportAttributes anImport : imports) {
-                    importedPackages.add(anImport.getPackageName() + ".");
-                }
+            String[] packageKeys = new String[packages.size()];
+            for (int i = 0; i < packageKeys.length; i++) {
+                packageKeys[i] = packages.get(i) + ".";
             }
+            NavigableSet<String> importedPackages = new TreeSet<>(Arrays.asList(packageKeys));
             // initializes importLayoutStatistics.pkgToBlockPattern which is used in the loop that follows
             importLayoutStatistics.mapBlockPatterns(importedPackages);
 
-            for (List<ImportAttributes> imports : importsBySourceFile) {
+            for (int[] imports : importsBySourceFile) {
                 Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
-                importLayoutStatistics.staticAtBotCount += (!imports.isEmpty() &&
-                                                            imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
-                importLayoutStatistics.staticAtTopCount += (!imports.isEmpty() &&
-                                                            imports.get(0).isStatic()) ? 1 : 0;
+                importLayoutStatistics.staticAtBotCount += (imports.length > 0 &&
+                                                            isStatic(imports[imports.length - 1])) ? 1 : 0;
+                importLayoutStatistics.staticAtTopCount += (imports.length > 0 &&
+                                                            isStatic(imports[0])) ? 1 : 0;
 
                 boolean staticBlock = false;
                 int blockStart = 0;
@@ -1062,12 +1096,13 @@ public class Autodetect extends NamedStyles {
                 int javaPos = Integer.MAX_VALUE;
                 int javaxPos = Integer.MAX_VALUE;
                 Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
-                for (ImportAttributes anImport : imports) {
-                    previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
-                    boolean containsNewLine = anImport.isBlankLineBefore();
+                for (int anImport : imports) {
+                    String packageKey = packageKeys[packageIndex(anImport)];
+                    previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(packageKey)) ? 1 : 0;
+                    boolean containsNewLine = isBlankLineBefore(anImport);
                     if (containsNewLine ||
-                        i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
-                        !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
+                        i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(packageKey) &&
+                        !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(packageKey))) {
                         if (i > blockStart) {
                             ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                                     staticBlock ?
@@ -1090,9 +1125,9 @@ public class Autodetect extends NamedStyles {
                         blockStart = i;
                     }
 
-                    staticBlock = anImport.isStatic();
+                    staticBlock = isStatic(anImport);
                     i++;
-                    previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(anImport.getPackageName() + ".", "");
+                    previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(packageKey, "");
                 }
 
                 if (i > blockStart) {
@@ -1171,13 +1206,15 @@ public class Autodetect extends NamedStyles {
                 }
             }
 
-            samples.importsBySourceFile.add(cu.getImports().stream()
-                    .map(it -> {
-                        String prefix = it.getPrefix().getWhitespace();
-                        return new ImportAttributes(it.isStatic(), it.getPackageName(),
-                                prefix.contains("\n\n") || prefix.contains("\r\n\r\n"));
-                    })
-                    .collect(toList()));
+            List<J.Import> imports = cu.getImports();
+            int[] encoded = new int[imports.size()];
+            for (int i = 0; i < encoded.length; i++) {
+                J.Import anImport = imports.get(i);
+                String prefix = anImport.getPrefix().getWhitespace();
+                encoded[i] = ImportLayoutSamples.encode(samples.indexOf(anImport.getPackageName()), anImport.isStatic(),
+                        prefix.contains("\n\n") || prefix.contains("\r\n\r\n"));
+            }
+            samples.importsBySourceFile.add(encoded);
 
             return cu;
         }

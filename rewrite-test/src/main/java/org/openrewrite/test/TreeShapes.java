@@ -39,28 +39,30 @@ final class TreeShapes {
 
     private final boolean shapes;
     private final boolean types;
-    private final Function<SourceFile, List<Parser.Builder>> parsersFor;
+    private final Function<SourceFile, List<Parser.Builder>> afterParsersFor;
+    private final Collection<Parser.Builder> specAfterParsers;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
 
-    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> parsersFor,
-               @Nullable Path relativeTo, ExecutionContext parseCtx) {
+    /**
+     * @param afterParsersFor  The parsers to parse a source the recipe returned with, which are those of its input
+     *                         where the test gives no after parser of its language.
+     * @param specAfterParsers Those of them that the test gave as after parsers.
+     */
+    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> afterParsersFor,
+               Collection<Parser.Builder> specAfterParsers, @Nullable Path relativeTo, ExecutionContext parseCtx) {
         this.shapes = shapes;
         this.types = types;
-        this.parsersFor = parsersFor;
+        this.afterParsersFor = afterParsersFor;
+        this.specAfterParsers = specAfterParsers;
         this.relativeTo = relativeTo;
         this.parseCtx = parseCtx;
     }
 
     /**
-     * @param sources The sources the recipe ran on, which are parsed again with the ones it changed so that a source
-     *                can refer to the others, as a Maven module does to its parent.
+     * @return Each source as the recipe left it, which is its output and the sources it ran on and didn't change.
      */
-    void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
-        if (!shapes && !types) {
-            return;
-        }
-        // each source as the recipe left it
+    static List<SourceFile> current(Collection<Result> results, List<SourceFile> sources) {
         List<SourceFile> current = new ArrayList<>();
         Set<UUID> changed = new HashSet<>();
         for (Result result : results) {
@@ -71,11 +73,27 @@ final class TreeShapes {
                 changed.add(result.getBefore().getId());
             }
         }
-        List<SourceFile> parsedAndOutput = new ArrayList<>(sources);
-        parsedAndOutput.addAll(current);
         for (SourceFile source : sources) {
             if (!changed.contains(source.getId())) {
                 current.add(source);
+            }
+        }
+        return current;
+    }
+
+    /**
+     * @param sources The sources the recipe ran on, which are parsed again with the ones it changed so that a source
+     *                can refer to the others, as a Maven module does to its parent.
+     */
+    void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
+        if (!shapes && !types) {
+            return;
+        }
+        List<SourceFile> current = current(results, sources);
+        List<SourceFile> parsedAndOutput = new ArrayList<>(sources);
+        for (Result result : results) {
+            if (result.getAfter() != null) {
+                parsedAndOutput.add(result.getAfter());
             }
         }
         Map<Parser.Builder, List<Result>> byParser = new LinkedHashMap<>();
@@ -87,7 +105,7 @@ final class TreeShapes {
                 before != null && printed(before).equals(printed(after))) {
                 continue;
             }
-            List<Parser.Builder> parsers = parsersFor.apply(after);
+            List<Parser.Builder> parsers = afterParsersFor.apply(after);
             if (!parsers.isEmpty() && service.reads(parsers.get(0), after)) {
                 byParser.computeIfAbsent(parsers.get(0), p -> new ArrayList<>()).add(result);
             }
@@ -255,7 +273,7 @@ final class TreeShapes {
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
         for (SourceFile source : current) {
-            List<Parser.Builder> parsers = parsersFor.apply(source);
+            List<Parser.Builder> parsers = afterParsersFor.apply(source);
             if (parsers.isEmpty() || parsers.get(0) != builder) {
                 continue;
             }
@@ -266,11 +284,19 @@ final class TreeShapes {
         Map<UUID, Reparsed> reparsed = new HashMap<>();
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
-        // types need the test's own parser, with its classpath, and shapes alone parse faster without types
+        boolean afterParser = specAfterParsers.contains(builder);
+        // Types need a parser with the output's classpath, and shapes alone parse faster without types. An after
+        // parser types the output afresh, as a clone of the input's parser holds the input classpath's types under
+        // the output's names.
         Parser.Builder reparser = service == null ? builder :
-                types ? service.typedParser(builder, parsedAndOutput) : service.untypedParser(builder);
+                !types ? service.untypedParser(builder) :
+                        afterParser ? service.typedParser(builder) : service.typedParser(builder, parsedAndOutput);
         List<SourceFile> parsed = parse(reparser, inputs, errors);
         if (parsed == null) {
+            if (afterParser) {
+                fail("The test's after parser of " + builder.getDslName() + " sources threw as it parsed the " +
+                     "recipe's output, which leaves that output unchecked.", errors.get(errors.size() - 1));
+            }
             return reparsed;
         }
         for (int i = 0; i < sources.size(); i++) {
@@ -331,6 +357,7 @@ final class TreeShapes {
         try {
             return builder.clone().build().parseInputs(inputs, relativeTo, ctx).collect(toList());
         } catch (Exception | LinkageError e) {
+            errors.add(e);
             return null;
         }
     }

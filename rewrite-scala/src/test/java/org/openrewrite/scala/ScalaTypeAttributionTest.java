@@ -582,7 +582,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void unresolvedReceiverHasNoMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
@@ -602,7 +601,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void unresolvableWildcardImportDoesNotShadowOtherNames() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             import doobie.implicits._
@@ -706,7 +704,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void importsAreAttributedWithTheImportedDefinition() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             import scala.concurrent.ExecutionContext.Implicits.global
@@ -958,7 +955,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void illTypedCallsHaveNoMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Person(name: String)
@@ -988,7 +984,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void callsWithNonConformingTypeArgumentsHaveNoMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
@@ -1019,7 +1014,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void illTypedCallHasSameShapeAsWellTypedCall() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
@@ -1059,7 +1053,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void callWithUnresolvedArgumentKeepsMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
