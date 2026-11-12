@@ -327,7 +327,8 @@ final class UnneededOptOuts {
                 options.addAll(asRun.optionsOnlyInDefaults());
             }
             List<String> calls = calls(spec, inDefaults ? null : needed.spec(true), options, !instead.isEmpty(),
-                    needed.afterChangesWithout(inDefaults));
+                    needed.afterChangesWithout(inDefaults),
+                    inDefaults && needed.spec(false).recipeQualityValidation != null);
             if (inDefaults) {
                 if (calls.isEmpty()) {
                     message.append("This test needs none of the opt-outs in defaults(RecipeSpec).\n");
@@ -338,8 +339,8 @@ final class UnneededOptOuts {
                 message.append("defaults(RecipeSpec) needs only what the tests of its class need together, which ")
                         .append("each test that fails like this one lists.\n");
             } else {
-                if (asRun.spec(false).recipeQualityValidation != null &&
-                    calls.stream().anyMatch(call -> call.startsWith("spec.recipeQualityValidation("))) {
+                if (asRun.spec(false).recipeQualityValidation != null && (!instead.isEmpty() ||
+                    calls.stream().anyMatch(call -> call.startsWith("spec.recipeQualityValidation(")))) {
                     options.add("recipeQualityValidation(..)");
                 }
                 if (calls.isEmpty()) {
@@ -366,25 +367,30 @@ final class UnneededOptOuts {
      * The calls on a recipe spec that set the given options as the spec has them, with the deprecated options of
      * {@link TypeValidation} that turn off a recipe quality check written as that check.
      *
-     * @param overridden   The spec of the test's class when the spec is the test's, whose options the test's override.
-     * @param afterNeeded Whether the after validation the spec sets has to stay, even when it is the default.
+     * @param overridden      The spec of the test's class when the spec is the test's, whose options the test's
+     *                        override.
+     * @param afterNeeded     Whether the after validation the spec sets has to stay, even when it is the default.
+     * @param qualityReplaced Whether the test replaces the recipe quality checks the spec sets, which leaves only the
+     *                        deprecated options themselves to turn their checks off.
      */
     @SuppressWarnings("deprecation")
     private static List<String> calls(RecipeSpec spec, @Nullable RecipeSpec overridden, Set<String> options,
-                                      boolean qualityChanged, boolean afterNeeded) {
+                                      boolean qualityChanged, boolean afterNeeded, boolean qualityReplaced) {
         List<String> calls = new ArrayList<>();
         List<String> turnedOffByTypeValidation = new ArrayList<>();
         if (options.contains("typeValidationOptions(..)") && spec.typeValidation != null) {
-            call(calls, "typeValidationOptions", render(spec.typeValidation),
+            call(calls, "typeValidationOptions", render(spec.typeValidation, qualityReplaced),
                     overridden != null && overridden.typeValidation != null ? "TypeValidation.all()" : null);
-            DEPRECATED_OPTIONS.forEach((check, deprecated) -> {
-                if (!isDefault(spec.typeValidation, field(TypeValidation.class, deprecated))) {
-                    turnedOffByTypeValidation.add(check);
-                }
-            });
+            if (!qualityReplaced) {
+                DEPRECATED_OPTIONS.forEach((check, deprecated) -> {
+                    if (!isDefault(spec.typeValidation, field(TypeValidation.class, deprecated))) {
+                        turnedOffByTypeValidation.add(check);
+                    }
+                });
+            }
         }
         if (options.contains("afterTypeValidationOptions(..)") && spec.afterTypeValidation != null) {
-            call(calls, "afterTypeValidationOptions", render(spec.afterTypeValidation),
+            call(calls, "afterTypeValidationOptions", render(spec.afterTypeValidation, false),
                     afterNeeded || overridden != null && overridden.afterTypeValidation != null ?
                             "TypeValidation.all()" : null);
         }
@@ -418,12 +424,15 @@ final class UnneededOptOuts {
         }
     }
 
-    private static @Nullable String render(TypeValidation typeValidation) {
+    /**
+     * @param deprecated Whether to write the deprecated options, which are otherwise written as the recipe quality
+     *                   checks they turn off.
+     */
+    private static @Nullable String render(TypeValidation typeValidation, boolean deprecated) {
         StringBuilder rendered = new StringBuilder("TypeValidation.all()");
         for (Field option : options(TypeValidation.class)) {
-            // the deprecated options are written as the recipe quality checks they turn off
-            if (!DEPRECATED_OPTIONS.containsValue(option.getName()) && !NO_EFFECT.equals(option.getName()) &&
-                !isDefault(typeValidation, option)) {
+            if ((deprecated || !DEPRECATED_OPTIONS.containsValue(option.getName())) &&
+                !NO_EFFECT.equals(option.getName()) && !isDefault(typeValidation, option)) {
                 rendered.append('.').append(option.getName()).append('(').append(value(typeValidation, option))
                         .append(')');
             }
@@ -438,7 +447,7 @@ final class UnneededOptOuts {
                 rendered.append('.').append(option.getName()).append('(').append(value(quality, option)).append(')');
             }
         }
-        String types = quality.types() == null ? null : render(quality.types());
+        String types = quality.types() == null ? null : render(quality.types(), false);
         if (types == null && quality.types() != null && typesNeeded) {
             types = "TypeValidation.all()";
         }

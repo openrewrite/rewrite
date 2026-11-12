@@ -38,6 +38,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -187,6 +188,33 @@ class UnneededOptOutsTest implements RewriteTest {
           .hasMessageContaining("This test needs none of the opt-outs in defaults(RecipeSpec).");
     }
 
+    @SuppressWarnings("deprecation")
+    @Test
+    void keepADeprecatedOptOutOfTheDefaultsThatTheTestsOwnQualityValidationLeavesInEffect() {
+        RewriteTest optsOutInDefaults = new RewriteTest() {
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.typeValidationOptions(TypeValidation.all().identifiers(false).immutableExecutionContext(false));
+            }
+        };
+        AssertionError e = withOptOutsChecked("all", () -> assertThrows(AssertionError.class, () ->
+          optsOutInDefaults.rewriteRun(
+            spec -> spec
+              .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      ctx.putMessage("seen", true);
+                      return text;
+                  }
+              }))
+              .recipeQualityValidation(RecipeQualityValidation.builder().build()),
+            text("a")
+          )));
+        assertThat(e).hasMessageContaining(
+          "Of the opt-outs in defaults(RecipeSpec), this test needs only:\n" +
+          "    spec.typeValidationOptions(TypeValidation.all().immutableExecutionContext(false))\n");
+    }
+
     @Test
     void checkEveryRecipeQualityCheckThatIsTurnedOff() throws IllegalAccessException {
         RecipeQualityValidation all = withParserTypedTrees(RecipeQualityValidation::all);
@@ -256,35 +284,47 @@ class UnneededOptOutsTest implements RewriteTest {
     @Test
     void turnOffTheCheckThatTypeValidationKeptFromRunning() {
         AssertionError e = withOptOutsChecked("all", () -> withParserTypedTrees(() ->
-          assertThrows(AssertionError.class, () -> rewriteRun(
-            spec -> spec
-              .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.Primitive visitPrimitive(J.Primitive primitive, ExecutionContext ctx) {
-                      return primitive.getType() == JavaType.Primitive.Int ?
-                        primitive.withType(JavaType.Primitive.Long) : primitive;
-                  }
-              }))
-              .typeValidationOptions(TypeValidation.all().identifiers(false)),
-            java(
-              """
-                class A {
-                    int x = 1;
-                }
-                """,
-              """
-                class A {
-                    long x = 1;
-                }
-                """
-            )
-          ))));
+          assertThrows(AssertionError.class, () -> retypeIntAsLongWithoutIdentifiersChecked(spec -> {
+          }))));
         assertThat(e)
           .hasMessageContaining("turns off checks that pass: identifiers.")
           .hasMessageContaining("With the type checks on, parserTypedTrees runs and fails")
           .hasMessageContaining("Replace typeValidationOptions(..) in the test's RecipeSpec with:\n" +
                                 "    spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
                                 ".parserTypedTrees(false).build())");
+
+        AssertionError turnedOnByTheTest = withOptOutsChecked("all", () ->
+          withSystemProperty("org.openrewrite.test.parserTypedTrees", null, () ->
+            assertThrows(AssertionError.class, () -> retypeIntAsLongWithoutIdentifiersChecked(spec ->
+              spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())))));
+        assertThat(turnedOnByTheTest).hasMessageContaining(
+          "Remove typeValidationOptions(..) and recipeQualityValidation(..) from the test's RecipeSpec.");
+    }
+
+    private void retypeIntAsLongWithoutIdentifiersChecked(Consumer<RecipeSpec> options) {
+        rewriteRun(
+          spec -> options.accept(spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Primitive visitPrimitive(J.Primitive primitive, ExecutionContext ctx) {
+                    return primitive.getType() == JavaType.Primitive.Int ?
+                      primitive.withType(JavaType.Primitive.Long) : primitive;
+                }
+            }))
+            .typeValidationOptions(TypeValidation.all().identifiers(false))),
+          java(
+            """
+              class A {
+                  int x = 1;
+              }
+              """,
+            """
+              class A {
+                  long x = 1;
+              }
+              """
+          )
+        );
     }
 
     private static SourceSpecs validatedText(String before, SourceSpec.ValidateSource validateSource) {
