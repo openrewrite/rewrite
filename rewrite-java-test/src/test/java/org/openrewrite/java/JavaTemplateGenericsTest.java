@@ -646,10 +646,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
                       return List.of("a", i);
                   }
 
-                  List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
-                      return List.of(i, numbers);
-                  }
-
                   List<?> wildcard(Integer i, List<Long> longs) {
                       return List.of(i, longs);
                   }
@@ -667,10 +663,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
                       return java.util.Arrays.asList("a", i);
                   }
 
-                  List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
-                      return java.util.Arrays.asList(i, numbers.get(0));
-                  }
-
                   List<?> wildcard(Integer i, List<Long> longs) {
                       return java.util.Arrays.asList(i, longs.get(0));
                   }
@@ -681,6 +673,193 @@ class JavaTemplateGenericsTest implements RewriteTest {
                     J.Return asList = (J.Return) Objects.requireNonNull(((J.MethodDeclaration) method).getBody()).getStatements().get(0);
                     JavaType.Parameterized list = (JavaType.Parameterized) ((J.MethodInvocation) asList.getExpression()).getType();
                     assertThat(Objects.requireNonNull(list).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                }
+            })
+          )
+        );
+    }
+
+    @Test
+    void typeVariableTakesTheTypeThatTheArgumentsSupertypeGivesIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate unmodifiable = JavaTemplate.builder("java.util.Collections.unmodifiableList(#{any(java.util.List<T>)})")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("copyOf".equals(method.getSimpleName())) {
+                      return unmodifiable.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Test {
+                  static class Names extends ArrayList<String> {
+                  }
+
+                  static class Pairs<A, B> extends ArrayList<B> {
+                  }
+
+                  static class Rows<A> extends ArrayList<A[]> {
+                  }
+
+                  static class Bounded<A> extends ArrayList<List<? extends A>> {
+                  }
+
+                  List<String> copy(ArrayList<String> list) {
+                      return List.copyOf(list);
+                  }
+
+                  List<String> copy(Names names) {
+                      return List.copyOf(names);
+                  }
+
+                  List<String> copy(Pairs<Integer, String> pairs) {
+                      return List.copyOf(pairs);
+                  }
+
+                  List<String> copyWildcard(Pairs<?, String> pairs) {
+                      return List.copyOf(pairs);
+                  }
+
+                  List<String[]> copy(Rows<String> rows) {
+                      return List.copyOf(rows);
+                  }
+
+                  List<List<? extends String>> copy(Bounded<String> bounded) {
+                      return List.copyOf(bounded);
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Test {
+                  static class Names extends ArrayList<String> {
+                  }
+
+                  static class Pairs<A, B> extends ArrayList<B> {
+                  }
+
+                  static class Rows<A> extends ArrayList<A[]> {
+                  }
+
+                  static class Bounded<A> extends ArrayList<List<? extends A>> {
+                  }
+
+                  List<String> copy(ArrayList<String> list) {
+                      return java.util.Collections.unmodifiableList(list);
+                  }
+
+                  List<String> copy(Names names) {
+                      return java.util.Collections.unmodifiableList(names);
+                  }
+
+                  List<String> copy(Pairs<Integer, String> pairs) {
+                      return java.util.Collections.unmodifiableList(pairs);
+                  }
+
+                  List<String> copyWildcard(Pairs<?, String> pairs) {
+                      return java.util.Collections.unmodifiableList(pairs);
+                  }
+
+                  List<String[]> copy(Rows<String> rows) {
+                      return java.util.Collections.unmodifiableList(rows);
+                  }
+
+                  List<List<? extends String>> copy(Bounded<String> bounded) {
+                      return java.util.Collections.unmodifiableList(bounded);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeVariableThatTheArgumentsSupertypeLeavesOpenStaysUnbound() {
+        rewriteRun(
+          spec -> spec
+            // javac binds T through the wildcard's capture and the enclosing class's argument, where T stays unbound
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate unmodifiable = JavaTemplate.builder("java.util.Collections.unmodifiableList(#{any(java.util.List<T>)})")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("copyOf".equals(method.getSimpleName())) {
+                        return unmodifiable.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Set;
+
+              class Test {
+                  static class Sets<X> extends ArrayList<Set<X>> {
+                  }
+
+                  static class Outer<E> {
+                      class Inner extends ArrayList<E> {
+                      }
+                  }
+
+                  List<?> copy(Sets<?> sets) {
+                      return List.copyOf(sets);
+                  }
+
+                  List<?> copy(Outer<String>.Inner inner) {
+                      return List.copyOf(inner);
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Set;
+
+              class Test {
+                  static class Sets<X> extends ArrayList<Set<X>> {
+                  }
+
+                  static class Outer<E> {
+                      class Inner extends ArrayList<E> {
+                      }
+                  }
+
+                  List<?> copy(Sets<?> sets) {
+                      return java.util.Collections.unmodifiableList(sets);
+                  }
+
+                  List<?> copy(Outer<String>.Inner inner) {
+                      return java.util.Collections.unmodifiableList(inner);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                for (Statement statement : cu.getClasses().getFirst().getBody().getStatements()) {
+                    if (statement instanceof J.MethodDeclaration copy) {
+                        J.Return unmodifiable = (J.Return) Objects.requireNonNull(copy.getBody()).getStatements().getFirst();
+                        JavaType.Parameterized list = (JavaType.Parameterized) Objects.requireNonNull(unmodifiable.getExpression()).getType();
+                        assertThat(Objects.requireNonNull(list).getTypeParameters().getFirst())
+                          .isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, t -> assertThat(t.getName()).isEqualTo("T"));
+                    }
                 }
             })
           )
