@@ -246,6 +246,50 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepStarImportOfThePackageWhenRemovingANestedTypeNamedWithDollar() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.*;
+              import java.util.Map.Entry;
+
+              class A {
+                 List<String> l;
+              }
+              """,
+            """
+              import java.util.*;
+
+              class A {
+                 List<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedStarImportOfThePackageWhenRemovingANestedTypeNamedWithDollar() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.*;
+              import java.util.Map.Entry;
+
+              class A {
+              }
+              """,
+            """
+              class A {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/919")
     @Test
     void leaveStarImportInPlaceIfFiveOrMoreTypesStillReferredTo() {
