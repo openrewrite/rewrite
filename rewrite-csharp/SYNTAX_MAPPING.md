@@ -284,3 +284,16 @@ The following Cs types were evaluated for potential mapping to J types:
 | All LINQ types | **No** | LINQ query syntax is entirely C#-specific. |
 | All pattern types | **Mostly No** | C# pattern matching (relational, property, list, slice) has no Java equivalent. `BinaryPattern` and `UnaryPattern` cleverly reuse J.Binary/J.Unary. |
 | All preprocessor types | **No** | Java has no preprocessor directives. |
+
+## C# language versions
+
+A `CSharpLanguageVersion` marker on each C# compilation unit records the effective
+Roslyn parse-options version as a string, such as `"12.0"`. `latest` and `default`
+are resolved by Roslyn before the marker is created. A standalone parse records
+the parser's default version. Project parses additionally populate
+`TargetFrameworkVersions` with the effective version of each loaded target-framework
+variant, including versions overridden in MSBuild. `Version` describes the compilation
+used for attribution; recipes introducing syntax must check every applicable
+`TargetFrameworkVersions` entry. The list is empty for standalone parses and project
+recovery without an evaluated Roslyn project. Unloaded target frameworks cannot be
+reported by this marker.

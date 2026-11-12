@@ -16,6 +16,7 @@
 using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.MSBuild;
 using NuGet.Frameworks;
 using NuGet.ProjectModel;
@@ -764,7 +765,13 @@ public class SolutionParser
                 }))
             .ToList();
 
-        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput);
+        var languageVersions = solution.Projects
+            .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
+                        p.ParseOptions is CSharpParseOptions)
+            .Select(p => new CSharpLanguageVersion.TargetFrameworkVersion(
+                TargetFrameworkOf(p) ?? "", ((CSharpParseOptions)p.ParseOptions!).LanguageVersion.ToDisplayString()))
+            .ToList();
+        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput, languageVersions);
     }
 
     /// <summary>
@@ -827,7 +834,8 @@ public class SolutionParser
 
     private List<SourceFile> ParseUnits(
         string projectPath, string rootDir, IReadOnlyList<ParseUnit> units,
-        List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput)
+        List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput,
+        IList<CSharpLanguageVersion.TargetFrameworkVersion>? languageVersions = null)
     {
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
 
@@ -905,6 +913,11 @@ public class SolutionParser
                     }
                 }
 
+                if (languageVersions != null && cu.Markers.FindFirst<CSharpLanguageVersion>() is { } languageVersion)
+                {
+                    cu = cu.WithMarkers(cu.Markers.Remove<CSharpLanguageVersion>()
+                        .Add(languageVersion.WithTargetFrameworkVersions(languageVersions)));
+                }
                 cu = cu.WithMarkers(cu.Markers.Add(dotNetProject));
                 results.Add(cu);
                 fileSw.Stop();

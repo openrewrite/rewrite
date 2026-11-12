@@ -37,7 +37,10 @@ public class CSharpParser
         if (symbols.Count == 0)
             return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
-        return ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
+        var cu = ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
+        return cu.WithMarkers(cu.Markers.Add(new CSharpLanguageVersion(Tree.RandomId(),
+            ((CSharpParseOptions?)semanticModel?.SyntaxTree.Options ?? CSharpParseOptions.Default)
+            .LanguageVersion.ToDisplayString())));
     }
 
     /// <summary>
@@ -388,7 +391,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new CompilationUnit(
             Tree.RandomId(),
             prefix,
-            Markers.Empty,
+            Markers.Build([new CSharpLanguageVersion(Tree.RandomId(),
+                ((CSharpParseOptions)node.SyntaxTree.Options).LanguageVersion.ToDisplayString())]),
             node.SyntaxTree.FilePath ?? "source.cs",
             "UTF-8",
             _charsetBomMarked,

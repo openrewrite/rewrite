@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 using LibGit2Sharp;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.NuGet;
 using Serilog;
@@ -36,6 +39,41 @@ public class SolutionParserTests : IDisposable
     {
         try { Directory.Delete(_tempDir, true); }
         catch { /* best effort cleanup */ }
+    }
+
+    [Fact]
+    public void LanguageVersionsOfEveryTargetFramework()
+    {
+        // given
+        var projectPath = WriteFile("Sample.csproj", "<Project />");
+        const string source = "class C {}";
+        var sourcePath = WriteFile("C.cs", source);
+        using var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+        foreach (var (framework, version) in new[]
+                 {
+                     ("net8.0", LanguageVersion.CSharp12),
+                     ("net9.0", LanguageVersion.CSharp13)
+                 })
+        {
+            var id = ProjectId.CreateNewId();
+            solution = solution.AddProject(ProjectInfo.Create(id, VersionStamp.Create(),
+                    $"Sample ({framework})", "Sample", LanguageNames.CSharp, filePath: projectPath,
+                    parseOptions: new CSharpParseOptions(version)))
+                .AddDocument(DocumentId.CreateNewId(id), "C.cs", SourceText.From(source), filePath: sourcePath);
+        }
+
+        // when
+        var files = new SolutionParser().ParseProject(solution, projectPath, _tempDir);
+
+        // then
+        var cu = Assert.IsType<CompilationUnit>(Assert.Single(files));
+        var marker = cu.Markers.FindFirst<CSharpLanguageVersion>();
+        Assert.NotNull(marker);
+        Assert.Equal("12.0", marker.Version);
+        Assert.Collection(marker.TargetFrameworkVersions,
+            v => { Assert.Equal("net8.0", v.TargetFramework); Assert.Equal("12.0", v.Version); },
+            v => { Assert.Equal("net9.0", v.TargetFramework); Assert.Equal("13.0", v.Version); });
     }
 
     private string WriteFile(string relativePath, string content)
