@@ -780,7 +780,7 @@ class TypeUtilsTest implements RewriteTest {
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Long));
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Int));
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Short));
-        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Char));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Char));
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Byte));
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Double));
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Float));
