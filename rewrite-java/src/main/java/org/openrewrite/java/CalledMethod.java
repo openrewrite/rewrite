@@ -44,6 +44,10 @@ final class CalledMethod {
      */
     static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name,
                                           List<@Nullable JavaType> argumentTypes) {
+        // a type in the hierarchy that is only its name may declare the method that is called
+        if (isNameOnly(type, new HashSet<>())) {
+            return null;
+        }
         List<JavaType.Method> candidates = new ArrayList<>();
         collect(type, false, name, candidates, new HashSet<>());
         for (JavaType.Method candidate : candidates) {
@@ -52,12 +56,8 @@ final class CalledMethod {
                 return null;
             }
         }
-        candidates.removeIf(candidate -> candidate.getParameterTypes().size() != argumentTypes.size());
-        // The only method with the call's name and number of arguments is the one javac calls once the program
-        // compiles, while an argument's type may still be one that a later recipe changes.
-        if (candidates.size() > 1) {
-            candidates.removeIf(candidate -> !accepts(type, candidate, argumentTypes));
-        }
+        candidates.removeIf(candidate -> candidate.getParameterTypes().size() != argumentTypes.size() ||
+                                         !accepts(type, candidate, argumentTypes));
         return candidates.size() == 1 ? calledOn(type, candidates.get(0)) : null;
     }
 
@@ -155,11 +155,7 @@ final class CalledMethod {
                 }
             }
         } else if (type instanceof JavaType.Parameterized) {
-            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            if (contains(parameterized.getType(), test)) {
-                return true;
-            }
-            for (JavaType typeParameter : parameterized.getTypeParameters()) {
+            for (JavaType typeParameter : ((JavaType.Parameterized) type).getTypeParameters()) {
                 if (contains(typeParameter, test)) {
                     return true;
                 }
@@ -175,10 +171,10 @@ final class CalledMethod {
         if (type == null || !visited.add(type.getFullyQualifiedName())) {
             return;
         }
-        // an interface's static methods aren't inherited
+        // a subtype inherits neither a private method nor a static method of an interface
         boolean staticMethods = !supertype || type.getKind() != JavaType.FullyQualified.Kind.Interface;
         for (JavaType.Method method : type.getMethods()) {
-            if (method.getName().equals(name) && !method.hasFlags(Flag.Private) &&
+            if (method.getName().equals(name) && (!supertype || !method.hasFlags(Flag.Private)) &&
                 (staticMethods || !method.hasFlags(Flag.Static))) {
                 add(method, candidates);
             }
@@ -190,9 +186,9 @@ final class CalledMethod {
     }
 
     /**
-     * Adds {@code method}, or replaces the method with its parameter types where {@code method} returns a narrower type.
-     * A subtype's methods come before those of its supertypes, which they override. An interface can come after one it
-     * overrides, as in {@code New extends Wide, Narrow}.
+     * Adds {@code method}, or replaces the method with its parameter types where {@code method} returns a narrower
+     * type. A subtype's methods come before those of its supertypes, which they override. An interface can come after
+     * one it overrides, as in {@code New extends Wide, Narrow}.
      */
     private static void add(JavaType.Method method, List<JavaType.Method> candidates) {
         for (int i = 0; i < candidates.size(); i++) {
@@ -206,6 +202,29 @@ final class CalledMethod {
             }
         }
         candidates.add(method);
+    }
+
+    /**
+     * Whether {@code type} or one of its supertypes is only its name, which tells neither its methods nor its own
+     * supertypes. {@link ChangeType} gives the new type as such a type, also where it is another type's supertype.
+     */
+    private static boolean isNameOnly(JavaType.@Nullable FullyQualified type, Set<String> visited) {
+        if (type instanceof JavaType.Parameterized) {
+            type = ((JavaType.Parameterized) type).getType();
+        }
+        if (type == null || !visited.add(type.getFullyQualifiedName())) {
+            return false;
+        }
+        if (type instanceof JavaType.ShallowClass || type instanceof JavaType.Unknown ||
+            isNameOnly(type.getSupertype(), visited)) {
+            return true;
+        }
+        for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+            if (isNameOnly(anInterface, visited)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean sameTypes(List<JavaType> types, List<JavaType> others) {
@@ -227,10 +246,11 @@ final class CalledMethod {
             JavaType argumentType = argumentTypes.get(i);
             JavaType declaredType = method.getParameterTypes().get(i);
             JavaType parameterType = Substitutions.withArguments(declaredType, typeArguments);
-            // an untyped argument, or one whose type holds a type that is only its name and so has no supertypes,
-            // rules out no method
+            // an untyped argument, or one whose type holds a type with supertypes that can't be told, rules out no
+            // method
             if (argumentType != null &&
-                !contains(argumentType, t -> t instanceof JavaType.Unknown || t instanceof JavaType.ShallowClass) &&
+                !contains(argumentType, t -> t instanceof JavaType.FullyQualified &&
+                                             isNameOnly((JavaType.FullyQualified) t, new HashSet<>())) &&
                 !TypeUtils.isAssignableTo(parameterType == null ? declaredType : parameterType, argumentType)) {
                 return false;
             }
