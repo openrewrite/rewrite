@@ -647,14 +647,19 @@ public class GroovyParserVisitor {
                         markers.addAll(0, onLine);
                         k = lineStart;
                     }
+                    // A resolved annotation's position can be the first annotation's in the run (`@Other @Deprecated`
+                    // gives @Deprecated @Other's), so a marker is matched to it by simple name, each used once.
                     List<AnnotationNode> all = new ArrayList<>();
+                    List<AnnotationNode> unmatched = new ArrayList<>(resolved);
                     for (AnnotationNode marker : markers) {
                         AnnotationNode same = null;
-                        for (AnnotationNode a : resolved) {
-                            if (a.getLineNumber() == marker.getLineNumber() && a.getColumnNumber() == marker.getColumnNumber()) {
+                        for (AnnotationNode a : unmatched) {
+                            if (a.getClassNode().getNameWithoutPackage().equals(marker.getClassNode().getNameWithoutPackage())) {
                                 same = a;
+                                break;
                             }
                         }
+                        unmatched.remove(same);
                         all.add(same != null ? same : marker);
                     }
                     if (all.isEmpty()) {

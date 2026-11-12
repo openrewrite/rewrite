@@ -680,6 +680,29 @@ class TraitClassDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/9228")
     @Test
+    void annotationNotOnTheClasspathBeforeOneThatIs() {
+        rewriteRun(
+          groovy(
+            """
+              trait T {
+                @Other @Deprecated
+                static int n
+
+                @Other
+                @Deprecated
+                List v
+
+                @Deprecated @Other @Deprecated2
+                static String s = 's'
+              }
+              """,
+            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9228")
+    @Test
     void superCalls() {
         rewriteRun(
           groovy(
