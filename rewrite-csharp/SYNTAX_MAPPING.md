@@ -47,6 +47,57 @@ Comprehensive mapping of every Roslyn C# syntax element to its OpenRewrite LST r
 | `TypeParameterSyntax` | `Cs.ConstrainedTypeParameter` | `T where T : class, new()` | Variance (`in`/`out`) + `where` constraints |
 | Primary constructor | `J.MethodDeclaration` + `PrimaryConstructor` | `class Foo(int x /*~~>*/) { }` | Synthesized method in class body |
 
+### Primary-constructor templates
+
+For classes and structs, the C# parser places a synthetic `J.MethodDeclaration`
+first in the declaration's body. The method carries a `PrimaryConstructor` marker;
+its synthetic `<constructor>` name carries an `Implicit` marker. The enclosing
+`J.ClassDeclaration` has no `PrimaryConstructor` marker, and its
+`PrimaryConstructor` property remains null.
+
+The existing `CSharpTemplate.ClassMember` API can produce this shape. In the C#
+SDK, using `OpenRewrite.CSharp.Template` and `OpenRewrite.Java`, extract the
+synthetic method from an applied scaffold and prepend it to an eligible
+`declaration`, with `Cursor` pointing to that declaration:
+
+```csharp
+var template = CSharpTemplate.ClassMember("class C(int value) { }");
+var scaffold = (ClassDeclaration)template.Apply(Cursor)!;
+var constructor = scaffold.Body.Statements[0];
+var updated = declaration.WithBody(declaration.Body.WithStatements(
+    [constructor, .. declaration.Body.Statements]));
+```
+
+`Apply` refreshes node IDs; inserting cached `GetTree()` nodes directly would
+reuse IDs across declarations. This example preserves the original declaration's
+name, modifiers, type parameters, and body members, but constructs syntax only.
+`Apply` retains the scaffold's type attribution: the constructor and its
+parameters still belong to the scaffold type, and existing field initializers
+are not rebound to the new parameters. Template `usings` and `context` can resolve
+parameter types in the scaffold but do not rebind ownership to the destination.
+The modified source must be attributed in its destination context before relying
+on constructor ownership or parameter bindings; reparsing with a semantic model
+for the modified source provides those bindings. That standalone reparse creates
+new nodes and does not preserve existing node IDs or markers, and the example
+recipe does not perform it.
+
+For a simple conversion of an ordinary constructor with an unchanged signature,
+retaining its parameter nodes and moving the existing assignment's value into a
+field initializer can preserve the parameter binding. The synthetic constructor
+must also retain the original constructor's `MethodType` and use that same type
+for its implicit name; replacing only the parameter nodes leaves their owner
+inconsistent with the scaffold's method type. The conversion tests cover this
+restricted case, including a generic parameter type, without reparsing the result.
+
+A restricted `UsePrimaryConstructor` recipe can reuse existing constructor and
+parameter attribution as demonstrated here. Cases requiring changed signatures or
+newly bound references need additional SDK support and should initially be excluded.
+
+A conversion recipe must check eligibility, skip existing primary constructors,
+and handle constructor delegation, base initializers, parameter scope, and field
+initialization safety. The scaffold alone does not make arbitrary constructor
+conversions safe.
+
 ## Statements
 
 | Roslyn Syntax | LST Type | Example | Cs Justification |
