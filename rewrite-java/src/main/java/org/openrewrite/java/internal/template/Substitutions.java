@@ -157,12 +157,11 @@ public class Substitutions {
                 type = ((J.NewClass) parameter).getClazz().getType();
             } else if (parameter instanceof J.Empty && ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).isPresent()) {
                 type = ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).get().getType();
-            } else if (parameter instanceof TypedTree) {
-                type = ((TypedTree) parameter).getType();
-            } else if ("anyArray".equals(matcherName)) {
-                type = new JavaType.Array(null, JavaType.ShallowClass.build("java.lang.Object"), null);
             } else {
-                type = null;
+                type = typeOf(parameter);
+                if (type == null && "anyArray".equals(matcherName)) {
+                    type = new JavaType.Array(null, JavaType.ShallowClass.build("java.lang.Object"), null);
+                }
             }
             extractTypeVariables(type);
         }
@@ -293,10 +292,17 @@ public class Substitutions {
     }
 
     private static String typeHintFor(Object j) {
-        if (j instanceof TypedTree) {
-            return typeHintFor(((TypedTree) j).getType());
+        return typeHintFor(typeOf(j));
+    }
+
+    /**
+     * A parenthesized expression, like a few others, is an {@link Expression} but not a {@link TypedTree}.
+     */
+    private static @Nullable JavaType typeOf(@Nullable Object tree) {
+        if (tree instanceof Expression) {
+            return ((Expression) tree).getType();
         }
-        return "";
+        return tree instanceof TypedTree ? ((TypedTree) tree).getType() : null;
     }
 
     private static String typeHintFor(@Nullable JavaType t) {
@@ -315,8 +321,7 @@ public class Substitutions {
         if (generics.isEmpty()) {
             return;
         }
-        declaredParameterTypes.forEach((index, declared) -> bindTypeVariables(declared,
-                parameters[index] instanceof TypedTree ? ((TypedTree) parameters[index]).getType() : null));
+        declaredParameterTypes.forEach((index, declared) -> bindTypeVariables(declared, typeOf(parameters[index])));
         if (bindType != null && replaced != null) {
             try {
                 JavaType declared = TypeParameter.toJavaType(TypeParameter.parser(bindType).type(), generics);

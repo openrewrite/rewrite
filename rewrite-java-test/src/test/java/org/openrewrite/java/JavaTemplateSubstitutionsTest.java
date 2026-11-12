@@ -542,6 +542,42 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     }
 
     @Test
+    void anyWithAParenthesizedArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("count".equals(method.getSimpleName())) {
+                      return JavaTemplate.apply("java.util.Collections.frequency(#{any()}, #{any()})",
+                        getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              abstract class Test {
+                  abstract int count(List<String> values, String value);
+                  int test(List<String> values, String value) {
+                      return count((values), value);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              abstract class Test {
+                  abstract int count(List<String> values, String value);
+                  int test(List<String> values, String value) {
+                      return java.util.Collections.frequency((values), value);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void throwNewException() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
