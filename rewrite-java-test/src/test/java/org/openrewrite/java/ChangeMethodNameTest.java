@@ -725,7 +725,9 @@ class ChangeMethodNameTest implements RewriteTest {
     @Test
     void renamedCallKeepsItsTypeWhereItsDeclarationIsRenamedToo() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("a.A addItem(String)", "add", null, null)),
+          spec -> spec.recipes(
+            new ChangeMethodName("a.A addItem(String)", "add", null, null),
+            new ChangeMethodName("a.A describe()", "toString", null, null)),
           java(
             """
               package a;
@@ -733,6 +735,8 @@ class ChangeMethodNameTest implements RewriteTest {
               public class A {
                   public void addItem(String item) {}
                   public void add(int count) {}
+
+                  public String describe() { return ""; }
               }
               """,
             """
@@ -741,21 +745,27 @@ class ChangeMethodNameTest implements RewriteTest {
               public class A {
                   public void add(String item) {}
                   public void add(int count) {}
+
+                  public String toString() { return ""; }
               }
               """
           ),
           java(
             """
               class Test {
-                  void test(a.A a) {
+                  Object test(a.A a) {
                       a.addItem("x");
+
+                      return a.describe();
                   }
               }
               """,
             """
               class Test {
-                  void test(a.A a) {
+                  Object test(a.A a) {
                       a.add("x");
+
+                      return a.toString();
                   }
               }
               """

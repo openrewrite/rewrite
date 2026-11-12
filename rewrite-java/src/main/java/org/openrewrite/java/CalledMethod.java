@@ -44,16 +44,6 @@ final class CalledMethod {
      */
     static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name,
                                           List<@Nullable JavaType> argumentTypes) {
-        JavaType.Method declared = declared(type, name, argumentTypes);
-        return declared == null ? null : calledOn(type, declared);
-    }
-
-    /**
-     * @return The method of {@code type} that a call of {@code name} with arguments of {@code argumentTypes} calls, as
-     * it is declared, or {@code null} when not exactly one fits it.
-     */
-    static JavaType.@Nullable Method declared(JavaType.FullyQualified type, String name,
-                                              List<@Nullable JavaType> argumentTypes) {
         List<JavaType.Method> candidates = new ArrayList<>();
         collect(type, false, name, candidates, new HashSet<>());
         for (JavaType.Method candidate : candidates) {
@@ -68,7 +58,7 @@ final class CalledMethod {
         if (candidates.size() > 1) {
             candidates.removeIf(candidate -> !accepts(type, candidate, argumentTypes));
         }
-        return candidates.size() == 1 ? candidates.get(0) : null;
+        return candidates.size() == 1 ? calledOn(type, candidates.get(0)) : null;
     }
 
     /**
@@ -157,7 +147,7 @@ final class CalledMethod {
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
             // a named variable's bound may refer back to it, as in `T extends Comparable<T>`
-            if ("?".equals(variable.getName())) {
+            if (isWildcard(variable)) {
                 for (JavaType bound : variable.getBounds()) {
                     if (contains(bound, test)) {
                         return true;
@@ -207,7 +197,7 @@ final class CalledMethod {
     private static void add(JavaType.Method method, List<JavaType.Method> candidates) {
         for (int i = 0; i < candidates.size(); i++) {
             JavaType.Method candidate = candidates.get(i);
-            if (sameParameterTypes(candidate, method)) {
+            if (sameTypes(candidate.getParameterTypes(), method.getParameterTypes())) {
                 if (TypeUtils.isAssignableTo(candidate.getReturnType(), method.getReturnType()) &&
                     !TypeUtils.isAssignableTo(method.getReturnType(), candidate.getReturnType())) {
                     candidates.set(i, method);
@@ -218,12 +208,12 @@ final class CalledMethod {
         candidates.add(method);
     }
 
-    private static boolean sameParameterTypes(JavaType.Method method, JavaType.Method other) {
-        if (method.getParameterTypes().size() != other.getParameterTypes().size()) {
+    static boolean sameTypes(List<JavaType> types, List<JavaType> others) {
+        if (types.size() != others.size()) {
             return false;
         }
-        for (int i = 0; i < method.getParameterTypes().size(); i++) {
-            if (!TypeUtils.isOfType(method.getParameterTypes().get(i), other.getParameterTypes().get(i))) {
+        for (int i = 0; i < types.size(); i++) {
+            if (!TypeUtils.isOfType(types.get(i), others.get(i))) {
                 return false;
             }
         }

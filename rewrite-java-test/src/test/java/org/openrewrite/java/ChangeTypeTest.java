@@ -3619,6 +3619,7 @@ class ChangeTypeTest implements RewriteTest {
               package a;
               public class Old {
                   public boolean isAfter(Object other) { return false; }
+                  public Object get() { return null; }
               }
               """
           ),
@@ -3627,6 +3628,7 @@ class ChangeTypeTest implements RewriteTest {
               package b;
               public interface Chrono<D> {
                   default boolean isAfter(Chrono<?> other) { return false; }
+                  default D get() { return null; }
               }
               """
           ),
@@ -3646,6 +3648,7 @@ class ChangeTypeTest implements RewriteTest {
                   New n;
                   void test(Old o) {
                       o.isAfter(o);
+                      o.get();
                   }
               }
               """,
@@ -3656,6 +3659,7 @@ class ChangeTypeTest implements RewriteTest {
                   New n;
                   void test(New o) {
                       o.isAfter(o);
+                      o.get();
                   }
               }
               """
