@@ -2164,6 +2164,146 @@ class JavaTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceMethodWithAnOverloadTakingTheNewArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("IOUtils write(StringBuffer, java.io.OutputStream)").matches(mi)) {
+                      maybeAddImport("java.nio.charset.StandardCharsets");
+                      return JavaTemplate.builder("write(#{any(java.lang.StringBuffer)}, #{any(java.io.OutputStream)}, StandardCharsets.#{})")
+                        .imports("java.nio.charset.StandardCharsets")
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceMethod(),
+                          mi.getArguments().get(0), mi.getArguments().get(1), "UTF_8");
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              import java.io.OutputStream;
+              import java.nio.charset.Charset;
+
+              class IOUtils {
+                  static void write(StringBuffer data, OutputStream output) {
+                  }
+
+                  static void write(CharSequence data, OutputStream output, Charset charset) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import java.io.OutputStream;
+
+              class Test {
+                  void test(StringBuffer data, OutputStream output) {
+                      IOUtils.write(data, output);
+                  }
+              }
+              """,
+            """
+              import java.io.OutputStream;
+              import java.nio.charset.StandardCharsets;
+
+              class Test {
+                  void test(StringBuffer data, OutputStream output) {
+                      IOUtils.write(data, output, StandardCharsets.UTF_8);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodWithARenamedMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log warning(String)").matches(mi)) {
+                      return JavaTemplate.apply("warn(#{any(java.lang.String)})",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceMethod(),
+                        mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void warning(String message);
+                  void warn(Object message);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warning(name);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warn(name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodWithARenamedVarargsMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log warning(String[])").matches(mi)) {
+                      return JavaTemplate.apply("warn(#{any(java.lang.String)})",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceMethod(),
+                        mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void warning(String... messages);
+                  void warn(Object... messages);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warning(name);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warn(name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableDeclarationWithFinalVar() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
