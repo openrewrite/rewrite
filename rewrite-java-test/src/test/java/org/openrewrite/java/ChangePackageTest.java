@@ -2664,7 +2664,7 @@ class ChangePackageTest implements RewriteTest {
     void singleElementPackageNameRecursiveKeepsUnresolvedFieldAccess() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               package somepkg;

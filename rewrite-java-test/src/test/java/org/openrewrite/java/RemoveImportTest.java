@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -229,7 +228,7 @@ class RemoveImportTest implements RewriteTest {
                   // only the nested type is attributed
                   return "Map".equals(identifier.getSimpleName()) ? identifier.withType(null) : identifier;
               }
-          })).afterTypeValidationOptions(TypeValidation.none()),
+          })),
           java(
             """
               import java.util.*;

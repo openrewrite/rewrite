@@ -2249,8 +2249,6 @@ class JavadocTest implements RewriteTest {
     @Test
     void varargsWithPrefix() {
         rewriteRun(
-          // for some reason the compiler AST's type attribution is incomplete here
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               class A {

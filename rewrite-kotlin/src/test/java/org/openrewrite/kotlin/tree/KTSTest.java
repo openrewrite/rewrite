@@ -68,7 +68,7 @@ class KTSTest implements RewriteTest {
     @Test
     void dslSample() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodInvocations(false)),
           kotlinScript(
             //language=none
             """
