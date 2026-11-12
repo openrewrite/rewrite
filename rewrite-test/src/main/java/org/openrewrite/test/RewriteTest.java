@@ -414,16 +414,16 @@ public interface RewriteTest extends SourceSpecs {
         specParsers.addAll(testClassSpecParsers);
         Function<SourceFile, List<Parser.Builder>> parsersFor = after ->
                 RewriteTestUtils.parsersFor(after, specBySourceFile, parserBySourceSpec, sourceSpecs, specParsers);
-        List<Parser.Builder> afterParsers = new ArrayList<>(testMethodSpec.afterParsers);
+        List<Parser.Builder> specAfterParsers = new ArrayList<>(testMethodSpec.afterParsers);
         for (Parser.Builder afterParser : testClassSpec.afterParsers) {
-            afterParsers.add(afterParser.clone());
+            specAfterParsers.add(afterParser.clone());
         }
-        Function<SourceFile, List<Parser.Builder>> outputParsersFor = output ->
-                RewriteTestUtils.outputParsersFor(output, afterParsers, parsersFor);
+        Function<SourceFile, List<Parser.Builder>> afterParsersFor = after ->
+                RewriteTestUtils.afterParsersFor(after, specAfterParsers, parsersFor);
         Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
         AddedMarkers addedMarkers = quality.reportingMarkersOnly() ||
                                     unneededOptOuts.runsOnTheSide("reportingMarkersOnly") ?
-                new AddedMarkers(beforeSourceFiles, outputParsersFor, relativeTo, ctx) : null;
+                new AddedMarkers(beforeSourceFiles, afterParsersFor, relativeTo, ctx) : null;
         UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();
         AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ||
                                                   unneededOptOuts.runsOnTheSide("lightweightAccumulators") ?
@@ -731,13 +731,13 @@ public interface RewriteTest extends SourceSpecs {
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), false, true));
         new TreeShapes(quality.parserShapedTrees(),
                 quality.parserTypedTrees() && TypeValidation.validatesTypes(testMethodSpec, testClassSpec),
-                outputParsersFor, afterParsers, relativeTo, ctx)
+                afterParsersFor, specAfterParsers, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         unneededOptOuts.checkOnTheSideLater("parserShapedTrees", () ->
-                new TreeShapes(true, false, outputParsersFor, afterParsers, relativeTo, ctx)
+                new TreeShapes(true, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.checkOnTheSideLater("parserTypedTrees", () ->
-                new TreeShapes(false, true, outputParsersFor, afterParsers, relativeTo, ctx)
+                new TreeShapes(false, true, afterParsersFor, specAfterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
                 CompositeOrder.assertOrdered(recipe));
@@ -919,18 +919,19 @@ class RewriteTestUtils {
     }
 
     /**
-     * The parsers that might parse a source the recipe returned: the test's after parsers of the DSL of the parser
-     * that {@link #parsersFor} chooses first, then the parsers it chooses. Parsers of two DSLs can make the same
-     * kind of source, as Gradle's and Groovy's do, so the kind alone doesn't tell which one an after parser is for.
+     * The parsers to parse a source the recipe returned with: the test's after parsers of the DSL of the parser
+     * that {@link #parsersFor} chooses first, then the parsers it chooses, which are all of them in a test without
+     * an after parser. Parsers of two DSLs can make the same kind of source, as Gradle's and Groovy's do, so the
+     * kind alone doesn't tell which one an after parser is for.
      */
-    static List<Parser.Builder> outputParsersFor(SourceFile output, List<Parser.Builder> afterParsers,
-                                                 Function<SourceFile, List<Parser.Builder>> parsersFor) {
-        List<Parser.Builder> inputParsers = parsersFor.apply(output);
+    static List<Parser.Builder> afterParsersFor(SourceFile after, List<Parser.Builder> specAfterParsers,
+                                                Function<SourceFile, List<Parser.Builder>> parsersFor) {
+        List<Parser.Builder> inputParsers = parsersFor.apply(after);
         if (inputParsers.isEmpty()) {
             return inputParsers;
         }
         List<Parser.Builder> parsers = new ArrayList<>();
-        for (Parser.Builder afterParser : afterParsers) {
+        for (Parser.Builder afterParser : specAfterParsers) {
             if (afterParser.getDslName().equals(inputParsers.get(0).getDslName())) {
                 parsers.add(afterParser);
             }

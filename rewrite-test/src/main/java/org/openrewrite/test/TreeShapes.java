@@ -39,21 +39,22 @@ final class TreeShapes {
 
     private final boolean shapes;
     private final boolean types;
-    private final Function<SourceFile, List<Parser.Builder>> outputParsersFor;
-    private final Collection<Parser.Builder> afterParsers;
+    private final Function<SourceFile, List<Parser.Builder>> afterParsersFor;
+    private final Collection<Parser.Builder> specAfterParsers;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
 
     /**
-     * @param outputParsersFor The parsers of a source the recipe returned.
-     * @param afterParsers     Those of them that the test gave for the recipe's output.
+     * @param afterParsersFor  The parsers to parse a source the recipe returned with, which are those of its input
+     *                         where the test gives no after parser of its language.
+     * @param specAfterParsers Those of them that the test gave as after parsers.
      */
-    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> outputParsersFor,
-               Collection<Parser.Builder> afterParsers, @Nullable Path relativeTo, ExecutionContext parseCtx) {
+    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> afterParsersFor,
+               Collection<Parser.Builder> specAfterParsers, @Nullable Path relativeTo, ExecutionContext parseCtx) {
         this.shapes = shapes;
         this.types = types;
-        this.outputParsersFor = outputParsersFor;
-        this.afterParsers = afterParsers;
+        this.afterParsersFor = afterParsersFor;
+        this.specAfterParsers = specAfterParsers;
         this.relativeTo = relativeTo;
         this.parseCtx = parseCtx;
     }
@@ -93,7 +94,7 @@ final class TreeShapes {
                 before != null && printed(before).equals(printed(after))) {
                 continue;
             }
-            List<Parser.Builder> parsers = outputParsersFor.apply(after);
+            List<Parser.Builder> parsers = afterParsersFor.apply(after);
             if (!parsers.isEmpty() && service.reads(parsers.get(0), after)) {
                 byParser.computeIfAbsent(parsers.get(0), p -> new ArrayList<>()).add(result);
             }
@@ -261,7 +262,7 @@ final class TreeShapes {
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
         for (SourceFile source : current) {
-            List<Parser.Builder> parsers = outputParsersFor.apply(source);
+            List<Parser.Builder> parsers = afterParsersFor.apply(source);
             if (parsers.isEmpty() || parsers.get(0) != builder) {
                 continue;
             }
@@ -272,7 +273,7 @@ final class TreeShapes {
         Map<UUID, Reparsed> reparsed = new HashMap<>();
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
-        boolean afterParser = afterParsers.contains(builder);
+        boolean afterParser = specAfterParsers.contains(builder);
         // Types need a parser with the output's classpath, and shapes alone parse faster without types. An after
         // parser types the output afresh, as a clone of the input's parser holds the input classpath's types under
         // the output's names.
