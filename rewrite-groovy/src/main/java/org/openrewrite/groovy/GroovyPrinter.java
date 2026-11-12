@@ -453,6 +453,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 prefix = "?.";
             } else if (nameMarkers.findFirst(StarDot.class).isPresent()) {
                 prefix = "*.";
+            } else if (nameMarkers.findFirst(ImplicitDot.class).isPresent()) {
+                prefix = ""; // a command chain's property, `call(x) name`: no dot in the source
             }
 
             visitLeftPadded(prefix, fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
