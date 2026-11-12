@@ -31,19 +31,22 @@ public class CSharpLanguageVersion implements Marker, RpcCodec<CSharpLanguageVer
     UUID id;
     String version;
     List<TargetFrameworkVersion> targetFrameworkVersions;
+    boolean targetFrameworkCoverageComplete;
 
     @Override
     public void rpcSend(CSharpLanguageVersion after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
         q.getAndSend(after, CSharpLanguageVersion::getVersion);
         q.getAndSendList(after, CSharpLanguageVersion::getTargetFrameworkVersions, TargetFrameworkVersion::getTargetFramework, null);
+        q.getAndSend(after, CSharpLanguageVersion::isTargetFrameworkCoverageComplete);
     }
 
     @Override
     public CSharpLanguageVersion rpcReceive(CSharpLanguageVersion before, RpcReceiveQueue q) {
         return before.withId(q.receiveAndGet(before.id, UUID::fromString))
                 .withVersion(q.receive(before.version))
-                .withTargetFrameworkVersions(q.receiveList(before.targetFrameworkVersions, null));
+                .withTargetFrameworkVersions(q.receiveList(before.targetFrameworkVersions, null))
+                .withTargetFrameworkCoverageComplete(q.receive(before.targetFrameworkCoverageComplete));
     }
     @Value
     public static class TargetFrameworkVersion implements RpcCodec<TargetFrameworkVersion> {

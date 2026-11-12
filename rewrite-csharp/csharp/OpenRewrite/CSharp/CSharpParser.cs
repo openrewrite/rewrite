@@ -90,6 +90,8 @@ public class CSharpParser
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
+        var parseOptions = (semanticModel?.SyntaxTree.Options as CSharpParseOptions)
+            ?.WithPreprocessorSymbols(Array.Empty<string>());
         for (int i = 0; i < permutations.Count; i++)
         {
             var (cleanSource, definedSymbols) = permutations[i];
@@ -98,9 +100,6 @@ public class CSharpParser
             CompilationUnit cu;
             if (isPrimary && semanticModel != null)
             {
-                // Preserve parse options from the original tree to avoid "Inconsistent syntax tree features"
-                var parseOptions = semanticModel.SyntaxTree.Options as CSharpParseOptions;
-                parseOptions = parseOptions?.WithPreprocessorSymbols(Array.Empty<string>());
                 var syntaxTree = CSharpSyntaxTree.ParseText(cleanSource, options: parseOptions, path: sourcePath);
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
@@ -109,7 +108,7 @@ public class CSharpParser
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache, parseOptions);
             }
 
             cu = (CompilationUnit)DirectiveBoundaryInjector.Inject(cu);
@@ -144,7 +143,7 @@ public class CSharpParser
     }
 
     private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel,
-        Dictionary<ISymbol, JavaType>? typeCache = null)
+        Dictionary<ISymbol, JavaType>? typeCache = null, CSharpParseOptions? parseOptions = null)
     {
         if (semanticModel != null)
         {
@@ -159,7 +158,7 @@ public class CSharpParser
         }
         else
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, path: sourcePath);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, options: parseOptions, path: sourcePath);
             var root = syntaxTree.GetCompilationUnitRoot();
             var visitor = new CSharpParserVisitor(source, charsetBomMarked: _charsetBomMarked);
             return visitor.VisitCompilationUnit(root);
@@ -182,6 +181,8 @@ public class CSharpParser
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
+        var parseOptions = (semanticModel?.SyntaxTree.Options as CSharpParseOptions)
+            ?.WithPreprocessorSymbols(Array.Empty<string>());
         for (int i = 0; i < permutations.Count; i++)
         {
             var (cleanSource, definedSymbols) = permutations[i];
@@ -190,9 +191,6 @@ public class CSharpParser
             CompilationUnit cu;
             if (isPrimary && semanticModel != null)
             {
-                // Preserve parse options from the original tree to avoid "Inconsistent syntax tree features"
-                var parseOptions = semanticModel.SyntaxTree.Options as CSharpParseOptions;
-                parseOptions = parseOptions?.WithPreprocessorSymbols(Array.Empty<string>());
                 var syntaxTree = CSharpSyntaxTree.ParseText(cleanSource, options: parseOptions, path: sourcePath);
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
@@ -201,7 +199,7 @@ public class CSharpParser
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache, parseOptions);
             }
 
             // Convert ghost comments in whitespace to DirectiveBoundaryMarker markers

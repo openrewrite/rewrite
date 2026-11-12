@@ -297,3 +297,25 @@ used for attribution; recipes introducing syntax must check every applicable
 `TargetFrameworkVersions` entry. The list is empty for standalone parses and project
 recovery without an evaluated Roslyn project. Unloaded target frameworks cannot be
 reported by this marker.
+
+Framework names prefer Roslyn's compiler-visible `TargetFramework` metadata, then
+MSBuild-evaluated declarations (including imported properties) for single-target
+projects. The Roslyn project name is a fallback for multi-target variants.
+`IsTargetFrameworkCoverageComplete` is true only when every evaluated target framework
+has a loaded, supported variant with an identified framework name. It is false when
+coverage is incomplete or cannot be established, including standalone and recovery
+parses. Consumers can require this flag before checking every framework's version;
+no comparison with `DotNetProject.TargetFrameworks` is needed.
+
+`preview` remains the literal string `"preview"` in both `Version` and framework
+entries. It does not resolve to a numeric version, so consumers must handle it
+explicitly rather than assuming all effective versions parse as numbers. The
+coverage flag describes framework coverage only; it does not imply a particular
+language feature is available.
+
+Conditional preprocessor branches retain the original Roslyn parse options,
+including the language version, even when a secondary branch has no semantic model.
+Project parsing attaches the same `CSharpLanguageVersion` metadata to the outer
+compilation unit and every nested branch compilation unit. A recipe may therefore
+read the nearest compilation unit's marker for both its version and framework
+coverage without walking back to the outer file.

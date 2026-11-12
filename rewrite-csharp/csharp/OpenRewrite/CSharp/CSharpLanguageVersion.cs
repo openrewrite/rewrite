@@ -18,29 +18,35 @@ using OpenRewrite.Core.Rpc;
 
 namespace OpenRewrite.CSharp;
 
-public sealed class CSharpLanguageVersion(Guid id, string version, IList<CSharpLanguageVersion.TargetFrameworkVersion>? targetFrameworkVersions = null) : Marker, IRpcCodec<CSharpLanguageVersion>, IEquatable<CSharpLanguageVersion>
+public sealed class CSharpLanguageVersion(Guid id, string version, IList<CSharpLanguageVersion.TargetFrameworkVersion>? targetFrameworkVersions = null, bool isTargetFrameworkCoverageComplete = false) : Marker, IRpcCodec<CSharpLanguageVersion>, IEquatable<CSharpLanguageVersion>
 {
     public Guid Id { get; } = id;
     public string Version { get; } = version;
     public IList<TargetFrameworkVersion> TargetFrameworkVersions { get; } = targetFrameworkVersions ?? [];
+    public bool IsTargetFrameworkCoverageComplete { get; } = isTargetFrameworkCoverageComplete;
 
-    public CSharpLanguageVersion WithId(Guid id) => id == Id ? this : new(id, Version, TargetFrameworkVersions);
-    public CSharpLanguageVersion WithVersion(string version) => version == Version ? this : new(Id, version, TargetFrameworkVersions);
+    public CSharpLanguageVersion WithId(Guid id) => id == Id ? this : new(id, Version, TargetFrameworkVersions, IsTargetFrameworkCoverageComplete);
+    public CSharpLanguageVersion WithVersion(string version) => version == Version ? this : new(Id, version, TargetFrameworkVersions, IsTargetFrameworkCoverageComplete);
 
     public CSharpLanguageVersion WithTargetFrameworkVersions(IList<TargetFrameworkVersion> versions) =>
-        ReferenceEquals(versions, TargetFrameworkVersions) ? this : new(Id, Version, versions);
+        ReferenceEquals(versions, TargetFrameworkVersions) ? this : new(Id, Version, versions, IsTargetFrameworkCoverageComplete);
+
+    public CSharpLanguageVersion WithTargetFrameworkCoverageComplete(bool complete) =>
+        complete == IsTargetFrameworkCoverageComplete ? this : new(Id, Version, TargetFrameworkVersions, complete);
 
     public void RpcSend(CSharpLanguageVersion after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
         q.GetAndSend(after, m => m.Version);
         q.GetAndSendList(after, m => m.TargetFrameworkVersions, v => v.TargetFramework, null);
+        q.GetAndSend(after, m => m.IsTargetFrameworkCoverageComplete);
     }
 
     public CSharpLanguageVersion RpcReceive(CSharpLanguageVersion before, RpcReceiveQueue q) => before
         .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
         .WithVersion(q.Receive(before.Version)!)
-        .WithTargetFrameworkVersions(q.ReceiveList(before.TargetFrameworkVersions, null)!);
+        .WithTargetFrameworkVersions(q.ReceiveList(before.TargetFrameworkVersions, null)!)
+        .WithTargetFrameworkCoverageComplete(q.Receive(before.IsTargetFrameworkCoverageComplete));
 
     public bool Equals(CSharpLanguageVersion? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as CSharpLanguageVersion);

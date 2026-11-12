@@ -765,13 +765,31 @@ public class SolutionParser
                 }))
             .ToList();
 
+        var frameworkProperties = NuGetResolver.EvaluateProperties(projectPath,
+            ["TargetFramework", "TargetFrameworks", "TargetFrameworkMoniker"]);
+        var frameworks = frameworkProperties.TryGetValue("TargetFrameworks", out var multiTarget)
+            ? multiTarget.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : frameworkProperties.TryGetValue("TargetFramework", out var singleTarget)
+                ? [singleTarget.Value.Trim()]
+                : frameworkProperties.TryGetValue("TargetFrameworkMoniker", out var legacyTarget)
+                    ? [NuGetFramework.Parse(legacyTarget.Value).GetShortFolderName()]
+                    : Array.Empty<string>();
         var languageVersions = solution.Projects
             .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
-                        p.ParseOptions is CSharpParseOptions)
+                        !_unsupportedVariants.Contains(p.Id) && p.ParseOptions is CSharpParseOptions)
             .Select(p => new CSharpLanguageVersion.TargetFrameworkVersion(
-                TargetFrameworkOf(p) ?? "", ((CSharpParseOptions)p.ParseOptions!).LanguageVersion.ToDisplayString()))
+                p.AnalyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+                    "build_property.TargetFramework", out var framework) && !string.IsNullOrWhiteSpace(framework)
+                    ? framework.Trim()
+                    : frameworks.Length == 1 ? frameworks[0] : TargetFrameworkOf(p) ?? "",
+                ((CSharpParseOptions)p.ParseOptions!).LanguageVersion.ToDisplayString()))
             .ToList();
-        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput, languageVersions);
+        var frameworkCoverageComplete = frameworks.Length > 0 &&
+            languageVersions.All(v => !string.IsNullOrEmpty(v.TargetFramework)) &&
+            new HashSet<string>(frameworks, StringComparer.OrdinalIgnoreCase)
+                .SetEquals(languageVersions.Select(v => v.TargetFramework));
+        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput,
+            languageVersions, frameworkCoverageComplete);
     }
 
     /// <summary>
@@ -819,6 +837,15 @@ public class SolutionParser
         Func<string?> ReadSource,
         Func<SemanticModel?> GetSemanticModel);
 
+    private sealed class LanguageVersionVisitor : CSharpVisitor<CSharpLanguageVersion>
+    {
+        public override OpenRewrite.Java.J VisitCompilationUnit(CompilationUnit cu, CSharpLanguageVersion version)
+        {
+            cu = (CompilationUnit)base.VisitCompilationUnit(cu, version);
+            return cu.WithMarkers(cu.Markers.Remove<CSharpLanguageVersion>().Add(version));
+        }
+    }
+
     private static string? ReadSource(string filePath)
     {
         try
@@ -835,7 +862,8 @@ public class SolutionParser
     private List<SourceFile> ParseUnits(
         string projectPath, string rootDir, IReadOnlyList<ParseUnit> units,
         List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput,
-        IList<CSharpLanguageVersion.TargetFrameworkVersion>? languageVersions = null)
+        IList<CSharpLanguageVersion.TargetFrameworkVersion>? languageVersions = null,
+        bool frameworkCoverageComplete = false)
     {
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
 
@@ -915,8 +943,9 @@ public class SolutionParser
 
                 if (languageVersions != null && cu.Markers.FindFirst<CSharpLanguageVersion>() is { } languageVersion)
                 {
-                    cu = cu.WithMarkers(cu.Markers.Remove<CSharpLanguageVersion>()
-                        .Add(languageVersion.WithTargetFrameworkVersions(languageVersions)));
+                    cu = (CompilationUnit)new LanguageVersionVisitor().VisitNonNull(cu,
+                        languageVersion.WithTargetFrameworkVersions(languageVersions)
+                            .WithTargetFrameworkCoverageComplete(frameworkCoverageComplete));
                 }
                 cu = cu.WithMarkers(cu.Markers.Add(dotNetProject));
                 results.Add(cu);

@@ -25,6 +25,7 @@ public class CSharpLanguageVersionTests
     [InlineData(LanguageVersion.CSharp10, "10.0")]
     [InlineData(LanguageVersion.CSharp12, "12.0")]
     [InlineData(LanguageVersion.Latest, "14.0")]
+    [InlineData(LanguageVersion.Preview, "preview")]
     public void EffectiveLanguageVersion(LanguageVersion version, string expected)
     {
         // given
@@ -56,6 +57,48 @@ public class CSharpLanguageVersionTests
         var marker = cu.Markers.FindFirst<CSharpLanguageVersion>();
         Assert.NotNull(marker);
         Assert.Equal(CSharpParseOptions.Default.LanguageVersion.ToDisplayString(), marker.Version);
+        Assert.False(marker.IsTargetFrameworkCoverageComplete);
+    }
+
+    [Theory]
+    [InlineData(LanguageVersion.CSharp7_3, "7.3", false)]
+    [InlineData(LanguageVersion.CSharp7_3, "7.3", true)]
+    [InlineData(LanguageVersion.Preview, "preview", false)]
+    public void ConditionalBranchesPreserveLanguageVersion(LanguageVersion version, string expected,
+        bool withConfigurations)
+    {
+        // given
+        const string source = """
+            #if OUTER
+            #if INNER
+            class A { }
+            #else
+            class B { }
+            #endif
+            #else
+            class C { }
+            #endif
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(version));
+        var model = CSharpCompilation.Create("test", [tree]).GetSemanticModel(tree);
+        var parser = new CSharpParser();
+
+        // when
+        var cu = withConfigurations
+            ? parser.ParseWithConfigurations(source, "source.cs", model, [new(), new() { "OUTER" }])
+            : parser.Parse(source, semanticModel: model);
+
+        // then
+        var directive = Assert.IsType<ConditionalDirective>(Assert.Single(cu.Members).Element);
+        Assert.True(directive.Branches.Count >= 3);
+        Assert.All(new[] { cu }.Concat(directive.Branches.Select(b => b.Element)), unit =>
+        {
+            var marker = unit.Markers.FindFirst<CSharpLanguageVersion>();
+            Assert.NotNull(marker);
+            Assert.Equal(expected, marker.Version);
+            Assert.False(marker.IsTargetFrameworkCoverageComplete);
+        });
+        Assert.Equal(source, new CSharpPrinter<int>().Print(cu));
     }
 
 }
