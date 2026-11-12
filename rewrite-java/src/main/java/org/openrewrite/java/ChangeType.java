@@ -363,6 +363,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             }
                             if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                                 addImport(fullyQualifiedTarget);
+                                // the target's import shortens `Owner.Target` to `Target`, which can leave the owner's unused
+                                for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
+                                    maybeRemoveImport(owner);
+                                }
                             }
                         }
                     }
