@@ -23,6 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -173,8 +174,10 @@ public class ChangeMethodName extends Recipe {
                     // Without type attribution, assume a clash when the arity matches
                     return m1.getParameters().size() == m2.getParameters().size();
                 }
-                List<JavaType> p1 = t1.getParameterTypes();
-                List<JavaType> p2 = t2.getParameterTypes();
+                return sameParameterTypes(t1.getParameterTypes(), t2.getParameterTypes());
+            }
+
+            private boolean sameParameterTypes(List<JavaType> p1, List<JavaType> p2) {
                 if (p1.size() != p2.size()) {
                     return false;
                 }
@@ -192,12 +195,56 @@ public class ChangeMethodName extends Recipe {
                 if (methodMatcher.matches(method) && !method.getSimpleName().equals(newMethodName)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
-                        type = type.withName(newMethodName);
+                        type = renamed(m, type);
                     }
                     m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
                             .withMethodType(type);
                 }
                 return m;
+            }
+
+            /**
+             * The method named {@code newMethodName} that {@code call} calls on its receiver's type, such as a
+             * {@code select()} that returns another type than the {@code transform()} it replaces, or {@code type}
+             * with the new name where the receiver's type has no such method or doesn't tell which one the call calls.
+             */
+            private JavaType.Method renamed(J.MethodInvocation call, JavaType.Method type) {
+                JavaType.Method renamed = type.withName(newMethodName);
+                // The receiver has the type of the method an earlier rename gave it, as in
+                // `multi.select().byTakingFirstItems(2)`, which isn't the type that declares the old method.
+                JavaType.FullyQualified receiver = call.getSelect() == null ? type.getDeclaringType() :
+                        TypeUtils.asFullyQualified(call.getSelect().getType());
+                // Kotlin, Groovy and the other languages resolve a call by rules of their own
+                if (receiver == null || getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
+                    return renamed;
+                }
+                List<@Nullable JavaType> argumentTypes = new ArrayList<>();
+                for (Expression argument : call.getArguments()) {
+                    if (!(argument instanceof J.Empty)) {
+                        argumentTypes.add(argument.getType());
+                    }
+                }
+                JavaType.Method target = CalledMethod.declared(receiver, newMethodName, argumentTypes);
+                if (target == null) {
+                    return renamed;
+                }
+                JavaType.Method original = CalledMethod.declared(receiver, type.getName(), argumentTypes);
+                String declaringType = target.getDeclaringType().getFullyQualifiedName();
+                if (original != null && sameSignature(original, target) &&
+                    TypeUtils.isOfClassType(type.getDeclaringType(), declaringType)) {
+                    // javac inferred the call's types from this signature, type variables of the method included
+                    return target.withDeclaringType(type.getDeclaringType())
+                            .withReturnType(type.getReturnType())
+                            .withParameterTypes(type.getParameterTypes());
+                }
+                JavaType.Method called = CalledMethod.calledOn(receiver, target);
+                return called == null ? renamed : called;
+            }
+
+            private boolean sameSignature(JavaType.Method m1, JavaType.Method m2) {
+                return TypeUtils.isOfType(m1.getDeclaringType(), m2.getDeclaringType()) &&
+                       TypeUtils.isOfType(m1.getReturnType(), m2.getReturnType()) &&
+                       sameParameterTypes(m1.getParameterTypes(), m2.getParameterTypes());
             }
 
             @Override

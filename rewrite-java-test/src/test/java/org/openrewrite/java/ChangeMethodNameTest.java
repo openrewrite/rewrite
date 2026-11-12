@@ -579,4 +579,89 @@ class ChangeMethodNameTest implements RewriteTest {
           )
         );
     }
+
+    @Language("java")
+    String multi = """
+      package a;
+
+      import java.util.function.Function;
+
+      public interface Multi<T> {
+          @Deprecated
+          default Transform<T> transform() { return null; }
+          Select<T> select();
+
+          @Deprecated
+          default <R> Multi<R> apply(Function<? super T, ? extends R> mapper) { return null; }
+          <R> Multi<R> map(Function<? super T, ? extends R> mapper);
+
+          class Transform<T> {
+              public Multi<T> byTakingFirstItems(long count) { return null; }
+          }
+
+          class Select<T> {
+              public Multi<T> first() { return null; }
+              public Multi<T> first(long count) { return null; }
+              public Multi<T> first(String until) { return null; }
+          }
+      }
+      """;
+
+    @Test
+    void chainedRenamedCallsHaveTheTypesOfTheMethodsTheyCall() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("a.Multi transform()", "select", null, null),
+            new ChangeMethodName("a.Multi.Transform byTakingFirstItems(..)", "first", null, true)),
+          java(multi),
+          java(
+            """
+              import a.Multi;
+
+              class Test {
+                  Object test(Multi<String> multi) {
+                      return multi.transform().byTakingFirstItems(2);
+                  }
+              }
+              """,
+            """
+              import a.Multi;
+
+              class Test {
+                  Object test(Multi<String> multi) {
+                      return multi.select().first(2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallKeepsTheTypesInferredForIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Multi apply(..)", "map", null, null)),
+          java(multi),
+          java(
+            """
+              import a.Multi;
+
+              class Test {
+                  Multi<Integer> test(Multi<String> multi) {
+                      return multi.apply(String::length);
+                  }
+              }
+              """,
+            """
+              import a.Multi;
+
+              class Test {
+                  Multi<Integer> test(Multi<String> multi) {
+                      return multi.map(String::length);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

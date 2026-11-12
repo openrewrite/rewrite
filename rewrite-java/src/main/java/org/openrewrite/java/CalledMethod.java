@@ -21,8 +21,10 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -36,12 +38,21 @@ final class CalledMethod {
     }
 
     /**
-     * @return The method of {@code type} that a call of {@code name} with arguments of {@code argumentTypes} calls, or
-     * {@code null} when not exactly one fits it or the signature of the one that does has a type variable. A call
-     * has the types javac substitutes for a type variable, which the method's declaration doesn't hold.
+     * @return The method of {@code type} that a call of {@code name} with arguments of {@code argumentTypes} calls,
+     * with the types the call has, or {@code null} when not exactly one fits it or its types can't be told.
      */
     static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name,
                                           List<@Nullable JavaType> argumentTypes) {
+        JavaType.Method declared = declared(type, name, argumentTypes);
+        return declared == null ? null : calledOn(type, declared);
+    }
+
+    /**
+     * @return The method of {@code type} that a call of {@code name} with arguments of {@code argumentTypes} calls, as
+     * it is declared, or {@code null} when not exactly one fits it.
+     */
+    static JavaType.@Nullable Method declared(JavaType.FullyQualified type, String name,
+                                              List<@Nullable JavaType> argumentTypes) {
         List<JavaType.Method> candidates = new ArrayList<>();
         collect(type, false, name, candidates, new HashSet<>());
         for (JavaType.Method candidate : candidates) {
@@ -54,26 +65,105 @@ final class CalledMethod {
         // The only method with the call's name and number of arguments is the one javac calls once the program
         // compiles, while an argument's type may still be one that a later recipe changes.
         if (candidates.size() > 1) {
-            candidates.removeIf(candidate -> !accepts(candidate, argumentTypes));
+            candidates.removeIf(candidate -> !accepts(type, candidate, argumentTypes));
         }
-        if (candidates.size() != 1) {
-            return null;
-        }
-        JavaType.Method method = candidates.get(0);
-        if (hasTypeVariable(method.getReturnType())) {
-            return null;
-        }
-        for (JavaType parameterType : method.getParameterTypes()) {
-            if (hasTypeVariable(parameterType)) {
-                return null;
-            }
-        }
-        return method;
+        return candidates.size() == 1 ? candidates.get(0) : null;
     }
 
-    private static boolean hasTypeVariable(JavaType type) {
-        return contains(type, t -> t instanceof JavaType.GenericTypeVariable &&
-                                   !"?".equals(((JavaType.GenericTypeVariable) t).getName()));
+    /**
+     * @return {@code declared} with the types that a call on a receiver of {@code type} has, such as
+     * {@code List<String>} for a {@code List<T>} called on a {@code Box<String>}, or {@code null} when {@code type}
+     * has no argument for one of their type variables. A raw type and a wildcard are no argument, and javac infers a
+     * variable of the method itself from the call.
+     */
+    static JavaType.@Nullable Method calledOn(JavaType.FullyQualified type, JavaType.Method declared) {
+        Map<String, JavaType> typeArguments = typeArguments(type, declared);
+        JavaType returnType = substitute(declared.getReturnType(), typeArguments);
+        if (returnType == null) {
+            return null;
+        }
+        boolean asDeclared = returnType == declared.getReturnType();
+        List<JavaType> parameterTypes = new ArrayList<>();
+        for (JavaType declaredType : declared.getParameterTypes()) {
+            JavaType parameterType = substitute(declaredType, typeArguments);
+            if (parameterType == null) {
+                return null;
+            }
+            asDeclared &= parameterType == declaredType;
+            parameterTypes.add(parameterType);
+        }
+        if (asDeclared) {
+            return declared;
+        }
+        // the parser names the declaring type of a method with other types than it is declared with by the type's
+        // own variables, as in `Box<T>`
+        JavaType.FullyQualified declaringType = declared.getDeclaringType();
+        return declared
+                .withDeclaringType(new JavaType.Parameterized(null, declaringType, declaringType.getTypeParameters()))
+                .withReturnType(returnType)
+                .withParameterTypes(parameterTypes);
+    }
+
+    /**
+     * What the type variables of the type that declares {@code method} stand for in a receiver of {@code type}, by
+     * name. A subtype of the declaring type, a wildcard and a variable that one of {@code method}'s own hides are
+     * left out.
+     */
+    private static Map<String, JavaType> typeArguments(JavaType.FullyQualified type, JavaType.Method method) {
+        Map<String, JavaType> typeArguments = new HashMap<>();
+        if (type instanceof JavaType.Parameterized &&
+            type.getFullyQualifiedName().equals(method.getDeclaringType().getFullyQualifiedName())) {
+            List<JavaType> variables = ((JavaType.Parameterized) type).getType().getTypeParameters();
+            List<JavaType> arguments = type.getTypeParameters();
+            for (int i = 0; i < variables.size() && i < arguments.size(); i++) {
+                if (variables.get(i) instanceof JavaType.GenericTypeVariable && !isWildcard(arguments.get(i))) {
+                    typeArguments.put(((JavaType.GenericTypeVariable) variables.get(i)).getName(), arguments.get(i));
+                }
+            }
+        }
+        typeArguments.keySet().removeAll(method.getDeclaredFormalTypeNames());
+        return typeArguments;
+    }
+
+    private static boolean isWildcard(JavaType type) {
+        return type instanceof JavaType.GenericTypeVariable &&
+               "?".equals(((JavaType.GenericTypeVariable) type).getName());
+    }
+
+    /**
+     * @return {@code type} with each type variable replaced by what it stands for, or {@code null} when
+     * {@code typeArguments} lacks one of them.
+     */
+    private static @Nullable JavaType substitute(JavaType type, Map<String, JavaType> typeArguments) {
+        if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            if (!isWildcard(variable)) {
+                return typeArguments.get(variable.getName());
+            }
+            List<JavaType> bounds = substitute(variable.getBounds(), typeArguments);
+            return bounds == null ? null : variable.withBounds(bounds);
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            List<JavaType> typeParameters = substitute(parameterized.getTypeParameters(), typeArguments);
+            return typeParameters == null ? null : parameterized.withTypeParameters(typeParameters);
+        } else if (type instanceof JavaType.Array) {
+            JavaType.Array array = (JavaType.Array) type;
+            JavaType elemType = substitute(array.getElemType(), typeArguments);
+            return elemType == null ? null : array.withElemType(elemType);
+        }
+        return type;
+    }
+
+    private static @Nullable List<JavaType> substitute(List<JavaType> types, Map<String, JavaType> typeArguments) {
+        List<JavaType> substituted = new ArrayList<>(types.size());
+        for (JavaType type : types) {
+            JavaType s = substitute(type, typeArguments);
+            if (s == null) {
+                return null;
+            }
+            substituted.add(s);
+        }
+        return substituted;
     }
 
     /**
@@ -159,14 +249,18 @@ final class CalledMethod {
         return true;
     }
 
-    private static boolean accepts(JavaType.Method method, List<@Nullable JavaType> argumentTypes) {
+    private static boolean accepts(JavaType.FullyQualified type, JavaType.Method method,
+                                   List<@Nullable JavaType> argumentTypes) {
+        Map<String, JavaType> typeArguments = typeArguments(type, method);
         for (int i = 0; i < argumentTypes.size(); i++) {
             JavaType argumentType = argumentTypes.get(i);
+            JavaType declaredType = method.getParameterTypes().get(i);
+            JavaType parameterType = substitute(declaredType, typeArguments);
             // an untyped argument, or one whose type holds a type that is only its name and so has no supertypes,
             // rules out no method
             if (argumentType != null &&
                 !contains(argumentType, t -> t instanceof JavaType.Unknown || t instanceof JavaType.ShallowClass) &&
-                !TypeUtils.isAssignableTo(method.getParameterTypes().get(i), argumentType)) {
+                !TypeUtils.isAssignableTo(parameterType == null ? declaredType : parameterType, argumentType)) {
                 return false;
             }
         }
