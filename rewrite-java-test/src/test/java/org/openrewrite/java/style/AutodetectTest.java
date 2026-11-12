@@ -1784,6 +1784,13 @@ class AutodetectTest implements RewriteTest {
             }
         }
 
+        @Test
+        void packageNamesAreSerializedOncePerDetector() throws Exception {
+            // java.util is imported by three of the files
+            var json = new ObjectMapper().findAndRegisterModules().writeValueAsString(detector(sources));
+            assertThat(json.split("\"java\\.util\"", -1)).hasSize(2);
+        }
+
         private Autodetect.Detector detector(List<SourceFile> sources) {
             var detector = Autodetect.detector();
             sources.forEach(detector::sample);
