@@ -35,6 +35,7 @@ import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaParserExecutionContextView;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.NoStaticImport;
@@ -43,6 +44,7 @@ import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.java.format.AutoFormat;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
@@ -65,6 +67,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
+import javax.tools.ToolProvider;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URL;
@@ -2302,17 +2305,48 @@ class RewriteTestTest implements RewriteTest {
           """;
 
         @Test
-        void compareTypesWithTheAfterParserTypedAfresh() {
-            // the first run fills the builder's type cache with the input's a.A, which a clone reads through to
-            JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD);
-            for (int run = 0; run < 2; run++) {
-                rewriteRun(
-                  spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
-                    .parser(parser)
-                    .afterParser(parser.clone().dependsOn(STATIC_METHOD)),
-                  java(BEFORE, AFTER)
-                );
+        void compareTypesWithTheAfterParserTypedAfresh(@TempDir Path dir) throws Exception {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(dir.toFile());
+            Path resources = dir.resolve("resources");
+            Path typeTable = resources.resolve("META-INF/rewrite/classpath.tsv.gz");
+            Files.createDirectories(typeTable.getParent());
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(typeTable))) {
+                writer.jar("a", "lib", "1.0").write(jarOf(INSTANCE_METHOD, dir.resolve("1.0")));
+                writer.jar("a", "lib", "2.0").write(jarOf(STATIC_METHOD, dir.resolve("2.0")));
             }
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            try (URLClassLoader withTypeTable = new URLClassLoader(new URL[]{resources.toUri().toURL()},
+              contextClassLoader)) {
+                Thread.currentThread().setContextClassLoader(withTypeTable);
+                JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().classpathFromResources(ctx, "lib-1");
+                // the first run fills the builder's type cache with the input's a.A, which a clone reads through to
+                for (int run = 0; run < 2; run++) {
+                    rewriteRun(
+                      spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                        .parser(parser)
+                        .afterParser(parser.clone().classpathFromResources(ctx, "lib-2")),
+                      java(BEFORE, AFTER)
+                    );
+                }
+            } finally {
+                Thread.currentThread().setContextClassLoader(contextClassLoader);
+            }
+        }
+
+        private Path jarOf(String stub, Path dir) throws Exception {
+            Path source = dir.resolve("a/A.java");
+            Files.createDirectories(source.getParent());
+            Files.writeString(source, stub);
+            assertThat(ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", dir.toString(),
+              source.toString())).isZero();
+            Path jar = dir.resolve("lib.jar");
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+                out.putNextEntry(new JarEntry("a/A.class"));
+                out.write(Files.readAllBytes(dir.resolve("a/A.class")));
+                out.closeEntry();
+            }
+            return jar;
         }
 
         @Test
