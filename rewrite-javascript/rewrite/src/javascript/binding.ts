@@ -344,20 +344,16 @@ type WholeModuleBinding =
     Extract<ModuleBinding, {form: "default" | "namespace" | "import-equals" | "require" | "dynamic-import"}>;
 
 /**
- * The rows of `table` that bind a whole module: imports first, then requires, then dynamic imports, the order
- * `bindingOf` answers in. `import D from "m"` counts, since `export =` typings make the default the module.
+ * The rows of `table` that bind a whole module, in file order, so the first of them is the one `bindingOf` answers.
+ * `import D from "m"` counts, since `export =` typings make the default the module.
  * `const a = require("a"), b = require("b")` → `a` and `b`; `const {a} = require("a")` → none.
  */
 function wholeModuleBindings(table: readonly ModuleBinding[]): WholeModuleBinding[] {
     // As `requiredModuleOfDeclaration` reads one, a declaration of several variables binds none of them whole;
     // the parser gives each declarator a declaration of its own
-    const single = (b: ModuleBinding) => "declaration" in b && b.declaration.variables.length === 1;
-    return [
-        ...table.filter((b): b is WholeModuleBinding =>
-            b.form === "default" || b.form === "namespace" || b.form === "import-equals"),
-        ...table.filter((b): b is WholeModuleBinding => b.form === "require" && single(b)),
-        ...table.filter((b): b is WholeModuleBinding => b.form === "dynamic-import" && single(b))
-    ];
+    return table.filter((b): b is WholeModuleBinding =>
+        b.form === "default" || b.form === "namespace" || b.form === "import-equals" ||
+        (b.form === "require" || b.form === "dynamic-import") && b.declaration.variables.length === 1);
 }
 
 /**

@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../src/test";
 import {
     AddImport, AddImportOptions, bindingTable, javascript, JavaScriptVisitor, JS, maybeBind, MaybeBindOptions, ModuleBinding,
-    maybeRebind, MaybeRebindOptions, moduleScopeBindings, ModuleScopeBinding, typescript
+    maybeRebind, MaybeRebindOptions, moduleBindings, moduleScopeBindings, ModuleScopeBinding, typescript
 } from "../../src/javascript";
 import {J} from "../../src/java";
 
@@ -389,5 +389,44 @@ describe("an export const require is not reassignable, though no binding can lea
                 )
             );
         expect(bound.name).toBe("Old");
+    });
+});
+
+describe("the earliest whole-module binding answers for its module", () => {
+    test("bindingOf answers a require written above an import of the same module", async () => {
+        let bound: string | undefined;
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound = moduleBindings(this).bindingOf("react");
+                return cu;
+            }
+        });
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const ReactCompat = require("react");
+                import React from "react";
+
+                ReactCompat.render(React.createElement("div"));
+            `)
+        );
+        // Before: "React", since every import came before every require
+        expect(bound).toBe("ReactCompat");
+    });
+
+    test("maybeBind of the module answers a require written above an import of it", async () => {
+        const bound: {name?: string} = {};
+        await binding({module: "react", onlyIfReferenced: false}, bound).rewriteRun(
+            //language=typescript
+            typescript(`
+                const ReactCompat = require("react");
+                import React from "react";
+
+                ReactCompat.render(React.createElement("div"));
+            `)
+        );
+        // Before: "React"
+        expect(bound.name).toBe("ReactCompat");
     });
 });
