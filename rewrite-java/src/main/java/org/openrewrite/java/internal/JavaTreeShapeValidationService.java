@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -29,9 +30,18 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.java.tree.TypedTree;
 
+import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -294,6 +304,47 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             written = signatures.signature(type);
         }
         return written.contains("{undefined}") ? null : written.replace('$', '.');
+    }
+
+    @Override
+    public void collectCompilationErrors(ExecutionContext parseCtx) {
+        parseCtx.putMessage(JavaParser.COMPILATION_ERRORS, new ArrayList<Diagnostic<? extends JavaFileObject>>());
+    }
+
+    @Override
+    public Map<Path, Map<String, List<String>>> compilationErrors(ExecutionContext parseCtx) {
+        Collection<Diagnostic<? extends JavaFileObject>> errors = parseCtx.getMessage(JavaParser.COMPILATION_ERRORS);
+        Map<Path, Map<String, List<String>>> byPath = new LinkedHashMap<>();
+        if (errors == null) {
+            return byPath;
+        }
+        Map<JavaFileObject, String[]> lines = new IdentityHashMap<>();
+        Set<String> reported = new HashSet<>();
+        for (Diagnostic<? extends JavaFileObject> error : errors) {
+            JavaFileObject source = error.getSource();
+            // an error that javac places in no source isn't about the code the sources hold
+            if (source != null) {
+                String[] ofSource = lines.computeIfAbsent(source, JavaTreeShapeValidationService::lines);
+                long number = error.getLineNumber();
+                Path path = Paths.get(source.getName());
+                String message = error.getMessage(Locale.ENGLISH).trim().replaceAll("\\s+", " ");
+                // javac reports some errors more than once, such as an import of a missing package
+                if (reported.add(path + ":" + error.getPosition() + ":" + message)) {
+                    byPath.computeIfAbsent(path, p -> new LinkedHashMap<>())
+                            .computeIfAbsent(message, m -> new ArrayList<>())
+                            .add(number >= 1 && number <= ofSource.length ? ofSource[(int) number - 1].trim() : "");
+                }
+            }
+        }
+        return byPath;
+    }
+
+    private static String[] lines(JavaFileObject source) {
+        try {
+            return source.getCharContent(true).toString().split("\\R", -1);
+        } catch (IOException e) {
+            return new String[0];
+        }
     }
 
     @Override
