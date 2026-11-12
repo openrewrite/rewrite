@@ -644,13 +644,18 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         /**
-         * Whether the source file imports {@code type} itself or by a star import of its package, an import that
-         * ChangeType leaves as it is.
+         * Whether the source file imports {@code type}, its members, or the contents of the package or class that
+         * declares it, an import that ChangeType leaves as it is.
          */
         private static boolean imports(JavaSourceFile sf, JavaType.FullyQualified type) {
+            String container = type.getOwningClass() == null ? type.getPackageName() : type.getOwningClass().getFullyQualifiedName();
             for (J.Import anImport : sf.getImports()) {
-                if (!anImport.isStatic() && (TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(), type.getFullyQualifiedName()) ||
-                        "*".equals(anImport.getQualid().getSimpleName()) && anImport.getPackageName().equals(type.getPackageName()))) {
+                String typeName = anImport.getTypeName();
+                if (anImport.isStatic() || !"*".equals(anImport.getQualid().getSimpleName())) {
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type.getFullyQualifiedName())) {
+                        return true;
+                    }
+                } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName.substring(0, typeName.length() - 2), container)) {
                     return true;
                 }
             }
