@@ -721,4 +721,95 @@ class ChangeMethodNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renamedCallKeepsItsTypeWhereItsDeclarationIsRenamedToo() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.A addItem(String)", "add", null, null)),
+          java(
+            """
+              package a;
+
+              public class A {
+                  public void addItem(String item) {}
+                  public void add(int count) {}
+              }
+              """,
+            """
+              package a;
+
+              public class A {
+                  public void add(String item) {}
+                  public void add(int count) {}
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(a.A a) {
+                      a.addItem("x");
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(a.A a) {
+                      a.add("x");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallThrowsTheExceptionsOfTheReceiversTypeArguments() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("a.Action run()", "call", null, null),
+            new ChangeMethodName("a.Action runAll()", "first", null, null)),
+          java(
+            """
+              package a;
+
+              import java.util.List;
+
+              public interface Action<T, E extends Exception> {
+                  default T run() throws E { return null; }
+                  default T call() throws E { return null; }
+
+                  default List<T> runAll() throws E { return null; }
+                  default T first() throws E { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Action;
+
+              import java.io.IOException;
+
+              class Test {
+                  Object test(Action<String, IOException> action) throws IOException {
+                      action.run();
+                      return action.runAll();
+                  }
+              }
+              """,
+            """
+              import a.Action;
+
+              import java.io.IOException;
+
+              class Test {
+                  Object test(Action<String, IOException> action) throws IOException {
+                      action.call();
+                      return action.first();
+                  }
+              }
+              """
+          )
+        );
+    }
 }

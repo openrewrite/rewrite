@@ -366,7 +366,7 @@ public class Substitutions {
      * The supertype of a type that is the class with the given name, with the type arguments the type gives it, as
      * javac matches an argument to a parameter. A raw type has none.
      */
-    private static JavaType.@Nullable Parameterized asSupertype(@Nullable JavaType type, String fqn) {
+    public static JavaType.@Nullable Parameterized asSupertype(@Nullable JavaType type, String fqn) {
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             if (TypeUtils.fullyQualifiedNamesAreEqual(parameterized.getFullyQualifiedName(), fqn)) {
@@ -408,10 +408,11 @@ public class Substitutions {
     }
 
     /**
-     * A supertype with the type's arguments in place of its class's variables, or null where it names a variable those
-     * arguments don't give, such as one a wildcard argument leaves open or a variable of an enclosing class.
+     * A type, such as a supertype, with a type's arguments in place of its class's variables, or null where it names a
+     * variable those arguments don't give, such as one a wildcard argument leaves open or a variable of an enclosing
+     * class.
      */
-    private static @Nullable JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
+    public static @Nullable JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
             if (!isWildcard(variable)) {

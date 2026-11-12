@@ -174,10 +174,10 @@ public class ChangeMethodName extends Recipe {
                     // Without type attribution, assume a clash when the arity matches
                     return m1.getParameters().size() == m2.getParameters().size();
                 }
-                return sameParameterTypes(t1.getParameterTypes(), t2.getParameterTypes());
+                return sameTypes(t1.getParameterTypes(), t2.getParameterTypes());
             }
 
-            private boolean sameParameterTypes(List<JavaType> p1, List<JavaType> p2) {
+            private boolean sameTypes(List<JavaType> p1, List<JavaType> p2) {
                 if (p1.size() != p2.size()) {
                     return false;
                 }
@@ -233,12 +233,21 @@ public class ChangeMethodName extends Recipe {
                     return renamed;
                 }
                 JavaType.Method original = CalledMethod.declared(receiver, type.getName(), argumentTypes);
-                if (original != null && sameSignature(original, target) &&
-                    TypeUtils.isOfClassType(declaringType, target.getDeclaringType().getFullyQualifiedName())) {
-                    // javac inferred the call's types from this signature, type variables of the method included
-                    return target.withDeclaringType(declaringType)
-                            .withReturnType(type.getReturnType())
-                            .withParameterTypes(type.getParameterTypes());
+                if (original != null) {
+                    // Where this recipe renames the old method's declaration too, the call calls that method, which
+                    // the receiver's type doesn't have yet. The declaration keeps its name only where the type has
+                    // the new name with the same parameters.
+                    if (!sameTypes(original.getParameterTypes(), target.getParameterTypes())) {
+                        return renamed;
+                    }
+                    if (sameSignature(original, target) &&
+                        TypeUtils.isOfClassType(declaringType, target.getDeclaringType().getFullyQualifiedName())) {
+                        // javac inferred the call's types from this signature, type variables of the method included
+                        return target.withDeclaringType(declaringType)
+                                .withReturnType(type.getReturnType())
+                                .withParameterTypes(type.getParameterTypes())
+                                .withThrownExceptions(type.getThrownExceptions());
+                    }
                 }
                 JavaType.Method called = CalledMethod.calledOn(receiver, target);
                 return called == null ? renamed : called;
@@ -247,7 +256,8 @@ public class ChangeMethodName extends Recipe {
             private boolean sameSignature(JavaType.Method m1, JavaType.Method m2) {
                 return TypeUtils.isOfType(m1.getDeclaringType(), m2.getDeclaringType()) &&
                        TypeUtils.isOfType(m1.getReturnType(), m2.getReturnType()) &&
-                       sameParameterTypes(m1.getParameterTypes(), m2.getParameterTypes());
+                       sameTypes(m1.getParameterTypes(), m2.getParameterTypes()) &&
+                       sameTypes(m1.getThrownExceptions(), m2.getThrownExceptions());
             }
 
             @Override
