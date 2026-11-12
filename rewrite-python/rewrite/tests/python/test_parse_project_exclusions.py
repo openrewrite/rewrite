@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Which directories a ParseProject walk prunes."""
+"""What a ParseProject walk leaves out."""
 from pathlib import Path
 
 from rewrite.rpc.server import DEFAULT_PARSE_EXCLUSIONS, _walk_python_files
@@ -62,3 +62,27 @@ def test_caller_exclusions_extend_the_defaults(tmp_path):
         'src/app.py',
         exclusions=DEFAULT_PARSE_EXCLUSIONS + ['vendor'],
     ) == ['src/app.py']
+
+
+def test_a_pattern_with_a_slash_matches_a_path_below_the_project(tmp_path):
+    assert _sources(
+        tmp_path,
+        'app.py',
+        'scripts/app.py',
+        'gen/helper.py',
+        'extras/gen/helper.py',
+        'tests/test_app.py',
+        'tests/conftest.py',
+        exclusions=['/app.py', 'gen/helper.py', 'tests/test_*.py'],
+    ) == ['extras/gen/helper.py', 'scripts/app.py', 'tests/conftest.py']
+
+
+def test_a_pattern_without_a_slash_matches_a_file_name_at_any_depth(tmp_path):
+    assert _sources(
+        tmp_path,
+        'conftest.py',
+        'tests/conftest.py',
+        'tests/test_app.py',
+        'tests/helpers.py',
+        exclusions=['conftest.py', 'test_*.py'],
+    ) == ['tests/helpers.py']
