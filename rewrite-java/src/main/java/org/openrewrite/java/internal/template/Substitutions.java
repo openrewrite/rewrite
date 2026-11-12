@@ -311,13 +311,13 @@ public class Substitutions {
      * by matching the types its typed parameters declare against their arguments' types, and its bind type against
      * the type of the expression it replaces.
      */
-    public void bindTypeVariables(String bindType, @Nullable Expression replaced) {
+    public void bindTypeVariables(@Nullable String bindType, @Nullable Expression replaced) {
         if (generics.isEmpty()) {
             return;
         }
         declaredParameterTypes.forEach((index, declared) -> bindTypeVariables(declared,
                 parameters[index] instanceof TypedTree ? ((TypedTree) parameters[index]).getType() : null));
-        if (replaced != null) {
+        if (bindType != null && replaced != null) {
             try {
                 JavaType declared = TypeParameter.toJavaType(TypeParameter.parser(bindType).type(), generics);
                 bindTypeVariables(declared, replaced.getType());

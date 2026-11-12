@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.nio.file.Path;
 
@@ -30,5 +32,18 @@ class Java8ParserTest {
         JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
         ctx.setParserClasspathDownloadTarget(temp.toFile());
         assertThat(JavaParser.dependenciesFromResources(ctx, "guava-31.0-jre")).isNotEmpty();
+    }
+
+    @Test
+    void varInitializerIsTypedByItself() {
+        // JavaTemplate's context-free stub declares its expression with var, an unknown class to this javac
+        J.CompilationUnit cu = (J.CompilationUnit) Java8Parser.builder().build()
+          .parse("class T {{ var o = \"\".isEmpty() ? \"x\" : \"\".trim(); var l = java.util.Collections.emptyList(); }}")
+          .findFirst()
+          .get();
+        J.Block initializer = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
+        assertThat(initializer.getStatements())
+          .extracting(s -> TypeUtils.toString(((J.VariableDeclarations) s).getVariables().get(0).getInitializer().getType()))
+          .containsExactly("java.lang.String", "java.util.List<java.lang.Object>");
     }
 }
