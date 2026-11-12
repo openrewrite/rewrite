@@ -293,3 +293,29 @@ describe("import X = require binds its module for every reader", () => {
         expect(bound.name).toBe("path");
     });
 });
+
+describe("a whole require answers a namespace request, since CommonJS has no default/namespace split", () => {
+    test("AddImport of the namespace finds a require under that name and adds nothing", async () => {
+        // Before: a second `const fs = require("fs");` was added
+        await adding({module: "fs", member: "*", alias: "fs", onlyIfReferenced: false}).rewriteRun(
+            //language=javascript
+            javascript(`
+                const fs = require("fs");
+
+                fs.readFileSync("config.json");
+            `)
+        );
+    });
+
+    test("AddImport of the namespace finds import X = require under that name and adds nothing", async () => {
+        // Before: `import * as fs from "fs";` was added below it, a second declaration of `fs`
+        await adding({module: "fs", member: "*", alias: "fs", onlyIfReferenced: false}).rewriteRun(
+            //language=typescript
+            typescript(`
+                import fs = require("fs");
+
+                fs.readFileSync("config.json");
+            `)
+        );
+    });
+});
