@@ -1177,7 +1177,14 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
+                // Emit only what javac stripped, up to the node's next character. javac can strip part
+                // of the whitespace after the margin and keep the rest (inside `<pre>`, ` * \t// SNIP` gives the node
+                // "\t// SNIP"); emitting all of it took the kept tab too, and the cursor ran one ahead of the node.
+                int start = cursor;
+                while (cursor < source.length() && source.charAt(cursor) != node.charAt(i + 1) && isInlineWhitespace(source.charAt(cursor))) {
+                    cursor++;
+                }
+                text.append(source, start, cursor);
             }
         }
 
