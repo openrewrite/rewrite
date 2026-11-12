@@ -44,6 +44,13 @@ subprojects {
         }
     }
 
+    // Hands the test JVMs the opt-outs to check, as in -Dorg.openrewrite.test.failOnUnneededOptOuts=all
+    providers.systemProperty("org.openrewrite.test.failOnUnneededOptOuts").orNull?.let { checks ->
+        tasks.withType<Test>().configureEach {
+            systemProperty("org.openrewrite.test.failOnUnneededOptOuts", checks)
+        }
+    }
+
     // Added after module scripts have changed the release, as a plain argument: a task tracks an argument provider's
     // class, so a provider compiled from this script would make every edit here recompile every module.
     afterEvaluate {

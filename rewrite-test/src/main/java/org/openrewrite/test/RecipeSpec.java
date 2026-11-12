@@ -296,6 +296,10 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * Whether the recipe is checked to serialize, load and describe itself as recipes must. See
+     * {@link #typeValidationOptions(TypeValidation)} for finding opt-outs that a test no longer needs.
+     */
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
@@ -317,6 +321,17 @@ public class RecipeSpec {
                 expectedCyclesThatMakeChanges;
     }
 
+    /**
+     * Checks of the LST the test parses, and of what the recipe produces unless {@link #afterTypeValidationOptions} or
+     * the types of {@link #recipeQualityValidation} are set.
+     * <p>
+     * To find opt-outs that tests no longer need, set the system property
+     * {@code org.openrewrite.test.failOnUnneededOptOuts} to {@code all}, or to the options to look at, such as
+     * {@code methodInvocations,unknown}. Then a test that turns off checks that pass on its sources fails, and says
+     * which opt-outs it needs instead. This covers this option, {@link #afterTypeValidationOptions},
+     * {@link #recipeQualityValidation} and {@link #validateRecipeSerialization}, whether a test or its class's defaults
+     * set them.
+     */
     public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
         this.typeValidation = typeValidation;
         return this;
@@ -333,7 +348,8 @@ public class RecipeSpec {
     }
 
     /**
-     * Checks of how the recipe behaves and what it produces, including the type attribution of its output.
+     * Checks of how the recipe behaves and what it produces, including the type attribution of its output. See
+     * {@link #typeValidationOptions(TypeValidation)} for finding opt-outs that a test no longer needs.
      */
     public RecipeSpec recipeQualityValidation(RecipeQualityValidation recipeQualityValidation) {
         this.recipeQualityValidation = recipeQualityValidation;

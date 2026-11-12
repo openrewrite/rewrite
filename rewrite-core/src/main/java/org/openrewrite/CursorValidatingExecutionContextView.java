@@ -60,20 +60,26 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        boolean mutationAllowed =
-                !getMessage(VALIDATE_CTX_MUTATION, false) ||
-                VALIDATE_CURSOR_ACYCLIC.equals(key) ||
-                VALIDATE_CTX_MUTATION.equals(key) ||
-                PANIC.equals(key) ||
-                ExecutionContext.CURRENT_CYCLE.equals(key) ||
-                ExecutionContext.CURRENT_RECIPE.equals(key) ||
-                DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
-                WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
-                ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
-                key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
-                || key.startsWith("io.moderne"); // We ought to know what we're doing
-        assert mutationAllowed : mutationMessage(key);
+        assert !getMessage(VALIDATE_CTX_MUTATION, false) || isAlwaysMutable(key) : mutationMessage(key);
         super.putMessage(key, value);
+    }
+
+    /**
+     * Whether a key may be put even when the execution context is validated to stay unchanged, as the keys of the
+     * framework's own bookkeeping may.
+     */
+    @Incubating(since = "8.106.0")
+    protected boolean isAlwaysMutable(String key) {
+        return VALIDATE_CURSOR_ACYCLIC.equals(key) ||
+               VALIDATE_CTX_MUTATION.equals(key) ||
+               PANIC.equals(key) ||
+               ExecutionContext.CURRENT_CYCLE.equals(key) ||
+               ExecutionContext.CURRENT_RECIPE.equals(key) ||
+               DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
+               WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
+               ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
+               key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
+               || key.startsWith("io.moderne"); // We ought to know what we're doing
     }
 
     private String mutationMessage(String key) {
