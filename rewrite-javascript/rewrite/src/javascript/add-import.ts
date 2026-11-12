@@ -241,10 +241,9 @@ export interface ModuleScopeBinding {
 /**
  * {@link bindingTable} as {@link ModuleScopeBinding}s, the rows this function listed before the table, so a
  * caller asking "which name answers this request" keeps its vocabulary.
- * `import D from "m"` and `const D = require("m")` → `{name: "D", module: "m", member: undefined}`;
+ * `import D from "m"`, `import D = require("m")` and `const D = require("m")` → `{name: "D", module: "m", member: undefined}`;
  * `import * as NS from "m"` → `{member: "*"}`; `{a as b}` and `const {a: b} = require("m")` → `{name: "b", member: "a"}`.
- * `import X = require("m")`, `import X = A.B` and `...rest` of a require keep only their name, and
- * `const X = await import("m")` is left out.
+ * `import X = A.B` and `...rest` of a require keep only their name, and `const X = await import("m")` is left out.
  */
 export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
@@ -266,6 +265,7 @@ export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[
 function asScopeBinding(binding: ModuleBinding): ModuleScopeBinding | undefined {
     switch (binding.form) {
         case "default":
+        case "import-equals":
         case "require":
             return {name: binding.name, module: binding.module, member: undefined, typeOnly: binding.typeOnly};
         case "namespace":
@@ -273,8 +273,6 @@ function asScopeBinding(binding: ModuleBinding): ModuleScopeBinding | undefined 
         case "named":
         case "require-member":
             return {name: binding.name, module: binding.module, member: binding.member, typeOnly: binding.typeOnly};
-        case "import-equals":
-            return {name: binding.name, module: undefined, member: undefined, typeOnly: binding.typeOnly};
         case "require-pattern":
             return {name: binding.name};
         case "dynamic-import":
@@ -293,13 +291,15 @@ function namespaceAliasOf(statement: J | undefined): ModuleScopeBinding | undefi
 
 /**
  * Whether `binding` is what a request for `member` of its module asks for, `member` read by {@link memberName}:
- * `import D from "m"` and `const D = require("m")` answer `undefined`, `import * as NS from "m"` answers `'*'`,
- * and `{a as b}` and `const {a: b} = require("m")` answer `"a"`. `import X = require("m")`, `const X = await import("m")`
- * and `...rest` of a require answer no request, since {@link moduleScopeBindings} never gave them a module.
+ * `import D from "m"`, `import D = require("m")` and `const D = require("m")` answer `undefined`,
+ * `import * as NS from "m"` answers `'*'`, and `{a as b}` and `const {a: b} = require("m")` answer `"a"`.
+ * `const X = await import("m")` and `...rest` of a require answer no request, since {@link moduleScopeBindings}
+ * never gave them a module.
  */
 export function bindsMember(binding: ModuleBinding, member: string | undefined): boolean {
     switch (binding.form) {
         case "default":
+        case "import-equals":
         case "require":
             return member === undefined;
         case "namespace":
@@ -1163,19 +1163,16 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Check if the import matches what we're trying to add
      */
     private isMatchingImport(jsImport: JS.Import): boolean {
-        const moduleSpecifier = jsImport.moduleSpecifier?.element;
-        const module = moduleSpecifier && this.getModuleName(moduleSpecifier);
-        if (module === undefined || !sameModule(module, this.module)) {
-            return false;
-        }
-
         // A side-effect import is the clause-less one, and no import carrying bindings stands in
         // for it — nor it for them.
         const importClause = jsImport.importClause;
         if (!importClause || this.sideEffectOnly) {
-            return !importClause && this.sideEffectOnly;
+            const moduleSpecifier = jsImport.moduleSpecifier?.element;
+            const module = moduleSpecifier && this.getModuleName(moduleSpecifier);
+            return !importClause && this.sideEffectOnly && module !== undefined && sameModule(module, this.module);
         }
 
+        // `import X = require("m")` has no `from`, and its row reads the module from the `require`
         return bindingsOf(jsImport).some(binding => this.answeredBy(binding));
     }
 

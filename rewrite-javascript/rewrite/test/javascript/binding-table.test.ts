@@ -1,6 +1,7 @@
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../src/test";
 import {
-    bindingTable, javascript, JavaScriptVisitor, JS, ModuleBinding, moduleScopeBindings, ModuleScopeBinding, typescript
+    AddImport, AddImportOptions, bindingTable, javascript, JavaScriptVisitor, JS, maybeBind, MaybeBindOptions, ModuleBinding,
+    moduleScopeBindings, ModuleScopeBinding, typescript
 } from "../../src/javascript";
 import {J} from "../../src/java";
 
@@ -23,6 +24,29 @@ async function tablesOf(source: SourceSpec<any>): Promise<{rows: Row[], scope: M
     });
     await spec.rewriteRun(source);
     return seen;
+}
+
+/** A spec whose recipe calls `maybeBind` from the compilation unit, keeping the first cycle's answer in `bound`. */
+function binding(options: MaybeBindOptions, bound: {name?: string}): RecipeSpec {
+    const spec = new RecipeSpec();
+    let asked = false;
+    spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            if (!asked) {
+                asked = true;
+                bound.name = maybeBind(this, options);
+            }
+            return cu;
+        }
+    });
+    return spec;
+}
+
+/** A spec whose recipe is one `AddImport` of `options`. */
+function adding(options: AddImportOptions): RecipeSpec {
+    const spec = new RecipeSpec();
+    spec.recipe = fromVisitor(new AddImport(options));
+    return spec;
 }
 
 describe("bindingTable", () => {
@@ -197,7 +221,7 @@ describe("moduleScopeBindings over the binding table", () => {
         ]);
     });
 
-    test("import X = require, import X = A.B and a rest element keep only their name, and await import has no row", async () => {
+    test("import X = require binds its module, import X = A.B and a rest element keep only their name, and await import has no row", async () => {
         const {scope} = await tablesOf(
             //language=typescript
             typescript(`
@@ -210,11 +234,62 @@ describe("moduleScopeBindings over the binding table", () => {
                 const os = await import("os");
             `)
         );
+        // Before: {name: "fs", module: undefined, member: undefined, typeOnly: false}
         expect(scope).toEqual([
-            {name: "fs", module: undefined, member: undefined, typeOnly: false},
+            {name: "fs", module: "fs", member: undefined, typeOnly: false},
             {name: "S", module: undefined, member: undefined, typeOnly: false},
             {name: "a", module: "r", member: "a", typeOnly: false},
             {name: "rest"}
         ]);
+    });
+});
+
+describe("import X = require binds its module for every reader", () => {
+    test("a type-only import X = require is the type-only row of its whole module", async () => {
+        const {scope} = await tablesOf(
+            //language=typescript
+            typescript(`
+                import type path = require("path");
+
+                let parsed: path.ParsedPath;
+            `)
+        );
+        // Before: {name: "path", module: undefined, member: undefined, typeOnly: true}
+        expect(scope).toEqual([{name: "path", module: "path", member: undefined, typeOnly: true}]);
+        // Before: undefined, so a caller looking for a type-only binding of the whole module found none
+        expect(scope.find(b => b.module === "path" && b.member === undefined && b.typeOnly)?.name).toBe("path");
+    });
+
+    test("AddImport of the module finds import X = require and adds nothing", async () => {
+        // Before: `import fs from "fs";` was added below it, a second declaration of `fs`
+        await adding({module: "fs", onlyIfReferenced: false}).rewriteRun(
+            //language=typescript
+            typescript(`
+                import fs = require("fs");
+
+                fs.readFileSync("config.json");
+            `)
+        );
+    });
+
+    test("maybeBind of the module as a value reuses a type-only import X = require, dropping its type", async () => {
+        const bound: {name?: string} = {};
+        // Before: answered "path_1" and added `import path_1 from "path";` beside it
+        await binding({module: "path", onlyIfReferenced: false}, bound).rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    import type path = require("path");
+
+                    let parsed: path.ParsedPath;
+                `,
+                `
+                    import path = require("path");
+
+                    let parsed: path.ParsedPath;
+                `
+            )
+        );
+        expect(bound.name).toBe("path");
     });
 });
