@@ -2383,7 +2383,7 @@ class RewriteTestTest implements RewriteTest {
 
         @Test
         void respellTheInputWithTheInputParser() {
-            // the after parser lacks a.A, so a respelled input parsed with it loses its types and its miss goes unreported
+            // the after parser lacks a.A, so a respelled input it parsed would be dropped for its lost types
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
               spec -> spec.recipe(new FindQualifiedCallsByName("A", "method"))
                 .parser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))

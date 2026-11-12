@@ -207,7 +207,8 @@ public class RecipeSpec {
      * such as {@link RecipeQualityValidation#parserTypedTrees()}, parse it with this parser in place of the input's
      * parser of the same language, so that the types they compare the output with are those of the classpath it is
      * written for. It parses the output together with the sources the recipe left unchanged, so a class that differs
-     * between the two classpaths belongs on them and not among the test's sources.
+     * between the two classpaths belongs on them and not among the test's sources. A type it doesn't resolve isn't
+     * compared, so it needs the whole classpath of the output and not only the libraries that change.
      *
      * @return The current recipe spec.
      */
