@@ -729,6 +729,8 @@ public interface RewriteTest extends SourceSpecs {
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), true, false));
         unneededOptOuts.checkOnTheSideLater("removeUnusedImports", () ->
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), false, true));
+        RewriteTestUtils.assertAfterParsersParse(testMethodSpec.afterParsers, afterParsersFor,
+                recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         new TreeShapes(quality.parserShapedTrees(),
                 quality.parserTypedTrees() && TypeValidation.validatesTypes(testMethodSpec, testClassSpec),
                 afterParsersFor, specAfterParsers, relativeTo, ctx)
@@ -922,22 +924,53 @@ class RewriteTestUtils {
      * The parsers to parse a source the recipe returned with: the test's after parsers of the DSL of the parser
      * that {@link #parsersFor} chooses first, then the parsers it chooses, which are all of them in a test without
      * an after parser. Parsers of two DSLs can make the same kind of source, as Gradle's and Groovy's do, so the
-     * kind alone doesn't tell which one an after parser is for.
+     * kind alone doesn't tell which one an after parser is for. It has to where {@link #parsersFor} chooses none,
+     * as for a source the recipe turned into a language that no parser of the test's input makes.
      */
     static List<Parser.Builder> afterParsersFor(SourceFile after, List<Parser.Builder> specAfterParsers,
                                                 Function<SourceFile, List<Parser.Builder>> parsersFor) {
         List<Parser.Builder> inputParsers = parsersFor.apply(after);
-        if (inputParsers.isEmpty()) {
-            return inputParsers;
-        }
         List<Parser.Builder> parsers = new ArrayList<>();
         for (Parser.Builder afterParser : specAfterParsers) {
-            if (afterParser.getDslName().equals(inputParsers.get(0).getDslName())) {
+            if (inputParsers.isEmpty() ? afterParser.getSourceFileType().isInstance(after) :
+                    afterParser.getDslName().equals(inputParsers.get(0).getDslName())) {
                 parsers.add(afterParser);
             }
         }
         parsers.addAll(inputParsers);
         return parsers;
+    }
+
+    /**
+     * Fails for an after parser that parses nothing, which is one that {@code afterParsersFor} gives first for none
+     * of the recipe's output and none of the sources it left unchanged. The test's author expects the output to be
+     * checked with it, while the checks go on using the input's parser.
+     *
+     * @param afterParsers The after parsers of the test method. Those of the test class serve many tests, of which
+     *                     some can have nothing for them to parse.
+     * @param sources      The sources the recipe ran on.
+     */
+    static void assertAfterParsersParse(List<Parser.Builder> afterParsers,
+                                        Function<SourceFile, List<Parser.Builder>> afterParsersFor,
+                                        List<Result> results, List<SourceFile> sources) {
+        if (afterParsers.isEmpty()) {
+            return;
+        }
+        Set<Parser.Builder> parsing = new HashSet<>();
+        for (SourceFile source : TreeShapes.current(results, sources)) {
+            List<Parser.Builder> parsers = afterParsersFor.apply(source);
+            if (!parsers.isEmpty()) {
+                parsing.add(parsers.get(0));
+            }
+        }
+        for (Parser.Builder afterParser : afterParsers) {
+            if (parsing.contains(afterParser)) {
+                continue;
+            }
+            fail("The test's after parser of " + afterParser.getDslName() + " sources parses nothing, which leaves " +
+                 "the recipe's output to the parser of its input. None of the test's sources and none of the " +
+                 "recipe's output is in its language, or an after parser before it is for the same language.");
+        }
     }
 
     /**

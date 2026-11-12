@@ -58,6 +58,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
@@ -65,6 +66,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
 import javax.tools.ToolProvider;
@@ -2411,7 +2413,7 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
-        void leaveAnOutputOfAnotherDslToTheInputParser() {
+        void rejectAfterParserOfADslNoSourceIsIn() {
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
               spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
                 .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
@@ -2419,7 +2421,86 @@ class RewriteTestTest implements RewriteTest {
                   () -> JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD).build())),
               java(BEFORE, AFTER)
             ));
-            assertThat(e).hasMessageContaining("where the parser gives void a.A.method() with the flags [Public]");
+            assertThat(e).hasMessageStartingWith("The test's after parser of other sources parses nothing");
+        }
+
+        @Test
+        void rejectSecondAfterParserOfADsl() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))
+                .afterParser(JavaParser.fromJavaVersion()),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources parses nothing");
+        }
+
+        @Test
+        void rejectAfterParserOfTheLanguageTheRecipeTurnsEachSourceFrom() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new YamlToJava())
+                .afterParser(YamlParser.builder()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of yaml sources parses nothing");
+        }
+
+        @Test
+        void reportUnexpectedOutputBeforeTheAfterParserItLeavesWithNothingToParse() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("changed", true))
+                .afterParser(JavaParser.fromJavaVersion()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageContaining("deprecated: changed").hasMessageNotContaining("after parser");
+        }
+
+        @Test
+        void acceptAfterParserOfSourcesTheRecipeLeaves() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD)),
+              java("class Unchanged {}")
+            );
+        }
+
+        @Test
+        void parseSourceTurnedIntoAnotherLanguageWithTheAfterParserOfItsKind() {
+            // the test has no parser of Java sources whose DSL could tell that the after parser is for the output
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new YamlToJava())
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "java", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources threw");
         }
 
         @Test
@@ -2461,6 +2542,23 @@ class RewriteTestTest implements RewriteTest {
                   """
               )
             );
+        }
+
+        @Nested
+        class InDefaults implements RewriteTest {
+
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.afterParser(JavaParser.fromJavaVersion());
+            }
+
+            @Test
+            void acceptAfterParserOfADslNoSourceIsIn() {
+                rewriteRun(
+                  spec -> spec.recipe(new ChangeFirstValue("changed", true)),
+                  yaml("key: value", "key: changed")
+                );
+            }
         }
     }
 

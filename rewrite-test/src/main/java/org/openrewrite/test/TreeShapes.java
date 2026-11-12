@@ -60,14 +60,9 @@ final class TreeShapes {
     }
 
     /**
-     * @param sources The sources the recipe ran on, which are parsed again with the ones it changed so that a source
-     *                can refer to the others, as a Maven module does to its parent.
+     * @return Each source as the recipe left it, which is its output and the sources it ran on and didn't change.
      */
-    void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
-        if (!shapes && !types) {
-            return;
-        }
-        // each source as the recipe left it
+    static List<SourceFile> current(Collection<Result> results, List<SourceFile> sources) {
         List<SourceFile> current = new ArrayList<>();
         Set<UUID> changed = new HashSet<>();
         for (Result result : results) {
@@ -78,11 +73,27 @@ final class TreeShapes {
                 changed.add(result.getBefore().getId());
             }
         }
-        List<SourceFile> parsedAndOutput = new ArrayList<>(sources);
-        parsedAndOutput.addAll(current);
         for (SourceFile source : sources) {
             if (!changed.contains(source.getId())) {
                 current.add(source);
+            }
+        }
+        return current;
+    }
+
+    /**
+     * @param sources The sources the recipe ran on, which are parsed again with the ones it changed so that a source
+     *                can refer to the others, as a Maven module does to its parent.
+     */
+    void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
+        if (!shapes && !types) {
+            return;
+        }
+        List<SourceFile> current = current(results, sources);
+        List<SourceFile> parsedAndOutput = new ArrayList<>(sources);
+        for (Result result : results) {
+            if (result.getAfter() != null) {
+                parsedAndOutput.add(result.getAfter());
             }
         }
         Map<Parser.Builder, List<Result>> byParser = new LinkedHashMap<>();

@@ -209,6 +209,10 @@ public class RecipeSpec {
      * written for. It parses the output together with the sources the recipe left unchanged, so a class that differs
      * between the two classpaths belongs on them and not among the test's sources. A type it doesn't resolve isn't
      * compared, so it needs the whole classpath of the output and not only the libraries that change.
+     * <p>
+     * A source that the recipe turns into another language is parsed with the after parser of that language. A test
+     * fails when an after parser of its own spec parses nothing, as when none of its sources and none of the
+     * recipe's output is in the parser's language.
      *
      * @return The current recipe spec.
      */
