@@ -28,6 +28,8 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -484,6 +486,161 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void conditionalTakesTheTypeOfItsBranches() {
+        rewriteRun(
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orDefault".equals(method.getSimpleName())) {
+                      Expression s = method.getArguments().getFirst();
+                      return JavaTemplate.apply("#{any(String)} == null ? \"default\" : #{any(String)}",
+                        getCursor(), method.getCoordinates().replace(), s, s);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = orDefault(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = s == null ? "default" : s;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitObjectBindTypeIsTheTarget() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orDefault".equals(method.getSimpleName())) {
+                      Expression s = method.getArguments().getFirst();
+                      return JavaTemplate.builder("#{any(String)} == null ? \"default\" : #{any(String)}")
+                        .bindType("Object")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), s, s);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      Object r = orDefault(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      Object r = s == null ? "default" : s;
+                  }
+              }
+              """
+          )
+        );
+        assertThat(stubs).anySatisfy(stub -> assertThat(stub).contains("Object o ="));
+    }
+
+    @Test
+    void nullLiteralTemplate() {
+        rewriteRun(
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orDefault".equals(method.getSimpleName())) {
+                      return JavaTemplate.apply("null", getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = orDefault(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitObjectBindTypeDoesNotTypeALambda() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  Runnable r = () -> {};
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaVisitor<Integer>() {
+            @Override
+            public J visitLambda(J.Lambda lambda, Integer p) {
+                return JavaTemplate.builder("() -> System.out.println()").bindType("Object").build()
+                  .apply(getCursor(), lambda.getCoordinates().replace());
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("bindType");
     }
 
     @Test

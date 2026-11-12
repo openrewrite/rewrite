@@ -91,7 +91,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String bindType, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, @Nullable String bindType, Set<String> imports,
                          Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, bindType));
     }
@@ -239,7 +239,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
-        private String bindType = "Object";
+        private @Nullable String bindType;
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 

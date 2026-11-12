@@ -53,10 +53,10 @@ public class BlockStatementTemplateGenerator {
     protected final Set<String> imports;
     private final boolean contextSensitive;
     @Getter
-    private final String bindType;
+    private final @Nullable String bindType;
 
     public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
-        this(imports, contextSensitive, "Object");
+        this(imports, contextSensitive, null);
     }
 
     public String template(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location, JavaCoordinates.Mode mode) {
@@ -233,12 +233,13 @@ public class BlockStatementTemplateGenerator {
                                        Space.Location location, JavaCoordinates.Mode mode) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
                 "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
-        if (j instanceof J.Lambda && "Object".equals(bindType)) {
+        boolean bindsObject = bindType == null || "Object".equals(bindType);
+        if (j instanceof J.Lambda && bindsObject) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
                     "specify the type by calling JavaTemplate.Builder#bindType()");
-        } else if (j instanceof J.MemberReference && "Object".equals(bindType)) {
+        } else if (j instanceof J.MemberReference && bindsObject) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
@@ -250,13 +251,13 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append(bindType).append(" o = ");
+                before.append(declaredType()).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
-            before.append(bindType).append(" o = ");
-            after.append(";\n}");
+            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            before.append(declaredType()).append(" o = ");
+            after.append(";\n}}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
                    (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
@@ -283,6 +284,15 @@ public class BlockStatementTemplateGenerator {
         for (String anImport : imports) {
             before.insert(0, anImport);
         }
+    }
+
+    /**
+     * A poly expression such as a conditional takes its target's type, so declared {@code Object} it is typed Object
+     * where its branches say String. {@code var} gives it no target, and javac 8, to which {@code var} is an unknown
+     * class, types it the same way. {@code var} is only legal for a local, hence the initializer block around it.
+     */
+    private String declaredType() {
+        return bindType == null ? "var" : bindType;
     }
 
     @SuppressWarnings("ConstantConditions")
