@@ -731,13 +731,13 @@ public interface RewriteTest extends SourceSpecs {
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), false, true));
         new TreeShapes(quality.parserShapedTrees(),
                 quality.parserTypedTrees() && TypeValidation.validatesTypes(testMethodSpec, testClassSpec),
-                parsersFor, outputParsersFor, relativeTo, ctx)
+                outputParsersFor, afterParsers, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         unneededOptOuts.checkOnTheSideLater("parserShapedTrees", () ->
-                new TreeShapes(true, false, parsersFor, outputParsersFor, relativeTo, ctx)
+                new TreeShapes(true, false, outputParsersFor, afterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.checkOnTheSideLater("parserTypedTrees", () ->
-                new TreeShapes(false, true, parsersFor, outputParsersFor, relativeTo, ctx)
+                new TreeShapes(false, true, outputParsersFor, afterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
                 CompositeOrder.assertOrdered(recipe));

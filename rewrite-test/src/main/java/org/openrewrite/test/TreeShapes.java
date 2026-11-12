@@ -39,22 +39,21 @@ final class TreeShapes {
 
     private final boolean shapes;
     private final boolean types;
-    private final Function<SourceFile, List<Parser.Builder>> parsersFor;
     private final Function<SourceFile, List<Parser.Builder>> outputParsersFor;
+    private final Collection<Parser.Builder> afterParsers;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
 
     /**
-     * @param parsersFor       The parsers of a source the test parsed.
      * @param outputParsersFor The parsers of a source the recipe returned.
+     * @param afterParsers     Those of them that the test gave for the recipe's output.
      */
-    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> parsersFor,
-               Function<SourceFile, List<Parser.Builder>> outputParsersFor, @Nullable Path relativeTo,
-               ExecutionContext parseCtx) {
+    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> outputParsersFor,
+               Collection<Parser.Builder> afterParsers, @Nullable Path relativeTo, ExecutionContext parseCtx) {
         this.shapes = shapes;
         this.types = types;
-        this.parsersFor = parsersFor;
         this.outputParsersFor = outputParsersFor;
+        this.afterParsers = afterParsers;
         this.relativeTo = relativeTo;
         this.parseCtx = parseCtx;
     }
@@ -273,8 +272,7 @@ final class TreeShapes {
         Map<UUID, Reparsed> reparsed = new HashMap<>();
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
-        // a parser that didn't parse the input is one of the test's after parsers
-        boolean afterParser = !sources.isEmpty() && !parsersFor.apply(sources.get(0)).contains(builder);
+        boolean afterParser = afterParsers.contains(builder);
         // Types need a parser with the output's classpath, and shapes alone parse faster without types. An after
         // parser types the output afresh, as a clone of the input's parser holds the input classpath's types under
         // the output's names.
