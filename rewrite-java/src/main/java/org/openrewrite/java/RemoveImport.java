@@ -193,6 +193,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (otherTypesInPackageUsed.isEmpty()) {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
+                    } else if (type.lastIndexOf('$') > type.lastIndexOf('.')) {
+                        // the star import never provided a nested type, so it has no reason to change while in use
+                        return import_;
                     } else {
                         return unfoldStarImport(import_, otherTypesInPackageUsed, cu);
                     }
