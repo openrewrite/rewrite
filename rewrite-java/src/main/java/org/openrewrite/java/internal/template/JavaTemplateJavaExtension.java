@@ -578,11 +578,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
-                    // The call takes a listed overload's type instead, if one takes the new arguments
+                    // The call takes a listed overload of the template's name instead, if one takes the new arguments
                     JavaType.Method mt = method.getMethodType();
                     JavaType.Method overload = null;
-                    if (m.getMethodType() == null && mt != null && loc == METHOD_INVOCATION_ARGUMENTS) {
-                        overload = overloadTaking(mt, m.getArguments());
+                    if (m.getMethodType() == null && mt != null) {
+                        overload = overloadTaking(mt, m.getSimpleName(), m.getArguments());
                     }
                     if (overload != null) {
                         m = m.withMethodType(overload);
@@ -772,36 +772,41 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
     }
 
     /**
-     * The overload of {@code method}, or {@code method} itself, that takes the arguments. As in javac, one that takes
-     * them by fixed arity without boxing comes first, then one that boxes or unboxes them, then one that takes varargs.
+     * The method of {@code name} that {@code method}'s declaring type lists and that takes the arguments, or
+     * {@code method} itself when it has that name. As in javac, one that takes them by fixed arity without boxing
+     * comes first, then one that boxes or unboxes them, then one that takes varargs.
      * A listed overload lacks what javac substitutes for a type variable. So when the declaring type or an overload
-     * names one, the result is null unless {@code method} itself takes the arguments by varargs, as in #9825.
+     * names one, the result is null unless {@code method} has the name and takes the arguments by varargs, as in
+     * #9825.
      */
-    private static JavaType.@Nullable Method overloadTaking(JavaType.Method method, List<Expression> arguments) {
+    private static JavaType.@Nullable Method overloadTaking(JavaType.Method method, String name,
+                                                            List<Expression> arguments) {
         List<@Nullable JavaType> argumentTypes = new ArrayList<>(arguments.size());
         for (Expression argument : arguments) {
             if (!(argument instanceof J.Empty)) {
                 argumentTypes.add(argument.getType());
             }
         }
-        boolean ownVarargs = varargsTakes(method, argumentTypes);
-        boolean generic = !method.getDeclaringType().getTypeParameters().isEmpty() ||
-                          method.getDeclaringType().getMethods().stream().anyMatch(candidate ->
-                                  candidate.getName().equals(method.getName()) && namesTypeVariable(candidate));
+        boolean ownVarargs = name.equals(method.getName()) && varargsTakes(method, argumentTypes);
+        JavaType.FullyQualified declaringType = method.getDeclaringType();
+        boolean generic = !declaringType.getTypeParameters().isEmpty() ||
+                          declaringType.getMethods().stream().anyMatch(candidate ->
+                                  candidate.getName().equals(name) && namesTypeVariable(candidate));
         if (generic && !ownVarargs) {
             return null;
         }
         BiPredicate<JavaType.Method, JavaType.Method> byParameters =
                 (candidate, other) -> takes(other.getParameterTypes(), candidate.getParameterTypes(), false);
-        JavaType.Method overload = mostSpecific(method,
+        JavaType.Method overload = mostSpecific(declaringType, name,
                 c -> takes(c.getParameterTypes(), argumentTypes, false), byParameters);
         if (overload == null) {
-            overload = mostSpecific(method, c -> takes(c.getParameterTypes(), argumentTypes, true), byParameters);
+            overload = mostSpecific(declaringType, name,
+                    c -> takes(c.getParameterTypes(), argumentTypes, true), byParameters);
         }
         if (overload == null && !ownVarargs) {
             // As in JLS 15.12.2.5, varargs methods compare by their parameter types expanded to the arguments
             int arity = argumentTypes.size();
-            overload = mostSpecific(method, c -> varargsTakes(c, argumentTypes), (candidate, other) -> {
+            overload = mostSpecific(declaringType, name, c -> varargsTakes(c, argumentTypes), (candidate, other) -> {
                 int length = other.getParameterTypes().size() == arity + 1 ? arity + 1 : arity;
                 return takes(expanded(other, length), expanded(candidate, length), false);
             });
@@ -814,16 +819,16 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
         }
         // A listed overload lacks the generic declaring type that the parser gives the call, and the receiver's
         // type arguments that a generic declaring type substitutes in the return type
-        overload = overload.withDeclaringType(method.getDeclaringType());
+        overload = overload.withDeclaringType(declaringType);
         return generic ? overload.withReturnType(method.getReturnType()) : overload;
     }
 
-    private static JavaType.@Nullable Method mostSpecific(JavaType.Method method,
+    private static JavaType.@Nullable Method mostSpecific(JavaType.FullyQualified declaringType, String name,
                                                          Predicate<JavaType.Method> takesArguments,
                                                          BiPredicate<JavaType.Method, JavaType.Method> moreSpecific) {
         JavaType.Method overload = null;
-        for (JavaType.Method candidate : method.getDeclaringType().getMethods()) {
-            if (candidate.getName().equals(method.getName()) && takesArguments.test(candidate) &&
+        for (JavaType.Method candidate : declaringType.getMethods()) {
+            if (candidate.getName().equals(name) && takesArguments.test(candidate) &&
                 (overload == null || moreSpecific.test(candidate, overload))) {
                 overload = candidate;
             }
