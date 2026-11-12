@@ -680,6 +680,55 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void callOnAReceiverWhoseSupertypeBindsTheTypeVariableHasOneMethodType() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+            // the template types the call on an AbstractOptionalAssert<?, T>, where the code has an OptionalAssert<Object>
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate hasValue = JavaTemplate.builder("#{optionalAssert:any(org.assertj.core.api.AbstractOptionalAssert<?, T>)}.hasValue(#{expectedValue:any(T)})")
+                  .genericTypes("T")
+                  .javaParser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("contains".equals(method.getSimpleName())) {
+                        return hasValue.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().getFirst());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.Optional;
+
+              import static org.assertj.core.api.Assertions.assertThat;
+
+              class Test {
+                  void test(Optional<Object> optional, Object value) {
+                      assertThat(optional).contains(value);
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+
+              import static org.assertj.core.api.Assertions.assertThat;
+
+              class Test {
+                  void test(Optional<Object> optional, Object value) {
+                      assertThat(optional).hasValue(value);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeVariableTakesTheTypeThatTheArgumentsSupertypeGivesIt() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
