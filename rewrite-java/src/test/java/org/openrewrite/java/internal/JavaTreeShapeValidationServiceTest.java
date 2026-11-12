@@ -17,11 +17,13 @@ package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
@@ -91,7 +93,7 @@ class JavaTreeShapeValidationServiceTest {
         J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
                 .withReturnType(JavaType.Primitive.Long));
 
-        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed))
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, new Cursor(null, parsed)))
                 .contains("the method long A.m() where the parser gives int A.m()");
     }
 
@@ -102,9 +104,45 @@ class JavaTreeShapeValidationServiceTest {
         J.MethodDeclaration recipes = parsed.withMethodType(methodType.withThrownExceptions(
                 List.of(methodType.getThrownExceptions().get(0), JavaType.ShallowClass.build("java.lang.Exception"))));
 
-        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed)).containsExactly(
-                "the method void A.m() throwing {undefined}, java.lang.Exception " +
-                "where the parser gives void A.m() throwing {undefined}, java.io.IOException");
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, new Cursor(null, parsed)))
+                .containsExactly("the method void A.m() throwing {undefined}, java.lang.Exception " +
+                                 "where the parser gives void A.m() throwing {undefined}, java.io.IOException");
+    }
+
+    @Test
+    void comparesNoTypesOfACallWithAnArgumentTheParserCannotType() {
+        J.MethodDeclaration m = (J.MethodDeclaration) parse(JavaParser.fromJavaVersion(),
+                "class A { int f(String s) { return 0; } String f(char[] c) { return \"\"; } " +
+                "void m(char[] c) { f(\"s\"); f(c); f(new Missing()); } }").getBody().getStatements().get(2);
+        List<J.MethodInvocation> calls = requireNonNull(m.getBody()).getStatements().stream()
+                .map(J.MethodInvocation.class::cast)
+                .collect(toList());
+        // the Java 25 parser gives such a call a method, which the parser of this test may not
+        J.MethodInvocation parsed = withMethod(calls.get(2), calls.get(1).getMethodType());
+        J.MethodInvocation recipes = withMethod(calls.get(2), calls.get(0).getMethodType());
+        JavaTreeShapeValidationService service = new JavaTreeShapeValidationService();
+        Cursor parsedCall = new Cursor(null, parsed);
+
+        assertThat(service.typeDifferences(recipes, parsedCall)).isEmpty();
+
+        assertThat(service.typeDifferences(recipes.getName(), new Cursor(parsedCall, parsed.getName()))).isEmpty();
+    }
+
+    @Test
+    void comparesACallWithoutArguments() {
+        J.MethodDeclaration m = (J.MethodDeclaration) parse(JavaParser.fromJavaVersion(),
+                "class A { int f() { return 0; } long g() { return 0; } void m() { f(); g(); } }")
+                .getBody().getStatements().get(2);
+        List<Statement> calls = requireNonNull(m.getBody()).getStatements();
+        J.MethodInvocation parsed = (J.MethodInvocation) calls.get(0);
+        J.MethodInvocation recipes = parsed.withMethodType(((J.MethodInvocation) calls.get(1)).getMethodType());
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, new Cursor(null, parsed)))
+                .contains("the method long A.g() where the parser gives int A.f()");
+    }
+
+    private static J.MethodInvocation withMethod(J.MethodInvocation call, JavaType.@Nullable Method method) {
+        return call.withMethodType(method).withName(call.getName().withType(method));
     }
 
     private static J.MethodDeclaration method(String source) {

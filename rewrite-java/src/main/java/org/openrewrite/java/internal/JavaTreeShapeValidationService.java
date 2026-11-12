@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -23,9 +24,11 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.java.tree.TypedTree;
 
@@ -156,7 +159,17 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
-    public List<String> typeDifferences(Tree tree, Tree parsed) {
+    public List<String> typeDifferences(Tree tree, Cursor parsedCursor) {
+        Tree parsed = parsedCursor.getValue();
+        Cursor above = parsedCursor.getParent();
+        Tree parsedParent = above == null ? null : above.firstEnclosing(Tree.class);
+        // An argument without a type fits every overload and binds no type variable, so a parser may give the call
+        // and its name any method.
+        if (hasUntypedArgument(parsed) || parsedParent instanceof J.MethodInvocation &&
+                                          ((J.MethodInvocation) parsedParent).getName().isScope(parsed) &&
+                                          hasUntypedArgument(parsedParent)) {
+            return emptyList();
+        }
         Map<String, @Nullable JavaType> parsedTypes = types(parsed);
         List<String> differences = new ArrayList<>();
         types(tree).forEach((of, type) -> {
@@ -171,6 +184,17 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             }
         });
         return differences;
+    }
+
+    private static boolean hasUntypedArgument(@Nullable Tree tree) {
+        if (tree instanceof MethodCall) {
+            for (Expression argument : ((MethodCall) tree).getArguments()) {
+                if (!(argument instanceof J.Empty) && written(argument.getType()) == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static Map<String, @Nullable JavaType> types(Tree tree) {

@@ -16,6 +16,7 @@
 package org.openrewrite.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -95,11 +96,11 @@ public interface TreeShapeValidationService {
     }
 
     /**
-     * @return How the types of {@code tree} differ from those of {@code parsed}, the same node in a parse of the text
-     * it prints, each such as "the variable int x where the parser gives long x". A type either of them doesn't
-     * resolve isn't compared.
+     * @param parsed The same node as {@code tree} in a parse of the text it prints, at its place in that parse.
+     * @return How the types of {@code tree} differ from those of {@code parsed}, each such as "the variable int x
+     * where the parser gives long x". A type either of them doesn't resolve isn't compared.
      */
-    default List<String> typeDifferences(Tree tree, Tree parsed) {
+    default List<String> typeDifferences(Tree tree, Cursor parsed) {
         return emptyList();
     }
 

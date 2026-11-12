@@ -181,7 +181,7 @@ final class TreeShapes {
             shapeProblems.add(node + " has " + value + " where the parser makes " + parsedValue);
         }
         if (!full(typeProblems)) {
-            for (String difference : service.typeDifferences(node.tree, parsed.tree)) {
+            for (String difference : service.typeDifferences(node.tree, parsed.cursor)) {
                 if (full(typeProblems)) {
                     break;
                 }
@@ -242,7 +242,7 @@ final class TreeShapes {
                 return tree;
             }
         }.visit(sourceFile, 0);
-        return roots.isEmpty() ? new Node(sourceFile, new Cursor(null, Cursor.ROOT_VALUE)) : roots.get(0);
+        return roots.isEmpty() ? new Node(sourceFile, new Cursor(null, sourceFile)) : roots.get(0);
     }
 
     /**
