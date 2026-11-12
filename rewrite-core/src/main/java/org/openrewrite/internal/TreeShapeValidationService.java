@@ -24,7 +24,6 @@ import org.openrewrite.Tree;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -127,9 +126,10 @@ public interface TreeShapeValidationService {
     /**
      * @return The errors of the language's compiler in the sources that were parsed with {@code parseCtx} since
      * {@link #collectCompilationErrors} prepared it, by the path of the input they are in. Each message of the
-     * compiler, such as "incompatible types", has the lines of source it is about, such as {@code int i = "";}.
+     * compiler, such as "incompatible types", has the line of source of each error it reports, such as
+     * {@code int i = "";}.
      */
-    default Map<Path, Map<String, Set<String>>> compilationErrors(ExecutionContext parseCtx) {
+    default Map<Path, Map<String, List<String>>> compilationErrors(ExecutionContext parseCtx) {
         return emptyMap();
     }
 

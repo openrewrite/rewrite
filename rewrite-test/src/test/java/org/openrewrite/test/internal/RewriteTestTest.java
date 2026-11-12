@@ -2308,12 +2308,30 @@ class RewriteTestTest implements RewriteTest {
               java(
                 """
                   class A {
-                      String s = "a".trim().length();
+                      void a(String o) {
+                          String s = o.trim().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
                   }
                   """,
                 """
                   class A {
-                      String s = "a".strip().length();
+                      void a(String o) {
+                          String s = o.strip().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
                   }
                   """
               )
@@ -2343,6 +2361,27 @@ class RewriteTestTest implements RewriteTest {
             // javac says the same about both lines, and only the second is the recipe's
             assertThat(e).hasMessageContaining("`String t = \"b\".length();` incompatible types")
               .hasMessageNotContaining("\"a\".length()");
+        }
+
+        @Test
+        void rejectASecondErrorWithTheSameMessageOnTheSameLine() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length(), t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length(), t = "b".length();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles");
         }
 
         @Test

@@ -118,13 +118,13 @@ final class TreeShapes {
         StringBuilder foundErrors = new StringBuilder();
         boolean withoutAfterParser = false;
         for (Map.Entry<Parser.Builder, List<Result>> group : byParser.entrySet()) {
-            Map<UUID, Map<String, Set<String>>> errors = new HashMap<>();
+            Map<UUID, Map<String, List<String>>> errors = new HashMap<>();
             Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current, parsedAndOutput, errors);
             if (!errors.isEmpty() && !specAfterParsers.contains(group.getKey())) {
                 // An error that the same parser reports as often before the recipe ran isn't the recipe's, and the
                 // recipe may have changed the line it is on. An after parser didn't parse the test's sources, so it
                 // has no such before.
-                Map<UUID, Map<String, Set<String>>> errorsBefore = new HashMap<>();
+                Map<UUID, Map<String, List<String>>> errorsBefore = new HashMap<>();
                 reparse(group.getKey(), sources, parsedAndOutput, errorsBefore);
                 Map<UUID, UUID> beforeIds = new HashMap<>();
                 for (Result result : results) {
@@ -133,14 +133,16 @@ final class TreeShapes {
                     }
                 }
                 errors.forEach((id, ofSource) -> {
-                    Map<String, Set<String>> before = errorsBefore.getOrDefault(beforeIds.getOrDefault(id, id),
+                    Map<String, List<String>> before = errorsBefore.getOrDefault(beforeIds.getOrDefault(id, id),
                             Collections.emptyMap());
                     ofSource.entrySet().removeIf(error -> {
-                        Set<String> linesBefore = before.getOrDefault(error.getKey(), Collections.emptySet());
+                        List<String> linesBefore = before.getOrDefault(error.getKey(), Collections.emptyList());
                         if (error.getValue().size() <= linesBefore.size()) {
                             return true;
                         }
-                        error.getValue().removeAll(linesBefore);
+                        for (String line : linesBefore) {
+                            error.getValue().remove(line);
+                        }
                         return false;
                     });
                 });
@@ -193,7 +195,7 @@ final class TreeShapes {
     }
 
     private static void append(StringBuilder found, SourceFile source, Collection<Result> results,
-                               @Nullable Map<String, Set<String>> errors) {
+                               @Nullable Map<String, List<String>> errors) {
         if (errors == null) {
             return;
         }
@@ -205,7 +207,7 @@ final class TreeShapes {
         }
         found.append(":\n");
         int listed = 0;
-        for (Map.Entry<String, Set<String>> error : errors.entrySet()) {
+        for (Map.Entry<String, List<String>> error : errors.entrySet()) {
             for (String line : error.getValue()) {
                 if (listed++ < MAX_PER_FILE) {
                     found.append("    `").append(line).append("` ").append(error.getKey()).append('\n');
@@ -341,7 +343,7 @@ final class TreeShapes {
      */
     private Map<UUID, Reparsed> reparse(Parser.Builder builder, List<SourceFile> current,
                                         List<SourceFile> parsedAndOutput,
-                                        Map<UUID, Map<String, Set<String>>> compilationErrors) {
+                                        Map<UUID, Map<String, List<String>>> compilationErrors) {
         List<SourceFile> sources = new ArrayList<>();
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
@@ -377,12 +379,12 @@ final class TreeShapes {
             return reparsed;
         }
         if (compiles && service != null) {
-            Map<Path, Map<String, Set<String>>> byPath = service.compilationErrors(ctx);
+            Map<Path, Map<String, List<String>>> byPath = service.compilationErrors(ctx);
             for (int i = 0; i < sources.size(); i++) {
-                Map<String, Set<String>> ofSource = byPath.get(inputs.get(i).getPath());
+                Map<String, List<String>> ofSource = byPath.get(inputs.get(i).getPath());
                 if (ofSource != null) {
-                    Map<String, Set<String>> copy = new LinkedHashMap<>();
-                    ofSource.forEach((message, lines) -> copy.put(message, new LinkedHashSet<>(lines)));
+                    Map<String, List<String>> copy = new LinkedHashMap<>();
+                    ofSource.forEach((message, lines) -> copy.put(message, new ArrayList<>(lines)));
                     compilationErrors.put(sources.get(i).getId(), copy);
                 }
             }
