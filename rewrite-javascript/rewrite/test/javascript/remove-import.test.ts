@@ -130,7 +130,9 @@ describe('RemoveImport visitor', () => {
     describe('methods with same names from different types', () => {
         test('util.isArray coming from namespace import but uses Array.isArray', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
+            // A request for `isArray` alone keeps a namespace import, so this asks for the whole module.
+            // Before: new RemoveImport("util", "isArray"), which removed an unused namespace import too
+            spec.recipe = fromVisitor(new RemoveImport("util"));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -546,9 +548,10 @@ describe('RemoveImport visitor', () => {
             );
         });
 
-        test('should remove unused namespace import when removing a specific member', async () => {
+        test('should remove unused namespace import when removing the namespace', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new RemoveImport("react", "SFC"));
+            // Before: new RemoveImport("react", "SFC") removed it too, while a request for one member now keeps it
+            spec.recipe = fromVisitor(new RemoveImport("react", "*"));
 
             //language=typescript
             await spec.rewriteRun(
@@ -1007,10 +1010,11 @@ describe('RemoveImport visitor', () => {
             );
         });
 
-        test('should remove unused import-equals-require with member specified', async () => {
+        test('should keep unused import-equals-require when removing a specific member', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
 
+            // Before: removed, leaving `console.log("no util usage");` and an `export {};`
             //language=typescript
             await spec.rewriteRun(
                 typescript(
@@ -1018,11 +1022,6 @@ describe('RemoveImport visitor', () => {
                         import util = require("util");
 
                         console.log("no util usage");
-                    `,
-                    `
-                        console.log("no util usage");
-
-                        export {};
                     `
                 )
             );
@@ -2142,19 +2141,17 @@ describe('RemoveImport visitor', () => {
             );
         });
 
-        test('a member-scoped removal removes a namespace import that JSX does not read', async () => {
+        test('a member-scoped removal keeps a namespace import that JSX does not read', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("lodash", "map"));
 
+            // Before: removed, leaving `export const A = () => <div/>;`
             //language=tsx
             await spec.rewriteRun(
                 tsx(
                     `
                         import * as _ from 'lodash';
 
-                        export const A = () => <div/>;
-                    `,
-                    `
                         export const A = () => <div/>;
                     `
                 )
@@ -2303,12 +2300,12 @@ describe("RemoveImport reading the binding table", () => {
         );
     });
 
-    // Wanted: a request for one member removes only the bindings of that member, so the unused namespace import stays.
-    // Differs: RemoveImport removes an unused namespace import, `import X = require` or whole `require` for any member,
-    // since once a recipe has rewritten the file's last `fs.readFile`, nothing reads it.
-    test.fails("a request for one member keeps an unused namespace import", async () => {
+    // A request for one member removes only the bindings of that member, as the table reads a request
+    test("a request for one member keeps an unused namespace import", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+        // Before: `import * as fs from "fs";` was removed, as an unused namespace import, `import X = require` or whole
+        // `require` was for any member, since once a recipe has rewritten the file's last `fs.readFile` nothing reads it
         await spec.rewriteRun(
             //language=typescript
             typescript(`

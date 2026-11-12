@@ -251,7 +251,7 @@ with the name its binding carries after the move, whether or not the cursor reac
 `bindingTable(cu)` (`src/javascript/binding-table.ts`) lists every name the file's top level binds to a
 module, and `bindingsOf(statement)` one statement's rows. Every reader of "what binds a module here" reads
 it rather than the import and `require` syntax: `moduleBindings`, `maybeBind`, `maybeRebind`, `AddImport`,
-`RebindImport` and `moduleScopeBindings`, which is a view of it in `AddImportOptions.member`'s vocabulary.
+`RebindImport`, `RemoveImport` and `moduleScopeBindings`, which is a view of it in `AddImportOptions.member`'s vocabulary.
 Each row says its `form`, since forms that read alike hold different values:
 
 ```ts
@@ -265,7 +265,9 @@ const {...rest} = require("m") // require-pattern: no one member, as `{a: {b}}` 
 const X = await import("m")    // dynamic-import: the namespace object
 ```
 
-`RemoveImport` still reads the syntax itself, since its rules differ from the table's.
+`RemoveImport` removes the unused rows a request asks for as `bindsMember` reads it: with no member every row of
+the module, with `'default'` or `'*'` the default or namespace import or a whole-module `require`, and with a name
+only that member's, so `RemoveImport("fs", "readFile")` keeps an unused `import * as fs from "fs"`.
 
 ### Which name a rebind binds
 
