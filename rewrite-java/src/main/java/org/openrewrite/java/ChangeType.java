@@ -408,6 +408,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            if (fieldAccess.getName().getFieldType() != null) {
+                // a field can share the name of its type, so the text of a read can look like a type reference
+                return super.visitFieldAccess(fieldAccess, ctx);
+            }
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fqTarget = (JavaType.FullyQualified) targetType;
@@ -499,7 +503,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                                    ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
                                    parent instanceof J.MethodDeclaration &&
                                    ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
-                if (ident.getSimpleName().equals(className)) {
+                // a variable of the type can share its name, and is not a reference to the type
+                if (ident.getFieldType() == null && ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
                             JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;

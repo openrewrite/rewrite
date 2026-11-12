@@ -4199,4 +4199,111 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void fieldNamedLikeTheTypeItHoldsKeepsItsName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Inner", "a.Other$Inner", true)),
+          java("package a; public class Other { public static class Inner {} }"),
+          java(
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+
+                  public static final Inner Inner = new Inner();
+
+                  static Object read() {
+                      return Inner;
+                  }
+              }
+              """,
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+
+                  public static final Other.Inner Inner = new Other.Inner();
+
+                  static Object read() {
+                      return Inner;
+                  }
+              }
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "b.Bar", true)),
+          java("package a; public class Foo {}"),
+          java("package b; public class Bar {}"),
+          java(
+            """
+              package c;
+
+              import a.Foo;
+
+              class C {
+                  static final Foo Foo = new Foo();
+                  Object o = Foo;
+              }
+              """,
+            """
+              package c;
+
+              import b.Bar;
+
+              class C {
+                  static final Bar Foo = new Bar();
+                  Object o = Foo;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifiedReadOfAFieldNamedLikeItsTypeIsLeftAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Inner", "a.Other$Inner", true)),
+          java("package a; public class Other { public static class Inner {} }"),
+          java(
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+
+                  public static Inner Inner;
+              }
+              """,
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+
+                  public static Other.Inner Inner;
+              }
+              """
+          ),
+          java(
+            """
+              package c;
+
+              import a.Outer;
+
+              class C {
+                  Object o = Outer.Inner;
+                  Object p = a.Outer.Inner;
+              }
+              """
+          )
+        );
+    }
 }
