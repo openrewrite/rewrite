@@ -4306,4 +4306,56 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renamedEnumAndTheTypesNestedInItKeepTheirKind() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "a.Bar", false)),
+          java(
+            """
+              package a;
+
+              public enum Foo {
+                  A, B;
+
+                  public interface Nested {
+                  }
+              }
+              """,
+            """
+              package a;
+
+              public enum Bar {
+                  A, B;
+
+                  public interface Nested {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantNamedLikeItsEnumKeepsItsName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "a.Bar", false)),
+          java(
+            """
+              package a;
+
+              public enum Foo {
+                  Foo, B
+              }
+              """,
+            """
+              package a;
+
+              public enum Bar {
+                  Foo, B
+              }
+              """
+          )
+        );
+    }
 }
