@@ -3347,7 +3347,7 @@ class ChangeTypeTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new ChangeType("java.util.List", "java.util.Collection", null))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().classDeclarations(false)),
           java(
             """
               import java.util.List;

@@ -995,7 +995,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void retainPackageInfoAnnotationWithMissingTypeInformation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.none()),
+          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.all()
+            .classDeclarations(false).identifiers(false).methodDeclarations(false)
+            .methodInvocations(false).constructorInvocations(false)),
           java(
             """
               @NullMarked
@@ -2397,7 +2399,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void missingTypeReturnValueOfMethodWithArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodDeclarations(false)),
           // method with argument should still remove unused import
           java(
             """

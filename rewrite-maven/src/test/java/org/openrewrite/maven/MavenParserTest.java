@@ -3787,7 +3787,7 @@ class MavenParserTest implements RewriteTest {
           // Suppress test framework's usual error handler because we expect an error resolving coherence
           spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().dependencyModel(false)),
           mavenProject("a",
             pomXml("""
                 <project>
@@ -3847,7 +3847,7 @@ class MavenParserTest implements RewriteTest {
           // Suppress test framework's usual error handler because we expect an error resolving coherence
           spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().dependencyModel(false)),
           mavenProject("x",
             pomXml("""
                 <project>

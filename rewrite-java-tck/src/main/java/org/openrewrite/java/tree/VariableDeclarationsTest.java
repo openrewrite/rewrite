@@ -277,7 +277,7 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void unknownVar() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           java(
             """
               class Test {

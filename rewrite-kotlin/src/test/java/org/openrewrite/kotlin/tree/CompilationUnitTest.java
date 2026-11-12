@@ -73,7 +73,7 @@ class CompilationUnitTest implements RewriteTest {
     @Test
     void unresolvedCallableReference() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodInvocations(false)),
           kotlinScript(
             """
               kotlin { jvmToolchain { languageVersion.set(libs.versions.jdk.map(JavaLanguageVersion::of)) } }

@@ -430,7 +430,7 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void unresolvedMethodInvocationName() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               val x = some .  qualified   . fooBar ( )
@@ -949,7 +949,7 @@ class MethodInvocationTest implements RewriteTest {
     void typeArgumentsOnQualifier() {
         AtomicBoolean asserted = new AtomicBoolean();
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).variableDeclarations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             //language=none
             """

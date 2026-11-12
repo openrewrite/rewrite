@@ -229,7 +229,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationOnUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).constructorInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           java(
             """
               import java.util.ArrayList;
@@ -452,7 +452,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationTypeBoundWhenArgumentTypeUnresolvable() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import static java.util.Objects.requireNonNull;
@@ -488,7 +488,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationTypeResolvedFromRecoveredInvocationTypeWhenArgumentTypeUnresolvable() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import static java.util.Objects.requireNonNull;
@@ -527,7 +527,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationTypeBoundOnOverloadedCalleeWithUnresolvableArgument() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               class MyTest {

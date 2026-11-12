@@ -45,7 +45,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
     @ValueSource(ints = { 11, 17, 21 })
     void missingTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
-          s -> s.typeValidationOptions(TypeValidation.none()),
+          s -> s.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           //language=java
           version(
             java(
@@ -75,7 +75,6 @@ class FinalizeLocalVariablesTest implements RewriteTest {
     @ValueSource(ints = { 11, 17, 21 })
     void explicitTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
-          s -> s.typeValidationOptions(TypeValidation.none()),
           //language=java
           version(
             java(

@@ -241,7 +241,7 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void keepImportAlias() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(removeMemberImportRecipe("java.util.regex.Pattern", "COMMENTS")),
           kotlin(
             """
@@ -260,8 +260,8 @@ class RemoveImportTest implements RewriteTest {
     void removeImportAlias() {
         // TODO check if this is really what we want to happen
         rewriteRun(
-          // Type validation is disabled until https://github.com/openrewrite/rewrite-kotlin/issues/545 is implemented.
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          // Identifiers are not validated until https://github.com/openrewrite/rewrite-kotlin/issues/545 is implemented.
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(removeMemberImportRecipe("java.util.regex.Pattern", "COMMENTS")),
           kotlin(
             """
