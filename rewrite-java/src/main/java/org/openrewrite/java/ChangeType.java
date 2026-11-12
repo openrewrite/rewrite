@@ -190,6 +190,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final Boolean ignoreDefinition;
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
+        private final Map<String, Optional<JavaType.Class>> typesWithMembers = new HashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
 
@@ -893,23 +894,26 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             if (type == null || type instanceof JavaType.Class && !(type instanceof JavaType.ShallowClass)) {
                 return type;
             }
+            return typesWithMembers.computeIfAbsent(type.getFullyQualifiedName(), this::typeWithMembers).orElse(null);
+        }
+
+        private Optional<JavaType.Class> typeWithMembers(String fullyQualifiedName) {
             JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
             if (sourceFile != null) {
                 for (JavaType inUse : sourceFile.getTypesInUse().getTypesInUse()) {
                     if (inUse instanceof JavaType.Class && !(inUse instanceof JavaType.ShallowClass) &&
-                        ((JavaType.Class) inUse).getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                        return (JavaType.Class) inUse;
+                        ((JavaType.Class) inUse).getFullyQualifiedName().equals(fullyQualifiedName)) {
+                        return Optional.of((JavaType.Class) inUse);
                     }
                 }
             }
-            if (!JdkClassSharingTypeFactory.isJdkClass(type.getFullyQualifiedName())) {
-                return null;
+            if (!JdkClassSharingTypeFactory.isJdkClass(fullyQualifiedName)) {
+                return Optional.empty();
             }
             // parsed once a cycle, for every source file and ChangeType that calls a method of it
             Map<String, Optional<JavaType.Class>> jdkClasses = getCursor().getRoot()
                     .computeMessageIfAbsent(JDK_CLASSES_MESSAGE_KEY, k -> new HashMap<>());
-            return jdkClasses.computeIfAbsent(type.getFullyQualifiedName(), JavaChangeTypeVisitor::parseJdkClass)
-                    .orElse(null);
+            return jdkClasses.computeIfAbsent(fullyQualifiedName, JavaChangeTypeVisitor::parseJdkClass);
         }
 
         private static Optional<JavaType.Class> parseJdkClass(String fullyQualifiedName) {

@@ -42,7 +42,9 @@ final class CalledMethod {
     static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name,
                                           List<@Nullable JavaType> argumentTypes) {
         List<JavaType.Method> candidates = new ArrayList<>();
-        collect(type, name, argumentTypes.size(), candidates, new HashSet<>());
+        collect(type, false, name, argumentTypes.size(), candidates, new HashSet<>());
+        // The only method with the call's name and number of arguments is the one javac calls once the program
+        // compiles, while an argument's type may still be one that a later recipe changes.
         if (candidates.size() > 1) {
             candidates.removeIf(candidate -> !accepts(candidate, argumentTypes));
         }
@@ -85,20 +87,23 @@ final class CalledMethod {
         return false;
     }
 
-    private static void collect(JavaType.@Nullable FullyQualified type, String name, int arity,
+    private static void collect(JavaType.@Nullable FullyQualified type, boolean supertype, String name, int arity,
                                 List<JavaType.Method> candidates, Set<String> visited) {
         if (type == null || !visited.add(type.getFullyQualifiedName())) {
             return;
         }
+        // an interface's static methods aren't inherited
+        boolean staticMethods = !supertype || type.getKind() != JavaType.FullyQualified.Kind.Interface;
         for (JavaType.Method method : type.getMethods()) {
             if (method.getName().equals(name) && method.getParameterTypes().size() == arity &&
-                !method.hasFlags(Flag.Private) && !overridden(method, candidates)) {
+                !method.hasFlags(Flag.Private) && (staticMethods || !method.hasFlags(Flag.Static)) &&
+                !overridden(method, candidates)) {
                 candidates.add(method);
             }
         }
-        collect(type.getSupertype(), name, arity, candidates, visited);
+        collect(type.getSupertype(), true, name, arity, candidates, visited);
         for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-            collect(anInterface, name, arity, candidates, visited);
+            collect(anInterface, true, name, arity, candidates, visited);
         }
     }
 
@@ -126,8 +131,9 @@ final class CalledMethod {
     private static boolean accepts(JavaType.Method method, List<@Nullable JavaType> argumentTypes) {
         for (int i = 0; i < argumentTypes.size(); i++) {
             JavaType argumentType = argumentTypes.get(i);
-            // an argument the source's parser couldn't type rules out no method
+            // an untyped argument, or one whose type is only its name and so has no supertypes, rules out no method
             if (argumentType != null && !(argumentType instanceof JavaType.Unknown) &&
+                !(argumentType instanceof JavaType.ShallowClass) &&
                 !TypeUtils.isAssignableTo(method.getParameterTypes().get(i), argumentType)) {
                 return false;
             }

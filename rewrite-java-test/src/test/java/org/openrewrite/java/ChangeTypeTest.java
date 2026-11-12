@@ -3658,6 +3658,176 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void argumentOfTheNewTypeRulesOutNoMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public abstract class Old implements CharSequence {
+                  public void put(CharSequence s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public abstract class New implements CharSequence {
+                  public void put(Object o) {}
+                  public void put(CharSequence s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.put(o);
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.put(o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callWithAnArgumentOfATypeChangedLaterCallsTheOnlyMethodOfItsArity() {
+        rewriteRun(
+          spec -> spec.recipes(new ChangeType("a.Old", "b.New", true), new ChangeType("a.Arg", "b.Arg", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public void plus(Object o) {}
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class Arg {
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public interface Amount {
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Arg implements Amount {
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New {
+                  public void plus(Amount a) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Arg;
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o, Arg arg) {
+                      o.plus(arg);
+                  }
+              }
+              """,
+            """
+              import b.Arg;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o, Arg arg) {
+                      o.plus(arg);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticMethodOfAnInterfaceOfTheNewTypeIsNotItsMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public static void of(int i) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public interface Of {
+                  static void of(int i) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New implements Of {
+                  public static void of(long l) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test() {
+                      Old.of(1);
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test() {
+                      New.of(1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void callThatSeveralOfTheNewTypesMethodsAcceptKeepsItsMethod() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
