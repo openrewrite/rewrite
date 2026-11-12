@@ -54,6 +54,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext>, Heavyweigh
      * A {@code Collection<String>} that the scanning phase adds the recipe and path of each edit a scanner makes to, so
      * that a test can find whether a scanner edits without {@link #SCANNING_MUTATION_VALIDATION} failing the run.
      */
+    @Incubating(since = "8.106.0")
     String SCANNING_MUTATIONS = "org.openrewrite.test.scanningMutations";
 
     @Incubating(since = "7.20.0")

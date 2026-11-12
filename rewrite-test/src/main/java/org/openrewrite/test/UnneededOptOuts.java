@@ -85,6 +85,7 @@ final class UnneededOptOuts {
     private final Options asRun;
     private final List<Consumer<TypeValidation>> beforeValidations = new ArrayList<>();
     private final List<Consumer<TypeValidation>> afterValidations = new ArrayList<>();
+    private final Map<String, Runnable> checksOfTheRun = new HashMap<>();
     private final Map<String, Runnable> checksOnTheSide = new HashMap<>();
     private final Map<String, Boolean> passedOnTheSide = new HashMap<>();
 
@@ -140,7 +141,13 @@ final class UnneededOptOuts {
     void check(String check, boolean on, Runnable assertion) {
         if (on) {
             assertion.run();
-        } else if (runsOnTheSide(check)) {
+        } else {
+            checkOnTheSide(check, assertion);
+        }
+    }
+
+    private void checkOnTheSide(String check, Runnable assertion) {
+        if (runsOnTheSide(check)) {
             passedOnTheSide.put(check, passes(assertion));
         }
     }
@@ -182,7 +189,7 @@ final class UnneededOptOuts {
             return CursorValidatingExecutionContextView.view(ctx);
         }
         ExecutionContextChanges changes = new ExecutionContextChanges(ctx);
-        checkOnTheSideLater("executionContextUnchanged", () -> assertThat(changes.keys).isEmpty());
+        checksOfTheRun.put("executionContextUnchanged", () -> assertThat(changes.keys).isEmpty());
         return changes;
     }
 
@@ -193,8 +200,15 @@ final class UnneededOptOuts {
         if (runsOnTheSide("noEditsInScanningPhase")) {
             Collection<String> mutations = new CopyOnWriteArrayList<>();
             ctx.putMessage(SCANNING_MUTATIONS, mutations);
-            checkOnTheSideLater("noEditsInScanningPhase", () -> assertThat(mutations).isEmpty());
+            checksOfTheRun.put("noEditsInScanningPhase", () -> assertThat(mutations).isEmpty());
         }
+    }
+
+    /**
+     * Runs on the side the checks of what the recipe did while it ran, before RewriteTest runs it again.
+     */
+    void recipeRan() {
+        checksOfTheRun.forEach(this::checkOnTheSide);
     }
 
     void assertNoneUnneeded() {
@@ -280,7 +294,7 @@ final class UnneededOptOuts {
         try {
             assertion.run();
             return true;
-        } catch (Exception | AssertionError e) {
+        } catch (Exception | AssertionError | LinkageError | StackOverflowError e) {
             return false;
         }
     }

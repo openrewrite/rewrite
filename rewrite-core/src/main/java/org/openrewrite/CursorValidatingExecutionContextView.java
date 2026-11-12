@@ -68,6 +68,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
      * Whether a key may be put even when the execution context is validated to stay unchanged, as the keys of the
      * framework's own bookkeeping may.
      */
+    @Incubating(since = "8.106.0")
     protected boolean isAlwaysMutable(String key) {
         return VALIDATE_CURSOR_ACYCLIC.equals(key) ||
                VALIDATE_CTX_MUTATION.equals(key) ||
