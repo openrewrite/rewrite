@@ -187,6 +187,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final Boolean ignoreDefinition;
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
+        private final Map<String, Optional<JavaType.Class>> typesWithMembers = new HashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
 
@@ -290,7 +291,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         .withName(method.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) j;
-                JavaType.Method mt = updateType(method.getMethodType());
+                JavaType.Method mt = calledMethod(method, updateType(method.getMethodType()));
                 j = method.withMethodType(mt)
                         .withName(method.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
@@ -864,6 +865,71 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 return method;
             }
             return null;
+        }
+
+        /**
+         * The method of the receiver's new type that a call on the original type resolves to, such as
+         * {@code plusDays(long)} for a call of the original type's {@code plusDays(int)}, or {@code mapped} where that
+         * can't be told.
+         */
+        private JavaType.@Nullable Method calledMethod(J.MethodInvocation method, JavaType.@Nullable Method mapped) {
+            // Kotlin, Groovy and the other languages resolve a call by rules of their own
+            if (mapped == null || !(getCursor().getValue() instanceof J.MethodInvocation) ||
+                getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
+                return mapped;
+            }
+            J.MethodInvocation original = getCursor().getValue();
+            JavaType.Method originalType = original.getMethodType();
+            JavaType.FullyQualified originalReceiver = original.getSelect() == null ? null :
+                    TypeUtils.asFullyQualified(original.getSelect().getType());
+            if (originalType == null || !isOfOriginalType(originalType.getDeclaringType()) &&
+                                        !isOfOriginalType(originalReceiver)) {
+                return mapped;
+            }
+            // A receiver's type that another recipe already changed, as in `ZonedDateTime.now().getZone()` with
+            // `getZone()` still declared by the original type, is where the call finds its method.
+            JavaType.FullyQualified receiver = withMembers(method.getSelect() == null ? mapped.getDeclaringType() :
+                    TypeUtils.asFullyQualified(method.getSelect().getType()));
+            if (receiver == null) {
+                return mapped;
+            }
+            List<@Nullable JavaType> argumentTypes = new ArrayList<>();
+            for (Expression argument : method.getArguments()) {
+                if (!(argument instanceof J.Empty)) {
+                    argumentTypes.add(argument.getType());
+                }
+            }
+            JavaType.Method called = CalledMethod.find(receiver, mapped.getName(), argumentTypes);
+            // the receiver's own type may still hold the original type among its supertypes
+            return called == null || isOfOriginalType(called.getDeclaringType()) ? mapped : called;
+        }
+
+        private boolean isOfOriginalType(JavaType.@Nullable FullyQualified fq) {
+            return isTargetFullyQualifiedType(fq) || isNestedTypeOfOriginal(fq);
+        }
+
+        /**
+         * {@code type} with its members where {@code type} is only its name, as the target type is, from the types the
+         * source file uses.
+         */
+        private JavaType.@Nullable FullyQualified withMembers(JavaType.@Nullable FullyQualified type) {
+            if (type == null || type instanceof JavaType.Class && !(type instanceof JavaType.ShallowClass)) {
+                return type;
+            }
+            return typesWithMembers.computeIfAbsent(type.getFullyQualifiedName(), this::typeWithMembers).orElse(null);
+        }
+
+        private Optional<JavaType.Class> typeWithMembers(String fullyQualifiedName) {
+            JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+            if (sourceFile != null) {
+                for (JavaType inUse : sourceFile.getTypesInUse().getTypesInUse()) {
+                    if (inUse instanceof JavaType.Class && !(inUse instanceof JavaType.ShallowClass) &&
+                        ((JavaType.Class) inUse).getFullyQualifiedName().equals(fullyQualifiedName)) {
+                        return Optional.of((JavaType.Class) inUse);
+                    }
+                }
+            }
+            return Optional.empty();
         }
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
