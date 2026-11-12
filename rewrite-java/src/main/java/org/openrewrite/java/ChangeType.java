@@ -31,7 +31,6 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
 import java.lang.reflect.Method;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -142,7 +141,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
                             mayContainDefinition(cu, normalizedOldName) &&
-                            containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
+                            containsClassDefinition(cu, oldFullyQualifiedTypeName) &&
+                            !declaresNestedTypeThatStays(cu, oldFullyQualifiedTypeName, newFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
                     return cu;
@@ -187,17 +187,24 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         private J.@Nullable Identifier importAlias;
 
-        @Nullable
-        private final Boolean ignoreDefinition;
+        private final String newFullyQualifiedTypeName;
+        private final boolean ignoreDefinition;
+
+        /**
+         * Whether the visited file's definition of the original type stays as it is, where asked to or where renaming
+         * it in place can't make it the target type.
+         */
+        private boolean keepsDefinition;
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
-        private final Set<String> topLevelClassnames = new HashSet<>();
+        private final Set<String> declaredClassNames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
-            this.ignoreDefinition = ignoreDefinition;
+            this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
+            this.ignoreDefinition = Boolean.TRUE.equals(ignoreDefinition);
             importAlias = null;
         }
 
@@ -205,7 +212,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
-                if (!Boolean.TRUE.equals(ignoreDefinition)) {
+                keepsDefinition = ignoreDefinition ||
+                        declaresNestedTypeThatStays(cu, originalType.getFullyQualifiedName(), newFullyQualifiedTypeName);
+                if (!keepsDefinition) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                     if (fq != null) {
                         ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
@@ -233,11 +242,18 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-            J.ClassDeclaration cd = (J.ClassDeclaration) super.visitClassDeclaration(classDecl, ctx);
-            if (cd.getType() != null) {
-                topLevelClassnames.add(getTopLevelClassName(cd.getType()).getFullyQualifiedName());
+            if (classDecl.getType() != null) {
+                declaredClassNames.add(classDecl.getType().getFullyQualifiedName().replace('$', '.'));
             }
-            return cd;
+            if (isKeptDefinition(classDecl)) {
+                // a definition that stays is left untouched, with its references to itself and the types of its members
+                return classDecl;
+            }
+            return super.visitClassDeclaration(classDecl, ctx);
+        }
+
+        private boolean isKeptDefinition(J.ClassDeclaration classDecl) {
+            return keepsDefinition && TypeUtils.isOfClassType(classDecl.getType(), originalType.getFullyQualifiedName());
         }
 
         @Override
@@ -273,6 +289,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         @Override
         public @Nullable J postVisit(J tree, ExecutionContext ctx) {
             J j = super.postVisit(tree, ctx);
+            if (j instanceof J.ClassDeclaration && isKeptDefinition((J.ClassDeclaration) j)) {
+                // a definition that stays keeps its type, as visitClassDeclaration leaves it untouched
+                return j;
+            }
             if (j instanceof J.ArrayType) {
                 J.ArrayType arrayType = (J.ArrayType) j;
                 JavaType type = updateType(arrayType.getType());
@@ -280,16 +300,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             } else if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration method = (J.MethodDeclaration) j;
                 JavaType.Method mt = updateType(method.getMethodType());
-                JavaType.Method declared = getCursor().getValue() instanceof J.MethodDeclaration ?
-                        ((J.MethodDeclaration) getCursor().getValue()).getMethodType() : null;
-                if (mt != null && declared != null && Boolean.TRUE.equals(ignoreDefinition) &&
-                    TypeUtils.isOfClassType(declared.getDeclaringType(), originalType.getFullyQualifiedName())) {
-                    // the definition is left as it is, so it still declares its methods and constructs itself
-                    mt = mt.withDeclaringType(declared.getDeclaringType());
-                    if (declared.isConstructor()) {
-                        mt = mt.withReturnType(declared.getReturnType());
-                    }
-                }
                 j = method.withMethodType(mt)
                         .withName(method.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
@@ -303,14 +313,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             } else if (j instanceof MethodCall) {
                 MethodCall call = (MethodCall) j;
                 j = (J) call.withMethodType(updateType(call.getMethodType()));
-            } else if (j instanceof J.ClassDeclaration && Boolean.TRUE.equals(ignoreDefinition) &&
-                       getCursor().getValue() instanceof J.ClassDeclaration &&
-                       TypeUtils.isOfClassType(((J.ClassDeclaration) getCursor().getValue()).getType(),
-                               originalType.getFullyQualifiedName())) {
-                // the definition is left as it is, and so is its type
-                J.ClassDeclaration original = getCursor().getValue();
-                J.ClassDeclaration cd = (J.ClassDeclaration) j;
-                j = cd.withType(original.getType()).withName(cd.getName().withType(original.getName().getType()));
             } else if (tree instanceof TypedTree) {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
@@ -358,7 +360,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
-                    if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
+                    if (!declaredClassNames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName().replace('$', '.'))) {
                         if (hasNoConflictingName(sf)) {
                             for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
                                 if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
@@ -479,11 +481,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
-            // Do not modify the identifier if it's on a inner class definition.
-            if (Boolean.TRUE.equals(ignoreDefinition) && getCursor().getParent() != null &&
-                    getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
-                return super.visitIdentifier(ident, ctx);
-            }
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
             if (TypeUtils.isOfClassType(ident.getType(), originalType.getFullyQualifiedName())) {
@@ -505,7 +502,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
-                            return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
+                            JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
+                            String name = hasNoConflictingName(sf) || nameOnly ? target.getClassName() :
+                                    target.getFullyQualifiedName().replace('$', '.');
+                            return updateOuterClassTypes(TypeTree.build(name)
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
                         } else {
@@ -917,10 +917,17 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             if (fq == null || !(targetType instanceof JavaType.FullyQualified)) {
                 return false;
             }
-            String fqn = fq.getFullyQualifiedName();
-            String originalFqn = originalType.getFullyQualifiedName();
-            // Check if fq is a nested class of the original type (e.g., a.b.c.A$Nested when original is a.b.c.A)
-            return fqn.startsWith(originalFqn + "$");
+            return isNestedIn(fq.getFullyQualifiedName(), originalType.getFullyQualifiedName());
+        }
+
+        /**
+         * Whether {@code fullyQualifiedName}, such as {@code a.Outer$Inner$Deep}, names a type nested in {@code outer},
+         * which can name its own outer types with dots, as {@code a.Outer.Inner}.
+         */
+        private static boolean isNestedIn(String fullyQualifiedName, String outer) {
+            int length = outer.length();
+            return fullyQualifiedName.length() > length && fullyQualifiedName.charAt(length) == '$' &&
+                   TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName.substring(0, length), outer);
         }
 
         private JavaType.FullyQualified updateNestedType(JavaType.FullyQualified nestedType) {
@@ -1029,20 +1036,29 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     return false;
                 }
             }
-            return !otherTypeNames(sf, newType).contains(newType.getClassName());
+            Set<String> otherTypeNames = otherTypeNames(sf, newType);
+            // a nested target is written through its outermost class, so that name has to be free as well
+            return !otherTypeNames.contains(newType.getClassName()) &&
+                   !otherTypeNames.contains(getTopLevelClassName(newType).getClassName());
         }
 
         /**
-         * The simple names that the file declares for types other than the target, or writes unqualified for types
-         * other than the target and the original. Uses of the original are renamed, while a declaration of it stays.
-         * Shortening the target to one of these names would bind that name to two types.
+         * The simple names that the file declares for types other than the target and its outermost class, or writes
+         * unqualified for types other than those and the original. Uses of the original are renamed, while a
+         * declaration of it stays. Shortening the target to one of these names would bind that name to two types.
          */
         private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
             if (otherTypeNames == null) {
+                JavaType.FullyQualified outermost = getTopLevelClassName(newType);
                 otherTypeNames = new JavaIsoVisitor<Set<String>>() {
+                    private boolean isTarget(@Nullable JavaType type) {
+                        return TypeUtils.isOfClassType(type, newType.getFullyQualifiedName()) ||
+                               TypeUtils.isOfClassType(type, outermost.getFullyQualifiedName());
+                    }
+
                     @Override
                     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> names) {
-                        if (!TypeUtils.isOfClassType(classDecl.getType(), newType.getFullyQualifiedName())) {
+                        if (!isTarget(classDecl.getType())) {
                             names.add(classDecl.getSimpleName());
                         }
                         return super.visitClassDeclaration(classDecl, names);
@@ -1059,8 +1075,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     @Override
                     public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
                         JavaType type = identifier.getType();
-                        if (identifier.getFieldType() == null && type instanceof JavaType.FullyQualified &&
-                                !TypeUtils.isOfClassType(type, newType.getFullyQualifiedName()) &&
+                        if (identifier.getFieldType() == null && type instanceof JavaType.FullyQualified && !isTarget(type) &&
                                 !TypeUtils.isOfClassType(type, originalType.getFullyQualifiedName())) {
                             names.add(identifier.getSimpleName());
                         }
@@ -1113,6 +1128,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
+                boolean declaresOriginal = false;
                 for (J.ClassDeclaration declaration : cu.getClasses()) {
                     // Check the class name instead of source path, as it might differ.
                     // Non-Java (e.g. Python) class declarations may lack type attribution.
@@ -1123,22 +1139,39 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     String fqn = declarationType.getFullyQualifiedName();
                     if (fqn.equals(originalType.getFullyQualifiedName())) {
                         getCursor().putMessage("UPDATE_PACKAGE", true);
+                        declaresOriginal = true;
                         break;
                     }
                 }
 
                 String oldPath = cu.getSourcePath().toString().replace('\\', '/');
-                // The old FQN must exist in the path.
-                String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
-                String newFqn = fqnToPath(targetType.getFullyQualifiedName());
-
-                Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
-                if (updatePath(cu, oldPath, newPath.toString())) {
-                    cu = cu.withSourcePath(newPath);
+                String newPath = movedPath(oldPath);
+                if (newPath != null && updatePath(cu, oldPath, newPath)) {
+                    cu = cu.withSourcePath(Paths.get(newPath));
                 }
-                return super.visit(cu, ctx);
+                J visited = super.visit(cu, ctx);
+                if (declaresOriginal && visited instanceof J.CompilationUnit &&
+                    ((J.CompilationUnit) visited).getPackageDeclaration() == null && !targetType.getPackageName().isEmpty()) {
+                    visited = addPackage((J.CompilationUnit) visited, targetType.getPackageName());
+                }
+                return visited;
             }
             return super.visit(tree, ctx);
+        }
+
+        /**
+         * The path of a file whose name and directories end in the old type's top-level class and package, with
+         * those replaced by the target's.
+         */
+        private @Nullable String movedPath(String oldPath) {
+            String oldTypePath = fqnToPath(originalType.getFullyQualifiedName());
+            int extension = oldPath.lastIndexOf('.');
+            String withoutExtension = extension > oldPath.lastIndexOf('/') ? oldPath.substring(0, extension) : oldPath;
+            if (!withoutExtension.equals(oldTypePath) && !withoutExtension.endsWith("/" + oldTypePath)) {
+                return null;
+            }
+            return withoutExtension.substring(0, withoutExtension.length() - oldTypePath.length()) +
+                   fqnToPath(targetType.getFullyQualifiedName()) + oldPath.substring(withoutExtension.length());
         }
 
         private String fqnToPath(String fullyQualifiedName) {
@@ -1147,11 +1180,31 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return topLevelClassName.replace('.', '/');
         }
 
+        /**
+         * Adds the package above the first import or type. The comments in front of that, such as a license header, go
+         * above the package, except for a type's Javadoc and what follows it.
+         */
+        private static J.CompilationUnit addPackage(J.CompilationUnit cu, String packageName) {
+            Space prefix = cu.getImports().isEmpty() ? cu.getClasses().get(0).getPrefix() : cu.getImports().get(0).getPrefix();
+            List<Comment> comments = prefix.getComments();
+            int javadoc = 0;
+            while (javadoc < comments.size() && !(comments.get(javadoc) instanceof Javadoc.DocComment)) {
+                javadoc++;
+            }
+            Space rest = Space.build("\n\n", new ArrayList<>(comments.subList(javadoc, comments.size())));
+            cu = cu.getImports().isEmpty() ?
+                    cu.withClasses(ListUtils.mapFirst(cu.getClasses(), cd -> cd.withPrefix(rest))) :
+                    cu.withImports(ListUtils.mapFirst(cu.getImports(), i -> i.withPrefix(rest)));
+            return cu.withPackageDeclaration(new J.Package(Tree.randomId(),
+                    prefix.withComments(new ArrayList<>(comments.subList(0, javadoc))), Markers.EMPTY,
+                    TypeTree.build(packageName).withPrefix(Space.SINGLE_SPACE), emptyList()));
+        }
+
         private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
             return !oldPath.equals(newPath) && sf.getClasses().stream()
                     .anyMatch(o -> !o.hasModifier(J.Modifier.Type.Private) &&
                             o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
-                            TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType).getFullyQualifiedName()));
+                            TypeUtils.isOfClassType(o.getType(), originalType.getFullyQualifiedName()));
         }
 
         @Override
@@ -1181,17 +1234,18 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
             Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
             if (updatePrefix != null && updatePrefix) {
-                _import = _import.withPrefix(Space.EMPTY);
+                _import = _import.withPrefix(_import.getPrefix().withWhitespace(""));
             }
             return super.visitImport(_import, ctx);
         }
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+            // polled before the body, as a type nested in this one doesn't follow the removed package
             Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
+            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             if (updatePrefix != null && updatePrefix) {
-                cd = cd.withPrefix(Space.EMPTY);
+                cd = cd.withPrefix(cd.getPrefix().withWhitespace(""));
             }
 
             if (TypeUtils.isOfClassType(classDecl.getType(), originalType.getFullyQualifiedName())) {
@@ -1205,7 +1259,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (method.isConstructor() && originalConstructor.matches(method.getMethodType())) {
-                method = method.withName(method.getName().withSimpleName(targetType.getClassName()));
+                method = method.withName(method.getName().withSimpleName(getNewClassName(targetType)));
                 method = method.withMethodType(updateType(method.getMethodType()));
             }
             return super.visitMethodDeclaration(method, ctx);
@@ -1245,13 +1299,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         private boolean isNestedTypeOfOriginal(JavaType.@Nullable FullyQualified fq) {
-            if (fq == null) {
-                return false;
-            }
-            String fqn = fq.getFullyQualifiedName();
-            String originalFqn = originalType.getFullyQualifiedName();
-            // Check if fq is a nested class of the original type (e.g., a.b.c.A$Nested when original is a.b.c.A)
-            return fqn.startsWith(originalFqn + "$");
+            return fq != null && JavaChangeTypeVisitor.isNestedIn(fq.getFullyQualifiedName(), originalType.getFullyQualifiedName());
         }
 
         private JavaType.FullyQualified updateNestedType(JavaType.FullyQualified nestedType) {
@@ -1325,6 +1373,39 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         // The declared type's package equals the file's, so the old name must begin with the file's
         // package. The prefix check never rejects a file that actually declares the type.
         return PackageNameUtils.isPrefixOf(packageDeclaration, normalizedOldName);
+    }
+
+    /**
+     * Whether the source file declares the old type nested in an outer class that doesn't declare the new type. A
+     * definition is renamed where it is declared, so that definition stays.
+     */
+    private static boolean declaresNestedTypeThatStays(JavaSourceFile sourceFile, String oldFullyQualifiedTypeName,
+                                                       String newFullyQualifiedTypeName) {
+        for (J.ClassDeclaration classDecl : sourceFile.getClasses()) {
+            JavaType.FullyQualified outer = outerClassDeclaring(classDecl, oldFullyQualifiedTypeName);
+            if (outer != null) {
+                int lastSeparator = Math.max(newFullyQualifiedTypeName.lastIndexOf('.'), newFullyQualifiedTypeName.lastIndexOf('$'));
+                return lastSeparator < 0 || !TypeUtils.fullyQualifiedNamesAreEqual(
+                        newFullyQualifiedTypeName.substring(0, lastSeparator), outer.getFullyQualifiedName());
+            }
+        }
+        return false;
+    }
+
+    private static JavaType.@Nullable FullyQualified outerClassDeclaring(J.ClassDeclaration classDecl, String fullyQualifiedTypeName) {
+        for (Statement member : classDecl.getBody().getStatements()) {
+            if (member instanceof J.ClassDeclaration) {
+                J.ClassDeclaration nested = (J.ClassDeclaration) member;
+                if (TypeUtils.isOfClassType(nested.getType(), fullyQualifiedTypeName)) {
+                    return classDecl.getType();
+                }
+                JavaType.FullyQualified outer = outerClassDeclaring(nested, fullyQualifiedTypeName);
+                if (outer != null) {
+                    return outer;
+                }
+            }
+        }
+        return null;
     }
 
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
