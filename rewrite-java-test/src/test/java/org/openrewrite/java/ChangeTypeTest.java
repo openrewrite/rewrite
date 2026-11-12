@@ -370,6 +370,45 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceNestedTypeQualifiedByItsOuterTypeWithNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Serialize$Inclusion", "b.Include$Value", true)),
+          java(
+            """
+              package a;
+              public @interface Serialize {
+                  enum Inclusion { NON_NULL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public @interface Include {
+                  enum Value { NON_NULL }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Serialize;
+
+              class A {
+                  Object o = Serialize.Inclusion.NON_NULL;
+              }
+              """,
+            """
+              import b.Include;
+
+              class A {
+                  Object o = Include.Value.NON_NULL;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2521")
     @Test
     void replacePrivateNestedType() {

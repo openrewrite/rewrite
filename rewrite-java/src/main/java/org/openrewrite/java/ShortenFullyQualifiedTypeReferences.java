@@ -200,15 +200,17 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
             }
 
             private J shorten(J.FieldAccess fieldAccess) {
-                if (!fieldAccess.getName().getAnnotations().isEmpty()) {
-                    return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
+                // the name has the type of the qualified name it replaces, which keeps an import added for it
+                J.Identifier name = fieldAccess.getName().withType(fieldAccess.getType());
+                if (!name.getAnnotations().isEmpty()) {
+                    return name.withAnnotations(ListUtils.map(name.getAnnotations(), (i, a) -> {
                         if (i == 0) {
                             return a.withPrefix(fieldAccess.getPrefix());
                         }
                         return a;
                     }));
                 }
-                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                return name.withPrefix(fieldAccess.getPrefix());
             }
 
             private boolean isAnnotationTypeName() {
