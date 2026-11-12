@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {npm, packageJson, RemoveImport, tsx, typescript} from "../../src/javascript";
+import {javascript, npm, packageJson, RemoveImport, tsx, typescript} from "../../src/javascript";
 import {withDir} from "tmp-promise";
 
 describe('RemoveImport visitor', () => {
@@ -2264,4 +2264,78 @@ describe('RemoveImport visitor', () => {
         });
     });
 
+});
+
+/** What `RemoveImport` would remove if it read the binding table, where its own rules read the syntax differently. */
+describe("RemoveImport reading the binding table", () => {
+    // Wanted: the module is the name the specifier spells, as the table reads it with `moduleNameOf`, so the unused
+    // import of "./author's-notes" goes.
+    // Differs: RemoveImport strips every quote character from the literal's value, reading "./authors-notes".
+    test.fails("a module name holding a quote character is the name the specifier spells", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("./author's-notes"));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    import notes from "./author's-notes";
+
+                    export const title = "Notes";
+                `,
+                `
+                    export const title = "Notes";
+                `
+            )
+        );
+    });
+
+    // Wanted: `container.require("logger")` calls a method of `container`, which the table does not count as a
+    // `require`, so nothing binds the module "logger" and the statement stays.
+    // Differs: RemoveImport counts any call named `require`, whatever it is called on.
+    test.fails("a method named require binds no module", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("logger"));
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(`
+                const container = createContainer();
+                const logger = container.require("logger");
+
+                container.start();
+            `)
+        );
+    });
+
+    // Wanted: a request for one member removes only the bindings of that member, so the unused namespace import stays.
+    // Differs: RemoveImport removes an unused namespace import, `import X = require` or whole `require` for any member,
+    // since once a recipe has rewritten the file's last `fs.readFile`, nothing reads it.
+    test.fails("a request for one member keeps an unused namespace import", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                import * as fs from "fs";
+                import {join} from "path";
+
+                export const configPath = join("config", "app.json");
+            `)
+        );
+    });
+
+    // Wanted: only a request for the default removes a default import, as the table gives it no member.
+    // Differs: RemoveImport also removes it when the member requested is its local name, reading `React` as a member.
+    test.fails("a request for a member named like a default import keeps the default import", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("react", "React"));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                import React from "react";
+                import {useState} from "react";
+
+                export const useCounter = () => useState(0);
+            `)
+        );
+    });
 });
