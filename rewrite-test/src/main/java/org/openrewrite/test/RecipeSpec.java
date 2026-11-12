@@ -322,8 +322,8 @@ public class RecipeSpec {
     }
 
     /**
-     * Checks of the LST the test parses, and of what the recipe produces unless {@link #recipeQualityValidation}
-     * sets its types.
+     * Checks of the LST the test parses, and of what the recipe produces unless {@link #afterTypeValidationOptions} or
+     * the types of {@link #recipeQualityValidation} are set.
      * <p>
      * To find opt-outs that tests no longer need, set the system property
      * {@code org.openrewrite.test.failOnUnneededOptOuts} to {@code all}, or to the options to look at, such as
