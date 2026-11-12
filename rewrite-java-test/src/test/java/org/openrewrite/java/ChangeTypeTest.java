@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
@@ -30,6 +31,8 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -285,6 +288,34 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void leaveTheSameNestedNameOfAnotherOuterType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo$Builder", "b.Foo$Builder", true)),
+          java("package a; public class Foo { public static class Builder {} }"),
+          java("package b; public class Foo { public static class Builder {} }"),
+          java("package c; public class Foo { public static class Builder {} }"),
+          java(
+            """
+              import c.Foo;
+
+              class D {
+                  a.Foo.Builder x;
+                  Foo.Builder y;
+              }
+              """,
+            """
+              import c.Foo;
+
+              class D {
+                  b.Foo.Builder x;
+                  Foo.Builder y;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/768")
     @Test
     void changeStaticFieldAccess() {
@@ -498,6 +529,58 @@ class ChangeTypeTest implements RewriteTest {
 
               class A {
                   Snake s = new Snake();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameNestedTypeWithinItsOuterTypeImportedThroughTheOuterType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategy.Python", true)),
+          java("package a; public class Strategy { public static class Snake {} public static class Python {} }"),
+          java(
+            """
+              import a.Strategy;
+
+              class A {
+                  Strategy.Snake s = new Strategy.Snake();
+              }
+              """,
+            """
+              import a.Strategy.Python;
+
+              class A {
+                  Python s = new Python();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameNestedTypeWithinItsOuterTypeKeepsAStarImportOfItsPackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategy.Python", true)),
+          java("package a; public class Strategy { public static class Snake {} public static class Python {} }"),
+          java("package a; public class Other {}"),
+          java(
+            """
+              import a.*;
+
+              class A {
+                  Strategy.Snake s = new Strategy.Snake();
+                  Other o;
+              }
+              """,
+            """
+              import a.*;
+              import a.Strategy.Python;
+
+              class A {
+                  Python s = new Python();
+                  Other o;
               }
               """
           )
@@ -995,6 +1078,109 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeVariableBoundedByItselfKeepsItsType() {
+        AtomicReference<JavaType> before = new AtomicReference<>();
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import java.util.List;
+
+              class B {
+                  A1 a;
+
+                  <T extends Comparable<? super T>> void sort(List<T> list) {
+                  }
+              }
+              """,
+            """
+              import a.A2;
+
+              import java.util.List;
+
+              class B {
+                  A2 a;
+
+                  <T extends Comparable<? super T>> void sort(List<T> list) {
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> before.set(firstParameterType(cu)))
+              .afterRecipe(cu -> assertThat(firstParameterType(cu)).isSameAs(before.get()))
+          )
+        );
+    }
+
+    private static @Nullable JavaType firstParameterType(J.CompilationUnit cu) {
+        J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+        return ((J.VariableDeclarations) method.getParameters().getFirst()).getType();
+    }
+
+    @Test
+    void qualifiedNameWithoutTypeIsMatchedByItsText() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo$Builder", "b.Foo$Builder", true))
+            // neither a.Foo nor b.Foo is on the classpath, so nothing in D has a type
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import a.Foo;
+              import a.Foo.Builder;
+
+              class D {
+                  Builder x;
+                  Foo.Builder y;
+              }
+              """,
+            """
+              import b.Foo;
+              import b.Foo.Builder;
+
+              class D {
+                  Builder x;
+                  Foo.Builder y;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeArgumentsWithinTypeArguments() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import java.util.List;
+
+              class B {
+                  List<List<A1>> nested;
+                  List<? extends List<A1>> bound;
+                  List<A1[]> array;
+              }
+              """,
+            """
+              import a.A2;
+
+              import java.util.List;
+
+              class B {
+                  List<List<A2>> nested;
+                  List<? extends List<A2>> bound;
+                  List<A2[]> array;
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("RedundantCast")
     @Test
     void typeCast() {
@@ -1409,6 +1595,31 @@ class ChangeTypeTest implements RewriteTest {
                   public String work2() {
                       return new OuterClass().toString();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fileThatOnlyImportsANestedTypeOfTheOldType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true)),
+          java("package com.acme.product; public class OuterClass { public static class InnerClass {} }"),
+          java("package com.acme.product.v2; public class OuterClass { public static class InnerClass {} }"),
+          java(
+            """
+              import com.acme.product.OuterClass.InnerClass;
+
+              class A {
+                  InnerClass i = new InnerClass();
+              }
+              """,
+            """
+              import com.acme.product.v2.OuterClass.InnerClass;
+
+              class A {
+                  InnerClass i = new InnerClass();
               }
               """
           )
