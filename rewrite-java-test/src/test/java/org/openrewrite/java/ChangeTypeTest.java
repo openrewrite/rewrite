@@ -409,6 +409,101 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void moveNestedTypeImportedThroughItsOuterTypeToAnotherOuterType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategies.Snake", true)),
+          java(
+            """
+              package a;
+              public class Strategy {
+                  public static class Snake {}
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class Strategies {
+                  public static class Snake {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Strategy;
+
+              class A {
+                  Strategy.Snake s = new Strategy.Snake();
+              }
+              """,
+            """
+              import a.Strategies.Snake;
+
+              class A {
+                  Snake s = new Snake();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moveNestedTypeKeepsAStarImportOfItsPackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategies.Snake", true)),
+          java("package a; public class Strategy { public static class Snake {} }"),
+          java("package a; public class Strategies { public static class Snake {} }"),
+          java("package a; public class Other {}"),
+          java(
+            """
+              import a.*;
+
+              class A {
+                  Strategy.Snake s = new Strategy.Snake();
+                  Other o;
+              }
+              """,
+            """
+              import a.*;
+              import a.Strategies.Snake;
+
+              class A {
+                  Snake s = new Snake();
+                  Other o;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moveNestedTypeKeepsAnImportOfItsNewOuterTypeThatTheFileHad() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategies.Snake", true)),
+          java("package a; public class Strategy { public static class Snake {} }"),
+          java("package a; public class Strategies { public static class Snake {} }"),
+          java(
+            """
+              import a.Strategies;
+              import a.Strategy;
+
+              class A {
+                  Strategy.Snake s = new Strategy.Snake();
+              }
+              """,
+            """
+              import a.Strategies;
+              import a.Strategies.Snake;
+
+              class A {
+                  Snake s = new Snake();
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2521")
     @Test
     void replacePrivateNestedType() {

@@ -363,6 +363,12 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             }
                             if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                                 addImport(fullyQualifiedTarget);
+                                // the target's import shortens `Owner.Target` to `Target`, which can leave the owner's unused
+                                for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
+                                    if (!imports(sf, owner)) {
+                                        maybeRemoveImport(owner);
+                                    }
+                                }
                             }
                         }
                     }
@@ -635,6 +641,25 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     .withTarget(target)
                     .withName(fieldAccess.getName().withSimpleName(newSimpleName).withType(null))
                     .withType(updatedFieldAccessType);
+        }
+
+        /**
+         * Whether the source file imports {@code type}, its members, or the contents of the package or class that
+         * declares it, an import that ChangeType leaves as it is.
+         */
+        private static boolean imports(JavaSourceFile sf, JavaType.FullyQualified type) {
+            String container = type.getOwningClass() == null ? type.getPackageName() : type.getOwningClass().getFullyQualifiedName();
+            for (J.Import anImport : sf.getImports()) {
+                String typeName = anImport.getTypeName();
+                if (anImport.isStatic() || !"*".equals(anImport.getQualid().getSimpleName())) {
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type.getFullyQualifiedName())) {
+                        return true;
+                    }
+                } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName.substring(0, typeName.length() - 2), container)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static Expression attributeTopLevelClassName(Expression expr, JavaType.FullyQualified topLevelType) {
