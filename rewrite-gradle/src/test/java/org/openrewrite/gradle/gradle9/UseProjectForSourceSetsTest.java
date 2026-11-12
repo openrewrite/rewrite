@@ -20,7 +20,6 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -339,7 +338,6 @@ class UseProjectForSourceSetsTest implements RewriteTest {
     @Test
     void sparseAttribution() {
         rewriteRun(
-            spec -> spec.typeValidationOptions(TypeValidation.none()),
             buildGradle(
                 """
                 dependencies { compileOnly project(':core').sourceSets.main.runtimeClasspath }
