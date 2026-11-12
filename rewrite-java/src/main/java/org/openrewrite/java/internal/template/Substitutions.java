@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.ParenthesizeVisitor;
@@ -37,7 +38,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 @ToString
@@ -52,7 +55,9 @@ public class Substitutions {
             "#{", "}", null);
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
-    private Collection<JavaType.GenericTypeVariable> genericTypeVariables = emptyList();
+    private Map<String, JavaType.GenericTypeVariable> generics = emptyMap();
+    private final Map<Integer, JavaType> declaredParameterTypes = new HashMap<>();
+    private final Map<String, @Nullable JavaType> typeVariableBindings = new HashMap<>();
     private final Set<UUID> splicedParameterIds = new HashSet<>();
 
     /**
@@ -76,8 +81,7 @@ public class Substitutions {
     }
 
     public String substitute() {
-        Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
-        genericTypeVariables = generics.values();
+        generics = TypeParameter.parseGenericTypes(genericTypes);
         typeVariables.addAll(generics.values());
         AtomicInteger requiredParameters = new AtomicInteger(0);
         AtomicInteger index = new AtomicInteger(0);
@@ -98,7 +102,7 @@ public class Substitutions {
                         }
                     } else {
                         int i = index.getAndIncrement();
-                        s = substituteTypedPattern(key, i, typedPattern, generics);
+                        s = substituteTypedPattern(key, i, typedPattern);
                         if (ctx.typedPattern().parameterName() != null) {
                             String paramName = ctx.typedPattern().parameterName().Identifier().getText();
                             typedPatternByName.put(paramName, s);
@@ -126,7 +130,8 @@ public class Substitutions {
         return substituted;
     }
 
-    private String substituteTypedPattern(String key, int index, TemplateParameterParser.TypedPatternContext typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
+    private String substituteTypedPattern(String key, int index,
+                                          TemplateParameterParser.TypedPatternContext typedPattern) {
         if (index >= parameters.length) {
             throw new IllegalArgumentException("This template requires more parameters.");
         }
@@ -144,6 +149,7 @@ public class Substitutions {
             if ("anyArray".equals(matcherName)) {
                 type = new JavaType.Array(null, type, null);
             }
+            declaredParameterTypes.put(index, type);
         } else {
             if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
                     ((J.NewClass) parameter).getClazz() != null) {
@@ -181,7 +187,7 @@ public class Substitutions {
         return "__P__./*__p" + index + "__*/" + fqn + "p()";
     }
 
-    private String getTypeName(@Nullable JavaType type) {
+    static String getTypeName(@Nullable JavaType type) {
         if (type == null) {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
@@ -300,6 +306,214 @@ public class Substitutions {
         return TypeUtils.toString(t);
     }
 
+    /**
+     * Records what the type variables declared with {@code genericTypes()} stand for where the template is applied,
+     * by matching the types its typed parameters declare against their arguments' types, and its bind type against
+     * the type of the expression it replaces.
+     */
+    public void bindTypeVariables(@Nullable String bindType, @Nullable Expression replaced) {
+        if (generics.isEmpty()) {
+            return;
+        }
+        declaredParameterTypes.forEach((index, declared) -> bindTypeVariables(declared,
+                parameters[index] instanceof TypedTree ? ((TypedTree) parameters[index]).getType() : null));
+        if (bindType != null && replaced != null) {
+            try {
+                JavaType declared = TypeParameter.toJavaType(TypeParameter.parser(bindType).type(), generics);
+                bindTypeVariables(declared, replaced.getType());
+            } catch (IllegalArgumentException e) {
+                // a bind type this can't read, such as a simple name that needs the template's imports, binds nothing
+            }
+        }
+    }
+
+    private void bindTypeVariables(@Nullable JavaType declared, @Nullable JavaType actual) {
+        if (declared instanceof JavaType.GenericTypeVariable) {
+            String name = ((JavaType.GenericTypeVariable) declared).getName();
+            if (isWildcard(declared)) {
+                unbindTypeVariables(declared);
+                return;
+            }
+            // A matched template parameter can carry the matcher template's own variable, which is this one.
+            if (TypeUtils.isOfType(declared, actual)) {
+                return;
+            }
+            boolean sure = actual != null && !(actual instanceof JavaType.Unknown) &&
+                           !(actual instanceof JavaType.Primitive) && !isWildcard(actual) &&
+                           (!typeVariableBindings.containsKey(name) ||
+                            TypeUtils.isOfType(typeVariableBindings.get(name), actual));
+            // The variable stays unbound where javac infers its type, such as from a primitive, a wildcard or
+            // arguments of different types.
+            typeVariableBindings.put(name, sure ? actual : null);
+        } else if (declared instanceof JavaType.Parameterized) {
+            JavaType.Parameterized declaredParameterized = (JavaType.Parameterized) declared;
+            List<JavaType> declaredArguments = declaredParameterized.getTypeParameters();
+            JavaType.Parameterized supertype = asSupertype(actual, declaredParameterized.getFullyQualifiedName());
+            List<JavaType> actualArguments = supertype == null ? emptyList() : supertype.getTypeParameters();
+            if (declaredArguments.size() == actualArguments.size()) {
+                for (int i = 0; i < declaredArguments.size(); i++) {
+                    bindTypeVariables(declaredArguments.get(i), actualArguments.get(i));
+                }
+            } else {
+                unbindTypeVariables(declared);
+            }
+        } else if (declared instanceof JavaType.Array && actual instanceof JavaType.Array) {
+            bindTypeVariables(((JavaType.Array) declared).getElemType(), ((JavaType.Array) actual).getElemType());
+        }
+    }
+
+    /**
+     * The supertype of a type that is the class with the given name, with the type arguments the type gives it, as
+     * javac matches an argument to a parameter. A raw type has none.
+     */
+    private static JavaType.@Nullable Parameterized asSupertype(@Nullable JavaType type, String fqn) {
+        if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            if (TypeUtils.fullyQualifiedNamesAreEqual(parameterized.getFullyQualifiedName(), fqn)) {
+                return parameterized;
+            }
+            List<JavaType> variables = parameterized.getType().getTypeParameters();
+            List<JavaType> arguments = parameterized.getTypeParameters();
+            if (variables.size() != arguments.size()) {
+                return null;
+            }
+            Map<String, JavaType> argumentsByVariable = new HashMap<>();
+            for (int i = 0; i < variables.size(); i++) {
+                if (!(variables.get(i) instanceof JavaType.GenericTypeVariable)) {
+                    return null;
+                }
+                // javac captures a wildcard argument, so a supertype naming its variable gets a capture variable
+                if (!isWildcard(arguments.get(i))) {
+                    String variable = ((JavaType.GenericTypeVariable) variables.get(i)).getName();
+                    argumentsByVariable.put(variable, arguments.get(i));
+                }
+            }
+            return asSupertype(parameterized.getType(), fqn, argumentsByVariable);
+        } else if (type instanceof JavaType.Class && ((JavaType.Class) type).getTypeParameters().isEmpty()) {
+            return asSupertype((JavaType.Class) type, fqn, emptyMap());
+        }
+        return null;
+    }
+
+    private static JavaType.@Nullable Parameterized asSupertype(JavaType.FullyQualified type, String fqn,
+                                                                 Map<String, JavaType> argumentsByVariable) {
+        for (JavaType.FullyQualified supertype : type.getInterfaces()) {
+            JavaType.Parameterized found = asSupertype(withArguments(supertype, argumentsByVariable), fqn);
+            if (found != null) {
+                return found;
+            }
+        }
+        return type.getSupertype() == null ? null :
+                asSupertype(withArguments(type.getSupertype(), argumentsByVariable), fqn);
+    }
+
+    /**
+     * A supertype with the type's arguments in place of its class's variables, or null where it names a variable those
+     * arguments don't give, such as one a wildcard argument leaves open or a variable of an enclosing class.
+     */
+    private static @Nullable JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
+        if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            if (!isWildcard(variable)) {
+                return argumentsByVariable.get(variable.getName());
+            }
+            List<JavaType> bounds = withArguments(variable.getBounds(), argumentsByVariable);
+            return bounds == null ? null : variable.withBounds(bounds);
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            List<JavaType> arguments = withArguments(parameterized.getTypeParameters(), argumentsByVariable);
+            return arguments == null ? null : parameterized.withTypeParameters(arguments);
+        } else if (type instanceof JavaType.Array) {
+            JavaType.Array array = (JavaType.Array) type;
+            JavaType element = withArguments(array.getElemType(), argumentsByVariable);
+            return element == null ? null : array.withElemType(element);
+        }
+        return type;
+    }
+
+    private static @Nullable List<JavaType> withArguments(List<JavaType> types,
+                                                          Map<String, JavaType> argumentsByVariable) {
+        List<JavaType> mapped = new ArrayList<>(types.size());
+        for (JavaType type : types) {
+            JavaType withArguments = withArguments(type, argumentsByVariable);
+            if (withArguments == null) {
+                return null;
+            }
+            mapped.add(withArguments);
+        }
+        return mapped;
+    }
+
+    private static boolean isWildcard(@Nullable JavaType type) {
+        return type instanceof JavaType.GenericTypeVariable &&
+               "?".equals(((JavaType.GenericTypeVariable) type).getName());
+    }
+
+    /**
+     * Leaves the variables in a declared type unbound where the argument says nothing sure about them, such as a raw
+     * argument or a wildcard's bound.
+     */
+    private void unbindTypeVariables(JavaType declared) {
+        if (declared instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) declared;
+            if (isWildcard(variable)) {
+                variable.getBounds().forEach(this::unbindTypeVariables);
+            } else {
+                typeVariableBindings.put(variable.getName(), null);
+            }
+        } else if (declared instanceof JavaType.Parameterized) {
+            ((JavaType.Parameterized) declared).getTypeParameters().forEach(this::unbindTypeVariables);
+        } else if (declared instanceof JavaType.Array) {
+            unbindTypeVariables(((JavaType.Array) declared).getElemType());
+        }
+    }
+
+    /**
+     * Replaces the type variables that {@link #bindTypeVariables} bound, found by name, with their types, in a type and
+     * the types it is made of. A method's declaring type, and a field's type as its class declares it, are left alone,
+     * because a type variable there is the class's own.
+     */
+    private @Nullable JavaType withBoundTypeVariables(@Nullable JavaType type, Set<JavaType> visiting) {
+        if (type == null || !visiting.add(type)) {
+            return type;
+        }
+        try {
+            if (type instanceof JavaType.GenericTypeVariable) {
+                JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+                JavaType bound = typeVariableBindings.get(generic.getName());
+                if (bound != null) {
+                    return bound;
+                } else if ("?".equals(generic.getName())) {
+                    return generic.withBounds(
+                            ListUtils.map(generic.getBounds(), b -> withBoundTypeVariables(b, visiting)));
+                }
+            } else if (type instanceof JavaType.Parameterized) {
+                JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+                return parameterized.withTypeParameters(
+                        ListUtils.map(parameterized.getTypeParameters(), t -> withBoundTypeVariables(t, visiting)));
+            } else if (type instanceof JavaType.Array) {
+                JavaType.Array array = (JavaType.Array) type;
+                return array.withElemType(withBoundTypeVariables(array.getElemType(), visiting));
+            } else if (type instanceof JavaType.Method) {
+                JavaType.Method method = (JavaType.Method) type;
+                return method.withReturnType(withBoundTypeVariables(method.getReturnType(), visiting))
+                        .withParameterTypes(
+                                ListUtils.map(method.getParameterTypes(), t -> withBoundTypeVariables(t, visiting)))
+                        .withThrownExceptions(
+                                ListUtils.map(method.getThrownExceptions(), t -> withBoundTypeVariables(t, visiting)));
+            } else if (type instanceof JavaType.Variable &&
+                       // the parser gives a local of an initializer block an unknown owner
+                       (!(((JavaType.Variable) type).getOwner() instanceof JavaType.FullyQualified) ||
+                        ((JavaType.Variable) type).getOwner() instanceof JavaType.Unknown)) {
+                JavaType.Variable variable = (JavaType.Variable) type;
+                return variable.withType(withBoundTypeVariables(variable.getType(), visiting));
+            }
+            return type;
+        } finally {
+            visiting.remove(type);
+        }
+    }
+
     private void extractTypeVariables(@Nullable JavaType type) {
         if (type == null) {
             return;
@@ -379,24 +593,59 @@ public class Substitutions {
         return ParenthesizeVisitor.maybeParenthesize(newTree, cursor);
     }
 
+    public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
+        return resolveTypeVariables(singletonList(j)).get(0);
+    }
+
     /**
      * Resolve identifiers of the type variables declared with {@code genericTypes()} to their erasure.
      * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
      * when T is unbounded, or the first bound's simple name when bounded.
      * Type variables taken from a parameter's type belong to the code the template is applied to,
      * so a template naming one keeps it.
+     * In the types of the generated code, a type variable that {@link #bindTypeVariables} bound gives way to its type,
+     * unless one of the trees names it as a type.
      */
-    public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
-        if (genericTypeVariables.isEmpty()) {
-            return j;
+    public <J2 extends J> List<J2> resolveTypeVariables(List<J2> js) {
+        if (generics.isEmpty()) {
+            return js;
         }
-        //noinspection unchecked
-        return (J2) new JavaVisitor<Integer>() {
+        // A variable the template names as a type prints as its erasure, which javac types the code with, except as
+        // a member reference's qualifier, which javac types from its target.
+        JavaIsoVisitor<Integer> unbindNamed = new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                // a placeholder names the variable in the type it declares, which its parameter replaces
+                return parameterIndex(method.getName().getPrefix()) == null ?
+                        super.visitMethodInvocation(method, p) : method;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
+                if (ident.getType() instanceof JavaType.GenericTypeVariable &&
+                    ident.getSimpleName().equals(((JavaType.GenericTypeVariable) ident.getType()).getName()) &&
+                    generics.containsKey(ident.getSimpleName()) &&
+                    !(getCursor().getParentTreeCursor().getValue() instanceof J.MemberReference)) {
+                    typeVariableBindings.put(ident.getSimpleName(), null);
+                }
+                return ident;
+            }
+        };
+        if (typeVariableBindings.values().stream().anyMatch(Objects::nonNull)) {
+            js.forEach(j -> unbindNamed.visit(j, 0));
+        }
+
+        boolean bound = typeVariableBindings.values().stream().anyMatch(Objects::nonNull);
+        Set<JavaType> visiting = newSetFromMap(new IdentityHashMap<>());
+        // A type this visitor returned is bound already, such as the method type a call takes from its name.
+        // Binding a recursive type again expands it a level further into a new instance.
+        Set<JavaType> boundTypes = newSetFromMap(new IdentityHashMap<>());
+        JavaVisitor<Integer> resolve = new JavaVisitor<Integer>() {
             @Override
             public J visitIdentifier(J.Identifier ident, Integer integer) {
                 if (ident.getType() instanceof JavaType.GenericTypeVariable) {
                     JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) ident.getType();
-                    for (JavaType.GenericTypeVariable tv : genericTypeVariables) {
+                    for (JavaType.GenericTypeVariable tv : generics.values()) {
                         // Only resolve when the identifier name matches the type variable name,
                         // i.e. the identifier IS the type reference (like T in T::toString),
                         // not a variable that happens to have type T (like e in e -> e.toString())
@@ -412,7 +661,29 @@ public class Substitutions {
                 }
                 return super.visitIdentifier(ident, integer);
             }
-        }.visitNonNull(j, 0);
+
+            @Override
+            public J visitMemberReference(J.MemberReference memberRef, Integer integer) {
+                J j = super.visitMemberReference(memberRef, integer);
+                // the parser gives a member reference the method as declared, whose type variables are its own
+                return j instanceof J.MemberReference ?
+                        ((J.MemberReference) j).withMethodType(memberRef.getMethodType()) : j;
+            }
+
+            @Override
+            public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
+                if (!bound || boundTypes.contains(javaType)) {
+                    return javaType;
+                }
+                JavaType boundType = withBoundTypeVariables(javaType, visiting);
+                if (boundType != null) {
+                    boundTypes.add(boundType);
+                }
+                return boundType;
+            }
+        };
+        //noinspection unchecked
+        return ListUtils.map(js, j -> (J2) resolve.visitNonNull(j, 0));
     }
 
     @SuppressWarnings("SpellCheckingInspection")
@@ -519,18 +790,18 @@ public class Substitutions {
                 }
                 return null;
             }
-
-            private @Nullable Integer parameterIndex(Space space) {
-                for (Comment comment : space.getComments()) {
-                    if (comment instanceof TextComment) {
-                        Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
-                        if (matcher.matches()) {
-                            return Integer.valueOf(matcher.group(1));
-                        }
-                    }
-                }
-                return null;
-            }
         }.visitNonNull(j, 0);
+    }
+
+    private static @Nullable Integer parameterIndex(Space space) {
+        for (Comment comment : space.getComments()) {
+            if (comment instanceof TextComment) {
+                Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
+                if (matcher.matches()) {
+                    return Integer.valueOf(matcher.group(1));
+                }
+            }
+        }
+        return null;
     }
 }

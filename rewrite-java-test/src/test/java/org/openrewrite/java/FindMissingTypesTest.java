@@ -181,7 +181,7 @@ class FindMissingTypesTest implements RewriteTest {
     @Test
     void missingMethodReturnTypeNoMethodArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodDeclarations(false)),
           java(
             """
               import java.util.GenClass1;

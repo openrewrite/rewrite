@@ -214,6 +214,11 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters");
 
+        RpcSendQueue.RegisterJavaTypeName(typeof(CSharpLanguageVersion.TargetFrameworkVersion),
+            "org.openrewrite.csharp.marker.CSharpLanguageVersion$TargetFrameworkVersion");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CSharpLanguageVersion),
+            "org.openrewrite.csharp.marker.CSharpLanguageVersion");
+
         // DotNetProject marker
         RpcSendQueue.RegisterJavaTypeName(typeof(DotNetProject),
             "org.openrewrite.csharp.marker.DotNetProject");

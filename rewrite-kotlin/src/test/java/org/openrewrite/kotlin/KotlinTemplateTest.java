@@ -81,7 +81,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void addStatementToMethodInClass() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false))
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
@@ -120,8 +120,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void replaceExpressionStatementWithTemplate() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                     J.Block b = super.visitBlock(block, ctx);
@@ -158,7 +157,7 @@ class KotlinTemplateTest implements RewriteTest {
         // ClassCastException. The wrapper must be a first-class visited node for the scope-based
         // template replacement to target it.
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false))
             .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.Return visitReturn(J.Return aReturn, ExecutionContext ctx) {
@@ -214,7 +213,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void replaceUnitReturningMethodInvocation() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false))
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -326,7 +325,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void replaceExpressionWithWhenExpression() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -360,8 +359,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void captureValueInsideTrailingLambda() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("toUpperCase".equals(method.getSimpleName())) {
@@ -393,7 +391,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void captureValueInsideNamedArgument() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false))
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -427,8 +425,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void captureValueInsideReceiverScope() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("trim".equals(method.getSimpleName())) {
@@ -462,8 +459,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void captureValueInsideExtensionFunction() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("oldHelper".equals(method.getSimpleName())) {
@@ -493,8 +489,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void replacePropertyDeclaration() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().size() == 1 &&
@@ -1137,7 +1132,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void insertAfterTopLevelScriptStatement() {
         rewriteRun(
-          spec -> spec.recipe(insertAtTopLevel(false)).typeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipe(insertAtTopLevel(false)),
           kotlinScript(
             """
               val x = 1
@@ -1152,7 +1147,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void insertBeforeTopLevelScriptStatement() {
         rewriteRun(
-          spec -> spec.recipe(insertAtTopLevel(true)).typeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipe(insertAtTopLevel(true)),
           kotlinScript(
             """
               val x = 1
@@ -1167,7 +1162,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Test
     void insertDeclarationBeforeExpressionStatement() {
         rewriteRun(
-          spec -> spec.recipe(insertAtTopLevel(true)).typeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipe(insertAtTopLevel(true)),
           kotlinScript(
             """
               println("x")

@@ -396,6 +396,46 @@ public class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddImportIfOnlyReferencedThroughVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeAddImport("a.Node");
+                  return cu;
+              }
+          })),
+          kotlin(
+            """
+              package a
+
+              class Node {
+                  val next: Node? = null
+              }
+              """
+          ),
+          kotlin(
+            """
+              package a
+
+              open class Base {
+                  val node: Node = Node()
+              }
+              """
+          ),
+          kotlin(
+            """
+              package b
+
+              class B : a.Base() {
+                  fun next() = node.next
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noImportOfImplicitTypes() {
         rewriteRun(
           spec -> spec.recipe(importTypeRecipe("kotlin.Pair")),

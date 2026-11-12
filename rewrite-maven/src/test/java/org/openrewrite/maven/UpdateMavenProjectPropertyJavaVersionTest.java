@@ -1454,6 +1454,38 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
+    void successiveMigrationsRaiseReleaseAddedInTheSameRun() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpdateMavenProjectPropertyJavaVersion(11),
+            new UpdateMavenProjectPropertyJavaVersion(17)
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <properties>
+                      <maven.compiler.release>17</maven.compiler.release>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void successiveMigrationsInTheSameRun() {
         rewriteRun(
           spec -> spec.recipes(

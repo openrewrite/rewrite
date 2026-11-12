@@ -20,14 +20,22 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.List;
+
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTreeShapeValidationServiceTest {
+
+    static {
+        JdkClassSharingTypeFactory.useForParsers();
+    }
 
     private static final String SOURCE = "class A { org.jspecify.annotations.NullMarked m; b.B d; " +
                                          "Object o = java.util.Collections.emptyList(); }";
@@ -46,12 +54,100 @@ class JavaTreeShapeValidationServiceTest {
         assertThat(TypeUtils.isOfClassType(fieldType(parse(typed), 0), "org.jspecify.annotations.NullMarked")).isTrue();
     }
 
+    @Test
+    void typedParserTakesTypesFromTheParserItCopiesButNotTheSourcesClassesAndGivesItNone() {
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
+        String source = "package a; class A { String s; void m() {} class B { void m() {} } }";
+        J.CompilationUnit original = compilationUnit(typed, source);
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(typed, List.of(original));
+
+        J.ClassDeclaration reparsed = parse(reparser, source.replace("m()", "renamed()"));
+        assertThat(methods(reparsed)).containsExactly("renamed");
+        assertThat(methods((J.ClassDeclaration) reparsed.getBody().getStatements().get(2))).containsExactly("renamed");
+        assertThat(fieldType(reparsed, 0)).isSameAs(fieldType(original.getClasses().get(0), 0));
+
+        assertThat(methods(parse(typed, source))).containsExactly("m");
+    }
+
+    @Test
+    void typedParserGivesACallOfASharedClassTheMethodTheClassDeclares() {
+        parse(JavaParser.fromJavaVersion(), "class P { java.util.List<String> l; }");
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
+        J.CompilationUnit original = compilationUnit(typed,
+                "class A { boolean m(java.util.List<String> l) { return l.size() > 0; } }");
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(typed, List.of(original));
+
+        J.ClassDeclaration reparsed = parse(reparser,
+                "class A { boolean m(java.util.List<String> l) { return l.isEmpty(); } }");
+        J.MethodDeclaration m = (J.MethodDeclaration) reparsed.getBody().getStatements().get(0);
+        J.Return returned = (J.Return) requireNonNull(m.getBody()).getStatements().get(0);
+        J.MethodInvocation call = (J.MethodInvocation) requireNonNull(returned.getExpression());
+        JavaType.Method isEmpty = requireNonNull(call.getMethodType());
+        assertThat(isEmpty.getDeclaringType().getMethods()).anyMatch(method -> method == isEmpty);
+    }
+
+    @Test
+    void typedParserOfItsOwnTypesTakesNoneFromTheParserItCopies() {
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion()
+                .dependsOn("package b; public class B { public void m() {} }");
+        parse(typed, "class A { void a(b.B b) { b.m(); } }");
+        // a clone's cache reads through to that of the builder it copies, which holds B as it parsed it
+        JavaParser.Builder<?, ?> next = typed.clone()
+                .dependsOn("package b; public class B { public static void m() {} }");
+        Parser.Builder reparser = new JavaTreeShapeValidationService().typedParser(next);
+
+        J.ClassDeclaration reparsed = parse(reparser, "class A { void a() { b.B.m(); } }");
+        J.MethodDeclaration a = (J.MethodDeclaration) reparsed.getBody().getStatements().get(0);
+        J.MethodInvocation call = (J.MethodInvocation) requireNonNull(a.getBody()).getStatements().get(0);
+        assertThat(requireNonNull(call.getMethodType()).hasFlags(Flag.Static)).isTrue();
+    }
+
+    @Test
+    void comparesTheRestOfAMethodThatThrowsAnExceptionTheParserCannotResolve() {
+        J.MethodDeclaration parsed = method("class A { int m() throws Missing { return 1; } }");
+        J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
+                .withReturnType(JavaType.Primitive.Long));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed))
+                .contains("the method long A.m() where the parser gives int A.m()");
+    }
+
+    @Test
+    void writesAThrownExceptionTheParserCannotResolveAsUndefined() {
+        J.MethodDeclaration parsed = method("class A { void m() throws Missing, java.io.IOException {} }");
+        JavaType.Method methodType = requireNonNull(parsed.getMethodType());
+        J.MethodDeclaration recipes = parsed.withMethodType(methodType.withThrownExceptions(
+                List.of(methodType.getThrownExceptions().get(0), JavaType.ShallowClass.build("java.lang.Exception"))));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed)).containsExactly(
+                "the method void A.m() throwing {undefined}, java.lang.Exception " +
+                "where the parser gives void A.m() throwing {undefined}, java.io.IOException");
+    }
+
+    private static J.MethodDeclaration method(String source) {
+        return (J.MethodDeclaration) parse(JavaParser.fromJavaVersion(), source).getBody().getStatements().get(0);
+    }
+
     private static J.ClassDeclaration parse(Parser.Builder parser) {
-        J.CompilationUnit cu = (J.CompilationUnit) parser.build()
-                .parse(new InMemoryExecutionContext(), SOURCE)
+        return parse(parser, SOURCE);
+    }
+
+    private static J.ClassDeclaration parse(Parser.Builder parser, String source) {
+        return compilationUnit(parser, source).getClasses().get(0);
+    }
+
+    private static J.CompilationUnit compilationUnit(Parser.Builder parser, String source) {
+        return (J.CompilationUnit) parser.build()
+                .parse(new InMemoryExecutionContext(), source)
                 .findFirst()
                 .orElseThrow(IllegalStateException::new);
-        return cu.getClasses().get(0);
+    }
+
+    private static List<String> methods(J.ClassDeclaration a) {
+        return requireNonNull(a.getType()).getMethods().stream()
+                .filter(m -> !m.isConstructor())
+                .map(JavaType.Method::getName)
+                .collect(toList());
     }
 
     private static @Nullable JavaType fieldType(J.ClassDeclaration a, int index) {

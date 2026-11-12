@@ -517,27 +517,39 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
 
             if (oldType instanceof JavaType.Parameterized) {
                 JavaType.Parameterized pt = (JavaType.Parameterized) oldType;
-                pt = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), tp -> {
+                // in the map before its arguments change, so that a bound referring back to it, as in
+                // `Node<T extends Node<T>>`, refers to the changed type
+                JavaType.Parameterized changed = new JavaType.Parameterized(null, null, Collections.emptyList());
+                oldNameToChangedType.put(oldType, changed);
+                List<JavaType> typeParameters = pt.getTypeParameters();
+                List<JavaType> changedTypeParameters = ListUtils.map(typeParameters, tp -> {
                     if (tp instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
                         if (isTargetFullyQualifiedType(tpFq)) {
                             return updateType(tpFq);
                         }
+                    } else if (tp instanceof JavaType.GenericTypeVariable) {
+                        return updateType(tp);
                     }
                     return tp;
-                }));
+                });
 
+                JavaType.FullyQualified changedType = pt.getType();
                 if (isTargetFullyQualifiedType(pt)) {
-                    //noinspection DataFlowIssue
-                    pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
+                    changedType = (JavaType.FullyQualified) updateType(pt.getType());
                 }
-
-                oldNameToChangedType.put(oldType, pt);
-                return pt;
+                if (changedTypeParameters == typeParameters && changedType == pt.getType()) {
+                    oldNameToChangedType.put(oldType, oldType);
+                    return oldType;
+                }
+                changed.unsafeSet(changedType, changedTypeParameters);
+                return changed;
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getRawClassName()));
+                    String newPackage = getNewPackageName(original.getPackageName());
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(
+                            (newPackage.isEmpty() ? "" : newPackage + ".") + original.getRawClassName()));
                     //noinspection DataFlowIssue
                     oldNameToChangedType.put(oldType, fq);
                     oldNameToChangedType.put(fq, fq);
@@ -552,16 +564,24 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
-                gtv = gtv.withBounds(ListUtils.map(gtv.getBounds(), b -> {
+                // in the map before its bounds change, for a bound that refers back to it
+                JavaType.GenericTypeVariable changed = new JavaType.GenericTypeVariable(null, gtv.getName(),
+                        gtv.getVariance(), Collections.emptyList());
+                oldNameToChangedType.put(oldType, changed);
+                List<JavaType> bounds = gtv.getBounds();
+                List<JavaType> changedBounds = ListUtils.map(bounds, b -> {
                     if (b instanceof JavaType.FullyQualified && isTargetFullyQualifiedType((JavaType.FullyQualified) b)) {
                         return updateType(b);
                     }
                     return b;
-                }));
-
-                oldNameToChangedType.put(oldType, gtv);
-                oldNameToChangedType.put(gtv, gtv);
-                return gtv;
+                });
+                if (changedBounds == bounds) {
+                    oldNameToChangedType.put(oldType, oldType);
+                    return oldType;
+                }
+                changed.unsafeSet(gtv.getName(), gtv.getVariance(), changedBounds);
+                oldNameToChangedType.put(changed, changed);
+                return changed;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
                 variable = variable.withOwner(updateType(variable.getOwner()));
@@ -592,7 +612,12 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                 //noinspection DataFlowIssue
                 method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
+                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType))
+                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), e ->
+                                // the exception itself or a type variable's bound, without the supertypes that
+                                // updateType walks
+                                e instanceof JavaType.GenericTypeVariable ||
+                                isTargetFullyQualifiedType(TypeUtils.asFullyQualified(e)) ? updateType(e) : e));
                 oldNameToChangedType.put(oldMethodType, method);
                 oldNameToChangedType.put(method, method);
                 return method;

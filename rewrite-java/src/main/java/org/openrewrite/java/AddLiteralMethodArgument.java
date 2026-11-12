@@ -114,23 +114,25 @@ public class AddLiteralMethodArgument extends Recipe {
                 args.remove(0);
             }
             if (methodMatcher.matches(m) && (long) args.size() >= argumentIndex) {
-                JavaType.Primitive primitive;
+                JavaType parameterType;
                 String valueSource;
                 Object value;
                 JavaType.Primitive literalType;
                 if (StringUtils.isBlank(primitiveType) || "string".equalsIgnoreCase(primitiveType)) {
-                    primitive = Primitive.String;
+                    // a String literal has the type Primitive.String, but a String parameter has the class type
+                    parameterType = JavaType.ShallowClass.build("java.lang.String");
                     valueSource = String.format("\"%s\"", getLiteral());
                     value = String.valueOf(getLiteral());
-                    literalType = primitive;
+                    literalType = Primitive.String;
                 } else if("char".equalsIgnoreCase(primitiveType)){
-                    primitive = Primitive.Char;
+                    parameterType = Primitive.Char;
                     valueSource = String.format("'%s'", getLiteral());
                     String c = String.valueOf(getLiteral());
                     value = c.length() == 1 ? (Object) c.charAt(0) : getLiteral();
-                    literalType = primitive;
+                    literalType = Primitive.Char;
                 }else {
-                    primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
+                    Primitive primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
+                    parameterType = primitive;
                     valueSource = String.valueOf(getLiteral());
                     // the parser gives the literal the value and type its text has, whatever the parameter's type
                     Object[] parsed = parseLiteral(valueSource);
@@ -150,7 +152,7 @@ public class AddLiteralMethodArgument extends Recipe {
                 if (methodType != null && declaresOwnParameter(methodType)) {
                     m = m.withMethodType(methodType
                             .withParameterNames(ListUtils.insert(methodType.getParameterNames(), "arg" + argumentIndex, argumentIndex))
-                            .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), primitive, argumentIndex)));
+                            .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), parameterType, argumentIndex)));
                     if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
                         m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(m.getMethodType()));
                     }

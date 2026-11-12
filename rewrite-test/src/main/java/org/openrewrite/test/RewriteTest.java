@@ -38,6 +38,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -46,6 +47,7 @@ import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.newSetFromMap;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
@@ -169,6 +171,7 @@ public interface RewriteTest extends SourceSpecs {
 
         RecipeSpec testMethodSpec = RecipeSpec.defaults();
         spec.accept(testMethodSpec);
+        UnneededOptOuts unneededOptOuts = UnneededOptOuts.of(testMethodSpec, testClassSpec);
 
         ExecutionContext ctx;
         if (testMethodSpec.getExecutionContext() != null) {
@@ -194,10 +197,13 @@ public interface RewriteTest extends SourceSpecs {
                 testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
                 testMethodSpec.recipe;
 
-        if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
-            !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
-            testClassSpec.serializationValidation &&
-            testMethodSpec.serializationValidation) {
+        boolean serializable = !(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
+                               !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop()));
+        unneededOptOuts.check("validateRecipeSerialization",
+                testClassSpec.serializationValidation && testMethodSpec.serializationValidation, () -> {
+            if (!serializable) {
+                return;
+            }
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
@@ -223,7 +229,7 @@ public interface RewriteTest extends SourceSpecs {
             }
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
-        }
+        });
 
         if (testMethodSpec.getRecipePrinter() != null) {
             testMethodSpec.getRecipePrinter().printTree(recipe);
@@ -267,6 +273,8 @@ public interface RewriteTest extends SourceSpecs {
                     .as("Recipe validation must have no failures")
                     .isEmpty();
         }
+
+        RecipeQualityValidation quality = RecipeQualityValidation.of(testMethodSpec, testClassSpec);
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -352,55 +360,18 @@ public interface RewriteTest extends SourceSpecs {
                 SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
 
                 // Validate before source
-                TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
-                nextSpec.validateSource.accept(sourceFile, beforeValidations);
-                ctx.putMessage(SCANNING_MUTATION_VALIDATION,
-                        RecipeQualityValidation.of(testMethodSpec, testClassSpec).noEditsInScanningPhase());
-
-                // Validate that printing the LST yields the same source text
-                // Validate that the LST whitespace do not contain any non-whitespace characters
-                int j = 0;
-                for (Parser.Input input : inputs.values()) {
-                    if (j++ == i && !(sourceFile instanceof Quark)) {
-                        if (beforeValidations.parseAndPrintEquality()) {
-                            // EncodingDetectingInputStream strips BOM from expected
-                            String expected = StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx));
-                            String actual = sourceFile.printAll(out.clone());
-
-                            // Strip BOM from actual for comparison, but verify it matches charsetBomMarked flag
-                            boolean actualHasBom = actual.startsWith("\uFEFF");
-                            if (actualHasBom) {
-                                actual = actual.substring(1);
-                            }
-                            if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
-                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printing did not restore it.");
-                            } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
-                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printing added one.");
-                            }
-                            assertContentEquals(
-                                    sourceFile,
-                                    expected,
-                                    actual,
-                                    "When parsing and printing the source code back to text without modifications, " +
-                                    "the printed source didn't match the original source code. This means there is a bug in the " +
-                                    "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                    "code that generated this error."
-                            );
-                        }
-                        if (!beforeValidations.allowNonWhitespaceInWhitespace()) {
-                            try {
-                                WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
-                                SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
-                                if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
-                                    fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
-                                         "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
-                                }
-                            } catch (UnsupportedOperationException e) {
-                                // Language/parser does not provide whitespace validation and that's OK for now
-                            }
-                        }
+                SourceFile parsed = sourceFile;
+                Parser.Input input = inputs.get(nextSpec);
+                SourceSpec.ValidateSource validateSource = nextSpec.validateSource;
+                Consumer<TypeValidation> validateParsed = validation -> {
+                    validateSource.accept(parsed, validation);
+                    if (!(parsed instanceof Quark)) {
+                        RewriteTestUtils.validatePrinting(parsed, input, parser, out, validation, ctx);
                     }
-                }
+                };
+                validateParsed.accept(TypeValidation.before(testMethodSpec, testClassSpec));
+                unneededOptOuts.validatesBefore(validateParsed);
+                ctx.putMessage(SCANNING_MUTATION_VALIDATION, quality.noEditsInScanningPhase());
 
                 specBySourceFile.put(mapped, nextSpec);
             }
@@ -443,14 +414,22 @@ public interface RewriteTest extends SourceSpecs {
         specParsers.addAll(testClassSpecParsers);
         Function<SourceFile, List<Parser.Builder>> parsersFor = after ->
                 RewriteTestUtils.parsersFor(after, specBySourceFile, parserBySourceSpec, sourceSpecs, specParsers);
-        Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
-        RecipeQualityValidation quality = RecipeQualityValidation.of(testMethodSpec, testClassSpec);
-        AddedMarkers addedMarkers = null;
-        if (quality.reportingMarkersOnly()) {
-            addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
+        List<Parser.Builder> specAfterParsers = new ArrayList<>(testMethodSpec.afterParsers);
+        for (Parser.Builder afterParser : testClassSpec.afterParsers) {
+            specAfterParsers.add(afterParser.clone());
         }
+        Function<SourceFile, List<Parser.Builder>> afterParsersFor = after ->
+                RewriteTestUtils.afterParsersFor(after, specAfterParsers, parsersFor);
+        Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
+        AddedMarkers addedMarkers = quality.reportingMarkersOnly() ||
+                                    unneededOptOuts.runsOnTheSide("reportingMarkersOnly") ?
+                new AddedMarkers(beforeSourceFiles, afterParsersFor, relativeTo, ctx) : null;
         UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();
-        AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ? new AccumulatorContents() : null;
+        AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ||
+                                                  unneededOptOuts.runsOnTheSide("lightweightAccumulators") ?
+                new AccumulatorContents() : null;
+        Collection<String> scannerEdits = unneededOptOuts.runsOnTheSide("noEditsInScanningPhase") ?
+                new CopyOnWriteArrayList<>() : null;
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -459,10 +438,11 @@ public interface RewriteTest extends SourceSpecs {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles,
-                    addedMarkers, unchangedTreeIdentity, accumulatorContents);
+                    quality.reportingMarkersOnly() ? addedMarkers : null, unchangedTreeIdentity, accumulatorContents,
+                    scannerEdits);
         }
 
-        recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
+        recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
                 .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
                 testClassSpec.getRunner() != null ? testClassSpec.getRunner() :
@@ -472,20 +452,31 @@ public interface RewriteTest extends SourceSpecs {
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
-        FormattingScope formattingScope = new FormattingScope(recipe, quality.minimalFormatting());
-        ImportedNames importedNames = ImportedNames.of(quality, recipe, runnableSourceFiles);
+        NameMatching nameMatchingOnTheSide = nameMatching == null &&
+                                             unneededOptOuts.runsOnTheSide("matchByTypeNotName") ?
+                NameMatching.ignoringOptOuts(recipe, runner, runnerContext, beforeSourceFiles, parsersFor, relativeTo,
+                        ctx) : null;
+        FormattingScope formattingScope = new FormattingScope(recipe,
+                quality.minimalFormatting() || unneededOptOuts.runsOnTheSide("minimalFormatting"));
+        ImportedNames importedNames = ImportedNames.of(
+                quality.importReferencedTypes() || unneededOptOuts.runsOnTheSide("importReferencedTypes"),
+                quality.removeUnusedImports() || unneededOptOuts.runsOnTheSide("removeUnusedImports"),
+                recipe, runnableSourceFiles);
         long runStart = System.nanoTime();
         RecipeRun recipeRun = formattingScope.record(() ->
                 importedNames.record(() -> runner.run(recipe, runnerContext)));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
-        if (addedMarkers != null) {
-            addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
-        }
+        unneededOptOuts.check("reportingMarkersOnly", quality.reportingMarkersOnly(), () ->
+                requireNonNull(addedMarkers).assertNoneAdded(recipeRun.getChangeset().getAllResults()));
         unchangedTreeIdentity.assertNoneFound();
-        if (accumulatorContents != null) {
-            accumulatorContents.assertNoneFound();
-        }
+        unneededOptOuts.check("lightweightAccumulators", quality.lightweightAccumulators(), () ->
+                requireNonNull(accumulatorContents).assertNoneFound());
         boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
+        unneededOptOuts.checkOnTheSideLater("noEditsInScanningPhase", () -> {
+            // only an in-process run of this source set reports the edits of its scanners
+            assertThat(probed).isTrue();
+            assertThat(scannerEdits).isEmpty();
+        });
         EmptySources emptySources = probed ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
         UnparsedSources unparsedSources = probed ?
@@ -497,6 +488,12 @@ public interface RewriteTest extends SourceSpecs {
         for (Consumer<RecipeRun> afterRecipe : testMethodSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
         }
+
+        BiConsumer<SourceSpec<?>, SourceFile> validateAfter = (afterSpec, afterSource) -> {
+            Consumer<TypeValidation> validation = v -> afterSpec.validateSource.accept(afterSource, v);
+            validation.accept(TypeValidation.after(testMethodSpec, testClassSpec));
+            unneededOptOuts.validatesAfter(validation);
+        };
 
         Collection<SourceSpec<?>> expectedNewSources = newSetFromMap(new IdentityHashMap<>());
         Collection<Result> expectedNewResults = newSetFromMap(new IdentityHashMap<>());
@@ -534,7 +531,7 @@ public interface RewriteTest extends SourceSpecs {
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
-                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
+                        validateAfter.accept(sourceSpec, result.getAfter());
                         continue nextSourceSpec;
                     }
                 }
@@ -561,7 +558,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
-                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
+                        validateAfter.accept(sourceSpec, result.getAfter());
                         if (sourceSpec.sourcePath != null) {
                             assertThat(result.getAfter().getSourcePath())
                                     .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));
@@ -621,7 +618,7 @@ public interface RewriteTest extends SourceSpecs {
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
                             assertContentEquals(result.getAfter(), expected, actualAfter, "Unexpected result in");
-                            sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
+                            validateAfter.accept(sourceSpec, result.getAfter());
                         } else {
                             boolean isRemote = result.getAfter() instanceof Remote;
                             if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
@@ -724,20 +721,42 @@ public interface RewriteTest extends SourceSpecs {
                  "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
                  "    before | after | expected\n" + paths);
         }
-        formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
-        importedNames.assertImports(recipeRun.getChangeset().getAllResults());
-        new TreeShapes(quality.parserShapedTrees(), parsersFor, relativeTo, ctx)
+        unneededOptOuts.check("minimalFormatting", quality.minimalFormatting(), () ->
+                formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults()));
+        importedNames.assertImports(recipeRun.getChangeset().getAllResults(), quality.importReferencedTypes(),
+                quality.removeUnusedImports());
+        unneededOptOuts.checkOnTheSideLater("importReferencedTypes", () ->
+                importedNames.assertImports(recipeRun.getChangeset().getAllResults(), true, false));
+        unneededOptOuts.checkOnTheSideLater("removeUnusedImports", () ->
+                importedNames.assertImports(recipeRun.getChangeset().getAllResults(), false, true));
+        RewriteTestUtils.assertAfterParsersParse(testMethodSpec.afterParsers, afterParsersFor,
+                recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
+        boolean validatesTypes = TypeValidation.validatesTypes(testMethodSpec, testClassSpec);
+        new TreeShapes(quality.parserShapedTrees(), quality.parserTypedTrees() && validatesTypes,
+                quality.compilableOutput() && validatesTypes, afterParsersFor, specAfterParsers, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
-        if (quality.orderStepsForEarlierChanges()) {
-            CompositeOrder.assertOrdered(recipe);
-        }
-        if (quality.noStaticVisitors()) {
-            StaticVisitors.assertNoneKept(recipe);
-        }
+        unneededOptOuts.checkOnTheSideLater("parserShapedTrees", () ->
+                new TreeShapes(true, false, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        unneededOptOuts.checkOnTheSideLater("parserTypedTrees", () ->
+                new TreeShapes(false, true, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        unneededOptOuts.checkOnTheSideLater("compilableOutput", () ->
+                new TreeShapes(false, false, true, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
+                CompositeOrder.assertOrdered(recipe));
+        unneededOptOuts.check("noStaticVisitors", quality.noStaticVisitors(), () ->
+                StaticVisitors.assertNoneKept(recipe));
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
         }
+        unneededOptOuts.checkOnTheSideLater("matchByTypeNotName", () -> {
+            if (nameMatchingOnTheSide != null) {
+                nameMatchingOnTheSide.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
+            }
+        });
 
         if (emptySources != null) {
             emptySources.assertNoneThrow(specBySourceFile, parserBySourceSpec::get, relativeTo, ctx, recipeCtx, cycles);
@@ -745,6 +764,7 @@ public interface RewriteTest extends SourceSpecs {
         if (unparsedSources != null) {
             unparsedSources.assertNoneThrow(runnableSourceFiles, recipeCtx, cycles);
         }
+        unneededOptOuts.assertNoneUnneeded();
     }
 
     static void assertContentEquals(SourceFile sourceFile, String expected, String actual, String errorMessagePrefix) {
@@ -901,6 +921,104 @@ class RewriteTestUtils {
         }
         parsers.remove(null);
         return new ArrayList<>(parsers);
+    }
+
+    /**
+     * The parsers to parse a source the recipe returned with: the test's after parsers of the DSL of the parser
+     * that {@link #parsersFor} chooses first, then the parsers it chooses, which are all of them in a test without
+     * an after parser. Parsers of two DSLs can make the same kind of source, as Gradle's and Groovy's do, so the
+     * kind alone doesn't tell which one an after parser is for. It has to where {@link #parsersFor} chooses none,
+     * as for a source the recipe turned into a language that no parser of the test's input makes.
+     */
+    static List<Parser.Builder> afterParsersFor(SourceFile after, List<Parser.Builder> specAfterParsers,
+                                                Function<SourceFile, List<Parser.Builder>> parsersFor) {
+        List<Parser.Builder> inputParsers = parsersFor.apply(after);
+        List<Parser.Builder> parsers = new ArrayList<>();
+        for (Parser.Builder afterParser : specAfterParsers) {
+            if (inputParsers.isEmpty() ? afterParser.getSourceFileType().isInstance(after) :
+                    afterParser.getDslName().equals(inputParsers.get(0).getDslName())) {
+                parsers.add(afterParser);
+            }
+        }
+        parsers.addAll(inputParsers);
+        return parsers;
+    }
+
+    /**
+     * Fails for an after parser that parses nothing, which is one that {@code afterParsersFor} gives first for none
+     * of the recipe's output and none of the sources it left unchanged. The test's author expects the output to be
+     * checked with it, while the checks go on using the input's parser.
+     *
+     * @param afterParsers The after parsers of the test method. Those of the test class serve many tests, of which
+     *                     some can have nothing for them to parse.
+     * @param sources      The sources the recipe ran on.
+     */
+    static void assertAfterParsersParse(List<Parser.Builder> afterParsers,
+                                        Function<SourceFile, List<Parser.Builder>> afterParsersFor,
+                                        List<Result> results, List<SourceFile> sources) {
+        if (afterParsers.isEmpty()) {
+            return;
+        }
+        Set<Parser.Builder> parsing = new HashSet<>();
+        for (SourceFile source : TreeShapes.current(results, sources)) {
+            List<Parser.Builder> parsers = afterParsersFor.apply(source);
+            if (!parsers.isEmpty()) {
+                parsing.add(parsers.get(0));
+            }
+        }
+        for (Parser.Builder afterParser : afterParsers) {
+            if (parsing.contains(afterParser)) {
+                continue;
+            }
+            fail("The test's after parser of " + afterParser.getDslName() + " sources parses nothing, which leaves " +
+                 "the recipe's output to the parser of its input. None of the test's sources and none of the " +
+                 "recipe's output is in its language, or an after parser before it is for the same language.");
+        }
+    }
+
+    /**
+     * Validates that printing a source the test parsed yields its text, and that its whitespace holds only whitespace.
+     */
+    static void validatePrinting(SourceFile sourceFile, Parser.Input input, Parser parser,
+                                 PrintOutputCapture<ExecutionContext> out, TypeValidation validation,
+                                 ExecutionContext ctx) {
+        if (validation.parseAndPrintEquality()) {
+            // EncodingDetectingInputStream strips BOM from expected
+            String expected = StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx));
+            String actual = sourceFile.printAll(out.clone());
+
+            // Strip BOM from actual for comparison, but verify it matches charsetBomMarked flag
+            boolean actualHasBom = actual.startsWith("\uFEFF");
+            if (actualHasBom) {
+                actual = actual.substring(1);
+            }
+            if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
+                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printing did not restore it.");
+            } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
+                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printing added one.");
+            }
+            RewriteTest.assertContentEquals(
+                    sourceFile,
+                    expected,
+                    actual,
+                    "When parsing and printing the source code back to text without modifications, " +
+                    "the printed source didn't match the original source code. This means there is a bug in the " +
+                    "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                    "code that generated this error."
+            );
+        }
+        if (!validation.allowNonWhitespaceInWhitespace()) {
+            try {
+                WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                    fail("Source file was parsed into an LST that contains non-whitespace characters in its " +
+                         "whitespace. This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                }
+            } catch (UnsupportedOperationException e) {
+                // Language/parser does not provide whitespace validation and that's OK for now
+            }
+        }
     }
 
     static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {

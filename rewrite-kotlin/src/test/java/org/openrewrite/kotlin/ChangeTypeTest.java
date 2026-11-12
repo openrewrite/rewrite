@@ -422,6 +422,36 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void replaceWithNestedTypeQualifyingStaticMember() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "a.Holder$New", true)),
+          kotlin(
+            """
+              package a
+
+              enum class Old { X }
+              """
+          ),
+          kotlin(
+            """
+              import a.Old
+
+              class A {
+                  val o: Any = Old.X
+              }
+              """,
+            """
+              import a.Holder
+
+              class A {
+                  val o: Any = Holder.New.X
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void constructorReference() {
         rewriteRun(
           kotlin(

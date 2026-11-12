@@ -22,6 +22,7 @@ import org.openrewrite.Preconditions
 import org.openrewrite.Recipe
 import org.openrewrite.java.search.UsesField
 import org.openrewrite.java.search.UsesMethod
+import org.openrewrite.test.RecipeQualityValidation
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.TypeValidation
@@ -297,14 +298,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseFirstOrNullWithPredicate",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                // The synthesized `firstOrNull(p)` outer call doesn't get a
-                // resolved JavaType.Method on the template-substituted MethodInvocation;
-                // the formatting check is what this test is about, not type
-                // attribution.
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 """
                 fun first(xs: List<Int>): Int? = xs
@@ -341,10 +335,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseFirstOrNullWithPredicate",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 """
                 fun first(xs: List<Int>): Int? = xs.filter { it > 0 }.firstOrNull()
@@ -377,10 +368,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseMapNotNull",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 """
                 fun nonNull(xs: List<Int>): List<Int> = xs
@@ -422,10 +410,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseFirstOrNullWithPredicate",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 // Byte-for-byte from commercetools/rmf-codegen
                 // codegen-renderers/.../MethodExtensions.kt#Method.returnType:
@@ -489,10 +474,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseMapNotNull",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 // Byte-for-byte from aws/aws-toolkit-jetbrains
                 // plugins/toolkit/jetbrains-rider/.../DotNetRuntimeUtils.kt.
@@ -551,10 +533,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseMapNotNull",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 // Byte-for-byte from commercetools/rmf-codegen
                 // languages/csharp/.../CsharpObjectTypeExtensions.kt#getUsings.
@@ -648,10 +627,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseSumOfWithSelector",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 """
                 data class Result(val durationMillis: Long?, val testName: String)
@@ -778,10 +754,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseToMutableList",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 """
                 fun copy(xs: List<Int>): List<Int> = xs.toList()
@@ -820,10 +793,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseUppercase",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 """
                 fun upper(s: String): String = s
@@ -860,10 +830,7 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseAnyWithPredicateInsteadOfFilterAny",
         )
         rewriteRun(
-            { spec ->
-                spec.recipe(r)
-                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
-            },
+            { spec -> spec.recipe(r) },
             kotlin(
                 // `filter { ... }.any { ... }` — the WITH-predicate any. The
                 // recipe targets the NO-arg any. Without the arg-count guard,
@@ -1245,7 +1212,11 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseListOf",
         )
         rewriteRun(
-            { spec -> spec.recipe(r) },
+            // the recipe types List.of by its arguments, the parser by the variable it is assigned to
+            { spec ->
+                spec.recipe(r)
+                    .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            },
             java(
                 """
                 import java.util.Arrays;
@@ -1318,7 +1289,11 @@ class RecipePluginRewriteTest : RewriteTest {
             propertyName = "UseListOf",
         )
         rewriteRun(
-            { spec -> spec.recipe(r) },
+            // the recipe types List.of by its arguments, the parser by the variable it is assigned to
+            { spec ->
+                spec.recipe(r)
+                    .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            },
             java(
                 """
                 import java.util.Arrays;
@@ -1401,8 +1376,7 @@ class RecipePluginRewriteTest : RewriteTest {
             // validation relaxed: the generated recipe's JavaTemplate parses the
             // after template with a JDK-only classpath, so it can't re-attribute
             // a method on the test's own `demo.Log` (a real recipe targeting a
-            // classpath type like org.slf4j.Logger resolves fine). Same reason
-            // ~9 other tests in this file use TypeValidation.none(); the reorder
+            // classpath type like org.slf4j.Logger resolves fine). The reorder
             // itself is asserted by the before/after text.
             { spec -> spec.recipe(r).typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()) },
             java(

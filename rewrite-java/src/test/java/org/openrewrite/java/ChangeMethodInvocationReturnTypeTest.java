@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -32,7 +33,9 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeMethodInvocationReturnType("java.lang.Integer parseInt(String)", "long"));
+        spec.recipe(new ChangeMethodInvocationReturnType("java.lang.Integer parseInt(String)", "long"))
+          // the recipe models a library whose method returns a new type, which the test's classpath doesn't have
+          .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build());
     }
 
     @DocumentExample
@@ -54,7 +57,15 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                       long one = Integer.parseInt("1");
                   }
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(variable.getType()).isEqualTo(JavaType.Primitive.Long);
+                    assertThat(variable.getName().getFieldType()).isEqualTo(variable.getVariableType());
+                    return variable;
+                }
+            }.visit(cu, 0))
           )
         );
     }

@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -384,7 +385,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     @Test
     void arrayTernaryToMethodAccess() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template types an argument by the position it is moved from
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitTernary(J.Ternary ternary, ExecutionContext executionContext) {
                   maybeAddImport("java.util.Arrays");
@@ -725,7 +728,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     @Test
     void replacedExpressionPassedAsParameterKeepsItsCommentsOnce() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template doesn't retype the call that its replacement is an argument of
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                   if ("o".equals(ident.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation m &&

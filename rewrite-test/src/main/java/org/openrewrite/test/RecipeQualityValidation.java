@@ -21,6 +21,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Incubating;
 
 /**
  * Checks of how a recipe behaves and what it produces. {@link TypeValidation} checks the LST the recipe is given.
@@ -103,6 +104,28 @@ public class RecipeQualityValidation {
     private boolean parserShapedTrees = true;
 
     /**
+     * Controls whether the source files the recipe changes are validated to have the types that their parser gives the
+     * text they print, such as a variable's declared type and not its initializer's. Types the parser doesn't resolve,
+     * such as those of a library missing from the test's classpath, aren't compared. Skipped when the test doesn't
+     * validate the type attribution of the recipe's input and output. Off by default until recipes give their output
+     * these types, unless the system property {@code org.openrewrite.test.parserTypedTrees} is {@code true}, which a
+     * build sets for its tests to find the recipes that don't.
+     */
+    @Builder.Default
+    private boolean parserTypedTrees = Boolean.getBoolean("org.openrewrite.test.parserTypedTrees");
+
+    /**
+     * Controls whether the source files the recipe leaves are validated to compile, with the test's
+     * {@link RecipeSpec#afterParser after parser} or else with the parser of its sources. Without an after parser, an
+     * error that the source file had before the recipe ran doesn't fail the test. Skipped when the test doesn't
+     * validate the type attribution of the recipe's input and output. Off unless the system property
+     * {@code org.openrewrite.test.compilableOutput} is {@code true}, which a build sets for its tests.
+     */
+    @Incubating(since = "8.107.0")
+    @Builder.Default
+    private boolean compilableOutput = Boolean.getBoolean("org.openrewrite.test.compilableOutput");
+
+    /**
      * Controls whether a composite recipe is validated to run each step before the steps that rename what it looks
      * for, such as a ChangeType of a type in a package before a ChangePackage of that package.
      */
@@ -118,7 +141,8 @@ public class RecipeQualityValidation {
     private boolean noStaticVisitors = true;
 
     /**
-     * Enable all recipe quality checks.
+     * The recipe quality checks that are on by default, which are all of them except {@link #parserTypedTrees()} and
+     * {@link #compilableOutput()}, each of which its system property turns on.
      */
     public static RecipeQualityValidation all() {
         return new RecipeQualityValidation();
@@ -147,6 +171,8 @@ public class RecipeQualityValidation {
                 .importReferencedTypes(quality.importReferencedTypes())
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
+                .parserTypedTrees(quality.parserTypedTrees())
+                .compilableOutput(quality.compilableOutput())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .noStaticVisitors(quality.noStaticVisitors())
                 .build();
