@@ -295,7 +295,7 @@ function namespaceAliasOf(statement: J | undefined): ModuleScopeBinding | undefi
  * Whether `binding` is what a request for `member` of its module asks for, `member` read by {@link memberName}:
  * `import D from "m"` and `const D = require("m")` answer `undefined`, `import * as NS from "m"` answers `'*'`,
  * and `{a as b}` and `const {a: b} = require("m")` answer `"a"`. `import X = require("m")`, `const X = await import("m")`
- * and `...rest` of a require answer no request.
+ * and `...rest` of a require answer no request, since {@link moduleScopeBindings} never gave them a module.
  */
 export function bindsMember(binding: ModuleBinding, member: string | undefined): boolean {
     switch (binding.form) {

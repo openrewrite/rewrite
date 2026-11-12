@@ -177,7 +177,7 @@ export function moduleBindings(
     }
 
     const cu = compilationUnitOf(from);
-    // Read on first use, so `exportOf` on a name no import binds, the commonest question, reads no import
+    // Read on first use: `exportOf` on a name a nearer scope binds, the commonest question, never needs the table
     let rows: ModuleBinding[] | undefined;
     let wholeRows: WholeModuleBinding[] | undefined;
     const table = () => rows ??= cu === undefined ? [] : bindingTable(cu);

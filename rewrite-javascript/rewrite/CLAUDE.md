@@ -246,6 +246,27 @@ shadows it, `maybeBind` binds the module again under a name that reaches — a s
 second AMD dependency — because a caller mid-rewrite needs a name it can emit. `maybeRebind` answers
 with the name its binding carries after the move, whether or not the cursor reaches it.
 
+### The binding table
+
+`bindingTable(cu)` (`src/javascript/binding-table.ts`) lists every name the file's top level binds to a
+module, and `bindingsOf(statement)` one statement's rows. Every reader of "what binds a module here" reads
+it rather than the import and `require` syntax: `moduleBindings`, `maybeBind`, `maybeRebind`, `AddImport`,
+`RebindImport` and `moduleScopeBindings`, which is a view of it in `AddImportOptions.member`'s vocabulary.
+Each row says its `form`, since forms that read alike hold different values:
+
+```ts
+import D from "m"              // default: the default export, the module only with `export =` typings
+import * as NS from "m"        // namespace: the namespace object
+import {a as b} from "m"       // named, member "a"
+import X = require("m")        // import-equals: the whole module
+const X = require("m")         // require: the whole module, and `reassignable` for `let` and `var`
+const {a: b} = require("m")    // require-member, member "a"
+const {...rest} = require("m") // require-pattern: no one member, as `{a: {b}}` and `[x]`
+const X = await import("m")    // dynamic-import: the namespace object
+```
+
+`RemoveImport` still reads the syntax itself, since its rules differ from the table's.
+
 ### Which name a rebind binds
 
 `to.alias` settles it when given, or refuses the move where that name is taken.
