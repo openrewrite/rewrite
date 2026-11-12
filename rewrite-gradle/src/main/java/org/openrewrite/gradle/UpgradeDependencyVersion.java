@@ -180,6 +180,35 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          * carrying no marker of its own resolves against the same repositories the build does.
          */
         AtomicReference<@Nullable ProjectRepositories> repositories = new AtomicReference<>();
+
+        /**
+         * The repositories of every project but the root, which a root {@code subprojects} or {@code allprojects}
+         * block's dependencies resolve from.
+         */
+        Set<MavenRepository> subprojectRepositories = Collections.synchronizedSet(new LinkedHashSet<>());
+
+        /**
+         * Dependencies declared in a root {@code subprojects} or {@code allprojects} block, resolved once the
+         * repositories of every subproject are known.
+         */
+        List<ProjectsBlockDependency> projectsBlockDependencies = new ArrayList<>();
+
+        AtomicBoolean projectsBlockDependenciesResolved = new AtomicBoolean();
+    }
+
+    @Value
+    static class ProjectsBlockDependency {
+        ProjectRepositories rootRepositories;
+        String block;
+        GroupArtifact ga;
+
+        /**
+         * The version the root project requests, if it has the configuration at all.
+         */
+        @Nullable
+        String version;
+
+        String configurationName;
     }
 
     @Value
@@ -221,6 +250,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     if (gradleProject != null && (acc.repositories.get() == null || ":".equals(gradleProject.getPath()))) {
                         acc.repositories.set(ProjectRepositories.of(gradleProject));
+                    }
+                    if (gradleProject != null && !":".equals(gradleProject.getPath())) {
+                        acc.subprojectRepositories.addAll(gradleProject.getMavenRepositories());
                     }
                     for (GroupArtifactVersion bom : SpringBomProperty.importedBoms((JavaSourceFile) tree)) {
                         if (!acc.scriptImportedBoms.contains(bom)) {
@@ -324,7 +356,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
 
                     // Resolve the new version if needed
-                    if (!acc.gaToNewVersion.containsKey(ga)) {
+                    if (!acc.gaToNewVersion.containsKey(ga) &&
+                            !deferToProjectsBlock(ga, entry.getVersion(), "dependencyManagement")) {
                         try {
                             String selectedVersion;
                             if (entry.getVersion() != null) {
@@ -369,16 +402,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 recordBomCandidate(gradleDependency, ga, configName);
 
                 if (!acc.gaToNewVersion.containsKey(ga)) {
+                    String versionVar = gradleDependency.getVersionVariable();
+                    if (deferToProjectsBlock(ga, requestedVersion(ga, configName), configName)) {
+                        if (versionVar != null) {
+                            recordVersionProperty(versionVar, ga, configName);
+                        }
+                        return;
+                    }
                     try {
-                        String versionVar = gradleDependency.getVersionVariable();
                         String selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                 .select(ga, configName, UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
 
                         if (versionVar != null) {
-                            acc.versionPropNameToGA
-                                    .computeIfAbsent(versionVar, k -> new HashMap<>())
-                                    .computeIfAbsent(ga, k -> new HashSet<>())
-                                    .add(configName);
+                            recordVersionProperty(versionVar, ga, configName);
                         }
 
                         acc.gaToNewVersion.put(ga, selectedVersion);
@@ -386,6 +422,30 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         acc.gaToNewVersion.put(ga, e);
                     }
                 }
+            }
+
+            private void recordVersionProperty(String versionVar, GroupArtifact ga, String configName) {
+                acc.versionPropNameToGA
+                        .computeIfAbsent(versionVar, k -> new HashMap<>())
+                        .computeIfAbsent(ga, k -> new HashSet<>())
+                        .add(configName);
+            }
+
+            // Which repositories the subprojects declare isn't known until every script has been scanned.
+            private boolean deferToProjectsBlock(GroupArtifact ga, @Nullable String version, String configName) {
+                String block = enclosingProjectsBlock(getCursor());
+                if (gradleProject == null || block == null || !":".equals(gradleProject.getPath())) {
+                    return false;
+                }
+                acc.projectsBlockDependencies.add(new ProjectsBlockDependency(ProjectRepositories.of(gradleProject), block, ga, version, configName));
+                return true;
+            }
+
+            private @Nullable String requestedVersion(GroupArtifact ga, String configName) {
+                GradleDependencyConfiguration configuration = gradleProject == null ? null : gradleProject.getConfiguration(configName);
+                Dependency requested = configuration == null ? null :
+                        configuration.findRequestedDependency(ga.getGroupId(), ga.getArtifactId());
+                return requested == null ? null : requested.getVersion();
             }
 
             // Which BOMs the build imports isn't known until every script has been scanned.
@@ -462,6 +522,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 stopAfterPreVisit();
                 Tree t = tree;
                 if (t instanceof SourceFile) {
+                    resolveProjectsBlockDependencies(acc, ctx);
                     resolveBomCandidates(acc, ctx);
                     SourceFile sf = (SourceFile) t;
                     if (updateProperties.isAcceptable(sf, ctx)) {
@@ -614,6 +675,62 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
             return entry;
         }
+    }
+
+    private void resolveProjectsBlockDependencies(DependencyVersionState acc, ExecutionContext ctx) {
+        if (!acc.projectsBlockDependenciesResolved.compareAndSet(false, true)) {
+            return;
+        }
+        for (ProjectsBlockDependency dependency : acc.projectsBlockDependencies) {
+            GroupArtifact ga = dependency.getGa();
+            if (acc.gaToNewVersion.containsKey(ga)) {
+                continue;
+            }
+            ProjectRepositories root = dependency.getRootRepositories();
+            DependencyVersionSelector selector = new ProjectRepositories(
+                    projectsBlockRepositories(root.getRepositories(), dependency.getBlock(), acc),
+                    root.getClasspathRepositories()).selector(metadataFailures);
+            try {
+                String version = dependency.getVersion();
+                acc.gaToNewVersion.put(ga, version == null ?
+                        selector.select(ga, dependency.getConfigurationName(), newVersion, versionPattern, ctx) :
+                        selector.select(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version),
+                                dependency.getConfigurationName(), newVersion, versionPattern, ctx));
+            } catch (MavenDownloadingException e) {
+                acc.gaToNewVersion.put(ga, e);
+            }
+        }
+    }
+
+    /**
+     * Gradle resolves a dependency declared in the root's {@code subprojects} or {@code allprojects} block in each
+     * subproject, against that subproject's repositories, which the root project often does not declare itself.
+     */
+    private static List<MavenRepository> projectsBlockRepositories(List<MavenRepository> rootRepositories, String block,
+                                                                   DependencyVersionState acc) {
+        if (acc.subprojectRepositories.isEmpty()) {
+            return rootRepositories;
+        }
+        Set<MavenRepository> repositories = new LinkedHashSet<>();
+        if ("allprojects".equals(block)) {
+            repositories.addAll(rootRepositories);
+        }
+        synchronized (acc.subprojectRepositories) {
+            repositories.addAll(acc.subprojectRepositories);
+        }
+        return new ArrayList<>(repositories);
+    }
+
+    private static @Nullable String enclosingProjectsBlock(Cursor cursor) {
+        for (Cursor c = cursor.getParent(); c != null; c = c.getParent()) {
+            if (c.getValue() instanceof J.MethodInvocation) {
+                String name = ((J.MethodInvocation) c.getValue()).getSimpleName();
+                if ("subprojects".equals(name) || "allprojects".equals(name)) {
+                    return name;
+                }
+            }
+        }
+        return null;
     }
 
     // Recorded like a version variable so the shared-variable guard vets the other artifacts the property governs.
@@ -1133,6 +1250,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             // Select the new version
+            GradleProject resolvingProject = gradleProject;
+            String block = enclosingProjectsBlock(dependency.getCursor());
+            if (resolvingProject != null && block != null && ":".equals(resolvingProject.getPath())) {
+                resolvingProject = resolvingProject.withMavenRepositories(
+                        projectsBlockRepositories(resolvingProject.getMavenRepositories(), block, acc));
+            }
             String selectedVersion;
             try {
                 String configName = dependency.getConfigurationName();
@@ -1140,7 +1263,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (currentVersion == null) {
                     GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
                     if (dependency.isPlatform()) {
-                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, resolvingProject, null)
                                 .select(ga, configName, newVersion, versionPattern, ctx);
                     } else {
                         // A version the build never declares is ours to pin only when a platform supplies it.
@@ -1150,7 +1273,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             return dependency.getTree();
                         }
                         GroupArtifactVersion gav = new GroupArtifactVersion(declaredGroupId, declaredArtifactId, managedVersion);
-                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, resolvingProject, null)
                                 .select(gav, configName, newVersion, versionPattern, ctx);
                         if (managedVersion.equals(selectedVersion)) {
                             return dependency.getTree();
@@ -1158,7 +1281,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                 } else {
                     GroupArtifactVersion gav = new GroupArtifactVersion(declaredGroupId, declaredArtifactId, currentVersion);
-                    selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                    selectedVersion = new DependencyVersionSelector(metadataFailures, resolvingProject, null)
                             .select(gav, configName, newVersion, versionPattern, ctx);
                 }
 
@@ -1170,18 +1293,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             try {
-                if (gradleProject != null && dependency.isPlatform()) {
+                if (resolvingProject != null && dependency.isPlatform()) {
                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                    Set<GroupArtifact> requested = gradleProject.getConfigurations().stream()
+                    Set<GroupArtifact> requested = resolvingProject.getConfigurations().stream()
                             .flatMap(conf -> conf.getRequested().stream())
                             .map(Dependency::getGav)
                             .map(GroupArtifactVersion::asGroupArtifact)
                             .collect(toSet());
-                    List<GroupArtifact> oldPlatformManaged = mpd.download(dependency.getGav(), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                    List<GroupArtifact> oldPlatformManaged = mpd.download(dependency.getGav(), null, null, resolvingProject.getMavenRepositories()).getDependencyManagement().stream()
                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                             .filter(requested::contains)
                             .collect(toList());
-                    List<GroupArtifact> newPlatformManaged = mpd.download(dependency.getGav().withVersion(selectedVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                    List<GroupArtifact> newPlatformManaged = mpd.download(dependency.getGav().withVersion(selectedVersion), null, null, resolvingProject.getMavenRepositories()).getDependencyManagement().stream()
                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                             .filter(requested::contains)
                             .collect(toList());
