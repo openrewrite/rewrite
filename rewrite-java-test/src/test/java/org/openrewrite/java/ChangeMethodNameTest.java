@@ -664,4 +664,61 @@ class ChangeMethodNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renamedCallOnASubtypeHasTheTypeArgumentsOfItsSupertype() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Holder boxed()", "get", null, null)),
+          java(
+            """
+              package a;
+
+              import java.util.List;
+
+              public interface Holder<T> {
+                  default List<T> boxed() { return null; }
+                  default T get() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Names implements Holder<String> {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Lazy<V> implements Holder<V> {
+              }
+              """
+          ),
+          java(
+            """
+              import a.Lazy;
+              import a.Names;
+
+              class Test {
+                  Object test(Names names, Lazy<Integer> lazy) {
+                      return names.boxed() == lazy.boxed();
+                  }
+              }
+              """,
+            """
+              import a.Lazy;
+              import a.Names;
+
+              class Test {
+                  Object test(Names names, Lazy<Integer> lazy) {
+                      return names.get() == lazy.get();
+                  }
+              }
+              """
+          )
+        );
+    }
 }

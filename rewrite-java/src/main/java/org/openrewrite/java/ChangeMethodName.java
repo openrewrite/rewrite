@@ -211,9 +211,13 @@ public class ChangeMethodName extends Recipe {
             private JavaType.Method renamed(J.MethodInvocation call, JavaType.Method type) {
                 JavaType.Method renamed = type.withName(newMethodName);
                 // The receiver has the type of the method an earlier rename gave it, as in
-                // `multi.select().byTakingFirstItems(2)`, which isn't the type that declares the old method.
-                JavaType.FullyQualified receiver = call.getSelect() == null ? type.getDeclaringType() :
-                        TypeUtils.asFullyQualified(call.getSelect().getType());
+                // `multi.select().byTakingFirstItems(2)`, which isn't the type that declares the old method. A call
+                // without a receiver may be on a subtype, whose type arguments the declaring type doesn't tell.
+                JavaType.FullyQualified declaringType = type.getDeclaringType();
+                JavaType.FullyQualified receiver = call.getSelect() != null ?
+                        TypeUtils.asFullyQualified(call.getSelect().getType()) :
+                        declaringType instanceof JavaType.Parameterized ?
+                                ((JavaType.Parameterized) declaringType).getType() : declaringType;
                 // Kotlin, Groovy and the other languages resolve a call by rules of their own
                 if (receiver == null || getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
                     return renamed;
@@ -229,11 +233,10 @@ public class ChangeMethodName extends Recipe {
                     return renamed;
                 }
                 JavaType.Method original = CalledMethod.declared(receiver, type.getName(), argumentTypes);
-                String declaringType = target.getDeclaringType().getFullyQualifiedName();
                 if (original != null && sameSignature(original, target) &&
-                    TypeUtils.isOfClassType(type.getDeclaringType(), declaringType)) {
+                    TypeUtils.isOfClassType(declaringType, target.getDeclaringType().getFullyQualifiedName())) {
                     // javac inferred the call's types from this signature, type variables of the method included
-                    return target.withDeclaringType(type.getDeclaringType())
+                    return target.withDeclaringType(declaringType)
                             .withReturnType(type.getReturnType())
                             .withParameterTypes(type.getParameterTypes());
                 }

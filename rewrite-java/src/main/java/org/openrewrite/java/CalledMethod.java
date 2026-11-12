@@ -106,13 +106,25 @@ final class CalledMethod {
 
     /**
      * What the type variables of the type that declares {@code method} stand for in a receiver of {@code type}, by
-     * name. A subtype of the declaring type, a wildcard and a variable that one of {@code method}'s own hides are
-     * left out.
+     * name. A wildcard and a variable that one of {@code method}'s own hides are left out.
      */
     private static Map<String, JavaType> typeArguments(JavaType.FullyQualified type, JavaType.Method method) {
+        Map<String, JavaType> typeArguments = typeArguments(type,
+                method.getDeclaringType().getFullyQualifiedName(), new HashSet<>());
+        if (typeArguments == null) {
+            return new HashMap<>();
+        }
+        typeArguments.keySet().removeAll(method.getDeclaredFormalTypeNames());
+        return typeArguments;
+    }
+
+    private static @Nullable Map<String, JavaType> typeArguments(JavaType.@Nullable FullyQualified type,
+                                                                 String declaringType, Set<String> visited) {
+        if (type == null || !visited.add(type.getFullyQualifiedName())) {
+            return null;
+        }
         Map<String, JavaType> typeArguments = new HashMap<>();
-        if (type instanceof JavaType.Parameterized &&
-            type.getFullyQualifiedName().equals(method.getDeclaringType().getFullyQualifiedName())) {
+        if (type instanceof JavaType.Parameterized) {
             List<JavaType> variables = ((JavaType.Parameterized) type).getType().getTypeParameters();
             List<JavaType> arguments = type.getTypeParameters();
             for (int i = 0; i < variables.size() && i < arguments.size(); i++) {
@@ -121,8 +133,22 @@ final class CalledMethod {
                 }
             }
         }
-        typeArguments.keySet().removeAll(method.getDeclaredFormalTypeNames());
-        return typeArguments;
+        if (type.getFullyQualifiedName().equals(declaringType)) {
+            return typeArguments;
+        }
+        List<JavaType.FullyQualified> supertypes = new ArrayList<>(type.getInterfaces());
+        supertypes.add(type.getSupertype());
+        for (JavaType.FullyQualified supertype : supertypes) {
+            // `class Box<E> implements Holder<E>` names its supertype by its own variables, which a raw `Box` has
+            // no arguments for
+            JavaType inType = supertype == null ? null : substitute(supertype, typeArguments);
+            Map<String, JavaType> found = inType instanceof JavaType.FullyQualified ?
+                    typeArguments((JavaType.FullyQualified) inType, declaringType, visited) : null;
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     private static boolean isWildcard(JavaType type) {
