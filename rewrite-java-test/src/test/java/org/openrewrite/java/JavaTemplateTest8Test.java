@@ -996,4 +996,85 @@ class JavaTemplateTest8Test implements RewriteTest {
           .allSatisfy(stub -> assertThat(stub).contains("String[] args"));
     }
 
+    @Test
+    void contextSensitiveTemplateInitializingOneOfSeveralVariablesTakesThatVariablesType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("make")) {
+                      return JavaTemplate.builder("java.util.Collections.emptyList()")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<String> make() { return null; }
+                  void test() {
+                      List<String> a = make(), b[] = null;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<String> make() { return null; }
+                  void test() {
+                      List<String> a = java.util.Collections.emptyList(), b[] = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateSeesVarLocalsWithTheirInferredTypes() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("clear")) {
+                      return JavaTemplate.builder("take(arr, n)")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void take(int[] a, int n) {}
+                  void take(int[] a, long n) {}
+                  void clear() {}
+                  void test() {
+                      var arr = new int[3];
+                      var n = 1L;
+                      clear();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void take(int[] a, int n) {}
+                  void take(int[] a, long n) {}
+                  void clear() {}
+                  void test() {
+                      var arr = new int[3];
+                      var n = 1L;
+                      take(arr, n);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

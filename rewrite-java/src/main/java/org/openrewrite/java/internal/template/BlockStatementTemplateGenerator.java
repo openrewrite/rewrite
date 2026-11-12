@@ -524,7 +524,13 @@ public class BlockStatementTemplateGenerator {
                         .append('=')
                         .append(valueOfType(((J.VariableDeclarations) j).getType()));
             } else {
-                before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+                J.VariableDeclarations declarations = (J.VariableDeclarations) j;
+                int initialized = declarations.getVariables().indexOf(prior);
+                if (initialized >= 0) {
+                    // The stub's `=` goes to the last variable it declares, so it ends at the template's variable
+                    declarations = declarations.withVariables(declarations.getVariables().subList(0, initialized + 1));
+                }
+                before.insert(0, variable(declarations, false, cursor) + '=');
             }
             after.append(";");
         } else if (j instanceof J.MethodInvocation) {
@@ -858,8 +864,13 @@ public class BlockStatementTemplateGenerator {
         for (int i = 0, variablesSize = variables.size(); i < variablesSize; i++) {
             J.VariableDeclarations.NamedVariable nv = variables.get(i);
             if (i == 0) {
-                if (variable.getTypeExpression() != null) {
-                    varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor));
+                TypeTree typeExpression = variable.getTypeExpression();
+                if (initializer && typeExpression != null &&
+                    typeExpression.getMarkers().findFirst(JavaVarKeyword.class).isPresent()) {
+                    // `var` would take the placeholder value's type, so the stub declares the variable's type
+                    varBuilder.append(Substitutions.getTypeName(nv.getType()));
+                } else if (typeExpression != null) {
+                    varBuilder.append(typeExpression.withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
                 if (variable.getVarargs() != null) {
                     varBuilder.append("[]");
