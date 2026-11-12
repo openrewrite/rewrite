@@ -64,6 +64,11 @@ public class RecipeSpec {
     List<Parser.Builder> parsers = new ArrayList<>();
 
     /**
+     * Parsers of the recipe's output, where it needs another classpath than its input.
+     */
+    List<Parser.Builder> afterParsers = new ArrayList<>();
+
+    /**
      * Used for both parsing and recipe execution unless an alternative recipe execution context is set with
      * {@link #recipeExecutionContext(ExecutionContext)}.
      */
@@ -193,6 +198,21 @@ public class RecipeSpec {
      */
     public RecipeSpec parser(Parser.Builder parser) {
         this.parsers.add(parser);
+        return this;
+    }
+
+    /**
+     * The parser of the recipe's output, for a recipe whose output needs another classpath than its input, such as
+     * one that migrates from one version of a library to the next. The checks that parse the text the output prints,
+     * such as {@link RecipeQualityValidation#parserTypedTrees()}, parse it with this parser in place of the input's
+     * parser of the same language, so that the types they compare the output with are those of the classpath it is
+     * written for. It parses the output together with the sources the recipe left unchanged, so a class that differs
+     * between the two classpaths belongs on them and not among the test's sources.
+     *
+     * @return The current recipe spec.
+     */
+    public RecipeSpec afterParser(Parser.Builder parser) {
+        this.afterParsers.add(parser);
         return this;
     }
 

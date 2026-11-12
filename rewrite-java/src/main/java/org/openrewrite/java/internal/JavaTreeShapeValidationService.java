@@ -124,6 +124,19 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 new HashMapJavaTypeCache(new WithoutClassesOf(sources, java.getTypeCache()))));
     }
 
+    @Override
+    public Parser.Builder typedParser(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        // a cache of its own, of the kind a builder gives its parsers, which reads the JDK classes test parsers share
+        JavaTypeCache cache = HashMapJavaTypeCache.forParser(
+                JdkClassSharingTypeFactory.cacheForParser(new JavaTypeCache(), parser.getClass(), false), false);
+        JavaTypeFactory factory = JdkClassSharingTypeFactory.forParser(cache);
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .typeFactory(factory == null ? new DefaultJavaTypeFactory(cache) : factory);
+    }
+
     /**
      * The types of a cache, but for those whose signature names a class that one of the sources declares.
      */

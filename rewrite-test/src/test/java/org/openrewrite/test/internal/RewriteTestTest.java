@@ -30,6 +30,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.AddImport;
+import org.openrewrite.java.ChangeMethodTargetToStatic;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -81,6 +82,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -2262,6 +2264,173 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class AfterParser {
+        //language=java
+        private static final String INSTANCE_METHOD = """
+          package a;
+          public class A {
+              public void method() {}
+          }
+          """;
+
+        //language=java
+        private static final String STATIC_METHOD = """
+          package a;
+          public class A {
+              public static void method() {}
+          }
+          """;
+
+        //language=java
+        private static final String BEFORE = """
+          import a.A;
+          class Test {
+              void test() {
+                  new A().method();
+              }
+          }
+          """;
+
+        //language=java
+        private static final String AFTER = """
+          import a.A;
+          class Test {
+              void test() {
+                  A.method();
+              }
+          }
+          """;
+
+        @Test
+        void compareTypesWithTheAfterParserTypedAfresh() {
+            // the first run fills the builder's type cache with the input's a.A, which a clone reads through to
+            JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD);
+            for (int run = 0; run < 2; run++) {
+                rewriteRun(
+                  spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                    .parser(parser)
+                    .afterParser(parser.clone().dependsOn(STATIC_METHOD)),
+                  java(BEFORE, AFTER)
+                );
+            }
+        }
+
+        @Test
+        void reportTypeTheAfterParserGivesDifferently() {
+            // the input parser can't resolve b.B, so only the after parser has types to compare with
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "b.B", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                        public void method() {}
+                    }
+                    """
+                )),
+              java(
+                BEFORE,
+                """
+                  import b.B;
+
+                  class Test {
+                      void test() {
+                          B.method();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`B.method()` has the method void b.B.method() with the flags " +
+                                               "[Public, Static] where the parser gives void b.B.method() with " +
+                                               "the flags [Public]");
+        }
+
+        @Test
+        void respellTheInputWithTheInputParser() {
+            // the after parser lacks a.A, so a respelled input parsed with it loses its types and its miss goes unreported
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("A", "method"))
+                .parser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                    }
+                    """
+                )),
+              java(
+                AFTER,
+                """
+                  import a.A;
+                  class Test {
+                      void test() {
+                          /*~~>*/A.method();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
+              .hasMessageContaining("`A.method()` written `method()`");
+        }
+
+        @Test
+        void leaveAnOutputOfAnotherDslToTheInputParser() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "other",
+                  () -> JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD).build())),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageContaining("where the parser gives void a.A.method() with the flags [Public]");
+        }
+
+        @Test
+        void rejectAfterParserThatThrows() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "java", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources threw")
+              .hasRootCauseMessage("no classpath");
+        }
+
+        @Test
+        void explainMarkersWithTheInputParserWhenTheAfterParserFails() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        return m.withArguments(ListUtils.map(m.getArguments(), arg ->
+                          arg.getMarkers().findFirst(OmitParentheses.class).isPresent() ? arg :
+                            arg.withPrefix(Space.SINGLE_SPACE)
+                              .withMarkers(arg.getMarkers().add(new OmitParentheses(Tree.randomId())))));
+                    }
+                }))
+                .afterParser(new ParserBuilderOfDsl(GroovyParser.builder().getSourceFileType(), "groovy", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              groovy(
+                """
+                  println("hello")
+                  """,
+                """
+                  println "hello"
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class NoStaticVisitors {
 
         @Test
@@ -2897,6 +3066,27 @@ class ReturnNullByHand extends Recipe {
                   Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
             }
         };
+    }
+}
+
+class ParserBuilderOfDsl extends Parser.Builder {
+    private final String dslName;
+    private final Supplier<Parser> parser;
+
+    ParserBuilderOfDsl(Class<? extends SourceFile> sourceFileType, String dslName, Supplier<Parser> parser) {
+        super(sourceFileType);
+        this.dslName = dslName;
+        this.parser = parser;
+    }
+
+    @Override
+    public Parser build() {
+        return parser.get();
+    }
+
+    @Override
+    public String getDslName() {
+        return dslName;
     }
 }
 

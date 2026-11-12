@@ -40,14 +40,21 @@ final class TreeShapes {
     private final boolean shapes;
     private final boolean types;
     private final Function<SourceFile, List<Parser.Builder>> parsersFor;
+    private final Function<SourceFile, List<Parser.Builder>> outputParsersFor;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
 
+    /**
+     * @param parsersFor       The parsers of a source the test parsed.
+     * @param outputParsersFor The parsers of a source the recipe returned.
+     */
     TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> parsersFor,
-               @Nullable Path relativeTo, ExecutionContext parseCtx) {
+               Function<SourceFile, List<Parser.Builder>> outputParsersFor, @Nullable Path relativeTo,
+               ExecutionContext parseCtx) {
         this.shapes = shapes;
         this.types = types;
         this.parsersFor = parsersFor;
+        this.outputParsersFor = outputParsersFor;
         this.relativeTo = relativeTo;
         this.parseCtx = parseCtx;
     }
@@ -87,7 +94,7 @@ final class TreeShapes {
                 before != null && printed(before).equals(printed(after))) {
                 continue;
             }
-            List<Parser.Builder> parsers = parsersFor.apply(after);
+            List<Parser.Builder> parsers = outputParsersFor.apply(after);
             if (!parsers.isEmpty() && service.reads(parsers.get(0), after)) {
                 byParser.computeIfAbsent(parsers.get(0), p -> new ArrayList<>()).add(result);
             }
@@ -255,7 +262,7 @@ final class TreeShapes {
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
         for (SourceFile source : current) {
-            List<Parser.Builder> parsers = parsersFor.apply(source);
+            List<Parser.Builder> parsers = outputParsersFor.apply(source);
             if (parsers.isEmpty() || parsers.get(0) != builder) {
                 continue;
             }
@@ -266,11 +273,20 @@ final class TreeShapes {
         Map<UUID, Reparsed> reparsed = new HashMap<>();
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
-        // types need the test's own parser, with its classpath, and shapes alone parse faster without types
+        // a parser that didn't parse the input is one of the test's after parsers
+        boolean afterParser = !sources.isEmpty() && !parsersFor.apply(sources.get(0)).contains(builder);
+        // Types need a parser with the output's classpath, and shapes alone parse faster without types. An after
+        // parser types the output afresh, as a clone of the input's parser holds the input classpath's types under
+        // the output's names.
         Parser.Builder reparser = service == null ? builder :
-                types ? service.typedParser(builder, parsedAndOutput) : service.untypedParser(builder);
+                !types ? service.untypedParser(builder) :
+                        afterParser ? service.typedParser(builder) : service.typedParser(builder, parsedAndOutput);
         List<SourceFile> parsed = parse(reparser, inputs, errors);
         if (parsed == null) {
+            if (afterParser) {
+                fail("The test's after parser of " + builder.getDslName() + " sources threw as it parsed the " +
+                     "recipe's output, which leaves that output unchecked.", errors.get(errors.size() - 1));
+            }
             return reparsed;
         }
         for (int i = 0; i < sources.size(); i++) {
@@ -331,6 +347,7 @@ final class TreeShapes {
         try {
             return builder.clone().build().parseInputs(inputs, relativeTo, ctx).collect(toList());
         } catch (Exception | LinkageError e) {
+            errors.add(e);
             return null;
         }
     }
