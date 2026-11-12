@@ -16,11 +16,19 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyResultOfObjectAllocationIgnored")
 class ConstructorTest implements RewriteTest {
 
     @Test
@@ -180,5 +188,109 @@ class ConstructorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @Test
+    void aNestedClassNameBrokenAfterTheDot() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                foo(1, new Outer.
+                  Inner(1))
+              }
+              """,
+            spec -> spec.afterRecipe(ConstructorTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @Test
+    void aSpaceAfterTheDot() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                foo(new Outer. Inner(1))
+              }
+              """,
+            spec -> spec.afterRecipe(ConstructorTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @Test
+    void aSpaceBeforeTheDot() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                foo(new Outer .Inner(1))
+              }
+              """,
+            spec -> spec.afterRecipe(ConstructorTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @Test
+    void aPackageNameBrokenAfterADot() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                foo(new a.b.
+                  C(1))
+              }
+              """,
+            spec -> spec.afterRecipe(ConstructorTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @Test
+    void aDeclaredTypeWithSpacedDotsAndACallOnAType() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                def x = List
+                  .of(1)
+                def y = new Outer.Inner(1)
+                java.util.List z = null
+                java . util . Map w = null
+              }
+              """,
+            spec -> spec.afterRecipe(ConstructorTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    /**
+     * Printing back alone can't tell whether source text was parsed: text the parser never visits is kept as
+     * whitespace and still prints. Each source here must leave none.
+     */
+    private static void nothingKeptAsWhitespace(SourceFile sf) {
+        List<String> kept = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                if (!space.getWhitespace().isBlank()) {
+                    kept.add(loc + ": " + space.getWhitespace().strip());
+                }
+                for (Comment c : space.getComments()) {
+                    if (!c.getSuffix().isBlank()) {
+                        kept.add(loc + ": " + c.getSuffix().strip());
+                    }
+                }
+                return space;
+            }
+        }.visit(sf, 0);
+        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
