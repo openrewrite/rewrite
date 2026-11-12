@@ -235,6 +235,16 @@ async function exportOfIn(source: string, reference: string, options?: ExportOfO
             return super.visitMethodInvocation(method, p);
         }
 
+        override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: any): Promise<J | undefined> {
+            await this.ask(arrayAccess);
+            return super.visitArrayAccess(arrayAccess, p);
+        }
+
+        override async visitFunctionCall(functionCall: JS.FunctionCall, p: any): Promise<J | undefined> {
+            await this.ask(functionCall);
+            return super.visitFunctionCall(functionCall, p);
+        }
+
         override async visitImportType(importType: JS.ImportType, p: any): Promise<J | undefined> {
             await this.ask(importType);
             return super.visitImportType(importType, p);
@@ -290,6 +300,21 @@ describe("exportOf", () => {
         ["a member through a let require the file never reassigns",
             `let React = require("react"); React.createElement("div");`, `React.createElement("div")`, undefined,
             react("createElement", false, "require", "React")],
+        ["a member through a module object in parentheses", `import * as React from "react"; (React).createElement("div");`,
+            `(React).createElement("div")`, undefined, react("createElement", false, "namespace", "React")],
+        ["a member read by its string name", `import * as React from "react"; const c = React["createElement"];`,
+            `React["createElement"]`, undefined, react("createElement", false, "namespace", "React")],
+        ["a call of a member read by its string name", `import * as React from "react"; React["createElement"]("div");`,
+            `React["createElement"]("div")`, undefined, react("createElement", false, "namespace", "React")],
+        ["a name the top level destructures from a module object",
+            `import * as React from "react"; const {useState: useLocalState} = React; useLocalState(0);`, "useLocalState(0)",
+            undefined, react("useState", false, "destructured", "useLocalState")],
+        ["a name destructured from a default import, where the caller says the default is the module",
+            `import React from "react"; const {useState} = React; useState(0);`, "useState(0)", {defaultIsModule: ["react"]},
+            react("useState", false, "destructured", "useState")],
+        ["the member a re-export reads", `export {useState as useLocalState} from "react";`, "useState", undefined,
+            react("useState", false, "re-export")],
+        ["a type-only re-export", `export type {FC} from "react";`, "FC", undefined, react("FC", true, "re-export")],
     ] as [string, string, string, ExportOfOptions | undefined, ModuleExport | undefined][])(
         "%s", async (_rule, source, reference, options, expected) => {
             expect(await exportOfIn(source, reference, options)).toEqual(expected);
@@ -314,10 +339,29 @@ describe("exportOf", () => {
         ["a member through a let require the file reassigns",
             `let React = require("react"); React = other; React.createElement("div");`, `React.createElement("div")`,
             undefined],
+        ["a name destructured from a default import, which reads a property of the default export",
+            `import React from "react"; const {useState} = React; useState(0);`, "useState(0)", undefined],
+        ["the name a re-export publishes", `export {useState as useLocalState} from "react";`, "useLocalState", undefined],
     ] as [string, string, string, ExportOfOptions | undefined][])(
         "no export: %s", async (_rule, source, reference, options) => {
             expect(await exportOfIn(source, reference, options)).toBeUndefined();
         });
+
+    // maybeRebind moves this one. exportOf reads only the top level's bindings, since `resolve` names the
+    // function binding `useState`, not the declaration that would say it comes from React.
+    test.fails("a name a function destructures from a module object", async () => {
+        expect(await exportOfIn(
+            //language=typescript
+            `
+            import * as React from "react";
+            function useToggle() {
+                const {useState} = React;
+                return useState(false);
+            }
+            `,
+            "useState(false)"
+        )).toEqual(react("useState", false, "destructured", "useState"));
+    });
 
     test("a cursor in place of the visitor, for a node the visitor's node holds", async () => {
         const spec = new RecipeSpec();

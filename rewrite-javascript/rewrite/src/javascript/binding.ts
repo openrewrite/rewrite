@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 import {isIdentifier, isStringLiteral, J} from "../java";
-import {JS} from "./tree";
+import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {
-    compilationUnitOf, cursorOf, declarationsOf, isFree, isReference, namesUsedIn, referencesOf, resolve, scopeOf,
-    valuesDeclaredAtTopLevel
+    bindingNames, compilationUnitOf, cursorOf, declarationsOf, isFree, isReference, namesUsedIn, referencesOf, resolve,
+    scopeOf, valuesDeclaredAtTopLevel
 } from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
@@ -27,7 +27,9 @@ import {
     requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
-import {importTypeMember, RenameMemberSpellings} from "./member-spellings";
+import {
+    importTypeMember, memberRead, objectRead, RenameMemberSpellings, reExportDeclaration, reExportedName
+} from "./member-spellings";
 import {sameModule} from "./package-name";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
@@ -98,7 +100,8 @@ export interface ModuleBindings {
      * The export of a module that `ref` names, read where the cursor (or the visitor's) stands on it
      * or on the node holding it, or undefined where it names none: a local, a binding nearer than the
      * module's, an unbound global, or a module object's own name. `ref` is an identifier, a member
-     * read through a module object (`NS.X`, `NS.f()`) or an `import()` type.
+     * read through a module object (`NS.X`, `(NS).X`, `NS["X"]`, `NS.f()`), the `X` of
+     * `export {X} from "m"`, or an `import()` type: the spellings `maybeRebind` moves.
      * `S` with `import {SFC as S} from "react"`, `R.SFC` with `import * as R from "react"`, and
      * `import("react").SFC` → `{module: "react", member: "SFC"}`
      */
@@ -112,14 +115,23 @@ export interface ModuleExport {
     /** `"SFC"` for `SFC`, for `S` of `{SFC as S}` and for `R.SFC`; `"default"` for a default import's own name. */
     member: string;
 
-    /** A type-only import binds it, or an `import()` type spells it, so it stands for no value at runtime. */
+    /**
+     * A type-only import or re-export binds it, or an `import()` type spells it, so it stands for no
+     * value at runtime.
+     */
     typeOnly: boolean;
 
     /**
      * How the file reaches it, so a replacement can be spelled alike: `{kind: "namespace", name: "R"}`
-     * for `R.SFC` with `import * as R`. `name` is the local name read; an `import()` type reads none.
+     * for `R.SFC` with `import * as R`, `{kind: "destructured", name: "s"}` for `s` after a top-level
+     * `const {useState: s} = React`. `name` is the local name read; an `import()` type and the `X` of
+     * `export {X} from "m"` read none.
      */
-    via: {kind: "named" | "default" | "namespace" | "require" | "amd" | "global" | "import-type"; name?: string};
+    via: {
+        kind: "named" | "default" | "namespace" | "require" | "amd" | "global" | "import-type" | "destructured" |
+            "re-export";
+        name?: string;
+    };
 }
 
 /** What `exportOf` reads as a module object beyond the bindings that are one by their syntax. */
@@ -174,8 +186,17 @@ export function moduleBindings(
         },
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
         bindingOf: module => bound.find(b => sameModule(b.module, module))?.name,
-        exportOf: (ref, options) => cu === undefined ? undefined : exportRead(from, ref, cu,
-            name => {
+        exportOf: (ref, options) => {
+            if (cu === undefined) {
+                return undefined;
+            }
+            const moduleObject = (name: string): ModuleObjectRead | undefined => {
+                const object = bound.find(b => b.name === name && !isReassigned(cu, b));
+                return object === undefined || object.shape === "default" && !defaultIsModule(object, options)
+                    ? undefined
+                    : {module: object.module, kind: object.shape, typeOnly: object.typeOnly};
+            };
+            return exportRead(from, ref, cu, name => {
                 const object = bound.find(b => b.name === name);
                 if (object !== undefined) {
                     // A module object's own name names no one export, unless it is a default that is not the module
@@ -184,15 +205,58 @@ export function moduleBindings(
                         : undefined;
                 }
                 const named = moduleScopeBindings(cu).find(b => b.name === name && b.member !== undefined && b.member !== "*");
-                return named?.module === undefined ? undefined :
-                    {module: named.module, member: named.member!, typeOnly: named.typeOnly ?? false, via: {kind: "named", name}};
-            },
-            name => {
-                const object = bound.find(b => b.name === name && !isReassigned(cu, b));
-                return object === undefined || object.shape === "default" && !defaultIsModule(object, options) ? undefined :
-                    {module: object.module, kind: object.shape, typeOnly: object.typeOnly};
-            },
-            options)
+                return named?.module === undefined
+                    ? destructuredExport(cu, name, moduleObject)
+                    : {module: named.module, member: named.member!, typeOnly: named.typeOnly ?? false,
+                        via: {kind: "named", name}};
+            }, moduleObject, options);
+        }
+    };
+}
+
+/**
+ * What `name` reads where the file's top level destructures it from a module object:
+ * `s` in `const {useState: s} = React` → `useState` of React's module. Only the top level, as with imports.
+ */
+function destructuredExport(
+    cu: JS.CompilationUnit,
+    name: string,
+    moduleObject: (name: string) => ModuleObjectRead | undefined
+): ModuleExport | undefined {
+    // At the top level nothing nearer can bind `NS`, so its name is enough
+    const root = new Cursor(cu);
+    for (const statement of cu.statements) {
+        for (const declaration of declarationsOf(statement.element)) {
+            for (const variable of declaration.variables) {
+                const member = bindingNames(variable.element.name).find(b => b.name === name)?.member;
+                const object = objectRead(variable.element.initializer?.element, root)?.object;
+                const read = member === undefined || object === undefined ? undefined : moduleObject(object.simpleName);
+                if (read !== undefined) {
+                    return {module: read.module, member: member!, typeOnly: read.typeOnly,
+                        via: {kind: "destructured", name}};
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+/**
+ * `X` in `export {X} from "m"` and `export {X as Y} from "m"`, which reads `X` of `m` with no binding in the file.
+ * `Y` is the name the file publishes, so it reads nothing.
+ */
+function reExportRead(at: Cursor): ModuleExport | undefined {
+    const specifier = [at.parentTree(), at.parentTree(2)].find(c => c?.value.kind === JS.Kind.ExportSpecifier);
+    const read = specifier === undefined ? undefined : reExportedName(specifier.value);
+    if (specifier === undefined || read?.id !== (at.value as J).id) {
+        return undefined;
+    }
+    // The specifier's list, then the declaration
+    const reExport = reExportDeclaration(specifier.parentTree(2)?.value);
+    return reExport && {
+        module: reExport.module, member: moduleExportName(read),
+        typeOnly: reExport.declaration.typeOnly.element || (specifier.value as JS.ExportSpecifier).typeOnly.element,
+        via: {kind: "re-export"}
     };
 }
 
@@ -225,29 +289,34 @@ function exportRead(
     }
     // By id, so a visitor's own copy of the node it stands on is that node
     let at = (cursor.value as J | undefined)?.id === ref.id ? cursor : new Cursor(ref, cursor);
-    const boundHere = (id: J.Identifier) => resolve(at, id)?.id === owner.id;
-    // `f()` names what `f` does
+    const reExported = reExportRead(at);
+    if (reExported !== undefined) {
+        return reExported;
+    }
+    // `f()` and `NS["f"]()` name what they call
     const callee = ref.kind === J.Kind.MethodInvocation && (ref as J.MethodInvocation).select === undefined
-        ? (ref as J.MethodInvocation).name : undefined;
+        ? (ref as J.MethodInvocation).name
+        : ref.kind === JS.Kind.FunctionCall ? (ref as JS.FunctionCall).function?.element : undefined;
     if (callee !== undefined) {
         at = new Cursor(callee, at);
     }
     const name = callee ?? ref;
     // `resolve` answers nothing for a name that declares or names rather than reads
     if (isIdentifier(name)) {
-        return boundHere(name) ? namedExport(name.simpleName) : undefined;
+        return resolve(at, name)?.id === owner.id ? namedExport(name.simpleName) : undefined;
     }
-    const [qualifier, member] = ref.kind === J.Kind.FieldAccess ? [(ref as J.FieldAccess).target, (ref as J.FieldAccess).name.element] :
-        ref.kind === J.Kind.MethodInvocation ? [(ref as J.MethodInvocation).select?.element, (ref as J.MethodInvocation).name] :
-            [undefined, undefined];
-    if (qualifier === undefined || member === undefined || !isIdentifier(qualifier)) {
+    // `NS.X`, `(NS).X`, `NS["X"]` and `NS.X()`, as `maybeRebind` reads them
+    const read = memberRead(name, at);
+    if (read === undefined) {
         return undefined;
     }
-    const global = options.globals?.[qualifier.simpleName];
-    const object = boundHere(qualifier) ? moduleObject(qualifier.simpleName) :
-        global !== undefined && isFree(at, qualifier) ? {module: global, kind: "global" as const, typeOnly: false} : undefined;
-    return object && {module: object.module, member: member.simpleName, typeOnly: object.typeOnly,
-        via: {kind: object.kind, name: qualifier.simpleName}};
+    const {object, at: objectAt, member} = read;
+    const global = options.globals?.[object.simpleName];
+    const reached = resolve(objectAt, object)?.id === owner.id ? moduleObject(object.simpleName) :
+        global !== undefined && isFree(objectAt, object) ? {module: global, kind: "global" as const, typeOnly: false} :
+            undefined;
+    return reached && {module: reached.module, member, typeOnly: reached.typeOnly,
+        via: {kind: reached.kind, name: object.simpleName}};
 }
 
 /** `import("m").X`, which names `X` of `m` with no binding in the file; `import("m").X.Y` names `X` too. */
