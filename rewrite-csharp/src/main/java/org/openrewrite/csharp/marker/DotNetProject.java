@@ -52,6 +52,16 @@ public class DotNetProject implements Marker, RpcCodec<DotNetProject> {
     @Nullable
     String sdk;
 
+    /**
+     * The usings that apply to every file of the project in every target framework, each as it
+     * reads after {@code global using}, such as {@code static System.Math}. They come from
+     * implicit usings, {@code <Using>} items and the project's {@code global using} directives at
+     * parse time. Empty when MSBuild could not evaluate the project, and null in LSTs that
+     * predate it.
+     */
+    @Nullable
+    List<String> globalUsings;
+
     @Override
     public void rpcSend(DotNetProject after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
@@ -59,6 +69,8 @@ public class DotNetProject implements Marker, RpcCodec<DotNetProject> {
         q.getAndSendList(after, DotNetProject::getTargetFrameworks, s -> s, s ->
                 q.getAndSend(s, x -> x));
         q.getAndSend(after, DotNetProject::getSdk);
+        q.getAndSendList(after, DotNetProject::getGlobalUsings, s -> s, s ->
+                q.getAndSend(s, x -> x));
     }
 
     @Override
@@ -68,6 +80,8 @@ public class DotNetProject implements Marker, RpcCodec<DotNetProject> {
                 .withProjectName(q.receive(before.projectName))
                 .withTargetFrameworks(q.receiveList(before.targetFrameworks, s ->
                         q.<String, String>receiveAndGet(s, x -> x)))
-                .withSdk(q.receive(before.sdk));
+                .withSdk(q.receive(before.sdk))
+                .withGlobalUsings(q.receiveList(before.globalUsings, s ->
+                        q.<String, String>receiveAndGet(s, x -> x)));
     }
 }

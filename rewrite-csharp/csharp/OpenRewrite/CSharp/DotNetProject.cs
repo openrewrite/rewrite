@@ -30,25 +30,43 @@ public sealed class DotNetProject : Marker, IRpcCodec<DotNetProject>, IEquatable
     public IList<string> TargetFrameworks { get; }
     public string? Sdk { get; }
 
-    public DotNetProject(Guid id, string projectName, IList<string>? targetFrameworks = null, string? sdk = null)
+    /// <summary>
+    /// The usings that apply to every file of the project in every target framework, each as it
+    /// reads after <c>global using</c>, such as <c>static System.Math</c>. They come from
+    /// implicit usings, <c>&lt;Using&gt;</c> items and the project's <c>global using</c>
+    /// directives at parse time. Empty when MSBuild could not evaluate the project, or the tree
+    /// predates this property.
+    /// </summary>
+    public IList<string> GlobalUsings { get; }
+
+    public DotNetProject(Guid id, string projectName, IList<string>? targetFrameworks = null, string? sdk = null,
+        IList<string>? globalUsings = null)
     {
         Id = id;
         ProjectName = projectName;
         TargetFrameworks = targetFrameworks ?? [];
         Sdk = sdk;
+        GlobalUsings = globalUsings ?? [];
     }
 
     public DotNetProject WithId(Guid id) =>
-        id == Id ? this : new(id, ProjectName, TargetFrameworks, Sdk);
+        id == Id ? this : new(id, ProjectName, TargetFrameworks, Sdk, GlobalUsings);
 
     public DotNetProject WithProjectName(string projectName) =>
-        projectName == ProjectName ? this : new(Id, projectName, TargetFrameworks, Sdk);
+        projectName == ProjectName ? this : new(Id, projectName, TargetFrameworks, Sdk, GlobalUsings);
 
     public DotNetProject WithTargetFrameworks(IList<string> targetFrameworks) =>
-        ReferenceEquals(targetFrameworks, TargetFrameworks) ? this : new(Id, ProjectName, targetFrameworks, Sdk);
+        ReferenceEquals(targetFrameworks, TargetFrameworks)
+            ? this
+            : new(Id, ProjectName, targetFrameworks, Sdk, GlobalUsings);
 
     public DotNetProject WithSdk(string? sdk) =>
-        sdk == Sdk ? this : new(Id, ProjectName, TargetFrameworks, sdk);
+        sdk == Sdk ? this : new(Id, ProjectName, TargetFrameworks, sdk, GlobalUsings);
+
+    public DotNetProject WithGlobalUsings(IList<string> globalUsings) =>
+        ReferenceEquals(globalUsings, GlobalUsings)
+            ? this
+            : new(Id, ProjectName, TargetFrameworks, Sdk, globalUsings);
 
     public void RpcSend(DotNetProject after, RpcSendQueue q)
     {
@@ -58,6 +76,9 @@ public sealed class DotNetProject : Marker, IRpcCodec<DotNetProject>, IEquatable
             s => s,
             s => q.GetAndSend(s, x => x));
         q.GetAndSend(after, m => m.Sdk);
+        q.GetAndSendList(after, m => m.GlobalUsings,
+            s => s,
+            s => q.GetAndSend(s, x => x));
     }
 
     public DotNetProject RpcReceive(DotNetProject before, RpcReceiveQueue q)
@@ -67,7 +88,9 @@ public sealed class DotNetProject : Marker, IRpcCodec<DotNetProject>, IEquatable
             .WithProjectName(q.Receive(before.ProjectName)!)
             .WithTargetFrameworks(q.ReceiveList(before.TargetFrameworks,
                 s => q.ReceiveAndGet<string, string>(s, x => x)!) ?? [])
-            .WithSdk(q.Receive(before.Sdk));
+            .WithSdk(q.Receive(before.Sdk))
+            .WithGlobalUsings(q.ReceiveList(before.GlobalUsings,
+                s => q.ReceiveAndGet<string, string>(s, x => x)!) ?? []);
     }
 
     public bool Equals(DotNetProject? other) => other is not null && Id == other.Id;
