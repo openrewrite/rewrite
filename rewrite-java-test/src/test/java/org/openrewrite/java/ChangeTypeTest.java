@@ -1880,6 +1880,64 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void renameTopLevelTypeInAPackageWithACapitalizedName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.MyCompany.Foo", "org.acme.Foo", false)),
+          java(
+            """
+              package com.MyCompany;
+
+              public class Foo {
+              }
+              """,
+            """
+              package org.acme;
+
+              public class Foo {
+              }
+              """,
+            spec -> spec.path("com/MyCompany/Foo.java")
+          )
+        );
+    }
+
+    @Test
+    void moveTypeFromTheDefaultPackageIntoAPackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("App", "b.App2", false)),
+          java(
+            """
+              /*
+               * License header
+               */
+
+              /**
+               * The application.
+               */
+              class App {
+              }
+              """,
+            """
+              /*
+               * License header
+               */
+
+              package b;
+
+              /**
+               * The application.
+               */
+              class App2 {
+              }
+              """,
+            spec -> spec.path("MyApp/src/main/java/App.java").afterRecipe(cu ->
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString()))
+                .isEqualTo("MyApp/src/main/java/b/App2.java"))
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     void updateImportPrefixWithEmptyPackage() {
@@ -1925,6 +1983,30 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void nestedClassKeepsItsPrefixWhenThePackageIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
+          java(
+            """
+              package a.b;
+
+              class Original {
+                  static class Inner {
+                  }
+              }
+              """,
+            """
+              class Target {
+                  static class Inner {
+                  }
+              }
+              """,
+            spec -> spec.path("a/b/Original.java")
+          )
+        );
+    }
+
+    @Test
     void targetInDefaultPackageIsNeverImported() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.A1", "Target", true)),
@@ -1965,6 +2047,8 @@ class ChangeTypeTest implements RewriteTest {
               package a.b;
               public class C {
                   public static class Original {
+                      Original() {
+                      }
                   }
               }
               """,
@@ -1972,6 +2056,98 @@ class ChangeTypeTest implements RewriteTest {
               package a.b;
               public class C {
                   public static class Target {
+                      Target() {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeDefinitionStaysWhenItMovesToAnotherOuterType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.B$Builder", false)),
+          java("package bar; public class B { public static class Builder {} }"),
+          java(
+            """
+              package foo;
+
+              public class A {
+                  public static Builder builder() {
+                      return new Builder();
+                  }
+
+                  public static class Builder {
+                  }
+              }
+              """,
+            """
+              package foo;
+
+              import bar.B;
+
+              public class A {
+                  public static B.Builder builder() {
+                      return new B.Builder();
+                  }
+
+                  public static class Builder {
+                  }
+              }
+              """,
+            spec -> spec.path("foo/A.java").afterRecipe(cu ->
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("foo/A.java"))
+          )
+        );
+    }
+
+    @Test
+    void qualifyNestedTypeMovedToAnotherOuterClassOfTheSameName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", false)),
+          java("package bar; public class A { public static class Builder {} }"),
+          java(
+            """
+              package foo;
+
+              public class A {
+                  public static Builder builder() {
+                      return new Builder();
+                  }
+
+                  public static class Builder {
+                  }
+              }
+              """,
+            """
+              package foo;
+
+              public class A {
+                  public static bar.A.Builder builder() {
+                      return new bar.A.Builder();
+                  }
+
+                  public static class Builder {
+                  }
+              }
+              """,
+            spec -> spec.path("foo/A.java")
+          )
+        );
+    }
+
+    @Test
+    void fileDeclaringANestedTypeThatStaysIsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", false)),
+          java(
+            """
+              package foo;
+
+              public class A {
+                  public static class Builder {
                   }
               }
               """
