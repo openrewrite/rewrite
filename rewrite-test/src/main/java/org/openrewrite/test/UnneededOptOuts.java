@@ -188,7 +188,8 @@ final class UnneededOptOuts {
 
     private boolean checksTypeValidation() {
         for (Field option : options(TypeValidation.class)) {
-            if (checked.contains(option.getName())) {
+            // the deprecated options turn off recipe quality checks, which no type validation reads
+            if (checked.contains(option.getName()) && !DEPRECATED_OPTIONS.containsValue(option.getName())) {
                 return true;
             }
         }
