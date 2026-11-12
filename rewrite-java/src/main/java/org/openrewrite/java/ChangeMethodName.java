@@ -198,11 +198,8 @@ public class ChangeMethodName extends Recipe {
             private JavaType.Method renamed(J.MethodInvocation call, JavaType.Method type) {
                 JavaType.Method renamed = type.withName(newMethodName);
                 JavaType.FullyQualified declaringType = type.getDeclaringType();
-                // a call without a receiver may be on a subtype, whose type arguments the declaring type doesn't tell
                 JavaType.FullyQualified receiver = call.getSelect() != null ?
-                        TypeUtils.asFullyQualified(call.getSelect().getType()) :
-                        declaringType instanceof JavaType.Parameterized ?
-                                ((JavaType.Parameterized) declaringType).getType() : declaringType;
+                        TypeUtils.asFullyQualified(call.getSelect().getType()) : thisType(declaringType);
                 // Kotlin, Groovy and the other languages resolve a call by rules of their own
                 if (receiver == null || getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
                     return renamed;
@@ -240,13 +237,30 @@ public class ChangeMethodName extends Recipe {
                                 .withThrownExceptions(type.getThrownExceptions());
                     }
                 }
-                // javac erases the types of an instance method that is called on a raw type
-                if (called == null || call.getSelect() != null && !called.hasFlags(Flag.Static) &&
-                                      receiver instanceof JavaType.Class && !receiver.getTypeParameters().isEmpty()) {
+                if (called == null || CalledMethod.isErased(receiver, called, call.getArguments())) {
                     return renamed;
                 }
                 called = CalledMethod.calledOn(receiver, called);
                 return called == null ? renamed : called;
+            }
+
+            /**
+             * The type of {@code this} for the call at the cursor, which has no receiver and calls a method of
+             * {@code declaringType}. It is the class around the call where that is a subtype. An anonymous class
+             * doesn't tell its type and a static import has none, so there it is {@code declaringType} as a raw type.
+             */
+            private JavaType.FullyQualified thisType(JavaType.FullyQualified declaringType) {
+                Object enclosing = getCursor().dropParentUntil(tree -> tree instanceof J.ClassDeclaration ||
+                        tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null ||
+                        tree == Cursor.ROOT_VALUE).getValue();
+                if (enclosing instanceof J.ClassDeclaration) {
+                    JavaType.FullyQualified type = ((J.ClassDeclaration) enclosing).getType();
+                    if (type != null && TypeUtils.isAssignableTo(declaringType.getFullyQualifiedName(), type)) {
+                        return type;
+                    }
+                }
+                return declaringType instanceof JavaType.Parameterized ?
+                        ((JavaType.Parameterized) declaringType).getType() : declaringType;
             }
 
             /**

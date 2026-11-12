@@ -794,6 +794,21 @@ class ChangeMethodNameTest implements RewriteTest {
               public class Sub extends Base {
                   @Override
                   public String neu() { return null; }
+                  Object withoutReceiver() {
+                      // no anonymous class, so the call is on a `Sub`
+                      return new java.util.EventObject(old());
+                  }
+              }
+              """,
+            """
+              package a;
+              public class Sub extends Base {
+                  @Override
+                  public String neu() { return null; }
+                  Object withoutReceiver() {
+                      // no anonymous class, so the call is on a `Sub`
+                      return new java.util.EventObject(neu());
+                  }
               }
               """
           ),
@@ -860,16 +875,16 @@ class ChangeMethodNameTest implements RewriteTest {
     @Test
     void renamedCallOnARawTypeKeepsItsType() {
         rewriteRun(
-          // javac erases the types of a method that is called on a raw type, which neither `old()` nor `neu()` tells
+          // javac has these calls return a `List`, the erasure of `neu()`'s type, where they keep the type of `old()`
           spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null))
             .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           java(
             """
               package a;
               import java.util.List;
-              public interface Box<T> {
-                  Object old();
-                  List<String> neu();
+              public class Box<T> {
+                  public T old() { return null; }
+                  public List<String> neu() { return null; }
               }
               """
           ),
@@ -892,15 +907,44 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                    assertThat(requireNonNull(method.getMethodType()).getReturnType()).hasToString("java.lang.Object");
-                    return method;
-                }
-            }.visit(cu, 0))
+            spec -> spec.afterRecipe(ChangeMethodNameTest::assertCallsReturnObject)
+          ),
+          java(
+            """
+              import a.Box;
+
+              class Strings extends Box<String> {
+                  Object test() {
+                      return new Box() {
+                          Object anonymous = old();
+                      };
+                  }
+              }
+              """,
+            """
+              import a.Box;
+
+              class Strings extends Box<String> {
+                  Object test() {
+                      return new Box() {
+                          Object anonymous = neu();
+                      };
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(ChangeMethodNameTest::assertCallsReturnObject)
           )
         );
+    }
+
+    private static void assertCallsReturnObject(J.CompilationUnit cu) {
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                assertThat(requireNonNull(method.getMethodType()).getReturnType()).hasToString("java.lang.Object");
+                return method;
+            }
+        }.visit(cu, 0);
     }
 
     @Test
@@ -935,6 +979,26 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """
+          ),
+          java(
+            """
+              import static a.Box.old;
+
+              class Imported {
+                  Object test() {
+                      return old();
+                  }
+              }
+              """,
+            """
+              import static a.Box.neu;
+
+              class Imported {
+                  Object test() {
+                      return neu();
+                  }
+              }
+              """
           )
         );
     }
@@ -948,7 +1012,7 @@ class ChangeMethodNameTest implements RewriteTest {
               package a;
               public abstract class Box<T> {
                   abstract Object old();
-                  abstract String neu();
+                  abstract T neu();
                   Object test() {
                       return old();
                   }
@@ -958,7 +1022,7 @@ class ChangeMethodNameTest implements RewriteTest {
               package a;
               public abstract class Box<T> {
                   abstract Object old();
-                  abstract String neu();
+                  abstract T neu();
                   Object test() {
                       return neu();
                   }

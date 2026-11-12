@@ -121,6 +121,51 @@ final class CalledMethod {
     }
 
     /**
+     * @return Whether javac erases types of {@code declared} for a call with {@code arguments} on a receiver of
+     * {@code type}. It does for an instance method that a raw type inherits, and for a method that takes a raw
+     * argument for a parameterized parameter.
+     */
+    static boolean isErased(JavaType.FullyQualified type, JavaType.Method declared, List<Expression> arguments) {
+        JavaType.FullyQualified declaringType = declared.getDeclaringType();
+        if (!declared.hasFlags(Flag.Static) && !declaringType.getTypeParameters().isEmpty() &&
+            Substitutions.asSupertype(type, declaringType.getFullyQualifiedName()) == null) {
+            return true;
+        }
+        Map<String, JavaType> typeArguments = typeArguments(type, declared);
+        List<JavaType> parameterTypes = declared.getParameterTypes();
+        int i = 0;
+        for (Expression argument : arguments) {
+            if (!(argument instanceof J.Empty)) {
+                // a varargs parameter takes the arguments after its own too
+                JavaType declaredType = parameterTypes.get(Math.min(i++, parameterTypes.size() - 1));
+                JavaType parameterType = Substitutions.withArguments(declaredType, typeArguments);
+                if (takesRaw(parameterType == null ? declaredType : parameterType, argument)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether {@code parameter} is a parameterized type and {@code argument} is of a raw one, or of a type that
+     * doesn't tell. A lambda, a method reference and {@code null} are of no raw type.
+     */
+    private static boolean takesRaw(JavaType parameter, Expression argument) {
+        JavaType type = argument.getType();
+        while (parameter instanceof JavaType.Array) {
+            parameter = ((JavaType.Array) parameter).getElemType();
+        }
+        while (type instanceof JavaType.Array) {
+            type = ((JavaType.Array) type).getElemType();
+        }
+        Expression unwrapped = argument.unwrap();
+        return parameter instanceof JavaType.Parameterized && !(unwrapped instanceof J.Lambda) &&
+               !(unwrapped instanceof J.MemberReference) && type != JavaType.Primitive.Null &&
+               Substitutions.asSupertype(type, ((JavaType.Parameterized) parameter).getFullyQualifiedName()) == null;
+    }
+
+    /**
      * @return {@code types} itself where none of them names a type variable.
      */
     private static @Nullable List<JavaType> withArguments(List<JavaType> types, Map<String, JavaType> typeArguments) {
@@ -215,19 +260,23 @@ final class CalledMethod {
     }
 
     /**
-     * Adds {@code method}, or replaces the method with its parameter types where {@code method} returns a narrower
-     * type. A subtype's methods come before those of its supertypes, which they override. An interface can come after
-     * one it overrides, as in {@code New extends Wide, Narrow}.
+     * Adds {@code method} in place of the methods it overrides, unless one of {@code candidates} overrides it. An
+     * interface can come after one it overrides, as in {@code New extends Wide, Narrow}. Of methods with the same
+     * parameters in unrelated types javac calls the concrete one, which a class declares. Among abstract ones its
+     * choice is arbitrary, so they all stay.
      */
     private static void add(JavaType.Method method, List<JavaType.Method> candidates) {
-        for (int i = 0; i < candidates.size(); i++) {
-            JavaType.Method candidate = candidates.get(i);
+        JavaType.FullyQualified type = method.getDeclaringType();
+        for (Iterator<JavaType.Method> others = candidates.iterator(); others.hasNext(); ) {
+            JavaType.Method candidate = others.next();
             if (sameTypes(candidate.getParameterTypes(), method.getParameterTypes())) {
-                if (TypeUtils.isAssignableTo(candidate.getReturnType(), method.getReturnType()) &&
-                    !TypeUtils.isAssignableTo(method.getReturnType(), candidate.getReturnType())) {
-                    candidates.set(i, method);
+                JavaType.FullyQualified candidateType = candidate.getDeclaringType();
+                if (TypeUtils.isAssignableTo(candidateType.getFullyQualifiedName(), type)) {
+                    others.remove();
+                } else if (TypeUtils.isAssignableTo(type.getFullyQualifiedName(), candidateType) ||
+                           !candidate.hasFlags(Flag.Abstract)) {
+                    return;
                 }
-                return;
             }
         }
         candidates.add(method);
@@ -269,14 +318,16 @@ final class CalledMethod {
     }
 
     /**
-     * The type of {@code argument} where it tells which parameters take it. A lambda, a method reference and a call
-     * of a generic method have the type that javac inferred from the parameter they were written for, and a type with
-     * a supertype that is only its name doesn't tell all that it is assignable to.
+     * The type of {@code argument} where it tells which parameters take it. A lambda, a method reference, a call of a
+     * generic method and a conditional or {@code switch} of such have the type that javac inferred from the parameter
+     * they were written for, and a type with a supertype that is only its name doesn't tell all that it is assignable
+     * to.
      */
     private static @Nullable JavaType tellingType(Expression argument) {
         Expression unwrapped = argument.unwrap();
         JavaType type = argument.getType();
         if (type == null || unwrapped instanceof J.Lambda || unwrapped instanceof J.MemberReference ||
+            unwrapped instanceof J.Ternary || unwrapped instanceof J.SwitchExpression ||
             unwrapped instanceof J.MethodInvocation && isGeneric(((J.MethodInvocation) unwrapped).getMethodType()) ||
             contains(type, t -> t instanceof JavaType.FullyQualified &&
                                 isNameOnly((JavaType.FullyQualified) t, new HashSet<>()))) {
