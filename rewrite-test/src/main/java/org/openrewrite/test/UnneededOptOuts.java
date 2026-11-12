@@ -48,12 +48,6 @@ final class UnneededOptOuts {
     private static final String SERIALIZATION = "validateRecipeSerialization";
 
     /**
-     * The options of {@link TypeValidation} that {@link TypeValidation#validatesTypes} requires.
-     */
-    private static final List<String> TYPE_CHECKS = asList("classDeclarations", "identifiers", "methodDeclarations",
-            "variableDeclarations", "methodInvocations", "constructorInvocations");
-
-    /**
      * Recipe quality checks that run only when the test validates the type attribution of the recipe's input and
      * output.
      */
@@ -140,7 +134,7 @@ final class UnneededOptOuts {
         if (SERIALIZATION.equals(check)) {
             return checked.contains(check) && !asRun.serializes();
         }
-        return (checked.contains(check) || NEED_TYPES.contains(check) && !Collections.disjoint(checked, TYPE_CHECKS)) &&
+        return (checked.contains(check) || NEED_TYPES.contains(check) && checksTypeValidation()) &&
                !asRun.runs(check);
     }
 
