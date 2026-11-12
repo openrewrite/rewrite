@@ -119,6 +119,17 @@ class UnneededOptOutsTest implements RewriteTest {
     }
 
     @Test
+    void leaveChecksThatAreOffByDefaultOnWhenTheTestTurnsThemOn() {
+        withSystemProperty("org.openrewrite.test.parserTypedTrees", null, () -> {
+            withOptOutsChecked("all", () -> rewriteRun(
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build()),
+              text("a")
+            ));
+            return null;
+        });
+    }
+
+    @Test
     void offUnlessItsSystemPropertyNamesChecks() {
         withOptOutsChecked(null, () -> rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),

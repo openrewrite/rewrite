@@ -54,7 +54,8 @@ final class UnneededOptOuts {
     private static final Set<String> NEED_TYPES = new HashSet<>(asList("matchByTypeNotName", "parserTypedTrees"));
 
     /**
-     * The deprecated option of {@link TypeValidation} that has no effect, so turning it off is never reported.
+     * The deprecated option of {@link TypeValidation} that has no effect, so the property can't name it and turning it
+     * off is never reported.
      */
     private static final String NO_EFFECT = "cursorAcyclic";
 
@@ -75,7 +76,9 @@ final class UnneededOptOuts {
         OPTION_FIELDS.put(TypeValidation.class, declaredOptions(TypeValidation.class));
         OPTION_FIELDS.put(RecipeQualityValidation.class, declaredOptions(RecipeQualityValidation.class));
         for (Field option : options(TypeValidation.class)) {
-            KNOWN.add(option.getName());
+            if (!NO_EFFECT.equals(option.getName())) {
+                KNOWN.add(option.getName());
+            }
         }
         for (Field option : options(RecipeQualityValidation.class)) {
             KNOWN.add(option.getName());
@@ -496,8 +499,10 @@ final class UnneededOptOuts {
     private static List<String> turnedOff(Object options, Set<String> checked) {
         List<String> turnedOff = new ArrayList<>();
         for (Field option : options(options.getClass())) {
+            // a recipe quality check that is off by default and that the test turns on isn't an opt-out
             if (checked.contains(option.getName()) && !NO_EFFECT.equals(option.getName()) &&
-                !isDefault(options, option)) {
+                !isDefault(options, option) &&
+                !(options instanceof RecipeQualityValidation && Boolean.TRUE.equals(get(options, option)))) {
                 turnedOff.add(option.getName());
             }
         }
