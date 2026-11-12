@@ -187,7 +187,7 @@ public class Substitutions {
         return "__P__./*__p" + index + "__*/" + fqn + "p()";
     }
 
-    private String getTypeName(@Nullable JavaType type) {
+    static String getTypeName(@Nullable JavaType type) {
         if (type == null) {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
