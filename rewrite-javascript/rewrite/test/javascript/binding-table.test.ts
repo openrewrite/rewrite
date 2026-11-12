@@ -163,6 +163,22 @@ describe("bindingTable", () => {
         ]);
     });
 
+    // Wanted: a quoted property name is the member the pattern reads, as an identifier one is.
+    // Not fixed: `bindingNames` in scope.ts reads only an identifier there, and a require rarely quotes one.
+    test.fails("a quoted property name in a require's pattern is the member it reads", async () => {
+        const {rows} = await tablesOf(
+            //language=javascript
+            javascript(`
+                const {"x-request-id": requestId} = require("./headers");
+            `)
+        );
+        // Now: member "requestId", the local name
+        expect(rows).toEqual([
+            {form: "require-member", name: "requestId", member: "x-request-id", module: "./headers", typeOnly: false,
+                reassignable: false}
+        ]);
+    });
+
     test("an awaited dynamic import binds the module namespace object", async () => {
         const {rows} = await tablesOf(
             //language=typescript
@@ -428,5 +444,24 @@ describe("the earliest whole-module binding answers for its module", () => {
         );
         // Before: "React"
         expect(bound.name).toBe("ReactCompat");
+    });
+});
+
+describe("a named import of an export literally called \"*\"", () => {
+    // Wanted: `{"*" as star}` binds the export named "*", not the namespace, so a namespace request binds anew.
+    // Not fixed: `moduleScopeBindings` spells a namespace import's member "*" too, and telling the two apart would
+    // take code for a specifier hardly anyone writes. `exportOf` already reads it as the export.
+    test.fails("maybeBind of the namespace does not answer with it", async () => {
+        const bound: {name?: string} = {};
+        await binding({module: "./exports-star", member: "*", preferredName: "ns"}, bound).rewriteRun(
+            //language=typescript
+            typescript(`
+                import {"*" as star} from "./exports-star";
+
+                star();
+            `)
+        );
+        // Now: "star"
+        expect(bound.name).toBe("ns");
     });
 });

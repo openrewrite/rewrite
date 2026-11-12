@@ -209,9 +209,8 @@ export function moduleBindings(
                         ? {module: object.module, member: "default", typeOnly: object.typeOnly, via: {kind: "default", name}}
                         : undefined;
                 }
-                // `{"*" as x}` names no export here, as when this read `ModuleScopeBinding`, which spells a namespace `*`
                 const named = table().find((b): b is MemberBinding => b.name === name &&
-                    (b.form === "named" || b.form === "require-member") && b.member !== "*");
+                    (b.form === "named" || b.form === "require-member"));
                 return named === undefined
                     ? destructuredExport(cu, name, moduleObject)
                     : {module: named.module, member: named.member, typeOnly: named.typeOnly, via: {kind: "named", name}};

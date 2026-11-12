@@ -394,6 +394,20 @@ describe("exportOf", () => {
         `));
         expect(seen).toEqual([{module: "sap/m/Button", member: "extend", typeOnly: false, via: {kind: "amd", name: "Button"}}]);
     });
+
+    test("a named import of an export literally called \"*\" names that export", async () => {
+        const read = await exportOfIn(
+            //language=typescript
+            `
+                import {"*" as star} from "./exports-star";
+
+                star();
+            `,
+            "star()"
+        );
+        // Before: undefined, since the lookup skipped the member "*", which `moduleScopeBindings` spells a namespace with
+        expect(read).toEqual({module: "./exports-star", member: "*", typeOnly: false, via: {kind: "named", name: "star"}});
+    });
 });
 
 describe("isAmdBlock", () => {
