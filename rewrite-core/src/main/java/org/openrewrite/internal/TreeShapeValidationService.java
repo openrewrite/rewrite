@@ -95,6 +95,15 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @return A copy of {@code parser} for when the check compares types, which reads no types that another parser
+     * mapped. It is for a parser that didn't parse the test's sources, as the types it would read can be those of
+     * the classpath the sources were parsed with.
+     */
+    default Parser.Builder typedParser(Parser.Builder parser) {
+        return parser;
+    }
+
+    /**
      * @return How the types of {@code tree} differ from those of {@code parsed}, the same node in a parse of the text
      * it prints, each such as "the variable int x where the parser gives long x". A type either of them doesn't
      * resolve isn't compared.
