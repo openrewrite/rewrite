@@ -365,7 +365,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                                 addImport(fullyQualifiedTarget);
                                 // the target's import shortens `Owner.Target` to `Target`, which can leave the owner's unused
                                 for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
-                                    maybeRemoveImport(owner);
+                                    if (!imports(sf, owner)) {
+                                        maybeRemoveImport(owner);
+                                    }
                                 }
                             }
                         }
@@ -639,6 +641,20 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     .withTarget(target)
                     .withName(fieldAccess.getName().withSimpleName(newSimpleName).withType(null))
                     .withType(updatedFieldAccessType);
+        }
+
+        /**
+         * Whether the source file imports {@code type} itself or by a star import of its package, an import that
+         * ChangeType leaves as it is.
+         */
+        private static boolean imports(JavaSourceFile sf, JavaType.FullyQualified type) {
+            for (J.Import anImport : sf.getImports()) {
+                if (!anImport.isStatic() && (TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(), type.getFullyQualifiedName()) ||
+                        "*".equals(anImport.getQualid().getSimpleName()) && anImport.getPackageName().equals(type.getPackageName()))) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static Expression attributeTopLevelClassName(Expression expr, JavaType.FullyQualified topLevelType) {
