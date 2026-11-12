@@ -15,8 +15,12 @@
  */
 package org.openrewrite.java.style;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
@@ -35,6 +39,8 @@ import org.openrewrite.style.Style;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY;
+import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.newSetFromMap;
 import static java.util.stream.Collectors.*;
@@ -56,18 +62,48 @@ public class Autodetect extends NamedStyles {
         return new Detector();
     }
 
+    /**
+     * Accumulates formatting statistics from sampled source files. Its state is serializable with Jackson and
+     * can be {@link #merge(Detector) merged}, so files sampled in separate processes produce the same styles
+     * as if one detector had sampled them all.
+     */
+    @JsonAutoDetect(fieldVisibility = NONE, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     public static class Detector {
 
-        private final IndentStatistics indentStatistics = new IndentStatistics();
-        private final SpacesStatistics spacesStatistics = new SpacesStatistics();
-        private final WrappingAndBracesStatistics wrappingAndBracesStatistics = new WrappingAndBracesStatistics();
-        private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+        @JsonProperty
+        private IndentStatistics indentStatistics = new IndentStatistics();
+
+        @JsonProperty
+        private SpacesStatistics spacesStatistics = new SpacesStatistics();
+
+        @JsonProperty
+        private WrappingAndBracesStatistics wrappingAndBracesStatistics = new WrappingAndBracesStatistics();
+
+        @JsonProperty
+        private GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+
+        @JsonProperty
+        private ImportLayoutSamples importLayoutSamples = new ImportLayoutSamples();
 
         private final FindImportLayout findImportLayout = new FindImportLayout();
         private final FindIndentJavaVisitor findIndent = new FindIndentJavaVisitor();
         private final FindSpacesStyle findSpaces = new FindSpacesStyle();
         private final FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
+
+        /**
+         * Add another detector's statistics to this one. The result does not depend on the order detectors are merged in.
+         *
+         * @return this detector
+         */
+        public Detector merge(Detector other) {
+            indentStatistics.merge(other.indentStatistics);
+            spacesStatistics.merge(other.spacesStatistics);
+            wrappingAndBracesStatistics.merge(other.wrappingAndBracesStatistics);
+            generalFormatStatistics.merge(other.generalFormatStatistics);
+            importLayoutSamples.merge(other.importLayoutSamples);
+            return this;
+        }
 
         public void sample(SourceFile cu) {
             // only sample Java sources; extending languages need their own `Autodetect.Detector`
@@ -78,7 +114,7 @@ public class Autodetect extends NamedStyles {
         }
 
         public void sampleJava(JavaSourceFile cu) {
-            findImportLayout.visitNonNull(cu, 0);
+            findImportLayout.visitNonNull(cu, importLayoutSamples);
             findIndent.visitNonNull(cu, indentStatistics);
             findSpaces.visitNonNull(cu, spacesStatistics);
             findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
@@ -88,7 +124,7 @@ public class Autodetect extends NamedStyles {
         public Autodetect build() {
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
-                    findImportLayout.aggregate().getImportLayoutStyle(),
+                    importLayoutSamples.aggregate().getImportLayoutStyle(),
                     spacesStatistics.getSpacesStyle(),
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle()));
@@ -99,7 +135,7 @@ public class Autodetect extends NamedStyles {
         }
 
         public ImportLayoutStyle getImportLayoutStyle() {
-            return findImportLayout.aggregate().getImportLayoutStyle();
+            return importLayoutSamples.aggregate().getImportLayoutStyle();
         }
 
         public SpacesStyle getSpacesStyle() {
@@ -115,9 +151,15 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class GeneralFormatStatistics {
         private int linesWithCRLFNewLines = 0;
         private int linesWithLFNewLines = 0;
+
+        void merge(GeneralFormatStatistics other) {
+            linesWithCRLFNewLines += other.linesWithCRLFNewLines;
+            linesWithLFNewLines += other.linesWithLFNewLines;
+        }
 
         public boolean isIndentedWithLFNewLines() {
             return linesWithLFNewLines >= linesWithCRLFNewLines;
@@ -130,7 +172,6 @@ public class Autodetect extends NamedStyles {
         }
     }
 
-    @Data
     private static class IndentStatistic {
         @Value
         private static class DepthCoordinate {
@@ -140,6 +181,37 @@ public class Autodetect extends NamedStyles {
 
         // depth -> count of whitespace char (4 spaces, 2 tabs, etc) -> count of occurrences
         Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new ConcurrentHashMap<>();
+
+        void merge(IndentStatistic other) {
+            other.depthToSpaceIndentFrequencies.forEach((depth, frequencies) -> {
+                Map<Integer, Long> merged = depthToSpaceIndentFrequencies.computeIfAbsent(depth, d -> new ConcurrentHashMap<>());
+                frequencies.forEach((charCount, count) -> merged.merge(charCount, count, Long::sum));
+            });
+        }
+
+        /**
+         * Serialized as rows of {@code [indentDepth, continuationDepth, charCount, occurrences]}, since JSON object
+         * keys can't be {@link DepthCoordinate}s.
+         */
+        @JsonValue
+        List<long[]> toRows() {
+            List<long[]> rows = new ArrayList<>();
+            depthToSpaceIndentFrequencies.forEach((depth, frequencies) -> frequencies.forEach((charCount, count) ->
+                    rows.add(new long[]{depth.getIndentDepth(), depth.getContinuationDepth(), charCount, count})));
+            rows.sort(Comparator.<long[]>comparingLong(r -> r[0]).thenComparingLong(r -> r[1]).thenComparingLong(r -> r[2]));
+            return rows;
+        }
+
+        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+        static IndentStatistic fromRows(List<long[]> rows) {
+            IndentStatistic statistic = new IndentStatistic();
+            for (long[] row : rows) {
+                statistic.depthToSpaceIndentFrequencies
+                        .computeIfAbsent(new DepthCoordinate((int) row[0], (int) row[1]), d -> new ConcurrentHashMap<>())
+                        .merge((int) row[2], row[3], Long::sum);
+            }
+            return statistic;
+        }
 
         public void record(int indentDepth, int continuationDepth, int charCount) {
             record(new DepthCoordinate(indentDepth, continuationDepth), charCount);
@@ -182,24 +254,37 @@ public class Autodetect extends NamedStyles {
                     })
                     .collect(toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
 
-            return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
+            return map.entrySet().stream().max(MOST_FREQUENT_THEN_SMALLEST)
                     .map(Map.Entry::getKey)
                     .orElse(commonIndent * 2);
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class IndentStatistics {
-        private final IndentStatistic spaceIndentFrequencies = new IndentStatistic();
-        private final IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
-        private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
-        private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
-        private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
+        private IndentStatistic spaceIndentFrequencies = new IndentStatistic();
+        private IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
+        private IndentStatistic tabIndentFrequencies = new IndentStatistic();
+        private IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
+        private IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
         private long accumulateDepthCount = 0;
 
+        // Position of the visitor within the file currently being sampled
         @Getter
+        @JsonIgnore
         private int depth = 0;
         @Getter
+        @JsonIgnore
         private int continuationDepth = 1;
+
+        void merge(IndentStatistics other) {
+            spaceIndentFrequencies.merge(other.spaceIndentFrequencies);
+            spaceContinuationIndentFrequencies.merge(other.spaceContinuationIndentFrequencies);
+            tabIndentFrequencies.merge(other.tabIndentFrequencies);
+            tabContinuationIndentFrequencies.merge(other.tabContinuationIndentFrequencies);
+            deltaSpaceIndentFrequencies.merge(other.deltaSpaceIndentFrequencies);
+            accumulateDepthCount += other.accumulateDepthCount;
+        }
 
         public void incrementDepth() {
             depth++;
@@ -277,6 +362,11 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    // Ties go to the smaller key, so the result doesn't depend on map iteration order
+    private static final Comparator<Map.Entry<Integer, Long>> MOST_FREQUENT_THEN_SMALLEST =
+            Map.Entry.<Integer, Long>comparingByValue()
+                    .thenComparing(Map.Entry.<Integer, Long>comparingByKey().reversed());
+
     private static long getTotalCharCount(IndentStatistic indentStatistic) {
         return indentStatistic.depthToSpaceIndentFrequencies.entrySet()
                 .stream()
@@ -286,17 +376,17 @@ public class Autodetect extends NamedStyles {
     }
 
     private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
-        Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
+        Map<Integer, Long> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
                 // A prefix with more tabs than its block depth has a negative delta, from which no tab size can be inferred
                 .filter(entry -> entry.getKey().indentDepth > 0)
                 .flatMap(entry -> entry.getValue().entrySet().stream()
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
-                                spaceCountToFrequency.getValue().intValue())))
-                .collect(groupingBy(Map.Entry::getKey, summingInt(Map.Entry::getValue)));
+                                spaceCountToFrequency.getValue())))
+                .collect(groupingBy(Map.Entry::getKey, summingLong(Map.Entry::getValue)));
 
         return tabSizeToFrequencyMap.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
+                .max(MOST_FREQUENT_THEN_SMALLEST)
                 .map(Map.Entry::getKey)
                 .orElse(0);
     }
@@ -571,6 +661,8 @@ public class Autodetect extends NamedStyles {
                                     .filter(b -> "all other imports".equals(b.pattern))
                                     .count()
                             )
+                            // a total order, so the choice doesn't depend on the order files were sampled in
+                            .thenComparing(ImportLayoutStatistics::compareBlockSequences)
                     )
                     .map(longestBlocks -> {
                         ImportLayoutStyle.Builder builder = ImportLayoutStyle.builder();
@@ -851,6 +943,21 @@ public class Autodetect extends NamedStyles {
             }
         }
 
+        private static final Comparator<Block> BLOCK_ORDER = Comparator
+                .<Block, BlockType>comparing(b -> b.type)
+                .thenComparing(b -> b.pattern)
+                .thenComparing(b -> b.addBlankLine);
+
+        private static int compareBlockSequences(List<Block> a, List<Block> b) {
+            for (int i = 0; i < Math.min(a.size(), b.size()); i++) {
+                int c = BLOCK_ORDER.compare(a.get(i), b.get(i));
+                if (c != 0) {
+                    return c;
+                }
+            }
+            return Integer.compare(a.size(), b.size());
+        }
+
         /**
          * Maps the imported packages to patterns used to create Blocks in the ImportLayout.
          * Patterns are generated early to prevent block patterns that are too specific.
@@ -901,18 +1008,41 @@ public class Autodetect extends NamedStyles {
     }
 
     @Value
+    @AllArgsConstructor(onConstructor_ = @JsonCreator)
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class ImportAttributes {
         boolean isStatic;
         String packageName;
-        String prefix;
+        boolean blankLineBefore;
     }
 
-    private static class FindImportLayout extends JavaIsoVisitor<Integer> {
-        private final List<List<ImportAttributes>> importsBySourceFile = new ArrayList<>();
-        private final NavigableSet<String> importedPackages = new TreeSet<>();
-        private final ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
+    /**
+     * Raw per-file import observations. Block patterns depend on the packages imported across every file,
+     * so files can only be grouped into blocks once all samples are in.
+     */
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
+    private static class ImportLayoutSamples {
+        List<List<ImportAttributes>> importsBySourceFile = new ArrayList<>();
+        int minimumFoldedImports = Integer.MAX_VALUE;
+        int minimumFoldedStaticImports = Integer.MAX_VALUE;
 
-        public ImportLayoutStatistics aggregate() {
+        void merge(ImportLayoutSamples other) {
+            importsBySourceFile.addAll(other.importsBySourceFile);
+            minimumFoldedImports = Math.min(minimumFoldedImports, other.minimumFoldedImports);
+            minimumFoldedStaticImports = Math.min(minimumFoldedStaticImports, other.minimumFoldedStaticImports);
+        }
+
+        ImportLayoutStatistics aggregate() {
+            ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
+            importLayoutStatistics.minimumFoldedImports = minimumFoldedImports;
+            importLayoutStatistics.minimumFoldedStaticImports = minimumFoldedStaticImports;
+
+            NavigableSet<String> importedPackages = new TreeSet<>();
+            for (List<ImportAttributes> imports : importsBySourceFile) {
+                for (ImportAttributes anImport : imports) {
+                    importedPackages.add(anImport.getPackageName() + ".");
+                }
+            }
             // initializes importLayoutStatistics.pkgToBlockPattern which is used in the loop that follows
             importLayoutStatistics.mapBlockPatterns(importedPackages);
 
@@ -934,7 +1064,7 @@ public class Autodetect extends NamedStyles {
                 Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
                 for (ImportAttributes anImport : imports) {
                     previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
-                    boolean containsNewLine = anImport.getPrefix().contains("\n\n") || anImport.getPrefix().contains("\r\n\r\n");
+                    boolean containsNewLine = anImport.isBlankLineBefore();
                     if (containsNewLine ||
                         i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
                         !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
@@ -992,12 +1122,12 @@ public class Autodetect extends NamedStyles {
 
             return importLayoutStatistics;
         }
+    }
 
+    private static class FindImportLayout extends JavaIsoVisitor<ImportLayoutSamples> {
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer integer) {
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ImportLayoutSamples samples) {
             for (J.Import anImport : cu.getImports()) {
-                importedPackages.add(anImport.getPackageName() + ".");
-
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
                         String importedTypeName = anImport.getTypeName();
@@ -1016,8 +1146,8 @@ public class Autodetect extends NamedStyles {
                             }
                         }
 
-                        importLayoutStatistics.minimumFoldedStaticImports = Math.min(
-                                importLayoutStatistics.minimumFoldedStaticImports,
+                        samples.minimumFoldedStaticImports = Math.min(
+                                samples.minimumFoldedStaticImports,
                                 staticMembers.size()
                         );
                     } else {
@@ -1033,90 +1163,107 @@ public class Autodetect extends NamedStyles {
                             }
                         }
 
-                        importLayoutStatistics.minimumFoldedImports = Math.min(
-                                importLayoutStatistics.minimumFoldedImports,
+                        samples.minimumFoldedImports = Math.min(
+                                samples.minimumFoldedImports,
                                 fqns.size()
                         );
                     }
                 }
             }
 
-            importsBySourceFile.add(cu.getImports().stream()
-                    .map(it -> new ImportAttributes(it.isStatic(), it.getPackageName(), it.getPrefix().getWhitespace()))
+            samples.importsBySourceFile.add(cu.getImports().stream()
+                    .map(it -> {
+                        String prefix = it.getPrefix().getWhitespace();
+                        return new ImportAttributes(it.isStatic(), it.getPackageName(),
+                                prefix.contains("\n\n") || prefix.contains("\r\n\r\n"));
+                    })
                     .collect(toList()));
 
             return cu;
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class SpacesStatistics {
-        int beforeIf = 1;
-        int beforeMethodCall = 0;
-        int beforeMethodDeclaration = 0;
-        int beforeFor = 1;
-        int beforeWhile = 1;
-        int beforeSwitch = 1;
-        int beforeTry = 1;
-        int beforeCatch = 1;
-        int beforeSynchronized = 1;
-        int beforeComma = 0;
-        int afterComma = 1;
-        int beforeColonInForEach = 1;
-        int beforeForSemiColon = 0;
-        int afterForSemiColon = 0;
-        int afterTypeCast = 0;
-        int withinMethodCallParentheses = 0;
+        // Net votes: +1 for each occurrence with a space, -1 for each without
+        int beforeIf;
+        int beforeMethodCall;
+        int beforeMethodDeclaration;
+        int beforeFor;
+        int beforeWhile;
+        int beforeSwitch;
+        int beforeTry;
+        int beforeCatch;
+        int beforeSynchronized;
+        int beforeComma;
+        int afterComma;
+        int beforeColonInForEach;
+        int beforeForSemiColon;
+        int afterForSemiColon;
+        int afterTypeCast;
+        int withinMethodCallParentheses;
+
+        void merge(SpacesStatistics other) {
+            beforeIf += other.beforeIf;
+            beforeMethodCall += other.beforeMethodCall;
+            beforeMethodDeclaration += other.beforeMethodDeclaration;
+            beforeFor += other.beforeFor;
+            beforeWhile += other.beforeWhile;
+            beforeSwitch += other.beforeSwitch;
+            beforeTry += other.beforeTry;
+            beforeCatch += other.beforeCatch;
+            beforeSynchronized += other.beforeSynchronized;
+            beforeComma += other.beforeComma;
+            afterComma += other.afterComma;
+            beforeColonInForEach += other.beforeColonInForEach;
+            beforeForSemiColon += other.beforeForSemiColon;
+            afterForSemiColon += other.afterForSemiColon;
+            afterTypeCast += other.afterTypeCast;
+            withinMethodCallParentheses += other.withinMethodCallParentheses;
+        }
 
         public SpacesStyle getSpacesStyle() {
             SpacesStyle spaces = IntelliJ.spaces();
+            SpacesStyle.BeforeParentheses bp = spaces.getBeforeParentheses();
+            SpacesStyle.Within within = spaces.getWithin();
+            SpacesStyle.Other other = spaces.getOther();
+            boolean forOrWhile = vote(beforeFor, bp.getForParentheses()) || vote(beforeWhile, bp.getWhileParentheses());
+            boolean tryOrCatch = vote(beforeTry, bp.getTryParentheses()) || vote(beforeCatch, bp.getCatchParentheses());
             return spaces
                     .withBeforeParentheses(
                             new SpacesStyle.BeforeParentheses(
-                                    beforeMethodDeclaration > 0,
-                                    beforeMethodCall > 0,
-                                    beforeIf > 0,
-                                    beforeFor > 0 || beforeWhile > 0,
-                                    beforeWhile > 0 || beforeFor > 0,
-                                    beforeSwitch > 0,
-                                    beforeTry > 0 || beforeCatch > 0,
-                                    beforeTry > 0 || beforeCatch > 0,
-                                    beforeSynchronized > 0,
+                                    vote(beforeMethodDeclaration, bp.getMethodDeclaration()),
+                                    vote(beforeMethodCall, bp.getMethodCall()),
+                                    vote(beforeIf, bp.getIfParentheses()),
+                                    forOrWhile,
+                                    forOrWhile,
+                                    vote(beforeSwitch, bp.getSwitchParentheses()),
+                                    tryOrCatch,
+                                    tryOrCatch,
+                                    vote(beforeSynchronized, bp.getSynchronizedParentheses()),
                                     false
                             )
                     )
-                    .withWithin(new SpacesStyle.Within(
-                            spaces.getWithin().getCodeBraces(),
-                            spaces.getWithin().getBrackets(),
-                            spaces.getWithin().getArrayInitializerBraces(),
-                            spaces.getWithin().getEmptyArrayInitializerBraces(),
-                            spaces.getWithin().getGroupingParentheses(),
-                            spaces.getWithin().getMethodDeclarationParentheses(),
-                            spaces.getWithin().getEmptyMethodDeclarationParentheses(),
-                            withinMethodCallParentheses > 0,
-                            spaces.getWithin().getEmptyMethodCallParentheses(),
-                            spaces.getWithin().getIfParentheses(),
-                            spaces.getWithin().getForParentheses(),
-                            spaces.getWithin().getWhileParentheses(),
-                            spaces.getWithin().getSwitchParentheses(),
-                            spaces.getWithin().getTryParentheses(),
-                            spaces.getWithin().getCatchParentheses(),
-                            spaces.getWithin().getSynchronizedParentheses(),
-                            spaces.getWithin().getTypeCastParentheses(),
-                            spaces.getWithin().getAnnotationParentheses(),
-                            spaces.getWithin().getAngleBrackets(),
-                            spaces.getWithin().getRecordHeader()
-                    ))
+                    .withWithin(within.withMethodCallParentheses(
+                            vote(withinMethodCallParentheses, within.getMethodCallParentheses())))
                     .withOther(new SpacesStyle.Other(
-                            beforeComma > 0,
-                            afterComma >= 1,
-                            beforeForSemiColon > 0,
-                            afterForSemiColon >= 0,
-                            afterTypeCast > 0,
-                            beforeColonInForEach > 0,
+                            vote(beforeComma, other.getBeforeComma()),
+                            vote(afterComma, other.getAfterComma()),
+                            vote(beforeForSemiColon, other.getBeforeForSemicolon()),
+                            vote(afterForSemiColon, other.getAfterForSemicolon()),
+                            vote(afterTypeCast, other.getAfterTypeCast()),
+                            vote(beforeColonInForEach, other.getBeforeColonInForEach()),
                             false,
                             true
                     ));
         }
+    }
+
+    /**
+     * Without a majority either way, fall back to the default.
+     */
+    private static boolean vote(int net, boolean defaultValue) {
+        return net > 0 || net == 0 && defaultValue;
     }
 
     private static class FindSpacesStyle extends JavaIsoVisitor<SpacesStatistics> {
@@ -1292,6 +1439,7 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class WrappingAndBracesStatistics {
         int elseOnNewLine = 0;
         int classAnnotationsWrapped = 0;
@@ -1302,6 +1450,18 @@ public class Autodetect extends NamedStyles {
         int enumFieldAnnotationsWrapped = 0;
         int multilineAlignedToFirstArgument = 0;
         int multilineNotAlignedToFirstArgument = 0;
+
+        void merge(WrappingAndBracesStatistics other) {
+            elseOnNewLine += other.elseOnNewLine;
+            classAnnotationsWrapped += other.classAnnotationsWrapped;
+            methodAnnotationsWrapped += other.methodAnnotationsWrapped;
+            fieldAnnotationsWrapped += other.fieldAnnotationsWrapped;
+            parameterAnnotationsWrapped += other.parameterAnnotationsWrapped;
+            localVariableAnnotationsWrapped += other.localVariableAnnotationsWrapped;
+            enumFieldAnnotationsWrapped += other.enumFieldAnnotationsWrapped;
+            multilineAlignedToFirstArgument += other.multilineAlignedToFirstArgument;
+            multilineNotAlignedToFirstArgument += other.multilineNotAlignedToFirstArgument;
+        }
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
