@@ -68,9 +68,12 @@ final class UnneededOptOuts {
         DEPRECATED_OPTIONS.put("noEditsInScanningPhase", "immutableScanning");
     }
 
+    private static final Map<Class<?>, List<Field>> OPTION_FIELDS = new HashMap<>();
     private static final Set<String> KNOWN = new LinkedHashSet<>();
 
     static {
+        OPTION_FIELDS.put(TypeValidation.class, declaredOptions(TypeValidation.class));
+        OPTION_FIELDS.put(RecipeQualityValidation.class, declaredOptions(RecipeQualityValidation.class));
         for (Field option : options(TypeValidation.class)) {
             KNOWN.add(option.getName());
         }
@@ -204,17 +207,12 @@ final class UnneededOptOuts {
         }
     }
 
-    /**
-     * Runs on the side the checks of what the recipe did while it ran, before RewriteTest runs it again.
-     */
-    void recipeRan() {
-        checksOfTheRun.forEach(this::checkOnTheSide);
-    }
-
     void assertNoneUnneeded() {
         if (checked.isEmpty()) {
             return;
         }
+        // RewriteTest's reruns of the recipe, which the real checks also see, are over, and those of side checks aren't
+        checksOfTheRun.forEach(this::checkOnTheSide);
         List<OptOut> unneeded = new ArrayList<>();
         Map<Boolean, Set<String>> turnedOffInstead = new HashMap<>();
         Options current = asRun;
@@ -328,7 +326,8 @@ final class UnneededOptOuts {
             if (inDefaults) {
                 options.addAll(asRun.optionsOnlyInDefaults());
             }
-            List<String> calls = calls(spec, inDefaults ? null : needed.spec(true), options, !instead.isEmpty());
+            List<String> calls = calls(spec, inDefaults ? null : needed.spec(true), options, !instead.isEmpty(),
+                    needed.afterChangesWithout(inDefaults));
             if (inDefaults) {
                 if (calls.isEmpty()) {
                     message.append("This test needs none of the opt-outs in defaults(RecipeSpec).\n");
@@ -367,11 +366,12 @@ final class UnneededOptOuts {
      * The calls on a recipe spec that set the given options as the spec has them, with the deprecated options of
      * {@link TypeValidation} that turn off a recipe quality check written as that check.
      *
-     * @param overridden The spec of the test's class when the spec is the test's, whose options the test's override.
+     * @param overridden   The spec of the test's class when the spec is the test's, whose options the test's override.
+     * @param afterNeeded Whether the after validation the spec sets has to stay, even when it is the default.
      */
     @SuppressWarnings("deprecation")
     private static List<String> calls(RecipeSpec spec, @Nullable RecipeSpec overridden, Set<String> options,
-                                      boolean qualityChanged) {
+                                      boolean qualityChanged, boolean afterNeeded) {
         List<String> calls = new ArrayList<>();
         List<String> turnedOffByTypeValidation = new ArrayList<>();
         if (options.contains("typeValidationOptions(..)") && spec.typeValidation != null) {
@@ -385,16 +385,18 @@ final class UnneededOptOuts {
         }
         if (options.contains("afterTypeValidationOptions(..)") && spec.afterTypeValidation != null) {
             call(calls, "afterTypeValidationOptions", render(spec.afterTypeValidation),
-                    overridden != null && overridden.afterTypeValidation != null ? "TypeValidation.all()" : null);
+                    afterNeeded || overridden != null && overridden.afterTypeValidation != null ?
+                            "TypeValidation.all()" : null);
         }
         if (options.contains("recipeQualityValidation(..)") || qualityChanged ||
             !turnedOffByTypeValidation.isEmpty()) {
-            RecipeQualityValidation quality = spec.recipeQualityValidation == null ?
-                    RecipeQualityValidation.all() : spec.recipeQualityValidation;
+            RecipeQualityValidation quality = spec.recipeQualityValidation != null ? spec.recipeQualityValidation :
+                    overridden != null && overridden.recipeQualityValidation != null ?
+                            overridden.recipeQualityValidation : RecipeQualityValidation.all();
             for (String check : turnedOffByTypeValidation) {
                 quality = with(quality, check, false);
             }
-            call(calls, "recipeQualityValidation", render(quality),
+            call(calls, "recipeQualityValidation", render(quality, afterNeeded),
                     overridden != null && overridden.recipeQualityValidation != null ?
                             "RecipeQualityValidation.builder().build()" : null);
         }
@@ -429,7 +431,7 @@ final class UnneededOptOuts {
         return rendered.length() == "TypeValidation.all()".length() ? null : rendered.toString();
     }
 
-    private static @Nullable String render(RecipeQualityValidation quality) {
+    private static @Nullable String render(RecipeQualityValidation quality, boolean typesNeeded) {
         StringBuilder rendered = new StringBuilder("RecipeQualityValidation.builder()");
         for (Field option : options(RecipeQualityValidation.class)) {
             if (!isDefault(quality, option)) {
@@ -437,6 +439,9 @@ final class UnneededOptOuts {
             }
         }
         String types = quality.types() == null ? null : render(quality.types());
+        if (types == null && quality.types() != null && typesNeeded) {
+            types = "TypeValidation.all()";
+        }
         if (types != null) {
             rendered.append(".types(").append(types).append(')');
         }
@@ -453,6 +458,10 @@ final class UnneededOptOuts {
      * The options of {@link TypeValidation} or the recipe quality checks of {@link RecipeQualityValidation}.
      */
     private static List<Field> options(Class<?> type) {
+        return OPTION_FIELDS.get(type);
+    }
+
+    private static List<Field> declaredOptions(Class<?> type) {
         List<Field> options = new ArrayList<>();
         for (Field field : type.getDeclaredFields()) {
             if (!Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() &&
@@ -655,6 +664,21 @@ final class UnneededOptOuts {
                 options.add("validateRecipeSerialization(false)");
             }
             return options;
+        }
+
+        /**
+         * Whether leaving out the after validation of the test or of its class changes the after validation, since
+         * without one it falls back on the before validation.
+         */
+        boolean afterChangesWithout(boolean inDefaults) {
+            RecipeSpec without = copy(spec(inDefaults));
+            without.afterTypeValidation = null;
+            if (without.recipeQualityValidation != null) {
+                without.recipeQualityValidation = with(without.recipeQualityValidation, "types", null);
+            }
+            TypeValidation after = inDefaults ? TypeValidation.after(testMethodSpec, without) :
+                    TypeValidation.after(without, testClassSpec);
+            return !after.equals(after());
         }
 
         Options turnOn(OptOut optOut) {

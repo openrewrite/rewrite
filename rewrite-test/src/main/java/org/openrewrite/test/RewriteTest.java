@@ -458,7 +458,6 @@ public interface RewriteTest extends SourceSpecs {
         RecipeRun recipeRun = formattingScope.record(() ->
                 importedNames.record(() -> runner.run(recipe, runnerContext)));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
-        unneededOptOuts.recipeRan();
         unneededOptOuts.check("reportingMarkersOnly", quality.reportingMarkersOnly(), () ->
                 requireNonNull(addedMarkers).assertNoneAdded(recipeRun.getChangeset().getAllResults()));
         unchangedTreeIdentity.assertNoneFound();

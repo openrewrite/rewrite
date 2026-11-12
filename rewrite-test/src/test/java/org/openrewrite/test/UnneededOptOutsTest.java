@@ -17,6 +17,7 @@ package org.openrewrite.test;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -76,6 +77,45 @@ class UnneededOptOutsTest implements RewriteTest {
         assertThat(predicate).hasMessageContaining(
           "    spec.typeValidationOptions(TypeValidation.all().allowMissingType(..))\n" +
           "Where these show .., keep the test's own argument.");
+    }
+
+    @Test
+    void keepAnAfterValidationThatWouldFallBackOnTheBeforeValidation() {
+        SourceSpec<PlainText> changed = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), "a",
+          (source, validation) -> {
+              if (validation.unknown() && "a".equals(((PlainText) source).getText())) {
+                  throw new IllegalStateException("LST contains unknown elements");
+              }
+              return source;
+          }, ctx -> {
+        });
+        changed.after(actual -> "b");
+        AssertionError e = withOptOutsChecked("all", () -> assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(new ChangeText("b"))
+            .typeValidationOptions(TypeValidation.all().unknown(false))
+            .afterTypeValidationOptions(TypeValidation.all().identifiers(false)),
+          changed
+        )));
+        assertThat(e).hasMessageContaining("Replace afterTypeValidationOptions(..) in the test's RecipeSpec with:\n" +
+                                           "    spec.afterTypeValidationOptions(TypeValidation.all())\n");
+    }
+
+    @Test
+    void carryOverTheQualityOptOutsOfTheTestClassDefaults() {
+        RewriteTest optsOutInDefaults = new RewriteTest() {
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false).build());
+            }
+        };
+        AssertionError e = withOptOutsChecked("identifiers", () -> assertThrows(AssertionError.class, () ->
+          optsOutInDefaults.rewriteRun(
+            spec -> spec.recipe(new EditsWhileScanning())
+              .typeValidationOptions(TypeValidation.all().identifiers(false).immutableScanning(false)),
+            text("a")
+          )));
+        assertThat(e).hasMessageContaining("    spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
+                                           ".noEditsInScanningPhase(false).minimalFormatting(false).build())");
     }
 
     @Test
@@ -230,11 +270,11 @@ class UnneededOptOutsTest implements RewriteTest {
         });
     }
 
-    private static <T> T withOptOutsChecked(String checks, Supplier<T> test) {
+    private static <T> T withOptOutsChecked(@Nullable String checks, Supplier<T> test) {
         return withSystemProperty(UnneededOptOuts.PROPERTY, checks, test);
     }
 
-    private static void withOptOutsChecked(String checks, Runnable test) {
+    private static void withOptOutsChecked(@Nullable String checks, Runnable test) {
         withSystemProperty(UnneededOptOuts.PROPERTY, checks, () -> {
             test.run();
             return null;
@@ -245,7 +285,7 @@ class UnneededOptOutsTest implements RewriteTest {
         return withSystemProperty("org.openrewrite.test.parserTypedTrees", "true", test);
     }
 
-    private static <T> T withSystemProperty(String property, String value, Supplier<T> test) {
+    private static <T> T withSystemProperty(String property, @Nullable String value, Supplier<T> test) {
         String set = System.getProperty(property);
         try {
             if (value == null) {
