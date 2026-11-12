@@ -22,15 +22,19 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava25;
+import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,7 +46,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration", "RedundantThrows", "ConcatenationWithEmptyString"})
 class JavadocTest implements RewriteTest {
 
     @SuppressWarnings("JavadocReference")
@@ -3415,5 +3418,146 @@ class JavadocTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void aMarginStarOnTheOpeningLine() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**   * Get x
+                 * @return x
+                 **/  int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void withAClosingLine() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**   * Get x
+                 */
+                int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void twoStars() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**  ** Get x
+                 */
+                int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void oneLineParsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** * Get x */
+                int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void noMarginParsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** Get x
+                 */
+                int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void parsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /*** Get x
+                 */
+                int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void aStarInTheText() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** a * b
+                 */
+                int x() { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    /**
+     * Printing back alone can't tell whether source text was parsed: text the parser never visits is kept as
+     * whitespace and still prints. Each source here must leave none.
+     */
+    private static void nothingKeptAsWhitespace(SourceFile sf) {
+        List<String> kept = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                if (!space.getWhitespace().isBlank()) {
+                    kept.add(loc + ": " + space.getWhitespace().strip());
+                }
+                for (Comment c : space.getComments()) {
+                    if (!c.getSuffix().isBlank()) {
+                        kept.add(loc + ": " + c.getSuffix().strip());
+                    }
+                }
+                return space;
+            }
+        }.visit(sf, 0);
+        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
