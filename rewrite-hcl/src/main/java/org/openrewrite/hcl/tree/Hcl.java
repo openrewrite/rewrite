@@ -1306,7 +1306,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>());
+            return withPrefix(Space.EMPTY).print(new HclPrinter<>());
         }
     }
 

@@ -62,6 +62,33 @@ class HclToStringTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"  hello  ", "   ", "\thello\t"})
+    void quotedTemplateLiteralWhitespace(String text) {
+        rewriteRun(
+          hcl(
+            "value = \"" + text + "\"",
+            spec -> spec.afterRecipe(config -> {
+                Hcl.QuotedTemplate template = (Hcl.QuotedTemplate) ((Hcl.Attribute) config.getBody().getFirst()).getValue();
+                assertThat(template.getExpressions().getFirst().toString()).isEqualTo(text);
+            })
+          )
+        );
+    }
+
+    @Test
+    void heredocLiteralWhitespace() {
+        rewriteRun(
+          hcl(
+            "value = <<EOF\n  hello\nEOF\n",
+            spec -> spec.afterRecipe(config -> {
+                Hcl.HeredocTemplate template = (Hcl.HeredocTemplate) ((Hcl.Attribute) config.getBody().getFirst()).getValue();
+                assertThat(template.getExpressions().getFirst().toString()).isEqualTo("  hello");
+            })
+          )
+        );
+    }
+
     @Test
     void configFileBlockAndAttribute() {
         rewriteRun(
