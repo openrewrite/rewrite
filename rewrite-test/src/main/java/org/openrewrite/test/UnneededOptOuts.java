@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -169,7 +170,7 @@ final class UnneededOptOuts {
      * @param validation Validates a source the test parsed with the type validation it is given.
      */
     void validatesBefore(Consumer<TypeValidation> validation) {
-        if (!checked.isEmpty()) {
+        if (checksTypeValidation()) {
             beforeValidations.add(validation);
         }
     }
@@ -178,9 +179,18 @@ final class UnneededOptOuts {
      * @param validation Validates a source the recipe made with the type validation it is given.
      */
     void validatesAfter(Consumer<TypeValidation> validation) {
-        if (!checked.isEmpty()) {
+        if (checksTypeValidation()) {
             afterValidations.add(validation);
         }
+    }
+
+    private boolean checksTypeValidation() {
+        for (Field option : options(TypeValidation.class)) {
+            if (checked.contains(option.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -713,7 +723,7 @@ final class UnneededOptOuts {
      * A view of the execution context that records the messages a recipe puts on it.
      */
     private static final class ExecutionContextChanges extends CursorValidatingExecutionContextView {
-        final Set<String> keys = new LinkedHashSet<>();
+        final Set<String> keys = ConcurrentHashMap.newKeySet();
 
         ExecutionContextChanges(ExecutionContext delegate) {
             super(delegate);

@@ -396,6 +396,8 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        // where SCANNING_MUTATION_VALIDATION is, so that only the edits the real check would see are recorded
+        unneededOptOuts.recordScanningMutations(ctx);
         ExecutionContext recipeCtx = ctx;
         if (testMethodSpec.getRecipeExecutionContext() != null) {
             recipeCtx = testMethodSpec.getRecipeExecutionContext();
@@ -433,7 +435,6 @@ public interface RewriteTest extends SourceSpecs {
                     quality.reportingMarkersOnly() ? addedMarkers : null, unchangedTreeIdentity, accumulatorContents);
         }
 
-        unneededOptOuts.recordScanningMutations(recipeCtx);
         recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
                 .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
@@ -941,8 +942,8 @@ class RewriteTestUtils {
                 WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
                 SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
                 if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
-                    fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
-                         "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                    fail("Source file was parsed into an LST that contains non-whitespace characters in its " +
+                         "whitespace. This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
                 }
             } catch (UnsupportedOperationException e) {
                 // Language/parser does not provide whitespace validation and that's OK for now

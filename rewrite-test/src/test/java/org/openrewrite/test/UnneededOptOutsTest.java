@@ -20,7 +20,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.Tree;
@@ -220,7 +219,6 @@ class UnneededOptOutsTest implements RewriteTest {
                         text.withMarkers(text.getMarkers().add(new Seen(Tree.randomId())));
                   }
               }))
-            .recipeExecutionContext(new InMemoryExecutionContext())
             .expectedCyclesThatMakeChanges(1)
             .recipeQualityValidation(RecipeQualityValidation.builder()
               .executionContextUnchanged(false)
