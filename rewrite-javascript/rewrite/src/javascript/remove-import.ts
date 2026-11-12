@@ -3,6 +3,7 @@ import {isIdentifier, J, TextComment} from "../java";
 import {bindingNames, namesReferencedAsTypesWithin, namesReferencedWithin, valuesDeclaredAtTopLevel, walk} from "./scope";
 import {sameModule} from "./package-name";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
+import {moduleNameOf, requiredModule} from "./binding-table";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 import {randomId} from "../uuid";
@@ -369,14 +370,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         usedNames: ReadonlySet<string>,
         p: P
     ): Promise<JS.Import | undefined> {
-        const initializer = jsImport.initializer?.element;
-        if (!initializer || !isRequireCall(initializer)) {
-            return jsImport;
-        }
-
-        const methodInv = initializer as J.MethodInvocation;
-        const moduleName = this.getModuleNameFromRequire(methodInv);
-        if (!moduleName || !this.matchesTargetModule(moduleName)) {
+        const moduleName = requiredModule(jsImport.initializer?.element);
+        if (moduleName === undefined || !sameModule(moduleName, this.module)) {
             return jsImport;
         }
 
@@ -396,13 +391,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         return jsImport;
-    }
-
-    /**
-     * Check if the module name matches the target module
-     */
-    private matchesTargetModule(moduleName: string): boolean {
-        return sameModule(moduleName, this.module);
     }
 
     /**
@@ -494,14 +482,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return varDecls;
         }
 
-        const initializer = namedVar.initializer?.element;
-        if (!initializer || !isRequireCall(initializer)) {
-            return varDecls;
-        }
-
-        const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
+        // As the binding table reads one: `container.require("m")` calls a method rather than loading a module
+        const moduleName = requiredModule(namedVar.initializer?.element);
         const pattern = namedVar.name;
-        if (!moduleName || !this.matchesTargetModule(moduleName) || !pattern) {
+        if (moduleName === undefined || !sameModule(moduleName, this.module) || !pattern) {
             return varDecls;
         }
 
@@ -530,23 +514,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         return varDecls;
-    }
-
-    /**
-     * Get the module name from a require() call
-     */
-    private getModuleNameFromRequire(methodInv: J.MethodInvocation): string | undefined {
-        const args = methodInv.arguments?.elements;
-        if (!args || args.length === 0) {
-            return undefined;
-        }
-
-        const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
-            return undefined;
-        }
-
-        return (firstArg as J.Literal).value?.toString();
     }
 
     private async processObjectBindingPattern(
@@ -659,11 +626,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return false;
         }
 
-        const literal = moduleSpecifier as J.Literal;
-        const moduleName = literal.value?.toString().replace(/['"`]/g, '');
-
-        // Match the module name
-        return moduleName !== undefined && sameModule(moduleName, this.module);
+        // As the binding table reads it, so `"./author's-notes"` keeps its quote
+        return sameModule(moduleNameOf(moduleSpecifier as J.Literal), this.module);
     }
 
 }
@@ -723,14 +687,6 @@ function hasJsx(cu: JS.CompilationUnit): boolean {
         return !found;
     });
     return found;
-}
-
-function isRequireCall(node: J): boolean {
-    if (node.kind !== J.Kind.MethodInvocation) {
-        return false;
-    }
-    const name = (node as J.MethodInvocation).name;
-    return name?.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === 'require';
 }
 
 function hasModuleSyntax(statements: J.RightPadded<J>[]): boolean {

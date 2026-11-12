@@ -2266,14 +2266,12 @@ describe('RemoveImport visitor', () => {
 
 });
 
-/** What `RemoveImport` would remove if it read the binding table, where its own rules read the syntax differently. */
+/** What `RemoveImport` removes where its own rules read the syntax differently from the binding table. */
 describe("RemoveImport reading the binding table", () => {
-    // Wanted: the module is the name the specifier spells, as the table reads it with `moduleNameOf`, so the unused
-    // import of "./author's-notes" goes.
-    // Differs: RemoveImport strips every quote character from the literal's value, reading "./authors-notes".
-    test.fails("a module name holding a quote character is the name the specifier spells", async () => {
+    test("a module name holding a quote character is the name the specifier spells", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new RemoveImport("./author's-notes"));
+        // Before: kept, since RemoveImport stripped every quote character from the literal's value, reading "./authors-notes"
         await spec.rewriteRun(
             //language=typescript
             typescript(
@@ -2289,12 +2287,11 @@ describe("RemoveImport reading the binding table", () => {
         );
     });
 
-    // Wanted: `container.require("logger")` calls a method of `container`, which the table does not count as a
-    // `require`, so nothing binds the module "logger" and the statement stays.
-    // Differs: RemoveImport counts any call named `require`, whatever it is called on.
-    test.fails("a method named require binds no module", async () => {
+    // `container.require("logger")` calls a method of `container`, which the table does not count as a `require`
+    test("a method named require binds no module", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new RemoveImport("logger"));
+        // Before: the statement was removed, since any call named `require` counted, whatever it was called on
         await spec.rewriteRun(
             //language=javascript
             javascript(`
