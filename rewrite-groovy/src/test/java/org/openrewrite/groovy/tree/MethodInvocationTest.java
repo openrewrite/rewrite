@@ -17,8 +17,16 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class MethodInvocationTest implements RewriteTest {
@@ -782,5 +790,75 @@ class MethodInvocationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void aPropertyReadAtTheEndOfACommandChain() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib') _
+
+              foo()
+              """,
+            spec -> spec.afterRecipe(MethodInvocationTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void withALaterDotInTheFile() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib') _
+
+              foo.bar()
+              """,
+            spec -> spec.afterRecipe(MethodInvocationTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void withTheLibrarySVersion() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib@1.0') _
+
+              pipeline {
+                agent any
+              }
+              """,
+            spec -> spec.afterRecipe(MethodInvocationTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    /**
+     * Printing back alone can't tell whether source text was parsed: text the parser never visits is kept as
+     * whitespace and still prints. Each source here must leave none.
+     */
+    private static void nothingKeptAsWhitespace(SourceFile sf) {
+        List<String> kept = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                if (!space.getWhitespace().isBlank()) {
+                    kept.add(loc + ": " + space.getWhitespace().strip());
+                }
+                for (Comment c : space.getComments()) {
+                    if (!c.getSuffix().isBlank()) {
+                        kept.add(loc + ": " + c.getSuffix().strip());
+                    }
+                }
+                return space;
+            }
+        }.visit(sf, 0);
+        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
