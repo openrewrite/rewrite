@@ -17,7 +17,7 @@ import {isIdentifier, isStringLiteral, J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {
-    compilationUnitOf, cursorOf, declarationsOf, isFree, isReference, namesUsedIn, referencesOf, resolve, rootName, scopeOf,
+    compilationUnitOf, cursorOf, declarationsOf, isFree, isReference, namesUsedIn, referencesOf, resolve, scopeOf,
     valuesDeclaredAtTopLevel
 } from "./scope";
 import {Cursor, isTree} from "../tree";
@@ -27,7 +27,7 @@ import {
     requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
-import {RenameMemberSpellings} from "./member-spellings";
+import {importTypeMember, RenameMemberSpellings} from "./member-spellings";
 import {sameModule} from "./package-name";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
@@ -252,13 +252,8 @@ function exportRead(
 
 /** `import("m").X`, which names `X` of `m` with no binding in the file; `import("m").X.Y` names `X` too. */
 function importTypeExport(importType: JS.ImportType): ModuleExport | undefined {
-    const argument = importType.argumentAndAttributes.elements[0]?.element;
-    const literal = argument?.kind === JS.Kind.LiteralType ? (argument as JS.LiteralType).literal : undefined;
-    const member = rootName(importType.qualifier?.element);
-    if (literal?.kind !== J.Kind.Literal || typeof (literal as J.Literal).value !== "string" || !isIdentifier(member)) {
-        return undefined;
-    }
-    return {module: moduleNameOf(literal as J.Literal), member: member.simpleName, typeOnly: true, via: {kind: "import-type"}};
+    const named = importTypeMember(importType);
+    return named && {...named, typeOnly: true, via: {kind: "import-type"}};
 }
 
 export function isAmdBlock(node: J, options?: AmdCalleeOptions): boolean {
