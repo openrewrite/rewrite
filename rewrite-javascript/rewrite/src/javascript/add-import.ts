@@ -2063,8 +2063,11 @@ export interface ExistingImportBinding {
     /** Whether a top-level `require` declaration binds it rather than an import. */
     viaRequire: boolean;
 
-    /** Whether a `let` or `var` declares it, which the file may reassign. */
-    reassignable: boolean;
+    /**
+     * Whether a plain `const` `require` declares it, which a binding can leave for a new `const` one or join.
+     * `let x = require("m")` may be reassigned, and `export const {a} = require("m")` publishes `a`, so neither is.
+     */
+    plainConst: boolean;
 
     /** The import or `require` declaration that binds it. */
     statement: JS.Import | J.VariableDeclarations;
@@ -2090,7 +2093,7 @@ export function existingImportBinding(
                 aliased: required !== memberName(member),
                 typeOnly: false,
                 viaRequire: true,
-                reassignable: keywordsOf(declaration!) !== 'const',
+                plainConst: keywordsOf(declaration!) === 'const',
                 statement: declaration!
             };
         }
@@ -2105,7 +2108,7 @@ export function existingImportBinding(
                 aliased: binding.name !== memberName(member),
                 typeOnly: binding.typeOnly,
                 viaRequire: false,
-                reassignable: false,
+                plainConst: false,
                 statement: element as JS.Import
             };
         }

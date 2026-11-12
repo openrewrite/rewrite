@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../src/test";
 import {
     AddImport, AddImportOptions, bindingTable, javascript, JavaScriptVisitor, JS, maybeBind, MaybeBindOptions, ModuleBinding,
-    moduleScopeBindings, ModuleScopeBinding, typescript
+    maybeRebind, MaybeRebindOptions, moduleScopeBindings, ModuleScopeBinding, typescript
 } from "../../src/javascript";
 import {J} from "../../src/java";
 
@@ -35,6 +35,22 @@ function binding(options: MaybeBindOptions, bound: {name?: string}): RecipeSpec 
             if (!asked) {
                 asked = true;
                 bound.name = maybeBind(this, options);
+            }
+            return cu;
+        }
+    });
+    return spec;
+}
+
+/** A spec whose recipe calls `maybeRebind` from the compilation unit, keeping the first cycle's answer in `bound`. */
+function rebinding(options: MaybeRebindOptions, bound: {name?: string}): RecipeSpec {
+    const spec = new RecipeSpec();
+    let asked = false;
+    spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            if (!asked) {
+                asked = true;
+                bound.name = maybeRebind(this, options);
             }
             return cu;
         }
@@ -317,5 +333,61 @@ describe("a whole require answers a namespace request, since CommonJS has no def
                 fs.readFileSync("config.json");
             `)
         );
+    });
+});
+
+describe("an export const require is not reassignable, though no binding can leave it", () => {
+    test("the table reads export const as const", async () => {
+        const {rows} = await tablesOf(
+            //language=typescript
+            typescript(`
+                export const fs = require("fs");
+                export let path = require("path");
+            `)
+        );
+        expect(rows).toEqual([
+            {form: "require", name: "fs", module: "fs", typeOnly: false, reassignable: false},
+            {form: "require", name: "path", module: "path", typeOnly: false, reassignable: true}
+        ]);
+    });
+
+    test("maybeRebind keeps a member in an export const destructuring beside other names", async () => {
+        const bound: {name?: string} = {};
+        // Moving it out would give it a plain `const {New} = require("legacy-v2")`, and the file would stop exporting `Old`
+        await rebinding({from: {module: "legacy", member: "Old"}, to: {module: "legacy-v2", member: "New"}}, bound)
+            .rewriteRun(
+                //language=typescript
+                typescript(`
+                    export const {Old, helper} = require("legacy");
+
+                    Old(helper());
+                `)
+            );
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("maybeRebind of an export const member rewrites it in place rather than joining the target's require", async () => {
+        const bound: {name?: string} = {};
+        // Joining would drop the exported statement for `const {New} = require("legacy-v2")`, and a rewrite in place
+        // under the target's name would declare `New` twice, so it keeps its own name
+        await rebinding({from: {module: "legacy", member: "Old"}, to: {module: "legacy-v2", member: "New"}}, bound)
+            .rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        export const {Old} = require("legacy");
+                        const {New} = require("legacy-v2");
+
+                        New(Old());
+                    `,
+                    `
+                        export const {New: Old} = require("legacy-v2");
+                        const {New} = require("legacy-v2");
+
+                        New(Old());
+                    `
+                )
+            );
+        expect(bound.name).toBe("Old");
     });
 });

@@ -532,8 +532,9 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         }
         return undefined;
     }
-    // A binding leaving a `let` or `var` destructuring would land in a `const` require.
-    if (existing.viaRequire && existing.reassignable && !existing.onlyMemberOfStatement) {
+    // A binding leaving a `let`, `var` or `export const` destructuring would land in a plain `const` require,
+    // losing its `let` or its export.
+    if (existing.viaRequire && !existing.plainConst && !existing.onlyMemberOfStatement) {
         return undefined;
     }
     // `RebindImport` replaces an import it cannot rewrite in place, and a CommonJS file can gain no import.
@@ -637,7 +638,7 @@ function reusesTargetImport(
     // An import and a require of one module are separate declarations of the name.
     // A require takes the move in only where `AddImport` joins it.
     const joinTarget = moved.viaRequire ? requireJoinTarget(cu, to.module) : undefined;
-    const joined = !moved.viaRequire || (!moved.reassignable && joinTarget !== undefined &&
+    const joined = !moved.viaRequire || (moved.plainConst && joinTarget !== undefined &&
         requireBinds(joinTarget, to.module, to.member) === name);
     return target?.localName === name && target.viaRequire === moved.viaRequire && joined &&
         bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);

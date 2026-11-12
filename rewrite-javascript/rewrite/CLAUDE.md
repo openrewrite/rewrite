@@ -441,7 +441,8 @@ The four above that still apply, plus these:
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out
-- `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
+- `from` is destructured in a `let`, `var` or `export const` `require` beside other names, since it would move
+  into a plain `const` `require`, losing its `let` or its export
 - `from`'s `require` has a type annotation, which describes the pattern the move would change
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
