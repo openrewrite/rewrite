@@ -717,6 +717,12 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
                   implementation("org.openrewrite:rewrite-core:8.55.0")
                   implementation("org.openrewrite:rewrite-core:8.56.0")
+                  testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.2"
+                  testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.1"
+                  testRuntimeOnly "org.objenesis:objenesis"
+                  testRuntimeOnly "org.objenesis:objenesis"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm"
               }
               """,
             """
@@ -730,6 +736,174 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
+                  testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.2"
+                  testRuntimeOnly "org.objenesis:objenesis"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsDuplicatesWithoutASingleUnconditionalNewest() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.1"
+                  if (project.hasProperty("newerHamcrest")) {
+                      testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  }
+
+                  testRuntimeOnly "org.objenesis:objenesis:3.3"
+                  testRuntimeOnly "org.objenesis:objenesis:3.3"
+                  testRuntimeOnly "org.objenesis:objenesis:3.3.0"
+
+                  testRuntimeOnly "org.ow2.asm:asm:9.7"
+                  testRuntimeOnly "org.ow2.asm:asm:9.7-dev"
+
+                  testRuntimeOnly "org.ow2.asm:asm-tree"
+                  testRuntimeOnly "org.ow2.asm:asm-tree:9.7"
+
+                  testRuntimeOnly "org.hamcrest:hamcrest-core:1.1"
+                  testRuntimeOnly "org.hamcrest:hamcrest-core:1.01"
+
+                  testRuntimeOnly "org.ow2.asm:asm-util:9.7"
+                  testRuntimeOnly "org.ow2.asm:asm-util:9.9999999999999999999"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsSameDependencyInAnotherConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              configurations {
+                  mockitoAgent
+                  instrumentation
+              }
+
+              dependencies {
+                  testImplementation "org.mockito:mockito-core:5.24.0"
+                  mockitoAgent("org.mockito:mockito-core:5.24.0") {
+                      transitive = false
+                  }
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  instrumentation "org.hamcrest:hamcrest:2.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsSameModuleWithAnotherArtifactOrVariant() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def osdetector = [classifier: "linux-x86_64"]
+              dependencies {
+                  runtimeOnly "org.lwjgl:lwjgl:3.3.4:natives-linux"
+                  runtimeOnly "org.lwjgl:lwjgl:3.3.4:natives-windows"
+
+                  testRuntimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-linux"
+                  testRuntimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-windows"
+
+                  testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final"
+                  testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final:${osdetector.classifier}"
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.1@jar"
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm", version: "9.6", configuration: "runtime"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm", version: "9.7"
+
+                  implementation platform("org.junit:junit-bom:5.10.1")
+                  implementation "org.junit:junit-bom:5.10.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsDuplicatesWithConfigurationBlockOrRichVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testImplementation "org.mockito:mockito-core:5.24.0"
+                  testImplementation("org.mockito:mockito-core:5.24.0") {
+                      transitive = false
+                  }
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.1"
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2!!"
+                  testRuntimeOnly "org.hamcrest:hamcrest:[2.0,3.0)"
+
+                  testRuntimeOnly "org.objenesis:objenesis:3.4"
+                  testRuntimeOnly "org.objenesis:objenesis:3.4!!3.3"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsRepeatedDependencyOutsideGroupPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions("org.springframework.boot", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+                  implementation("org.openrewrite:rewrite-core:8.55.0")
               }
               """
           )

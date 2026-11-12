@@ -26,9 +26,11 @@ import org.openrewrite.gradle.trait.GradleDependencies;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -45,10 +47,12 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.RemoveRedundantDependencyVersions.Comparator.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -109,6 +113,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             "testRuntime" // deprecated
     );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
+    private static final Pattern NUMERIC_VERSION = Pattern.compile("(0|[1-9]\\d{0,17})(\\.(0|[1-9]\\d{0,17}))*");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -202,39 +207,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 @Override
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                    if ("dependencies".equals(m.getSimpleName())) {
-                                        // Gradle tolerates multiple declarations of the same dependency, but only the one with the newest version is used
-                                        // Filter out duplicates
-                                        Map<GroupArtifactVersion, J.MethodInvocation> requestedToDeclaration = new HashMap<>();
-                                        Map<GroupArtifact, List<String>> gaToRequested = new HashMap<>();
-                                        new JavaIsoVisitor<ExecutionContext>() {
-                                            @Override
-                                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                                                J.MethodInvocation m1 = super.visitMethodInvocation(method, executionContext);
-                                                new GradleDependency.Matcher().get(getCursor()).ifPresent(it -> {
-                                                    if (it.getResolvedDependency().getRequested().getVersion() != null) {
-                                                        requestedToDeclaration.put(it.getResolvedDependency().getRequested().getGav(), m1);
-                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), (groupArtifact -> new ArrayList<>()))
-                                                                .add(it.getResolvedDependency().getRequested().getVersion());
-                                                    }
-                                                });
-                                                return m1;
-                                            }
-                                        }.visit(m.getArguments().get(0), ctx, getCursor());
-
-                                        for (Map.Entry<GroupArtifact, List<String>> gaToRequestedVersions : gaToRequested.entrySet()) {
-                                            GroupArtifact ga = gaToRequestedVersions.getKey();
-                                            List<String> requested = gaToRequestedVersions.getValue();
-                                            if (requested.size() < 2) {
-                                                continue;
-                                            }
-                                            // The newest version number is relevant, others are redundant and can be removed
-                                            requested.stream()
-                                                    .sorted(VERSION_COMPARATOR.reversed())
-                                                    .skip(1)
-                                                    .forEach(redundant -> statementsToRemove.add(requestedToDeclaration.get(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), redundant))));
-                                        }
-                                    } else if ("constraints".equals(m.getSimpleName())) {
+                                    if ("constraints".equals(m.getSimpleName())) {
                                         if (m.getArguments().isEmpty() ||
                                             !(m.getArguments().get(0) instanceof J.Lambda) ||
                                             !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
@@ -386,6 +359,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .orElse(m);
                                 }
                             }.visitNonNull(tree, ctx);
+
+                            // Duplicates are compared after managed versions are removed, as removing a version can
+                            // make two declarations identical
+                            J visited = super.visit(tree, ctx);
+                            return visited == null ? null : withoutDuplicates(visited, ctx);
                         }
                         return super.visit(tree, ctx);
                     }
@@ -464,6 +442,159 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     }
                 }
         );
+    }
+
+    private J withoutDuplicates(J sourceFile, ExecutionContext ctx) {
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (!"dependencies".equals(m.getSimpleName())) {
+                    return m;
+                }
+                Cursor cursor = new Cursor(getCursor().getParentOrThrow(), m);
+                Set<J.MethodInvocation> duplicates = redundantDuplicates(m, cursor);
+                return duplicates.isEmpty() ? m : new GradleDependencies.Matcher().get(cursor)
+                        .map(dependencies -> dependencies.filterStatements(s -> !duplicates.contains(s)))
+                        .map(Trait::getTree)
+                        .orElse(m);
+            }
+        }.visitNonNull(sourceFile, ctx);
+    }
+
+    /**
+     * The redundant declarations of a dependency declared more than once in one configuration, all of them simple.
+     * Identical ones repeat the first. Otherwise older numeric versions are redundant, as Gradle resolves the newest,
+     * unless two versions are written differently but rank the same. Declarations in other configurations are not
+     * compared, as they can serve another purpose, such as a Java agent. Only the statements of the
+     * {@code dependencies} block itself are compared, as a declaration nested in a condition may not apply.
+     */
+    private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor) {
+        Map<List<Object>, List<GradleDependency>> declarations = new HashMap<>();
+        Expression block = dependencies.getArguments().isEmpty() ? null : dependencies.getArguments().get(0);
+        if (block instanceof J.Lambda && ((J.Lambda) block).getBody() instanceof J.Block) {
+            GradleDependency.Matcher matcher = new GradleDependency.Matcher()
+                    .groupId(groupPattern)
+                    .artifactId(artifactPattern);
+            J.Block body = (J.Block) ((J.Lambda) block).getBody();
+            Cursor bodyCursor = new Cursor(new Cursor(cursor, block), body);
+            for (Statement statement : body.getStatements()) {
+                Cursor statementCursor = new Cursor(bodyCursor, statement);
+                Expression returned = statement instanceof J.Return ? ((J.Return) statement).getExpression() : null;
+                if (returned instanceof J.MethodInvocation) {
+                    statementCursor = new Cursor(statementCursor, returned);
+                }
+                matcher.get(statementCursor).ifPresent(declaration -> declarations.computeIfAbsent(
+                        Arrays.asList(declaration.getConfigurationName(), declaration.isPlatform(),
+                                declaration.getGroupId(), declaration.getArtifactId()),
+                        key -> new ArrayList<>()).add(declaration));
+            }
+        }
+
+        Set<J.MethodInvocation> redundant = new HashSet<>();
+        for (List<GradleDependency> sameDependency : declarations.values()) {
+            Set<@Nullable List<@Nullable String>> notations = sameDependency.stream()
+                    .map(RemoveRedundantDependencyVersions::simpleNotation)
+                    .collect(toSet());
+            if (notations.contains(null)) {
+                continue;
+            }
+            if (notations.size() == 1) {
+                sameDependency.stream()
+                        .skip(1)
+                        .forEach(declaration -> redundant.add(declaration.getTree()));
+                continue;
+            }
+            Set<@Nullable String> versions = sameDependency.stream()
+                    .map(RemoveRedundantDependencyVersions::numericVersion)
+                    .collect(toSet());
+            if (versions.contains(null)) {
+                continue;
+            }
+            Set<String> ranks = new TreeSet<>(VERSION_COMPARATOR);
+            ranks.addAll(versions);
+            if (ranks.size() < versions.size()) {
+                continue;
+            }
+            sameDependency.stream()
+                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(numericVersion(d2), numericVersion(d1)))
+                    .skip(1)
+                    .forEach(declaration -> redundant.add(declaration.getTree()));
+        }
+        return redundant;
+    }
+
+    /**
+     * The group, artifact and version, if any, of a declaration that names nothing else, as {@code "g:a"},
+     * {@code "g:a:v"} or named arguments, possibly inside {@code platform(...)}. Anything more can change what is
+     * resolved, so it gives null.
+     */
+    private static @Nullable List<@Nullable String> simpleNotation(GradleDependency declaration) {
+        List<Expression> arguments = declaration.getTree().getArguments();
+        if (declaration.isPlatform()) {
+            if (arguments.size() != 1 || !(arguments.get(0) instanceof J.MethodInvocation)) {
+                return null;
+            }
+            arguments = ((J.MethodInvocation) arguments.get(0)).getArguments();
+        }
+        if (arguments.size() == 1 && arguments.get(0) instanceof J.Literal) {
+            Object notation = ((J.Literal) arguments.get(0)).getValue();
+            if (!(notation instanceof String) || ((String) notation).contains("@")) {
+                return null;
+            }
+            List<@Nullable String> parts = new ArrayList<>(Arrays.asList(((String) notation).split(":", -1)));
+            if (parts.size() < 2 || parts.size() > 3 || parts.contains("")) {
+                return null;
+            }
+            if (parts.size() == 2) {
+                parts.add(null);
+            }
+            return parts;
+        }
+        Map<String, String> named = namedLiterals(arguments);
+        if (named == null || !named.containsKey("group") || !named.containsKey("name") ||
+                named.size() != (named.containsKey("version") ? 3 : 2)) {
+            return null;
+        }
+        return Arrays.asList(named.get("group"), named.get("name"), named.get("version"));
+    }
+
+    /**
+     * The version of a simple declaration when it is numeric. The version comparator here ranks qualifiers such as
+     * {@code -dev} and parts with leading zeros unlike Gradle, so those give null. A part has at most 18 digits,
+     * which keeps it within a {@code long}.
+     */
+    private static @Nullable String numericVersion(GradleDependency declaration) {
+        List<@Nullable String> notation = simpleNotation(declaration);
+        String version = notation == null ? null : notation.get(2);
+        return version != null && NUMERIC_VERSION.matcher(version).matches() ? version : null;
+    }
+
+    private static @Nullable Map<String, String> namedLiterals(List<Expression> arguments) {
+        if (arguments.size() == 1 && arguments.get(0) instanceof G.MapLiteral) {
+            arguments = new ArrayList<>(((G.MapLiteral) arguments.get(0)).getElements());
+        }
+        Map<String, String> named = new HashMap<>();
+        for (Expression argument : arguments) {
+            Expression name;
+            Expression value;
+            if (argument instanceof G.MapEntry) {
+                name = ((G.MapEntry) argument).getKey();
+                value = ((G.MapEntry) argument).getValue();
+            } else if (argument instanceof J.Assignment) {
+                name = ((J.Assignment) argument).getVariable();
+                value = ((J.Assignment) argument).getAssignment();
+            } else {
+                return null;
+            }
+            String key = name instanceof J.Literal ? String.valueOf(((J.Literal) name).getValue()) :
+                    name instanceof J.Identifier ? ((J.Identifier) name).getSimpleName() : null;
+            if (key == null || !(value instanceof J.Literal) || !(((J.Literal) value).getValue() instanceof String)) {
+                return null;
+            }
+            named.put(key, (String) ((J.Literal) value).getValue());
+        }
+        return named;
     }
 
     private Comparator determineComparator() {
