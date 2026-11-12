@@ -3419,4 +3419,288 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void callOnTheNewTypeCallsTheNewTypesMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Base {
+                  public String getZone() { return ""; }
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class Old extends Base {
+                  public void plusDays(int days) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New {
+                  public void plusDays(long days) {}
+                  public Object getZone() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.plusDays(1);
+                      o.getZone();
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.plusDays(1);
+                      o.getZone();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callOnTheNewTypeCallsItsJdkMethodWhereTheFileDoesNotUseTheNewType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "java.time.LocalDate", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public void plusDays(int days) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  void test(Old o) {
+                      o.plusDays(1);
+                  }
+              }
+              """,
+            """
+              import java.time.LocalDate;
+
+              class Test {
+                  void test(LocalDate o) {
+                      o.plusDays(1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callOnTheNewTypeCallsAMethodOfItsGenericSupertype() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public boolean isAfter(Object other) { return false; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public interface Chrono<D> {
+                  default boolean isAfter(Chrono<?> other) { return false; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New implements Chrono<String> {
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.isAfter(o);
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.isAfter(o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callWithoutReceiverCallsTheMethodOfTheNewSupertype() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public void plusDays(int days) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New {
+                  public void plusDays(long days) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test extends Old {
+                  New n;
+                  void test() {
+                      plusDays(1);
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test extends New {
+                  New n;
+                  void test() {
+                      plusDays(1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callOnTheNewTypeCallsTheOnlyOverloadThatAcceptsItsArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public void put(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New {
+                  public void put(Integer i) {}
+                  public void put(CharSequence s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.put("");
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.put("");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callThatSeveralOfTheNewTypesMethodsAcceptKeepsItsMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public void plus(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New {
+                  public void plus(Object o) {}
+                  public void plus(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.plus("");
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.plus("");
+                  }
+              }
+              """
+          )
+        );
+    }
 }

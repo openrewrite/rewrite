@@ -113,7 +113,7 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
     /**
      * A source can declare a class in a new {@code java.*} package, so the class must also be one the JDK has.
      */
-    private static boolean isJdkClass(String fqn) {
+    public static boolean isJdkClass(String fqn) {
         return fqn.startsWith("java.") && ClassLoader.getSystemResource(fqn.replace('.', '/') + ".class") != null;
     }
 

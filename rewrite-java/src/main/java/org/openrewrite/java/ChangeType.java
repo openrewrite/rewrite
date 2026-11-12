@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -177,6 +178,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
     }
 
     private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+        private static final String JDK_CLASSES_MESSAGE_KEY = "org.openrewrite.java.ChangeType.jdkClasses";
+
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
@@ -290,7 +293,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         .withName(method.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) j;
-                JavaType.Method mt = updateType(method.getMethodType());
+                JavaType.Method mt = calledMethod(method, updateType(method.getMethodType()));
                 j = method.withMethodType(mt)
                         .withName(method.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
@@ -839,6 +842,91 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 return method;
             }
             return null;
+        }
+
+        /**
+         * The method of the receiver's new type that a call on the original type resolves to, such as
+         * {@code plusDays(long)} for a call of the original type's {@code plusDays(int)}, or {@code mapped} where that
+         * can't be told.
+         */
+        private JavaType.@Nullable Method calledMethod(J.MethodInvocation method, JavaType.@Nullable Method mapped) {
+            // Kotlin, Groovy and the other languages resolve a call by rules of their own
+            if (mapped == null || !(getCursor().getValue() instanceof J.MethodInvocation) ||
+                getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
+                return mapped;
+            }
+            J.MethodInvocation original = getCursor().getValue();
+            JavaType.Method originalType = original.getMethodType();
+            JavaType.FullyQualified originalReceiver = original.getSelect() == null ? null :
+                    TypeUtils.asFullyQualified(original.getSelect().getType());
+            if (originalType == null || !isOfOriginalType(originalType.getDeclaringType()) &&
+                                        !isOfOriginalType(originalReceiver)) {
+                return mapped;
+            }
+            // A receiver's type that another recipe already changed, as in `ZonedDateTime.now().getZone()` with
+            // `getZone()` still declared by the original type, is where the call finds its method.
+            JavaType.FullyQualified receiver = withMembers(method.getSelect() == null ? mapped.getDeclaringType() :
+                    TypeUtils.asFullyQualified(method.getSelect().getType()));
+            if (receiver == null) {
+                return mapped;
+            }
+            List<@Nullable JavaType> argumentTypes = new ArrayList<>();
+            for (Expression argument : method.getArguments()) {
+                if (!(argument instanceof J.Empty)) {
+                    argumentTypes.add(argument.getType());
+                }
+            }
+            JavaType.Method called = CalledMethod.find(receiver, mapped.getName(), argumentTypes);
+            // the receiver's own type may still hold the original type among its supertypes
+            return called == null || isOfOriginalType(called.getDeclaringType()) ? mapped : called;
+        }
+
+        private boolean isOfOriginalType(JavaType.@Nullable FullyQualified fq) {
+            return isTargetFullyQualifiedType(fq) || isNestedTypeOfOriginal(fq);
+        }
+
+        /**
+         * {@code type} with its members where {@code type} is only its name, as the target type is, from the types the
+         * source file uses or else from a parse of the JDK's class.
+         */
+        private JavaType.@Nullable FullyQualified withMembers(JavaType.@Nullable FullyQualified type) {
+            if (type == null || type instanceof JavaType.Class && !(type instanceof JavaType.ShallowClass)) {
+                return type;
+            }
+            JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+            if (sourceFile != null) {
+                for (JavaType inUse : sourceFile.getTypesInUse().getTypesInUse()) {
+                    if (inUse instanceof JavaType.Class && !(inUse instanceof JavaType.ShallowClass) &&
+                        ((JavaType.Class) inUse).getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                        return (JavaType.Class) inUse;
+                    }
+                }
+            }
+            if (!JdkClassSharingTypeFactory.isJdkClass(type.getFullyQualifiedName())) {
+                return null;
+            }
+            // parsed once a cycle, for every source file and ChangeType that calls a method of it
+            Map<String, Optional<JavaType.Class>> jdkClasses = getCursor().getRoot()
+                    .computeMessageIfAbsent(JDK_CLASSES_MESSAGE_KEY, k -> new HashMap<>());
+            return jdkClasses.computeIfAbsent(type.getFullyQualifiedName(), JavaChangeTypeVisitor::parseJdkClass)
+                    .orElse(null);
+        }
+
+        private static Optional<JavaType.Class> parseJdkClass(String fullyQualifiedName) {
+            SourceFile stub = JavaParser.fromJavaVersion().build()
+                    .parse("class Stub { " + fullyQualifiedName.replace('$', '.') + " t; }")
+                    .findFirst()
+                    .orElse(null);
+            if (stub instanceof J.CompilationUnit && !((J.CompilationUnit) stub).getClasses().isEmpty()) {
+                List<Statement> statements = ((J.CompilationUnit) stub).getClasses().get(0).getBody().getStatements();
+                if (!statements.isEmpty() && statements.get(0) instanceof J.VariableDeclarations) {
+                    JavaType parsed = ((J.VariableDeclarations) statements.get(0)).getType();
+                    if (parsed instanceof JavaType.Class && !(parsed instanceof JavaType.ShallowClass)) {
+                        return Optional.of((JavaType.Class) parsed);
+                    }
+                }
+            }
+            return Optional.empty();
         }
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
