@@ -1434,6 +1434,22 @@ public class GroovyParserVisitor {
             return parenthesized;
         }
 
+        /**
+         * Any statement can carry labels (Spock's `when:`, `then:`, `expect:` before a switch, a
+         * while, a try, a return…), not only the ones whose visitors called {@link #labeled}; the rest kept the label
+         * as whitespace. Visits the statement, then wraps it in its labels.
+         */
+        private void withLabels(org.codehaus.groovy.ast.stmt.Statement statement, Runnable visit) {
+            if (statement.getStatementLabels() == null || statement.getStatementLabels().isEmpty()) {
+                visit.run();
+                return;
+            }
+            queue.add(labeled(statement, () -> {
+                visit.run();
+                return (Statement) queue.poll();
+            }));
+        }
+
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
             List<J.Label> labels = null;
             if (statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
@@ -1917,6 +1933,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBlockStatement(BlockStatement block) {
+            withLabels(block, () -> visitBlockStatementUnlabeled(block));
+        }
+
+        private void visitBlockStatementUnlabeled(BlockStatement block) {
             if (isUnwrappedDesugaredResourceBlock(block)) {
                 // A try-with-resources without a catch or finally clause is desugared by Groovy 4 into a
                 // bare block (rather than being wrapped in a TryCatchStatement like the cases that have a
@@ -2087,6 +2107,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBreakStatement(BreakStatement statement) {
+            withLabels(statement, () -> visitBreakStatementUnlabeled(statement));
+        }
+
+        private void visitBreakStatementUnlabeled(BreakStatement statement) {
             queue.add(new J.Break(randomId(),
                     sourceBefore("break"),
                     Markers.EMPTY,
@@ -2407,6 +2431,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitContinueStatement(ContinueStatement statement) {
+            withLabels(statement, () -> visitContinueStatementUnlabeled(statement));
+        }
+
+        private void visitContinueStatementUnlabeled(ContinueStatement statement) {
             queue.add(new J.Continue(randomId(),
                     sourceBefore("continue"),
                     Markers.EMPTY,
@@ -3320,6 +3348,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitReturnStatement(ReturnStatement return_) {
+            withLabels(return_, () -> visitReturnStatementUnlabeled(return_));
+        }
+
+        private void visitReturnStatementUnlabeled(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
             if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
                     (((ConstantExpression) return_.getExpression()).getValue() == null)) {
@@ -3344,6 +3376,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitSwitch(SwitchStatement statement) {
+            withLabels(statement, () -> visitSwitchUnlabeled(statement));
+        }
+
+        private void visitSwitchUnlabeled(SwitchStatement statement) {
             queue.add(new J.Switch(
                     randomId(),
                     sourceBefore("switch"),
@@ -3362,6 +3398,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitSynchronizedStatement(SynchronizedStatement statement) {
+            withLabels(statement, () -> visitSynchronizedStatementUnlabeled(statement));
+        }
+
+        private void visitSynchronizedStatementUnlabeled(SynchronizedStatement statement) {
             Space fmt = sourceBefore("synchronized");
             queue.add(new J.Synchronized(randomId(), fmt, Markers.EMPTY,
                     new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
@@ -3387,6 +3427,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitThrowStatement(ThrowStatement statement) {
+            withLabels(statement, () -> visitThrowStatementUnlabeled(statement));
+        }
+
+        private void visitThrowStatementUnlabeled(ThrowStatement statement) {
             Space fmt = sourceBefore("throw");
             queue.add(new J.Throw(randomId(), fmt, Markers.EMPTY, doVisit(statement.getExpression())));
         }
@@ -3495,6 +3539,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTryCatchFinally(TryCatchStatement node) {
+            withLabels(node, () -> visitTryCatchFinallyUnlabeled(node));
+        }
+
+        private void visitTryCatchFinallyUnlabeled(TryCatchStatement node) {
             Space prefix = sourceBefore("try");
 
             // Groovy 4 desugars try-with-resources at parse time (getResourceStatements() is always empty).
@@ -3731,6 +3779,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitDoWhileLoop(DoWhileStatement loop) {
+            withLabels(loop, () -> visitDoWhileLoopUnlabeled(loop));
+        }
+
+        private void visitDoWhileLoopUnlabeled(DoWhileStatement loop) {
             Space fmt = sourceBefore("do");
             Statement body = visitLoopBody(loop.getLoopBlock());
             Space beforeWhile = sourceBefore("while");
@@ -3744,6 +3796,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitWhileLoop(WhileStatement loop) {
+            withLabels(loop, () -> visitWhileLoopUnlabeled(loop));
+        }
+
+        private void visitWhileLoopUnlabeled(WhileStatement loop) {
             Space fmt = sourceBefore("while");
             queue.add(new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
                     new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
