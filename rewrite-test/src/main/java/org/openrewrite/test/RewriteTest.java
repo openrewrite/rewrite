@@ -275,7 +275,6 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         RecipeQualityValidation quality = RecipeQualityValidation.of(testMethodSpec, testClassSpec);
-        unneededOptOuts.recordScanningMutations(ctx);
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -362,7 +361,7 @@ public interface RewriteTest extends SourceSpecs {
 
                 // Validate before source
                 SourceFile parsed = sourceFile;
-                Parser.Input input = new ArrayList<>(inputs.values()).get(i);
+                Parser.Input input = inputs.get(nextSpec);
                 SourceSpec.ValidateSource validateSource = nextSpec.validateSource;
                 Consumer<TypeValidation> validateParsed = validation -> {
                     validateSource.accept(parsed, validation);
@@ -434,6 +433,7 @@ public interface RewriteTest extends SourceSpecs {
                     quality.reportingMarkersOnly() ? addedMarkers : null, unchangedTreeIdentity, accumulatorContents);
         }
 
+        unneededOptOuts.recordScanningMutations(recipeCtx);
         recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
                 .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
@@ -458,10 +458,8 @@ public interface RewriteTest extends SourceSpecs {
         RecipeRun recipeRun = formattingScope.record(() ->
                 importedNames.record(() -> runner.run(recipe, runnerContext)));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
-        // matching the results to the expected sources removes the marker-only changes from the run's results
-        List<Result> results = new ArrayList<>(recipeRun.getChangeset().getAllResults());
         unneededOptOuts.check("reportingMarkersOnly", quality.reportingMarkersOnly(), () ->
-                requireNonNull(addedMarkers).assertNoneAdded(results));
+                requireNonNull(addedMarkers).assertNoneAdded(recipeRun.getChangeset().getAllResults()));
         unchangedTreeIdentity.assertNoneFound();
         unneededOptOuts.check("lightweightAccumulators", quality.lightweightAccumulators(), () ->
                 requireNonNull(accumulatorContents).assertNoneFound());
@@ -714,18 +712,20 @@ public interface RewriteTest extends SourceSpecs {
                 formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults()));
         importedNames.assertImports(recipeRun.getChangeset().getAllResults(), quality.importReferencedTypes(),
                 quality.removeUnusedImports());
-        unneededOptOuts.checksOnTheSide("importReferencedTypes", () ->
+        unneededOptOuts.checkOnTheSideLater("importReferencedTypes", () ->
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), true, false));
-        unneededOptOuts.checksOnTheSide("removeUnusedImports", () ->
+        unneededOptOuts.checkOnTheSideLater("removeUnusedImports", () ->
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), false, true));
         new TreeShapes(quality.parserShapedTrees(),
                 quality.parserTypedTrees() && TypeValidation.validatesTypes(testMethodSpec, testClassSpec),
                 parsersFor, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
-        unneededOptOuts.checksOnTheSide("parserShapedTrees", () -> new TreeShapes(true, false, parsersFor, relativeTo,
-                ctx).assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
-        unneededOptOuts.checksOnTheSide("parserTypedTrees", () -> new TreeShapes(false, true, parsersFor, relativeTo,
-                ctx).assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        unneededOptOuts.checkOnTheSideLater("parserShapedTrees", () ->
+                new TreeShapes(true, false, parsersFor, relativeTo, ctx)
+                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        unneededOptOuts.checkOnTheSideLater("parserTypedTrees", () ->
+                new TreeShapes(false, true, parsersFor, relativeTo, ctx)
+                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
                 CompositeOrder.assertOrdered(recipe));
         unneededOptOuts.check("noStaticVisitors", quality.noStaticVisitors(), () ->
@@ -734,7 +734,7 @@ public interface RewriteTest extends SourceSpecs {
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
         }
-        unneededOptOuts.checksOnTheSide("matchByTypeNotName", () -> {
+        unneededOptOuts.checkOnTheSideLater("matchByTypeNotName", () -> {
             if (nameMatchingOnTheSide != null) {
                 nameMatchingOnTheSide.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
             }

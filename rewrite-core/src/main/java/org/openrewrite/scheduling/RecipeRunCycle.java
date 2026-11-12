@@ -274,18 +274,18 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
                                     Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                    assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
+                                            scanningRecipe.getName() + "'s scanner changed " + source.getSourcePath() +
+                                            ", and the scanning phase discards edits. Record what the scanner finds " +
+                                            "in the accumulator, and make the edits in getVisitor(acc). A scanner " +
+                                            "that reuses an editing visitor opts out with " +
+                                            "RecipeQualityValidation.builder().noEditsInScanningPhase(false).";
                                     if (maybeMutated != source) {
-                                        String mutation = scanningRecipe.getName() + "'s scanner changed " +
-                                                          source.getSourcePath();
                                         Collection<String> mutations = ctx.getMessage(SCANNING_MUTATIONS);
                                         if (mutations != null) {
-                                            mutations.add(mutation);
+                                            mutations.add(scanningRecipe.getName() + "'s scanner changed " +
+                                                          source.getSourcePath());
                                         }
-                                        assert !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
-                                                mutation + ", and the scanning phase discards edits. Record what " +
-                                                "the scanner finds in the accumulator, and make the edits in " +
-                                                "getVisitor(acc). A scanner that reuses an editing visitor opts out " +
-                                                "with RecipeQualityValidation.builder().noEditsInScanningPhase(false).";
                                     }
                                 }
                                 return source;

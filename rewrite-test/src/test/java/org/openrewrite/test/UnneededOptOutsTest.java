@@ -19,6 +19,7 @@ import lombok.Value;
 import lombok.With;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.Tree;
@@ -62,6 +63,19 @@ class UnneededOptOutsTest implements RewriteTest {
                                 "classDeclarations, identifiers,")
           .hasMessageContaining("Replace typeValidationOptions(..) in the test's RecipeSpec with:\n" +
                                 "    spec.typeValidationOptions(TypeValidation.all().unknown(false))");
+
+        AssertionError predicate = withOptOutsChecked("all", () -> assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().allowMissingType(o -> true).identifiers(false)),
+          validatedText("a", (source, validation) -> {
+              if (!validation.allowMissingType().apply(source)) {
+                  throw new IllegalStateException("LST is missing a type");
+              }
+              return source;
+          })
+        )));
+        assertThat(predicate).hasMessageContaining(
+          "    spec.typeValidationOptions(TypeValidation.all().allowMissingType(..))\n" +
+          "Where these show .., keep the test's own argument.");
     }
 
     @Test
@@ -166,6 +180,7 @@ class UnneededOptOutsTest implements RewriteTest {
                         text.withMarkers(text.getMarkers().add(new Seen(Tree.randomId())));
                   }
               }))
+            .recipeExecutionContext(new InMemoryExecutionContext())
             .expectedCyclesThatMakeChanges(1)
             .recipeQualityValidation(RecipeQualityValidation.builder()
               .executionContextUnchanged(false)

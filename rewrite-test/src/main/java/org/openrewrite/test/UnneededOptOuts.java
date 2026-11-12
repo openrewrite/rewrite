@@ -68,6 +68,18 @@ final class UnneededOptOuts {
         DEPRECATED_OPTIONS.put("noEditsInScanningPhase", "immutableScanning");
     }
 
+    private static final Set<String> KNOWN = new LinkedHashSet<>();
+
+    static {
+        for (Field option : options(TypeValidation.class)) {
+            KNOWN.add(option.getName());
+        }
+        for (Field option : options(RecipeQualityValidation.class)) {
+            KNOWN.add(option.getName());
+        }
+        KNOWN.add(SERIALIZATION);
+    }
+
     private final String property;
     private final Set<String> checked;
     private final Options asRun;
@@ -84,21 +96,13 @@ final class UnneededOptOuts {
 
     static UnneededOptOuts of(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
         String property = System.getProperty(PROPERTY, "").trim();
-        Set<String> known = new LinkedHashSet<>();
-        for (Field option : options(TypeValidation.class)) {
-            known.add(option.getName());
-        }
-        for (Field option : options(RecipeQualityValidation.class)) {
-            known.add(option.getName());
-        }
-        known.add(SERIALIZATION);
         Set<String> checked = new LinkedHashSet<>();
         List<String> unknown = new ArrayList<>();
         for (String name : property.split(",")) {
             name = name.trim();
             if ("all".equals(name)) {
-                checked.addAll(known);
-            } else if (known.contains(name)) {
+                checked.addAll(KNOWN);
+            } else if (KNOWN.contains(name)) {
                 checked.add(name);
             } else if (!name.isEmpty()) {
                 unknown.add(name);
@@ -107,7 +111,7 @@ final class UnneededOptOuts {
         if (!unknown.isEmpty()) {
             throw new IllegalArgumentException(PROPERTY + " names checks that don't exist: " +
                                                String.join(", ", unknown) + ". Name all, or some of: " +
-                                               String.join(", ", known) + ".");
+                                               String.join(", ", KNOWN) + ".");
         }
         DEPRECATED_OPTIONS.forEach((check, deprecated) -> {
             if (checked.contains(check) || checked.contains(deprecated)) {
@@ -126,22 +130,26 @@ final class UnneededOptOuts {
         if (SERIALIZATION.equals(check)) {
             return checked.contains(check) && !asRun.serializes();
         }
-        return !asRun.runs(check) &&
-               (checked.contains(check) || NEED_TYPES.contains(check) && !Collections.disjoint(checked, TYPE_CHECKS));
+        return (checked.contains(check) || NEED_TYPES.contains(check) && !Collections.disjoint(checked, TYPE_CHECKS)) &&
+               !asRun.runs(check);
     }
 
     /**
-     * Runs the assertion if the test asks for the check, or else keeps it to run on the side.
+     * Runs the assertion if the test asks for the check, or else runs it on the side.
      */
     void check(String check, boolean on, Runnable assertion) {
         if (on) {
             assertion.run();
-        } else {
-            checksOnTheSide(check, assertion);
+        } else if (runsOnTheSide(check)) {
+            passedOnTheSide.put(check, passes(assertion));
         }
     }
 
-    void checksOnTheSide(String check, Runnable assertion) {
+    /**
+     * Keeps the assertion to run on the side only if the opt-outs being turned back on need it. What it reads has to
+     * stay as it is until the test ends.
+     */
+    void checkOnTheSideLater(String check, Runnable assertion) {
         if (runsOnTheSide(check)) {
             checksOnTheSide.put(check, assertion);
         }
@@ -174,7 +182,7 @@ final class UnneededOptOuts {
             return CursorValidatingExecutionContextView.view(ctx);
         }
         ExecutionContextChanges changes = new ExecutionContextChanges(ctx);
-        checksOnTheSide("executionContextUnchanged", () -> assertThat(changes.keys).isEmpty());
+        checkOnTheSideLater("executionContextUnchanged", () -> assertThat(changes.keys).isEmpty());
         return changes;
     }
 
@@ -185,7 +193,7 @@ final class UnneededOptOuts {
         if (runsOnTheSide("noEditsInScanningPhase")) {
             Collection<String> mutations = new CopyOnWriteArrayList<>();
             ctx.putMessage(SCANNING_MUTATIONS, mutations);
-            checksOnTheSide("noEditsInScanningPhase", () -> assertThat(mutations).isEmpty());
+            checkOnTheSideLater("noEditsInScanningPhase", () -> assertThat(mutations).isEmpty());
         }
     }
 
@@ -312,7 +320,7 @@ final class UnneededOptOuts {
                     message.append("This test needs none of the opt-outs in defaults(RecipeSpec).\n");
                 } else {
                     message.append("Of the opt-outs in defaults(RecipeSpec), this test needs only:\n");
-                    calls.forEach(call -> message.append("    ").append(call).append('\n'));
+                    append(message, calls);
                 }
                 message.append("defaults(RecipeSpec) needs only what the tests of its class need together, which ")
                         .append("each test that fails like this one lists.\n");
@@ -327,11 +335,18 @@ final class UnneededOptOuts {
                 } else {
                     message.append("Replace ").append(String.join(" and ", options)).append(" in ").append(where)
                             .append(" with:\n");
-                    calls.forEach(call -> message.append("    ").append(call).append('\n'));
+                    append(message, calls);
                 }
             }
         }
         return message.toString();
+    }
+
+    private static void append(StringBuilder message, List<String> calls) {
+        calls.forEach(call -> message.append("    ").append(call).append('\n'));
+        if (calls.stream().anyMatch(call -> call.contains("(..)"))) {
+            message.append("Where these show .., keep the test's own argument.\n");
+        }
     }
 
     /**
