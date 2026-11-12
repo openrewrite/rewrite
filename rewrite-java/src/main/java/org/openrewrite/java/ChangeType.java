@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -178,8 +177,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
     }
 
     private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
-        private static final String JDK_CLASSES_MESSAGE_KEY = "org.openrewrite.java.ChangeType.jdkClasses";
-
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
@@ -888,7 +885,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         /**
          * {@code type} with its members where {@code type} is only its name, as the target type is, from the types the
-         * source file uses or else from a parse of the JDK's class.
+         * source file uses.
          */
         private JavaType.@Nullable FullyQualified withMembers(JavaType.@Nullable FullyQualified type) {
             if (type == null || type instanceof JavaType.Class && !(type instanceof JavaType.ShallowClass)) {
@@ -904,29 +901,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     if (inUse instanceof JavaType.Class && !(inUse instanceof JavaType.ShallowClass) &&
                         ((JavaType.Class) inUse).getFullyQualifiedName().equals(fullyQualifiedName)) {
                         return Optional.of((JavaType.Class) inUse);
-                    }
-                }
-            }
-            if (!JdkClassSharingTypeFactory.isJdkClass(fullyQualifiedName)) {
-                return Optional.empty();
-            }
-            // parsed once a cycle, for every source file and ChangeType that calls a method of it
-            Map<String, Optional<JavaType.Class>> jdkClasses = getCursor().getRoot()
-                    .computeMessageIfAbsent(JDK_CLASSES_MESSAGE_KEY, k -> new HashMap<>());
-            return jdkClasses.computeIfAbsent(fullyQualifiedName, JavaChangeTypeVisitor::parseJdkClass);
-        }
-
-        private static Optional<JavaType.Class> parseJdkClass(String fullyQualifiedName) {
-            SourceFile stub = JavaParser.fromJavaVersion().build()
-                    .parse("class Stub { " + fullyQualifiedName.replace('$', '.') + " t; }")
-                    .findFirst()
-                    .orElse(null);
-            if (stub instanceof J.CompilationUnit && !((J.CompilationUnit) stub).getClasses().isEmpty()) {
-                List<Statement> statements = ((J.CompilationUnit) stub).getClasses().get(0).getBody().getStatements();
-                if (!statements.isEmpty() && statements.get(0) instanceof J.VariableDeclarations) {
-                    JavaType parsed = ((J.VariableDeclarations) statements.get(0)).getType();
-                    if (parsed instanceof JavaType.Class && !(parsed instanceof JavaType.ShallowClass)) {
-                        return Optional.of((JavaType.Class) parsed);
                     }
                 }
             }

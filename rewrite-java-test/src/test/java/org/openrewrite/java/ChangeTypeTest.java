@@ -3477,41 +3477,6 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void callOnTheNewTypeCallsItsJdkMethodWhereTheFileDoesNotUseTheNewType() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.Old", "java.time.LocalDate", true)),
-          java(
-            """
-              package a;
-              public class Old {
-                  public void plusDays(int days) {}
-              }
-              """
-          ),
-          java(
-            """
-              import a.Old;
-
-              class Test {
-                  void test(Old o) {
-                      o.plusDays(1);
-                  }
-              }
-              """,
-            """
-              import java.time.LocalDate;
-
-              class Test {
-                  void test(LocalDate o) {
-                      o.plusDays(1);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void callOnTheNewTypeCallsAMethodOfItsGenericSupertype() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
@@ -3867,6 +3832,169 @@ class ChangeTypeTest implements RewriteTest {
                   New n;
                   void test(New o) {
                       o.plus("");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callOnTheNewTypeWithAVarargsMethodOfItsNameKeepsItsMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public void of(int... is) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New {
+                  public void of(String a, String b, String c) {}
+                  public void of(int... is) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.of(1, 2, 3);
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.of(1, 2, 3);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void callOnTheNewTypeCallsTheInheritedMethodWithTheNarrowerReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package a;
+              public class Old {
+                  public Object get() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public interface Wide {
+                  Object get();
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public interface Narrow extends Wide {
+                  String get();
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public interface New extends Wide, Narrow {
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o) {
+                      o.get();
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o) {
+                      o.get();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayOfTheNewTypeRulesOutNoMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java(
+            """
+              package b;
+              public interface Iface {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              import b.Iface;
+              public class Old implements Iface {
+                  public void put(Iface[] is) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class New implements Iface {
+                  public void put(Object o) {}
+                  public void put(Iface[] is) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(Old o, Old[] os) {
+                      o.put(os);
+                  }
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New n;
+                  void test(New o, New[] os) {
+                      o.put(os);
                   }
               }
               """

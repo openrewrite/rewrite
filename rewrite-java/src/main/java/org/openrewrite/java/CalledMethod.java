@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Finds the method of a type that a call resolves to, from the members of the type and its supertypes, when exactly
@@ -42,7 +43,14 @@ final class CalledMethod {
     static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name,
                                           List<@Nullable JavaType> argumentTypes) {
         List<JavaType.Method> candidates = new ArrayList<>();
-        collect(type, false, name, argumentTypes.size(), candidates, new HashSet<>());
+        collect(type, false, name, candidates, new HashSet<>());
+        for (JavaType.Method candidate : candidates) {
+            // a varargs method takes any number of arguments, so a call's number of arguments can't rule it out
+            if (candidate.hasFlags(Flag.Varargs)) {
+                return null;
+            }
+        }
+        candidates.removeIf(candidate -> candidate.getParameterTypes().size() != argumentTypes.size());
         // The only method with the call's name and number of arguments is the one javac calls once the program
         // compiles, while an argument's type may still be one that a later recipe changes.
         if (candidates.size() > 1) {
@@ -64,30 +72,44 @@ final class CalledMethod {
     }
 
     private static boolean hasTypeVariable(JavaType type) {
+        return contains(type, t -> t instanceof JavaType.GenericTypeVariable &&
+                                   !"?".equals(((JavaType.GenericTypeVariable) t).getName()));
+    }
+
+    /**
+     * Whether {@code type} or a type it is made of passes {@code test}.
+     */
+    private static boolean contains(JavaType type, Predicate<JavaType> test) {
+        if (test.test(type)) {
+            return true;
+        }
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
-            // a wildcard is no variable of its own, but its bound may be one
-            if (!"?".equals(variable.getName())) {
-                return true;
-            }
-            for (JavaType bound : variable.getBounds()) {
-                if (hasTypeVariable(bound)) {
-                    return true;
+            // a named variable's bound may refer back to it, as in `T extends Comparable<T>`
+            if ("?".equals(variable.getName())) {
+                for (JavaType bound : variable.getBounds()) {
+                    if (contains(bound, test)) {
+                        return true;
+                    }
                 }
             }
         } else if (type instanceof JavaType.Parameterized) {
-            for (JavaType typeParameter : ((JavaType.Parameterized) type).getTypeParameters()) {
-                if (hasTypeVariable(typeParameter)) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            if (contains(parameterized.getType(), test)) {
+                return true;
+            }
+            for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                if (contains(typeParameter, test)) {
                     return true;
                 }
             }
         } else if (type instanceof JavaType.Array) {
-            return hasTypeVariable(((JavaType.Array) type).getElemType());
+            return contains(((JavaType.Array) type).getElemType(), test);
         }
         return false;
     }
 
-    private static void collect(JavaType.@Nullable FullyQualified type, boolean supertype, String name, int arity,
+    private static void collect(JavaType.@Nullable FullyQualified type, boolean supertype, String name,
                                 List<JavaType.Method> candidates, Set<String> visited) {
         if (type == null || !visited.add(type.getFullyQualifiedName())) {
             return;
@@ -95,31 +117,40 @@ final class CalledMethod {
         // an interface's static methods aren't inherited
         boolean staticMethods = !supertype || type.getKind() != JavaType.FullyQualified.Kind.Interface;
         for (JavaType.Method method : type.getMethods()) {
-            if (method.getName().equals(name) && method.getParameterTypes().size() == arity &&
-                !method.hasFlags(Flag.Private) && (staticMethods || !method.hasFlags(Flag.Static)) &&
-                !overridden(method, candidates)) {
-                candidates.add(method);
+            if (method.getName().equals(name) && !method.hasFlags(Flag.Private) &&
+                (staticMethods || !method.hasFlags(Flag.Static))) {
+                add(method, candidates);
             }
         }
-        collect(type.getSupertype(), true, name, arity, candidates, visited);
+        collect(type.getSupertype(), true, name, candidates, visited);
         for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-            collect(anInterface, true, name, arity, candidates, visited);
+            collect(anInterface, true, name, candidates, visited);
         }
     }
 
     /**
-     * Whether a method of a subtype, which is collected before those of its supertypes, overrides {@code method}.
+     * Adds {@code method}, or replaces the method with its parameter types where {@code method} returns a narrower type.
+     * A subtype's methods come before those of its supertypes, which they override. An interface can come after one it
+     * overrides, as in {@code New extends Wide, Narrow}.
      */
-    private static boolean overridden(JavaType.Method method, List<JavaType.Method> candidates) {
-        for (JavaType.Method candidate : candidates) {
+    private static void add(JavaType.Method method, List<JavaType.Method> candidates) {
+        for (int i = 0; i < candidates.size(); i++) {
+            JavaType.Method candidate = candidates.get(i);
             if (sameParameterTypes(candidate, method)) {
-                return true;
+                if (TypeUtils.isAssignableTo(candidate.getReturnType(), method.getReturnType()) &&
+                    !TypeUtils.isAssignableTo(method.getReturnType(), candidate.getReturnType())) {
+                    candidates.set(i, method);
+                }
+                return;
             }
         }
-        return false;
+        candidates.add(method);
     }
 
     private static boolean sameParameterTypes(JavaType.Method method, JavaType.Method other) {
+        if (method.getParameterTypes().size() != other.getParameterTypes().size()) {
+            return false;
+        }
         for (int i = 0; i < method.getParameterTypes().size(); i++) {
             if (!TypeUtils.isOfType(method.getParameterTypes().get(i), other.getParameterTypes().get(i))) {
                 return false;
@@ -131,9 +162,10 @@ final class CalledMethod {
     private static boolean accepts(JavaType.Method method, List<@Nullable JavaType> argumentTypes) {
         for (int i = 0; i < argumentTypes.size(); i++) {
             JavaType argumentType = argumentTypes.get(i);
-            // an untyped argument, or one whose type is only its name and so has no supertypes, rules out no method
-            if (argumentType != null && !(argumentType instanceof JavaType.Unknown) &&
-                !(argumentType instanceof JavaType.ShallowClass) &&
+            // an untyped argument, or one whose type holds a type that is only its name and so has no supertypes,
+            // rules out no method
+            if (argumentType != null &&
+                !contains(argumentType, t -> t instanceof JavaType.Unknown || t instanceof JavaType.ShallowClass) &&
                 !TypeUtils.isAssignableTo(method.getParameterTypes().get(i), argumentType)) {
                 return false;
             }
