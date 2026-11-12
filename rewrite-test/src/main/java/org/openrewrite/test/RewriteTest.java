@@ -731,15 +731,18 @@ public interface RewriteTest extends SourceSpecs {
                 importedNames.assertImports(recipeRun.getChangeset().getAllResults(), false, true));
         RewriteTestUtils.assertAfterParsersParse(testMethodSpec.afterParsers, afterParsersFor,
                 recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
-        new TreeShapes(quality.parserShapedTrees(),
-                quality.parserTypedTrees() && TypeValidation.validatesTypes(testMethodSpec, testClassSpec),
-                afterParsersFor, specAfterParsers, relativeTo, ctx)
+        boolean validatesTypes = TypeValidation.validatesTypes(testMethodSpec, testClassSpec);
+        new TreeShapes(quality.parserShapedTrees(), quality.parserTypedTrees() && validatesTypes,
+                quality.compilableOutput() && validatesTypes, afterParsersFor, specAfterParsers, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         unneededOptOuts.checkOnTheSideLater("parserShapedTrees", () ->
-                new TreeShapes(true, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                new TreeShapes(true, false, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.checkOnTheSideLater("parserTypedTrees", () ->
-                new TreeShapes(false, true, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                new TreeShapes(false, true, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        unneededOptOuts.checkOnTheSideLater("compilableOutput", () ->
+                new TreeShapes(false, false, true, afterParsersFor, specAfterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
                 CompositeOrder.assertOrdered(recipe));

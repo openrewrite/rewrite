@@ -17,6 +17,8 @@ package org.openrewrite.test;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.function.Function;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeQualityValidationTest {
@@ -34,15 +36,26 @@ class RecipeQualityValidationTest {
 
     @Test
     void parserTypedTreesOnlyWhenItsSystemPropertyTurnsThemOn() {
-        String property = "org.openrewrite.test.parserTypedTrees";
+        assertOnOnlyWhenItsSystemPropertyTurnsItOn("org.openrewrite.test.parserTypedTrees",
+          RecipeQualityValidation::parserTypedTrees);
+    }
+
+    @Test
+    void compilableOutputOnlyWhenItsSystemPropertyTurnsItOn() {
+        assertOnOnlyWhenItsSystemPropertyTurnsItOn("org.openrewrite.test.compilableOutput",
+          RecipeQualityValidation::compilableOutput);
+    }
+
+    private static void assertOnOnlyWhenItsSystemPropertyTurnsItOn(String property,
+                                                                   Function<RecipeQualityValidation, Boolean> check) {
         String set = System.getProperty(property);
         try {
             System.clearProperty(property);
-            assertThat(RecipeQualityValidation.all().parserTypedTrees()).isFalse();
-            assertThat(RecipeQualityValidation.builder().build().parserTypedTrees()).isFalse();
+            assertThat(check.apply(RecipeQualityValidation.all())).isFalse();
+            assertThat(check.apply(RecipeQualityValidation.builder().build())).isFalse();
             System.setProperty(property, "true");
-            assertThat(RecipeQualityValidation.all().parserTypedTrees()).isTrue();
-            assertThat(RecipeQualityValidation.builder().build().parserTypedTrees()).isTrue();
+            assertThat(check.apply(RecipeQualityValidation.all())).isTrue();
+            assertThat(check.apply(RecipeQualityValidation.builder().build())).isTrue();
         } finally {
             if (set == null) {
                 System.clearProperty(property);
