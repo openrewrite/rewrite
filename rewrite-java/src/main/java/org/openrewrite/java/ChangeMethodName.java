@@ -240,9 +240,12 @@ public class ChangeMethodName extends Recipe {
                                 .withThrownExceptions(type.getThrownExceptions());
                     }
                 }
-                if (called != null) {
-                    called = CalledMethod.calledOn(receiver, called);
+                // javac erases the types of an instance method that is called on a raw type
+                if (called == null || call.getSelect() != null && !called.hasFlags(Flag.Static) &&
+                                      receiver instanceof JavaType.Class && !receiver.getTypeParameters().isEmpty()) {
+                    return renamed;
                 }
+                called = CalledMethod.calledOn(receiver, called);
                 return called == null ? renamed : called;
             }
 

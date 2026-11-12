@@ -384,6 +384,31 @@ class CalledMethodTest {
         assertThat(CalledMethod.find(type, "go", calls.get(2).getArguments())).isNull();
     }
 
+    @Test
+    void callOfAGenericMethodRulesOutNoMethod() {
+        List<J.MethodInvocation> calls = calls(
+          """
+            package b;
+            public class New {
+                public Object old(Object o) { return o; }
+                public Number neu(Object o) { return 0; }
+                public String neu(String s) { return s; }
+                public <T> T get() { return null; }
+            }
+            """,
+          """
+            class Test {
+                void test(b.New n) {
+                    n.old(n.get());
+                }
+            }
+            """
+        );
+        // the parser has `get()` return the `Object` that `old` takes, where javac has it return a `String` for `neu`
+        J.MethodInvocation old = calls.get(0);
+        assertThat(CalledMethod.find(receiver(old), "neu", old.getArguments())).isNull();
+    }
+
     /**
      * The last call in the last of {@code sources}.
      */

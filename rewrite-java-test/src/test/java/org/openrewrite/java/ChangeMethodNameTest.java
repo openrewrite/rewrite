@@ -27,11 +27,13 @@ import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -848,6 +850,117 @@ class ChangeMethodNameTest implements RewriteTest {
               class Test {
                   Object test(A a) {
                       return a.neu("");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallOnARawTypeKeepsItsType() {
+        rewriteRun(
+          // javac erases the types of a method that is called on a raw type, which neither `old()` nor `neu()` tells
+          spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+          java(
+            """
+              package a;
+              import java.util.List;
+              public interface Box<T> {
+                  Object old();
+                  List<String> neu();
+              }
+              """
+          ),
+          java(
+            """
+              import a.Box;
+
+              class Test {
+                  Object test(Box box) {
+                      return box.old();
+                  }
+              }
+              """,
+            """
+              import a.Box;
+
+              class Test {
+                  Object test(Box box) {
+                      return box.neu();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(requireNonNull(method.getMethodType()).getReturnType()).hasToString("java.lang.Object");
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void renamedCallOfAStaticMethodOfAGenericTypeHasItsTypes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null)),
+          java(
+            """
+              package a;
+              public interface Box<T> {
+                  static Object old() { return null; }
+                  static String neu() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Box;
+
+              class Test {
+                  Object test() {
+                      return Box.old();
+                  }
+              }
+              """,
+            """
+              import a.Box;
+
+              class Test {
+                  Object test() {
+                      return Box.neu();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallWithoutAReceiverInAGenericTypeHasTheNewMethodsTypes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null)),
+          java(
+            """
+              package a;
+              public abstract class Box<T> {
+                  abstract Object old();
+                  abstract String neu();
+                  Object test() {
+                      return old();
+                  }
+              }
+              """,
+            """
+              package a;
+              public abstract class Box<T> {
+                  abstract Object old();
+                  abstract String neu();
+                  Object test() {
+                      return neu();
                   }
               }
               """

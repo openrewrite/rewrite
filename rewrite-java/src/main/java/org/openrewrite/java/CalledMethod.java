@@ -269,19 +269,35 @@ final class CalledMethod {
     }
 
     /**
-     * The type of {@code argument} where it tells which parameters take it. A lambda and a method reference have the
-     * type of the parameter they were written for, and a type with a supertype that is only its name doesn't tell all
-     * that it is assignable to.
+     * The type of {@code argument} where it tells which parameters take it. A lambda, a method reference and a call
+     * of a generic method have the type that javac inferred from the parameter they were written for, and a type with
+     * a supertype that is only its name doesn't tell all that it is assignable to.
      */
     private static @Nullable JavaType tellingType(Expression argument) {
         Expression unwrapped = argument.unwrap();
         JavaType type = argument.getType();
         if (type == null || unwrapped instanceof J.Lambda || unwrapped instanceof J.MemberReference ||
+            unwrapped instanceof J.MethodInvocation && isGeneric(((J.MethodInvocation) unwrapped).getMethodType()) ||
             contains(type, t -> t instanceof JavaType.FullyQualified &&
                                 isNameOnly((JavaType.FullyQualified) t, new HashSet<>()))) {
             return null;
         }
         return type;
+    }
+
+    /**
+     * Whether {@code called} has type variables of its own, which its declaration among the members of its type
+     * tells and its type as a call doesn't.
+     */
+    private static boolean isGeneric(JavaType.@Nullable Method called) {
+        if (called != null) {
+            for (JavaType.Method method : called.getDeclaringType().getMethods()) {
+                if (method.getName().equals(called.getName()) && !method.getDeclaredFormalTypeNames().isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean accepts(JavaType.FullyQualified type, JavaType.Method method,
