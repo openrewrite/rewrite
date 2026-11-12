@@ -2320,11 +2320,11 @@ describe("RemoveImport reading the binding table", () => {
         );
     });
 
-    // Wanted: only a request for the default removes a default import, as the table gives it no member.
-    // Differs: RemoveImport also removes it when the member requested is its local name, reading `React` as a member.
-    test.fails("a request for a member named like a default import keeps the default import", async () => {
+    // Only a request for the default or for the whole module removes a default import, as the table gives it no member
+    test("a request for a member named like a default import keeps the default import", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new RemoveImport("react", "React"));
+        // Before: `import React from "react";` was removed, its local name read as the member it imports
         await spec.rewriteRun(
             //language=typescript
             typescript(`

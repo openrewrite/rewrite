@@ -3,7 +3,8 @@ import {isIdentifier, J, TextComment} from "../java";
 import {bindingNames, namesReferencedAsTypesWithin, namesReferencedWithin, valuesDeclaredAtTopLevel, walk} from "./scope";
 import {sameModule} from "./package-name";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
-import {moduleNameOf, requiredModule} from "./binding-table";
+import {bindingsOf, ModuleBinding, moduleNameOf, requiredModule} from "./binding-table";
+import {bindsMember, memberName} from "./add-import";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 import {randomId} from "../uuid";
@@ -237,15 +238,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const identifier = defaultName as J.Identifier;
                 const name = identifier.simpleName;
 
-                // Check if we should remove this default import
-                let shouldRemove: boolean;
-                if (this.member === 'default') {
-                    // Special case: member 'default' means remove any default import from the target module if unused
-                    shouldRemove = !usedNames.has(name);
-                } else {
-                    // Regular case: check if the import name matches the removal criteria
-                    shouldRemove = this.shouldRemoveImport(name, usedNames, name);
-                }
+                // `'default'` or no member asks for it, whatever its local name
+                const shouldRemove = this.asksFor(bindingsOf(jsImport).find(b => b.form === "default")) &&
+                    !usedNames.has(name);
 
                 if (shouldRemove) {
                     // If there are no named imports, remove the entire import
@@ -391,6 +386,15 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         return jsImport;
+    }
+
+    /**
+     * Whether this removal asks for `binding`, as the binding table reads a request: every binding of the module
+     * when no member is given, else the one {@link bindsMember} reads for the member. `'default'` asks for `D` of
+     * `import D from "m"`, while `"D"` does not.
+     */
+    private asksFor(binding: ModuleBinding | undefined): boolean {
+        return binding !== undefined && (this.member === undefined || bindsMember(binding, memberName(this.member)));
     }
 
     /**
