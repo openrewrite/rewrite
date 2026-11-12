@@ -43,6 +43,14 @@ public class ParseProjectOptions {
     List<String> exclusions;
 
     /**
+     * Files the parse leaves out, given as the source paths it would report for them, so relative to
+     * {@link #relativeTo}. A host whose other parser already produced some of a project's files names
+     * them here. The type checker still reads them to resolve imports.
+     */
+    @Nullable
+    List<Path> excludedSourcePaths;
+
+    /**
      * Path to make source file paths relative to. When {@code null}, paths are relative to the project
      * path. Use this when parsing a subdirectory but wanting paths relative to the repository root.
      */

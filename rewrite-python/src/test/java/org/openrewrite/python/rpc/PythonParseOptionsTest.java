@@ -81,8 +81,16 @@ class PythonParseOptionsTest {
      */
     @Test
     void theOptionsFieldCarriesTheKeyLiteralThePythonServerMatches() throws Exception {
-        assertThat(new ObjectMapper().writeValueAsString(new ParseProject(Paths.get("."), null, null, null,
+        assertThat(new ObjectMapper().writeValueAsString(new ParseProject(Paths.get("."), null, null, null, null,
                 Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, "false"))))
                 .contains("\"options\":{\"org.openrewrite.requirePrintEqualsInput\":\"false\"}");
+    }
+
+    @Test
+    void excludedSourcePathsTravelUnderTheKeyThePythonServerReads() throws Exception {
+        assertThat(new ObjectMapper().writeValueAsString(new ParseProject(Paths.get("."), null,
+                Collections.singletonList(Paths.get("pkg/owned.py")), null, null, null)))
+                .as("a key the server does not read leaves every file in the parse")
+                .contains("\"excludedSourcePaths\":[");
     }
 }

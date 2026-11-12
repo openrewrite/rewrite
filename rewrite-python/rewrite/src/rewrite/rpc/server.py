@@ -784,6 +784,7 @@ def handle_parse_project(params: dict) -> List[dict]:
         excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
     ]
     relative_to = params.get('relativeTo') or project_path
+    excluded_source_paths = {Path(p) for p in params.get('excludedSourcePaths') or []}
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
@@ -814,6 +815,8 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     try:
         for path in _walk_python_files(project_path, exclusions):
+            if _source_path(path, relative_to) in excluded_source_paths:
+                continue
             try:
                 oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
             except OSError:

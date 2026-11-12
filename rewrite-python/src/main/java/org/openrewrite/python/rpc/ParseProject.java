@@ -43,6 +43,12 @@ class ParseProject implements RpcRequest {
     List<String> exclusions;
 
     /**
+     * Optional source paths, relative to relativeTo, of files the walk leaves out.
+     */
+    @Nullable
+    List<Path> excludedSourcePaths;
+
+    /**
      * Optional path to make source file paths relative to.
      * If not specified, paths are relative to projectPath.
      * Use this when parsing a subdirectory but wanting paths relative to the repository root.

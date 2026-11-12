@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Which directories a ParseProject walk prunes."""
+"""What a ParseProject walk leaves out."""
 from pathlib import Path
 
-from rewrite.rpc.server import DEFAULT_PARSE_EXCLUSIONS, _walk_python_files
+from rewrite.rpc.server import DEFAULT_PARSE_EXCLUSIONS, _walk_python_files, handle_parse_project
 
 
 def _sources(tmp_path, *relative_paths, exclusions=None):
@@ -62,3 +62,19 @@ def test_caller_exclusions_extend_the_defaults(tmp_path):
         'src/app.py',
         exclusions=DEFAULT_PARSE_EXCLUSIONS + ['vendor'],
     ) == ['src/app.py']
+
+
+def test_files_named_by_their_source_path_are_left_out(tmp_path):
+    project = tmp_path / 'proj'
+    for relative in ('app.py', 'pkg/owned.py'):
+        source = project / relative
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("x = 1\n")
+
+    parsed = [item['sourcePath'] for item in handle_parse_project({
+        'projectPath': str(project),
+        'relativeTo': str(tmp_path),
+        'excludedSourcePaths': ['proj/pkg/owned.py'],
+    })]
+
+    assert parsed == ['proj/app.py']
