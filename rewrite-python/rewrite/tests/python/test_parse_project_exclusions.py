@@ -14,7 +14,7 @@
 """What a ParseProject walk leaves out."""
 from pathlib import Path
 
-from rewrite.rpc.server import DEFAULT_PARSE_EXCLUSIONS, _walk_python_files, handle_parse_project
+from rewrite.rpc.server import DEFAULT_PARSE_EXCLUSIONS, _walk_python_files
 
 
 def _sources(tmp_path, *relative_paths, exclusions=None):
@@ -64,17 +64,25 @@ def test_caller_exclusions_extend_the_defaults(tmp_path):
     ) == ['src/app.py']
 
 
-def test_files_named_by_their_source_path_are_left_out(tmp_path):
-    project = tmp_path / 'proj'
-    for relative in ('app.py', 'pkg/owned.py'):
-        source = project / relative
-        source.parent.mkdir(parents=True, exist_ok=True)
-        source.write_text("x = 1\n")
+def test_a_pattern_with_a_slash_matches_a_path_below_the_project(tmp_path):
+    assert _sources(
+        tmp_path,
+        'app.py',
+        'scripts/app.py',
+        'gen/helper.py',
+        'extras/gen/helper.py',
+        'tests/test_app.py',
+        'tests/conftest.py',
+        exclusions=['/app.py', 'gen/helper.py', 'tests/test_*.py'],
+    ) == ['extras/gen/helper.py', 'scripts/app.py', 'tests/conftest.py']
 
-    parsed = [item['sourcePath'] for item in handle_parse_project({
-        'projectPath': str(project),
-        'relativeTo': str(tmp_path),
-        'excludedSourcePaths': ['proj/pkg/owned.py'],
-    })]
 
-    assert parsed == ['proj/app.py']
+def test_a_pattern_without_a_slash_matches_a_file_name_at_any_depth(tmp_path):
+    assert _sources(
+        tmp_path,
+        'conftest.py',
+        'tests/conftest.py',
+        'tests/test_app.py',
+        'tests/helpers.py',
+        exclusions=['conftest.py', 'test_*.py'],
+    ) == ['tests/helpers.py']

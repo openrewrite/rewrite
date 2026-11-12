@@ -757,23 +757,42 @@ DEFAULT_PARSE_EXCLUSIONS = [
 
 # Build output, which only ever sits at the project root; deeper down these are
 # ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
-ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+ROOT_PARSE_EXCLUSIONS = ['/build', '/dist']
+
+
+class _Exclusions:
+    """Patterns as ``exclusions`` in ``ParseProjectOptions`` describes them."""
+
+    def __init__(self, patterns: List[str]):
+        self._names, self._paths = set(), set()
+        self._name_globs, self._path_globs = [], []
+        for pattern in patterns:
+            anchored = '/' in pattern
+            pattern = os.path.normcase(pattern.lstrip('/'))
+            # A caller can list thousands of files, so a pattern without wildcards is a lookup.
+            if any(c in pattern for c in '*?['):
+                (self._path_globs if anchored else self._name_globs).append(pattern)
+            else:
+                (self._paths if anchored else self._names).add(pattern)
+
+    def cover(self, name: str, path: str) -> bool:
+        import fnmatch
+        name, path = os.path.normcase(name), os.path.normcase(path)
+        return (name in self._names or path in self._paths
+                or any(fnmatch.fnmatch(name, glob) for glob in self._name_globs)
+                or any(fnmatch.fnmatch(path, glob) for glob in self._path_globs))
 
 
 def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
-    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
-    import fnmatch
-
-    def excluded(name: str, patterns: List[str]) -> bool:
-        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
-
+    """Yield every ``.py`` path under ``project_path`` that no exclusion covers."""
+    excluded = _Exclusions(exclusions + ROOT_PARSE_EXCLUSIONS)
     for root, dirs, files in os.walk(project_path):
-        at_root = root == project_path
-        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
-        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+        below = os.path.relpath(root, project_path)
+        prefix = '' if below == os.curdir else below.replace(os.sep, '/') + '/'
+        dirs[:] = [d for d in dirs if not excluded.cover(d, prefix + d)]
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith('.py') and not excluded.cover(file, prefix + file):
                 yield os.path.join(root, file)
 
 
@@ -784,7 +803,6 @@ def handle_parse_project(params: dict) -> List[dict]:
         excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
     ]
     relative_to = params.get('relativeTo') or project_path
-    excluded_source_paths = {Path(p) for p in params.get('excludedSourcePaths') or []}
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
@@ -815,8 +833,6 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     try:
         for path in _walk_python_files(project_path, exclusions):
-            if _source_path(path, relative_to) in excluded_source_paths:
-                continue
             try:
                 oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
             except OSError:

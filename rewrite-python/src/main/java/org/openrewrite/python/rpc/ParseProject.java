@@ -35,18 +35,11 @@ class ParseProject implements RpcRequest {
     Path projectPath;
 
     /**
-     * Optional glob patterns matched against directory names, not paths.
-     * These extend the parser's built-in exclusions (__pycache__, .venv, etc.)
-     * rather than replacing them.
+     * Optional glob patterns of directories and files to leave out, as described on
+     * {@code exclusions} in {@link ParseProjectOptions}.
      */
     @Nullable
     List<String> exclusions;
-
-    /**
-     * Optional source paths, relative to relativeTo, of files the walk leaves out.
-     */
-    @Nullable
-    List<Path> excludedSourcePaths;
 
     /**
      * Optional path to make source file paths relative to.

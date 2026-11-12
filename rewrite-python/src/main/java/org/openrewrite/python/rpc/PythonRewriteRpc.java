@@ -273,8 +273,8 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions,
-                            options.getExcludedSourcePaths(), relativeTo, env, parseOptions(ctx)), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, env,
+                            parseOptions(ctx)), ParseProjectResponse.class);
                     // A setup.py-only project's resolution rides on setup.py, so it leads like any other manifest.
                     response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
                             !"setup.py".equals(Paths.get(item.getSourcePath()).getFileName().toString())));
