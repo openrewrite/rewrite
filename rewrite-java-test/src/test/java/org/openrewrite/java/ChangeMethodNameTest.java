@@ -774,6 +774,88 @@ class ChangeMethodNameTest implements RewriteTest {
     }
 
     @Test
+    void renamedCallOnASubtypeCallsItsOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Base old()", "neu", null, null)),
+          java(
+            """
+              package a;
+              public class Base {
+                  public Object old() { return null; }
+                  public Object neu() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class Sub extends Base {
+                  @Override
+                  public String neu() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Sub;
+
+              class Test {
+                  Object test(Sub sub) {
+                      return sub.old();
+                  }
+              }
+              """,
+            """
+              import a.Sub;
+
+              class Test {
+                  Object test(Sub sub) {
+                      return sub.neu();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallCallsTheOverloadOfTheNewNameThatItsArgumentsFit() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.A old(String)", "neu", null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                  public Object old(String s) { return null; }
+                  public String neu(String s) { return null; }
+                  public int neu(Integer i) { return 0; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+
+              class Test {
+                  Object test(A a) {
+                      return a.old("");
+                  }
+              }
+              """,
+            """
+              import a.A;
+
+              class Test {
+                  Object test(A a) {
+                      return a.neu("");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void renamedCallThrowsTheExceptionsOfTheReceiversTypeArguments() {
         rewriteRun(
           spec -> spec.recipes(

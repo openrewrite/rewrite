@@ -22,17 +22,19 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
-import static java.util.Collections.nCopies;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
 
 class CalledMethodTest {
@@ -58,7 +60,7 @@ class CalledMethodTest {
         );
         assertThat(find(call)).hasToString(parsed(call));
 
-        assertThat(CalledMethod.find(receiver(call), "set", argumentTypes(call))).isNull();
+        assertThat(CalledMethod.find(receiver(call), "set", call.getArguments())).isNull();
     }
 
     @Test
@@ -80,7 +82,8 @@ class CalledMethodTest {
             """
         );
         // arguments that rule out no method leave `of(String, String, String)` as the only one of their number
-        assertThat(CalledMethod.find(receiver(call), "of", nCopies(3, JavaType.Unknown.getInstance()))).isNull();
+        JavaType unknown = JavaType.Unknown.getInstance();
+        assertThat(CalledMethod.find(receiver(call), "of", arguments(unknown, unknown, unknown))).isNull();
     }
 
     @Test
@@ -229,7 +232,7 @@ class CalledMethodTest {
           new JavaType.Array(null, nameOnly, null),
           new JavaType.Parameterized(null, type, singletonList(wildcard))
         )) {
-            assertThat(CalledMethod.find(type, "put", singletonList(argumentType)))
+            assertThat(CalledMethod.find(type, "put", arguments(argumentType)))
               .as("with an argument of type %s", argumentType)
               .hasToString(parsed(call));
         }
@@ -266,7 +269,7 @@ class CalledMethodTest {
         // as `ChangeType` of `b.Base` to `c.Base` leaves the type `b.Arg`
         JavaType.Class arg = ((JavaType.Class) requireNonNull(call.getArguments().get(0).getType()))
           .withInterfaces(singletonList(JavaType.ShallowClass.build("c.Base")));
-        assertThat(CalledMethod.find(receiver(call), "put", singletonList(arg))).isNull();
+        assertThat(CalledMethod.find(receiver(call), "put", arguments(arg))).isNull();
     }
 
     @Test
@@ -295,27 +298,123 @@ class CalledMethodTest {
         // as `ChangeType` of `b.Base` to `c.Base` leaves the type `b.New`
         JavaType.Class type = ((JavaType.Class) receiver(call))
           .withSupertype(JavaType.ShallowClass.build("c.Base"));
-        assertThat(CalledMethod.find(type, "put", argumentTypes(call))).isNull();
+        assertThat(CalledMethod.find(type, "put", call.getArguments())).isNull();
+    }
+
+    @Test
+    void parameterOfATypeVariableRulesOutNoMethod() {
+        J.MethodInvocation call = call(
+          """
+            package b;
+            public class New {
+                public <R extends Number> void put(R r) {}
+                public void put(Object o) {}
+                public <R> void set(R[] rs) {}
+                public void set(Object o) {}
+            }
+            """,
+          """
+            class Test {
+                void test(b.New n, Integer[] is) {
+                    n.put(is[0]);
+                }
+            }
+            """
+        );
+        assertThat(find(call)).isNull();
+
+        J.ArrayAccess element = (J.ArrayAccess) call.getArguments().get(0);
+        assertThat(CalledMethod.find(receiver(call), "set", singletonList(element.getIndexed()))).isNull();
+    }
+
+    @Test
+    void rawArgumentIsOneForAParameterizedParameter() {
+        J.MethodInvocation call = call(
+          """
+            package b;
+            import java.util.List;
+            public class New {
+                public void put(List<String> l) {}
+                public void put(Integer i) {}
+            }
+            """,
+          """
+            import java.util.List;
+            class Test {
+                void test(b.New n, List raw) {
+                    n.put(raw);
+                }
+            }
+            """
+        );
+        assertThat(find(call)).hasToString(parsed(call));
+    }
+
+    @Test
+    void lambdaAndMethodReferenceRuleOutNoMethod() {
+        List<J.MethodInvocation> calls = calls(
+          """
+            package b;
+            public interface Mapper {
+                String map(String s);
+            }
+            """,
+          """
+            package b;
+            public class New {
+                public void go(Mapper m) {}
+                public void go(Object o) {}
+            }
+            """,
+          """
+            import java.util.function.Function;
+            class Test {
+                void old(Function<String, String> f) {}
+                void test(b.New n) {
+                    n.hashCode();
+                    old((s -> s));
+                    old(String::trim);
+                }
+            }
+            """
+        );
+        // the parser has each be a `Function`, the parameter of `old`, which is none of `go`
+        JavaType.FullyQualified type = receiver(calls.get(0));
+        assertThat(CalledMethod.find(type, "go", calls.get(1).getArguments())).isNull();
+        assertThat(CalledMethod.find(type, "go", calls.get(2).getArguments())).isNull();
     }
 
     /**
-     * The one call in the last of {@code sources}.
+     * The last call in the last of {@code sources}.
      */
     private static J.MethodInvocation call(@Language("java") String... sources) {
+        List<J.MethodInvocation> calls = calls(sources);
+        return calls.get(calls.size() - 1);
+    }
+
+    /**
+     * The calls in the last of {@code sources}.
+     */
+    private static List<J.MethodInvocation> calls(@Language("java") String... sources) {
         List<SourceFile> parsed = JavaParser.fromJavaVersion().build().parse(sources).collect(toList());
-        AtomicReference<J.MethodInvocation> call = new AtomicReference<>();
+        List<J.MethodInvocation> calls = new ArrayList<>();
         new JavaIsoVisitor<Integer>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                call.set(method);
-                return method;
+                calls.add(method);
+                return super.visitMethodInvocation(method, p);
             }
         }.visit(parsed.get(parsed.size() - 1), 0);
-        return requireNonNull(call.get());
+        return calls;
     }
 
+    /**
+     * The method that {@code call} is found to call, with the types the call has.
+     */
     private static JavaType.@Nullable Method find(J.MethodInvocation call) {
-        return CalledMethod.find(receiver(call), call.getSimpleName(), argumentTypes(call));
+        JavaType.FullyQualified type = receiver(call);
+        JavaType.Method found = CalledMethod.find(type, call.getSimpleName(), call.getArguments());
+        return found == null ? null : CalledMethod.calledOn(type, found);
     }
 
     /**
@@ -329,13 +428,11 @@ class CalledMethodTest {
         return requireNonNull(TypeUtils.asFullyQualified(requireNonNull(call.getSelect()).getType()));
     }
 
-    private static List<@Nullable JavaType> argumentTypes(J.MethodInvocation call) {
-        List<@Nullable JavaType> argumentTypes = new ArrayList<>();
-        for (Expression argument : call.getArguments()) {
-            if (!(argument instanceof J.Empty)) {
-                argumentTypes.add(argument.getType());
-            }
+    private static List<Expression> arguments(JavaType... types) {
+        List<Expression> arguments = new ArrayList<>();
+        for (JavaType type : types) {
+            arguments.add(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "arg", type, null));
         }
-        return argumentTypes;
+        return arguments;
     }
 }

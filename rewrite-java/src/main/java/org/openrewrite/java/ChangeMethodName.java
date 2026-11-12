@@ -23,7 +23,6 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -208,39 +207,42 @@ public class ChangeMethodName extends Recipe {
                 if (receiver == null || getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
                     return renamed;
                 }
+                JavaType.Method called;
                 if (!TypeUtils.isAssignableTo(declaringType.getFullyQualifiedName(), receiver)) {
                     // an earlier recipe gave the receiver another type, as in `multi.select().byTakingFirstItems(2)`
-                    List<@Nullable JavaType> argumentTypes = new ArrayList<>();
-                    for (Expression argument : call.getArguments()) {
-                        if (!(argument instanceof J.Empty)) {
-                            argumentTypes.add(argument.getType());
-                        }
+                    called = CalledMethod.find(receiver, newMethodName, call.getArguments());
+                } else {
+                    // Where this recipe renames the old method's declaration too, the call calls that method, which
+                    // its type's members don't hold. The declaration keeps its name only where its type declares the
+                    // new name with the same parameters, so only then is a method of the new name there to call.
+                    JavaType.Method original = declared(declaringType, type.getName(),
+                            method -> TypeUtils.isOfTypeIgnoringGenerics(method, type));
+                    if (original == null) {
+                        return renamed;
                     }
-                    JavaType.Method called = CalledMethod.find(receiver, newMethodName, argumentTypes);
-                    return called == null ? renamed : called;
+                    JavaType.Method target = declared(declaringType, newMethodName,
+                            method -> CalledMethod.sameTypes(method.getParameterTypes(), original.getParameterTypes()));
+                    if (target == null) {
+                        return renamed;
+                    }
+                    // the receiver's own type may override that method, or overload it for these arguments
+                    List<JavaType.Method> candidates = CalledMethod.candidates(receiver, newMethodName,
+                            call.getArguments());
+                    called = candidates.size() == 1 ? candidates.get(0) :
+                            CalledMethod.find(receiver, newMethodName, call.getArguments());
+                    if (called != null && TypeUtils.isOfType(called, target) &&
+                        TypeUtils.isOfType(original.getReturnType(), target.getReturnType()) &&
+                        CalledMethod.sameTypes(original.getThrownExceptions(), target.getThrownExceptions())) {
+                        // javac inferred the call's types from this signature, type variables of the method included
+                        return target.withDeclaringType(declaringType)
+                                .withReturnType(type.getReturnType())
+                                .withParameterTypes(type.getParameterTypes())
+                                .withThrownExceptions(type.getThrownExceptions());
+                    }
                 }
-                // Where this recipe renames the old method's declaration too, the call calls that method, which its
-                // type's members don't hold. The declaration keeps its name only where its type declares the new
-                // name with the same parameters, so that is the one method the call is sure to call.
-                JavaType.Method original = declared(declaringType, type.getName(),
-                        method -> TypeUtils.isOfTypeIgnoringGenerics(method, type));
-                if (original == null) {
-                    return renamed;
+                if (called != null) {
+                    called = CalledMethod.calledOn(receiver, called);
                 }
-                JavaType.Method target = declared(declaringType, newMethodName,
-                        method -> CalledMethod.sameTypes(method.getParameterTypes(), original.getParameterTypes()));
-                if (target == null) {
-                    return renamed;
-                }
-                if (TypeUtils.isOfType(original.getReturnType(), target.getReturnType()) &&
-                    CalledMethod.sameTypes(original.getThrownExceptions(), target.getThrownExceptions())) {
-                    // javac inferred the call's types from this signature, type variables of the method included
-                    return target.withDeclaringType(declaringType)
-                            .withReturnType(type.getReturnType())
-                            .withParameterTypes(type.getParameterTypes())
-                            .withThrownExceptions(type.getThrownExceptions());
-                }
-                JavaType.Method called = CalledMethod.calledOn(receiver, target);
                 return called == null ? renamed : called;
             }
 

@@ -17,13 +17,16 @@ package org.openrewrite.java;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,26 +42,52 @@ final class CalledMethod {
     }
 
     /**
-     * @return The method of {@code type} that a call of {@code name} with arguments of {@code argumentTypes} calls,
-     * with the types the call has, or {@code null} when not exactly one fits it or its types can't be told.
+     * @return The method that a call of {@code name} with {@code arguments} on a receiver of {@code type} calls, as it
+     * is declared, or {@code null} when not exactly one fits the call.
      */
-    static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name,
-                                          List<@Nullable JavaType> argumentTypes) {
+    static JavaType.@Nullable Method find(JavaType.FullyQualified type, String name, List<Expression> arguments) {
         // a type in the hierarchy that is only its name may declare the method that is called
         if (isNameOnly(type, new HashSet<>())) {
             return null;
         }
-        List<JavaType.Method> candidates = new ArrayList<>();
-        collect(type, false, name, candidates, new HashSet<>());
+        List<JavaType.Method> candidates = candidates(type, name, arguments);
         for (JavaType.Method candidate : candidates) {
-            // a varargs method takes any number of arguments, so a call's number of arguments can't rule it out
+            // whether a call passes its arguments one by one or as an array takes more than their types to tell
             if (candidate.hasFlags(Flag.Varargs)) {
                 return null;
             }
         }
-        candidates.removeIf(candidate -> candidate.getParameterTypes().size() != argumentTypes.size() ||
-                                         !accepts(type, candidate, argumentTypes));
-        return candidates.size() == 1 ? calledOn(type, candidates.get(0)) : null;
+        List<@Nullable JavaType> argumentTypes = new ArrayList<>();
+        for (Expression argument : arguments) {
+            if (!(argument instanceof J.Empty)) {
+                argumentTypes.add(tellingType(argument));
+            }
+        }
+        candidates.removeIf(candidate -> !accepts(type, candidate, argumentTypes));
+        return candidates.size() == 1 ? candidates.get(0) : null;
+    }
+
+    /**
+     * @return The methods named {@code name} that take as many arguments as {@code arguments}, among those that
+     * {@code type} declares and inherits. A method that another one overrides is not among them.
+     */
+    static List<JavaType.Method> candidates(JavaType.FullyQualified type, String name, List<Expression> arguments) {
+        int count = 0;
+        for (Expression argument : arguments) {
+            if (!(argument instanceof J.Empty)) {
+                count++;
+            }
+        }
+        List<JavaType.Method> candidates = new ArrayList<>();
+        collect(type, false, name, candidates, new HashSet<>());
+        for (Iterator<JavaType.Method> methods = candidates.iterator(); methods.hasNext(); ) {
+            JavaType.Method method = methods.next();
+            int parameters = method.getParameterTypes().size();
+            if (method.hasFlags(Flag.Varargs) ? parameters - 1 > count : parameters != count) {
+                methods.remove();
+            }
+        }
+        return candidates;
     }
 
     /**
@@ -239,6 +268,22 @@ final class CalledMethod {
         return true;
     }
 
+    /**
+     * The type of {@code argument} where it tells which parameters take it. A lambda and a method reference have the
+     * type of the parameter they were written for, and a type with a supertype that is only its name doesn't tell all
+     * that it is assignable to.
+     */
+    private static @Nullable JavaType tellingType(Expression argument) {
+        Expression unwrapped = argument.unwrap();
+        JavaType type = argument.getType();
+        if (type == null || unwrapped instanceof J.Lambda || unwrapped instanceof J.MemberReference ||
+            contains(type, t -> t instanceof JavaType.FullyQualified &&
+                                isNameOnly((JavaType.FullyQualified) t, new HashSet<>()))) {
+            return null;
+        }
+        return type;
+    }
+
     private static boolean accepts(JavaType.FullyQualified type, JavaType.Method method,
                                    List<@Nullable JavaType> argumentTypes) {
         Map<String, JavaType> typeArguments = typeArguments(type, method);
@@ -246,15 +291,27 @@ final class CalledMethod {
             JavaType argumentType = argumentTypes.get(i);
             JavaType declaredType = method.getParameterTypes().get(i);
             JavaType parameterType = Substitutions.withArguments(declaredType, typeArguments);
-            // an untyped argument, or one whose type holds a type with supertypes that can't be told, rules out no
-            // method
-            if (argumentType != null &&
-                !contains(argumentType, t -> t instanceof JavaType.FullyQualified &&
-                                             isNameOnly((JavaType.FullyQualified) t, new HashSet<>())) &&
-                !TypeUtils.isAssignableTo(parameterType == null ? declaredType : parameterType, argumentType)) {
+            if (argumentType != null && !mayTake(parameterType == null ? declaredType : parameterType, argumentType)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether javac may pass an argument of type {@code argument} for {@code parameter}. A type variable takes what
+     * javac infers for it and a parameterized type takes a raw one, so only the classes of the two types tell.
+     */
+    private static boolean mayTake(JavaType parameter, JavaType argument) {
+        if (parameter instanceof JavaType.GenericTypeVariable) {
+            return true;
+        }
+        if (parameter instanceof JavaType.Array && argument instanceof JavaType.Array) {
+            return mayTake(((JavaType.Array) parameter).getElemType(), ((JavaType.Array) argument).getElemType());
+        }
+        if (parameter instanceof JavaType.Parameterized) {
+            parameter = ((JavaType.Parameterized) parameter).getType();
+        }
+        return TypeUtils.isAssignableTo(parameter, argument);
     }
 }
