@@ -177,8 +177,11 @@ export function moduleBindings(
     }
 
     const cu = compilationUnitOf(from);
-    const table = cu === undefined ? [] : bindingTable(cu);
-    const bound = wholeModuleBindings(table);
+    // Read on first use, so `exportOf` on a name no import binds, the commonest question, reads no import
+    let rows: ModuleBinding[] | undefined;
+    let wholeRows: WholeModuleBinding[] | undefined;
+    const table = () => rows ??= cu === undefined ? [] : bindingTable(cu);
+    const bound = () => wholeRows ??= wholeModuleBindings(table());
     const defaultIsModule = (b: WholeModuleBinding, options?: ExportOfOptions) =>
         options?.defaultIsModule?.some(module => sameModule(module, b.module)) ?? false;
     return {
@@ -186,20 +189,20 @@ export function moduleBindings(
         get moduleSystem() {
             return cu === undefined ? "none" : isCommonJs(cu) ? "commonjs" : hasEsmSyntax(cu) ? "esm" : "none";
         },
-        moduleOf: localName => bound.find(b => b.name === localName)?.module,
-        bindingOf: module => bound.find(b => sameModule(b.module, module))?.name,
+        moduleOf: localName => bound().find(b => b.name === localName)?.module,
+        bindingOf: module => bound().find(b => sameModule(b.module, module))?.name,
         exportOf: (ref, options) => {
             if (cu === undefined) {
                 return undefined;
             }
             const moduleObject = (name: string): ModuleObjectRead | undefined => {
-                const object = bound.find(b => b.name === name && !isReassigned(cu, b));
+                const object = bound().find(b => b.name === name && !isReassigned(cu, b));
                 return object === undefined || object.form === "default" && !defaultIsModule(object, options)
                     ? undefined
                     : {module: object.module, kind: viaKindOf(object), typeOnly: object.typeOnly};
             };
             return exportRead(from, ref, cu, name => {
-                const object = bound.find(b => b.name === name);
+                const object = bound().find(b => b.name === name);
                 if (object !== undefined) {
                     // A module object's own name names no one export, unless it is a default that is not the module
                     return object.form === "default" && !defaultIsModule(object, options)
@@ -207,7 +210,7 @@ export function moduleBindings(
                         : undefined;
                 }
                 // `{"*" as x}` names no export here, as when this read `ModuleScopeBinding`, which spells a namespace `*`
-                const named = table.find((b): b is MemberBinding => b.name === name &&
+                const named = table().find((b): b is MemberBinding => b.name === name &&
                     (b.form === "named" || b.form === "require-member") && b.member !== "*");
                 return named === undefined
                     ? destructuredExport(cu, name, moduleObject)

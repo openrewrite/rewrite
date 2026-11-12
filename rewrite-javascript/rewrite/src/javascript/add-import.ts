@@ -247,35 +247,48 @@ export interface ModuleScopeBinding {
  * `const X = await import("m")` is left out.
  */
 export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
-    return cu.statements.flatMap(({element}) => [...bindingsOf(element).flatMap(asScopeBinding), ...namespaceAliasOf(element)]);
+    const bindings: ModuleScopeBinding[] = [];
+    for (const {element} of cu.statements) {
+        for (const binding of bindingsOf(element)) {
+            const row = asScopeBinding(binding);
+            if (row !== undefined) {
+                bindings.push(row);
+            }
+        }
+        const alias = namespaceAliasOf(element);
+        if (alias !== undefined) {
+            bindings.push(alias);
+        }
+    }
+    return bindings;
 }
 
-function asScopeBinding(binding: ModuleBinding): ModuleScopeBinding[] {
+function asScopeBinding(binding: ModuleBinding): ModuleScopeBinding | undefined {
     switch (binding.form) {
         case "default":
         case "require":
-            return [{name: binding.name, module: binding.module, member: undefined, typeOnly: binding.typeOnly}];
+            return {name: binding.name, module: binding.module, member: undefined, typeOnly: binding.typeOnly};
         case "namespace":
-            return [{name: binding.name, module: binding.module, member: '*', typeOnly: binding.typeOnly}];
+            return {name: binding.name, module: binding.module, member: '*', typeOnly: binding.typeOnly};
         case "named":
         case "require-member":
-            return [{name: binding.name, module: binding.module, member: binding.member, typeOnly: binding.typeOnly}];
+            return {name: binding.name, module: binding.module, member: binding.member, typeOnly: binding.typeOnly};
         case "import-equals":
-            return [{name: binding.name, module: undefined, member: undefined, typeOnly: binding.typeOnly}];
+            return {name: binding.name, module: undefined, member: undefined, typeOnly: binding.typeOnly};
         case "require-pattern":
-            return [{name: binding.name}];
+            return {name: binding.name};
         case "dynamic-import":
-            return [];
+            return undefined;
     }
 }
 
 /** `X` of `import X = A.B`, which names a TypeScript namespace and loads no module, so the table has no row for it. */
-function namespaceAliasOf(statement: J | undefined): ModuleScopeBinding[] {
+function namespaceAliasOf(statement: J | undefined): ModuleScopeBinding | undefined {
     const jsImport = statement?.kind === JS.Kind.Import ? statement as JS.Import : undefined;
     const local = jsImport?.importClause?.name?.element;
     return jsImport?.initializer === undefined || local?.kind !== J.Kind.Identifier ||
-        requiredModule(jsImport.initializer.element) !== undefined ? [] :
-        [{name: (local as J.Identifier).simpleName, module: undefined, member: undefined, typeOnly: jsImport.importClause!.typeOnly}];
+        requiredModule(jsImport.initializer.element) !== undefined ? undefined :
+        {name: (local as J.Identifier).simpleName, module: undefined, member: undefined, typeOnly: jsImport.importClause!.typeOnly};
 }
 
 /**

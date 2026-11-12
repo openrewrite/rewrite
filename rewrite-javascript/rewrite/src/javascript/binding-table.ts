@@ -70,7 +70,11 @@ export interface DeclaredBinding {
  * `[{form: "default", name: "R"}, {form: "named", name: "s", member: "useState"}, {form: "require", name: "fs"}]`.
  */
 export function bindingTable(cu: JS.CompilationUnit): ModuleBinding[] {
-    return cu.statements.flatMap(s => bindingsOf(s.element));
+    const bindings: ModuleBinding[] = [];
+    for (const {element} of cu.statements) {
+        addBindingsOf(element, bindings);
+    }
+    return bindings;
 }
 
 /**
@@ -79,33 +83,48 @@ export function bindingTable(cu: JS.CompilationUnit): ModuleBinding[] {
  * `import D, * as NS from "m"` → `D` (default) and `NS` (namespace); `import "m"` and `const x = 1` → none.
  */
 export function bindingsOf(statement: J | undefined): ModuleBinding[] {
-    if (statement?.kind === JS.Kind.Import) {
-        return importBindings(statement as JS.Import);
-    }
-    const reassignable = !declaresConst(statement);
-    return declarationsOf(statement).flatMap(declaration => declaration.variables.flatMap(({element: variable}) =>
-        declaredBindings(variable, {reassignable, declaration, statement: statement as Statement})));
+    const bindings: ModuleBinding[] = [];
+    addBindingsOf(statement, bindings);
+    return bindings;
 }
 
-function importBindings(statement: JS.Import): ModuleBinding[] {
+function addBindingsOf(statement: J | undefined, bindings: ModuleBinding[]): void {
+    if (statement?.kind === JS.Kind.Import) {
+        addImportBindings(statement as JS.Import, bindings);
+        return;
+    }
+    const declarations = declarationsOf(statement);
+    if (declarations.length === 0) {
+        return;
+    }
+    const reassignable = !declaresConst(statement);
+    for (const declaration of declarations) {
+        for (const {element: variable} of declaration.variables) {
+            addDeclaredBindings(variable, reassignable, declaration, statement as Statement, bindings);
+        }
+    }
+}
+
+function addImportBindings(statement: JS.Import, bindings: ModuleBinding[]): void {
     const clause = statement.importClause;
     if (clause === undefined) {
-        return [];
+        return;
     }
     const typeOnly = clause.typeOnly;
     const local = clause.name?.element;
     if (statement.initializer !== undefined) {
         // `import X = A.B` names a TypeScript namespace rather than loading a module
         const module = requiredModule(statement.initializer.element);
-        return module === undefined || local?.kind !== J.Kind.Identifier ? [] :
-            [{form: "import-equals", name: (local as J.Identifier).simpleName, module, typeOnly, statement}];
+        if (module !== undefined && local?.kind === J.Kind.Identifier) {
+            bindings.push({form: "import-equals", name: (local as J.Identifier).simpleName, module, typeOnly, statement});
+        }
+        return;
     }
     const specifier = statement.moduleSpecifier?.element;
     if (!isStringLiteral(specifier)) {
-        return [];
+        return;
     }
     const module = moduleNameOf(specifier);
-    const bindings: ModuleBinding[] = [];
     if (local?.kind === J.Kind.Identifier) {
         bindings.push({form: "default", name: (local as J.Identifier).simpleName, module, typeOnly, statement});
     }
@@ -120,35 +139,45 @@ function importBindings(statement: JS.Import): ModuleBinding[] {
         for (const {element} of (named as JS.NamedImports).elements.elements) {
             const bound = element?.kind === JS.Kind.ImportSpecifier ? specifierBinding(element as JS.ImportSpecifier) : undefined;
             if (bound !== undefined) {
-                bindings.push({form: "named", ...bound, module, typeOnly: typeOnly || (element as JS.ImportSpecifier).importType.element,
-                    statement});
+                bindings.push({form: "named", name: bound.name, member: bound.member, module,
+                    typeOnly: typeOnly || (element as JS.ImportSpecifier).importType.element, statement});
             }
         }
     }
-    return bindings;
 }
 
 /**
  * What one variable binds where its initializer loads a module. A pattern reads each member by its property name:
  * `{b: c} = require("m")` → `c` of member `b`; a nested `{a: {b}}`, a rest `...r` or an array `[x]` reads no one member.
  */
-function declaredBindings(
+function addDeclaredBindings(
     variable: J.VariableDeclarations.NamedVariable | undefined,
-    where: Pick<DeclaredBinding, "reassignable" | "declaration" | "statement">
-): ModuleBinding[] {
+    reassignable: boolean,
+    declaration: J.VariableDeclarations,
+    statement: Statement,
+    bindings: ModuleBinding[]
+): void {
     const pattern = variable?.name;
     const initializer = variable?.initializer?.element;
     const required = requiredModule(initializer);
     if (required !== undefined) {
-        return pattern?.kind === J.Kind.Identifier
-            ? [{form: "require", name: (pattern as J.Identifier).simpleName, module: required, typeOnly: false, ...where}]
-            : bindingNames(pattern).map(({name, member}): ModuleBinding => member === undefined
-                ? {form: "require-pattern", name, module: required, typeOnly: false, ...where}
-                : {form: "require-member", name, member, module: required, typeOnly: false, ...where});
+        if (pattern?.kind === J.Kind.Identifier) {
+            bindings.push({form: "require", name: (pattern as J.Identifier).simpleName, module: required, typeOnly: false,
+                reassignable, declaration, statement});
+            return;
+        }
+        for (const {name, member} of bindingNames(pattern)) {
+            bindings.push(member === undefined
+                ? {form: "require-pattern", name, module: required, typeOnly: false, reassignable, declaration, statement}
+                : {form: "require-member", name, member, module: required, typeOnly: false, reassignable, declaration, statement});
+        }
+        return;
     }
     const imported = dynamicallyImportedModule(initializer);
-    return imported === undefined || pattern?.kind !== J.Kind.Identifier ? [] :
-        [{form: "dynamic-import", name: (pattern as J.Identifier).simpleName, module: imported, typeOnly: false, ...where}];
+    if (imported !== undefined && pattern?.kind === J.Kind.Identifier) {
+        bindings.push({form: "dynamic-import", name: (pattern as J.Identifier).simpleName, module: imported, typeOnly: false,
+            reassignable, declaration, statement});
+    }
 }
 
 /** Whether `statement` declares `const`, which a list (`const a = 1, NS = require("m")`) spells on the statement. */
