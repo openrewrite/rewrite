@@ -43,6 +43,8 @@ export {
     deconflict, isReference, isValueReference, isWrite, isAssignmentTarget, meaningAt, resolve, referencesOf,
     declarationsOf, compilationUnitOf, walk
 } from "./scope";
+export type {ModuleBinding} from "./binding-table";
+export {bindingTable} from "./binding-table";
 export type {QuoteChar, AddImportOptions, ModuleScopeBinding} from "./add-import";
 export {
     ImportStyle, moduleNameOf, moduleScopeBindings, AddImport, hasEsmSyntax, isCommonJs, isDirective, prologueLength,
