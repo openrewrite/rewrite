@@ -637,7 +637,7 @@ public class Substitutions {
 
         boolean bound = typeVariableBindings.values().stream().anyMatch(Objects::nonNull);
         Set<JavaType> visiting = newSetFromMap(new IdentityHashMap<>());
-        // A call takes its name's type once the name is visited, so its method type may be one this visitor bound.
+        // A type this visitor returned is bound already, such as the method type a call takes from its name.
         // Binding a recursive type again expands it a level further into a new instance.
         Set<JavaType> boundTypes = newSetFromMap(new IdentityHashMap<>());
         JavaVisitor<Integer> resolve = new JavaVisitor<Integer>() {
