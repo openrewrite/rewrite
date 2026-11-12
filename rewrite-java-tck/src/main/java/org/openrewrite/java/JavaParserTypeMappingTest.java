@@ -191,6 +191,51 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void capturedWildcardKeepsItsBounds() {
+        // javac captures the wildcard of a variable read as an argument or a receiver
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class Box<T extends Number> {
+                      T get() {
+                          return null;
+                      }
+                  }
+
+                  static <T> int frequency(Iterable<T> iterable, T value) {
+                      return 0;
+                  }
+
+                  int test(Iterable<? super String> values, String value, Box<?> box) {
+                      box.get();
+                      return frequency(values, value);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> argumentType = new AtomicReference<>();
+                AtomicReference<JavaType> receiverBoundType = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("frequency".equals(method.getSimpleName())) {
+                            argumentType.set(method.getArguments().get(0).getType());
+                        } else {
+                            receiverBoundType.set(method.getType());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(argumentType.get()).hasToString("java.lang.Iterable<Generic{? super java.lang.String}>");
+
+                assertThat(receiverBoundType.get()).hasToString("Generic{? extends java.lang.Number}");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test
