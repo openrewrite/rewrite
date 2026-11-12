@@ -57,6 +57,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOf;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -1146,6 +1147,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 if (lineBreak != null) {
                     texts.add(lineBreak);
                 }
+                if (isInlineWhitespace(c) && cursor < source.length() && source.charAt(cursor) != c) {
+                    text.append(strippedIndentation(node, i));
+                }
             }
             if (c == '\n') {
                 if (text.length() > 0) {
@@ -1177,7 +1181,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
+                text.append(strippedIndentation(node, i + 1));
             }
         }
 
@@ -1332,6 +1336,18 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return whitespaceBeforeAsString(Character::isWhitespace);
     }
 
+    /// The whitespace at the cursor that javac stripped as common indentation, e.g. the space of a source's " \t".
+    private String strippedIndentation(String node, int nodeIndex) {
+        int nodeRun = whitespaceEnd(node, nodeIndex, ReloadableJava25JavadocVisitor::isInlineWhitespace) - nodeIndex;
+        int stripped = whitespaceEnd(source, cursor, ReloadableJava25JavadocVisitor::isInlineWhitespace) - cursor - nodeRun;
+        if (stripped <= 0 || !source.regionMatches(cursor + stripped, node, nodeIndex, nodeRun)) {
+            return whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace);
+        }
+        String strippedWhitespace = source.substring(cursor, cursor + stripped);
+        cursor += stripped;
+        return strippedWhitespace;
+    }
+
     /// Mirrors what javac's `JavadocTokenizer.getIndent` strips as a Javadoc's common indentation.
     private static boolean isInlineWhitespace(char c) {
         return c != '\n' && c != '\r' && Character.isWhitespace(c);
@@ -1342,15 +1358,15 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             return "";
         }
 
-        int i = cursor;
-        for (; i < source.length(); i++) {
-            if (!whitespace.test(source.charAt(i))) {
-                break;
-            }
-        }
+        int i = whitespaceEnd(source, cursor, whitespace);
         String fmt = source.substring(cursor, i);
         cursor = i;
         return fmt;
+    }
+
+    private static int whitespaceEnd(String s, int from, Predicate<Character> whitespace) {
+        int end = indexOf(s, from, whitespace.negate());
+        return end == -1 ? s.length() : end;
     }
 
     private List<Javadoc> whitespaceBefore() {
