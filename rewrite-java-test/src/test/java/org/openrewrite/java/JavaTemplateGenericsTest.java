@@ -708,6 +708,12 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   static class Pairs<A, B> extends ArrayList<B> {
                   }
 
+                  static class Rows<A> extends ArrayList<A[]> {
+                  }
+
+                  static class Bounded<A> extends ArrayList<List<? extends A>> {
+                  }
+
                   List<String> copy(ArrayList<String> list) {
                       return List.copyOf(list);
                   }
@@ -718,6 +724,18 @@ class JavaTemplateGenericsTest implements RewriteTest {
 
                   List<String> copy(Pairs<Integer, String> pairs) {
                       return List.copyOf(pairs);
+                  }
+
+                  List<String> copyWildcard(Pairs<?, String> pairs) {
+                      return List.copyOf(pairs);
+                  }
+
+                  List<String[]> copy(Rows<String> rows) {
+                      return List.copyOf(rows);
+                  }
+
+                  List<List<? extends String>> copy(Bounded<String> bounded) {
+                      return List.copyOf(bounded);
                   }
               }
               """,
@@ -732,6 +750,12 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   static class Pairs<A, B> extends ArrayList<B> {
                   }
 
+                  static class Rows<A> extends ArrayList<A[]> {
+                  }
+
+                  static class Bounded<A> extends ArrayList<List<? extends A>> {
+                  }
+
                   List<String> copy(ArrayList<String> list) {
                       return java.util.Collections.unmodifiableList(list);
                   }
@@ -742,6 +766,18 @@ class JavaTemplateGenericsTest implements RewriteTest {
 
                   List<String> copy(Pairs<Integer, String> pairs) {
                       return java.util.Collections.unmodifiableList(pairs);
+                  }
+
+                  List<String> copyWildcard(Pairs<?, String> pairs) {
+                      return java.util.Collections.unmodifiableList(pairs);
+                  }
+
+                  List<String[]> copy(Rows<String> rows) {
+                      return java.util.Collections.unmodifiableList(rows);
+                  }
+
+                  List<List<? extends String>> copy(Bounded<String> bounded) {
+                      return java.util.Collections.unmodifiableList(bounded);
                   }
               }
               """

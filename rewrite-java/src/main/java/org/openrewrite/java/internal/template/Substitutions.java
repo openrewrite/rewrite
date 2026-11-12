@@ -330,7 +330,7 @@ public class Substitutions {
     private void bindTypeVariables(@Nullable JavaType declared, @Nullable JavaType actual) {
         if (declared instanceof JavaType.GenericTypeVariable) {
             String name = ((JavaType.GenericTypeVariable) declared).getName();
-            if ("?".equals(name)) {
+            if (isWildcard(declared)) {
                 unbindTypeVariables(declared);
                 return;
             }
@@ -338,10 +338,8 @@ public class Substitutions {
             if (TypeUtils.isOfType(declared, actual)) {
                 return;
             }
-            boolean wildcard = actual instanceof JavaType.GenericTypeVariable &&
-                               "?".equals(((JavaType.GenericTypeVariable) actual).getName());
             boolean sure = actual != null && !(actual instanceof JavaType.Unknown) &&
-                           !(actual instanceof JavaType.Primitive) && !wildcard &&
+                           !(actual instanceof JavaType.Primitive) && !isWildcard(actual) &&
                            (!typeVariableBindings.containsKey(name) ||
                             TypeUtils.isOfType(typeVariableBindings.get(name), actual));
             // The variable stays unbound where javac infers its type, such as from a primitive, a wildcard or
@@ -381,11 +379,14 @@ public class Substitutions {
             }
             Map<String, JavaType> argumentsByVariable = new HashMap<>();
             for (int i = 0; i < variables.size(); i++) {
-                // javac captures a wildcard argument, so what it gives a supertype is a capture variable
-                if (!(variables.get(i) instanceof JavaType.GenericTypeVariable) || isWildcard(arguments.get(i))) {
+                if (!(variables.get(i) instanceof JavaType.GenericTypeVariable)) {
                     return null;
                 }
-                argumentsByVariable.put(((JavaType.GenericTypeVariable) variables.get(i)).getName(), arguments.get(i));
+                // javac captures a wildcard argument, so a supertype naming its variable gets a capture variable
+                if (!isWildcard(arguments.get(i))) {
+                    String variable = ((JavaType.GenericTypeVariable) variables.get(i)).getName();
+                    argumentsByVariable.put(variable, arguments.get(i));
+                }
             }
             return asSupertype(parameterized.getType(), fqn, argumentsByVariable);
         } else if (type instanceof JavaType.Class && ((JavaType.Class) type).getTypeParameters().isEmpty()) {
@@ -407,13 +408,13 @@ public class Substitutions {
     }
 
     /**
-     * A supertype with the type's arguments in place of its class's variables, or null where it names a variable of an
-     * enclosing class, which those arguments don't give.
+     * A supertype with the type's arguments in place of its class's variables, or null where it names a variable those
+     * arguments don't give, such as one a wildcard argument leaves open or a variable of an enclosing class.
      */
     private static @Nullable JavaType withArguments(JavaType type, Map<String, JavaType> argumentsByVariable) {
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
-            if (!"?".equals(variable.getName())) {
+            if (!isWildcard(variable)) {
                 return argumentsByVariable.get(variable.getName());
             }
             List<JavaType> bounds = withArguments(variable.getBounds(), argumentsByVariable);
@@ -430,7 +431,8 @@ public class Substitutions {
         return type;
     }
 
-    private static @Nullable List<JavaType> withArguments(List<JavaType> types, Map<String, JavaType> argumentsByVariable) {
+    private static @Nullable List<JavaType> withArguments(List<JavaType> types,
+                                                          Map<String, JavaType> argumentsByVariable) {
         List<JavaType> mapped = new ArrayList<>(types.size());
         for (JavaType type : types) {
             JavaType withArguments = withArguments(type, argumentsByVariable);
@@ -442,8 +444,9 @@ public class Substitutions {
         return mapped;
     }
 
-    private static boolean isWildcard(JavaType type) {
-        return type instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) type).getName());
+    private static boolean isWildcard(@Nullable JavaType type) {
+        return type instanceof JavaType.GenericTypeVariable &&
+               "?".equals(((JavaType.GenericTypeVariable) type).getName());
     }
 
     /**
@@ -453,7 +456,7 @@ public class Substitutions {
     private void unbindTypeVariables(JavaType declared) {
         if (declared instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) declared;
-            if ("?".equals(variable.getName())) {
+            if (isWildcard(variable)) {
                 variable.getBounds().forEach(this::unbindTypeVariables);
             } else {
                 typeVariableBindings.put(variable.getName(), null);
