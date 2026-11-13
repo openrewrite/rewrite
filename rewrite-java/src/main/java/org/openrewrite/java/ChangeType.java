@@ -278,12 +278,16 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return updateType(javaType);
         }
 
-        private void addImport(JavaType.FullyQualified owningClass) {
+        /**
+         * A nested target is written through its outermost class, the only one that is imported. An alias names the
+         * target itself.
+         */
+        private void addImport(JavaType.FullyQualified target) {
             if (importAlias != null) {
-                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, importAlias.getSimpleName(), true);
+                maybeAddImport(target.getPackageName(), target.getClassName(), null, importAlias.getSimpleName(), true);
             }
-
-            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
+            JavaType.FullyQualified outermost = getTopLevelClassName(target);
+            maybeAddImport(outermost.getPackageName(), outermost.getClassName(), null, null, true);
         }
 
         @Override
@@ -359,31 +363,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
                 JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
                 if (fullyQualifiedTarget != null) {
-                    JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
-                    if (!declaredClassNames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName().replace('$', '.'))) {
-                        if (hasNoConflictingName(sf)) {
-                            for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
-                                if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                    addImport(owner);
-                                }
-                            }
-                            if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                // a nested target's own import binds its simple name, as `Inner` for `Outer.Inner`,
-                                // which has to be free too
-                                String className = fullyQualifiedTarget.getClassName();
-                                if (!otherTypeNames(sf, fullyQualifiedTarget).contains(
-                                        className.substring(className.lastIndexOf('.') + 1))) {
-                                    addImport(fullyQualifiedTarget);
-                                }
-                                // the target's import shortens `Owner.Target` to `Target`, which can leave the owner's
-                                // unused, both where ChangeType added it and where the file named the original through it
-                                for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
-                                    if (!imports(sf, owner) || enclosesOriginal(owner) && importsSingleType(sf, owner)) {
-                                        maybeRemoveImport(owner);
-                                    }
-                                }
-                            }
-                        }
+                    if (!declaredClassNames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName().replace('$', '.')) &&
+                            hasNoConflictingName(sf) && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                        addImport(fullyQualifiedTarget);
                     }
                 }
 
@@ -629,51 +611,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 types.replaceWith(fieldAccess.getType(), updatedFieldAccessType);
             }
 
-            // The name has no type, so that AddImport does not import the inner class directly and strip the
-            // parameterized outer class (see #9291)
             String newSimpleName = targetFq.getFullyQualifiedName().substring(targetOwner.getFullyQualifiedName().length() + 1);
             return fieldAccess
                     .withTarget(target)
-                    .withName(fieldAccess.getName().withSimpleName(newSimpleName).withType(null))
+                    .withName(fieldAccess.getName().withSimpleName(newSimpleName).withType(targetFq))
                     .withType(updatedFieldAccessType);
-        }
-
-        /**
-         * Whether the source file imports {@code type}, its members, or the contents of the package or class that
-         * declares it.
-         */
-        private static boolean imports(JavaSourceFile sf, JavaType.FullyQualified type) {
-            String container = type.getOwningClass() == null ? type.getPackageName() : type.getOwningClass().getFullyQualifiedName();
-            for (J.Import anImport : sf.getImports()) {
-                String typeName = anImport.getTypeName();
-                if (anImport.isStatic() || !"*".equals(anImport.getQualid().getSimpleName())) {
-                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type.getFullyQualifiedName())) {
-                        return true;
-                    }
-                } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName.substring(0, typeName.length() - 2), container)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static boolean importsSingleType(JavaSourceFile sf, JavaType.FullyQualified type) {
-            for (J.Import anImport : sf.getImports()) {
-                if (!anImport.isStatic() && !"*".equals(anImport.getQualid().getSimpleName()) &&
-                    TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(), type.getFullyQualifiedName())) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private boolean enclosesOriginal(JavaType.FullyQualified type) {
-            for (JavaType.FullyQualified owner = originalType.getOwningClass(); owner != null; owner = owner.getOwningClass()) {
-                if (TypeUtils.fullyQualifiedNamesAreEqual(owner.getFullyQualifiedName(), type.getFullyQualifiedName())) {
-                    return true;
-                }
-            }
-            return false;
         }
 
         /**

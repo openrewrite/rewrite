@@ -171,6 +171,35 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void importAliasOfANestedTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Outer$Target", true)),
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original as MyAlias
+
+              class A {
+                  val type : MyAlias = MyAlias()
+              }
+              """,
+            """
+              import x.y.Outer.Target as MyAlias
+
+              class A {
+                  val type : MyAlias = MyAlias()
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/42")
     @Test
     void changeTypeWithGenericArgument() {
