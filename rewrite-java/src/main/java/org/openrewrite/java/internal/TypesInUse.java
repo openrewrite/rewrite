@@ -29,13 +29,14 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -643,6 +644,22 @@ public class TypesInUse {
         private final Set<String> docReferencePackages = new HashSet<>();
         private final Set<String> docReferenceTypes = new HashSet<>();
 
+        // The trees this visitor is inside of, innermost last
+        @Getter(AccessLevel.NONE)
+        private final List<J> enclosing = new ArrayList<>();
+
+        @Override
+        public J preVisit(J tree, Integer p) {
+            enclosing.add(tree);
+            return tree;
+        }
+
+        @Override
+        public J postVisit(J tree, Integer p) {
+            enclosing.remove(enclosing.size() - 1);
+            return tree;
+        }
+
         @Override
         public J.Import visitImport(J.Import _import, Integer p) {
             return _import;
@@ -650,12 +667,10 @@ public class TypesInUse {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-            Object parent = Objects.requireNonNull(getCursor().getParent()).getValue();
-            if (parent instanceof J.ClassDeclaration) {
-                // skip type of class
-                return identifier;
-            } else if (parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName() == identifier) {
-                // skip method name
+            // A declaration's own name is not a use of the type it declares
+            J parent = enclosing.size() > 1 ? enclosing.get(enclosing.size() - 2) : null;
+            if (parent instanceof J.ClassDeclaration && ((J.ClassDeclaration) parent).getName() == identifier ||
+                parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName() == identifier) {
                 return identifier;
             }
             return super.visitIdentifier(identifier, p);
@@ -677,21 +692,21 @@ public class TypesInUse {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
             if (javaType != null && !(javaType instanceof JavaType.Unknown)) {
-                Cursor cursor = getCursor();
+                J current = enclosing.isEmpty() ? null : enclosing.get(enclosing.size() - 1);
                 if (javaType instanceof JavaType.Variable) {
                     variables.add((JavaType.Variable) javaType);
                 } else if (javaType instanceof JavaType.Method) {
-                    if (cursor.getValue() instanceof J.MethodDeclaration) {
+                    if (current instanceof J.MethodDeclaration) {
                         declaredMethods.add((JavaType.Method) javaType);
                     } else {
                         usedMethods.add((JavaType.Method) javaType);
                     }
-                } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
-                        !(cursor.getValue() instanceof J.Lambda) &&
+                } else if (!(current instanceof J.ClassDeclaration) &&
+                        !(current instanceof J.Lambda) &&
                         // A source file may carry the type it declares, as a CFML file carries its component or
                         // template. Like a class declaration's type, that type isn't in use just for being declared.
-                        !(cursor.getValue() instanceof JavaSourceFile)) {
-                    if (isFullyQualifiedJavaDocReference(cursor)) {
+                        !(current instanceof JavaSourceFile)) {
+                    if (current instanceof J.FieldAccess && isFullyQualifiedJavaDocReference(getCursor())) {
                         if (javaType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
                             docReferencePackages.add(fq.getPackageName());

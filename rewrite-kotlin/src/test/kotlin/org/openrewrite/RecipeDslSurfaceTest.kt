@@ -157,8 +157,8 @@ class RecipeDslSurfaceTest {
             .parse("class A { void m() { System.out.println(\"hi\"); } }")
             .iterator().next() as org.openrewrite.java.tree.J.CompilationUnit
         r.visitor.visit(cu, InMemoryExecutionContext())
-        assertThat(depths).isNotEmpty
-        assertThat(depths.first()).isGreaterThan(0)
+        // println < padding < method body < m < padding < class body < A < compilation unit < root
+        assertThat(depths).containsExactly(9)
     }
 
     @Test

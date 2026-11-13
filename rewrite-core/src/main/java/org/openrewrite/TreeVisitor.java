@@ -27,6 +27,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -51,7 +52,40 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
     private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
     private static final int DEADLINE_CHECK_MASK = 255;
 
-    Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
+    // Built on first use, since a visitor started with a parent cursor never needs its own root. Private, so
+    // that code in this package reading `cursor` (a Kotlin property) gets getCursor() and its pending levels.
+    private @Nullable Cursor cursor;
+
+    private static final ClassValue<Boolean> OVERRIDES_SET_CURSOR = new ClassValue<Boolean>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("setCursor", Cursor.class).getDeclaringClass() != TreeVisitor.class;
+            } catch (NoSuchMethodException | LinkageError e) {
+                // A signature names a class that is not on the classpath, so assume it does
+                return true;
+            }
+        }
+    };
+
+    private final boolean overridesSetCursor = OVERRIDES_SET_CURSOR.get(getClass());
+
+    /**
+     * Values visited below {@link #cursor} that no one has asked a {@link Cursor} for yet, root-most first.
+     * {@link #getCursor()} turns them into cursors, so the path a visitor observes is the same as if every
+     * level had allocated one.
+     */
+    private Object @Nullable [] pending;
+
+    private int pendingDepth;
+
+    /**
+     * Whether each level gets its cursor as it is entered. A class that overrides {@link #setCursor(Cursor)}
+     * sees every move that way, and a visitor that asks for most of its cursors anyway switches to it.
+     */
+    private boolean eagerCursor = overridesSetCursor;
+
+    private int materializedFrames;
 
     public static <T extends Tree, P> TreeVisitor<T, P> noop() {
         return new TreeVisitor<T, P>() {
@@ -80,6 +114,74 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
     public void setCursor(@Nullable Cursor cursor) {
         assert cursor != null;
         this.cursor = cursor;
+        dropPending();
+    }
+
+    private void dropPending() {
+        if (pendingDepth > 0) {
+            //noinspection DataFlowIssue
+            Arrays.fill(pending, 0, pendingDepth, null);
+            pendingDepth = 0;
+        }
+    }
+
+    /**
+     * Enters {@code value} one level below the current position. Its cursor is built only if
+     * {@link #getCursor()} is called while the level is entered.
+     */
+    protected final void pushCursor(Object value) {
+        if (eagerCursor) {
+            pushEager(value);
+            return;
+        }
+        assert Cursor.isValidChild(pendingDepth > 0 ? pending[pendingDepth - 1] : getCursor().getValue(), value);
+        Object[] p = pending;
+        if (p == null) {
+            p = pending = new Object[4];
+        } else if (pendingDepth == p.length) {
+            p = pending = Arrays.copyOf(p, p.length * 2);
+        }
+        p[pendingDepth++] = value;
+    }
+
+    private void pushEager(Object value) {
+        if (overridesSetCursor) {
+            setCursor(new Cursor(getCursor(), value));
+        } else {
+            cursor = new Cursor(getCursor(), value);
+        }
+    }
+
+    /**
+     * Leaves the level entered by the matching {@link #pushCursor(Object)}.
+     */
+    protected final void popCursor() {
+        if (pendingDepth > 0) {
+            //noinspection DataFlowIssue
+            pending[--pendingDepth] = null;
+        } else if (overridesSetCursor) {
+            setCursor(cursor.getParent());
+        } else {
+            cursor = cursor.getParent();
+            assert cursor != null : "popped past the root cursor";
+        }
+    }
+
+    private void materialize() {
+        materializedFrames += pendingDepth;
+        // Building cursors on demand only pays when most of them are never asked for
+        if (visitCount >= 64 && materializedFrames > visitCount / 2) {
+            eagerCursor = true;
+        }
+        Object[] p = pending;
+        Cursor c = cursor == null ? new Cursor(null, Cursor.ROOT_VALUE) : cursor;
+        for (int i = 0; i < pendingDepth; i++) {
+            //noinspection DataFlowIssue
+            c = new Cursor(c, p[i]);
+            p[i] = null;
+        }
+        cursor = c;
+        pendingDepth = 0;
     }
 
     /**
@@ -111,6 +213,11 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
     }
 
     public final Cursor getCursor() {
+        if (pendingDepth > 0) {
+            materialize();
+        } else if (cursor == null) {
+            cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        }
         return cursor;
     }
 
@@ -122,7 +229,8 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
      * @return The updated cursor.
      */
     public final Cursor updateCursor(T currentValue) {
-        Object old = cursor.getValue();
+        Cursor c = getCursor();
+        Object old = c.getValue();
         if (!(old instanceof Tree)) {
             throw new IllegalArgumentException("To update the cursor, it must currently be positioned at a Tree instance");
         }
@@ -130,7 +238,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
             throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
                                                "that maintain the same ID after the mutation.");
         }
-        cursor = new Cursor(cursor.getParentOrThrow(), currentValue);
+        cursor = new Cursor(c.getParentOrThrow(), currentValue);
         return cursor;
     }
 
@@ -144,6 +252,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
         this.cursor = parent;
+        dropPending();
         return visit(tree, p);
     }
 
@@ -217,10 +326,13 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
             return defaultValue(null, p);
         }
 
-        boolean topLevel = visitCount == 0;
-
-        visitCount++;
-        setCursor(new Cursor(cursor, tree));
+        boolean topLevel = visitCount++ == 0;
+        // A visit of a single node gets one cursor and no pending stack
+        if (topLevel) {
+            pushEager(tree);
+        } else {
+            pushCursor(tree);
+        }
 
         T t = null;
         // Do you visitor take tree and do you tree take visitor?
@@ -234,7 +346,8 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
             if (isAcceptable) {
                 //noinspection unchecked
                 t = preVisit((T) tree, p);
-                if (!cursor.getMessage(STOP_AFTER_PRE_VISIT, false)) {
+                // A level that is still pending has no cursor, so no message on it either
+                if (pendingDepth > 0 || !cursor.getMessage(STOP_AFTER_PRE_VISIT, false)) {
                     if (t != null) {
                         t = t.accept(this, p);
                     }
@@ -247,15 +360,10 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
                 }
             }
 
-            setCursor(cursor.getParent());
+            popCursor();
 
             if (topLevel) {
-                if (t != null && afterVisit != null) {
-                    t = applyAfterVisitors(t, p);
-                }
-
-                afterVisit = null;
-                visitCount = 0;
+                t = finishTopLevel(t, p);
             }
         } catch (Throwable e) {
             if (e instanceof RecipeRunException) {
@@ -285,10 +393,22 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
     }
 
     /**
-     * Runs the visitors registered via {@link #doAfterVisit(TreeVisitor)} once the top-level tree has
-     * been visited. Extracted from {@link #visit(Tree, Object)} so that this rarely-taken path does not
-     * count against that method's inlining budget.
+     * Runs the visitors registered via {@link #doAfterVisit(TreeVisitor)} and resets the per-visit state once
+     * the top-level tree has been visited. It lives outside {@link #visit(Tree, Object)} to keep that method
+     * within the JIT's inlining budget.
      */
+    private @Nullable T finishTopLevel(@Nullable T t, P p) {
+        if (t != null && afterVisit != null) {
+            t = applyAfterVisitors(t, p);
+        }
+        afterVisit = null;
+        visitCount = 0;
+        materializedFrames = 0;
+        eagerCursor = overridesSetCursor;
+        return t;
+    }
+
+    // RewriteTest recognizes formatting done by an after-visitor by this method's name on the stack
     private @Nullable T applyAfterVisitors(@Nullable T t, P p) {
         for (TreeVisitor<?, P> v : afterVisit) {
             v.setCursor(getCursor());
