@@ -1531,6 +1531,51 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void staticImportOfAConstantOfANestedTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old$Typing", "b.New$Typing", true)),
+          java("package a; public class Old { public enum Typing { STATIC } }", SourceSpec::skip),
+          java("package b; public class New { public enum Typing { STATIC } }", SourceSpec::skip),
+          java(
+            """
+              import static a.Old.Typing.STATIC;
+
+              class Test {
+                  Object typing = STATIC;
+              }
+              """,
+            """
+              import static b.New.Typing.STATIC;
+
+              class Test {
+                  Object typing = STATIC;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old.Typing;
+
+              import static a.Old.Typing.STATIC;
+
+              class AlsoImportsTheType {
+                  Typing typing = STATIC;
+              }
+              """,
+            """
+              import b.New;
+
+              import static b.New.Typing.STATIC;
+
+              class AlsoImportsTheType {
+                  New.Typing typing = STATIC;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void staticStarImportNextToImportOfTheType() {
         rewriteRun(
           java(a1),
