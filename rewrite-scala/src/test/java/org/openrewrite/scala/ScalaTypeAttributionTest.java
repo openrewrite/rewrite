@@ -470,6 +470,35 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedMethodCallNameCarriesMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def walk(m: Int): Int = m
+              val a = this.walk(5)
+              val b = List(1, 2).map(x => x + 1)
+              val c = List(1, 2).map[Int](x => x + 1)
+              val d = 1 + 2
+              val e = List(1, 2)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.MethodInvocation> invocations = findAll(cu, J.MethodInvocation.class, m -> m.getSelect() != null);
+                assertThat(invocations)
+                  .extracting(J.MethodInvocation::getSimpleName)
+                  .contains("walk", "map", "apply");
+                assertThat(invocations).allSatisfy(m -> {
+                    assertThat(m.getMethodType()).isNotNull();
+                    assertThat(m.getName().getType()).isSameAs(m.getMethodType());
+                    assertThat(m.getName().getFieldType()).isNull();
+                });
+            })
+          )
+        );
+    }
+
+    @Test
     void namedVariableHasType() {
         rewriteRun(
           scala(
@@ -582,7 +611,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void unresolvedReceiverHasNoMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
@@ -602,7 +630,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void unresolvableWildcardImportDoesNotShadowOtherNames() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             import doobie.implicits._
@@ -706,7 +733,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void importsAreAttributedWithTheImportedDefinition() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             import scala.concurrent.ExecutionContext.Implicits.global
@@ -958,7 +984,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void illTypedCallsHaveNoMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Person(name: String)
@@ -988,7 +1013,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void callsWithNonConformingTypeArgumentsHaveNoMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
@@ -1019,7 +1043,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void illTypedCallHasSameShapeAsWellTypedCall() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {
@@ -1059,7 +1082,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void callWithUnresolvedArgumentKeepsMethodType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
           scala(
             """
             class Foo {

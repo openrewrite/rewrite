@@ -36,6 +36,255 @@ class RemoveUnusedImportsTest implements RewriteTest {
         spec.recipe(new RemoveUnusedImports());
     }
 
+    @Test
+    void duplicateOrdinaryImportWithInternalComment() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java./* explanation */util.List;
+              import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """,
+            """
+              import java.util.List;
+              /* explanation */import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateStaticImportWithSpacing() {
+        rewriteRun(
+          java(
+            """
+              import static java.util.Collections.emptyList;
+              import static java . util . Collections.emptyList;
+
+              class A {
+                  Object list = emptyList();
+              }
+              """,
+            """
+              import static java.util.Collections.emptyList;
+
+              class A {
+                  Object list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ordinaryWildcardWithInternalComment() {
+        rewriteRun(
+          java(
+            """
+              import java./* collections */util.*;
+
+              class A {
+                  List<String> list;
+              }
+              """,
+            """
+              import java./* collections */util.List;
+
+              class A {
+                  List<String> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticNestedTypeWithInternalComment() {
+        rewriteRun(
+          java(
+            """
+              import static java.util./* entry */Map.Entry;
+
+              class A {
+                  Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldingOrdinaryWildcardDeduplicatesStructuralNames() {
+        rewriteRun(
+          java(
+            """
+              import java. util.List;
+              import java.util.*;
+              import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """,
+            """
+              import java. util.List;
+              import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldingStaticWildcardDeduplicatesStructuralNames() {
+        rewriteRun(
+          java(
+            """
+              import static java.util.Collections.emptyList;
+              import static java. util.Collections.*;
+
+              class A {
+                  Object list = emptyList();
+              }
+              """,
+            """
+              import static java.util.Collections.emptyList;
+
+              class A {
+                  Object list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateStaticImportWithInternalCommentAtEnd() {
+        rewriteRun(
+          java(
+            """
+              import static java.util.Collections.emptyList;
+              import static java./* collections */util.Collections.emptyList;
+
+              class A {
+                  Object list = emptyList();
+              }
+              """,
+            """
+              import static java.util.Collections.emptyList;
+
+              /* collections */class A {
+                  Object list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldingWildcardWithOnlyDuplicatesPreservesInternalComment() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java./* collections */util.*;
+              import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """,
+            """
+              import java.util.List;
+              /* collections */import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticAndOrdinaryImportsHaveDistinctIdentities() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Map.Entry;
+              import static java.util.Map.Entry;
+
+              class A {
+                  Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldingWildcardPreservesInternalCommentOnce() {
+        rewriteRun(
+          java(
+            """
+              import java./* collections */util.*;
+
+              class A {
+                  List<Set<String>> lists;
+              }
+              """,
+            """
+              import java./* collections */util.List;
+              import java.util.Set;
+
+              class A {
+                  List<Set<String>> lists;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateImportsPreserveInternalCommentsAcrossBlankLines() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java./* first */util.List;
+              import java./* second */util.List;
+
+              // files
+              import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """,
+            """
+              import java.util.List;
+              /* first *//* second */// files
+              import java.io.File;
+
+              class A {
+                  List<File> files;
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void removeNamedImport() {
@@ -746,7 +995,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void retainPackageInfoAnnotationWithMissingTypeInformation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.none()),
+          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.all()
+            .classDeclarations(false).identifiers(false).methodDeclarations(false)
+            .methodInvocations(false).constructorInvocations(false)),
           java(
             """
               @NullMarked
@@ -2148,7 +2399,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void missingTypeReturnValueOfMethodWithArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodDeclarations(false).identifiers(false)),
           // method with argument should still remove unused import
           java(
             """

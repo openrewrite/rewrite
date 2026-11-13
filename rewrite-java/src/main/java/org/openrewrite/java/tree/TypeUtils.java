@@ -833,7 +833,6 @@ public class TypeUtils {
                         case Short:
                             switch (fromPrimitive) {
                                 case Byte:
-                                case Char:
                                 case Short:
                                     return true;
                             }

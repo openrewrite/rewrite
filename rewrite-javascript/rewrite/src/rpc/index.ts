@@ -35,6 +35,8 @@ export * from "../reference";
 export {RewriteRpc} from "./rewrite-rpc";
 export {RpcRecipe, RpcVisitor} from "./recipe";
 export {DelegatingRecipe, prepareJavaRecipe} from "./java-recipe";
+export {findTestClasspath, JavaRpcTestServer} from "./java-rpc-client";
+export type {JavaRpcOptions} from "./java-rpc-client";
 export {registerVisitor} from "./request/visitor-registry";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {

@@ -852,8 +852,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
         J clazz = convertInstanceOfTree(node);
         if (node.getPattern() instanceof JCBindingPattern b) {
+            JavaType.Variable variableType = typeMapping.variableType(b.var.sym);
             pattern = new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
+                    variableType != null ? variableType.getType() : null, variableType);
         }
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }

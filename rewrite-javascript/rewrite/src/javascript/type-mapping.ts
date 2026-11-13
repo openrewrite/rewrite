@@ -651,18 +651,7 @@ export class JavaScriptTypeMapping {
         const binding = this.moduleBinding(symbol.declarations?.[0], node);
         if (symbol.flags & ts.SymbolFlags.Alias || (binding && binding.kind !== 'namespace')) {
             if (binding) {
-                ownerType = {
-                    kind: Type.Kind.Class,
-                    flags: 0,
-                    classKind: Type.Class.Kind.Interface,
-                    fullyQualifiedName: binding.module,
-                    typeParameters: [],
-                    annotations: [],
-                    interfaces: [],
-                    members: [],
-                    methods: [],
-                    toJSON: typeSignatureToJSON
-                } as Type.Class;
+                ownerType = this.importOwner(binding.module);
             }
         } else {
             // For non-imported variables, check if they belong to a class/interface/namespace
@@ -709,6 +698,12 @@ export class JavaScriptTypeMapping {
                     }
                 }
             }
+        }
+
+        // An export read as `os.EOL` has the owner `import {EOL} from 'os'` gives it, unless a class or namespace declares it
+        if (!Type.isFullyQualified(ownerType)) {
+            const module = this.moduleReadThrough(node);
+            ownerType = module ? this.importOwner(module) : ownerType;
         }
 
         // Create the Type.Variable
@@ -839,6 +834,30 @@ export class JavaScriptTypeMapping {
             return module ? this.memberBinding(module, declaration.propertyName ?? declaration.name) : undefined;
         }
         return undefined;
+    }
+
+    /** The module `os` binds in `os.EOL`, given the node of `EOL`, where `os` binds a whole module. */
+    private moduleReadThrough(node: ts.Node): string | undefined {
+        if (!ts.isIdentifier(node) || !ts.isPropertyAccessExpression(node.parent) || node.parent.name !== node) {
+            return undefined;
+        }
+        const receiver = this.bindingOf(node.parent.expression);
+        return receiver?.kind === 'namespace' ? receiver.module : undefined;
+    }
+
+    private importOwner(module: string): Type.Class {
+        return {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Interface,
+            fullyQualifiedName: module,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: typeSignatureToJSON
+        } as Type.Class;
     }
 
     /** A binding of the export `name` names, where that is a static name. `default` names the default export. */

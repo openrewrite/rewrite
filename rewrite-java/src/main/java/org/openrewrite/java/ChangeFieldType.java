@@ -61,7 +61,8 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
             mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
                 JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
                 if (varType != null && !varType.equals(newFieldType)) {
-                    return var.withType(newFieldType).withName(var.getName().withType(newFieldType));
+                    J.VariableDeclarations.NamedVariable v = var.withType(newFieldType);
+                    return v.withName(v.getName().withType(newFieldType).withFieldType(v.getVariableType()));
                 }
                 return var;
             }));

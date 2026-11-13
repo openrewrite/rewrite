@@ -92,6 +92,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
             }
+            // a static import of a nested type also imports a field of the same name
+            boolean fieldNamedLikeTypeUsed = cu.getTypesInUse().getVariables().stream().anyMatch(variable -> {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+                return simpleName.equals(variable.getName()) && fq != null &&
+                       TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName() + "." + simpleName, type);
+            });
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -153,7 +159,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 J.Identifier alias = import_.getAlias();
                 if (import_.isStatic()) {
                     String imported = import_.getQualid().getSimpleName();
-                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) && (force || !methodsAndFieldsUsed.contains(imported))) {
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) &&
+                            (force || !methodsAndFieldsUsed.contains(imported) && !fieldNamedLikeTypeUsed)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
@@ -193,6 +200,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (otherTypesInPackageUsed.isEmpty()) {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
+                    } else if (type.lastIndexOf('$') > type.lastIndexOf('.')) {
+                        // the star import never provided a nested type, so it has no reason to change while in use
+                        return import_;
                     } else {
                         return unfoldStarImport(import_, otherTypesInPackageUsed, cu);
                     }
@@ -347,7 +357,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             if (javaType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
                 if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
-                    return fq;
+                    // an import names the raw type, not the parameterization of it that the source uses
+                    return fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq;
                 }
             }
         }

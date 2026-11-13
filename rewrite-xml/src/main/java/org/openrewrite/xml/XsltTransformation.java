@@ -62,6 +62,11 @@ public class XsltTransformation extends Recipe {
                "Note that there are no format matching guarantees when running this recipe.";
 
     @Override
+    public int maxCycles() {
+        return 1;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> visitor = new XsltTransformationVisitor(loadResource(xslt, xsltResource));
 

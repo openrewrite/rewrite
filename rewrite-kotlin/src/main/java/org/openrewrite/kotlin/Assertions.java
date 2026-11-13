@@ -505,7 +505,7 @@ public final class Assertions {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName() ||
-                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isMethodName(ident) || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
                     isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument() || isThisLabel();
         }
@@ -534,8 +534,9 @@ public final class Assertions {
             return getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
         }
 
-        private boolean isMethodName() {
-            return getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration;
+        private boolean isMethodName(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.MethodDeclaration && ident == ((J.MethodDeclaration) value).getName();
         }
 
         private boolean isMethodInvocationName() {
