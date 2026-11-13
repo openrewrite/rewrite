@@ -30,6 +30,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.AddImport;
+import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeMethodTargetToStatic;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -2265,6 +2266,221 @@ class RewriteTestTest implements RewriteTest {
                   """
               )
             );
+        }
+    }
+
+    @Nested
+    class CompilableOutput {
+        private final RecipeQualityValidation compilableOutput =
+          RecipeQualityValidation.builder().compilableOutput(true).build();
+
+        @Test
+        void rejectOutputThatDoesNotCompile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles")
+              .hasMessageContaining("A.java (changed by org.openrewrite.java.ChangeMethodName):\n" +
+                                    "    `String s = String.join(1);` ")
+              .hasMessageContaining("int cannot be converted to java.lang.CharSequence")
+              .hasMessageContaining("spec.afterParser(")
+              .hasMessageContaining("compilableOutput(false)");
+        }
+
+        @Test
+        void acceptErrorsThatTheSourceHadBeforeTheRecipeRan() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "strip", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      void a(String o) {
+                          String s = o.trim().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void a(String o) {
+                          String s = o.strip().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectOnlyTheErrorsThatTheSourceDidNotHaveBeforeTheRecipeRan() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length();
+                      String t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length();
+                      String t = "b".length();
+                  }
+                  """
+              )
+            ));
+            // javac says the same about both lines, and only the second is the recipe's
+            assertThat(e).hasMessageContaining("`String t = \"b\".length();` incompatible types")
+              .hasMessageNotContaining("\"a\".length()");
+        }
+
+        @Test
+        void rejectASecondErrorWithTheSameMessageOnTheSameLine() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length(), t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length(), t = "b".length();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles");
+        }
+
+        @Test
+        void compileWithTheAfterParser() {
+            //language=java
+            String before = """
+              import a.A;
+
+              class Test {
+                  A a;
+              }
+              """;
+            //language=java
+            String after = """
+              import b.B;
+
+              class Test {
+                  B a;
+              }
+              """;
+            JavaParser.Builder<?, ?> parserOfA = JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class A {
+                }
+                """
+            );
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeType("a.A", "b.B", null))
+                .parser(parserOfA)
+                .recipeQualityValidation(compilableOutput),
+              java(before, after)
+            ));
+            assertThat(e.getMessage()).containsOnlyOnce("`import b.B;` package b does not exist");
+
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("a.A", "b.B", null))
+                .parser(parserOfA)
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                    }
+                    """
+                ))
+                .recipeQualityValidation(compilableOutput),
+              java(before, after)
+            );
+        }
+
+        @Test
+        void skipWhenTheTestDoesNotValidateTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .typeValidationOptions(TypeValidation.all().identifiers(false))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectUnchangedSourceThatTheAfterParserDoesNotCompile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "strip", null, null))
+                .afterParser(JavaParser.fromJavaVersion())
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class Unchanged {
+                      String s = "a".length();
+                  }
+                  """
+              ),
+              java(
+                """
+                  class A {
+                      String t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String t = "b".strip();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("Unchanged.java:\n    `String s = \"a\".length();` incompatible types")
+              .hasMessageNotContaining("spec.afterParser(");
         }
     }
 

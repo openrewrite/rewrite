@@ -25,6 +25,7 @@ import org.openrewrite.ScanningRecipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
+import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -299,6 +300,31 @@ class UnneededOptOutsTest implements RewriteTest {
               spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())))));
         assertThat(turnedOnByTheTest).hasMessageContaining(
           "Remove typeValidationOptions(..) and recipeQualityValidation(..) from the test's RecipeSpec.");
+    }
+
+    @Test
+    void turnOffCompilableOutputThatTypeValidationKeptFromRunning() {
+        AssertionError e = withOptOutsChecked("all", () ->
+          withSystemProperty("org.openrewrite.test.compilableOutput", "true", () ->
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .typeValidationOptions(TypeValidation.all().identifiers(false)),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            ))));
+        assertThat(e)
+          .hasMessageContaining("With the type checks on, compilableOutput runs and fails")
+          .hasMessageContaining(".compilableOutput(false).build())");
     }
 
     private void retypeIntAsLongWithoutIdentifiersChecked(Consumer<RecipeSpec> options) {

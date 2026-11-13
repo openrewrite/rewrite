@@ -757,23 +757,42 @@ DEFAULT_PARSE_EXCLUSIONS = [
 
 # Build output, which only ever sits at the project root; deeper down these are
 # ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
-ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+ROOT_PARSE_EXCLUSIONS = ['/build', '/dist']
+
+
+class _Exclusions:
+    """Patterns as ``exclusions`` in ``ParseProjectOptions`` describes them."""
+
+    def __init__(self, patterns: List[str]):
+        self._names, self._paths = set(), set()
+        self._name_globs, self._path_globs = [], []
+        for pattern in patterns:
+            anchored = '/' in pattern
+            pattern = os.path.normcase(pattern.lstrip('/'))
+            # A caller can list thousands of files, so a pattern without wildcards is a lookup.
+            if any(c in pattern for c in '*?['):
+                (self._path_globs if anchored else self._name_globs).append(pattern)
+            else:
+                (self._paths if anchored else self._names).add(pattern)
+
+    def cover(self, name: str, path: str) -> bool:
+        import fnmatch
+        name, path = os.path.normcase(name), os.path.normcase(path)
+        return (name in self._names or path in self._paths
+                or any(fnmatch.fnmatch(name, glob) for glob in self._name_globs)
+                or any(fnmatch.fnmatch(path, glob) for glob in self._path_globs))
 
 
 def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
-    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
-    import fnmatch
-
-    def excluded(name: str, patterns: List[str]) -> bool:
-        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
-
+    """Yield every ``.py`` path under ``project_path`` that no exclusion covers."""
+    excluded = _Exclusions(exclusions + ROOT_PARSE_EXCLUSIONS)
     for root, dirs, files in os.walk(project_path):
-        at_root = root == project_path
-        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
-        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+        below = os.path.relpath(root, project_path)
+        prefix = '' if below == os.curdir else below.replace(os.sep, '/') + '/'
+        dirs[:] = [d for d in dirs if not excluded.cover(d, prefix + d)]
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith('.py') and not excluded.cover(file, prefix + file):
                 yield os.path.join(root, file)
 
 
@@ -1315,6 +1334,7 @@ def handle_reset(params: dict) -> bool:
     _prepared_recipes.clear()
     _delegating_recipes.clear()
     _prepared_unwrapped_editors.clear()
+    _prepared_unwrapped_scanners.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _local_object_ids.clear()
@@ -1870,6 +1890,8 @@ _delegating_recipes: Dict[str, Any] = {}
 # with every precondition sent in editPreconditions. The host evaluates those,
 # so dispatching edit:<id> unwraps the editor to keep them from running twice.
 _prepared_unwrapped_editors: Set[str] = set()
+# The same for a scanning recipe's scanner() and its scanPreconditions.
+_prepared_unwrapped_scanners: Set[str] = set()
 # Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
 # time from a Preconditions.check(...) wrapper around recipe.editor().
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
@@ -1975,8 +1997,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
-    # A Preconditions.check(...) wrapper around the editor is sent as editPreconditions, so the
-    # host can skip the visit RPC for files that don't match.
+    # A Preconditions.check(...) wrapper around the editor or scanner is sent as editPreconditions
+    # or scanPreconditions, so the host can skip the visit RPC for files that don't match.
     edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
     if not is_scanning:
         try:
@@ -1984,11 +2006,26 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         except Exception:
             editor_visitor = None
         if editor_visitor is not None:
-            extracted = _extract_preconditions_from_editor(editor_visitor)
+            extracted = _extract_preconditions(editor_visitor)
             if extracted is not None:
                 _prepared_unwrapped_editors.add(prepared_id)
                 edit_preconditions.extend(extracted[1])
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
+
+    scan_preconditions: List[Dict[str, Any]] = []
+    if is_scanning:
+        scan_preconditions.extend(_get_preconditions(recipe, 'scan'))
+        # No run has started, so the scanner gets a fresh accumulator of its own.
+        from rewrite import InMemoryExecutionContext
+        try:
+            scanner = recipe.scanner(recipe.initial_value(InMemoryExecutionContext()))
+        except Exception:
+            scanner = None
+        if scanner is not None:
+            extracted = _extract_preconditions(scanner)
+            if extracted is not None:
+                _prepared_unwrapped_scanners.add(prepared_id)
+                scan_preconditions.extend(extracted[1])
 
     response = {
         'id': prepared_id,
@@ -1996,7 +2033,7 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         'editVisitor': f'edit:{prepared_id}',
         'editPreconditions': edit_preconditions,
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
-        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
+        'scanPreconditions': scan_preconditions,
     }
     # Older Java hosts reject unknown response fields, so this is only sent when asked.
     if accepts_causes_another_cycle and getattr(recipe, 'causes_another_cycle', False):
@@ -2124,8 +2161,8 @@ def _get_preconditions(recipe, phase: str) -> List[dict]:
 
     Always includes the language gate (only visit Python source files). Recipe-
     declared preconditions from a ``Preconditions.check(...)`` wrapper around
-    ``recipe.editor()`` are added on top by ``handle_prepare_recipe`` — see
-    :func:`_extract_preconditions_from_editor`.
+    ``recipe.editor()`` or ``recipe.scanner()`` are added on top by
+    ``_prepare_instance`` — see :func:`_extract_preconditions`.
     """
     return [{
         'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
@@ -2133,11 +2170,11 @@ def _get_preconditions(recipe, phase: str) -> List[dict]:
     }]
 
 
-def _extract_preconditions_from_editor(editor_visitor):
-    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor result.
+def _extract_preconditions(visitor):
+    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor or scanner.
 
-    If ``editor_visitor`` is a :class:`rewrite.preconditions.Check`, returns a
-    tuple ``(bare_editor, [precondition_wire_entry, ...])`` where ``bare_editor``
+    If ``visitor`` is a :class:`rewrite.preconditions.Check`, returns a
+    tuple ``(bare_visitor, [precondition_wire_entry, ...])`` where ``bare_visitor``
     is the innermost non-Check visitor and the wire entries describe each
     precondition in evaluation order. Returns ``None`` if no Check wrapper
     is present.
@@ -2161,16 +2198,16 @@ def _extract_preconditions_from_editor(editor_visitor):
     """
     from rewrite.preconditions import Check, RecipeCheck
 
-    if not isinstance(editor_visitor, Check):
+    if not isinstance(visitor, Check):
         return None
 
     wire_entries: List[Dict[str, Any]] = []
-    inner: Any = editor_visitor
+    inner: Any = visitor
     while isinstance(inner, Check):
         wire = _check_wire_entry(inner)
         if wire is None:
             # Cannot serialize this check to the wire; abort the optimization
-            # for this editor. Returning None leaves the wrapper intact so
+            # for this visitor. Returning None leaves the wrapper intact so
             # the precondition runs Python-side as a fallback.
             return None
         wire_entries.append(wire)
@@ -2517,7 +2554,12 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
         acc = _recipe_accumulators[recipe_id]
 
-        return recipe.scanner(acc)
+        scanner = recipe.scanner(acc)
+        if recipe_id in _prepared_unwrapped_scanners:
+            from rewrite.preconditions import Check
+            while isinstance(scanner, Check):
+                scanner = scanner.wrapped
+        return scanner
 
     else:
         # Look up visitor by fully-qualified name from registry

@@ -25,6 +25,7 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
@@ -42,6 +43,7 @@ import static org.openrewrite.java.Assertions.markSourceSetDirty;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -2482,6 +2484,88 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void nameOfUnknownTypeImportedAsTheOriginalLeavesTheOuterClassNameFree() {
+        rewriteRun(
+          spec -> spec.recipes(
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                      // like a template that makes the method return the target's outer class, unattributed
+                      TypeTree returnType = method.getReturnTypeExpression();
+                      JavaType.Method methodType = method.getMethodType();
+                      if (returnType == null || methodType == null ||
+                          returnType.getType() instanceof JavaType.Unknown) {
+                          return method;
+                      }
+                      methodType = methodType.withReturnType(JavaType.ShallowClass.build("b.Response"));
+                      return method.withReturnTypeExpression(returnType.withType(JavaType.Unknown.getInstance()))
+                        .withMethodType(methodType)
+                        .withName(method.getName().withType(methodType));
+                  }
+              }),
+              new ChangeType("a.Response", "b.Response$Builder", true)
+            )
+            .afterTypeValidationOptions(TypeValidation.none()),
+          java("package a; public class Response {}"),
+          java("package b; public class Response { public static class Builder {} }"),
+          java(
+            """
+              import a.Response;
+
+              class Test {
+                  Response response() {
+                      return null;
+                  }
+
+                  Response builder = new Response();
+              }
+              """,
+            """
+              import b.Response;
+
+              class Test {
+                  Response response() {
+                      return null;
+                  }
+
+                  Response.Builder builder = new Response.Builder();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nameOfUnknownTypeThatNoImportExplainsTakesTheOuterClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Response$Builder", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java("package a; public class Old {}"),
+          // c.Response, like a class generated into package c, is on no classpath, so its name has an unknown type
+          java(
+            """
+              package c;
+
+              import a.Old;
+
+              class Test {
+                  Response response;
+                  Old old = new Old();
+              }
+              """,
+            """
+              package c;
+
+              class Test {
+                  Response response;
+                  b.Response.Builder old = new b.Response.Builder();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void fileDeclaringANestedTypeThatStaysIsUnchanged() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", false)),
@@ -4301,6 +4385,94 @@ class ChangeTypeTest implements RewriteTest {
               class C {
                   Object o = Outer.Inner;
                   Object p = a.Outer.Inner;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedEnumAndTheTypesNestedInItKeepTheirKind() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "a.Bar", false)),
+          java(
+            """
+              package a;
+
+              public enum Foo {
+                  A, B;
+
+                  public interface Nested {
+                  }
+              }
+              """,
+            """
+              package a;
+
+              public enum Bar {
+                  A, B;
+
+                  public interface Nested {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantNamedLikeItsEnumKeepsItsName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "a.Bar", false)),
+          java(
+            """
+              package a;
+
+              public enum Foo {
+                  Foo, B
+              }
+              """,
+            """
+              package a;
+
+              public enum Bar {
+                  Foo, B
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepImportOfTheOuterClassWhenTheTypeMovesWithinIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Old", "a.Outer$New", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+
+                public class Outer {
+                    public static class Old {
+                    }
+
+                    public static class New {
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import a.Outer;
+
+              class Test {
+                  Outer.Old o;
+              }
+              """,
+            """
+              import a.Outer;
+
+              class Test {
+                  Outer.New o;
               }
               """
           )

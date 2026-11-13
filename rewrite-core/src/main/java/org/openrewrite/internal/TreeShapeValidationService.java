@@ -16,13 +16,17 @@
 package org.openrewrite.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 /**
  * Lets the test framework check that a recipe's output is the tree its parser makes of the text it prints.
@@ -110,6 +114,23 @@ public interface TreeShapeValidationService {
      */
     default List<String> typeDifferences(Tree tree, Tree parsed) {
         return emptyList();
+    }
+
+    /**
+     * Has the parsers of the language that parse with {@code parseCtx} keep the errors of the language's compiler for
+     * {@link #compilationErrors} to return. Does nothing for a language whose parser doesn't compile what it reads.
+     */
+    default void collectCompilationErrors(ExecutionContext parseCtx) {
+    }
+
+    /**
+     * @return The errors of the language's compiler in the sources that were parsed with {@code parseCtx} since
+     * {@link #collectCompilationErrors} prepared it, by the path of the input they are in. Each message of the
+     * compiler, such as "incompatible types", has the line of source of each error it reports, such as
+     * {@code int i = "";}.
+     */
+    default Map<Path, Map<String, List<String>>> compilationErrors(ExecutionContext parseCtx) {
+        return emptyMap();
     }
 
     /**

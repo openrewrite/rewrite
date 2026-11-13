@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.fail;
 
 /**
  * Finds nodes in a recipe's output that its parser builds or types differently from the text they print, which recipes
- * that run after it don't match the way they match parsed code.
+ * that run after it don't match the way they match parsed code, and text that its compiler rejects.
  */
 final class TreeShapes {
     private static final int MAX_PER_FILE = 5;
@@ -39,6 +39,7 @@ final class TreeShapes {
 
     private final boolean shapes;
     private final boolean types;
+    private final boolean compiles;
     private final Function<SourceFile, List<Parser.Builder>> afterParsersFor;
     private final Collection<Parser.Builder> specAfterParsers;
     private final @Nullable Path relativeTo;
@@ -49,10 +50,12 @@ final class TreeShapes {
      *                         where the test gives no after parser of its language.
      * @param specAfterParsers Those of them that the test gave as after parsers.
      */
-    TreeShapes(boolean shapes, boolean types, Function<SourceFile, List<Parser.Builder>> afterParsersFor,
+    TreeShapes(boolean shapes, boolean types, boolean compiles,
+               Function<SourceFile, List<Parser.Builder>> afterParsersFor,
                Collection<Parser.Builder> specAfterParsers, @Nullable Path relativeTo, ExecutionContext parseCtx) {
         this.shapes = shapes;
         this.types = types;
+        this.compiles = compiles;
         this.afterParsersFor = afterParsersFor;
         this.specAfterParsers = specAfterParsers;
         this.relativeTo = relativeTo;
@@ -86,7 +89,7 @@ final class TreeShapes {
      *                can refer to the others, as a Maven module does to its parent.
      */
     void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
-        if (!shapes && !types) {
+        if (!shapes && !types && !compiles) {
             return;
         }
         List<SourceFile> current = current(results, sources);
@@ -112,8 +115,46 @@ final class TreeShapes {
         }
         StringBuilder foundShapes = new StringBuilder();
         StringBuilder foundTypes = new StringBuilder();
+        StringBuilder foundErrors = new StringBuilder();
+        boolean withoutAfterParser = false;
         for (Map.Entry<Parser.Builder, List<Result>> group : byParser.entrySet()) {
-            Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current, parsedAndOutput);
+            Map<UUID, Map<String, List<String>>> errors = new HashMap<>();
+            Map<UUID, Reparsed> reparsed = reparse(group.getKey(), current, parsedAndOutput, errors);
+            if (!errors.isEmpty() && !specAfterParsers.contains(group.getKey())) {
+                // An error that the same parser reports as often before the recipe ran isn't the recipe's, and the
+                // recipe may have changed the line it is on. An after parser didn't parse the test's sources, so it
+                // has no such before.
+                Map<UUID, Map<String, List<String>>> errorsBefore = new HashMap<>();
+                reparse(group.getKey(), sources, parsedAndOutput, errorsBefore);
+                Map<UUID, UUID> beforeIds = new HashMap<>();
+                for (Result result : results) {
+                    if (result.getBefore() != null && result.getAfter() != null) {
+                        beforeIds.put(result.getAfter().getId(), result.getBefore().getId());
+                    }
+                }
+                errors.forEach((id, ofSource) -> {
+                    Map<String, List<String>> before = errorsBefore.getOrDefault(beforeIds.getOrDefault(id, id),
+                            Collections.emptyMap());
+                    ofSource.entrySet().removeIf(error -> {
+                        List<String> linesBefore = before.getOrDefault(error.getKey(), Collections.emptyList());
+                        if (error.getValue().size() <= linesBefore.size()) {
+                            return true;
+                        }
+                        for (String line : linesBefore) {
+                            error.getValue().remove(line);
+                        }
+                        return false;
+                    });
+                });
+                errors.values().removeIf(Map::isEmpty);
+                withoutAfterParser |= !errors.isEmpty();
+            }
+            for (SourceFile source : current) {
+                append(foundErrors, source, results, errors.get(source.getId()));
+            }
+            if (!shapes && !types) {
+                continue;
+            }
             for (Result result : group.getValue()) {
                 SourceFile after = Objects.requireNonNull(result.getAfter());
                 Reparsed parse = reparsed.get(after.getId());
@@ -136,12 +177,42 @@ final class TreeShapes {
                  "parsed code never holds. If the output is meant to differ from parsed code, add " +
                  "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()).");
         }
+        if (foundErrors.length() > 0) {
+            fail("Write code that compiles. The compiler rejects the text that the recipe's output prints:\n" +
+                 foundErrors +
+                 (withoutAfterParser ? "If the output uses a library that the test's parser doesn't have, give the " +
+                                       "test the classpath of the output with spec.afterParser(..). " : "") +
+                 "If the output isn't meant to compile, such as code that a person has to finish, add " +
+                 "spec.recipeQualityValidation(RecipeQualityValidation.builder().compilableOutput(false).build()).");
+        }
         if (foundTypes.length() > 0) {
             fail("Give the code the recipe writes the types its parser gives that code. The recipe's output holds " +
                  "types that a parse of the text it prints doesn't:\n" + foundTypes +
                  "A recipe that runs after it matches code by its types, so it misses or mistakes code whose types " +
                  "are wrong. If the output is meant to differ from parsed code, add " +
                  "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()).");
+        }
+    }
+
+    private static void append(StringBuilder found, SourceFile source, Collection<Result> results,
+                               @Nullable Map<String, List<String>> errors) {
+        if (errors == null) {
+            return;
+        }
+        found.append("  ").append(source.getSourcePath());
+        for (Result result : results) {
+            if (result.getAfter() == source) {
+                found.append(NameMatching.changedBy(result));
+            }
+        }
+        found.append(":\n");
+        int listed = 0;
+        for (Map.Entry<String, List<String>> error : errors.entrySet()) {
+            for (String line : error.getValue()) {
+                if (listed++ < MAX_PER_FILE) {
+                    found.append("    `").append(line).append("` ").append(error.getKey()).append('\n');
+                }
+            }
         }
     }
 
@@ -266,9 +337,13 @@ final class TreeShapes {
     /**
      * A fresh parse, by {@code builder}, of the printed text of each of the {@code current} sources that it parses,
      * by the id of the source, leaving out the ones it doesn't parse back to the same kind of source.
+     *
+     * @param compilationErrors Is given what the compiler rejects in the text of each source, by the id of the
+     *                          source, when the test validates that the recipe's output compiles.
      */
     private Map<UUID, Reparsed> reparse(Parser.Builder builder, List<SourceFile> current,
-                                        List<SourceFile> parsedAndOutput) {
+                                        List<SourceFile> parsedAndOutput,
+                                        Map<UUID, Map<String, List<String>>> compilationErrors) {
         List<SourceFile> sources = new ArrayList<>();
         List<String> printed = new ArrayList<>();
         List<Parser.Input> inputs = new ArrayList<>();
@@ -285,19 +360,34 @@ final class TreeShapes {
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
         boolean afterParser = specAfterParsers.contains(builder);
-        // Types need a parser with the output's classpath, and shapes alone parse faster without types. An after
-        // parser types the output afresh, as a clone of the input's parser holds the input classpath's types under
-        // the output's names.
+        // Types and compilation need a parser with the output's classpath, and shapes alone parse faster without
+        // types. An after parser types the output afresh, as a clone of the input's parser holds the input
+        // classpath's types under the output's names.
         Parser.Builder reparser = service == null ? builder :
-                !types ? service.untypedParser(builder) :
+                !types && !compiles ? service.untypedParser(builder) :
                         afterParser ? service.typedParser(builder) : service.typedParser(builder, parsedAndOutput);
-        List<SourceFile> parsed = parse(reparser, inputs, errors);
+        ExecutionContext ctx = parseContext(errors);
+        if (compiles && service != null) {
+            service.collectCompilationErrors(ctx);
+        }
+        List<SourceFile> parsed = parse(reparser, inputs, ctx, errors);
         if (parsed == null) {
             if (afterParser) {
                 fail("The test's after parser of " + builder.getDslName() + " sources threw as it parsed the " +
                      "recipe's output, which leaves that output unchecked.", errors.get(errors.size() - 1));
             }
             return reparsed;
+        }
+        if (compiles && service != null) {
+            Map<Path, Map<String, List<String>>> byPath = service.compilationErrors(ctx);
+            for (int i = 0; i < sources.size(); i++) {
+                Map<String, List<String>> ofSource = byPath.get(inputs.get(i).getPath());
+                if (ofSource != null) {
+                    Map<String, List<String>> copy = new LinkedHashMap<>();
+                    ofSource.forEach((message, lines) -> copy.put(message, new ArrayList<>(lines)));
+                    compilationErrors.put(sources.get(i).getId(), copy);
+                }
+            }
         }
         for (int i = 0; i < sources.size(); i++) {
             SourceFile source = sources.get(i);
@@ -325,7 +415,7 @@ final class TreeShapes {
             // a parser that also checks the model, as Maven's does, can reject text that is valid for the format
             List<Throwable> syntaxErrors = new ArrayList<>();
             List<SourceFile> syntax = parse(syntaxParser, Collections.singletonList(input(source, printed)),
-                    syntaxErrors);
+                    parseContext(syntaxErrors), syntaxErrors);
             if (syntax != null && syntax.size() == 1) {
                 return reparsed(source, printed, syntax.get(0), syntaxErrors, false);
             }
@@ -349,11 +439,15 @@ final class TreeShapes {
         return new Reparsed(parse, null);
     }
 
-    private @Nullable List<SourceFile> parse(Parser.Builder builder, List<Parser.Input> inputs,
-                                             List<Throwable> errors) {
+    private ExecutionContext parseContext(List<Throwable> errors) {
         ExecutionContext ctx = new InMemoryExecutionContext(errors::add);
         parseCtx.getMessages().forEach(ctx::putMessage);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+        return ctx;
+    }
+
+    private @Nullable List<SourceFile> parse(Parser.Builder builder, List<Parser.Input> inputs, ExecutionContext ctx,
+                                             List<Throwable> errors) {
         try {
             return builder.clone().build().parseInputs(inputs, relativeTo, ctx).collect(toList());
         } catch (Exception | LinkageError e) {

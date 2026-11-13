@@ -49,7 +49,8 @@ final class UnneededOptOuts {
      * Recipe quality checks that run only when the test validates the type attribution of the recipe's input and
      * output.
      */
-    private static final Set<String> NEED_TYPES = new HashSet<>(asList("matchByTypeNotName", "parserTypedTrees"));
+    private static final Set<String> NEED_TYPES = new HashSet<>(asList("matchByTypeNotName", "parserTypedTrees",
+            "compilableOutput"));
 
     /**
      * The deprecated option of {@link TypeValidation} that has no effect, so the property can't name it and turning it

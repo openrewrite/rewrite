@@ -69,6 +69,15 @@ public interface JavaParser extends Parser {
      */
     String SHARE_CLASSPATH_JAR_INDEX = "org.openrewrite.java.shareClasspathJarIndex";
 
+    /**
+     * Set to a {@code Collection<javax.tools.Diagnostic<? extends javax.tools.JavaFileObject>>} on an
+     * {@link ExecutionContext} supplied to parsing to have the parser add the errors that javac reports in the
+     * sources it parses. The parser then also runs javac's flow analysis, which reports errors such as an
+     * unreported exception.
+     */
+    @Incubating(since = "8.107.0")
+    String COMPILATION_ERRORS = "org.openrewrite.java.compilationErrors";
+
     static List<Path> runtimeClasspath() {
         return RuntimeClasspathCache.getRuntimeClasspath();
     }

@@ -503,8 +503,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                                    ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
                                    parent instanceof J.MethodDeclaration &&
                                    ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
-                // a variable of the type can share its name, and is not a reference to the type
-                if (ident.getFieldType() == null && ident.getSimpleName().equals(className)) {
+                // a variable of the type can share its name and isn't a reference to it. An enum constant's name has
+                // no field type.
+                if (ident.getFieldType() == null && !(parent instanceof J.EnumValue) &&
+                    ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
                             JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
@@ -941,7 +943,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             String targetFqn = ((JavaType.FullyQualified) targetType).getFullyQualifiedName();
             // Replace the original type prefix with the target type prefix
             String newNestedFqn = targetFqn + nestedFqn.substring(originalFqn.length());
-            return JavaType.ShallowClass.build(newNestedFqn);
+            return JavaType.ShallowClass.build(newNestedFqn).withKind(nestedType.getKind());
         }
 
         /**
@@ -1055,6 +1057,13 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
             if (otherTypeNames == null) {
                 JavaType.FullyQualified outermost = getTopLevelClassName(newType);
+                Map<String, String> importedTypeNames = new HashMap<>();
+                for (J.Import anImport : sf.getImports()) {
+                    if (!anImport.isStatic() && anImport.getAlias() == null &&
+                            !"*".equals(anImport.getQualid().getSimpleName())) {
+                        importedTypeNames.put(anImport.getQualid().getSimpleName(), anImport.getTypeName());
+                    }
+                }
                 otherTypeNames = new JavaIsoVisitor<Set<String>>() {
                     private boolean isTarget(@Nullable JavaType type) {
                         return TypeUtils.isOfClassType(type, newType.getFullyQualifiedName()) ||
@@ -1080,6 +1089,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     @Override
                     public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
                         JavaType type = identifier.getType();
+                        String importedTypeName = importedTypeNames.get(identifier.getSimpleName());
+                        if (type instanceof JavaType.Unknown && importedTypeName != null) {
+                            // a name of unknown type refers to the type the file imports by that name
+                            type = JavaType.ShallowClass.build(importedTypeName);
+                        }
                         if (identifier.getFieldType() == null && type instanceof JavaType.FullyQualified && !isTarget(type) &&
                                 !TypeUtils.isOfClassType(type, originalType.getFullyQualifiedName())) {
                             names.add(identifier.getSimpleName());
@@ -1256,7 +1270,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             if (TypeUtils.isOfClassType(classDecl.getType(), originalType.getFullyQualifiedName())) {
                 String newClassName = getNewClassName(targetType);
                 cd = cd.withName(cd.getName().withSimpleName(newClassName));
-                cd = cd.withType(updateType(cd.getType()));
+                // the target type is built from its name alone, which makes it a class
+                cd = cd.withType(targetType.withKind(classDecl.getType().getKind()));
             }
             return cd;
         }
