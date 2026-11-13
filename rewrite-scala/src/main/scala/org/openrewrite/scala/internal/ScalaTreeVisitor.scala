@@ -627,7 +627,7 @@ class ScalaTreeVisitor(
           Collections.emptyList(), "apply", null, null)
         new J.MethodInvocation(Tree.randomId(), prefix,
           Markers.build(markers),
-          JRightPadded.build(select), null, nameId,
+          JRightPadded.build(select), null, typedMethodName(nameId, mt),
           JContainer.build(argContainerPrefix, args, Markers.EMPTY), mt)
     }
   }
@@ -675,7 +675,7 @@ class ScalaTreeVisitor(
     updateCursor(app.span.end)
     val mt = methodTypeAt(app)
     new J.MethodInvocation(Tree.randomId(), prefix, Markers.EMPTY,
-      null, null, nameId,
+      null, null, typedMethodName(nameId, mt),
       JContainer.build(argsBefore, args, Markers.EMPTY), mt)
   }
 
@@ -907,7 +907,8 @@ class ScalaTreeVisitor(
 
         updateCursor(postfixOp.span.end)
 
-        val name = ident(opName, namePrefix, typeAt(postfixOp.op), quoted = opQuoted)
+        val postfixMethodType = methodTypeAt(postfixOp)
+        val name = typedMethodName(ident(opName, namePrefix, typeAt(postfixOp.op), quoted = opQuoted), postfixMethodType)
 
         val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
         markersList.add(InfixNotation.create())
@@ -920,7 +921,7 @@ class ScalaTreeVisitor(
           null,
           name,
           JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Expression]](), Markers.EMPTY),
-          methodTypeAt(postfixOp)
+          postfixMethodType
         )
     }
   }
@@ -1046,7 +1047,7 @@ class ScalaTreeVisitor(
 
     val (select, methodName) = directCallName match {
       case Some(name) => (null, name)
-      case None => (JRightPadded.build(callee), ident("apply"))
+      case None => (JRightPadded.build(callee), typedMethodName(ident("apply"), methodType))
     }
 
     new J.MethodInvocation(
@@ -1265,7 +1266,7 @@ class ScalaTreeVisitor(
           Collections.emptyList(), "apply", null, null)
         return new J.MethodInvocation(Tree.randomId(), prefix,
           Markers.build(Collections.singletonList(FunctionApplication.create())),
-          JRightPadded.build(select), null, nameId,
+          JRightPadded.build(select), null, typedMethodName(nameId, mt),
           JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), mt)
     }
 
@@ -1383,7 +1384,8 @@ class ScalaTreeVisitor(
       case _ => Space.EMPTY
     }
 
-    val name = ident(methodName, nameSpace, quoted = methodNameQuoted)
+    val methodType = methodTypeOfTree(app)
+    val name = typedMethodName(ident(methodName, nameSpace, quoted = methodNameQuoted), methodType)
 
     val argContainer = JContainer.build(
       argContainerPrefix,
@@ -1411,7 +1413,7 @@ class ScalaTreeVisitor(
       typeParamsContainer,
       name,
       argContainer,
-      methodTypeOfTree(app)
+      methodType
     )
   }
 
@@ -1851,7 +1853,8 @@ class ScalaTreeVisitor(
     }
 
     // Create the method name identifier
-    val name = ident(methodName, methodNameSpace, quoted = methodNameQuoted)
+    val infixMethodType = methodTypeOfTree(infixOp)
+    val name = typedMethodName(ident(methodName, methodNameSpace, quoted = methodNameQuoted), infixMethodType)
 
     // For right-associative operators, store semantically: select = right, argument = left.
     // The printer checks for RightAssociative to restore the syntactic order on output.
@@ -1874,7 +1877,7 @@ class ScalaTreeVisitor(
       null, // typeParameters
       name,
       JContainer.build(Space.EMPTY, args, Markers.EMPTY),
-      methodTypeOfTree(infixOp)
+      infixMethodType
     )
   }
 
@@ -5964,15 +5967,16 @@ class ScalaTreeVisitor(
         val omitParens = Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))
         val args = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](), omitParens)
         updateCursor(ta.span.end)
+        val mt = methodTypeOfTree(ta)
         return new J.MethodInvocation(
           Tree.randomId(),
           prefix,
           Markers.EMPTY,
           null,
           typeParams,
-          ident(name),
+          typedMethodName(ident(name), mt),
           args,
-          methodTypeOfTree(ta)
+          mt
         )
 
       case _ =>
@@ -6034,6 +6038,7 @@ class ScalaTreeVisitor(
     val args = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](), omitParens)
 
     updateCursor(ta.span.end)
+    val mt = methodTypeOfTree(ta)
 
     new J.MethodInvocation(
       Tree.randomId(),
@@ -6041,9 +6046,9 @@ class ScalaTreeVisitor(
       Markers.EMPTY,
       new JRightPadded(qual, selectAfter, Markers.EMPTY),
       typeParams,
-      name,
+      typedMethodName(name, mt),
       args,
-      methodTypeOfTree(ta)
+      mt
     )
   }
 
@@ -9168,6 +9173,9 @@ class ScalaTreeVisitor(
     }
     false
   }
+
+  private def typedMethodName(name: J.Identifier, methodType: JavaType.Method): J.Identifier =
+    if (methodType == null) name else name.withType(methodType).withFieldType(null)
 
   private def ident(
     name: String,
