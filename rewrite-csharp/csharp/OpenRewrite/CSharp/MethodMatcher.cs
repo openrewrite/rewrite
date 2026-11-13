@@ -345,6 +345,11 @@ public class MethodMatcher
         private bool MatchesElement(JavaType paramType)
         {
             var fqn = TypeUtils.GetFullyQualifiedName(paramType);
+            if (paramType is JavaType.Primitive primitive &&
+                KeywordToFqn.TryGetValue(primitive.Kind == JavaType.PrimitiveKind.Boolean ? "bool" : primitive.Keyword,
+                    out var primitiveFqn))
+                fqn = primitiveFqn;
+
             if (fqn != null)
             {
                 if (_pattern.IsMatch(fqn)) return true;

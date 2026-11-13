@@ -53,6 +53,55 @@ public class MethodMatcherTests
         Assert.True(mm.Matches(method));
     }
 
+    [Theory]
+    [InlineData(JavaType.PrimitiveKind.Boolean, "bool", "System.Boolean")]
+    [InlineData(JavaType.PrimitiveKind.Byte, "byte", "System.Byte")]
+    [InlineData(JavaType.PrimitiveKind.Char, "char", "System.Char")]
+    [InlineData(JavaType.PrimitiveKind.Double, "double", "System.Double")]
+    [InlineData(JavaType.PrimitiveKind.Float, "float", "System.Single")]
+    [InlineData(JavaType.PrimitiveKind.Int, "int", "System.Int32")]
+    [InlineData(JavaType.PrimitiveKind.Long, "long", "System.Int64")]
+    [InlineData(JavaType.PrimitiveKind.Short, "short", "System.Int16")]
+    [InlineData(JavaType.PrimitiveKind.String, "string", "System.String")]
+    public void MatchesPrimitiveParameterAliases(JavaType.PrimitiveKind kind, string keyword, string fqn)
+    {
+        var keywordMatcher = new MethodMatcher($"N.C M({keyword})");
+        var fqnMatcher = new MethodMatcher($"N.C M({fqn})");
+        foreach (var parameterKind in Enum.GetValues<JavaType.PrimitiveKind>())
+        {
+            var method = MakeMethod("N.C", "M", parameterTypes: [JavaType.Primitive.Of(parameterKind)]);
+            Assert.Equal(parameterKind == kind, keywordMatcher.Matches(method));
+            Assert.Equal(parameterKind == kind, fqnMatcher.Matches(method));
+        }
+    }
+
+    [Theory]
+    [InlineData("bool", "System.Boolean")]
+    [InlineData("byte", "System.Byte")]
+    [InlineData("sbyte", "System.SByte")]
+    [InlineData("char", "System.Char")]
+    [InlineData("decimal", "System.Decimal")]
+    [InlineData("double", "System.Double")]
+    [InlineData("float", "System.Single")]
+    [InlineData("int", "System.Int32")]
+    [InlineData("uint", "System.UInt32")]
+    [InlineData("long", "System.Int64")]
+    [InlineData("ulong", "System.UInt64")]
+    [InlineData("short", "System.Int16")]
+    [InlineData("ushort", "System.UInt16")]
+    [InlineData("string", "System.String")]
+    [InlineData("object", "System.Object")]
+    public void MatchesClassParameterAliases(string keyword, string fqn)
+    {
+        var method = MakeMethod("N.C", "M", parameterTypes: [MakeClass(fqn)]);
+        Assert.True(new MethodMatcher($"N.C M({keyword})").Matches(method));
+        Assert.True(new MethodMatcher($"N.C M({fqn})").Matches(method));
+        var otherMethod = MakeMethod("N.C", "M",
+            parameterTypes: [MakeClass(fqn == "System.Int32" ? "System.Int64" : "System.Int32")]);
+        Assert.False(new MethodMatcher($"N.C M({keyword})").Matches(otherMethod));
+        Assert.False(new MethodMatcher($"N.C M({fqn})").Matches(otherMethod));
+    }
+
     [Fact]
     public void DoesNotMatchWrongMethodName()
     {
@@ -278,10 +327,12 @@ public class MethodMatcherTests
         Assert.True(mm.Matches(method));
     }
 
-    [Fact]
-    public void MatchesPrimitiveArrayArg()
+    [Theory]
+    [InlineData("int[]")]
+    [InlineData("System.Int32[]")]
+    public void MatchesPrimitiveArrayArg(string arg)
     {
-        var mm = new MethodMatcher("N.C M(int[])");
+        var mm = new MethodMatcher($"N.C M({arg})");
         var method = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(Int)]);
         Assert.True(mm.Matches(method));
     }
