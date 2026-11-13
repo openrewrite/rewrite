@@ -325,18 +325,20 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     // The members a static star import of the original type brings in are now those of the target type,
                     // so it is changed here already. Otherwise removing an import of the original type below would also
                     // remove the static star import, as none of the members of the original type are used anymore.
+                    // Where it does, it also removes a static import of a single member, which is added again for the
+                    // target.
                     sf = sf.withImports(ListUtils.map(sf.getImports(), i -> {
-                        if (!i.isStatic() || !"*".equals(i.getQualid().getSimpleName()) ||
+                        if (!i.isStatic() ||
                                 !TypeUtils.fullyQualifiedNamesAreEqual(i.getTypeName(), originalType.getFullyQualifiedName())) {
                             return i;
                         }
-                        Cursor cursor = getCursor();
-                        setCursor(new Cursor(cursor, i));
-                        try {
-                            return visitAndCast(i, ctx, super::visitImport);
-                        } finally {
-                            setCursor(cursor);
+                        if (!"*".equals(i.getQualid().getSimpleName())) {
+                            JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
+                            maybeAddImport(target.getPackageName(), target.getClassName(),
+                                    i.getQualid().getSimpleName(), null, true);
+                            return i;
                         }
+                        return visitImportInPlace(i, ctx);
                     }));
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic()) {
@@ -374,15 +376,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     // the new import, which is what makes the old one safe to retire.
                     maybeRemoveImport(originalType.getFullyQualifiedName());
                 }
-                j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
-                    Cursor cursor = getCursor();
-                    setCursor(new Cursor(cursor, i));
-                    try {
-                        return visitAndCast(i, ctx, super::visitImport);
-                    } finally {
-                        setCursor(cursor);
-                    }
-                }));
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitImportInPlace(i, ctx)));
 
                 // If the new type is covered by a star import and another star import
                 // provides a type with the same simple name, add an explicit import
@@ -472,28 +466,31 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
 
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                // a declaration's own name stays an identifier, while elsewhere the parser makes a qualified name
-                // into field accesses and a keyword into a primitive type
                 Object parent = getCursor().getParentTreeCursor().getValue();
-                boolean nameOnly = !ident.getAnnotations().isEmpty() ||
-                                   parent instanceof J.ClassDeclaration &&
-                                   ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
-                                   parent instanceof J.MethodDeclaration &&
-                                   ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
+                // an identifier keeps its annotations, which a new qualified name or primitive would drop
+                boolean annotated = !ident.getAnnotations().isEmpty();
                 // a variable of the type can share its name and isn't a reference to it. An enum constant's name has
                 // no field type.
                 if (ident.getFieldType() == null && !(parent instanceof J.EnumValue) &&
                     ident.getSimpleName().equals(className)) {
-                    if (targetType instanceof JavaType.FullyQualified) {
+                    if (isDeclarationName(parent, ident)) {
+                        // a declaration's own name is a simple name, even where a reference would be qualified
+                        if (targetType instanceof JavaType.FullyQualified) {
+                            String name = ((JavaType.FullyQualified) targetType).getClassName();
+                            ident = ident.withSimpleName(name.substring(name.lastIndexOf('.') + 1));
+                        } else if (targetType instanceof JavaType.Primitive) {
+                            ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
+                        }
+                    } else if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
                             JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
-                            return hasNoConflictingName(sf) || nameOnly ?
+                            return hasNoConflictingName(sf) || annotated ?
                                     name(target.getClassName(), target, ident.getPrefix()) :
                                     qualifiedName(target, ident.getPrefix());
                         } else {
                             if (hasNoConflictingName(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
-                            } else if (nameOnly) {
+                            } else if (annotated) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
                             } else {
                                 return FullyQualifyTypeReference.qualifiedName((JavaType.FullyQualified) targetType,
@@ -502,26 +499,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
                         // the parser makes `String` an identifier, not a primitive
-                        if (!nameOnly && targetType != JavaType.Primitive.String) {
+                        if (!annotated && targetType != JavaType.Primitive.String) {
                             return new J.Primitive(ident.getId(), ident.getPrefix(), ident.getMarkers(),
                                     (JavaType.Primitive) targetType);
                         }
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
-                    }
-                }
-
-                // Recreate any static imports as needed
-                if (sf != null) {
-                    for (J.Import anImport : sf.getImports()) {
-                        if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
-                            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
-                            if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
-                                    ident.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
-                                JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
-                                maybeAddImport((targetFqn).getFullyQualifiedName(), ident.getSimpleName());
-                                break;
-                            }
-                        }
                     }
                 }
             }
@@ -529,28 +511,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return visitAndCast(ident, ctx, super::visitIdentifier);
         }
 
-        @Override
-        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if (method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
-                if (method.getMethodType().getDeclaringType().isAssignableFrom(originalType)) {
-                    JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-
-                    for (J.Import anImport : cu.getImports()) {
-                        if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {
-                            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
-                            if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
-                                    method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
-                                JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
-
-                                addImport(targetFqn);
-                                maybeAddImport((targetFqn).getFullyQualifiedName(), method.getName().getSimpleName());
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            return super.visitMethodInvocation(method, ctx);
+        private static boolean isDeclarationName(Object parent, J.Identifier ident) {
+            return parent instanceof J.ClassDeclaration && ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
+                   parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
         }
 
         private static String packageName(JavaSourceFile cu) {
@@ -785,6 +748,16 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
             }
             return sf.getPadding().withImports(imports);
+        }
+
+        private J.Import visitImportInPlace(J.Import anImport, ExecutionContext ctx) {
+            Cursor cursor = getCursor();
+            setCursor(new Cursor(cursor, anImport));
+            try {
+                return visitAndCast(anImport, ctx, super::visitImport);
+            } finally {
+                setCursor(cursor);
+            }
         }
 
         private boolean hasNoConflictingName(@Nullable JavaSourceFile sf) {

@@ -1474,6 +1474,63 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void staticImportsNextToImportOfTheType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java("package a; public class Old { public static Old of() { return null; } public static final int MAX = 1; }", SourceSpec::skip),
+          java("package b; public class New { public static New of() { return null; } public static final int MAX = 1; }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              import static a.Old.MAX;
+              import static a.Old.of;
+
+              class Test {
+                  Old method = of();
+                  int field = MAX;
+              }
+              """,
+            """
+              import b.New;
+
+              import static b.New.MAX;
+              import static b.New.of;
+
+              class Test {
+                  New method = of();
+                  int field = MAX;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declarationKeepsItsNameWhereAMoveKeepsTheSimpleNameAndTheFileHasAnother() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "b.Foo", false)),
+          java(
+            """
+              package a;
+
+              public class Foo {
+                  <Foo> void m(Foo t) {}
+              }
+              """,
+            """
+              package b;
+
+              public class Foo {
+                  <Foo> void m(Foo t) {}
+              }
+              """,
+            spec -> spec.path("a/Foo.java")
+          )
+        );
+    }
+
+    @Test
     void staticStarImportNextToImportOfTheType() {
         rewriteRun(
           java(a1),
