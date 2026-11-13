@@ -185,7 +185,7 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 
-        private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
+        private final TypeReplacer types = new TypeReplacer(this::replacement);
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
         private final boolean singleSegmentOldPackage = !oldPackageName.contains(".");
 
@@ -506,123 +506,20 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
         }
 
         private @Nullable JavaType updateType(@Nullable JavaType oldType) {
-            if (oldType == null || oldType instanceof JavaType.Unknown) {
-                return oldType;
-            }
-
-            JavaType type = oldNameToChangedType.get(oldType);
-            if (type != null) {
-                return type;
-            }
-
-            if (oldType instanceof JavaType.Parameterized) {
-                JavaType.Parameterized pt = (JavaType.Parameterized) oldType;
-                // in the map before its arguments change, so that a bound referring back to it, as in
-                // `Node<T extends Node<T>>`, refers to the changed type
-                JavaType.Parameterized changed = new JavaType.Parameterized(null, null, Collections.emptyList());
-                oldNameToChangedType.put(oldType, changed);
-                List<JavaType> typeParameters = pt.getTypeParameters();
-                List<JavaType> changedTypeParameters = ListUtils.map(typeParameters, tp -> {
-                    if (tp instanceof JavaType.FullyQualified) {
-                        JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
-                        if (isTargetFullyQualifiedType(tpFq)) {
-                            return updateType(tpFq);
-                        }
-                    } else if (tp instanceof JavaType.GenericTypeVariable) {
-                        return updateType(tp);
-                    }
-                    return tp;
-                });
-
-                JavaType.FullyQualified changedType = pt.getType();
-                if (isTargetFullyQualifiedType(pt)) {
-                    changedType = (JavaType.FullyQualified) updateType(pt.getType());
-                }
-                if (changedTypeParameters == typeParameters && changedType == pt.getType()) {
-                    oldNameToChangedType.put(oldType, oldType);
-                    return oldType;
-                }
-                changed.unsafeSet(changedType, changedTypeParameters);
-                return changed;
-            } else if (oldType instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
-                if (isTargetFullyQualifiedType(original)) {
-                    String newPackage = getNewPackageName(original.getPackageName());
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(
-                            (newPackage.isEmpty() ? "" : newPackage + ".") + original.getRawClassName()));
-                    //noinspection DataFlowIssue
-                    oldNameToChangedType.put(oldType, fq);
-                    oldNameToChangedType.put(fq, fq);
-                    return fq;
-                } else if (oldType instanceof JavaType.Class) {
-                    JavaType.Class clazz = ((JavaType.Class) oldType)
-                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
-                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
-                    oldNameToChangedType.put(oldType, clazz);
-                    oldNameToChangedType.put(clazz, clazz);
-                    return clazz;
-                }
-            } else if (oldType instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
-                // in the map before its bounds change, for a bound that refers back to it
-                JavaType.GenericTypeVariable changed = new JavaType.GenericTypeVariable(null, gtv.getName(),
-                        gtv.getVariance(), Collections.emptyList());
-                oldNameToChangedType.put(oldType, changed);
-                List<JavaType> bounds = gtv.getBounds();
-                List<JavaType> changedBounds = ListUtils.map(bounds, b -> {
-                    if (b instanceof JavaType.FullyQualified && isTargetFullyQualifiedType((JavaType.FullyQualified) b)) {
-                        return updateType(b);
-                    }
-                    return b;
-                });
-                if (changedBounds == bounds) {
-                    oldNameToChangedType.put(oldType, oldType);
-                    return oldType;
-                }
-                changed.unsafeSet(gtv.getName(), gtv.getVariance(), changedBounds);
-                oldNameToChangedType.put(changed, changed);
-                return changed;
-            } else if (oldType instanceof JavaType.Variable) {
-                JavaType.Variable variable = (JavaType.Variable) oldType;
-                variable = variable.withOwner(updateType(variable.getOwner()));
-                //noinspection DataFlowIssue
-                variable = variable.withType(updateType(variable.getType()));
-                oldNameToChangedType.put(oldType, variable);
-                oldNameToChangedType.put(variable, variable);
-                return variable;
-            } else if (oldType instanceof JavaType.Array) {
-                JavaType.Array array = (JavaType.Array) oldType;
-                //noinspection DataFlowIssue
-                array = array.withElemType(updateType(array.getElemType()));
-                oldNameToChangedType.put(oldType, array);
-                oldNameToChangedType.put(array, array);
-                return array;
-            }
-            return oldType;
+            return types.replace(oldType);
         }
 
         private JavaType.@Nullable Method updateType(JavaType.@Nullable Method oldMethodType) {
-            if (oldMethodType != null) {
-                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
-                if (method != null) {
-                    return method;
-                }
+            return types.replace(oldMethodType);
+        }
 
-                method = oldMethodType;
-                //noinspection DataFlowIssue
-                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
-                        .withReturnType(updateType(method.getReturnType()))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType))
-                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), e ->
-                                // the exception itself or a type variable's bound, without the supertypes that
-                                // updateType walks
-                                e instanceof JavaType.GenericTypeVariable ||
-                                isTargetFullyQualifiedType(TypeUtils.asFullyQualified(e)) ? updateType(e) : e));
-                oldNameToChangedType.put(oldMethodType, method);
-                oldNameToChangedType.put(method, method);
-                return method;
+        private JavaType.@Nullable FullyQualified replacement(JavaType.FullyQualified fq) {
+            if (!isTargetFullyQualifiedType(fq)) {
+                return null;
             }
-            return null;
+            String newPackage = getNewPackageName(fq.getPackageName());
+            return TypeUtils.asFullyQualified(JavaType.buildType(
+                    (newPackage.isEmpty() ? "" : newPackage + ".") + fq.getRawClassName()));
         }
 
         private String getNewPackageName(String packageName) {

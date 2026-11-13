@@ -196,7 +196,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
          */
         private boolean keepsDefinition;
 
-        private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
+        private final TypeReplacer types = new TypeReplacer(this::replacement);
         private final Set<String> declaredClassNames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
 
@@ -623,10 +623,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 JavaType ptType = updateType(pt.getType());
                 if (ptType instanceof JavaType.Parameterized) {
                     ptType = ((JavaType.Parameterized) ptType).withType(targetOwner);
-                    if (pt.getType() != null) {
-                        oldNameToChangedType.put(pt.getType(), ptType);
-                    }
-                    oldNameToChangedType.put(ptType, ptType);
+                    types.replaceWith(pt.getType() != null ? pt.getType() : ptType, ptType);
                 }
                 target = pt.withClazz(clazz).withType(ptType);
             } else if (target instanceof J.FieldAccess && hasParameterizedTarget((J.FieldAccess) target) &&
@@ -641,8 +638,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 updatedFieldAccessType = targetFq;
             }
             if (fieldAccess.getType() != null && updatedFieldAccessType != null) {
-                oldNameToChangedType.put(fieldAccess.getType(), updatedFieldAccessType);
-                oldNameToChangedType.put(updatedFieldAccessType, updatedFieldAccessType);
+                types.replaceWith(fieldAccess.getType(), updatedFieldAccessType);
             }
 
             // Clear the inner identifier's type (matching updateOuterClassTypes) so AddImport does not
@@ -770,150 +766,18 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         private @Nullable JavaType updateType(@Nullable JavaType oldType) {
-            if (oldType == null || oldType instanceof JavaType.Unknown) {
-                return oldType;
-            }
-
-            JavaType type = oldNameToChangedType.get(oldType);
-            if (type != null) {
-                return type;
-            }
-
-            if (oldType instanceof JavaType.Parameterized) {
-                JavaType.Parameterized pt = (JavaType.Parameterized) oldType;
-                // in the map before its arguments change, so that a bound referring back to it, as in
-                // `Node<T extends Node<T>>`, refers to the changed type
-                JavaType.Parameterized changed = new JavaType.Parameterized(null, null, emptyList());
-                oldNameToChangedType.put(oldType, changed);
-                List<JavaType> typeParameters = pt.getTypeParameters();
-                List<JavaType> changedTypeParameters = ListUtils.map(typeParameters, this::updateTypeArgument);
-
-                JavaType.FullyQualified changedType = pt.getType();
-                if (isTargetFullyQualifiedType(pt)) {
-                    changedType = (JavaType.FullyQualified) updateType(pt.getType());
-                } else if (isNestedTypeOfOriginal(pt)) {
-                    changedType = updateNestedType(pt.getType());
-                }
-                if (changedTypeParameters == typeParameters && changedType == pt.getType()) {
-                    oldNameToChangedType.put(oldType, oldType);
-                    return oldType;
-                }
-                changed.unsafeSet(changedType, changedTypeParameters);
-                oldNameToChangedType.put(changed, changed);
-                return changed;
-            } else if (oldType instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
-                if (isTargetFullyQualifiedType(original)) {
-                    oldNameToChangedType.put(oldType, targetType);
-                    return targetType;
-                } else if (isNestedTypeOfOriginal(original)) {
-                    JavaType.FullyQualified updatedNestedType = updateNestedType(original);
-                    oldNameToChangedType.put(oldType, updatedNestedType);
-                    return updatedNestedType;
-                } else if (oldType instanceof JavaType.Class) {
-                    JavaType.Class clazz = ((JavaType.Class) oldType)
-                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
-                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
-                    oldNameToChangedType.put(oldType, clazz);
-                    oldNameToChangedType.put(clazz, clazz);
-                    return clazz;
-                }
-            } else if (oldType instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
-                // in the map before its bounds change, for a bound that refers back to it
-                JavaType.GenericTypeVariable changed = new JavaType.GenericTypeVariable(null, gtv.getName(),
-                        gtv.getVariance(), emptyList());
-                oldNameToChangedType.put(oldType, changed);
-                List<JavaType> bounds = gtv.getBounds();
-                List<JavaType> changedBounds = ListUtils.map(bounds, this::updateTypeArgument);
-                if (changedBounds == bounds) {
-                    oldNameToChangedType.put(oldType, oldType);
-                    return oldType;
-                }
-                changed.unsafeSet(gtv.getName(), gtv.getVariance(), changedBounds);
-                oldNameToChangedType.put(changed, changed);
-                return changed;
-            } else if (oldType instanceof JavaType.Variable) {
-                JavaType.Variable variable = (JavaType.Variable) oldType;
-                variable = variable.withOwner(updateType(variable.getOwner()));
-                variable = variable.withType(updateType(variable.getType()));
-                oldNameToChangedType.put(oldType, variable);
-                oldNameToChangedType.put(variable, variable);
-                return variable;
-            } else if (oldType instanceof JavaType.Array) {
-                JavaType.Array array = (JavaType.Array) oldType;
-                array = array.withElemType(updateType(array.getElemType()));
-                oldNameToChangedType.put(oldType, array);
-                oldNameToChangedType.put(array, array);
-                return array;
-            } else if (oldType instanceof JavaType.Method) {
-                return updateType((JavaType.Method) oldType);
-            }
-
-            return oldType;
-        }
-
-        /**
-         * A type argument or bound changes only where it is, or contains, the original type. Any other stays the same
-         * instance, such as a class whose supertypes {@link #updateType(JavaType)} would update, or a type variable
-         * whose bound refers back to it, as in {@code T extends Comparable<? super T>}.
-         */
-        private JavaType updateTypeArgument(JavaType type) {
-            return containsOriginal(type, Collections.newSetFromMap(new IdentityHashMap<>())) ?
-                    requireNonNull(updateType(type)) : type;
-        }
-
-        private boolean containsOriginal(JavaType type, Set<JavaType> visited) {
-            if (!visited.add(type)) {
-                return false;
-            } else if (type instanceof JavaType.Parameterized) {
-                JavaType.Parameterized pt = (JavaType.Parameterized) type;
-                if (containsOriginal(pt.getType(), visited)) {
-                    return true;
-                }
-                for (JavaType typeParameter : pt.getTypeParameters()) {
-                    if (containsOriginal(typeParameter, visited)) {
-                        return true;
-                    }
-                }
-            } else if (type instanceof JavaType.GenericTypeVariable) {
-                for (JavaType bound : ((JavaType.GenericTypeVariable) type).getBounds()) {
-                    if (containsOriginal(bound, visited)) {
-                        return true;
-                    }
-                }
-            } else if (type instanceof JavaType.Array) {
-                return containsOriginal(((JavaType.Array) type).getElemType(), visited);
-            } else if (type instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                return isTargetFullyQualifiedType(fq) || isNestedTypeOfOriginal(fq);
-            }
-            return false;
+            return types.replace(oldType);
         }
 
         private JavaType.@Nullable Method updateType(JavaType.@Nullable Method oldMethodType) {
-            if (oldMethodType != null) {
-                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
-                if (method != null) {
-                    return method;
-                }
+            return types.replace(oldMethodType);
+        }
 
-                method = oldMethodType;
-                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
-                        .withReturnType(updateType(method.getReturnType()))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType))
-                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), e -> {
-                            // the exception itself or a type variable's bound, without the supertypes that
-                            // updateType walks
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(e);
-                            return e instanceof JavaType.GenericTypeVariable || isTargetFullyQualifiedType(fq) ||
-                                   isNestedTypeOfOriginal(fq) ? updateType(e) : e;
-                        }));
-                oldNameToChangedType.put(oldMethodType, method);
-                oldNameToChangedType.put(method, method);
-                return method;
+        private JavaType.@Nullable FullyQualified replacement(JavaType.FullyQualified fq) {
+            if (isTargetFullyQualifiedType(fq)) {
+                return (JavaType.FullyQualified) targetType;
             }
-            return null;
+            return isNestedTypeOfOriginal(fq) ? updateNestedType(fq) : null;
         }
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
@@ -1136,6 +1000,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
         private final MethodMatcher originalConstructor;
+        private final TypeReplacer types = new TypeReplacer(this::replacement);
 
         private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -1280,7 +1145,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (method.isConstructor() && originalConstructor.matches(method.getMethodType())) {
                 method = method.withName(method.getName().withSimpleName(getNewClassName(targetType)));
-                method = method.withMethodType(updateType(method.getMethodType()));
+                method = method.withMethodType(types.replace(method.getMethodType()));
             }
             return super.visitMethodDeclaration(method, ctx);
         }
@@ -1290,45 +1155,18 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     fq.getFullyQualifiedName().substring(fq.getOwningClass().getFullyQualifiedName().length() + 1);
         }
 
-        private JavaType updateType(@Nullable JavaType oldType) {
-            if (oldType instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
-                if (isTargetFullyQualifiedType(original)) {
-                    return targetType;
-                } else if (isNestedTypeOfOriginal(original)) {
-                    return updateNestedType(original);
-                }
-            }
-
-            //noinspection ConstantConditions
-            return oldType;
-        }
-
-        private JavaType.@Nullable Method updateType(JavaType.@Nullable Method mt) {
-            if (mt != null) {
-                return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
-                        .withReturnType(updateType(mt.getReturnType()))
-                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType))
-                        .withThrownExceptions(ListUtils.map(mt.getThrownExceptions(), this::updateType));
-            }
-            return null;
-        }
-
-        private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
-            return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName());
-        }
-
-        private boolean isNestedTypeOfOriginal(JavaType.@Nullable FullyQualified fq) {
-            return fq != null && JavaChangeTypeVisitor.isNestedIn(fq.getFullyQualifiedName(), originalType.getFullyQualifiedName());
-        }
-
-        private JavaType.FullyQualified updateNestedType(JavaType.FullyQualified nestedType) {
-            String nestedFqn = nestedType.getFullyQualifiedName();
+        private JavaType.@Nullable FullyQualified replacement(JavaType.FullyQualified fq) {
+            String fqn = fq.getFullyQualifiedName();
             String originalFqn = originalType.getFullyQualifiedName();
-            String targetFqn = targetType.getFullyQualifiedName();
-            // Replace the original type prefix with the target type prefix
-            String newNestedFqn = targetFqn + nestedFqn.substring(originalFqn.length());
-            return JavaType.ShallowClass.build(newNestedFqn);
+            if (TypeUtils.isOfClassType(fq, originalFqn)) {
+                return targetType;
+            }
+            // a type nested in the original follows it
+            if (!JavaChangeTypeVisitor.isNestedIn(fqn, originalFqn)) {
+                return null;
+            }
+            return JavaType.ShallowClass.build(targetType.getFullyQualifiedName() + fqn.substring(originalFqn.length()))
+                    .withKind(fq.getKind());
         }
     }
 
