@@ -16,7 +16,10 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -347,6 +350,71 @@ class LiteralTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9750")
+    @Test
+    void numericLiteralsWithSignedExponent() {
+        rewriteRun(
+          groovy(
+            """
+              def a = 1.2E+12
+              def b = 1.2e-3
+              def c = 1e+5
+              def d = 1.5E+3d
+              def e = 2.5e-3f
+              def f = 1E-5G
+              def g = -1.2E-3
+              def h = 1E5
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9750")
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "1.76244514319E+12|1.76244514319E+12",
+      "1.2e-3|1.2e-3",
+      "1e5+2|1e5",
+      "0x1e+2|0x1e",
+      "0X1E-2|0X1E"
+    })
+    void signedExponentIsPartOfTheLiteral(String expression, String firstLiteral) {
+        rewriteRun(
+          groovy(
+            "def a = " + expression,
+            spec -> spec.beforeRecipe(cu -> {
+                J initializer = requireNonNull(((J.VariableDeclarations) cu.getStatements().getFirst())
+                  .getVariables().getFirst().getInitializer());
+                J.Literal literal = initializer instanceof J.Binary binary ?
+                  (J.Literal) binary.getLeft() : (J.Literal) initializer;
+                assertThat(literal.getValueSource()).isEqualTo(firstLiteral);
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9750")
+    @Test
+    void signedExponentInSpockWhereTable() {
+        rewriteRun(
+          groovy(
+            """
+              class S {
+                def 't'() {
+                  expect:
+                  f(m) == r
+
+                  where:
+                  m || r
+                  [createdAt: 1.76244514319E+12] || Optional.of(1762445143190)
+                  [createdAt: 1.2e-3]            || Optional.empty()
+                }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void literalValueAndTypeAgree() {
         rewriteRun(groovy(
@@ -454,6 +522,55 @@ class LiteralTest implements RewriteTest {
     }
 
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8980")
+    @Test
+    void gStringInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def t = 1
+              def label = ("build.${t}")
+              def cast = ( "build.${t}" ) as String
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                J.Parentheses<?> parens = (J.Parentheses<?>) ((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().getFirst().getInitializer();
+                assertThat(requireNonNull(parens).getTree()).isInstanceOf(G.GString.class);
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8981")
+    @Test
+    void statementsInsideGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              def x = true
+              def s = "${if (x) { return 'a' }; return ''}"
+              def t = \"""#!/bin/bash
+              ${if (x) {
+                  return 'b'
+              }
+              return ''
+              }
+              \"""
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                G.GString gString = (G.GString) requireNonNull(((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().getFirst().getInitializer());
+                J.Block block = (J.Block) ((G.GString.Value) gString.getStrings().getFirst()).getTree();
+                assertThat(block.getMarkers().findFirst(OmitBraces.class)).isPresent();
+                assertThat(block.getStatements()).satisfiesExactly(
+                  s -> assertThat(s).isInstanceOf(J.If.class),
+                  s -> assertThat(s).isInstanceOf(J.Return.class)
+                );
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5232")
     @Test
     void stringWithMultipleBackslashes() {
@@ -529,6 +646,39 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               def pattern = ~/$$\\d+\\.\\d+/
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9489")
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "'''a'''' | a'",
+      "'''a''''' | a''",
+      "\"\"\"a\"\"\"\" | a\"",
+      "\"\"\"a\"\"\"\"\" | a\"\"",
+      "''''''' | '",
+    })
+    void tripleQuotedStringEndingWithQuotes(String literal, String value) {
+        rewriteRun(
+          groovy("def s = " + literal + " + 'b'", spec -> spec.beforeRecipe(cu -> {
+              J.Binary concat = (J.Binary) requireNonNull(((J.VariableDeclarations) cu.getStatements().getFirst())
+                .getVariables().getFirst().getInitializer());
+              J.Literal left = (J.Literal) concat.getLeft();
+              assertThat(left.getValueSource()).isEqualTo(literal);
+              assertThat(left.getValue()).isEqualTo(value);
+          }))
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9489")
+    @Test
+    void tripleQuotedStringEndingWithQuoteInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def s = ('''a'''') + ('b')
               """
           )
         );

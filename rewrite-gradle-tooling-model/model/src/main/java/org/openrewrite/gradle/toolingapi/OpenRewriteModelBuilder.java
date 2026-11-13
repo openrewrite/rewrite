@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.toolingapi;
 
+import org.gradle.tooling.GradleConnectionException;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.ModelBuilder;
 import org.gradle.tooling.ProjectConnection;
@@ -25,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,14 +34,19 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 @SuppressWarnings("JavadocLinkAsPlainText")
 public class OpenRewriteModelBuilder {
 
     /**
      * Build an OpenRewriteModel for a project directory, using the default Gradle init script bundled within this jar.
-     * The included init script accesses public artifact repositories (Maven Central, Nexus Snapshots) to be able to
-     * download rewrite dependencies, so public repositories must be accessible for this to work.
+     * The included init script downloads the model plugin at this jar's own version, with its rewrite dependencies, from
+     * Maven Central, or from the mirror at {@code MAVEN_CENTRAL_MIRROR_URL} when it, {@code MAVEN_CENTRAL_MIRROR_USERNAME}
+     * and {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set. Snapshots come from https://artifacts.codegenomeproject.org/maven,
+     * given {@code codegenomeUsername} and {@code codegenomePassword} in the Gradle user home's gradle.properties or as
+     * {@code ORG_GRADLE_PROJECT_} environment variables, or {@code CODEGENOME_USERNAME} and {@code CODEGENOME_TOKEN} in
+     * the environment.
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile) throws IOException {
         return forProjectDirectory(projectDir, buildFile, null);
@@ -78,33 +85,37 @@ public class OpenRewriteModelBuilder {
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+        Path wrapperProperties = projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties");
         String gradleVersion;
-        if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
-            gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
+        if (Files.exists(wrapperProperties)) {
+            gradleVersion = wrapperGradleVersion(wrapperProperties);
             connector.useBuildDistribution();
         } else {
-            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "8.14.5");
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "9.8.2");
             connector.useGradleVersion(gradleVersion);
         }
-        connector
-                // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
-                // Leaving commented out because the exact consequences of this internal API are unclear
-                // .embedded(true)
-                .forProjectDirectory(projectDir);
         List<String> arguments = new ArrayList<>();
         arguments.add("--init-script");
         Path init = projectDir.toPath().resolve("openrewrite-tooling.gradle").toAbsolutePath();
         arguments.add(init.toString());
+        File buildRoot = projectDir;
         Path settings = null;
         boolean settingsWritten = false;
         if (buildFile != null && buildFile.exists()) {
             if (isGradle9OrLater(gradleVersion)) {
-                // Gradle 9 dropped -b; for non-conventional build files write a temporary settings.gradle with rootProject.buildFileName.
+                // Gradle 9 dropped -b, which built from the build file's own directory; do the same, writing a
+                // temporary settings.gradle with rootProject.buildFileName for build files elsewhere or named otherwise
                 File abs = buildFile.getAbsoluteFile();
                 boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
                         abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
                 if (!atConventionalLocation) {
-                    Path projectPath = projectDir.toPath();
+                    buildRoot = abs.getParentFile();
+                    URI wrapperDistribution = wrapperDistributionUrl(wrapperProperties);
+                    if (wrapperDistribution != null) {
+                        // The build distribution is looked up from the build root, which no longer holds the wrapper
+                        connector.useDistribution(wrapperDistribution);
+                    }
+                    Path projectPath = buildRoot.toPath();
                     if (!Files.exists(projectPath.resolve("settings.gradle")) &&
                             !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
                         settings = projectPath.resolve("settings.gradle");
@@ -117,29 +128,34 @@ public class OpenRewriteModelBuilder {
                 arguments.add(buildFile.getAbsolutePath());
             }
         }
+        connector
+                // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
+                // Leaving commented out because the exact consequences of this internal API are unclear
+                // .embedded(true)
+                .forProjectDirectory(buildRoot);
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
             String resolvedInitScript;
+            String pluginVersion = null;
             if (initScript == null) {
                 if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
                     // code path only expected to be taken from within openrewrite/rewrite
                     resolvedInitScript = generateInitScriptFromManifest();
                 } else {
-                    // Use default init.gradle from resources
-                    try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
-                        if (is == null) {
-                            throw new IllegalStateException("Expected to find init.gradle on the classpath");
-                        }
-                        byte[] bytes = readAllBytes(is);
-                        resolvedInitScript = new String(bytes, StandardCharsets.UTF_8);
-                    }
+                    Package modelPackage = OpenRewriteModel.class.getPackage();
+                    pluginVersion = modelPackage == null ? null : modelPackage.getImplementationVersion();
+                    resolvedInitScript = defaultInitScript(pluginVersion);
                 }
             } else {
                 resolvedInitScript = initScript;
             }
             Files.write(init, (resolvedInitScript + mirrorScriptSnippet()).getBytes(StandardCharsets.UTF_8));
             customModelBuilder.withArguments(arguments);
-            return OpenRewriteModel.from(customModelBuilder.get());
+            try {
+                return OpenRewriteModel.from(customModelBuilder.get());
+            } catch (GradleConnectionException e) {
+                throw pluginVersion == null ? e : explainMissingPlugin(e, pluginVersion);
+            }
         } finally {
             try {
                 if (Files.exists(init)) {
@@ -155,17 +171,49 @@ public class OpenRewriteModelBuilder {
         }
     }
 
+    private static final String PLUGIN = "org.openrewrite.gradle.tooling:plugin:";
+
     /**
-     * When the env vars {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME}, and
-     * {@code REWRITE_GRADLE_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
-     * routes plugin and dependency resolution for the embedded Gradle build through that repository.
-     * If any var is missing, returns the empty string and the embedded Gradle resolves repositories
-     * exactly as the build files declare.
+     * The bundled init script, loading the plugin at the given version, so that the markers it builds are the ones this
+     * jar reads. Without a version, as for a model loaded from a classes directory, it loads the newest plugin.
+     */
+    static String defaultInitScript(@Nullable String pluginVersion) throws IOException {
+        try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
+            if (is == null) {
+                throw new IllegalStateException("Expected to find init.gradle on the classpath");
+            }
+            String script = new String(readAllBytes(is), StandardCharsets.UTF_8);
+            return pluginVersion == null ? script : script.replace(PLUGIN + "latest.integration", PLUGIN + pluginVersion);
+        }
+    }
+
+    static GradleConnectionException explainMissingPlugin(GradleConnectionException failure, String pluginVersion) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && t.getMessage().contains(PLUGIN + pluginVersion)) {
+                return new GradleConnectionException("Could not load " + PLUGIN + pluginVersion + ", the version of " +
+                        "this model. Its snapshots are published to https://artifacts.codegenomeproject.org/maven, which " +
+                        "the init script uses when the Gradle user home's gradle.properties or ORG_GRADLE_PROJECT_ " +
+                        "environment variables set codegenomeUsername and codegenomePassword, or the environment sets " +
+                        "CODEGENOME_USERNAME and CODEGENOME_TOKEN.", failure);
+            }
+        }
+        return failure;
+    }
+
+    /**
+     * When the env vars {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME}, and
+     * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
+     * points the embedded Gradle build's Maven Central and Sonatype snapshot repositories at that
+     * mirror instead, with its credentials. Other repositories stay as the build files declare them.
+     * The Gradle plugin portal contains releases that Maven Central does not, so it must stay separate.
+     * If any var is missing, returns the empty string.
      */
     private static String mirrorScriptSnippet() {
-        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
-        String user = System.getenv("REWRITE_GRADLE_MIRROR_USERNAME");
-        String pass = System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD");
+        return mirrorScriptSnippet(System.getenv("MAVEN_CENTRAL_MIRROR_URL"),
+                System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME"), System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD"));
+    }
+
+    static String mirrorScriptSnippet(@Nullable String url, @Nullable String user, @Nullable String pass) {
         if (url == null || user == null || pass == null || url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
             return "";
         }
@@ -173,30 +221,29 @@ public class OpenRewriteModelBuilder {
                 "def __rewriteMirrorUrl = '" + escapeGroovy(url) + "'\n" +
                 "def __rewriteMirrorUser = '" + escapeGroovy(user) + "'\n" +
                 "def __rewriteMirrorPass = '" + escapeGroovy(pass) + "'\n" +
-                // Prepend Artifactory as a Maven Central proxy by adding it through Gradle lifecycle
-                // hooks that fire BEFORE the user's settings.gradle / build.gradle is evaluated.
-                // Doing it this way avoids clearing the repository container (which doesn't survive
-                // re-add) and avoids touching pluginManagement.repositories (where Gradle's default
-                // gradlePluginPortal() injection happens lazily after our settingsEvaluated hook
-                // would run). Gradle tries repositories in order and falls through on 404, so Central
-                // artifacts come from Artifactory while Plugin Portal markers still resolve normally.
-                "def __rewriteAddMirror = { container ->\n" +
-                "    container.maven {\n" +
-                "        url = __rewriteMirrorUrl\n" +
-                "        credentials {\n" +
-                "            username = __rewriteMirrorUser\n" +
-                "            password = __rewriteMirrorPass\n" +
+                // configureEach also reaches the repositories the build files add after these hooks run
+                "def __rewriteUseMirror = { repositories ->\n" +
+                "    repositories.withType(MavenArtifactRepository).configureEach { repo ->\n" +
+                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org',\n" +
+                "                'central.sonatype.com', 'oss.sonatype.org', 's01.oss.sonatype.org']) {\n" +
+                "            repo.url = __rewriteMirrorUrl\n" +
+                "            repo.credentials {\n" +
+                "                it.username = __rewriteMirrorUser\n" +
+                "                it.password = __rewriteMirrorPass\n" +
+                "            }\n" +
                 "        }\n" +
                 "    }\n" +
                 "}\n" +
                 "try {\n" +
                 "    gradle.beforeSettings { settings ->\n" +
-                "        try { __rewriteAddMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
+                "        __rewriteUseMirror(settings.pluginManagement.repositories)\n" +
+                "        try { __rewriteUseMirror(settings.buildscript.repositories) } catch (Throwable ignored) {}\n" +
+                "        try { __rewriteUseMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
                 "    }\n" +
                 "} catch (Throwable ignored) {}\n" +
                 "gradle.beforeProject { project ->\n" +
-                "    __rewriteAddMirror(project.buildscript.repositories)\n" +
-                "    __rewriteAddMirror(project.repositories)\n" +
+                "    __rewriteUseMirror(project.buildscript.repositories)\n" +
+                "    __rewriteUseMirror(project.repositories)\n" +
                 "}\n";
     }
 
@@ -226,6 +273,24 @@ public class OpenRewriteModelBuilder {
         }
     }
 
+    private static @Nullable URI wrapperDistributionUrl(Path wrapperProperties) {
+        if (!Files.exists(wrapperProperties)) {
+            return null;
+        }
+        Properties properties = new Properties();
+        try (InputStream in = Files.newInputStream(wrapperProperties)) {
+            properties.load(in);
+        } catch (IOException e) {
+            return null;
+        }
+        String distributionUrl = properties.getProperty("distributionUrl");
+        if (distributionUrl == null) {
+            return null;
+        }
+        URI uri = URI.create(distributionUrl);
+        return uri.isAbsolute() ? uri : wrapperProperties.getParent().toUri().resolve(uri);
+    }
+
     private static @Nullable String wrapperGradleVersion(Path wrapperProperties) {
         try {
             for (String line : Files.readAllLines(wrapperProperties, StandardCharsets.UTF_8)) {
@@ -252,7 +317,7 @@ public class OpenRewriteModelBuilder {
      * But within openrewrite/rewrite it comes from a build directory.
      * So for our build only use an init script which understands that.
      */
-    private static String generateInitScriptFromManifest() throws IOException {
+    static String generateInitScriptFromManifest() throws IOException {
         String manifestPath = System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath");
         if (manifestPath == null || manifestPath.isEmpty()) {
             throw new IllegalStateException("System property org.openrewrite.gradle.local.use-embedded-classpath must be set to the path of test-manifest.txt");

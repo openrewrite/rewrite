@@ -197,7 +197,11 @@ public class PythonReceiver extends PythonVisitor<RpcReceiveQueue> {
         return value
                 .getPadding().withExpression(q.receive(value.getPadding().getExpression(), el -> visitRightPadded(el, q)))
                 .getPadding().withDebug(q.receive(value.getPadding().getDebug(), el -> visitRightPadded(el, q)))
-                .withConversion(q.receiveAndGet(value.getConversion(), toEnum(Py.FormattedString.Value.Conversion.class)))
+                .getPadding().withConversion(q.receive(value.getPadding().getConversion(), el -> el
+                        // an enum crosses as its name
+                        .withElement(q.receiveAndGet(el.getElement(), toEnum(Py.FormattedString.Value.Conversion.class)))
+                        .withAfter(q.receive(el.getAfter(), space -> visitSpace(space, q)))
+                        .withMarkers(q.receive(el.getMarkers()))))
                 .withFormat(q.receive(value.getFormat(), expr -> (Expression) visitNonNull(expr, q)));
     }
 

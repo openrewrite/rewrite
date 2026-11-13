@@ -45,13 +45,14 @@ public class PackageFile {
     boolean yanked;
 
     /**
-     * PEP 700 file size in bytes; null on PEP 503 HTML listings.
+     * File size in bytes, from PEP 700 or an HTML listing's {@code data-size}.
      */
     @Nullable
     Long size;
 
     /**
-     * PEP 700 {@code upload-time}, an ISO 8601 timestamp; null on PEP 503 HTML listings.
+     * An ISO 8601 timestamp, from PEP 700 or an HTML listing's {@code data-upload-time}, which no PEP covers
+     * and uv reads anyway.
      */
     @Nullable
     String uploadTime;

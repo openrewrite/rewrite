@@ -25,9 +25,13 @@ namespace OpenRewrite.Core;
 /// </summary>
 public static class RecipeScheduler
 {
-    public static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx)
+    public static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx) =>
+        Run(recipe, sources, ctx, null);
+
+    internal static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx,
+        IRunObserver? observer)
     {
-        var state = new RunState(ctx);
+        var state = new RunState(ctx, observer);
         var results = new List<Result>();
 
         if (HasScanningRecipe(recipe, state))
@@ -41,11 +45,13 @@ public static class RecipeScheduler
                 {
                     if (r is IScanningRecipe scanning)
                     {
-                        scanning.Scanner(state.Accumulator(scanning)).Visit(s, ctx);
+                        var scanned = scanning.Scanner(state.Accumulator(scanning)).Visit(s, ctx);
+                        state.Observer?.Scanned(r, s, scanned);
                     }
                     return s;
                 });
             }
+            state.Observer?.ScanningEnded(state.Accumulators);
 
             // Phase 2: Collect generated files
             var generated = RecurseRecipeList(recipe, new List<SourceFile>(), state, (r, g) =>
@@ -69,6 +75,7 @@ public static class RecipeScheduler
                     results.Add(new Result(null, after));
                 }
             }
+            state.Observer?.EditingEnded(state.Accumulators);
         }
         else
         {
@@ -117,6 +124,7 @@ public static class RecipeScheduler
     private static T? RecurseRecipeList<T>(Recipe recipe, T initial, RunState state, Func<Recipe, T, T?> fn)
         where T : class
     {
+        state.Observer?.Running(recipe);
         var t = fn(recipe, initial);
         foreach (var subRecipe in state.SubRecipes(recipe))
         {
@@ -152,12 +160,16 @@ public static class RecipeScheduler
     /// every phase. Resolving each recipe list once per run keeps sub-recipe identity — and
     /// therefore accumulator identity — stable.
     /// </summary>
-    private sealed class RunState(ExecutionContext ctx)
+    private sealed class RunState(ExecutionContext ctx, IRunObserver? observer)
     {
         public ExecutionContext Ctx { get; } = ctx;
 
+        public IRunObserver? Observer { get; } = observer;
+
         private readonly Dictionary<Recipe, List<Recipe>> _recipeLists = new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<IScanningRecipe, object> _accumulators = new(ReferenceEqualityComparer.Instance);
+
+        public IReadOnlyDictionary<IScanningRecipe, object> Accumulators => _accumulators;
 
         public List<Recipe> SubRecipes(Recipe recipe)
         {
@@ -179,4 +191,23 @@ public static class RecipeScheduler
             return acc;
         }
     }
+}
+
+/// <summary>
+/// Hears what a run does, so that the test harness can check the recipe while it runs. A run outside the harness has
+/// no observer.
+/// </summary>
+internal interface IRunObserver
+{
+    /// <summary>Called before the scheduler calls into <paramref name="recipe"/>.</summary>
+    void Running(Recipe recipe);
+
+    /// <summary>Called with what a scanner returned for <paramref name="source"/>, which the scan discards.</summary>
+    void Scanned(Recipe recipe, SourceFile source, Tree? scanned);
+
+    /// <summary>Called with the accumulator of each scanning recipe once every scanner has run.</summary>
+    void ScanningEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators);
+
+    /// <summary>Called with the accumulator of each scanning recipe once every editor has run.</summary>
+    void EditingEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators);
 }

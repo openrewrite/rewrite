@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {javascript, JavaScriptVisitor, RewriteRule} from "../../../src/javascript";
-import {capture, pattern, rewrite, template} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {javascript, JavaScriptVisitor, JS, RewriteRule} from "../../../src/javascript";
+import {capture, maybeParenthesize, pattern, Precedence, precedenceOf, rewrite, template} from "../../../src/javascript";
+import {emptySpace, Expression, J} from "../../../src/java";
+import {emptyMarkers} from "../../../src/markers";
 
 /** Applies `rule` to every `marker(...)` call, keeping each test's rewrite to one trigger point. */
 function onCall(rule: RewriteRule) {
@@ -272,6 +273,18 @@ describe('template precedence', () => {
                 `));
         });
 
+        test('`**` binds tighter than `*` but looser than a prefix operator', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`wrap(${x})`,
+                after: template`-${x} * ${x}`
+            })));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = wrap(n ** m);`,
+                `const a = -(n ** m) * n ** m;`));
+        });
+
         test('a sign may not fuse with the sign that precedes it', () => {
             const x = capture();
             spec.recipe = onCall(rewrite(() => ({
@@ -368,6 +381,38 @@ describe('template precedence', () => {
                 `const a = new (ns?.Cls)();`));
         });
 
+        test('a callee of `new` that is not a type tree is wrapped as one, as the parser does', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`mk(${x})`,
+                after: template`new ${x}()`
+            })));
+            const callees: string[] = [];
+            //language=javascript
+            return spec.rewriteRun({
+                ...javascript(
+                    `
+                        const a = mk(factory());
+                        const b = mk(registry[0]);
+                        const c = mk(ns.Cls);
+                    `,
+                    `
+                        const a = new (factory())();
+                        const b = new registry[0]();
+                        const c = new ns.Cls();
+                    `),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    await new class extends JavaScriptVisitor<number> {
+                        protected override async visitNewClass(newClass: J.NewClass, p: number): Promise<J | undefined> {
+                            callees.push(newClass.class!.kind);
+                            return super.visitNewClass(newClass, p);
+                        }
+                    }().visit(cu, 0);
+                    expect(callees).toEqual([JS.Kind.TypeTreeExpression, JS.Kind.TypeTreeExpression, J.Kind.FieldAccess]);
+                }
+            });
+        });
+
         test('the tag of a tagged template may not be an optional chain', () => {
             const x = capture();
             spec.recipe = onCall(rewrite(() => ({
@@ -456,10 +501,8 @@ describe('template precedence', () => {
                 `,
                 `
                     function h() {
-                        (function () {
-                        });
-                        (class {
-                        });
+                        (function () {});
+                        (class {});
                     }
                 `));
         });
@@ -471,9 +514,18 @@ describe('template precedence', () => {
                 after: template`class A extends ${x} {}`
             })));
             //language=javascript
-            return spec.rewriteRun(javascript(
-                `const a = base(p || q);`,
-                `const a = class A extends (p || q) {\n};`));
+            return spec.rewriteRun({
+                ...javascript(
+                    `const a = base(p || q);`,
+                    `
+                    const a = class A extends (p || q) {
+                    };`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    const a = (cu.statements[0].element as J.VariableDeclarations).variables[0].element;
+                    const classA = (a.initializer!.element as JS.StatementExpression).statement as J.ClassDeclaration;
+                    expect(classA.extends!.element.kind).toBe(JS.Kind.TypeTreeExpression);
+                }
+            });
         });
     });
 
@@ -557,6 +609,90 @@ describe('template precedence', () => {
                 `const a = (n + 1).toString();`));
         });
 
+        test('when the result comes from a chained rule whose first result is a capture', () => {
+            const x = capture();
+            // The first result keeps the id of `c`, which the call the cursor is on holds as an argument
+            spec.recipe = onCall(
+                rewrite(() => ({before: pattern`id(${x})`, after: template`${x}`}))
+                    .andThen(rewrite(() => ({before: pattern`c`, after: template`a + b`}))));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const v = id(c) * 2;`,
+                `const v = (a + b) * 2;`));
+        });
+
+        test('when the result replaces a descendant of the node the visitor is on', () => {
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    const [first] = visited.arguments.elements;
+                    const product = first.element as J.Binary;
+                    if (product.kind !== J.Kind.Binary || product.left.kind !== J.Kind.Identifier) {
+                        return visited;
+                    }
+                    // The cursor is on the call, and what holds the operand is its argument
+                    const sum = await template`x + y`.apply(product.left, this.cursor) as Expression;
+                    const elements = [{...first, element: {...product, left: sum}}];
+                    return {...visited, arguments: {...visited.arguments, elements}} as J.MethodInvocation;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `log(b * c);`,
+                `log((x + y) * c);`));
+        });
+
+        test('when the result replaces the binary visitExpression returned', () => {
+            const x = capture(), y = capture();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                    return await rewrite(() => ({before: pattern`${x} * ${y}`, after: template`${y} * ${x}`}))
+                        .tryOn(this.cursor, expression) || expression;
+                }
+
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    const visited = await super.visitBinary(binary, p) as J.Binary;
+                    return await rewrite(() => ({before: pattern`${x} * ${y}`, after: template`${x} + ${y}`}))
+                        .tryOn(this.cursor, visited) || visited;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = z - x * y;`,
+                `const a = z - (y + x);`));
+        });
+
+        test('when the result replaces an operand that visitExpression moved', () => {
+            const comparison = capture<J>({constraint: node => node.kind === J.Kind.Binary});
+            const l = capture(), r = capture();
+            const rule = rewrite(() => ({before: pattern`${comparison} === ${r}`, after: template`${r} === ${comparison}`}))
+                .orElse(rewrite(() => ({before: pattern`${l} < ${r}`, after: template`${l} === ${r}`})));
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, expression) || expression;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = p < q === s;`,
+                `const a = s === (p === q);`));
+        });
+
+        test('when the result replaces a part of a ternary that visitExpression moved', () => {
+            const c = capture(), t = capture(), f = capture();
+            const rule = rewrite(() => ({before: pattern`!${c} ? ${t} : ${f}`, after: template`${c} ? ${f} : ${t}`}))
+                .orElse(rewrite(() => ({before: pattern`b`, after: template`x ? y : z`})));
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, expression) || expression;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const v = !b ? a : c;`,
+                `const v = (x ? y : z) ? c : a;`));
+        });
+
         test('the parentheses the source already had are kept', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
@@ -575,5 +711,31 @@ describe('template precedence', () => {
                 `const y = 1 + (a === b ? false : true);`,
                 `const y = 1 + (!(a === b));`));
         });
+    });
+
+    test('a `**` parsed before it was a `JS.Binary` keeps its precedence', () => {
+        // given
+        const operand = (name: string) => ({
+            kind: J.Kind.Identifier, id: name, prefix: emptySpace, markers: emptyMarkers, simpleName: name, annotations: []
+        }) as unknown as J.Identifier;
+        const product = {
+            kind: J.Kind.Binary, id: 'product', prefix: emptySpace, markers: emptyMarkers,
+            left: operand('c'),
+            operator: {kind: J.Kind.LeftPadded, before: emptySpace, element: J.Binary.Type.Multiplication, markers: emptyMarkers},
+            right: operand('d')
+        } as unknown as J.Binary;
+        const power = {
+            kind: JS.Kind.AssignmentOperation, id: 'power', prefix: emptySpace, markers: emptyMarkers,
+            variable: operand('a'),
+            operator: {kind: J.Kind.LeftPadded, before: emptySpace, element: JS.AssignmentOperation.Type.Power, markers: emptyMarkers},
+            assignment: product
+        } as unknown as JS.AssignmentOperation;
+
+        // when
+        const wrapped = maybeParenthesize(power, product.id, product);
+
+        // then
+        expect(precedenceOf(power)).toBe(Precedence.Exponentiation);
+        expect(wrapped.kind).toBe(J.Kind.Parentheses);
     });
 });

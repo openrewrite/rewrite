@@ -44,10 +44,7 @@ func NewParseError(sourcePath string, source string, err error) *ParseError {
 		ExceptionType: "error",
 		Message:       err.Error(),
 	}
-	markers := Markers{
-		ID:      uuid.New(),
-		Entries: []Marker{marker},
-	}
+	markers := MakeMarkers(uuid.New(), []Marker{marker})
 	return &ParseError{
 		Ident:            uuid.New(),
 		Markers:          markers,

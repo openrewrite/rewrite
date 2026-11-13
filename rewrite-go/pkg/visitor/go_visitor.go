@@ -63,6 +63,8 @@ func (v *GoVisitor) Cursor() *Cursor { return v.cursor }
 // IDs before invoking Visit. Recipes typically don't call this directly.
 func (v *GoVisitor) SetCursor(c *Cursor) { v.cursor = c }
 
+func (*GoVisitor) IsHeavyweight() {}
+
 // DoAfterVisit queues a follow-up visitor to run after the main visit
 // completes. Mirrors JavaVisitor.doAfterVisit. Use this from inside any
 // Visit* override to compose side-effects like adding an import:
@@ -101,12 +103,16 @@ func (v *GoVisitor) PendingAfterVisits() []AfterVisitor {
 //  2. PreVisit(t, p) is called via virtual dispatch — subclasses
 //     (e.g. RPC sender/receiver) override it to handle cross-cutting
 //     fields (id, prefix, markers) once per node.
-//  3. The type-specific Visit* method is dispatched via virtual
-//     dispatch on the (possibly modified) tree returned by PreVisit.
-//  4. cursor pops on return.
+//  3. VisitStatement and VisitExpression are called on a node that is
+//     one, where and in the order JavaVisitor calls them.
+//  4. The type-specific Visit* method is dispatched via virtual
+//     dispatch on the (possibly modified) tree returned so far.
+//  5. cursor pops on return.
 //
 // PreVisit returning nil short-circuits the visit — useful for
-// receivers that get DELETE state from the wire.
+// receivers that get DELETE state from the wire. A VisitStatement or
+// VisitExpression returning nil or a node of another type replaces the
+// node without visiting its children, as in Java.
 func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
@@ -118,6 +124,10 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	t = v.self().PreVisit(t, p)
 	if t == nil {
 		return nil
+	}
+	t, ok := v.visitStatementAndExpression(t, p)
+	if !ok {
+		return t
 	}
 
 	switch n := t.(type) {
@@ -282,6 +292,46 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	}
 }
 
+// visitStatementAndExpression reports false when a hook replaced t with a
+// node the type-specific Visit* method must not visit.
+func (v *GoVisitor) visitStatementAndExpression(t java.Tree, p any) (java.Tree, bool) {
+	switch t.(type) {
+	case *java.Import, *java.ParenthesizedTypeTree:
+		// JavaVisitor gives these neither hook.
+		return t, true
+	case *java.FieldAccess:
+		// JavaVisitor.visitFieldAccess calls visitExpression first.
+		t, ok := v.visitExpressionHook(t, p)
+		if !ok {
+			return t, false
+		}
+		return v.visitStatementHook(t, p)
+	}
+	t, ok := v.visitStatementHook(t, p)
+	if !ok {
+		return t, false
+	}
+	return v.visitExpressionHook(t, p)
+}
+
+func (v *GoVisitor) visitStatementHook(t java.Tree, p any) (java.Tree, bool) {
+	s, ok := t.(java.Statement)
+	if !ok {
+		return t, true
+	}
+	r := v.self().VisitStatement(s, p)
+	return r, reflect.TypeOf(r) == reflect.TypeOf(t)
+}
+
+func (v *GoVisitor) visitExpressionHook(t java.Tree, p any) (java.Tree, bool) {
+	e, ok := t.(java.Expression)
+	if !ok {
+		return t, true
+	}
+	r := v.self().VisitExpression(e, p)
+	return r, reflect.TypeOf(r) == reflect.TypeOf(t)
+}
+
 func (v *GoVisitor) self() VisitorI {
 	if v.Self != nil {
 		if vi, ok := v.Self.(VisitorI); ok {
@@ -295,6 +345,8 @@ func (v *GoVisitor) self() VisitorI {
 type VisitorI interface {
 	Visit(t java.Tree, p any) java.Tree
 	PreVisit(t java.Tree, p any) java.Tree
+	VisitStatement(s java.Statement, p any) java.J
+	VisitExpression(e java.Expression, p any) java.J
 	VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J
 	// go.mod nodes are Tree, not J (their tokens are not Java
 	// expressions), so these return java.Tree rather than java.J.
@@ -390,6 +442,16 @@ var _ VisitorI = (*GoVisitor)(nil)
 // `markers` fields once per node, mirroring Java's
 // JavaVisitor.preVisit pattern.
 func (v *GoVisitor) PreVisit(t java.Tree, p any) java.Tree { return t }
+
+// VisitStatement is called on a statement before its type-specific Visit*
+// method, wherever JavaVisitor calls visitStatement. The default returns it
+// unchanged.
+func (v *GoVisitor) VisitStatement(s java.Statement, p any) java.J { return s }
+
+// VisitExpression is called on an expression before its type-specific Visit*
+// method, wherever JavaVisitor calls visitExpression. The default returns it
+// unchanged.
+func (v *GoVisitor) VisitExpression(e java.Expression, p any) java.J { return e }
 
 func (v *GoVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	prefix := v.self().VisitSpace(cu.Prefix, p)
@@ -909,7 +971,7 @@ func (v *GoVisitor) VisitImport(imp *java.Import, p any) java.J {
 			alias = &c
 		}
 	}
-	qualid := visitExpression(v, imp.Qualid, p)
+	qualid := visitAndCast[*java.FieldAccess](v, imp.Qualid, p)
 	if java.SpaceEqual(prefix, imp.Prefix) && java.MarkersEqual(markers, imp.Markers) &&
 		alias == imp.Alias && qualid == imp.Qualid {
 		return imp
@@ -984,10 +1046,11 @@ func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
 	markers := v.visitMarkers(cse.Markers, p)
 	exprsBefore := v.self().VisitSpace(cse.Expressions.Before, p)
 	exprsElems := visitRightPaddedExpressionList(v, cse.Expressions.Elements, p)
-	body := visitRightPaddedList(v, cse.Body, p)
+	bodyBefore := v.self().VisitSpace(cse.Body.Before, p)
+	body := visitRightPaddedList(v, cse.Body.Elements, p)
 	if java.SpaceEqual(prefix, cse.Prefix) && java.MarkersEqual(markers, cse.Markers) &&
 		java.SpaceEqual(exprsBefore, cse.Expressions.Before) && java.SameSlice(exprsElems, cse.Expressions.Elements) &&
-		java.SameSlice(body, cse.Body) {
+		java.SpaceEqual(bodyBefore, cse.Body.Before) && java.SameSlice(body, cse.Body.Elements) {
 		return cse
 	}
 	c := *cse
@@ -995,7 +1058,8 @@ func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
 	c.Markers = markers
 	c.Expressions.Before = exprsBefore
 	c.Expressions.Elements = exprsElems
-	c.Body = body
+	c.Body.Before = bodyBefore
+	c.Body.Elements = body
 	return &c
 }
 
@@ -1007,9 +1071,11 @@ func (v *GoVisitor) VisitForLoop(forLoop *java.ForLoop, p any) java.J {
 		// Control is a value field, so a pruned control has no deleted form.
 		ctrl = &forLoop.Control
 	}
-	body := visitAndCast[*java.Block](v, forLoop.Body, p)
+	body := forLoop.Body
+	body.Element = visitAndCast[java.Statement](v, forLoop.Body.Element, p)
+	body.After = v.self().VisitSpace(forLoop.Body.After, p)
 	if java.SpaceEqual(prefix, forLoop.Prefix) && java.MarkersEqual(markers, forLoop.Markers) &&
-		ctrl == &forLoop.Control && body == forLoop.Body {
+		ctrl == &forLoop.Control && java.RightPaddedEqual(body, forLoop.Body) {
 		return forLoop
 	}
 	c := *forLoop
@@ -1076,9 +1142,11 @@ func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
 	if ctrl == nil {
 		ctrl = &forEach.Control
 	}
-	body := visitAndCast[*java.Block](v, forEach.Body, p)
+	body := forEach.Body
+	body.Element = visitAndCast[java.Statement](v, forEach.Body.Element, p)
+	body.After = v.self().VisitSpace(forEach.Body.After, p)
 	if java.SpaceEqual(prefix, forEach.Prefix) && java.MarkersEqual(markers, forEach.Markers) &&
-		ctrl == &forEach.Control && body == forEach.Body {
+		ctrl == &forEach.Control && java.RightPaddedEqual(body, forEach.Body) {
 		return forEach
 	}
 	c := *forEach
@@ -1966,18 +2034,19 @@ func (v *GoVisitor) VisitMarker(marker java.Marker, p any) java.Marker {
 // sameMarker rather than ==, since marker types may hold slices or maps and
 // == panics on those.
 func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
-	if len(markers.Entries) == 0 {
+	existing := markers.Entries()
+	if len(existing) == 0 {
 		return markers
 	}
 	// Preserve identity: return the same Markers (same entries slice) when no
 	// entry changed, so the enclosing withX guard (java.MarkersEqual) reports
 	// no change. Only allocate once VisitMarker actually rewrites an entry.
 	var entries []java.Marker
-	for i, m := range markers.Entries {
+	for i, m := range existing {
 		visited := v.self().VisitMarker(m, p)
 		if entries == nil && !sameMarker(visited, m) {
-			entries = make([]java.Marker, len(markers.Entries))
-			copy(entries, markers.Entries[:i])
+			entries = make([]java.Marker, len(existing))
+			copy(entries, existing[:i])
 		}
 		if entries != nil {
 			entries[i] = visited
@@ -1986,7 +2055,7 @@ func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
 	if entries == nil {
 		return markers
 	}
-	return java.Markers{ID: markers.ID, Entries: entries}
+	return java.MakeMarkers(markers.GetID(), entries)
 }
 
 // sameMarker reports whether VisitMarker left an entry unchanged, without an

@@ -24,12 +24,13 @@ import {
     J,
     rightPadded,
     space,
-    spaceContainsNewline,
     Statement,
-    TrailingComma
+    TrailingComma,
+    Type
 } from "../java";
 import {JS} from "./tree";
-import {cursorOf, deconflict, namesDeclaredWithin, scopeOf} from "./scope";
+import {moduleNameOf} from "./add-import";
+import {cursorOf, deconflict, namesDeclaredWithin, namesReferencedWithin, scopeOf} from "./scope";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
@@ -183,7 +184,7 @@ function foldDeclarationTrailingSpace(entry: J.RightPadded<J>): J.RightPadded<J>
 export function dependencyNames(block: AmdBlock): string[] {
     return elementsOf(block).map(padded => {
         const element = padded.element;
-        return isLiteral(element) && typeof element.value === "string" ? element.value : "";
+        return isLiteral(element) && typeof element.value === "string" ? moduleNameOf(element) : "";
     });
 }
 
@@ -192,16 +193,20 @@ export function parameterNames(block: AmdBlock): (string | undefined)[] {
 }
 
 export function identifierOf(parameter: J): J.Identifier | undefined {
-    if (parameter.kind === J.Kind.VariableDeclarations) {
-        const name = (parameter as J.VariableDeclarations).variables[0]?.element.name;
-        return name !== undefined && isIdentifier(name) ? name : undefined;
-    }
-    return isIdentifier(parameter) ? parameter : undefined;
+    const name = declaredNameOf(parameter);
+    return name !== undefined && isIdentifier(name) ? name : undefined;
+}
+
+/** The name a factory parameter binds, which may be a destructuring pattern. */
+function declaredNameOf(parameter: J): J | undefined {
+    return parameter.kind === J.Kind.VariableDeclarations ?
+        (parameter as J.VariableDeclarations).variables[0]?.element.name :
+        parameter;
 }
 
 /**
  * Where an entry's leading whitespace sits. A dependency string carries it directly, while
- * a factory parameter carries it on the identifier inside the declaration that wraps it.
+ * a factory parameter carries it on the name its declaration wraps, even a destructuring one.
  */
 interface Slot<T extends J> {
     prefixOf(element: T): J.Space;
@@ -215,7 +220,7 @@ const dependencySlot: Slot<Expression> = {
 };
 
 const parameterSlot: Slot<J> = {
-    prefixOf: element => identifierOf(element)?.prefix ?? element.prefix,
+    prefixOf: element => declaredNameOf(element)?.prefix ?? element.prefix,
     withPrefix: (element, prefix) => {
         if (element.kind !== J.Kind.VariableDeclarations) {
             return {...element, prefix};
@@ -256,14 +261,27 @@ function moveTrailingComma<T extends J>(
 
 /**
  * The whitespace that separates one entry from the next, taken from the entries already
- * there so that a block listing its dependencies one per line keeps doing so.
+ * there so that a block listing its dependencies one per line keeps doing so. Comments in an
+ * entry's prefix document that entry, so they stay behind.
  */
 function separator<T extends J>(entries: readonly J.RightPadded<T>[], slot: Slot<T>): J.Space {
     if (entries.length >= 2) {
-        return slot.prefixOf(entries[1].element);
+        return space(layoutOf(slot.prefixOf(entries[1].element)));
     }
-    const first = slot.prefixOf(entries[0].element);
-    return spaceContainsNewline(first) ? first : space(" ");
+    const first = layoutOf(slot.prefixOf(entries[0].element));
+    return space(first.includes("\n") ? first : " ");
+}
+
+/**
+ * The prefix without its comments. That is the segment holding the line break, preferring the
+ * last comment's suffix, else the whitespace before the entry.
+ */
+function layoutOf(prefix: J.Space): string {
+    const last = prefix.comments[prefix.comments.length - 1];
+    if (last === undefined || (!last.suffix.includes("\n") && prefix.whitespace.includes("\n"))) {
+        return prefix.whitespace;
+    }
+    return last.suffix;
 }
 
 /**
@@ -411,7 +429,8 @@ function dependencyLiteral(module: string, quote: string): J.Literal {
         prefix: emptySpace,
         markers: emptyMarkers,
         value: module,
-        valueSource: `${quote}${module}${quote}`
+        valueSource: `${quote}${module}${quote}`,
+        type: Type.Primitive.String
     };
 }
 
@@ -496,8 +515,11 @@ export function withoutDependencyAt(
     block: AmdBlock,
     index: number
 ): J.MethodInvocation {
-    const dependencies = withElements(block.dependencies, removeEntry(elementsOf(block), index, dependencySlot));
     const parameters = parametersOf(block);
+    if (index < 0 || index >= Math.max(elementsOf(block).length, parameters.length)) {
+        return call;
+    }
+    const dependencies = withElements(block.dependencies, removeEntry(elementsOf(block), index, dependencySlot));
     const factory = index >= parameters.length ?
         block.factory :
         withParameters(block.factory, removeEntry(parameters, index, parameterSlot));
@@ -519,7 +541,7 @@ export function withDependencyModuleAt(
     const elements = [...elementsOf(block)];
     const entry = elements[index];
     const literal = entry.element as J.Literal;
-    const updated: J.Literal = {...literal, value: module, valueSource: `${quote}${module}${quote}`};
+    const updated: J.Literal = {...literal, value: module, valueSource: `${quote}${module}${quote}`, unicodeEscapes: undefined};
     elements[index] = {...entry, element: updated};
     const dependencies = withElements(block.dependencies, elements);
     return withParts(call, block, dependencies, block.factory);
@@ -544,6 +566,30 @@ function withParts(
     }
     args[factoryIndex] = {...args[factoryIndex], element: restoreFactory(args[factoryIndex].element, factory)};
     return {...call, arguments: {...call.arguments, elements: args}};
+}
+
+/**
+ * `call` with the body of `block`'s factory replaced by what `edit` makes of it, the factory staying
+ * in whichever wrapper it was written in. An arrow factory written without braces has no block body,
+ * so it is left alone and `edit` is not called. `block` is the {@link amdBlockOf} of `call`.
+ */
+export function withFactoryBody(
+    call: J.MethodInvocation,
+    block: AmdBlock,
+    edit: (body: J.Block) => J.Block
+): J.MethodInvocation {
+    const body = bodyOf(block);
+    if (body?.kind !== J.Kind.Block) {
+        return call;
+    }
+    const updated = edit(body as J.Block);
+    if (updated === body) {
+        return call;
+    }
+    const factory: J.MethodDeclaration | J.Lambda = block.factory.kind === J.Kind.MethodDeclaration ?
+        {...block.factory as J.MethodDeclaration, body: updated} :
+        {...block.factory as J.Lambda, body: updated};
+    return withParts(call, block, block.dependencies, factory);
 }
 
 /** Puts the rewritten factory back into whichever wrapper the original was written as. */
@@ -627,6 +673,11 @@ function queuedFor(visitor: JavaScriptVisitor<any>, blockId: UUID): AddAmdDepend
     return visitor.afterVisit.filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId);
 }
 
+/** Whether `scope` is where the factory's parameters are declared, which for an arrow is the arrow wrapping its lambda. */
+function declaresParameters(scope: J | undefined, factory: J.MethodDeclaration | J.Lambda): boolean {
+    return scope === factory || (scope?.kind === JS.Kind.ArrowFunction && (scope as JS.ArrowFunction).lambda === factory);
+}
+
 /**
  * A local binding for `module` on the AMD lane, creating one where the block does not already
  * have it, or `undefined` where no safe binding exists.
@@ -645,18 +696,19 @@ export function bindAmd(
     const modules = dependencyNames(amd.block);
     const bindings = parameterNames(amd.block);
 
-    const declared = module === "" ? -1 : modules.indexOf(module);
-    if (declared >= 0) {
-        const bound = bindings[declared];
-        if (bound === undefined) {
-            // A parameter that is not a plain name gives the module no binding to hand back.
-            return undefined;
-        }
-        // Only code the factory encloses can shadow its parameter, so a cursor elsewhere in the
-        // block — on the `define` call, or on its dependency array — has nothing to measure.
-        const cursor = cursorOf(visitor);
-        const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
-        if (withinFactory === undefined || scopeOf(cursor!).declaringScope(bound) === amd.block.factory) {
+    const declared = module === "" ? [] : modules.flatMap((m, i) => m === module ? [i] : []);
+    if (declared.length > 0 && bindings[declared[0]] === undefined) {
+        // A parameter that is not a plain name gives the module no binding to hand back.
+        return undefined;
+    }
+    // Only code the factory encloses can shadow its parameter, so a cursor elsewhere in the
+    // block — on the `define` call, or on its dependency array — has nothing to measure.
+    const cursor = cursorOf(visitor);
+    const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
+    for (const index of declared) {
+        const bound = bindings[index];
+        if (bound !== undefined && (withinFactory === undefined ||
+            declaresParameters(scopeOf(cursor!).declaringScope(bound), amd.block.factory))) {
             return bound;
         }
     }
@@ -679,10 +731,15 @@ export function bindAmd(
         return undefined;
     }
     // A parameter is in scope across the whole factory, and the queue hands this name to later
-    // requests at cursors inside it, so every name the factory declares is one it has to clear.
-    const taken = [...bindings, ...namesDeclaredWithin(amd.block.factory), ...queued.map(v => v.binding)];
+    // requests at cursors inside it, so every name the factory declares is one it has to clear,
+    // as is every name it reads from further out, such as a global like `Element`, which it would capture.
+    // A pinned alias is exempt from the latter: its caller names a global on purpose to take it over.
+    const declaredWithin = namesDeclaredWithin(amd.block.factory);
+    const referencedWithin = pinned ? new Set<string>() : namesReferencedWithin(amd.block.factory);
+    const isTaken = (candidate: string) => declaredWithin.has(candidate) || referencedWithin.has(candidate) ||
+        bindings.includes(candidate) || queued.some(v => v.binding === candidate);
     const requested = preferredName ?? derivedBindingName(module)!;
-    const binding = deconflict(requested, candidate => taken.includes(candidate));
+    const binding = deconflict(requested, isTaken);
     if (pinned && binding !== requested) {
         // An alias is bound verbatim or not at all, since the caller may already have emitted
         // code naming it, and a deconflicted spelling would leave that unbound.

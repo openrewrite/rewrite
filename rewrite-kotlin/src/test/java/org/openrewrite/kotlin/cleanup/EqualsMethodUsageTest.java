@@ -18,9 +18,13 @@ package org.openrewrite.kotlin.cleanup;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class EqualsMethodUsageTest implements RewriteTest {
@@ -130,6 +134,53 @@ class EqualsMethodUsageTest implements RewriteTest {
               """,
             """
               val v = print(listOf("1").filter { e -> e == "1" })
+              """
+          )
+        );
+    }
+
+    @Test
+    void negatedEqualsInLambdaBlockRemainsAStatement() {
+        rewriteRun(
+          kotlin(
+            """
+              class Session(val accountId: String?, val merchantId: String?) {
+                  val onBehalfOf: String?
+                      get() = accountId.takeIf { !it.equals(merchantId) }
+              }
+              """,
+            """
+              class Session(val accountId: String?, val merchantId: String?) {
+                  val onBehalfOf: String?
+                      get() = accountId.takeIf { it != merchantId }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new KotlinIsoVisitor<Integer>() {
+                @Override
+                public J.Block visitBlock(J.Block block, Integer p) {
+                    assertThat(block.getStatements()).allMatch(Statement.class::isInstance);
+                    return super.visitBlock(block, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedNegatedEqualsAsStatementPreservesComments() {
+        rewriteRun(
+          kotlin(
+            """
+              fun compare(a: String, b: String) {
+                  // Retain the comparison.
+                  !(a.equals(b))
+              }
+              """,
+            """
+              fun compare(a: String, b: String) {
+                  // Retain the comparison.
+                  a != b
+              }
               """
           )
         );

@@ -78,6 +78,19 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void typedDestructuredLambdaParams() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(pairs: List<Pair<Int, String>>) {
+                  pairs.forEach { (a: Int, b: String) -> println(a.toString() + b) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleDestructuredLambdaParams() {
         rewriteRun(
           kotlin(
@@ -264,6 +277,19 @@ class LambdaTest implements RewriteTest {
               fun method(map : HashMap<String, String>) {
                   map.forEach { (_, value) -> println("$value!") }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void straySemicolonInBody() {
+        rewriteRun(
+          kotlin(
+            """
+              val f = { ; }
+              val g = { println() ; ; }
+              val h = { x: Int -> ; x }
               """
           )
         );

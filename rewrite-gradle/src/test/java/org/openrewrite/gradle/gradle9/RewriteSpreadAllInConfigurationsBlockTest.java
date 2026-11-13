@@ -95,16 +95,179 @@ class RewriteSpreadAllInConfigurationsBlockTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mixedNamedConfigurationsAndSpreadGroups() {
+        rewriteRun(
+          buildGradle(
+            """
+              configurations {
+                  javadoc {}
+                  offlineJavadocPackages {}
+                  // Shared exclusions
+                  all*.exclude group: 'commons-logging'
+                  // Keep this with the second exclusion
+                  all*.exclude group: 'log4j'
+                  create("integrationTest")
+                  all*.exclude group: 'junit'
+                  resolutionStrategy { failOnVersionConflict() }
+              }
+              """,
+            """
+              configurations {
+                  javadoc {}
+                  offlineJavadocPackages {}
+                  // Shared exclusions
+                  all {
+                      exclude group: 'commons-logging'
+                      // Keep this with the second exclusion
+                      exclude group: 'log4j'
+                  }
+                  create("integrationTest")
+                  all {
+                      exclude group: 'junit'
+                  }
+                  resolutionStrategy { failOnVersionConflict() }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mixedBlockEndingInSpread() {
+        rewriteRun(
+          buildGradle(
+            """
+              configurations {
+                  javadoc {}
+                  all*.exclude group: 'commons-logging'
+                  all*.transitive(false)
+              }
+              """,
+            """
+              configurations {
+                  javadoc {}
+                  all {
+                      exclude group: 'commons-logging'
+                      transitive(false)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepControlFlowAndExplicitReturnInOuterClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              configurations {
+                  all*.exclude group: 'log4j'
+                  if (project.hasProperty('skip')) {
+                      return
+                  }
+                  all*.exclude group: 'junit'
+                  return all*.exclude(group: 'commons-logging')
+              }
+              """,
+            """
+              configurations {
+                  all {
+                      exclude group: 'log4j'
+                  }
+                  if (project.hasProperty('skip')) {
+                      return
+                  }
+                  all {
+                      exclude group: 'junit'
+                  }
+                  return all*.exclude(group: 'commons-logging')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveInlineAndTrailingComments() {
+        rewriteRun(
+          buildGradle(
+            """
+              configurations {
+                  javadoc {} // named configuration
+                  all*.exclude group: 'log4j' // first exclusion
+                  all*.exclude group: 'junit' // last exclusion
+                  // Keep the following configuration
+                  offlineJavadocPackages {}
+                  // End of configurations
+              }
+              """,
+            """
+              configurations {
+                  javadoc {} // named configuration
+                  all {
+                      exclude group: 'log4j' // first exclusion
+                      exclude group: 'junit'
+                  } // last exclusion
+                  // Keep the following configuration
+                  offlineJavadocPackages {}
+                  // End of configurations
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveSemicolonsAndUnrelatedStatements() {
+        rewriteRun(
+          buildGradle(
+            """
+              configurations {
+                  javadoc {};
+                  all*.exclude group: 'log4j'; all*.exclude group: 'junit';
+                  def retained = 'value'; println retained
+              }
+              """,
+            """
+              configurations {
+                  javadoc {};
+                  all {
+                      exclude group: 'log4j'; exclude group: 'junit';
+                  }
+                  def retained = 'value'; println retained
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange {
         @Test
-        void mixedSpreadAndOtherStatementsLeftAlone() {
+        void explicitReturnSpreadLeftAlone() {
             rewriteRun(
               buildGradle(
                 """
                   configurations {
-                      create("integrationTest")
-                      all*.exclude group: "log4j", module: "log4j"
+                      return all*.exclude(group: 'log4j')
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void spreadNestedInControlFlowLeftAlone() {
+            rewriteRun(
+              buildGradle(
+                """
+                  configurations {
+                      javadoc {}
+                      if (project.hasProperty('excludeLogging')) {
+                          all*.exclude group: 'log4j'
+                      }
                   }
                   """
               )

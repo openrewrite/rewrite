@@ -34,6 +34,7 @@ public class HttpUrlConnectionSender implements HttpSender {
     private final int connectTimeoutMs;
     private final int readTimeoutMs;
     private final Proxy proxy;
+    private final boolean followRedirects;
 
     /**
      * Creates a sender with the specified timeouts but uses the default proxy settings.
@@ -54,6 +55,11 @@ public class HttpUrlConnectionSender implements HttpSender {
      * @since 1.2.0
      */
     public HttpUrlConnectionSender(Duration connectTimeout, Duration readTimeout, Proxy proxy) {
+        this(connectTimeout, readTimeout, proxy, true);
+    }
+
+    private HttpUrlConnectionSender(Duration connectTimeout, Duration readTimeout, Proxy proxy, boolean followRedirects) {
+        this.followRedirects = followRedirects;
         this.connectTimeoutMs = (int) connectTimeout.toMillis();
         this.readTimeoutMs = (int) readTimeout.toMillis();
         this.proxy = proxy;
@@ -66,6 +72,16 @@ public class HttpUrlConnectionSender implements HttpSender {
         this.connectTimeoutMs = DEFAULT_CONNECT_TIMEOUT_MS;
         this.readTimeoutMs = DEFAULT_READ_TIMEOUT_MS;
         this.proxy = null;
+        this.followRedirects = true;
+    }
+
+    @Override
+    public HttpUrlConnectionSender withProxy(Proxy proxy) {
+        // A subclass may carry TLS or request behavior which a base-class clone would discard.
+        if (getClass() != HttpUrlConnectionSender.class) {
+            throw new UnsupportedOperationException("Custom HttpUrlConnectionSender must implement withProxy");
+        }
+        return new HttpUrlConnectionSender(Duration.ofMillis(connectTimeoutMs), Duration.ofMillis(readTimeoutMs), proxy, false);
     }
 
     @Override
@@ -77,6 +93,7 @@ public class HttpUrlConnectionSender implements HttpSender {
             } else {
                 con = (HttpURLConnection) request.getUrl().openConnection();
             }
+            con.setInstanceFollowRedirects(followRedirects);
             if (request.getConnectTimeout() != null) {
                 con.setConnectTimeout((int) request.getConnectTimeout().toMillis());
             } else {

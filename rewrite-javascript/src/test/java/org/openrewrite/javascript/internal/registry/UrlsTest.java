@@ -16,11 +16,58 @@
 package org.openrewrite.javascript.internal.registry;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UrlsTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://host.example:443/npm/",
+            "http://host.example:80/npm/",
+            "https://host.example:0443/npm/",
+            "http://host.example:080/npm/",
+            "HTTPS://host.example:443/npm/"
+    })
+    void nerfDartOmitsDefaultPorts(String url) {
+        assertThat(Urls.nerfDart(url)).isEqualTo("//host.example/npm/");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "https://host.example:8443/npm/, //host.example:8443/npm/",
+            "http://host.example:8080/npm/, //host.example:8080/npm/",
+            "https://host.example:80/npm/, //host.example:80/npm/",
+            "http://host.example:443/npm/, //host.example:443/npm/"
+    })
+    void nerfDartRetainsNonDefaultPorts(String url, String expected) {
+        assertThat(Urls.nerfDart(url)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "https://HOST.Example/npm/, //host.example/npm/",
+            "https://HOST.Example:443/Npm/, //host.example/Npm/",
+            "https://HOST.Example:8443/npm/, //host.example:8443/npm/"
+    })
+    void nerfDartLowercasesHostButNotPath(String url, String expected) {
+        assertThat(Urls.nerfDart(url)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "https://[::1]:443/npm/, //[::1]/npm/",
+            "http://[::1]:80/npm/, //[::1]/npm/",
+            "https://[::443]/npm/, //[::443]/npm/",
+            "https://[::1]:8443/npm/, //[::1]:8443/npm/"
+    })
+    void nerfDartHandlesIpv6Ports(String url, String expected) {
+        assertThat(Urls.nerfDart(url)).isEqualTo(expected);
+    }
 
     @Test
     void unscopedNameUnchanged() {

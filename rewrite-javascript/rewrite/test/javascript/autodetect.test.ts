@@ -29,6 +29,14 @@ describe('Autodetect', () => {
         return detector.build();
     }
 
+    async function detectIndentSize(source: string, sourcePath = 'test.ts'): Promise<number> {
+        const detector = Autodetect.detector();
+        for await (const cu of parser.parse({text: dedent(source), sourcePath})) {
+            await detector.sample(cu);
+        }
+        return detector.getTabsAndIndentsStyle().indentSize;
+    }
+
     describe('TabsAndIndentsStyle', () => {
         test('detects 4-space indentation', async () => {
             const autodetect = await parseAndDetect(`
@@ -62,6 +70,95 @@ describe('Autodetect', () => {
             expect(tabsAndIndents).toBeDefined();
             expect(tabsAndIndents!.useTabCharacter).toBe(false);
             expect(tabsAndIndents!.indentSize).toBe(2);
+        });
+
+        test('a misindented line does not outvote the rest of the file', async () => {
+            const autodetect = await parseAndDetect(`
+                class Api {
+                  get() {
+                    return 1;
+                  }
+
+                  fail() {
+                     return 2;
+                  }
+
+                  put() {
+                    if (ready) {
+                      return 3;
+                    }
+                  }
+                }
+                `);
+            const tabsAndIndents = autodetect.styles.find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle;
+
+            expect(tabsAndIndents.indentSize).toBe(2);
+        });
+
+        test('an unindented wrapper does not halve the detected width', async () => {
+            const autodetect = await parseAndDetect(`
+                (function () {
+                function f() {
+                    if (x) {
+                        y();
+                    }
+                }
+                })();
+                `);
+            const tabsAndIndents = autodetect.styles.find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle;
+
+            expect(tabsAndIndents.indentSize).toBe(4);
+        });
+
+        test('an array between object literals is a level', async () => {
+            expect(await detectIndentSize(`
+                import { APP_INITIALIZER, ApplicationConfig } from '@angular/core';
+
+                export const appConfig: ApplicationConfig = {
+                  providers: [
+                    {
+                      provide: APP_INITIALIZER,
+                      useFactory: initAuth,
+                      deps: [JwtService, UserService],
+                      multi: true,
+                    },
+                  ],
+                };
+                `)).toBe(2);
+        });
+
+        test('a chained call on its own line is a level', async () => {
+            expect(await detectIndentSize(`
+                route.params
+                  .subscribe(params => {
+                    id = params['id'];
+                    load();
+                  });
+                `)).toBe(2);
+        });
+
+        test('a block opens on the line a trailing comma breaks to', async () => {
+            expect(await detectIndentSize(`
+                for (const kind of [
+                  "ArgumentCoordinate",
+                  "DirectiveCoordinate",
+                ]) {
+                  delete visitorKeys[kind];
+                }
+                `)).toBe(2);
+        });
+
+        test('a JSX child on its own line is a level', async () => {
+            expect(await detectIndentSize(`
+                const List = () => (
+                  <ul>
+                    {items.map(item => {
+                      const key = item.id;
+                      return <li key={key}/>;
+                    })}
+                  </ul>
+                );
+                `, 'test.tsx')).toBe(2);
         });
 
         test('detects tab indentation', async () => {

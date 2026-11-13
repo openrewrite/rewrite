@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -51,5 +52,24 @@ func TestGoUnaryRoundTrip_OperatorSpaceChangePreservesAddressOf(t *testing.T) {
 	if got.Operator.Element != golang.AddressOf {
 		t.Errorf("Operator: want AddressOf=%d (&), got %d (0 makes the printer emit '?')",
 			int(golang.AddressOf), int(got.Operator.Element))
+	}
+}
+
+// An operator crosses RPC as the name Java knows it by, so one the printer
+// can print but Java cannot name would come back as another operator.
+func TestEveryPrintableJavaUnaryOperatorKeepsItsNameOverRpc(t *testing.T) {
+	printable := 0
+	for op := java.UnaryOperator(1); op < 64; op++ {
+		if printer.UnaryOperatorString(op) == "?" {
+			continue
+		}
+		printable++
+		if got := java.ParseUnaryOperator(op.String()); got != op {
+			t.Errorf("%q crosses as %q and comes back as %q", printer.UnaryOperatorString(op), op.String(),
+				printer.UnaryOperatorString(got))
+		}
+	}
+	if printable != 6 {
+		t.Errorf("printable operators: want 6, got %d", printable)
 	}
 }

@@ -35,16 +35,16 @@ public class DelegatesToTest
     }
 
     [Fact]
-    public void PrepareRecipe_RootDelegatesToJavaRecipe()
+    public async Task PrepareRecipe_RootDelegatesToJavaRecipe()
     {
         var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
         marketplace.Install(new DelegatingRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
         var server = new RewriteRpcServer(marketplace);
 
-        var response = server.PrepareRecipe(new PrepareRecipeRequest
+        var response = await server.PrepareRecipe(new PrepareRecipeRequest
         {
             Id = typeof(DelegatingRecipe).FullName!
-        }).GetAwaiter().GetResult();
+        });
 
         Assert.NotNull(response.DelegatesTo);
         Assert.Equal("org.openrewrite.java.ChangeType", response.DelegatesTo!.RecipeName);
@@ -55,16 +55,16 @@ public class DelegatesToTest
     }
 
     [Fact]
-    public void PrepareRecipe_CompositeChildDelegatesToJavaRecipe()
+    public async Task PrepareRecipe_CompositeChildDelegatesToJavaRecipe()
     {
         var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
         marketplace.Install(new CompositeWithDelegatingChild(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
         var server = new RewriteRpcServer(marketplace);
 
-        var parent = server.PrepareRecipe(new PrepareRecipeRequest
+        var parent = await server.PrepareRecipe(new PrepareRecipeRequest
         {
             Id = typeof(CompositeWithDelegatingChild).FullName!
-        }).GetAwaiter().GetResult();
+        });
 
         Assert.Null(parent.DelegatesTo);
         var child = Assert.Single(parent.RecipeList);

@@ -17,6 +17,7 @@ package org.openrewrite.yaml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -63,10 +64,20 @@ public class FindKey extends Recipe {
             @Override
             public Yaml visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, ctx);
-                if (matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor()) && !(getCursor().getParentTreeCursor().getValue() instanceof Yaml.Sequence.Entry)) {
                     m = SearchResult.found(m);
                 }
                 return m;
+            }
+
+            @Override
+            public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+                Yaml.Sequence.Entry e = (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, ctx);
+                if (e.getBlock() instanceof Yaml.Mapping &&
+                        matcher.matches(new Cursor(getCursor(), e.getBlock()))) {
+                    e = SearchResult.found(e);
+                }
+                return e;
             }
         };
     }

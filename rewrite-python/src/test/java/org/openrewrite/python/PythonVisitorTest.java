@@ -17,6 +17,7 @@ package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
@@ -36,15 +37,15 @@ import static org.openrewrite.python.Assertions.python;
 class PythonVisitorTest implements RewriteTest {
 
     private static List<String> collectTypeNames(Py.CompilationUnit cu) {
-        List<String> names = new ArrayList<>();
-        new PythonVisitor<List<String>>() {
+        return new PythonVisitor<List<String>>() {
             @Override
             public <N extends NameTree> N visitTypeName(N nameTree, List<String> ns) {
-                ns.add(nameTree.getClass().getSimpleName() + ":" + nameTree.printTrimmed(getCursor()));
+                // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                Cursor parent = getCursor().getValue() == nameTree ? getCursor().getParentOrThrow() : getCursor();
+                ns.add(nameTree.getClass().getSimpleName() + ":" + nameTree.printTrimmed(parent));
                 return nameTree;
             }
-        }.visit(cu, names);
-        return names;
+        }.reduce(cu, new ArrayList<>());
     }
 
     @Test

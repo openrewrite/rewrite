@@ -259,9 +259,9 @@ public class ArrayTests : RewriteTest
     /// reason about <c>typeof(int[])</c> or an array-typed declaration.
     /// </summary>
     [Fact]
-    public void ArrayTypeIsAttributed()
+    public async Task ArrayTypeIsAttributed()
     {
-        var arrayType = FirstArrayType(
+        var arrayType = await FirstArrayTypeAsync(
             """
             class Foo {
                 int[] arr;
@@ -278,9 +278,9 @@ public class ArrayTests : RewriteTest
     /// no per-level type to hand out.
     /// </summary>
     [Fact]
-    public void JaggedArrayTypeIsAttributedAtTheOutermostRank()
+    public async Task JaggedArrayTypeIsAttributedAtTheOutermostRank()
     {
-        var arrayType = FirstArrayType(
+        var arrayType = await FirstArrayTypeAsync(
             """
             class Foo {
                 int[][] arr;
@@ -291,11 +291,10 @@ public class ArrayTests : RewriteTest
         Assert.IsType<JavaType.Array>(elementType);
     }
 
-    private static ArrayType FirstArrayType(string code)
+    private static async Task<ArrayType> FirstArrayTypeAsync(string code)
     {
-        var references = Assemblies.Net90
-            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
-            .GetAwaiter().GetResult();
+        var references = await Assemblies.Net90
+            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
         var syntaxTree = CSharpSyntaxTree.ParseText(code, path: "source.cs");
         var compilation = CSharpCompilation.Create("TestCompilation")
             .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))

@@ -44,6 +44,12 @@ class YamlReferenceTest implements RewriteTest {
       "application.yml",
       "application-test.yaml",
       "application-test.yml",
+      "application-disable-security.yaml",
+      "application-disable-security.yml",
+      "application-eu.west.yml",
+      "application-blue+green.yml",
+      "application-ops@eu.yml",
+      "application-prüfung.yml",
       "/foo/bar/application-test.yaml",
       "/foo/bar/application-test.yml",
     })

@@ -27,16 +27,16 @@ public class PrepareRecipeTreeTest
     }
 
     [Fact]
-    public void PrepareRecipe_ReturnsConfiguredChildTree()
+    public async Task PrepareRecipe_ReturnsConfiguredChildTree()
     {
         var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
         marketplace.Install(new ParentRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
         var server = new RewriteRpcServer(marketplace);
 
-        var parent = server.PrepareRecipe(new PrepareRecipeRequest
+        var parent = await server.PrepareRecipe(new PrepareRecipeRequest
         {
             Id = typeof(ParentRecipe).FullName!
-        }).GetAwaiter().GetResult();
+        });
 
         Assert.Single(parent.RecipeList);
         var child = parent.RecipeList[0];
@@ -63,15 +63,14 @@ public class PrepareRecipeTreeTest
     }
 
     [Fact]
-    public void PrepareRecipe_ThrowsWhenAChildIsMissingARequiredOption()
+    public async Task PrepareRecipe_ThrowsWhenAChildIsMissingARequiredOption()
     {
         var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
         marketplace.Install(new ParentMissingChildOption(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
         var server = new RewriteRpcServer(marketplace);
 
-        var ex = Assert.ThrowsAny<Exception>(() =>
-            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(ParentMissingChildOption).FullName! })
-                .GetAwaiter().GetResult());
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(ParentMissingChildOption).FullName! }));
 
         Assert.Contains("RequiredThing", ex.Message);
         Assert.Contains("Missing required option", ex.Message);
@@ -101,16 +100,16 @@ public class PrepareRecipeTreeTest
     /// options, rather than collapsing them.
     /// </summary>
     [Fact]
-    public void PrepareRecipe_SameTypeChildrenPreserveDistinctOptions()
+    public async Task PrepareRecipe_SameTypeChildrenPreserveDistinctOptions()
     {
         var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
         marketplace.Install(new CompositeSameType(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
         var server = new RewriteRpcServer(marketplace);
 
-        var parent = server.PrepareRecipe(new PrepareRecipeRequest
+        var parent = await server.PrepareRecipe(new PrepareRecipeRequest
         {
             Id = typeof(CompositeSameType).FullName!
-        }).GetAwaiter().GetResult();
+        });
 
         Assert.Equal(3, parent.RecipeList.Count);
         Assert.Equal(3, parent.RecipeList.Select(c => c.Id).Distinct().Count());
@@ -119,5 +118,56 @@ public class PrepareRecipeTreeTest
             .Select(c => c.Descriptor.Options.Single(o => o.Name == "Text").Value)
             .ToList();
         Assert.Equal(new object?[] { "a", "b", "c" }, texts);
+    }
+
+    private sealed class EitherOptionRecipe : global::OpenRewrite.Core.Recipe
+    {
+        [global::OpenRewrite.Core.Option(DisplayName = "First", Description = "First alternative.",
+            Required = false)]
+        public string? First { get; set; }
+
+        [global::OpenRewrite.Core.Option(DisplayName = "Second", Description = "Second alternative.",
+            Required = false)]
+        public string? Second { get; set; }
+
+        public override string DisplayName => "Either option";
+        public override string Description => "A recipe needing at least one of two optional options.";
+
+        public override IEnumerable<string> Validate()
+        {
+            if (string.IsNullOrEmpty(First) && string.IsNullOrEmpty(Second))
+                yield return "At least one of `First` or `Second` must be set.";
+        }
+
+        public override JavaVisitor<ExecutionContext> GetVisitor() => new CSharpVisitor<ExecutionContext>();
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_ThrowsWhenRecipeValidateReportsAProblem()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new EitherOptionRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(EitherOptionRecipe).FullName! }));
+
+        Assert.Contains("At least one of `First` or `Second` must be set.", ex.Message);
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_SucceedsWhenRecipeValidatePasses()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new EitherOptionRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var prepared = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(EitherOptionRecipe).FullName!,
+            Options = new Dictionary<string, object?> { ["First"] = "value" }
+        });
+
+        Assert.Equal(typeof(EitherOptionRecipe).FullName, prepared.Descriptor.Name);
     }
 }

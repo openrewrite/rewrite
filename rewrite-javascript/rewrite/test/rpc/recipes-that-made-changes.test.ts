@@ -23,7 +23,7 @@ async function sendMarkers(markers: Markers) {
 }
 
 async function receiveMarkers(batch: any[]): Promise<Markers> {
-    const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+    const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
     return rq.receive<Markers>(undefined);
 }
 

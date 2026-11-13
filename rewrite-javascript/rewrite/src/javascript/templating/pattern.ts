@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {isIdentifier, J} from '../../java';
 import {
     Any,
     Capture,
@@ -27,12 +27,57 @@ import {
     PatternOptions
 } from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
-import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
-import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
-import {TemplateEngine} from './engine';
+import {
+    Focus,
+    MarkFocus,
+    MatcherCallbacks,
+    MatcherState,
+    PatternMatchingComparator,
+    PendingExplanation
+} from './comparator';
+import {
+    CaptureMarker,
+    CaptureStorageValue,
+    generateCacheKey,
+    globalAstCache,
+    PATTERN_PREFIXES_SYMBOL,
+    PlaceholderUtils,
+    WRAPPERS_MAP_SYMBOL
+} from './utils';
+import {walk} from '../scope';
+import {opensWithBrace, TemplateEngine} from './engine';
 import {TreePrinters} from '../../print';
 import {JS} from '../index';
+import {
+    AnsiAwarePrintOutputCapture,
+    callSite,
+    CaptureHighlightMarker,
+    DebugPatternMatchingComparator,
+    aroundMarks,
+    describe,
+    describeKind,
+    ElementMarkerVisitor,
+    mismatchDelimiters,
+    narrowMark,
+    PATTERN_DEBUG_MARKER_PRINTER,
+    shouldUseEmoji,
+    sourceLocation
+} from './debug';
+import {dedent} from '../../util';
+import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
 
+
+/**
+ * Printed code without its leading blank lines and trailing whitespace, and without the indentation
+ * all its lines share. Its first line counts as starting at `column`, where the code starts in its
+ * file, so that the lines after it keep their indentation relative to it.
+ */
+function layOut(printed: string, column?: number): string {
+    const text = printed.replace(/^\s*\n/, '');
+    const indent = text.length - text.trimStart().length;
+    const padded = column && column - 1 > indent ? ' '.repeat(column - 1 - indent) + text : text;
+    return dedent(padded).trimEnd().replace(/^[ \t]+/, '');
+}
 
 /**
  * Builder for creating patterns programmatically.
@@ -126,13 +171,16 @@ export class PatternBuilder {
 }
 
 /**
- * Represents a pattern that can be matched against AST nodes.
+ * Represents a pattern that can be matched against AST nodes. Where it does not match code you
+ * expected it to, {@link Pattern.match} with `{debug: true}` prints why, as {@link PatternOptions.debug} describes.
  */
 export class Pattern {
     private _options: PatternOptions = {};
-    private _cachedAstPattern?: J;
+    /** The pattern tree, keyed by whether its code was parsed as an expression. */
+    private _cachedAstPatterns = new Map<boolean, J>();
     private static nextPatternId = 1;
     private readonly patternId: number;
+    private readonly printedAttempts = new Set<string>();
     private readonly unnamedCaptureMapping = new Map<string, string>();
 
     /**
@@ -173,13 +221,13 @@ export class Pattern {
     ) {
         this.patternId = Pattern.nextPatternId++;
 
-        // Build mapping for unnamed captures (unnamed_N -> _X)
+        // Build mapping for unnamed captures (unnamed_N -> X, which will be displayed as 🪝X)
         let unnamedIndex = 1;
         for (const cap of captures) {
             if (cap && typeof cap === 'object' && 'getName' in cap) {
                 const name = (cap as Capture<any> | Any<any>).getName();
-                if (name && name.startsWith('unnamed_')) {
-                    this.unnamedCaptureMapping.set(name, `_${unnamedIndex}`);
+                if (name && name.startsWith('unnamed_') && !this.unnamedCaptureMapping.has(name)) {
+                    this.unnamedCaptureMapping.set(name, `${unnamedIndex}`);
                     unnamedIndex++;
                 }
             }
@@ -198,27 +246,33 @@ export class Pattern {
      *         context: ['import { forwardRef } from "react"'],
      *         dependencies: {'@types/react': '^18.0.0'}
      *     })
+     *
+     * @example
+     * // Print why each match attempt of this pattern matched or not
+     * pat.configure({debug: true})
      */
     configure(options: PatternOptions): Pattern {
-        this._options = { ...this._options, ...options };
+        this._options = {...this._options, ...options};
         // Invalidate cache when configuration changes
-        this._cachedAstPattern = undefined;
+        this._cachedAstPatterns.clear();
         return this;
     }
 
     /**
-     * Gets the AST pattern for this pattern, using two-level caching:
+     * Gets the AST pattern for this pattern, using three-level caching:
      * 1. Instance-level cache (fastest - this pattern instance)
      * 2. Global LRU cache (fast - shared across pattern instances with same code)
      * 3. Compute via TemplateProcessor (slow - parse and process)
      *
+     * @param expression Whether to parse the code as an expression, with statements as the fallback
      * @returns The cached or newly computed pattern AST
      * @internal
      */
-    async getAstPattern(): Promise<J> {
+    async getAstPattern(expression: boolean = false): Promise<J> {
         // Level 1: Instance cache (fastest path)
-        if (this._cachedAstPattern) {
-            return this._cachedAstPattern;
+        const instanceCached = this._cachedAstPatterns.get(expression);
+        if (instanceCached) {
+            return instanceCached;
         }
 
         // Generate cache key for global lookup
@@ -229,7 +283,7 @@ export class Pattern {
                 return `raw:${(c as RawCode).code}`;
             }
             return c.getName();
-        }).join(',');
+        }).join(',') + (expression ? '::expression' : '');
         const cacheKey = generateCacheKey(
             this.templateParts,
             capturesKey,
@@ -244,31 +298,44 @@ export class Pattern {
         let tree = globalAstCache.get(cacheKey);
         if (!tree) {
             // Level 3: Compute via TemplateEngine (slow path)
-            tree = await TemplateEngine.getPatternTree(
-                this.templateParts,
-                this.captures,
-                contextStatements,
-                this._options.dependencies || {},
-                this._options.types
-            );
+            try {
+                tree = await TemplateEngine.getPatternTree(
+                    this.templateParts,
+                    this.captures,
+                    contextStatements,
+                    this._options.dependencies || {},
+                    this._options.types,
+                    expression
+                );
+            } catch (e) {
+                // A block matches only a block, which the statement parse is for
+                if (!expression) {
+                    throw e;
+                }
+                const statementPattern = await this.getAstPattern(false);
+                this._cachedAstPatterns.set(expression, statementPattern);
+                return statementPattern;
+            }
             globalAstCache.set(cacheKey, tree);
         }
 
         // The key names captures but says nothing about their constraints, so two patterns of the
         // same shape share an entry; markers are attached per instance to keep them apart.
         const result = await TemplateEngine.attachCaptureMarkers(tree, this.captures);
-        this._cachedAstPattern = result;
+        this._cachedAstPatterns.set(expression, result);
 
         return result;
     }
 
     /**
-     * Creates a matcher for this pattern against a specific AST node.
+     * Matches this pattern against `tree`, returning what its captures hold, or `undefined` where it
+     * does not match. To see why it does not match, pass `{debug: true}`, or a predicate that picks
+     * the attempts to print, as {@link PatternOptions.debug} describes.
      *
      * @param tree The AST node to match against
      * @param cursor Cursor at the node's position in a larger tree. Used for context-aware
      *               capture constraints to navigate to parent nodes.
-     * @param options Optional match options (e.g., debug flag)
+     * @param options Optional match options, such as `debug`
      * @returns A MatchResult if the pattern matches, undefined otherwise
      *
      * @example
@@ -276,30 +343,21 @@ export class Pattern {
      * // Normal match
      * const match = await pattern.match(node, cursor);
      *
-     * // Debug this specific call
-     * const match = await pattern.match(node, cursor, { debug: true });
+     * // Print why this attempt matched or not
+     * const match = await pattern.match(node, cursor, {debug: true});
      * ```
      */
     async match(tree: J, cursor: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
         // Three-level precedence: call > pattern > global
-        const debugEnabled =
-            options?.debug !== undefined
-                ? options.debug  // 1. Explicit call-level (true OR false)
-                : (this._options.debug !== undefined
-                    ? this._options.debug  // 2. Explicit pattern-level
-                    : process.env.PATTERN_DEBUG === 'true');  // 3. Global
-
-        if (debugEnabled) {
-            // Use matchWithExplanation and log the result
-            const result = await this.matchWithExplanation(tree, cursor);
-            await this.logMatchResult(tree, cursor, result);
-
-            if (result.matched) {
-                // result.result is the MatchResult class instance
-                return result.result as MatchResult | undefined;
-            } else {
-                return undefined;
+        const debug = options?.debug ?? this._options.debug ?? process.env.PATTERN_DEBUG === 'true';
+        if (debug) {
+            // Taken before the first await, while the caller is still on the stack
+            const caller = callSite(new Error().stack);
+            const {attempt, patternAst, focus} = await this.attempt(tree, cursor);
+            if (debug === true || debug(tree, cursor, attempt)) {
+                await this.logMatchResult(tree, attempt, patternAst, focus, caller);
             }
+            return attempt.matched ? attempt.result as MatchResult : undefined;
         }
 
         // Fast path - no debug
@@ -310,121 +368,140 @@ export class Pattern {
         }
         // Create MatchResult with unified storage
         const storage = (matcher as any).storage;
-        return new MatchResult(new Map(storage));
+        return new MatchResult(new Map(storage), () => matcher.patternPrefixes());
     }
 
     /**
-     * Formats and logs the match result to stderr.
-     * @private
+     * Prints a match attempt to stderr, followed by a blank line. An attempt that prints the same as
+     * an earlier one prints only its heading.
      */
-    private async logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult): Promise<void> {
-        const patternSource = this.getPatternSource();
-        const patternId = `Pattern #${this.patternId}`;
-        const nodeKind = (tree as any).kind || 'unknown';
-        // Format kind: extract short name (e.g., "org.openrewrite.java.tree.J$Binary" -> "J$Binary")
-        const shortKind = typeof nodeKind === 'string'
-            ? nodeKind.split('.').pop() || nodeKind
-            : nodeKind;
+    private async logMatchResult(tree: J, attempt: MatchAttemptResult, patternAst: J, focus: Focus | undefined,
+                                 caller: string | undefined): Promise<void> {
+        const [source, heading, ...block] = await this.render(tree, attempt, patternAst, focus, caller, true);
+        const key = [heading, ...block.filter(line => !line.includes('called from'))].join('\n');
+        if (this.printedAttempts.has(key)) {
+            console.error(`${heading}, as before\n`);
+            return;
+        }
+        this.printedAttempts.add(key);
+        console.error(source);
+        console.error([heading, ...block].join('\n') + '\n');
+    }
 
-        // First, log the pattern source
-        console.error(`[${patternId}] ${patternSource}`);
-
-        // Build the complete match result message
-        const lines: string[] = [];
-
-        // Print the target tree being matched
-        let treeStr: string;
-        try {
-            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-            treeStr = await printer.print(tree);
-        } catch (e) {
-            treeStr = '(tree printing unavailable)';
+    /**
+     * The lines debug output prints for a match attempt. They start with the pattern and a heading that
+     * says where the code is. A success follows with the code and each capture lettered. A failure follows
+     * with the pattern and the code around the mismatch marked, and how they differ.
+     */
+    private async render(tree: J, attempt: MatchAttemptResult, patternAst: J, focus: Focus | undefined,
+                         caller: string | undefined, colours: boolean): Promise<string[]> {
+        const prefix = `[Pattern #${this.patternId}]`;
+        const location = attempt.location;
+        const where = location ? ` at ${location.sourcePath}` +
+            (location.line ? `:${location.line}:${location.column}` : '') : '';
+        const lines = [`${prefix} ${this.getPatternSource()}`,
+            `${prefix} ${attempt.matched ? '✅ SUCCESS' : '❌ FAILED'} matching against ${describeKind(tree)}${where}`];
+        if (caller) {
+            lines.push(`${prefix}    called from ${caller}`);
         }
 
-        if (result.matched) {
-            // Success case - result first, then tree, then captures
-            lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}:`);
-            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
-
-            // Log captured values
-            if (result.result) {
-                const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
-                if (storage && storage.size > 0) {
-                    for (const [name, value] of storage) {
-                        const extractedValue = (result.result as any).extractElements(value);
-                        const valueStr = this.formatCapturedValue(extractedValue);
-                        const displayName = this.unnamedCaptureMapping.get(name) || name;
-                        lines.push(`[${patternId}]    Captured '${displayName}': ${valueStr}`);
-                    }
-                }
+        if (attempt.matched) {
+            const result = attempt.result as any;
+            const captures = new Map<number, JTree | JTree[]>();
+            const legend: string[] = [];
+            for (const [name, value] of result.storage as Map<string, CaptureStorageValue>) {
+                const number = captures.size + 1;
+                const code = result.extractElements(value);
+                captures.set(number, code);
+                const displayName = this.unnamedCaptureMapping.get(name) ?? name;
+                const symbol = new CaptureHighlightMarker(number).symbol();
+                legend.push(`${prefix}     ${symbol} 🪝${displayName} = ${await describe(code)}`);
+            }
+            const printed = await this.printCaptures(tree, captures, location?.column);
+            lines.push(...printed.map(line => `${prefix}   ${line}`));
+            if (legend.length > 0) {
+                lines.push(prefix, `${prefix}   Captures:`, ...legend);
             }
         } else {
-            // Failure case - result first, then tree, then explanation
-            lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}:`);
-            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
-
-            const explanation = result.explanation;
+            const explanation = attempt.explanation;
+            const emoji = !colours || shouldUseEmoji();
+            const [green, red, reset] = emoji ? ['', '', ''] : ['\x1b[32m', '\x1b[31m', '\x1b[0m'];
+            if (emoji) {
+                lines.push(`${prefix}    (Mismatched elements are marked with 👉...👈)`);
+            }
+            const colored = (printed: string[], color: string) =>
+                printed.map(line => `${color}${prefix}       ${line}${reset}`);
+            const patternLines = await this.printMismatch(patternAst, explanation?.patternElement, focus?.pattern,
+                emoji);
+            const sourceLines = await this.printMismatch(tree, explanation?.targetElement, focus?.target, emoji,
+                location?.column);
+            lines.push(prefix, `${green}${prefix}    Pattern tree:${reset}`, ...colored(patternLines, green),
+                prefix, `${red}${prefix}    Source tree:${reset}`, ...colored(sourceLines, red));
             if (explanation) {
-                // Always show path, even if empty, to make it clear where the mismatch occurred
-                const compactedPath = this.compactPath(explanation.path);
-                const pathStr = compactedPath.length > 0 ? compactedPath.join(' → ') : '';
-                lines.push(`[${patternId}]    At path:  [${pathStr}]`);
-                lines.push(`[${patternId}]    Reason:   ${explanation.reason}`);
-                lines.push(`[${patternId}]    Expected: ${explanation.expected}`);
-                lines.push(`[${patternId}]    Actual:   ${explanation.actual}`);
+                lines.push(prefix, `${prefix}    Details:`,
+                    `${prefix}      Pattern:  ${explanation.expected}`,
+                    `${prefix}      Source:   ${explanation.actual}`,
+                    ...(explanation.details ? [`${prefix}      Note:     ${explanation.details}`] : []));
             }
         }
+        return lines;
+    }
 
-        // Single console.error call with all lines joined
-        console.error(lines.join('\n'));
+    /** The lines of `tree` around the mismatch, with it marked on `element` and narrowed to `focus` there. */
+    private async printMismatch(tree: J, element: JTree | undefined, focus: MarkFocus | undefined,
+                                emoji: boolean, column?: number): Promise<string[]> {
+        try {
+            const delimiters = mismatchDelimiters(emoji);
+            const marked = element ? await new ElementMarkerVisitor(element, emoji).visit(tree, undefined) as J : tree;
+            let printed = await TreePrinters.printer(JS.Kind.CompilationUnit)
+                .print(marked, new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER));
+            if (element && focus) {
+                printed = await narrowMark(printed, element as J, focus, delimiters);
+            }
+            return aroundMarks(layOut(this.replacePlaceholderNames(printed), column).split('\n'), delimiters);
+        } catch (e) {
+            return [`(tree printing unavailable: ${e})`];
+        }
+    }
+
+    /** The lines of `tree` with each capture's code between its letter, as in `Ⓐuser?Ⓐ.name`. */
+    private async printCaptures(tree: J, captures: Map<number, JTree | JTree[]>, column?: number): Promise<string[]> {
+        try {
+            const marked = await new ElementMarkerVisitor(captures).visit(tree, undefined) as J;
+            let printed = await TreePrinters.printer(JS.Kind.CompilationUnit)
+                .print(marked, new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER));
+            // An optional receiver's `?` and a non-null `!` belong to the captured code, which a template
+            // writes with them, but the printer writes them after the capture's closing letter
+            for (const [number, code] of captures) {
+                const last: any = [code].flat().pop();
+                const postfix = last?.markers?.markers.some((marker: any) =>
+                    marker.kind === JS.Markers.Optional || marker.kind === JS.Markers.NonNullAssertion);
+                if (postfix) {
+                    const symbol = new CaptureHighlightMarker(number).symbol();
+                    printed = printed.split(symbol + '?').join('?' + symbol).split(symbol + '!').join('!' + symbol);
+                }
+            }
+            return layOut(this.replacePlaceholderNames(printed), column).split('\n');
+        } catch (e) {
+            return [`(tree printing unavailable: ${e})`];
+        }
     }
 
     /**
-     * Compacts array index navigations into the previous path element.
-     * For example: ['J$VariableDeclarations#variables', '0'] → ['J$VariableDeclarations#variables[0]']
+     * Replaces placeholder names in tree strings with clean display names.
+     * Uses 🪝 prefix to make captures easily identifiable.
      * @private
      */
-    private compactPath(path: string[]): string[] {
-        const compacted: string[] = [];
-        let i = 0;
-
-        while (i < path.length) {
-            const current = path[i];
-
-            // Check if current element is itself a numeric index
-            if (/^\d+$/.test(current)) {
-                // This is a bare numeric index - shouldn't normally happen
-                // If we have a previous element, append to it
-                if (compacted.length > 0) {
-                    compacted[compacted.length - 1] += `[${current}]`;
-                } else {
-                    // No previous element to attach to - this is an error in path construction
-                    // Skip it to avoid bare [0] in output
-                    console.warn(`Warning: Path starts with numeric index '${current}' - skipping`);
-                }
-                i++;
-                continue;
-            }
-
-            // Look ahead to collect consecutive numeric indices
-            let j = i + 1;
-            const indices: string[] = [];
-            while (j < path.length && /^\d+$/.test(path[j])) {
-                indices.push(path[j]);
-                j++;
-            }
-
-            // If we found numeric indices, append them to current element
-            if (indices.length > 0) {
-                compacted.push(current + indices.map(idx => `[${idx}]`).join(''));
-                i = j; // Skip the indices we just processed
-            } else {
-                compacted.push(current);
-                i++;
-            }
+    private replacePlaceholderNames(treeStr: string): string {
+        let result = treeStr;
+        // Replace unnamed captures with their short forms (🪝1, 🪝2, etc.)
+        for (const [originalName, displayName] of this.unnamedCaptureMapping.entries()) {
+            const placeholder = `__capt_${originalName}__`;
+            result = result.split(placeholder).join(`🪝${displayName}`);
         }
-
-        return compacted;
+        // Replace all remaining __capt_XXX__ with 🪝XXX (for named captures)
+        result = result.replace(/__capt_([^_]+(?:_[^_]+)*)__/g, '🪝$1');
+        return result;
     }
 
     /**
@@ -446,9 +523,9 @@ export class Pattern {
                 // Show capture name or placeholder
                 const name = (cap as any)[CAPTURE_NAME_SYMBOL];
                 if (cap && typeof cap === 'object' && name) {
-                    // Use mapped name for unnamed captures, or original name
+                    // Use mapped name for unnamed captures, or original name (with 🪝 prefix)
                     const displayName = this.unnamedCaptureMapping.get(name) || name;
-                    source += `\${${displayName}}`;
+                    source += `\${🪝${displayName}}`;
                 } else {
                     source += '${...}';
                 }
@@ -459,82 +536,24 @@ export class Pattern {
     }
 
     /**
-     * Formats a captured value for logging.
-     * @private
-     */
-    private formatCapturedValue(value: any): string {
-        if (value === null) return 'null';
-        if (value === undefined) return 'undefined';
-
-        // Check if it's an array (variadic capture)
-        if (Array.isArray(value)) {
-            if (value.length === 0) return '[]';
-            const items = value.slice(0, 3).map(v => this.formatSingleValue(v));
-            const suffix = value.length > 3 ? `, ... (${value.length} total)` : '';
-            return `[${items.join(', ')}${suffix}]`;
-        }
-
-        return this.formatSingleValue(value);
-    }
-
-    /**
-     * Formats a single AST node for logging.
-     * @private
-     */
-    private formatSingleValue(value: any): string {
-        if (!value || typeof value !== 'object') {
-            return String(value);
-        }
-
-        const kind = (value as any).kind;
-        if (!kind) return String(value);
-
-        // Extract simple kind name (last segment)
-        const kindStr = kind.split('.').pop();
-
-        // For literals, show the value
-        if (kindStr === 'Literal' && value.value !== undefined) {
-            const litValue = typeof value.value === 'string'
-                ? `"${value.value}"`
-                : String(value.value);
-            return `${kindStr}(${litValue})`;
-        }
-
-        // For identifiers, show the name
-        if (kindStr === 'Identifier' && value.simpleName) {
-            return `${kindStr}(${value.simpleName})`;
-        }
-
-        // Default: just the kind
-        return kindStr;
-    }
-
-    /**
-     * Matches a pattern against an AST node with detailed debug information.
-     * Part of Layer 2 (Public API).
-     *
-     * This method always enables debug logging and returns detailed information about
-     * the match attempt, including:
-     * - Whether the pattern matched
-     * - Captured nodes (if matched)
-     * - Explanation of failure (if not matched)
-     * - Debug log entries showing the matching process
+     * Matches like {@link match}, and returns why the pattern did not match rather than printing it.
+     * A failed attempt's `explanation` holds the reason, the expected and actual code, and the pattern
+     * and source nodes where they differ. `debugLog` holds an entry for each capture constraint evaluated.
      *
      * @param tree The AST node to match against
      * @param cursor Cursor at the node's position in a larger tree
-     * @param debugOptions Optional debug options (defaults to all logging enabled)
-     * @returns Detailed result with debug information
+     * @param debugOptions Which entries `debugLog` collects, by default all of them
+     * @returns Whether the pattern matched, with the captures where it did and the explanation where it did not
      *
      * @example
      * const x = capture('x');
      * const pat = pattern`console.log(${x})`;
      * const attempt = await pat.matchWithExplanation(node, cursor);
      * if (attempt.matched) {
-     *     console.log('Matched!');
      *     console.log('Captured x:', attempt.result.get('x'));
      * } else {
-     *     console.log('Failed:', attempt.explanation);
-     *     console.log('Debug log:', attempt.debugLog);
+     *     const {reason, expected, actual} = attempt.explanation!;
+     *     console.log(`${reason}: the pattern has ${expected} where the source has ${actual}`);
      * }
      */
     async matchWithExplanation(
@@ -542,34 +561,36 @@ export class Pattern {
         cursor: Cursor,
         debugOptions?: DebugOptions
     ): Promise<MatchAttemptResult> {
-        // Default to full debug logging if not specified
-        const options: DebugOptions = {
-            enabled: true,
-            logComparison: true,
-            logConstraints: true,
-            ...debugOptions
-        };
+        return (await this.attempt(tree, cursor, debugOptions, true)).attempt;
+    }
 
+    /**
+     * The attempt, the pattern tree it compared, which holds the explanation's pattern element, and
+     * where on each side the mismatch is narrower than its marked node.
+     */
+    private async attempt(tree: J, cursor: Cursor, debugOptions?: DebugOptions, report: boolean = false):
+        Promise<{ attempt: MatchAttemptResult, patternAst: J, focus?: Focus }> {
+        const options: DebugOptions = {enabled: true, logComparison: true, logConstraints: true, ...debugOptions};
         const matcher = new Matcher(this, tree, cursor, options);
-        const success = await matcher.matches();
-
-        if (success) {
-            // Match succeeded - return MatchResult with debug info
-            const storage = (matcher as any).storage;
-            const matchResult = new MatchResult(new Map(storage));
-            return {
-                matched: true,
-                result: matchResult,
-                debugLog: matcher.getDebugLog()
-            };
-        } else {
-            // Match failed - return explanation
-            return {
-                matched: false,
-                explanation: matcher.getExplanation(),
-                debugLog: matcher.getDebugLog()
-            };
+        const matched = await matcher.matches();
+        const attempt: MatchAttemptResult = matched ? {
+            matched,
+            result: new MatchResult(new Map((matcher as any).storage), () => matcher.patternPrefixes()),
+            debugLog: matcher.getDebugLog()
+        } : {
+            matched,
+            explanation: await matcher.getExplanation(text => this.replacePlaceholderNames(text)),
+            debugLog: matcher.getDebugLog()
+        };
+        attempt.location = await sourceLocation(tree, cursor);
+        const patternAst = matcher.getPatternAst()!;
+        const focus = matcher.getFocus();
+        if (report) {
+            // Without the pattern's number, which depends on how many patterns were created before it
+            const lines = await this.render(tree, attempt, patternAst, focus, undefined, false);
+            attempt.report = lines.map(line => line.replace(/^\[Pattern #\d+] ?/, '')).join('\n') + '\n';
         }
+        return {attempt, patternAst, focus};
     }
 }
 
@@ -600,9 +621,12 @@ export class Pattern {
  */
 export class MatchResult implements IMatchResult {
     constructor(
-        private readonly storage: Map<string, CaptureStorageValue> = new Map()
+        private readonly storage: Map<string, CaptureStorageValue> = new Map(),
+        private readonly computePatternPrefixes: () => Map<string, J.Space> = () => new Map()
     ) {
     }
+
+    private patternPrefixes?: Map<string, J.Space>;
 
     // Overload: get with Capture returns value
     get<T>(capture: Capture<T>): T | undefined;
@@ -655,6 +679,11 @@ export class MatchResult implements IMatchResult {
         return value as J;
     }
 
+    /** @internal */
+    [PATTERN_PREFIXES_SYMBOL](): Map<string, J.Space> {
+        return this.patternPrefixes ??= this.computePatternPrefixes();
+    }
+
     /**
      * Internal method to get wrappers (used by template expansion).
      * Returns both scalar and variadic wrappers.
@@ -683,11 +712,10 @@ class Matcher {
     private readonly storage = new Map<string, CaptureStorageValue>();
     private patternAst?: J;
 
-    // Debug tracking (Layer 1: Core Instrumentation)
+    // Debug tracking
     private readonly debugOptions: DebugOptions;
     private readonly debugLog: DebugLogEntry[] = [];
-    private explanation?: MatchExplanation;
-    private readonly currentPath: string[] = [];
+    private explanation?: PendingExplanation;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -705,9 +733,13 @@ class Matcher {
     ) {
         this.cursor = cursor;
         this.debugOptions = debugOptions ?? {};
+        this.lenientTypeMatching = pattern.options.lenientTypeMatching ?? true;
+        this.sameCodeComparator = new JavaScriptSemanticComparatorVisitor(this.lenientTypeMatching);
     }
 
     private readonly cursor: Cursor;
+    private readonly lenientTypeMatching: boolean;
+    private readonly sameCodeComparator: JavaScriptSemanticComparatorVisitor;
 
     /**
      * Checks if the pattern matches the AST node.
@@ -716,10 +748,43 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
-            this.patternAst = await this.pattern.getAstPattern();
+            this.patternAst = await this.pattern.getAstPattern(
+                opensWithBrace(this.pattern.templateParts) && this.ast.kind !== J.Kind.Block);
         }
 
+        // A visit reaches what parentheses hold right after them, so seeing through them here would match it twice
+        if ((this.ast.kind === J.Kind.Parentheses || this.ast.kind === J.Kind.ControlParentheses) &&
+            this.patternAst.kind !== this.ast.kind) {
+            if (this.debugOptions.enabled) {
+                this.setExplanation('kind-mismatch', 'an expression without parentheses',
+                    `parentheses (${this.ast.kind.split('.').pop()})`,
+                    'A visitor reaches the expression inside the parentheses next, where this pattern can match it. ' +
+                    'To match the parentheses too, write them in the pattern.', this.patternAst, this.ast);
+            }
+            return false;
+        }
         return this.matchNode(this.patternAst, this.ast);
+    }
+
+    /**
+     * The prefix the pattern writes before each capture, by capture name. A capture of the whole
+     * match has none, since the prefix of what it holds lies outside the match.
+     */
+    patternPrefixes(): Map<string, J.Space> {
+        const prefixes = new Map<string, J.Space>();
+        walk(this.patternAst, node => {
+            const capture = isIdentifier(node) ? PlaceholderUtils.parseCapture(node.simpleName) : null;
+            if (capture && !prefixes.has(capture.name) && !this.capturesWholeMatch(capture.name)) {
+                prefixes.set(capture.name, (node as J.Identifier).prefix);
+            }
+            return true;
+        });
+        return prefixes;
+    }
+
+    private capturesWholeMatch(name: string): boolean {
+        const bound = this.storage.get(name);
+        return bound !== undefined && !Array.isArray(bound) && this.extractElements(bound) === this.ast;
     }
 
     /**
@@ -762,7 +827,6 @@ class Matcher {
 
     /**
      * Logs a debug message if debugging is enabled.
-     * Part of Layer 1 (Core Instrumentation).
      *
      * @param level The severity level
      * @param scope The scope/category
@@ -784,7 +848,6 @@ class Matcher {
         this.debugLog.push({
             level,
             scope,
-            path: [...this.currentPath],
             message,
             data
         });
@@ -793,48 +856,35 @@ class Matcher {
     /**
      * Sets the explanation for why the pattern match failed.
      * Only sets the first failure (most relevant).
-     * Part of Layer 1 (Core Instrumentation).
      *
      * @param reason The reason for failure
      * @param expected Human-readable description of what was expected
      * @param actual Human-readable description of what was found
      * @param details Optional additional context
+     * @param patternElement The actual pattern element that failed to match
+     * @param targetElement The actual target element that failed to match
      */
     private setExplanation(
         reason: MatchExplanation['reason'],
-        expected: string,
-        actual: string,
-        details?: string
+        expected: string | Promise<string>,
+        actual: string | Promise<string>,
+        details?: string,
+        patternElement?: any,
+        targetElement?: any,
+        focus?: Focus
     ): void {
         // Only set the first failure (most relevant)
         if (this.explanation) return;
 
         this.explanation = {
             reason,
-            path: [...this.currentPath],
             expected,
             actual,
-            details
+            details,
+            patternElement,
+            targetElement,
+            focus
         };
-    }
-
-    /**
-     * Pushes a path component onto the current path.
-     * Used to track where in the AST tree we are during matching.
-     * Part of Layer 1 (Core Instrumentation).
-     *
-     * @param name The path component to push
-     */
-    private pushPath(name: string): void {
-        this.currentPath.push(name);
-    }
-
-    /**
-     * Pops the last path component from the current path.
-     * Part of Layer 1 (Core Instrumentation).
-     */
-    private popPath(): void {
-        this.currentPath.pop();
     }
 
     /**
@@ -850,30 +900,30 @@ class Matcher {
         // - Kind checking
         // - Deep structural comparison
         // This centralizes all matching logic in one place
-        const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
-
         // Factory pattern: instantiate debug or production comparator
         // Zero cost in production - DebugPatternMatchingComparator is never instantiated
         const matcherCallbacks: MatcherCallbacks = {
             handleCapture: (capture: CaptureMarker, t: J, w?: J.RightPadded<J>) => this.handleCapture(capture, t, w),
             handleVariadicCapture: (capture: CaptureMarker, ts: J[], ws?: J.RightPadded<J>[]) => this.handleVariadicCapture(capture, ts, ws),
+            getCapture: (name: string) => this.storage.get(name),
             saveState: () => this.saveState(),
             restoreState: (state) => this.restoreState(state),
-            // Debug callbacks (Layer 1) - grouped together, always present or absent
+            // Debug callbacks, all present or all absent
             debug: this.debugOptions.enabled ? {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
-                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string) => this.setExplanation(reason, expected, actual, details),
+                setExplanation: (reason: MatchExplanation['reason'], expected: string | Promise<string>,
+                                 actual: string | Promise<string>, details?: string, patternElement?: any,
+                                 targetElement?: any, focus?: Focus) =>
+                    this.setExplanation(reason, expected, actual, details, patternElement, targetElement, focus),
                 getExplanation: () => this.explanation,
-                restoreExplanation: (explanation: MatchExplanation) => { this.explanation = explanation; },
-                clearExplanation: () => { this.explanation = undefined; },
-                pushPath: (name: string) => this.pushPath(name),
-                popPath: () => this.popPath()
+                restoreExplanation: (explanation: PendingExplanation) => { this.explanation = explanation; },
+                clearExplanation: () => { this.explanation = undefined; }
             } : undefined
         };
 
         const comparator = this.debugOptions.enabled
-            ? new DebugPatternMatchingComparator(matcherCallbacks, lenientTypeMatching)
-            : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
+            ? new DebugPatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching)
+            : new PatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
         const result = await comparator.compare(pattern, target, undefined, this.cursor);
@@ -886,7 +936,9 @@ class Matcher {
                 'structural-mismatch',
                 `Pattern node of type ${patternKind}`,
                 `Target node of type ${targetKind}`,
-                'Nodes did not match structurally'
+                'Nodes did not match structurally',
+                pattern,
+                target
             );
         }
 
@@ -895,7 +947,7 @@ class Matcher {
 
     /**
      * Saves the current state for backtracking.
-     * Includes both capture storage AND debug state (explanation, log, path).
+     * Includes both capture storage AND debug state (explanation, log).
      *
      * @returns A snapshot of the current state
      */
@@ -904,8 +956,7 @@ class Matcher {
             storage: new Map(this.storage),
             debugState: this.debugOptions.enabled ? {
                 explanation: this.explanation,
-                logLength: this.debugLog.length,
-                path: [...this.currentPath]
+                logLength: this.debugLog.length
             } : undefined
         };
     }
@@ -928,9 +979,6 @@ class Matcher {
             this.explanation = state.debugState.explanation;
             // Truncate debug log to saved length (remove entries added during failed attempt)
             this.debugLog.length = state.debugState.logLength;
-            // Restore path
-            this.currentPath.length = 0;
-            this.currentPath.push(...state.debugState.path);
         }
     }
 
@@ -942,7 +990,7 @@ class Matcher {
      * @param wrapper Optional wrapper containing the target (for preserving markers)
      * @returns true if the capture is successful, false otherwise
      */
-    private handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): boolean {
+    private async handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): Promise<boolean> {
         const captureName = capture.captureName;
 
         if (!captureName) {
@@ -960,10 +1008,29 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
+            const bound = this.storage.get(captureName);
+            if (bound !== undefined) {
+                return this.bindsSameCode(bound, [target]);
+            }
             // Store wrapper if available (preserves markers), otherwise store element
             this.storage.set(captureName, wrapper ?? target);
         }
 
+        return true;
+    }
+
+    /** A capture named twice in a pattern binds the same code at both places. */
+    private async bindsSameCode(bound: CaptureStorageValue, targets: J[]): Promise<boolean> {
+        const boundElements = (Array.isArray(bound) ? bound : [bound]).map(b =>
+            b.kind === J.Kind.RightPadded ? (b as J.RightPadded<J>).element : b as J);
+        if (boundElements.length !== targets.length) {
+            return false;
+        }
+        for (let i = 0; i < targets.length; i++) {
+            if (!await this.sameCodeComparator.compare(boundElements[i], targets[i])) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -975,7 +1042,7 @@ class Matcher {
      * @param wrappers Optional wrappers to preserve markers
      * @returns true if the capture is successful, false otherwise
      */
-    private handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
+    private async handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): Promise<boolean> {
         const captureName = capture.captureName;
 
         if (!captureName) {
@@ -993,6 +1060,10 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
+            const bound = this.storage.get(captureName);
+            if (bound !== undefined) {
+                return this.bindsSameCode(bound, targets);
+            }
             // Store the richest representation: wrappers if available, otherwise elements
             if (wrappers && wrappers.length > 0) {
                 this.storage.set(captureName, wrappers);
@@ -1006,7 +1077,6 @@ class Matcher {
 
     /**
      * Gets the debug log entries collected during matching.
-     * Part of Layer 2 (Public API).
      *
      * @returns The debug log entries, or undefined if debug wasn't enabled
      */
@@ -1015,13 +1085,26 @@ class Matcher {
     }
 
     /**
-     * Gets the explanation for why the match failed.
-     * Part of Layer 2 (Public API).
-     *
-     * @returns The match explanation, or undefined if match succeeded or no explanation available
+     * Why the match failed, once its expected and actual code have printed and `display` has
+     * rewritten the capture placeholders in them.
      */
-    getExplanation(): MatchExplanation | undefined {
-        return this.explanation;
+    async getExplanation(display: (text: string) => string): Promise<MatchExplanation | undefined> {
+        if (!this.explanation) {
+            return undefined;
+        }
+        const [expected, actual] = await Promise.all([this.explanation.expected, this.explanation.actual]);
+        const {focus, ...explanation} = this.explanation;
+        return {...explanation, expected: display(expected), actual: display(actual)};
+    }
+
+    /** Where the mismatch is narrower than the nodes the explanation marks. */
+    getFocus(): Focus | undefined {
+        return this.explanation?.focus;
+    }
+
+    /** The pattern tree the last attempt compared. */
+    getPatternAst(): J | undefined {
+        return this.patternAst;
     }
 }
 
@@ -1048,6 +1131,8 @@ class Matcher {
  */
 /**
  * Creates a pattern from a template literal (direct usage).
+ * To see why it does or does not match some code, pass `{debug: true}` to `match()`
+ * or create it with `pattern({debug: true})`, as {@link PatternOptions.debug} describes.
  *
  * @example
  * ```typescript
@@ -1061,7 +1146,8 @@ export function pattern(strings: TemplateStringsArray, ...captures: (Capture | A
  *
  * @example
  * ```typescript
- * const pat = pattern({ debug: true })`console.log(${x})`;
+ * // Prints why each match attempt matched or not, as PatternOptions.debug describes
+ * const pat = pattern({debug: true})`console.log(${x})`;
  * ```
  */
 export function pattern(options: PatternOptions): (strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]) => Pattern;

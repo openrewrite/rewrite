@@ -181,6 +181,34 @@ def test_conversion():
     RecipeSpec().rewrite_run(python("""a = f'{"foo"!r}'"""))
 
 
+def test_space_after_conversion():
+    # language=python
+    RecipeSpec().rewrite_run(python("""a = f'{"foo"!s  }'"""))
+    # language=python
+    RecipeSpec().rewrite_run(python("""a = f'{1.25!s  :10.10}' f'{x = !r }'"""))
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        a = f"{x!r # which
+          }"
+        b = 1
+        """
+    ))
+
+
+def test_comment_after_debug():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        a = f"{1+2 = # my comment
+          }"
+        b = f'''{x=
+        }'''
+        c = 1
+        """
+    ))
+
+
 def test_conversion_and_format():
     # language=python
     RecipeSpec().rewrite_run(python("""a = f'{"foo"!a:n}'"""))
@@ -303,3 +331,15 @@ def test_named_unicode_escape_beside_field_in_format_spec():
         r"""a = f"{x:{w}\N{BULLET}}"
 """
     ))
+
+
+@pytest.mark.parametrize('line_break', ['\r\n', '\r'], ids=['crlf', 'cr'])
+@pytest.mark.parametrize('source', [
+    'command = f"""get_addr {subnet}\n    --verbose"""\n',
+    "LOGGER.info(f'''Unsupported TLS {version}\n    for {ip}''')\n",
+    "LOGGER.error(f'''Answer for question \\\n{question} is incorrect''')\n",
+    "html = f'''\n    <td>{{{name}}}</td>\n    <td>{{literal}}</td>\n'''\n",
+    "x = f'''a {f'''b\n{c}'''}\n'''\n",
+], ids=['field-then-text', 'text-then-field', 'continuation', 'doubled-braces', 'nested'])
+def test_multiline_text_keeps_line_breaks(source: str, line_break: str):
+    RecipeSpec().rewrite_run(python(source.replace('\n', line_break)))

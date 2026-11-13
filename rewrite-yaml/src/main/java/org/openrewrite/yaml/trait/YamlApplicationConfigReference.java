@@ -33,7 +33,7 @@ public class YamlApplicationConfigReference extends YamlReference {
     Kind kind;
 
     public static class Provider extends YamlProvider {
-        private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
+        private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-[\\p{L}\\p{Nd}_.+@-]+)?\\.(yaml|yml)$").asPredicate();
         private static final SimpleTraitMatcher<YamlReference> matcher = new SimpleTraitMatcher<YamlReference>() {
             private final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
                             "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +

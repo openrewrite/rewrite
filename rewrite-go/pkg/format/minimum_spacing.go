@@ -55,21 +55,23 @@ func (v *MinimumViableSpacingVisitor) Visit(t java.Tree, p any) java.Tree {
 }
 
 func (v *MinimumViableSpacingVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
-	out := *cu
-	if cu.PackageDecl != nil {
-		decl := *cu.PackageDecl
-		decl.Element = separateFrom("package", decl.Element)
-		out.PackageDecl = &decl
+	out := cu
+	if pkg := cu.PackageDecl; pkg != nil {
+		if elem := separateFrom("package", pkg.Element); elem != pkg.Element {
+			decl := *pkg
+			decl.Element = elem
+			out = out.WithPackageDecl(&decl)
+		}
 	}
 	// Everything after the package clause is a declaration of its own, so the
 	// first one needs the same line break as the rest.
 	if cu.Imports != nil && cu.Imports.Before.IsEmpty() {
 		imports := *cu.Imports
-		imports.Before = java.Space{Whitespace: "\n"}
-		out.Imports = &imports
+		imports.Before = java.MakeSpace(nil, "\n")
+		out = out.WithImports(&imports)
 	}
-	out.Statements = separateStatements(cu.Statements, true)
-	return v.GoVisitor.VisitCompilationUnit(&out, p)
+	out = out.WithStatements(separateStatements(cu.Statements, true))
+	return v.GoVisitor.VisitCompilationUnit(out, p)
 }
 
 func (v *MinimumViableSpacingVisitor) VisitBlock(block *java.Block, p any) java.J {
@@ -80,23 +82,33 @@ func (v *MinimumViableSpacingVisitor) VisitBlock(block *java.Block, p any) java.
 
 func (v *MinimumViableSpacingVisitor) VisitCase(c *java.Case, p any) java.J {
 	out := v.GoVisitor.VisitCase(c, p).(*java.Case)
-	copied := *out
-	if len(out.Expressions.Elements) > 0 && !isDefaultClause(out) {
-		elements := append([]java.RightPadded[java.Expression](nil), out.Expressions.Elements...)
-		elements[0].Element = separateFrom("case", elements[0].Element)
-		copied.Expressions.Elements = elements
+	expressions := out.Expressions.Elements
+	if len(expressions) > 0 && !isDefaultClause(out) {
+		expressions = separateFirst("case", expressions)
 	}
-	copied.Body = separateStatements(out.Body, false)
+	body := separateStatements(out.Body.Elements, false)
+	if java.SameSlice(expressions, out.Expressions.Elements) && java.SameSlice(body, out.Body.Elements) {
+		return out
+	}
+	copied := *out
+	copied.Expressions.Elements = expressions
+	copied.Body.Elements = body
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	out := v.GoVisitor.VisitCommClause(cc, p).(*golang.CommClause)
-	copied := *out
-	if out.Comm != nil {
-		copied.Comm = separateFrom("case", out.Comm)
+	comm := out.Comm
+	if comm != nil {
+		comm = separateFrom("case", comm)
 	}
-	copied.Body = separateStatements(out.Body, false)
+	body := separateStatements(out.Body, false)
+	if comm == out.Comm && java.SameSlice(body, out.Body) {
+		return out
+	}
+	copied := *out
+	copied.Comm = comm
+	copied.Body = body
 	return &copied
 }
 
@@ -105,8 +117,12 @@ func (v *MinimumViableSpacingVisitor) VisitReturn(ret *java.Return, p any) java.
 	if out.Expression == nil {
 		return out
 	}
+	expr := separateFrom("return", out.Expression)
+	if expr == out.Expression {
+		return out
+	}
 	copied := *out
-	copied.Expression = separateFrom("return", out.Expression)
+	copied.Expression = expr
 	return &copied
 }
 
@@ -115,54 +131,65 @@ func (v *MinimumViableSpacingVisitor) VisitGoReturn(ret *golang.Return, p any) j
 	if len(out.Expressions) == 0 {
 		return out
 	}
+	expressions := separateFirst("return", out.Expressions)
+	if java.SameSlice(expressions, out.Expressions) {
+		return out
+	}
 	copied := *out
-	elements := append([]java.RightPadded[java.Expression](nil), out.Expressions...)
-	elements[0].Element = separateFrom("return", elements[0].Element)
-	copied.Expressions = elements
+	copied.Expressions = expressions
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J {
 	out := v.GoVisitor.VisitVariableDeclarations(vd, p).(*java.VariableDeclarations)
-	copied := *out
+	variables, typeExpr := out.Variables, out.TypeExpr
 
-	if keyword := declarationKeyword(out.Markers); keyword != "" && len(out.Variables) > 0 {
-		variables := append([]java.RightPadded[*java.VariableDeclarator](nil), out.Variables...)
-		variables[0].Element = separateFrom(keyword, variables[0].Element)
-		copied.Variables = variables
+	if keyword := declarationKeyword(out.Markers); keyword != "" && len(variables) > 0 {
+		variables = separateFirst(keyword, variables)
 	}
 	// Go writes a declared type straight after the name, so their separation is
 	// the grammar's rather than the layout's. An unnamed parameter or result
 	// prints no name to separate from.
-	if out.TypeExpr != nil && out.Varargs == nil && len(out.Variables) > 0 &&
-		getPrefix(out.TypeExpr).IsEmpty() && printer.Print(out.Variables[0].Element) != "" {
-		copied.TypeExpr = withLeadingSpace(out.TypeExpr).(java.Expression)
+	if typeExpr != nil && out.Varargs == nil && len(variables) > 0 &&
+		getPrefix(typeExpr).IsEmpty() && printer.Print(variables[0].Element) != "" {
+		typeExpr = withLeadingSpace(typeExpr).(java.Expression)
 	}
+	if java.SameSlice(variables, out.Variables) && typeExpr == out.TypeExpr {
+		return out
+	}
+	copied := *out
+	copied.Variables = variables
+	copied.TypeExpr = typeExpr
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	out := v.GoVisitor.VisitTypeDecl(td, p).(*golang.TypeDecl)
-	copied := *out
+	name, definition := out.Name, out.Definition
 	// A spec inside `type (…)` prints no keyword of its own.
-	if out.Name != nil && out.Specs == nil && !java.HasMarker[golang.GroupedSpec](out.Markers) {
-		copied.Name = separateFrom("type", out.Name)
+	if name != nil && out.Specs == nil && !java.HasMarker[golang.GroupedSpec](out.Markers) {
+		name = separateFrom("type", name)
 	}
-	if out.Definition != nil && out.Name != nil {
-		if fusesWith(printer.Print(out.Name), printer.Print(out.Definition)) {
-			copied.Definition = withLeadingSpace(out.Definition).(java.Expression)
+	if definition != nil && name != nil {
+		if fusesWith(printer.Print(name), printer.Print(definition)) {
+			definition = withLeadingSpace(definition).(java.Expression)
 		}
 	}
+	if name == out.Name && definition == out.Definition {
+		return out
+	}
+	copied := *out
+	copied.Name = name
+	copied.Definition = definition
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
 	out := v.GoVisitor.VisitMethodDeclaration(md, p).(*java.MethodDeclaration)
-	copied := *out
 	if out.Name != nil && !java.HasMarker[golang.InterfaceMethod](out.Markers) {
-		copied.Name = separateFrom("func", out.Name)
+		return out.WithName(separateFrom("func", out.Name))
 	}
-	return &copied
+	return out
 }
 
 // isDefaultClause reports whether c is Go's `default:`, which the printer spells
@@ -199,13 +226,25 @@ func separateStatements[T java.Tree](statements []java.RightPadded[T], separateF
 		if out == nil {
 			out = append([]java.RightPadded[T](nil), statements...)
 		}
-		if fixed, ok := any(withPrefix(rp.Element, java.Space{Whitespace: "\n"})).(T); ok {
+		if fixed, ok := any(withPrefix(rp.Element, java.MakeSpace(nil, "\n"))).(T); ok {
 			out[i].Element = fixed
 		}
 	}
 	if out == nil {
 		return statements
 	}
+	return out
+}
+
+// separateFirst separates the first of a list of elements from the keyword
+// written ahead of the list.
+func separateFirst[T java.Tree](keyword string, elements []java.RightPadded[T]) []java.RightPadded[T] {
+	first := separateFrom(keyword, elements[0].Element)
+	if any(first) == any(elements[0].Element) {
+		return elements
+	}
+	out := append([]java.RightPadded[T](nil), elements...)
+	out[0].Element = first
 	return out
 }
 
@@ -230,7 +269,7 @@ func separateFrom[T java.Tree](keyword string, t T, leading ...java.Space) T {
 }
 
 func withLeadingSpace(t java.Tree) java.Tree {
-	return withPrefix(t, java.Space{Whitespace: " "})
+	return withPrefix(t, java.MakeSpace(nil, " "))
 }
 
 // fusesWith reports whether the first token of after would join the last token
@@ -291,25 +330,24 @@ func (v *MinimumViableSpacingVisitor) VisitTypeParameter(tp *java.TypeParameter,
 	}
 	copied := *out
 	bounds := *out.Bounds
-	bounds.Before = java.Space{Whitespace: " "}
+	bounds.Before = java.MakeSpace(nil, " ")
 	copied.Bounds = &bounds
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 	out := v.GoVisitor.VisitIf(ifStmt, p).(*java.If)
-	copied := *out
 	if !v.followsAnInit() {
-		condition := out.Condition
-		condition.Tree.Element = separateFrom("if", condition.Tree.Element, condition.Prefix)
-		copied.Condition = condition
+		out = out.WithCondition(separateControl("if", out.Condition))
 	}
 	if out.ElsePart != nil && out.ElsePart.Body.Element != nil {
-		elsePart := *out.ElsePart
-		elsePart.Body.Element = separateFrom("else", elsePart.Body.Element)
-		copied.ElsePart = &elsePart
+		if body := separateFrom("else", out.ElsePart.Body.Element); body != out.ElsePart.Body.Element {
+			elsePart := *out.ElsePart
+			elsePart.Body.Element = body
+			out = out.WithElsePart(&elsePart)
+		}
 	}
-	return &copied
+	return out
 }
 
 func (v *MinimumViableSpacingVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
@@ -323,38 +361,69 @@ func (v *MinimumViableSpacingVisitor) VisitSwitch(sw *java.Switch, p any) java.J
 	if v.followsAnInit() {
 		return out
 	}
+	selector := separateControl("switch", out.Selector)
+	if selector == out.Selector {
+		return out
+	}
 	copied := *out
-	selector := *out.Selector
-	selector.Tree.Element = separateFrom("switch", selector.Tree.Element, selector.Prefix)
-	copied.Selector = &selector
+	copied.Selector = selector
+	return &copied
+}
+
+// separateControl separates the expression a keyword controls, which Go writes
+// without the parentheses the tree models around it.
+func separateControl(keyword string, control *java.ControlParentheses) *java.ControlParentheses {
+	element := separateFrom(keyword, control.Tree.Element, control.Prefix)
+	if element == control.Tree.Element {
+		return control
+	}
+	copied := *control
+	copied.Tree.Element = element
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
 	out := v.GoVisitor.VisitForEachControl(control, p).(*java.ForEachControl)
+	variable := separateFrom("for", out.Variable.Element, out.Prefix)
+	iterable := separateFrom("range", out.Iterable.Element)
+	if variable == out.Variable.Element && iterable == out.Iterable.Element {
+		return out
+	}
 	copied := *out
-	copied.Variable.Element = separateFrom("for", out.Variable.Element, out.Prefix)
-	copied.Iterable.Element = separateFrom("range", out.Iterable.Element)
+	copied.Variable.Element = variable
+	copied.Iterable.Element = iterable
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitGoStmt(g *golang.GoStmt, p any) java.J {
 	out := v.GoVisitor.VisitGoStmt(g, p).(*golang.GoStmt)
+	expr := separateFrom("go", out.Expr)
+	if expr == out.Expr {
+		return out
+	}
 	copied := *out
-	copied.Expr = separateFrom("go", out.Expr)
+	copied.Expr = expr
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitDefer(d *golang.Defer, p any) java.J {
 	out := v.GoVisitor.VisitDefer(d, p).(*golang.Defer)
+	expr := separateFrom("defer", out.Expr)
+	if expr == out.Expr {
+		return out
+	}
 	copied := *out
-	copied.Expr = separateFrom("defer", out.Expr)
+	copied.Expr = expr
 	return &copied
 }
 
 func (v *MinimumViableSpacingVisitor) VisitChannel(ch *golang.Channel, p any) java.J {
 	out := v.GoVisitor.VisitChannel(ch, p).(*golang.Channel)
+	value := separateFrom("chan", out.Value)
+	if value == out.Value {
+		return out
+	}
 	copied := *out
-	copied.Value = separateFrom("chan", out.Value)
+	copied.Value = value
 	return &copied
 }

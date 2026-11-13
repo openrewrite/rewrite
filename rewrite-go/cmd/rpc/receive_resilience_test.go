@@ -58,6 +58,12 @@ func frameReverseRequest(t *testing.T, method string) []byte {
 	})
 }
 
+// frameAbortGetObjectReply is the peer's answer once it has undone a transfer.
+func frameAbortGetObjectReply(t *testing.T) []byte {
+	t.Helper()
+	return frame(t, map[string]any{"jsonrpc": "2.0", "id": "go-AbortGetObject", "result": true})
+}
+
 // newResilienceTestServer returns a server with its log captured, since the
 // receive paths report desync by logging.
 func newResilienceTestServer(t *testing.T) (*server, *bytes.Buffer) {
@@ -130,79 +136,95 @@ func TestErrorOnAPrefetchedPageFailsTheTransfer(t *testing.T) {
 	require.Contains(t, fmt.Sprint(recovered), remoteMessage)
 }
 
-// TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs reproduces the
-// receive-stream cascade and pins down the containment contract.
-//
-// When a reverse GetObject panics mid-receive, the per-id baseline must be
-// dropped (so the next transfer of that id re-syncs as a full ADD rather than
-// a CHANGE delta against a baseline Go never finished applying — the source of
-// the "expected CHANGE with positions" cascade). The shared ref table must NOT
-// be wiped: Java's reverse-direction send refs are connection-scoped (cleared
-// only on Reset), so discarding Go's would make Java's bare {ref:N} look-ups
-// fail with "received reference to unknown object: N".
-func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
-	s, logs := newResilienceTestServer(t)
+// sentRequests reads back the requests the engine wrote to its peer.
+func sentRequests(t *testing.T, s *server) []jsonRPCRequest {
+	t.Helper()
+	sent, _ := newResilienceTestServer(t)
+	sent.reader = bufio.NewReader(bytes.NewReader(s.writer.(*bytes.Buffer).Bytes()))
+	var requests []jsonRPCRequest
+	for {
+		request, err := sent.readMessage()
+		if err != nil {
+			return requests
+		}
+		requests = append(requests, *request)
+	}
+}
 
-	// Java's two scripted replies on the reverse GetObject stream:
-	//  1) a bare reference to an object Go never received -> panics mid-receive
-	//     ("received reference to unknown object: 7"), a documented cascade
-	//     signature.
-	//  2) the page Go asks for ahead of the panic, since reply 1 does not close
-	//     the transfer; the failed transfer drains it rather than leaving it for
-	//     the next request to misread.
-	//  3) a clean full ADD of a simple value -> the follow-up request.
-	stream := append(
-		frameReverseGetObjectReply(t, []map[string]any{{"state": "ADD", "ref": 7}}),
-		append(
-			frameReverseGetObjectReply(t, []map[string]any{{"state": "END_OF_OBJECT"}}),
-			frameReverseGetObjectReply(t, []map[string]any{
-				{"state": "ADD", "value": "package main\n"},
-				{"state": "END_OF_OBJECT"},
-			})...,
-		)...,
-	)
-	s.reader = bufio.NewReader(bytes.NewReader(stream))
-	s.writer = &bytes.Buffer{} // the GetObject requests Go writes are irrelevant here
+// failedThenCleanTransfer scripts a transfer that defines ref 6 and then goes
+// on where the object should have ended, followed by the peer's answer to
+// being told so and a clean transfer of the same object.
+func failedThenCleanTransfer(t *testing.T, abortReply []byte) []byte {
+	t.Helper()
+	// The first page does not close the transfer, so the page after it has
+	// been asked for by the time the receive fails and has to be read past.
+	stream := frameReverseGetObjectReply(t, []map[string]any{
+		{"state": "ADD", "valueType": "org.openrewrite.java.tree.Space", "ref": 6},
+		{"state": "ADD", "ref": 7},
+	})
+	stream = append(stream, frameReverseGetObjectReply(t, []map[string]any{{"state": "END_OF_OBJECT"}})...)
+	stream = append(stream, abortReply...)
+	return append(stream, frameReverseGetObjectReply(t, []map[string]any{
+		{"state": "ADD", "value": "package main\n"},
+		{"state": "END_OF_OBJECT"},
+	})...)
+}
+
+// A receive that fails leaves the peer counting the object, and every ref it
+// sent with it, as received. Told that the transfer failed, the peer sends
+// both whole next time, so this side forgets what it had of them too.
+func TestFailedReceiveIsRolledBackWithThePeer(t *testing.T) {
+	s, logs := newResilienceTestServer(t)
+	s.reader = bufio.NewReader(bytes.NewReader(failedThenCleanTransfer(t, frameAbortGetObjectReply(t))))
+	s.writer = &bytes.Buffer{}
 
 	const id = "tree-X"
-	// Pre-seed state a live session would hold from prior successful cycles:
-	//  - a baseline that diverges from Java's once the receive panics, and
-	//  - a shared ref the panic must NOT wipe.
 	s.reverseRemoteObjects[id] = "STALE-BASELINE"
 	s.reverseRemoteRefs[5] = "shared-value-from-earlier-transfer"
 
-	// Transfer 1: must panic mid-receive.
-	panicked := func() (p bool) {
-		defer func() {
-			if r := recover(); r != nil {
-				p = true
-			}
-		}()
-		s.getObjectFromJava(id, "")
-		return false
-	}()
-	require.True(t, panicked, "transfer 1: expected a panic mid-receive, got none")
+	require.Panics(t, func() { s.getObjectFromJava(id, "") })
 
-	// Containment: the diverged per-id baseline is dropped.
-	if v, ok := s.reverseRemoteObjects[id]; ok {
-		t.Errorf("reverseRemoteObjects[%q] should be deleted after a receive panic, still present: %v", id, v)
-	}
-	// ...but the shared ref table survives.
-	if got := s.reverseRemoteRefs[5]; got != "shared-value-from-earlier-transfer" {
-		t.Errorf("reverseRemoteRefs[5] should survive a receive panic, got %v", got)
-	}
+	require.NotContains(t, s.reverseRemoteObjects, id, "the baseline the peer no longer diffs against")
+	require.NotContains(t, s.reverseRemoteRefs, 6, "a ref the failed transfer defined")
+	require.Equal(t, "shared-value-from-earlier-transfer", s.reverseRemoteRefs[5], "a ref from before it")
 
-	// Transfer 2: a fresh request on the same server must succeed cleanly,
-	// with no leftover state poisoning the receive.
-	got := s.getObjectFromJava(id, "")
-	if got != "package main\n" {
-		t.Errorf("transfer 2: want clean ADD value %q, got %#v", "package main\n", got)
-	}
-	if s.reverseRemoteObjects[id] != "package main\n" {
-		t.Errorf("transfer 2: baseline should be repopulated, got %#v", s.reverseRemoteObjects[id])
-	}
+	requests := sentRequests(t, s)
+	last := requests[len(requests)-1]
+	require.Equal(t, "AbortGetObject", last.Method)
+	require.JSONEq(t, `{"id":"tree-X"}`, string(last.Params))
+
+	// the next transfer reads its own reply, not one left over from the failure
+	require.Equal(t, "package main\n", s.getObjectFromJava(id, ""))
+	require.Equal(t, "package main\n", s.reverseRemoteObjects[id])
 	require.NotContains(t, logs.String(), "Expected the prefetched GetObject page",
-		"draining Java's own reply is the ordinary case and must not be reported as a desync")
+		"draining the peer's own reply is the ordinary case and must not be reported as a desync")
+}
+
+// A peer without the method still counts the refs it sent as received and
+// goes on sending them bare, so they are kept for it to name.
+func TestFailedReceiveKeepsItsRefsWhenThePeerCannotRollBack(t *testing.T) {
+	s, _ := newResilienceTestServer(t)
+	methodNotFound := frame(t, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "go-AbortGetObject",
+		"error":   map[string]any{"code": -32601, "message": "Method not found: AbortGetObject"},
+	})
+	s.reader = bufio.NewReader(bytes.NewReader(failedThenCleanTransfer(t, methodNotFound)))
+	s.writer = &bytes.Buffer{}
+
+	const id = "tree-X"
+	s.reverseRemoteObjects[id] = "STALE-BASELINE"
+
+	recovered := func() (r any) {
+		defer func() { r = recover() }()
+		s.getObjectFromJava(id, "")
+		return nil
+	}()
+
+	require.Contains(t, fmt.Sprint(recovered), "expected END_OF_OBJECT", "the receive's own failure")
+	require.NotContains(t, s.reverseRemoteObjects, id)
+	require.Contains(t, s.reverseRemoteRefs, 6)
+	require.Equal(t, "package main\n", s.getObjectFromJava(id, ""))
 }
 
 func TestDrainPageReadsPastARequestToReachTheGetObjectReply(t *testing.T) {
@@ -217,10 +239,13 @@ func TestDrainPageReadsPastARequestToReachTheGetObjectReply(t *testing.T) {
 			frameReverseRequest(t, "Visit"),
 			append(
 				frameReverseGetObjectReply(t, []map[string]any{{"state": "END_OF_OBJECT"}}),
-				frameReverseGetObjectReply(t, []map[string]any{
-					{"state": "ADD", "value": "package main\n"},
-					{"state": "END_OF_OBJECT"},
-				})...,
+				append(
+					frameAbortGetObjectReply(t),
+					frameReverseGetObjectReply(t, []map[string]any{
+						{"state": "ADD", "value": "package main\n"},
+						{"state": "END_OF_OBJECT"},
+					})...,
+				)...,
 			)...,
 		)...,
 	)

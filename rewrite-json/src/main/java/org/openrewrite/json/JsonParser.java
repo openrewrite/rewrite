@@ -49,11 +49,17 @@ public class JsonParser implements Parser {
 
                 JSON5Lexer lexer = new JSON5Lexer(CharStreams.fromString(sourceStr));
                 lexer.removeErrorListeners();
-                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                ForwardingErrorListener errorListener = new ForwardingErrorListener(input.getPath(), ctx);
+                lexer.addErrorListener(errorListener);
 
                 JSON5Parser parser = new JSON5Parser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                parser.addErrorListener(errorListener);
+
+                JSON5Parser.Json5Context tree = parser.json5();
+                // ANTLR error recovery yields trees with missing nodes or skipped tokens, which
+                // either break the visitor or produce an LST that does not print back to the input.
+                errorListener.throwIfSyntaxErrors();
 
                 Json.Document document = new JsonParserVisitor(
                         input.getRelativePath(relativeTo),
@@ -61,7 +67,7 @@ public class JsonParser implements Parser {
                         sourceStr,
                         charset,
                         charsetBomMarked
-                ).visitJson5(parser.json5());
+                ).visitJson5(tree);
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
@@ -90,6 +96,8 @@ public class JsonParser implements Parser {
     private static class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;
+        private @Nullable JsonParsingException firstError;
+        private int errorCount;
 
         private ForwardingErrorListener(Path sourcePath, ExecutionContext ctx) {
             this.sourcePath = sourcePath;
@@ -99,8 +107,26 @@ public class JsonParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            ctx.getOnError().accept(new JsonParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
+            JsonParsingException ex = new JsonParsingException(sourcePath,
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e);
+            if (firstError == null) {
+                firstError = ex;
+            }
+            errorCount++;
+        }
+
+        /**
+         * Fails the parse with the first syntax error encountered. The error is reported once, through the
+         * resulting {@link ParseError}, and via {@code ctx.getOnError()} by the caller.
+         */
+        private void throwIfSyntaxErrors() throws JsonParsingException {
+            if (firstError != null) {
+                if (errorCount > 1) {
+                    throw new JsonParsingException(sourcePath, firstError.getMessage() +
+                                                               " (" + (errorCount - 1) + " more syntax error(s))", firstError.getCause());
+                }
+                throw firstError;
+            }
         }
     }
 

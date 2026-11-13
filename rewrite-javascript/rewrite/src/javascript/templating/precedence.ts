@@ -75,6 +75,8 @@ interface SlotConstraints {
     readonly noLeadingDeclarationToken?: boolean;
     /** The slot is followed by `.`, so a bare integer literal would lex as a decimal point. */
     readonly followedByDot?: boolean;
+    /** The slot holds a `TypeTree`, so anything else is wrapped in `JS.TypeTreeExpression` as the parser does. */
+    readonly typeTree?: boolean;
 }
 
 /** The precedence of `expression` as printed; a kind this module does not model counts as Primary. */
@@ -93,9 +95,7 @@ export function precedenceOf(expression: J): number {
         case JS.Kind.SatisfiesExpression:
             return Precedence.Relational;
         case JS.Kind.AssignmentOperation:
-            // `**` is the odd one out: every other JS.AssignmentOperation is a compound assignment
-            return (expression as JS.AssignmentOperation).operator.element === JS.AssignmentOperation.Type.Power ?
-                Precedence.Exponentiation : Precedence.Assignment;
+            return isLegacyPower(expression as JS.AssignmentOperation) ? Precedence.Exponentiation : Precedence.Assignment;
         case J.Kind.Ternary:
         case J.Kind.Assignment:
         case J.Kind.AssignmentOperation:
@@ -158,10 +158,12 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
             if (precedence === undefined) {
                 return undefined;
             }
+            // Right-associative, and `-a ** b` is a syntax error
+            const exponentiation = binary.operator.element === JS.Binary.Type.Exponentiation;
             if (binary.left?.id === childId) {
-                return {precedence};
+                return {precedence: exponentiation ? Precedence.Postfix : precedence};
             }
-            return binary.right?.id === childId ? {precedence: precedence + 1} : undefined;
+            return binary.right?.id === childId ? {precedence: exponentiation ? precedence : precedence + 1} : undefined;
         }
 
         case J.Kind.Unary: {
@@ -193,25 +195,15 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
             return assignment.assignment?.element?.id === childId ? {precedence: Precedence.Assignment} : undefined;
         }
 
-        case J.Kind.AssignmentOperation: {
-            const assignment = parent as J.AssignmentOperation;
-            if (assignment.variable?.id === childId) {
-                return {precedence: Precedence.Call};
-            }
-            return assignment.assignment?.id === childId ? {precedence: Precedence.Assignment} : undefined;
-        }
-
+        case J.Kind.AssignmentOperation:
         case JS.Kind.AssignmentOperation: {
-            const assignment = parent as JS.AssignmentOperation;
-            const power = assignment.operator.element === JS.AssignmentOperation.Type.Power;
+            const assignment = parent as J.AssignmentOperation;
+            const power = parent.kind === JS.Kind.AssignmentOperation && isLegacyPower(parent as JS.AssignmentOperation);
             if (assignment.variable?.id === childId) {
-                // `-a ** b` is a syntax error, and `**` is right-associative besides
                 return {precedence: power ? Precedence.Postfix : Precedence.Call};
             }
-            if (assignment.assignment?.id === childId) {
-                return {precedence: power ? Precedence.Exponentiation : Precedence.Assignment};
-            }
-            return undefined;
+            return assignment.assignment?.id === childId ?
+                {precedence: power ? Precedence.Exponentiation : Precedence.Assignment} : undefined;
         }
 
         case J.Kind.FieldAccess: {
@@ -247,7 +239,7 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
         case J.Kind.NewClass: {
             const newClass = parent as J.NewClass;
             if (newClass.class?.id === childId) {
-                return {precedence: Precedence.Call, noCallShape: true, noOptionalChain: true};
+                return {precedence: Precedence.Call, noCallShape: true, noOptionalChain: true, typeTree: true};
             }
             return isContainerElement(newClass.arguments, childId) ? {precedence: Precedence.Assignment} : undefined;
         }
@@ -303,7 +295,7 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
         case J.Kind.ClassDeclaration:
             // `class A extends B {}` takes a LeftHandSideExpression
             return (parent as J.ClassDeclaration).extends?.element?.id === childId ?
-                {precedence: Precedence.Call} : undefined;
+                {precedence: Precedence.Call, typeTree: true} : undefined;
 
         case JS.Kind.ExpressionStatement:
             return (parent as JS.ExpressionStatement).expression?.id === childId ?
@@ -325,22 +317,42 @@ export function requiredPrecedence(parent: J, childId: string): number | undefin
  */
 export function maybeParenthesize(parent: J | undefined, childId: string, expression: J,
                                   slotMarkers?: Markers): J {
-    if (!parent) {
-        return expression;
-    }
-
-    const constraints = slotConstraints(parent, childId);
+    const constraints = parent && slotConstraints(parent, childId);
     if (!constraints) {
-        return expression;
+        return followsTrailingMarker(expression, slotMarkers) ? parenthesize(expression, slotMarkers) : expression;
     }
 
     // A statement wrapper is transparent here: the parentheses belong around the expression
     if (expression.kind === JS.Kind.ExpressionStatement) {
         const inner = (expression as JS.ExpressionStatement).expression;
-        const wrapped = wrapIfNeeded(parent, childId, constraints, inner, slotMarkers);
+        const wrapped = wrapIfNeeded(parent!, childId, constraints, inner, slotMarkers);
         return wrapped === inner ? expression : {...expression, expression: wrapped} as JS.ExpressionStatement;
     }
-    return wrapIfNeeded(parent, childId, constraints, expression, slotMarkers);
+    const wrapped = wrapIfNeeded(parent!, childId, constraints, expression, slotMarkers);
+    return constraints.typeTree ? asTypeTree(wrapped) : wrapped;
+}
+
+/** Whether the slot puts a `!` or `?.` after `expression`, which binds looser than the left-hand side they follow. */
+function followsTrailingMarker(expression: J, slotMarkers: Markers | undefined): boolean {
+    return !!slotMarkers?.markers.some(isTrailingMarker) && precedenceOf(expression) < Precedence.Call;
+}
+
+function asTypeTree(expression: J): J {
+    switch (expression.kind) {
+        case J.Kind.Identifier:
+        case J.Kind.FieldAccess:
+        case J.Kind.ArrayType:
+        case J.Kind.ParameterizedType:
+        case JS.Kind.TypeTreeExpression:
+            return expression;
+    }
+    return {
+        kind: JS.Kind.TypeTreeExpression,
+        id: randomId(),
+        prefix: expression.prefix,
+        markers: emptyMarkers,
+        expression: {...expression, prefix: emptySpace}
+    } as JS.TypeTreeExpression;
 }
 
 /** The nearest enclosing LST node in a cursor path, skipping the padding wrappers visitors push. */
@@ -383,7 +395,7 @@ export function parenthesize(expression: J, slotMarkers?: Markers): J.Parenthese
 
 function wrapIfNeeded(parent: J, childId: string, constraints: SlotConstraints, expression: J,
                       slotMarkers: Markers | undefined): J {
-    if (precedenceOf(expression) < constraints.precedence ||
+    if (precedenceOf(expression) < constraints.precedence || followsTrailingMarker(expression, slotMarkers) ||
         (constraints.noCallShape && isCallShaped(expression)) ||
         (constraints.noOptionalChain && hasOptionalChain(expression)) ||
         (constraints.noLeadingObjectLiteral && startsWithObjectLiteral(expression)) ||
@@ -446,9 +458,16 @@ function jsBinaryPrecedence(operator: JS.Binary.Type): number | undefined {
             return Precedence.LogicalOr;
         case JS.Binary.Type.Comma:
             return Precedence.Comma;
+        case JS.Binary.Type.Exponentiation:
+            return Precedence.Exponentiation;
         default:
             return undefined;
     }
+}
+
+/** `a ** b` as parsed before it was a {@link JS.Binary}, which trees from an older parser still hold. */
+function isLegacyPower(assignment: JS.AssignmentOperation): boolean {
+    return assignment.operator.element === JS.AssignmentOperation.Type.Power;
 }
 
 function isUpdateOperator(operator: J.Unary.Type): boolean {
@@ -468,8 +487,8 @@ function hasOmitParentheses(newClass: J.NewClass): boolean {
     return !!newClass.arguments?.markers?.markers?.some(marker => marker.kind === J.Markers.OmitParentheses);
 }
 
-/** The JS parser reuses `J.NewClass` for object literals, which have no `class`. */
-function isObjectLiteral(expression: J): boolean {
+/** Whether `expression` is an object literal, which the JS parser models as a `J.NewClass` with no `class`. */
+export function isObjectLiteral(expression: J): expression is J.NewClass {
     return expression.kind === J.Kind.NewClass && !(expression as J.NewClass).class;
 }
 
@@ -522,8 +541,11 @@ export function startsWithDeclarationToken(expression: J): boolean {
     return isObjectLiteral(leftmost) || isFunctionOrClassExpression(leftmost);
 }
 
-/** A function or class *expression*, which the JS parser wraps in a `JS.StatementExpression`. */
-function isFunctionOrClassExpression(expression: J): boolean {
+/**
+ * Whether `expression` is a function or class *expression*, which the JS parser wraps in a
+ * `JS.StatementExpression`. An arrow function is a `JS.ArrowFunction` and does not count.
+ */
+export function isFunctionOrClassExpression(expression: J): expression is JS.StatementExpression {
     if (expression.kind !== JS.Kind.StatementExpression) {
         return false;
     }
@@ -531,8 +553,24 @@ function isFunctionOrClassExpression(expression: J): boolean {
     return statement?.kind === J.Kind.MethodDeclaration || statement?.kind === J.Kind.ClassDeclaration;
 }
 
-/** Walks down the left spine, to the token the expression starts with. */
-function leftmostExpression(expression: J): J {
+/**
+ * The function a function *expression* `function () {}` declares, unwrapped from the
+ * `JS.StatementExpression` the JS parser puts around it. Anything else, a function declaration
+ * or a method included, answers undefined, and so does a class expression.
+ */
+export function functionExpressionOf(expression: J): J.MethodDeclaration | undefined {
+    if (expression.kind !== JS.Kind.StatementExpression) {
+        return undefined;
+    }
+    const statement = (expression as JS.StatementExpression).statement;
+    return statement?.kind === J.Kind.MethodDeclaration ? statement as J.MethodDeclaration : undefined;
+}
+
+/**
+ * Walks down the left spine, to the node holding the token the expression is printed starting
+ * with: `a` in `a.b().c + 1`. A node with no left operand answers itself.
+ */
+export function leftmostExpression(expression: J): J {
     let current = expression;
     for (let next = leftmostChild(current); next; next = leftmostChild(current)) {
         current = next;
@@ -540,7 +578,17 @@ function leftmostExpression(expression: J): J {
     return current;
 }
 
-function leftmostChild(expression: J): J | undefined {
+/** Whether `child` is the {@link leftmostChild} of `parent`, so that `parent` is printed starting with it. */
+export function isLeftmostChild(parent: J, child: J): boolean {
+    return leftmostChild(parent)?.id === child.id;
+}
+
+/**
+ * The operand `expression` is printed starting with, one step down its left spine: the left of a
+ * binary, the target of a member access, the callee of a call, the operand of a postfix `++`/`--`.
+ * Undefined where the expression starts with a token of its own, as a prefix unary or a literal does.
+ */
+export function leftmostChild(expression: J): J | undefined {
     switch (expression.kind) {
         case J.Kind.Binary:
             return (expression as J.Binary).left;
@@ -582,7 +630,7 @@ function leftmostChild(expression: J): J | undefined {
 }
 
 /** Markers the printer emits *after* the node they sit on. */
-function isTrailingMarker(marker: Marker): boolean {
+export function isTrailingMarker(marker: Marker): boolean {
     return marker.kind === JS.Markers.NonNullAssertion || marker.kind === JS.Markers.Optional;
 }
 

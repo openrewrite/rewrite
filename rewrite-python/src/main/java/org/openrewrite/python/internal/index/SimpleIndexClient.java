@@ -27,6 +27,8 @@ import org.openrewrite.python.internal.pep508.Pep508Requirement;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -93,8 +95,7 @@ public class SimpleIndexClient {
         try (HttpSender.Response response = httpSender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
-                throw new PythonIndexException(Reason.AUTH_FAILED, index.getUrl(),
-                        "HTTP " + code + " from " + pageUrl);
+                throw PythonIndexException.authFailed(index, code, pageUrl);
             }
             if (code == 404) {
                 throw new PythonIndexException(Reason.NOT_FOUND, index.getUrl(),
@@ -232,9 +233,32 @@ public class SimpleIndexClient {
             // PEP 592: presence of data-yanked means yanked, its value is only the reason
             boolean yanked = YANKED.matcher(attrsText).find();
             files.add(new PackageFile(filename, resolve(pageUrl, href), sha256,
-                    attrs.get("data-requires-python"), coreMetadata, yanked, null, null));
+                    attrs.get("data-requires-python"), coreMetadata, yanked, htmlSize(attrs),
+                    htmlUploadTime(attrs)));
         }
         return new PackageListing(packageName, files);
+    }
+
+    private static @Nullable Long htmlSize(Map<String, String> attrs) {
+        String size = attrs.get("data-size");
+        try {
+            return size == null ? null : Long.valueOf(size.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable String htmlUploadTime(Map<String, String> attrs) {
+        String uploadTime = attrs.get("data-upload-time");
+        if (uploadTime == null) {
+            return null;
+        }
+        try {
+            OffsetDateTime.parse(uploadTime.trim());
+            return uploadTime.trim();
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     private static String resolve(String pageUrl, String ref) {

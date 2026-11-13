@@ -75,13 +75,10 @@ class ParameterizedTypeTest implements RewriteTest {
                 assertThat(arrayType.getTypeParameters()).hasSize(1);
                 assertThat(arrayType.getTypeParameters().get(0)).isInstanceOf(J.Identifier.class);
                 assertThat(((J.Identifier) arrayType.getTypeParameters().get(0)).getSimpleName()).isEqualTo("String");
-                assertThat(arrayType.getType()).isInstanceOf(JavaType.Parameterized.class);
-                JavaType.Parameterized attributedType = (JavaType.Parameterized) arrayType.getType();
-                assertThat(attributedType.getType().getFullyQualifiedName()).isEqualTo("scala.Array");
-                assertThat(attributedType.getTypeParameters()).hasSize(1);
-                assertThat(attributedType.getTypeParameters().get(0))
-                  .isInstanceOf(JavaType.FullyQualified.class);
-                assertThat(((JavaType.FullyQualified) attributedType.getTypeParameters().get(0)).getFullyQualifiedName())
+                assertThat(arrayType.getType()).isInstanceOf(JavaType.Array.class);
+                JavaType.Array attributedType = (JavaType.Array) arrayType.getType();
+                assertThat(attributedType.getElemType()).isInstanceOf(JavaType.FullyQualified.class);
+                assertThat(((JavaType.FullyQualified) attributedType.getElemType()).getFullyQualifiedName())
                   .isEqualTo("java.lang.String");
             })
           )

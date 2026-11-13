@@ -19,7 +19,11 @@ package format
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 )
 
 func TestUnaryOperandSpacing(t *testing.T) {
@@ -48,4 +52,32 @@ func TestUnaryOperandSpacing(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSpacesVisitorWritesOneSpaceAfterImport(t *testing.T) {
+	// given import declarations, grouped and not, with two spaces or none after
+	// the keyword
+	src := "package p\n\nimport  (\n\t\"fmt\"\n)\n\nimport(\n\t\"os\"\n)\n\nimport  \"strings\"\n\nvar _, _, _ = fmt.Sprint, os.Args, strings.Join\n"
+	cu, err := parser.NewGoParser().Parse("t.go", src)
+	require.NoError(t, err)
+
+	// when
+	out := NewSpacesVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, "package p\n\nimport (\n\t\"fmt\"\n)\n\nimport (\n\t\"os\"\n)\n\nimport \"strings\"\n\nvar _, _, _ = fmt.Sprint, os.Args, strings.Join\n", printer.Print(out))
+}
+
+func TestSpacesVisitorLeavesTheVisitedTreeUntouched(t *testing.T) {
+	// given
+	src := "package main\n\nfunc f() {\n\tx := 0\n\tx=1\n\tx+=2\n\t_ = ! true\n}\n"
+	cu, err := parser.NewGoParser().Parse("t.go", src)
+	require.NoError(t, err)
+
+	// when
+	out := NewSpacesVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, src, printer.Print(cu))
+	assert.Equal(t, "package main\n\nfunc f() {\n\tx := 0\n\tx = 1\n\tx += 2\n\t_ = !true\n}\n", printer.Print(out))
 }

@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
+import org.jetbrains.kotlin.config.MessageCollectorAccess
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -117,6 +118,7 @@ class RecipeCompilerPluginRegistrarTest {
         assertThat(result.messages).contains("kotlin(\"jvm\")")
     }
 
+    @OptIn(MessageCollectorAccess::class)
     private fun configurationWith(messageCollector: MessageCollector) = CompilerConfiguration().apply {
         put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
     }

@@ -49,6 +49,33 @@ class AddKeyValueTest implements RewriteTest {
     }
 
     @Test
+    void keepFormattingOfOtherMembers() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "x",
+                  "o": {"a": 1, "b": 2},
+                  "l": [1,
+                        2]
+              }
+              """,
+            """
+              {
+                  "x": "x",
+                  "o": {"a": 1, "b": 2},
+                  "l": [1,
+                        2],
+                  "key": "val"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldAppendToNestedObject() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue("$.x.y.*", "key", "\"val\"", false)),
@@ -67,6 +94,59 @@ class AddKeyValueTest implements RewriteTest {
                       "y": {
                           "key": "val"
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldAppendToNestedObjectAddressedByItsKey() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.x.y", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": {
+                      "y": {}
+                  }
+              }
+              """,
+            """
+              {
+                  "x": {
+                      "y": {
+                          "key": "val"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingWildcardAppendsToTheObjectNotToItsChildren() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.x.*", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": {
+                      "a": {},
+                      "b": {}
+                  }
+              }
+              """,
+            """
+              {
+                  "x": {
+                      "a": {},
+                      "b": {},
+                      "key": "val"
                   }
               }
               """
@@ -193,6 +273,77 @@ class AddKeyValueTest implements RewriteTest {
                   },
                   "x": "x",
                   "l": [1, 2]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keyIsWrittenEscapedAndFoundByTheTextItStandsFor() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "\\.(css|less)$", "\"identity-obj-proxy\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "y"
+              }
+              """,
+            """
+              {
+                  "x": "y",
+                  "\\\\.(css|less)$": "identity-obj-proxy"
+              }
+              """
+          ),
+          //language=json
+          json(
+            """
+              {
+                  "\\\\.(css|less)$": "other"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keyThatReadsLikeASurrogateEscapeIsWrittenAsPlainText() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "\\ud800", "\"value\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "y"
+              }
+              """,
+            """
+              {
+                  "x": "y",
+                  "\\\\ud800": "value"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void membersWithUnpairedSurrogatesPrintAsWritten() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "added", "\"v\\ud800\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "\\ud800": "\\udfff"
+              }
+              """,
+            """
+              {
+                  "\\ud800": "\\udfff",
+                  "added": "v\\ud800"
               }
               """
           )

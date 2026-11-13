@@ -142,6 +142,7 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
                     return ident;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -178,6 +179,7 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
                     return await rule.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -254,6 +256,7 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
                     return await rule.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -388,6 +391,7 @@ describe('preMatch and postMatch Predicates on RewriteRule', () => {
                     return await combined.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript

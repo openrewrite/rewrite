@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
+import static org.openrewrite.rpc.Reference.asRef;
 
 @Value
 @With
@@ -125,7 +126,7 @@ public class ParseError implements SourceFile, RpcCodec<ParseError> {
     @Override
     public void rpcSend(ParseError after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
-        q.getAndSend(after, Tree::getMarkers);
+        q.getAndSend(after, mk -> asRef(mk.getMarkers()));
         q.getAndSend(after, (ParseError d) -> d.getSourcePath().toString());
         q.getAndSend(after, (ParseError d) -> d.getCharset().name());
         q.getAndSend(after, ParseError::isCharsetBomMarked);

@@ -22,9 +22,9 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
+import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 
@@ -90,13 +90,22 @@ public interface Hcl extends Tree {
         @Getter
         Expression name;
 
+        /**
+         * @return The name of this attribute. Quoted object keys like {@code "quoted-key" = 1} yield their
+         * unquoted content. Keys whose value is not statically known, such as {@code "${local.a}b"} or
+         * {@code (local.a)}, yield their source text.
+         */
         @JsonIgnore
         public String getSimpleName() {
-            return getSimpleName(name);
-        }
-
-        private String getSimpleName(Expression e) {
-            return e instanceof Parentheses ? getSimpleName(((Parentheses) e).getExpression()) : ((Identifier) e).getName();
+            Expression e = name;
+            while (e instanceof Parentheses) {
+                e = ((Parentheses) e).getExpression();
+            }
+            if (e instanceof Identifier) {
+                return ((Identifier) e).getName();
+            }
+            String value = HclValues.stringValue(e);
+            return value != null ? value : name.printTrimmed(new HclPrinter<>());
         }
 
         HclLeftPadded<Type> type;
@@ -125,7 +134,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Attribute{" + name + "}";
+            return "Attribute{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public enum Type {
@@ -205,7 +214,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "AttributeAccess{" + attribute + "." + name + "}";
+            return "AttributeAccess{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -274,7 +283,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "LegacyIndexAttributeAccess{" + base + "." + index + "}";
+            return "LegacyIndexAttributeAccess{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -353,7 +362,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Binary";
+            return "Binary{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public enum Type {
@@ -431,6 +440,25 @@ public interface Hcl extends Tree {
         @With
         List<BodyContent> body;
 
+        /**
+         * @return The block type, such as {@code resource}, or {@code null} for anonymous block expressions.
+         */
+        @Incubating(since = "8.94.0")
+        @JsonIgnore
+        public @Nullable String getSimpleName() {
+            return type == null ? null : type.getName();
+        }
+
+        /**
+         * @param index The zero-based position of the label.
+         * @return The name of the label at the given position, or {@code null} if the block has fewer labels.
+         * @see Label#getSimpleName()
+         */
+        @Incubating(since = "8.94.0")
+        public @Nullable String getLabelName(int index) {
+            return index >= 0 && index < labels.size() ? labels.get(index).getSimpleName() : null;
+        }
+
         @Incubating(since = "7.27.0")
         public @Nullable Attribute getAttribute(String attrName) {
             for (BodyContent t : body) {
@@ -454,7 +482,7 @@ public interface Hcl extends Tree {
         @Incubating(since = "7.27.0")
         public Hcl.Block withAttributeValue(String attrName, Object value) {
             Attribute attr = getAttribute(attrName);
-            if (attr == null || getAttributeValue(attrName).equals(value)) {
+            if (attr == null || value.equals(getAttributeValue(attrName))) {
                 return this;
             }
 
@@ -462,11 +490,13 @@ public interface Hcl extends Tree {
                 if (b == attr) {
                     if (attr.getValue() instanceof Literal) {
                         Literal l = (Literal) attr.getValue();
-                        return attr.withValue(l.withValue(value.toString()).withValueSource("\"" + value + "\""));
+                        String valueSource = value instanceof String ? "\"" + value + "\"" : value.toString();
+                        return valueSource.equals(l.getValueSource()) ? attr :
+                                attr.withValue(l.withValue(value).withValueSource(valueSource));
                     } else if (attr.getValue() instanceof QuotedTemplate) {
                         QuotedTemplate q = (QuotedTemplate) attr.getValue();
                         return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),
-                                Space.EMPTY, Markers.EMPTY, value, value.toString()))));
+                                Space.EMPTY, Markers.EMPTY, HclString.decodeQuoted(value.toString()), value.toString()))));
                     }
                 }
                 return b;
@@ -487,12 +517,9 @@ public interface Hcl extends Tree {
             Object value = attr.getValue() instanceof Literal ?
                     ((Literal) attr.getValue()).getValueSource() : null;
             if (attr.getValue() instanceof QuotedTemplate) {
-                Cursor root = new Cursor(null, HclParser.builder().build().parse("")
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL")));
                 StringBuilder valueBuilder = new StringBuilder();
                 for (Expression expr : ((QuotedTemplate) attr.getValue()).getExpressions()) {
-                    valueBuilder.append(expr.print(root));
+                    valueBuilder.append(expr.print(new HclPrinter<>()));
                 }
                 value = valueBuilder.toString();
             }
@@ -515,7 +542,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Block";
+            return "Block{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
     }
 
@@ -572,7 +599,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Block";
+            return "Conditional{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -673,7 +700,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "ConfigFile";
+            return "ConfigFile{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         @Override
@@ -703,7 +730,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Empty";
+            return "Empty{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
     }
 
@@ -750,7 +777,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "ForIntro";
+            return "ForIntro{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -855,7 +882,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "ForTuple";
+            return "ForObject{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -961,7 +988,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "ForTuple";
+            return "ForTuple{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -1044,7 +1071,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "FunctionCall{" + name + ", argArity=" + arguments.getElements().size() + "}";
+            return "FunctionCall{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -1116,7 +1143,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "QuotedTemplate";
+            return "HeredocTemplate{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
     }
 
@@ -1144,7 +1171,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Identifier{" + name + "}";
+            return "Identifier{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
     }
 
@@ -1175,7 +1202,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Index";
+            return "Index{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1217,7 +1244,7 @@ public interface Hcl extends Tree {
 
             @Override
             public String toString() {
-                return "IndexPosition";
+                return "IndexPosition{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
             }
 
             public Padding getPadding() {
@@ -1278,7 +1305,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Literal{" + valueSource + "}";
+            return "Literal{" + withPrefix(Space.EMPTY).print(new HclPrinter<>()) + "}";
         }
     }
 
@@ -1325,7 +1352,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "ObjectValue";
+            return "ObjectValue{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -1396,7 +1423,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Parentheses";
+            return "Parentheses{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -1452,7 +1479,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "QuotedTemplate";
+            return "QuotedTemplate{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
     }
 
@@ -1483,7 +1510,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Splat{" + select + "}";
+            return "Splat{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1521,7 +1548,7 @@ public interface Hcl extends Tree {
 
             @Override
             public String toString() {
-                return "SplatOperator";
+                return "SplatOperator{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
             }
 
             public enum Type {
@@ -1570,7 +1597,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "TemplateInterpolation";
+            return "TemplateInterpolation{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -1641,7 +1668,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Tuple";
+            return "Tuple{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public Padding getPadding() {
@@ -1700,7 +1727,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Unary";
+            return "Unary{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
 
         public enum Type {
@@ -1734,7 +1761,7 @@ public interface Hcl extends Tree {
 
         @Override
         public String toString() {
-            return "Variable{" + name + "}";
+            return "VariableExpression{" + withPrefix(Space.EMPTY).printTrimmed(new HclPrinter<>()) + "}";
         }
     }
 }

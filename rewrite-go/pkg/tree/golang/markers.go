@@ -92,3 +92,24 @@ func (m PartialTypeAttribution) ID() uuid.UUID { return m.Ident }
 func NewPartialTypeAttribution(reason string) PartialTypeAttribution {
 	return PartialTypeAttribution{Ident: uuid.New(), Reason: reason}
 }
+
+// BuildConstraint records the build constraints a CompilationUnit's file
+// declares: the combined `//go:build` / `// +build` expression and any
+// GOOS/GOARCH its filename suffix implies. Its presence marks a file as
+// platform-specific; a file with no constraint carries no marker. A file
+// outside the parser's primary build context still carries this marker but
+// is left un-type-checked (see PartialTypeAttribution), so mutually exclusive
+// files never collide as redeclarations. Mirrors
+// org.openrewrite.golang.marker.BuildConstraint.
+type BuildConstraint struct {
+	Ident      uuid.UUID
+	Constraint string
+	GOOS       string
+	GOARCH     string
+}
+
+func (m BuildConstraint) ID() uuid.UUID { return m.Ident }
+
+func NewBuildConstraint(constraint, goos, goarch string) BuildConstraint {
+	return BuildConstraint{Ident: uuid.New(), Constraint: constraint, GOOS: goos, GOARCH: goarch}
+}

@@ -76,7 +76,7 @@ public class HyphenRange extends LatestRelease {
         if (!NODE_HYPHEN_PATTERN.matcher(pattern.trim()).matches()) {
             return Validated.invalid("hyphenRange", pattern, "not a node hyphen range");
         }
-        UnionRange node = UnionRange.parse(pattern, false);
+        UnionRange node = UnionRange.parse(pattern);
         if (node == null) {
             return Validated.invalid("hyphenRange", pattern, "not a valid node range");
         }
@@ -84,33 +84,33 @@ public class HyphenRange extends LatestRelease {
     }
 
     // Port of node-semver range.js hyphenReplace; non-hyphen groups pass through.
-    static String hyphenReplace(String group, boolean incPre) {
+    static String hyphenReplace(String group) {
         Matcher m = NODE_HYPHEN_PATTERN.matcher(group);
         if (!m.matches()) {
             return group;
         }
-        String from = hyphenFrom(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), incPre);
-        String to = hyphenTo(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10), incPre);
+        String from = hyphenFrom(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5));
+        String to = hyphenTo(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10));
         return (from + " " + to).trim();
     }
 
-    private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr, boolean incPre) {
+    private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr) {
         if (XRange.isX(fM)) {
             return "";
         }
         if (XRange.isX(fm)) {
-            return ">=" + fM + ".0.0" + (incPre ? "-0" : "");
+            return ">=" + fM + ".0.0";
         }
         if (XRange.isX(fp)) {
-            return ">=" + fM + "." + fm + ".0" + (incPre ? "-0" : "");
+            return ">=" + fM + "." + fm + ".0";
         }
         if (fpr != null) {
             return ">=" + from;
         }
-        return ">=" + from + (incPre ? "-0" : "");
+        return ">=" + from;
     }
 
-    private static String hyphenTo(String to, String tM, String tm, String tp, @Nullable String tpr, boolean incPre) {
+    private static String hyphenTo(String to, String tM, String tm, String tp, @Nullable String tpr) {
         if (XRange.isX(tM)) {
             return "";
         }
@@ -122,9 +122,6 @@ public class HyphenRange extends LatestRelease {
         }
         if (tpr != null) {
             return "<=" + tM + "." + tm + "." + tp + "-" + tpr;
-        }
-        if (incPre) {
-            return "<" + tM + "." + tm + "." + NodeComparand.incr(tp) + "-0";
         }
         return "<=" + to;
     }

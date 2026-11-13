@@ -51,23 +51,11 @@ class CSharpRecipeTest implements RewriteTest {
 
     @BeforeAll
     static void setUpFactory() {
-        Path basePath = Paths.get(System.getProperty("user.dir"));
-        Path[] searchPaths = {
-          basePath.resolve("csharp"),
-          basePath.resolve("rewrite-csharp/csharp"),
-        };
-        for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-            if (csproj.toFile().exists()) {
-                CSharpRewriteRpc.setFactory(
-                  CSharpRewriteRpc.builder()
-                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
-                    .log(Paths.get("/tmp/csharp-rpc.log"))
-                );
-                return;
-            }
-        }
-        throw new IllegalStateException("Could not find C# Rewrite project");
+        CSharpRewriteRpc.setFactory(
+          CSharpRewriteRpc.builder()
+            .csharpServerEntry(CSharpServer.entry())
+            .log(Paths.get("/tmp/csharp-rpc.log"))
+        );
     }
 
     @AfterEach
@@ -245,7 +233,6 @@ class CSharpRecipeTest implements RewriteTest {
               "Newtonsoft.Json.JsonConvert SerializeObject(..)", "ToJson", null, null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -287,7 +274,6 @@ class CSharpRecipeTest implements RewriteTest {
             .recipe(new FindMethods("Newtonsoft.Json.JsonConvert SerializeObject(..)", null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -329,7 +315,6 @@ class CSharpRecipeTest implements RewriteTest {
             .recipe(new FindTypes("Newtonsoft.Json.JsonConvert", null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -371,7 +356,6 @@ class CSharpRecipeTest implements RewriteTest {
             .recipe(new DeleteMethodArgument("Newtonsoft.Json.JsonConvert SerializeObject(..)", 1))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -417,7 +401,6 @@ class CSharpRecipeTest implements RewriteTest {
               null, null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -461,7 +444,6 @@ class CSharpRecipeTest implements RewriteTest {
               "Newtonsoft.Json.JsonWriter", null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -502,7 +484,6 @@ class CSharpRecipeTest implements RewriteTest {
               "Newtonsoft.Json", "MyJson", true))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """

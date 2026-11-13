@@ -34,6 +34,15 @@ import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
 public class RecipeScheduler {
+    private static final ThreadLocal<@Nullable ExecutionContext> CURRENT_CONTEXT = new ThreadLocal<>();
+
+    /**
+     * The context of the recipe run executing on this thread, or {@code null} outside a recipe run.
+     */
+    @Incubating(since = "8.94.0")
+    public static @Nullable ExecutionContext currentContext() {
+        return CURRENT_CONTEXT.get();
+    }
 
     @Nullable
     private Supplier<Cursor> rootCursorProvider;
@@ -83,6 +92,7 @@ public class RecipeScheduler {
 
         LargeSourceSet after = sourceSet;
 
+        CURRENT_CONTEXT.set(ctxWithWatch);
         try {
             for (int i = 1; i <= maxCycles; i++) {
                 if (ctx.getMessage(PANIC) != null) {
@@ -107,15 +117,7 @@ public class RecipeScheduler {
                     after = cycle.generateSources(after);
                     after = cycle.editSources(after);
 
-                    boolean anyRecipeCausingAnotherCycle = false;
-                    for (Recipe madeChanges : cycle.getMadeChangesInThisCycle()) {
-                        if (madeChanges.causesAnotherCycle()) {
-                            anyRecipeCausingAnotherCycle = true;
-                        }
-                    }
-
-                    if (i >= minCycles &&
-                        (cycle.getMadeChangesInThisCycle().isEmpty() || !anyRecipeCausingAnotherCycle)) {
+                    if (i >= minCycles && !cycle.isCausesAnotherCycle()) {
                         after.afterCycle(true);
                         break;
                     }
@@ -133,6 +135,7 @@ public class RecipeScheduler {
                 }
             }
         } finally {
+            CURRENT_CONTEXT.remove();
             recipeRunStats.flush(ctx);
             recursiveOnComplete(recipe, ctxWithWatch);
         }

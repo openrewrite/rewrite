@@ -34,6 +34,9 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class EnvironmentTest implements RewriteTest {
 
+    // Scanning the runtime classpath reads every class file on it, so the tests that list what it holds share one scan
+    private static final Environment RUNTIME_CLASSPATH_ENV = Environment.builder().scanRuntimeClasspath().build();
+
     @DocumentExample
     @Test
     void declarativeRecipesDontAddToEstimatedTimeFixed() {
@@ -339,8 +342,7 @@ class EnvironmentTest implements RewriteTest {
 
     @Test
     void listRecipeDescriptors() {
-        var env = Environment.builder().scanRuntimeClasspath().build();
-        var recipeDescriptors = env.listRecipeDescriptors();
+        var recipeDescriptors = RUNTIME_CLASSPATH_ENV.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotEmpty();
         var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> "org.openrewrite.text.ChangeText".equals(rd.getName()))
           .findAny().orElse(null);
@@ -352,8 +354,7 @@ class EnvironmentTest implements RewriteTest {
 
     @Test
     void listStyles() {
-        var env = Environment.builder().scanRuntimeClasspath().build();
-        var styles = env.listStyles();
+        var styles = RUNTIME_CLASSPATH_ENV.listStyles();
         assertThat(styles).isNotEmpty();
         var sampleStyle = styles.stream().filter(s -> "org.openrewrite.SampleStyle".equals(s.getName()))
           .findAny().orElse(null);
@@ -381,8 +382,7 @@ class EnvironmentTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/543")
     @Test
     void recipeDescriptorsFromCrossResources() {
-        var env = Environment.builder().scanRuntimeClasspath().build();
-        var recipeDescriptors = env.listRecipeDescriptors();
+        var recipeDescriptors = RUNTIME_CLASSPATH_ENV.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotEmpty();
         var helloJon2 = recipeDescriptors.stream().filter(rd -> "org.openrewrite.HelloJon2".equals(rd.getName()))
           .findAny().orElseThrow();
@@ -518,6 +518,67 @@ class EnvironmentTest implements RewriteTest {
             ))).build();
         var recipe = env.activateRecipes("test.Foo");
         assertThat(recipe.validate().isValid()).isTrue();
+    }
+
+    @Test
+    void dependencyRecipeNestedTwoLevelsDeepResolvesARecipeFromThisEnvironment() {
+        var env = Environment.builder()
+          .load(new YamlResourceLoader(
+              //language=yaml
+              new ByteArrayInputStream(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.Main
+                  displayName: Main
+                  description: Test.
+                  recipeList:
+                    - test.dependency.Outer
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.Local
+                  displayName: Local
+                  description: Test.
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                  """.getBytes()
+              ),
+              URI.create("rewrite.yml"),
+              new Properties()
+            ),
+            List.of(new YamlResourceLoader(
+              //language=yaml
+              new ByteArrayInputStream(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.dependency.Outer
+                  displayName: Outer
+                  description: Test.
+                  recipeList:
+                    - test.dependency.Inner
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.dependency.Inner
+                  displayName: Inner
+                  description: Test.
+                  recipeList:
+                    - test.Local
+                  """.getBytes()
+              ),
+              URI.create("dependency.yml"),
+              new Properties()
+            ))).build();
+
+        Recipe main = env.listRecipes().stream()
+          .filter(r -> "test.Main".equals(r.getName()))
+          .findFirst()
+          .orElseThrow();
+        Recipe inner = main.getRecipeList().getFirst().getRecipeList().getFirst();
+        assertThat(inner.getRecipeList())
+          .extracting(Recipe::getName)
+          .containsExactly("test.Local");
+        assertThat(main.validateAll())
+          .allSatisfy(validated -> assertThat(validated.isValid()).isTrue());
     }
 
     @Test

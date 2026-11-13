@@ -1,3 +1,5 @@
+import pytest
+
 from rewrite.rpc.facade import Facade
 
 
@@ -22,6 +24,15 @@ class _FakeChildren:
 
     def owner(self, name):
         return self._owner.get(name)
+
+    def hosts(self, bundle):
+        return False
+
+    def hosting(self):
+        return False
+
+    def hosts_every_bundle(self):
+        return False
 
     def request(self, bundle, method, params):
         self.calls.append(("request", bundle, method))
@@ -140,7 +151,7 @@ class _EditingChildren(_FakeChildren):
 def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
     children = _EditingChildren()
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
 
     f.batch_visit({"treeId": "T", "sourceFileType": "py",
@@ -156,7 +167,7 @@ def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
 def test_single_visit_pulls_its_edit_into_the_hub():
     children = _EditingChildren()
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor["edit:a"] = "A"
 
     f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
@@ -167,7 +178,7 @@ def test_single_visit_pulls_its_edit_into_the_hub():
 def test_single_visit_does_not_pull_when_nothing_changed():
     children = _EditingChildren(modified=False)
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor["edit:a"] = "A"
 
     f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
@@ -178,7 +189,7 @@ def test_single_visit_does_not_pull_when_nothing_changed():
 def test_single_bundle_batch_still_pulls_its_edit_into_the_hub():
     children = _EditingChildren()
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor.update({"edit:a1": "A", "edit:a2": "A"})
 
     f.batch_visit({"treeId": "T", "sourceFileType": "py",
@@ -192,7 +203,7 @@ def test_single_bundle_batch_still_pulls_its_edit_into_the_hub():
 def test_unmodified_run_is_not_pulled():
     children = _EditingChildren(modified=False)
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor.update({"edit:a": "A"})
 
     f.batch_visit({"treeId": "T", "visitors": [{"visitor": "edit:a"}]})
@@ -204,6 +215,7 @@ def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp
     import rewrite.rpc.server as server
 
     class _FakeFacade:
+        def routes_to_children(self): return True
         def get_marketplace(self, params): ...
         def install_recipes(self, params): ...
         def prepare_recipe(self, params): ...
@@ -233,6 +245,7 @@ def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path)
     import rewrite.rpc.server as server
 
     class _FakeFacade:
+        def routes_to_children(self): return True
         def get_marketplace(self, params): ...
         def install_recipes(self, params): ...
         def prepare_recipe(self, params): ...
@@ -258,12 +271,51 @@ def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path)
     assert acquired == ["tree-1"]
 
 
+def test_each_visit_starts_from_the_tree_java_holds_now(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    visited = []
+
+    class _FakeFacade:
+        def routes_to_children(self): return True
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def generate(self, params): ...
+
+        def visit(self, params):
+            visited.append(server._hub_tree[params["treeId"]])
+            return {"modified": False}
+
+        def batch_visit(self, params):
+            visited.append(server._hub_tree[params["treeId"]])
+            return {"results": []}
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+    _isolated_hub(monkeypatch, server)
+
+    # A Java recipe edits the file between the two requests.
+    java_versions = [object(), object()]
+    from_java = iter(java_versions)
+    monkeypatch.setattr(server, "get_object_from_java", lambda obj_id, source_file_type=None: next(from_java))
+
+    server.handle_request("Visit", {"treeId": "T", "sourceFileType": "py", "visitor": "edit:a"})
+    server.handle_request("BatchVisit", {"treeId": "T", "sourceFileType": "py", "visitors": [{"visitor": "edit:b"}]})
+
+    assert visited == java_versions
+
+
 def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
     import rewrite.rpc.server as server
 
     routed = {}
 
     class _FakeFacade:
+        def routes_to_children(self): return True
+
         def get_marketplace(self, params):
             routed["marketplace"] = True
             return ["facade-rows"]
@@ -413,9 +465,10 @@ def _print_python(cu) -> str:
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
     for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_recv_refs",
-                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "local_objects",
+                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "_hub_last_served", "local_objects",
                  "_ref_checkpoints", "_local_ref_checkpoints"):
         monkeypatch.setattr(server, name, {})
+    monkeypatch.setattr(server, "_hub_deleted", set())
 
 
 def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_child(monkeypatch):
@@ -434,7 +487,6 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
     monkeypatch.setattr(server, "get_object_from_java",
                         lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
 
-    # The facade fetches the tree from Java once and owns it from then on.
     assert server._hub_acquire(tree_id, sft) is cu
 
     # The child is served the pre-edit tree in full.
@@ -472,6 +524,37 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
     # assertions above would degrade into if _hub_served were advanced by the local visit.
     noop = server._hub_serve_child(bundle, tree_id, sft)
     assert {d["state"] for d in noop} == {"NO_CHANGE", "END_OF_OBJECT"}
+
+
+def test_an_edit_java_fetched_from_the_facade_survives_the_next_refetch(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", Facade(_FakeChildren(), local_visit=server._hub_local_visit,
+                                                  is_local_visitor=server._hub_is_local_visitor))
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "remote_objects", {tree_id: cu})  # Java holds this side's parse
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "_last_sent", [])
+    # Java makes no edit of its own.
+    monkeypatch.setattr(server, "send_request",
+                        lambda method, params: [{"state": "NO_CHANGE"}, {"state": "END_OF_OBJECT"}])
+
+    visit = {"treeId": tree_id, "sourceFileType": sft, "visitor": _ADD_IMPORT,
+             "visitorOptions": {"module": "collections.abc", "name": "Iterable", "only_if_referenced": False}}
+    assert server.handle_request("Visit", visit) == {"modified": True}
+    edited = server._hub_tree[tree_id]
+    server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft})
+
+    server.handle_request("Visit", visit)
+
+    assert server._hub_tree[tree_id] is edited
 
 
 def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
@@ -535,6 +618,68 @@ def test_an_unknown_visitor_is_still_an_error():
         assert "No child owns visitor" in str(e)
 
 
+class _HostingChildren(_FakeChildren):
+    """``pkg`` runs in this process and ``other`` behind a child."""
+
+    def __init__(self):
+        super().__init__()
+        self._owner = {"pkg.R": "pkg", "other.R": "other"}
+
+    def hosts(self, bundle):
+        return bundle == "pkg"
+
+    def hosting(self):
+        return True
+
+
+def test_a_hosted_bundles_recipes_run_here_beside_a_childs():
+    children = _HostingChildren()
+    ran, generated = [], []
+    f = Facade(children,
+               local_visit=lambda items, params: [
+                   ran.append(i["visitor"]) or {"modified": False} for i in items],
+               # never registered with the facade, as when prepared before any child existed
+               is_local_visitor=lambda name: name == "edit:here",
+               local_prepare=lambda params: {"id": "here", "editVisitor": "edit:here"},
+               local_generate=lambda params: generated.append(params["id"]) or {"ids": []})
+
+    assert f.prepare_recipe({"id": "pkg.R"})["editVisitor"] == "edit:here"
+    assert f.prepare_recipe({"id": "pkg.R.sub"})["editVisitor"] == "edit:here"
+    f.prepare_recipe({"id": "other.R"})  # the child's prep-1
+
+    f.batch_visit({"treeId": "T", "visitors": [{"visitor": "edit:here"}, {"visitor": "edit:prep-1"}]})
+    f.generate({"id": "here"})
+    f.generate({"id": "prep-1"})
+
+    assert ran == ["edit:here"] and generated == ["here"]
+    assert [c for c in children.calls if c[0] == "request"] == [
+        ("request", "other", "PrepareRecipe"), ("request", "other", "BatchVisit"),
+        ("request", "other", "Generate")]
+
+
+def test_a_local_visit_reports_the_search_results_it_adds(monkeypatch):
+    import rewrite.rpc.server as server
+    from rewrite.markers import SearchResult
+    from rewrite.python.visitor import PythonVisitor
+
+    class _Mark(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            return SearchResult.found(cu)
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+    monkeypatch.setattr(server, "_VISITOR_REGISTRY", {"Mark": lambda options: _Mark()})
+
+    results = server._hub_local_visit([{"visitor": "Mark"}, {"visitor": "Mark"}],
+                                      {"treeId": tree_id, "sourceFileType": sft})
+
+    marker = next(m for m in server._hub_tree[tree_id].markers.markers if isinstance(m, SearchResult))
+    assert [r["searchResultIds"] for r in results] == [[str(marker.id)], []]
+
+
 class _RefUsingChild:
     """A child bundle as a real RPC peer: one persistent send ref map toward the hub, so the second
     edit that reuses a type the first edit already sent cites it as a bare ref."""
@@ -583,6 +728,7 @@ def test_facade_visit_checkpoints_its_own_ref_tables_so_evict_rolls_them_back(mo
     from rewrite.rpc.reference import ReferenceMap
 
     class _RefGrowingFacade:
+        def routes_to_children(self): return True
         def get_marketplace(self, params): ...
         def install_recipes(self, params): ...
         def prepare_recipe(self, params): ...
@@ -637,9 +783,11 @@ def test_reset_clears_the_hub_tables_too(monkeypatch):
     server._hub_recv_refs["A"] = {1: object()}
     server._hub_send_checkpoint[("A", "T")] = 0
     server._hub_recv_checkpoint[("A", "T")] = -1
+    server._hub_deleted.add("D")
 
     server.handle_reset({})
 
+    assert not server._hub_deleted
     assert not server._hub_tree
     assert not server._hub_served
     assert not server._hub_send_refs
@@ -686,9 +834,10 @@ def test_reset_drops_a_half_drained_dependency_types_page(monkeypatch):
 
 
 def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypatch):
-    """A child that deletes the file answers the pull with DELETE. The facade has to let go of the
-    tree — otherwise it serves the next bundle a file that no longer exists — but must leave both
-    ref maps alone: no Evict has been broadcast, so the child still holds this file's refs."""
+    """A child that deletes the file in a single Visit can only say so by answering the pull with
+    DELETE. The facade has to let go of the tree — otherwise it serves the next bundle a file that
+    no longer exists — but must leave both ref maps alone: no Evict has been broadcast, so the child
+    still holds this file's refs."""
     import rewrite.rpc.server as server
     from rewrite.rpc.reference import ReferenceMap
 
@@ -705,7 +854,7 @@ def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypat
     refs.create(object())
     server._hub_recv_refs[bundle] = {1: object()}
 
-    server._hub_pull_child_edit(_DeletingChild(), bundle, tree_id, sft)
+    server._hub_pull_child_edit(_DeletingChild(), bundle, tree_id, sft, may_delete=True)
 
     assert tree_id not in server._hub_tree
     assert (bundle, tree_id) not in server._hub_served
@@ -714,7 +863,7 @@ def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypat
     assert len(refs) == 1 and server._hub_recv_refs[bundle] == {1: server._hub_recv_refs[bundle][1]}
 
 
-def test_a_batch_stops_after_a_child_deletes_the_file():
+def test_a_batch_stops_after_a_bundle_deletes_the_file():
     """Once a bundle deletes the file there is nothing left for a later bundle to visit, and
     _hub_serve_child would answer it DELETE anyway."""
     ran = []
@@ -737,6 +886,16 @@ def test_a_batch_stops_after_a_child_deletes_the_file():
 
     assert [r.get("visitor") for r in resp["results"]] == ["del:a"]
     assert ran == [("A", ["del:a"])]
+
+    ran.clear()
+    f = Facade(children, is_local_visitor=lambda name: name == "del:here",
+               local_visit=lambda items, params: [{"modified": True, "deleted": True} for _ in items])
+    f._bundle_by_visitor.update({"edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "del:here"}, {"visitor": "edit:b"}]})
+
+    assert len(resp["results"]) == 1 and ran == []
 
 
 def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
@@ -761,11 +920,11 @@ def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
     dropped = []
     children = BundleChildren("python", "/tmp/venvs", upstream=lambda *a: None,
                               spawn=lambda *a, **k: _Child(), venv_ops=_Venvs(),
-                              on_child_replaced=dropped.append)
+                              on_child_replaced=dropped.append, activate=None)
     children.install("pkg", "pkg==1.0")
-    children.install("pkg", "pkg==1.1")   # venv unusable again -> stale child closed, fresh one spawned
+    children.install("pkg", "pkg==1.1")   # stale child closed, fresh one spawned
 
-    assert dropped == ["pkg", "pkg"]
+    assert dropped == ["pkg"]
 
     # and the server's hook is what clears the tables
     server._hub_send_refs["pkg"] = ReferenceMap()
@@ -781,3 +940,167 @@ def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
     assert not [k for k in server._hub_send_checkpoint if k[0] == "pkg"]
     assert not [k for k in server._hub_recv_checkpoint if k[0] == "pkg"]
     assert not [k for k in server._hub_served if k[0] == "pkg"]
+
+
+class _DeletingBatchChildren(_FakeChildren):
+    """Every BatchVisit reports that its visitors deleted the file."""
+    def request(self, bundle, method, params):
+        if method == "BatchVisit":
+            vs = [v["visitor"] for v in params.get("visitors", [])]
+            self.calls.append(("batch", bundle, vs))
+            return {"results": [{"visitor": v, "modified": True, "deleted": True} for v in vs]}
+        return super().request(bundle, method, params)
+
+
+def test_batch_visit_drops_a_deleted_file_instead_of_pulling_it():
+    children = _DeletingBatchChildren()
+    pulls, drops = [], []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)),
+               hub_drop=lambda tid: drops.append(tid))
+    f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "edit:a"}, {"visitor": "edit:b"}]})
+
+    # The deletion is reported and ends the batch; nothing is pulled and B never runs.
+    assert [r["deleted"] for r in resp["results"]] == [True]
+    assert pulls == []
+    assert drops == ["T"]
+    assert [c for c in children.calls if c[0] == "batch"] == [("batch", "A", ["edit:a"])]
+
+
+class _LostTreeChild:
+    """A child that answers every GetObject with DELETE, as one does for an id it no longer holds."""
+    def request(self, bundle, method, params):
+        return [{"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+
+def test_hub_pull_refuses_a_child_that_lost_the_tree(monkeypatch):
+    """A batch reports its deletions in its results, so DELETE on the pull means the child lost the
+    tree. The facade must keep the file it holds and fail the pull rather than let the host read the
+    missing tree as a deletion."""
+    import rewrite.rpc.server as server
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft, bundle = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+    server._hub_acquire(tree_id, sft)
+    server._hub_serve_child(bundle, tree_id, sft)
+
+    with pytest.raises(RuntimeError, match="no longer holds"):
+        server._hub_pull_child_edit(_LostTreeChild(), bundle, tree_id, sft)
+    assert server._hub_tree[tree_id] is cu
+    assert server.local_objects[tree_id] is cu
+
+    # A single Visit has no other way to report a deletion, so there the pull may let the file go.
+    server._hub_pull_child_edit(_LostTreeChild(), bundle, tree_id, sft, may_delete=True)
+    assert tree_id not in server._hub_tree
+    assert tree_id not in server.local_objects
+
+
+class _HostingFacade:
+    """A facade whose only bundle runs in this process, so there is nothing to route to."""
+
+    def routes_to_children(self): return False
+    def install_recipes(self, params): ...
+    def get_marketplace(self, params): ...
+    def evict(self, params): ...
+    def set_data_table_store(self, params): return True
+
+    def prepare_recipe(self, params): raise AssertionError("routed with no child to route to")
+    def visit(self, params): raise AssertionError("routed with no child to route to")
+    def batch_visit(self, params): raise AssertionError("routed with no child to route to")
+    def generate(self, params): raise AssertionError("routed with no child to route to")
+
+
+def test_a_lone_bundle_is_served_by_the_servers_own_handlers(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)   # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _HostingFacade())
+    monkeypatch.setattr(server, "handle_batch_visit", lambda p: "local-batch")
+    monkeypatch.setattr(server, "handle_visit", lambda p: "local-visit")
+    monkeypatch.setattr(server, "handle_prepare_recipe", lambda p: "local-prepare")
+    monkeypatch.setattr(server, "handle_print", lambda p: "local-print")
+
+    acquired = []
+    monkeypatch.setattr(server, "_hub_acquire", lambda oid, sft: acquired.append(oid))
+
+    tree = {"treeId": "T", "sourceFileType": "py"}
+    assert server.handle_request("PrepareRecipe", {"id": "pkg.R"}) == "local-prepare"
+    assert server.handle_request("BatchVisit", tree) == "local-batch"
+    assert server.handle_request("Visit", tree) == "local-visit"
+    assert server.handle_request("Print", tree) == "local-print"
+    assert acquired == []        # nothing is relayed, so the tree is not held a second time
+    assert server._hub_tree == {}
+
+
+def test_the_data_table_store_reaches_a_bundle_hosted_in_this_process(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+    from rewrite.data_table import CsvDataTableStore
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _HostingFacade())
+    monkeypatch.setattr(server, "_configured_data_table_store", None)
+
+    assert server.handle_request(
+        "SetDataTableStore", {"kind": "CSV", "outputDir": str(tmp_path / "tables")}) is True
+    assert isinstance(server._configured_data_table_store, CsvDataTableStore)
+
+
+class _DeletingVisitChild(_FakeChildren):
+    def request(self, bundle, method, params):
+        if method == "Visit":
+            return {"modified": True}
+        if method == "GetObject":
+            return [{"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+        return super().request(bundle, method, params)
+
+    def broadcast_evict(self, params): ...
+
+
+@pytest.mark.parametrize("visitor", ["edit:delete", "Delete"], ids=["child", "built-in"])
+def test_a_single_visit_deletion_reaches_the_host_until_its_evict(monkeypatch, tmp_path, visitor):
+    import rewrite.rpc.server as server
+    from rewrite.python.visitor import PythonVisitor
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _Delete(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            return None
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit"
+    fetched = []
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "remote_objects", {})
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    # Java goes on holding the undeleted file until its Evict.
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: fetched.append(obj_id) or cu)
+    monkeypatch.setattr(server, "_VISITOR_REGISTRY", {"Delete": lambda options: _Delete()})
+    facade = Facade(_DeletingVisitChild(), hub_pull=server._hub_pull_child_edit,
+                    hub_drop=server._hub_forget, local_visit=server._hub_local_visit,
+                    is_local_visitor=server._hub_is_local_visitor)
+    facade._bundle_by_visitor["edit:delete"] = "pkg"
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", facade)
+
+    visit = {"treeId": tree_id, "sourceFileType": sft, "visitor": visitor}
+    assert server.handle_request("Visit", visit) == {"modified": True}
+    assert server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft}) == [
+        {"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+    # Once Java has evicted the file, an id the facade does not hold is a lost tree, not a deletion.
+    server.handle_request("Evict", {"id": tree_id})
+    fetched.clear()
+    server.handle_request("GetObject", {"id": tree_id, "sourceFileType": sft})
+    assert fetched == [tree_id]

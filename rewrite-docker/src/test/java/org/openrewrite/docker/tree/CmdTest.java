@@ -70,4 +70,16 @@ class CmdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void execFormWithSpaceBeforeComma() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              CMD ["/bin/bash", "-c" ,"exec"]
+              """
+          )
+        );
+    }
 }

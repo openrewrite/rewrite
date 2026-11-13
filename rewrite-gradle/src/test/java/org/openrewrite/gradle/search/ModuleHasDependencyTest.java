@@ -29,7 +29,7 @@ class ModuleHasDependencyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ModuleHasDependency("org.openrewrite.recipe", "rewrite-spring", null, null));
+        spec.recipe(new ModuleHasDependency("org.openrewrite.recipe", "rewrite-spring", null, null, null));
     }
 
     @DocumentExample
@@ -95,6 +95,76 @@ class ModuleHasDependencyTest implements RewriteTest {
                   class B {}
                   """)
               )
+            )
+          )
+        );
+    }
+
+    @Test
+    void onlyDirectSkipsTransitiveMatch() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ModuleHasDependency("org.springframework", "spring-beans", null, null, true)),
+          mavenProject("project",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
+                }
+                """
+            ),
+            srcMainJava(
+              java("""
+                class A {}
+                """)
+            )
+          )
+        );
+    }
+
+    @Test
+    void onlyDirectStillMarksDirectMatch() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ModuleHasDependency("org.springframework", "spring-beans", null, null, true)),
+          mavenProject("project",
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation 'org.springframework:spring-beans:6.0.0'
+                }
+                """,
+              """
+                /*~~(Module has dependency: org.springframework:spring-beans)~~>*/plugins {
+                    id 'java'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation 'org.springframework:spring-beans:6.0.0'
+                }
+                """
+            ),
+            srcMainJava(
+              java("""
+                class A {}
+                """,
+                """
+                /*~~(Module has dependency: org.springframework:spring-beans)~~>*/class A {}
+                """)
             )
           )
         );

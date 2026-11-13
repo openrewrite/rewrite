@@ -126,6 +126,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
             if (!methodType.hasFlags(Flag.Static)) {
                 Set<Flag> flags = new LinkedHashSet<>(methodType.getFlags());
                 flags.add(Flag.Static);
+                // a static method is neither abstract nor an interface's default method
+                flags.remove(Flag.Abstract);
+                flags.remove(Flag.Default);
                 transformedType = transformedType.withFlags(flags);
             }
             if (returnType != null) {
@@ -146,11 +149,11 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
                     transformedType = transformMethodType(method.getMethodType());
                 }
-                if (m.getSelect() == null) {
+                if (m.getSelect() == null && !enclosingClassHasMethodNamed(m.getSimpleName())) {
                     maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName(), !matchUnknownTypes);
                 } else {
                     maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
-                    m = method.withSelect(
+                    m = m.withSelect(
                             new J.Identifier(randomId(),
                                     select == null ?
                                             Space.EMPTY :
@@ -167,6 +170,43 @@ public class ChangeMethodTargetToStatic extends Recipe {
                         .withName(m.getName().withType(transformedType));
             }
             return m;
+        }
+
+        /**
+         * A method of this name that is a member of a class enclosing the call, declared or inherited,
+         * shadows a static import of the name.
+         */
+        private boolean enclosingClassHasMethodNamed(String name) {
+            for (Cursor c = getCursor(); c != null; c = c.getParent()) {
+                Object value = c.getValue();
+                if (value instanceof J.ClassDeclaration &&
+                    hasMethodNamed(((J.ClassDeclaration) value).getType(), name) ||
+                    value instanceof J.NewClass && ((J.NewClass) value).getBody() != null &&
+                    hasMethodNamed(TypeUtils.asFullyQualified(((J.NewClass) value).getType()), name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean hasMethodNamed(JavaType.@Nullable FullyQualified type, String name) {
+            if (type == null) {
+                return false;
+            }
+            for (JavaType.Method method : type.getMethods()) {
+                if (method.getName().equals(name)) {
+                    return true;
+                }
+            }
+            if (hasMethodNamed(type.getSupertype(), name)) {
+                return true;
+            }
+            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+                if (hasMethodNamed(anInterface, name)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override

@@ -208,3 +208,17 @@ def test_an_unknown_keyword_is_refused_by_both_field_setters():
 
     with pytest.raises(TypeError, match="simple_nmae"):
         replace_if_changed(ident, simple_nmae="y")
+
+
+def test_container_padding_replace_takes_field_names_and_refuses_unknown_ones():
+    from rewrite.java.support_types import JContainer
+    from rewrite.java.tree import Identifier
+
+    ident = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+    container = JContainer(Space.EMPTY, [], Markers.EMPTY)
+    padded = [JRightPadded(ident, Space.EMPTY, Markers.EMPTY)]
+
+    assert container.padding.replace(_elements=padded).elements == [ident]
+
+    with pytest.raises(TypeError, match="elemnts"):
+        container.padding.replace(elemnts=padded)

@@ -25,7 +25,7 @@ function wireCopy(batch: any[]): any[] {
 }
 
 async function receive(batch: any[], table: StringInternTable): Promise<void> {
-    const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => wireCopy(batch),
+    const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [wireCopy(batch)],
         undefined, false, table);
     await q.receive<JS.CompilationUnit>(undefined);
 }

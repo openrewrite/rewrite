@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor} from '../..';
-import {J, NameTree} from '../../java';
+import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
@@ -35,11 +34,22 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
  */
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
+/** Symbol to access a match's pattern prefixes without exposing them as public API */
+export const PATTERN_PREFIXES_SYMBOL = Symbol('patternPrefixes');
+
 /**
  * Shared wrapper function name used by both patterns and templates.
  * Using the same name allows cache sharing when pattern and template code is identical.
  */
 export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
+
+/** The module of the file every template and pattern parses as. */
+export const TEMPLATE_MODULE = 'template';
+
+/** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
+export function wrapCode(code: string, expression: boolean): string {
+    return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;
+}
 
 /**
  * Simple LRU (Least Recently Used) cache implementation using Map's insertion order.
@@ -119,14 +129,7 @@ export function generateCacheKey(
     ].join('::');
 }
 
-abstract class IdVisitor extends JavaScriptVisitor<any> {
-    // `JavaVisitor.visitTypeName` is a no-op stub, which leaves annotation names unreachable
-    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: any): Promise<N> {
-        return (await this.visit(nameTree, p)) as N;
-    }
-}
-
-class RandomizeIdVisitor extends IdVisitor {
+class RandomizeIdVisitor extends JavaScriptVisitor<any> {
     readonly minted = new Set<string>();
 
     protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
@@ -136,7 +139,7 @@ class RandomizeIdVisitor extends IdVisitor {
     }
 }
 
-class CollectIdVisitor extends IdVisitor {
+class CollectIdVisitor extends JavaScriptVisitor<any> {
     readonly ids = new Set<string>();
 
     protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
@@ -145,7 +148,7 @@ class CollectIdVisitor extends IdVisitor {
     }
 }
 
-class RetainIdVisitor extends IdVisitor {
+class RetainIdVisitor extends JavaScriptVisitor<any> {
     private readonly seen = new Set<string>();
 
     constructor(private readonly retainable: ReadonlySet<string>) {
@@ -329,6 +332,15 @@ export class PlaceholderUtils {
         return undefined;
     }
 
+    /** The name of a shorthand property, which is what a placeholder written as `{${x}}` parses to. */
+    static shorthandPropertyName(node: J): J | undefined {
+        if (node.kind === JS.Kind.PropertyAssignment) {
+            const property = node as JS.PropertyAssignment;
+            return property.initializer === undefined ? property.name.element : undefined;
+        }
+        return undefined;
+    }
+
     /**
      * Extracts the relevant AST node from a wrapper function.
      * Used by both pattern and template processors to intelligently extract
@@ -336,9 +348,10 @@ export class PlaceholderUtils {
      *
      * @param lastStatement The last statement from the compilation unit
      * @param contextName Context name for error messages (e.g., 'Pattern', 'Template')
+     * @param expression Whether {@link wrapCode} parenthesized the code
      * @returns The extracted AST node
      */
-    static extractFromWrapper(lastStatement: J, contextName: string): J {
+    static extractFromWrapper(lastStatement: J, contextName: string, expression: boolean = false): J {
         let extracted: J;
 
         // Since we always wrap in function __WRAPPER__() { code }, look for it
@@ -378,6 +391,7 @@ export class PlaceholderUtils {
             extracted = lastStatement;
         }
 
-        return extracted;
+        return expression && extracted.kind === J.Kind.Parentheses ?
+            (extracted as J.Parentheses<J>).tree.element : extracted;
     }
 }

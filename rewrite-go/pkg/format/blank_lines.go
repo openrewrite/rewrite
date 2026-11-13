@@ -57,12 +57,36 @@ func (v *BlankLinesVisitor) Visit(t java.Tree, p any) java.Tree {
 	return out
 }
 
+// VisitCompilationUnit drops the blank lines a file opens with, as gofmt does.
+func (v *BlankLinesVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = cu.WithPrefix(adjustSpace(cu.Prefix, func(ws string) string {
+		return ws[strings.LastIndex(ws, "\n")+1:]
+	}))
+	return v.GoVisitor.VisitCompilationUnit(cu, p)
+}
+
+// VisitSpace caps each run of blank lines in s, ahead of its comments and
+// after each of them, at one.
 func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
-	if !strings.Contains(s.Whitespace, "\n\n\n") {
-		return s
+	whitespace := capInternalBlankLines(s.Whitespace(), 1)
+	var comments []java.Comment
+	for i, c := range s.Comments() {
+		suffix := capInternalBlankLines(c.Suffix, 1)
+		if suffix == c.Suffix {
+			continue
+		}
+		if comments == nil {
+			comments = append([]java.Comment(nil), s.Comments()...)
+		}
+		comments[i].Suffix = suffix
 	}
-	s.Whitespace = capInternalBlankLines(s.Whitespace, 1)
-	return s
+	if comments == nil {
+		if whitespace == s.Whitespace() {
+			return s
+		}
+		comments = s.Comments()
+	}
+	return java.MakeSpace(comments, whitespace)
 }
 
 func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
@@ -70,16 +94,17 @@ func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 	if !v.isDeclarationList() {
 		return out
 	}
-	if len(out.End.Comments) == 0 {
+	if len(out.End.Comments()) == 0 {
 		out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
 	}
 
 	if len(out.Statements) > 0 && out.Statements[0].Element != nil &&
-		len(getPrefix(out.Statements[0].Element).Comments) == 0 {
-		first := out.Statements[0]
-		if updated, ok := transformPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
-			first.Element = updated
-			out.Statements[0] = first
+		len(getPrefix(out.Statements[0].Element).Comments()) == 0 {
+		first := out.Statements[0].Element
+		if updated, ok := transformPrefix(first, stripLeadingBlankLinesSpace).(java.Statement); ok && updated != first {
+			statements := append([]java.RightPadded[java.Statement](nil), out.Statements...)
+			statements[0].Element = updated
+			out = out.WithStatements(statements)
 		}
 	}
 	return out
@@ -101,17 +126,15 @@ func (v *BlankLinesVisitor) isDeclarationList() bool {
 }
 
 func stripLeadingBlankLinesSpace(s java.Space) java.Space {
-	s.Whitespace = stripLeadingBlankLines(s.Whitespace)
-	return s
+	return java.MakeSpace(s.Comments(), stripLeadingBlankLines(s.Whitespace()))
 }
 
 func adjustSpace(s java.Space, f func(string) string) java.Space {
-	updated := f(s.Whitespace)
-	if updated == s.Whitespace {
+	updated := f(s.Whitespace())
+	if updated == s.Whitespace() {
 		return s
 	}
-	s.Whitespace = updated
-	return s
+	return java.MakeSpace(s.Comments(), updated)
 }
 
 // stripLeadingBlankLines collapses the first run of newlines in ws to a single
@@ -122,11 +145,8 @@ func stripLeadingBlankLines(ws string) string {
 	if start < 0 {
 		return ws
 	}
-	end := start
-	for end < len(ws) && ws[end] == '\n' {
-		end++
-	}
-	if end-start < 2 {
+	end, breaks := lineBreakRun(ws, start)
+	if breaks < 2 {
 		return ws
 	}
 	return ws[:start] + "\n" + ws[end:]
@@ -137,6 +157,9 @@ func stripLeadingBlankLines(ws string) string {
 // 0–2 newlines untouched.
 func capInternalBlankLines(ws string, max int) string {
 	allowed := max + 1
+	if strings.Count(ws, "\n") <= allowed {
+		return ws
+	}
 	var b strings.Builder
 	b.Grow(len(ws))
 	i := 0
@@ -146,19 +169,27 @@ func capInternalBlankLines(ws string, max int) string {
 			i++
 			continue
 		}
-		// Count run length.
-		j := i
-		for j < len(ws) && ws[j] == '\n' {
-			j++
+		end, breaks := lineBreakRun(ws, i)
+		if breaks > allowed {
+			b.WriteString(strings.Repeat("\n", allowed))
+		} else {
+			b.WriteString(ws[i:end])
 		}
-		run := j - i
-		if run > allowed {
-			run = allowed
-		}
-		for k := 0; k < run; k++ {
-			b.WriteByte('\n')
-		}
-		i = j
+		i = end
 	}
 	return b.String()
+}
+
+// lineBreakRun measures the run of line breaks starting at ws[start], and
+// returns where it ends and how many breaks it holds. A line holding only
+// spaces or tabs is blank, so the run goes on through it.
+func lineBreakRun(ws string, start int) (end, breaks int) {
+	for i := start; i < len(ws); i++ {
+		if ws[i] == '\n' {
+			end, breaks = i+1, breaks+1
+		} else if ws[i] != ' ' && ws[i] != '\t' {
+			break
+		}
+	}
+	return end, breaks
 }

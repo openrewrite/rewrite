@@ -21,8 +21,10 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.python.PythonVisitor;
 import org.openrewrite.python.tree.Py;
+import org.openrewrite.python.tree.PyComment;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -51,8 +53,8 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
             // and the receiver skips them anyway.
             return j;
         }
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, j2 -> spaceRef(j2.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
     }
@@ -66,7 +68,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
         q.getAndSend(cu, Py.CompilationUnit::getFileAttributes);
         q.getAndSendList(cu, c -> c.getPadding().getImports(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, Py.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, c -> spaceRef(c.getEof()), space -> visitSpace(getValueNonNull(space), q));
 
         return cu;
     }
@@ -94,7 +96,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     public J visitBinary(Py.Binary binary, RpcSendQueue q) {
         q.getAndSend(binary, Py.Binary::getLeft, el -> visit(el, q));
         q.getAndSend(binary, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
-        q.getAndSend(binary, Py.Binary::getNegation, space -> visitSpace(space, q));
+        q.getAndSend(binary, b -> spaceRef(b.getNegation()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(binary, Py.Binary::getRight, el -> visit(el, q));
         q.getAndSend(binary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return binary;
@@ -191,7 +193,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     public J visitFormattedStringValue(Py.FormattedString.Value value, RpcSendQueue q) {
         q.getAndSend(value, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
         q.getAndSend(value, el -> el.getPadding().getDebug(), el -> visitRightPadded(el, q));
-        q.getAndSend(value, Py.FormattedString.Value::getConversion);
+        q.getAndSend(value, el -> el.getPadding().getConversion(), el -> visitRightPadded(el, q));
         q.getAndSend(value, Py.FormattedString.Value::getFormat, el -> visit(el, q));
         return value;
     }
@@ -214,7 +216,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
         q.getAndSend(comprehensionExpression, Py.ComprehensionExpression::getKind);
         q.getAndSend(comprehensionExpression, Py.ComprehensionExpression::getResult, el -> visit(el, q));
         q.getAndSendList(comprehensionExpression, Py.ComprehensionExpression::getClauses, Tree::getId, el -> visit(el, q));
-        q.getAndSend(comprehensionExpression, Py.ComprehensionExpression::getSuffix, space -> visitSpace(space, q));
+        q.getAndSend(comprehensionExpression, c -> spaceRef(c.getSuffix()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(comprehensionExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return comprehensionExpression;
     }
@@ -369,6 +371,29 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public void visitSpace(Space space, RpcSendQueue q) {
+            q.getAndSendList(space, Space::getComments, c -> text(c) + c.getSuffix(), c -> {
+                q.getAndSend(c, Comment::isMultiline);
+                q.getAndSend(c, PythonSenderDelegate::text);
+                q.getAndSend(c, Comment::getSuffix);
+                q.getAndSend(c, mk -> asRef(mk.getMarkers()));
+                if (c instanceof PyComment) {
+                    q.getAndSend((PyComment) c, PyComment::isAlignedToIndent);
+                }
+            });
+            q.getAndSend(space, Space::getWhitespace);
+        }
+
+        private static String text(Comment comment) {
+            if (comment instanceof PyComment) {
+                return ((PyComment) comment).getText();
+            } else if (comment instanceof TextComment) {
+                return ((TextComment) comment).getText();
+            }
+            throw new IllegalArgumentException("Unexpected comment type " + comment.getClass().getName());
         }
     }
 }

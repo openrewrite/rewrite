@@ -20,6 +20,8 @@ import org.openrewrite.python.internal.pep440.PythonVersion;
 import org.openrewrite.python.internal.pep440.PythonVersionSpecifier;
 import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 
+import java.util.Objects;
+
 /**
  * The lock's requires-python interval; upper is null when unbounded.
  */
@@ -28,6 +30,11 @@ final class PyRange {
     boolean lowerExclusive;
     @Nullable PythonVersion upper;
     boolean upperInclusive;
+
+    boolean sameBounds(PyRange other) {
+        return Objects.equals(lower, other.lower) && lowerExclusive == other.lowerExclusive &&
+                Objects.equals(upper, other.upper) && upperInclusive == other.upperInclusive;
+    }
 
     static PyRange parse(String requiresPython) {
         PyRange range = new PyRange();
@@ -58,7 +65,8 @@ final class PyRange {
                     range.lower = v;
                     range.lowerExclusive = false;
                 }
-                PythonVersion next = bumpTrailingRelease(v);
+                // ~=X.Y admits up to X+1, ==X.Y.* only up to X.(Y+1)
+                PythonVersion next = wildcard ? bumpLastRelease(v) : bumpTrailingRelease(v);
                 if (next != null && (range.upper == null || next.compareTo(range.upper) < 0)) {
                     range.upper = next;
                     range.upperInclusive = false;
@@ -86,6 +94,47 @@ final class PyRange {
             b.append(i == release.length - 2 ? release[i] + 1 : release[i]);
         }
         return PythonVersion.parse(b.toString());
+    }
+
+    static @Nullable PythonVersion bumpLastRelease(PythonVersion v) {
+        long[] release = v.getRelease();
+        if (release.length == 0) {
+            return null;
+        }
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < release.length; i++) {
+            if (i > 0) {
+                b.append('.');
+            }
+            b.append(i == release.length - 1 ? release[i] + 1 : release[i]);
+        }
+        return PythonVersion.parse(b.toString());
+    }
+
+    /** The versions in both ranges, or null when there are none. */
+    @Nullable PyRange intersect(PyRange other) {
+        PyRange r = new PyRange();
+        if (lower == null || (other.lower != null && other.lower.compareTo(lower) > 0)) {
+            r.lower = other.lower;
+            r.lowerExclusive = other.lowerExclusive;
+        } else {
+            r.lower = lower;
+            r.lowerExclusive = lowerExclusive || (other.lower != null && other.lower.compareTo(lower) == 0 && other.lowerExclusive);
+        }
+        if (upper == null || (other.upper != null && other.upper.compareTo(upper) < 0)) {
+            r.upper = other.upper;
+            r.upperInclusive = other.upperInclusive;
+        } else {
+            r.upper = upper;
+            r.upperInclusive = upperInclusive && (other.upper == null || other.upper.compareTo(upper) != 0 || other.upperInclusive);
+        }
+        if (r.lower != null && r.upper != null) {
+            int cmp = r.lower.compareTo(r.upper);
+            if (cmp > 0 || (cmp == 0 && (r.lowerExclusive || !r.upperInclusive))) {
+                return null;
+            }
+        }
+        return r;
     }
 
     boolean withinUpperBound(PythonVersion version) {

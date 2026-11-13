@@ -28,8 +28,7 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
      * more common in the supplied AST.
      */
     public static GeneralFormatStyle autodetectGeneralFormatStyle(JavaSourceFile j) {
-        LineEndingsCount count = new LineEndingsCount();
-        new AutodetectGeneralFormatStyle().visit(j, count);
+        LineEndingsCount count = new AutodetectGeneralFormatStyle().reduce(j, new LineEndingsCount());
         if(count.lf >= count.crlf) {
             return new GeneralFormatStyle(false);
         } else {

@@ -60,4 +60,37 @@ class ShortenFullyQualifiedTypeReferencesKotlinTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepsJavaLangTypeThatKotlinShadowsQualified() {
+        rewriteRun(
+          kotlin(
+            """
+              @java.lang.Deprecated
+              fun f() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void aliasedImportDoesNotBringSimpleNameIntoScope() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.Objects as JObjects
+
+              val a = JObjects.hash(1)
+              val b = java.util.Objects.hash(2)
+              """,
+            """
+              import java.util.Objects as JObjects
+              import java.util.Objects
+
+              val a = JObjects.hash(1)
+              val b = Objects.hash(2)
+              """
+          )
+        );
+    }
 }

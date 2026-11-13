@@ -30,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SuppressWarnings("DataFlowIssue")
 @Deprecated
 class CategoryTreeTest {
-    private final Environment env = Environment.builder()
+    // Scanning the runtime classpath reads every class file on it, so the tests share one scan
+    private static final Environment RUNTIME_CLASSPATH_ENV = Environment.builder()
       .scanRuntimeClasspath()
       .build();
 
@@ -44,7 +45,7 @@ class CategoryTreeTest {
 
     private CategoryTree.Root<Group> categoryTree() {
         return CategoryTree.<Group>build()
-          .putAll(Group.Group1, env)
+          .putAll(Group.Group1, RUNTIME_CLASSPATH_ENV)
           .putAll(Group.Group2, custom);
     }
 
@@ -131,6 +132,25 @@ class CategoryTreeTest {
             "io.moderne.rewrite", "io.moderne.cloud", // because "io.moderne" is marked as a root
             "org.openrewrite" // because "org" is marked as a root
           );
+    }
+
+    @Test
+    void reverseDnsPrefixesAreCategoryRoots() {
+        CategoryTree.Root<Integer> ct = CategoryTree.<Integer>build()
+          .putAll(1, RUNTIME_CLASSPATH_ENV)
+          .putRecipes(1,
+            recipeDescriptor("uk.co.acme.recipes"),
+            recipeDescriptor("de.example.recipes"));
+
+        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
+          .contains(
+            "uk.co.acme", // because both "uk" and "uk.co" are marked as roots
+            "de.example" // because "de" is marked as a root
+          )
+          .doesNotContain("uk", "uk.co", "de");
+
+        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getDisplayName()))
+          .contains("Acme", "Example");
     }
 
     @Test

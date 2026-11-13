@@ -20,9 +20,11 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
+import org.openrewrite.properties.internal.PropertiesTreeShapeValidationService;
 import org.openrewrite.properties.service.PropertiesCommentService;
 
 import java.lang.ref.SoftReference;
@@ -121,6 +123,8 @@ public interface Properties extends Tree {
         public <S, T extends S> T service(Class<S> service) {
             if (CommentService.class.getName().equals(service.getName())) {
                 return (T) new PropertiesCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new PropertiesTreeShapeValidationService();
             }
             return SourceFileWithReferences.super.service(service);
         }

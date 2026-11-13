@@ -24,6 +24,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.*;
@@ -91,7 +92,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, PrintOutputCapture<P> p) {
         visit(annotatedExpression.getAnnotations(), p);
         visit(annotatedExpression.getExpression(), p);
-        afterSyntax(annotatedExpression, p);
         return annotatedExpression;
     }
 
@@ -160,7 +160,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(constructor.getPadding().getInvocation().getBefore(), KSpace.Location.CONSTRUCTOR_COLON, p);
         p.append(':');
         visit(constructor.getInvocation(), p);
-        afterSyntax(constructor, p);
+        afterSyntax(method, p);
 
         visit(method.getBody(), p);
 
@@ -182,11 +182,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(delegatedSuperType.getBy(), KSpace.Location.DELEGATED_SUPER_TYPE_BY, p);
         p.append("by");
         visit(delegatedSuperType.getDelegate(), p);
-        afterSyntax(delegatedSuperType, p);
         return delegatedSuperType;
     }
 
     @Override
+    @Deprecated
     public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, PrintOutputCapture<P> p) {
         beforeSyntax(destructuringDeclaration, KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p);
         visit(destructuringDeclaration.getInitializer().getLeadingAnnotations(), p);
@@ -217,6 +217,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(destructuringDeclaration, p);
         return destructuringDeclaration;
+    }
+
+    @Override
+    public J visitDestructuringPattern(K.DestructuringPattern destructuringPattern, PrintOutputCapture<P> p) {
+        beforeSyntax(destructuringPattern, KSpace.Location.DESTRUCTURING_PATTERN_PREFIX, p);
+        visitContainer("(", destructuringPattern.getPadding().getVariables(), KContainer.Location.DESTRUCTURING_PATTERN_NAMES, ")", p);
+        afterSyntax(destructuringPattern, p);
+        return destructuringPattern;
     }
 
     @Override
@@ -353,13 +361,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, PrintOutputCapture<P> p) {
-        visitSpace(parTree.getPrefix(), Space.Location.PARENTHESES_PREFIX, p);
-        visitParentheses(parTree.getParenthesizedType(), p);
-        return parTree;
-    }
-
-    @Override
     public J visitProperty(K.Property property, PrintOutputCapture<P> p) {
         beforeSyntax(property, KSpace.Location.PROPERTY_PREFIX, p);
 
@@ -404,6 +405,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append(equals);
             }
             visit(nv.getInitializer(), p);
+            afterSyntax(nv, p);
         }
 
         if (property.getTypeConstraints() != null) {
@@ -463,6 +465,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append("=");
             visit(nv.getInitializer(), p);
         }
+        afterSyntax(nv, p);
         afterSyntax(backingField, p);
     }
 
@@ -497,6 +500,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitRightPadded(annotationType.getPadding().getUseSite(), p);
         p.append(":");
         visit(annotationType.getCallee(), p);
+        afterSyntax(annotationType, p);
         return annotationType;
     }
 
@@ -510,6 +514,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         delegate.visitContainer("[", multiAnnotationType.getAnnotations(), JContainer.Location.TYPE_PARAMETERS, "", "]", p);
+        afterSyntax(multiAnnotationType, p);
         return multiAnnotationType;
     }
 
@@ -569,6 +574,29 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else {
                 return super.visit(tree, p);
             }
+        }
+
+        @Override
+        public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, PrintOutputCapture<P> p) {
+            JRightPadded<T> tree = controlParens.getPadding().getTree();
+            Optional<TrailingComma> trailingComma = tree.getMarkers().findFirst(TrailingComma.class);
+            if (!trailingComma.isPresent()) {
+                return super.visitControlParentheses(controlParens, p);
+            }
+            // The inherited printer emits right-padded markers ahead of the element, which would put a
+            // catch parameter's trailing comma before the parameter it follows.
+            Markers others = tree.getMarkers().removeByType(TrailingComma.class);
+            beforeSyntax(controlParens, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            p.append('(');
+            beforeSyntax(Space.EMPTY, others, null, p);
+            visit(tree.getElement(), p);
+            afterSyntax(others, p);
+            visitSpace(tree.getAfter(), Space.Location.PARENTHESES_SUFFIX, p);
+            p.append(',');
+            visitSpace(trailingComma.get().getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+            p.append(')');
+            afterSyntax(controlParens, p);
+            return controlParens;
         }
 
         @Override
@@ -1168,8 +1196,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
-                visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
-                visitMarkers(return_.getMarkers(), p);
+                beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
                 visit(return_.getExpression(), p);
                 afterSyntax(return_, p);
                 return return_;
@@ -1198,6 +1225,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(as);
 
             visit(controlParens.getTree(), p);
+            afterSyntax(controlParens, p);
             afterSyntax(typeCast, p);
             return typeCast;
         }
@@ -1276,15 +1304,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(Extension.class).isPresent();
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
-            // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
+            // Older LSTs spread a destructuring pattern over one named variable per name, with no declarator to hold them.
+            boolean destructured = !containsTypeReceiver && variables.size() > 1;
             for (int i = 0; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
-                if (variables.size() > 1 && !containsTypeReceiver && i == 0) {
+                if (destructured && i == 0) {
                     p.append("(");
                 }
 
-                visit(variable.getElement().getName(), p);
+                visit(variable.getElement().getDeclarator(), p);
                 visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
 
                 if (multiVariable.getTypeExpression() != null) {
@@ -1304,10 +1333,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
 
                 visit(variable.getElement().getInitializer(), p);
+                afterSyntax(variable.getElement(), p);
 
                 if (i < variables.size() - 1) {
                     p.append(",");
-                } else if (variables.size() > 1 && !containsTypeReceiver) {
+                } else if (destructured) {
                     p.append(")");
                 }
 

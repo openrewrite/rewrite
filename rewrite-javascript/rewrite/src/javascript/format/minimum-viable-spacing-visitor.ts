@@ -345,11 +345,11 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitImportClause(importClause: JS.ImportClause, p: P): Promise<J | undefined> {
         const ret = await super.visitImportClause(importClause, p) as JS.ImportClause;
         return produce(ret, draft => {
-            // named bindings open with a punctuator, which separates itself from `import` and `type`
-            if (draft.typeOnly || draft.name) {
+            // named bindings open with a punctuator, which separates itself from `import`, `type` and `defer`
+            if (draft.typeOnly || draft.deferred || draft.name) {
                 this.ensureSpace(draft.prefix);
             }
-            if (draft.typeOnly && draft.name) {
+            if ((draft.typeOnly || draft.deferred) && draft.name) {
                 this.ensureSpace(draft.name.element.prefix);
             }
         });

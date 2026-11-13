@@ -236,3 +236,47 @@ def f(x, y):
             pass
 """
     ))
+
+
+def test_match_with_brackets_that_belong_to_a_part_of_the_pattern():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        match x:
+            case {0: (0 | 1 | 2 as z)}:
+                pass
+            case {0: ([1, 2, {}] | False)} | {1: [[]]}:
+                pass
+            case (a, b) as c, d:
+                pass
+            case ((a as b, c as d) as e) as w, ((f as g, h) as i) as z:
+                pass
+            case [[a]], b:
+                pass
+            case [a], [b]:
+                pass
+            case (a),:
+                pass
+            case ((a, b)):
+                pass
+        """
+    ))
+
+
+def test_match_with_empty_patterns():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        match x:
+            case {}:
+                pass
+            case { } | [ ] | ( ):
+                pass
+            case {} if y:
+                pass
+            case {} as z:
+                pass
+            case [{}, []] | {"k": {}}:
+                pass
+        """
+    ))

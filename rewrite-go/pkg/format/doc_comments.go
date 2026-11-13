@@ -60,23 +60,29 @@ func (v *DocCommentVisitor) Visit(t java.Tree, p any) java.Tree {
 // file that imports "C" its doc comment is the cgo preamble, whose spacing is
 // significant, and gofmt exempts it too.
 func (v *DocCommentVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
-	out := *cu
 	// The file's own prefix is the one place a doc comment can begin the source
 	// with no line break ahead of it.
-	out.Prefix = canonicalDoc(cu.Prefix, true)
+	out := cu.WithPrefix(canonicalDoc(cu.Prefix, true))
 
 	declarationDoc := func(s java.Space) java.Space { return canonicalDoc(s, false) }
-	statements := make([]java.RightPadded[java.Statement], len(cu.Statements))
+	var statements []java.RightPadded[java.Statement]
 	for i, rp := range cu.Statements {
-		if rp.Element != nil {
-			if fixed, ok := transformPrefix(rp.Element, declarationDoc).(java.Statement); ok {
-				rp.Element = fixed
-			}
+		if rp.Element == nil {
+			continue
 		}
-		statements[i] = rp
+		fixed, ok := transformPrefix(rp.Element, declarationDoc).(java.Statement)
+		if !ok || fixed == rp.Element {
+			continue
+		}
+		if statements == nil {
+			statements = append([]java.RightPadded[java.Statement](nil), cu.Statements...)
+		}
+		statements[i].Element = fixed
 	}
-	out.Statements = statements
-	return v.GoVisitor.VisitCompilationUnit(&out, p)
+	if statements != nil {
+		out = out.WithStatements(statements)
+	}
+	return v.GoVisitor.VisitCompilationUnit(out, p)
 }
 
 // canonicalDoc rewrites the doc comment run of s, if it has one.
@@ -85,12 +91,15 @@ func canonicalDoc(s java.Space, atFileStart bool) java.Space {
 	if !ok {
 		return s
 	}
-	formatted, ok := canonicalDocComment(s.Comments[start:])
+	formatted, ok := canonicalDocComment(s.Comments()[start:])
 	if !ok {
 		return s
 	}
-	s.Comments = append(append([]java.Comment(nil), s.Comments[:start]...), formatted...)
-	return s
+	out := java.MakeSpace(append(append([]java.Comment(nil), s.Comments()[:start]...), formatted...), s.Whitespace())
+	if spaceContentEqual(out, s) {
+		return s
+	}
+	return out
 }
 
 // docCommentRun reports the index at which the run documenting whatever
@@ -99,26 +108,22 @@ func canonicalDoc(s java.Space, atFileStart bool) java.Space {
 // nothing, and dropping it would join two tokens. Earlier comments belong to
 // whatever preceded them.
 func docCommentRun(s java.Space, atFileStart bool) (int, bool) {
-	last := len(s.Comments) - 1
-	// Only the line break itself may stand between the run and the token it
-	// documents: go/printer leaves an indented token undocumented.
-	if last < 0 || s.Comments[last].Suffix != "\n" {
+	comments := s.Comments()
+	last := len(comments) - 1
+	// Only a line break may stand between the run and the token it documents.
+	// An indent there doesn't count, since TabsAndIndentsVisitor moves the token
+	// to the margin, where go/printer reads the run as its doc comment.
+	if last < 0 || strings.TrimRight(comments[last].Suffix, " \t") != "\n" {
 		return 0, false
 	}
 	for start := last; ; start-- {
 		// A run reaching the start of s, or preceded by anything other than a
 		// single line break, is as far back as this doc comment goes.
 		if start == 0 {
-			if s.Whitespace == "" && !atFileStart {
-				return 0, false
-			}
-			if s.Whitespace != "" && !strings.HasSuffix(s.Whitespace, "\n") {
-				return 0, false
-			}
-			return 0, true
+			return 0, atFileStart || strings.Contains(s.Whitespace(), "\n")
 		}
-		if !joinsLines(s.Comments[start-1].Suffix) {
-			return start, strings.Contains(s.Comments[start-1].Suffix, "\n")
+		if !joinsLines(comments[start-1].Suffix) {
+			return start, strings.Contains(comments[start-1].Suffix, "\n")
 		}
 	}
 }
@@ -151,9 +156,7 @@ func canonicalDocComment(run []java.Comment) ([]java.Comment, bool) {
 		return nil, false
 	}
 
-	var parser comment.Parser
-	var printer comment.Printer
-	text := string(printer.Comment(parser.Parse(prose.String())))
+	text := settledDocText(prose.String())
 
 	out := make([]java.Comment, 0, len(run)+len(directives)+1)
 	for text != "" {
@@ -187,6 +190,26 @@ func canonicalDocComment(run []java.Comment) ([]java.Comment, bool) {
 	out[len(out)-1].Suffix = run[len(run)-1].Suffix
 	return out, true
 }
+
+// settledDocText formats doc comment text with go/doc/comment until the text
+// stops changing. One pass can print a code block straight above a list, which
+// the next pass reads back as a single code block, as gofmt's next run does.
+func settledDocText(text string) string {
+	var parser comment.Parser
+	var printer comment.Printer
+	for range maxDocCommentPasses {
+		formatted := string(printer.Comment(parser.Parse(text)))
+		if formatted == text {
+			break
+		}
+		text = formatted
+	}
+	return text
+}
+
+// maxDocCommentPasses bounds settledDocText. A third pass changes nothing in
+// any doc comment of the standard library, as written or re-whitespaced.
+const maxDocCommentPasses = 4
 
 // docLine builds one comment line, taking everything but the text from an
 // existing line of the same run.

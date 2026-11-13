@@ -288,8 +288,8 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 return new MavenIsoVisitor<ExecutionContext>() {
                     @Override
                     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                        Xml.Tag plugins = super.visitTag(tag, ctx);
-                        plugins = (Xml.Tag) new MavenPlugin.Matcher(isParent, MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
+                        Xml.Tag visited = super.visitTag(tag, ctx);
+                        Xml.Tag plugins = (Xml.Tag) new MavenPlugin.Matcher(isParent, MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
                             MavenResolutionResult currentMrr = getResolutionResult();
                             AtomicReference<TreeVisitor<?, ExecutionContext>> maybePropertyUpdate = new AtomicReference<>();
 
@@ -368,9 +368,10 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                             }
 
                             return modifiedPlugin;
-                        }).visitNonNull(plugins, 0);
+                        }).visitNonNull(visited, 0);
 
-                        if (plugins != tag) {
+                        // Format where the path was added, not again at each enclosing tag up to <project>
+                        if (plugins != visited) {
                             plugins = autoFormat(plugins, ctx);
                         }
                         return plugins;

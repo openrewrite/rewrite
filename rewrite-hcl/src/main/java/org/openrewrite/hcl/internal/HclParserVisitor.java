@@ -214,8 +214,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             TerminalNode stringLiteral = ctx.stringLiteral().TemplateStringLiteral();
             skip(stringLiteral);
             sourceBefore("\"");
-            return new Hcl.Literal(randomId(), Space.format(prefix), Markers.EMPTY, stringLiteral.getText(),
-                    "\"" + stringLiteral.getText() + '"');
+            return new Hcl.Literal(randomId(), Space.format(prefix), Markers.EMPTY,
+                    HclString.decodeQuoted(stringLiteral.getText()), "\"" + stringLiteral.getText() + '"');
         });
     }
 
@@ -412,9 +412,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         for (HCLParser.HeredocTemplatePartContext part : ctx) {
             if (part.heredocLiteral() != null) {
                 Space prefix = Space.format(prefix(part.heredocLiteral()));
-                String value = part.heredocLiteral().getText();
+                String text = part.heredocLiteral().getText();
                 advanceCursor(part.heredocLiteral().getStop().getStopIndex() + 1);
-                expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, value, value));
+                expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, HclString.decodeHeredoc(text), text));
             } else if (part.templateInterpolation() != null) {
                 Space prefix = Space.format(prefix(part.templateInterpolation()));
                 expressions.add(visit(part.templateInterpolation()).withPrefix(prefix));
@@ -655,9 +655,9 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         for (HCLParser.QuotedTemplatePartContext part : ctx) {
             if (part.stringLiteral() != null) {
                 Space prefix = Space.format(prefix(part.stringLiteral()));
-                String value = part.stringLiteral().getText();
+                String text = part.stringLiteral().getText();
                 advanceCursor(part.stringLiteral().getStop().getStopIndex() + 1);
-                expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, value, value));
+                expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, HclString.decodeQuoted(text), text));
             } else if (part.templateInterpolation() != null) {
                 Space prefix = Space.format(prefix(part.templateInterpolation()));
                 expressions.add(visit(part.templateInterpolation()).withPrefix(prefix));

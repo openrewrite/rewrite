@@ -15,31 +15,37 @@
  */
 package org.openrewrite.golang.tree;
 
-import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.marker.Marker;
+import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 @Value
-@EqualsAndHashCode(callSuper = false)
-public class ChanDirMarker implements Marker {
+@With
+public class ChanDirMarker implements Marker, RpcCodec<ChanDirMarker> {
     UUID id;
     Space before;
 
-    public ChanDirMarker(UUID id, Space before) {
-        this.id = id;
-        this.before = before;
+    @Override
+    public void rpcSend(ChanDirMarker after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override
-    public UUID getId() {
-        return id;
-    }
-
-    @Override
-    public ChanDirMarker withId(UUID id) {
-        return new ChanDirMarker(id, this.before);
+    public ChanDirMarker rpcReceive(ChanDirMarker before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withBefore(q.receive(before.getBefore(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

@@ -66,7 +66,7 @@ public class SetFilePermissions extends Recipe {
                         return sourceFile;
                     }
                 }
-                return super.visit(tree, ctx);
+                return tree;
             }
         };
     }

@@ -21,12 +21,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
+import org.openrewrite.rpc.internal.FindTreesOfType;
 import org.openrewrite.rpc.request.PrepareRecipeResponse;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -51,12 +54,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String editVisitor;
 
     /**
-     * Composite of all editPreconditions resolved during PrepareRecipe. Exposed so that the
-     * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunCycle} can
-     * evaluate preconditions locally before adding a visitor to the batch — otherwise the
-     * batch would dispatch the visit RPC for files that the precondition would have rejected.
-     * The non-batch path uses {@link #getVisitor()}, which already wraps with
-     * {@link org.openrewrite.Preconditions#check}.
+     * Composite of all editPreconditions resolved during PrepareRecipe.
      */
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
@@ -74,6 +72,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     private final @Nullable List<PrepareRecipeResponse> childResponses;
 
+    private final boolean causesAnotherCycle;
+
     @Override
     public String getName() {
         return descriptor.getName();
@@ -82,6 +82,13 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     @Override
     public String getDisplayName() {
         return descriptor.getDisplayName();
+    }
+
+    @Override
+    public String getInstanceName() {
+        // Not every peer sends an instance name (Python doesn't)
+        //noinspection ConstantValue
+        return descriptor.getInstanceName() != null ? descriptor.getInstanceName() : super.getInstanceName();
     }
 
     @Override
@@ -116,13 +123,18 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     }
 
     @Override
+    public boolean causesAnotherCycle() {
+        return causesAnotherCycle;
+    }
+
+    @Override
     public Integer getInitialValue(ExecutionContext ctx) {
         return 0;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
-        return scanVisitor == null ? TreeVisitor.noop() : Preconditions.check(scanPreconditionVisitor, new RpcVisitor(rpc, scanVisitor));
+        return scanVisitor == null ? TreeVisitor.noop() : scanner(new RpcVisitor(rpc, scanVisitor));
     }
 
     @Override
@@ -132,7 +144,69 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Integer acc) {
-        return Preconditions.check(editPreconditionVisitor, new RpcVisitor(rpc, editVisitor));
+        return editor(new RpcVisitor(rpc, editVisitor));
+    }
+
+    private TreeVisitor<?, ExecutionContext> scanner(RpcVisitor remote) {
+        return Preconditions.check(scanPreconditionVisitor, remote);
+    }
+
+    private TreeVisitor<?, ExecutionContext> editor(RpcVisitor remote) {
+        return Preconditions.check(editPreconditionVisitor, remote);
+    }
+
+    /**
+     * Whether {@link #getScanner} would send {@code source} to {@link #getScanVisitor()}. A batch
+     * request names the remote visitor directly, so a batch asks this to send exactly the files the
+     * scanner would.
+     */
+    public boolean reachesScanVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
+        return scanVisitor != null && reachesRemote(this::scanner, scanVisitor, source, ctx, cursor);
+    }
+
+    /**
+     * Whether {@link #getVisitor()} would send {@code source} to {@link #getEditVisitor()}.
+     */
+    public boolean reachesEditVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
+        return reachesRemote(this::editor, editVisitor, source, ctx, cursor);
+    }
+
+    /**
+     * Whether an earlier recipe's edit can change what the edit precondition decides.
+     * A lone language gate only checks the file's class, which edits keep.
+     */
+    public boolean editPreconditionReadsContent() {
+        return editPreconditionVisitor != null && !isLanguageGate(editPreconditionVisitor);
+    }
+
+    /**
+     * A peer's {@link FindTreesOfType}, or an "or" of them from a peer whose visitor handles several tree types.
+     */
+    private static boolean isLanguageGate(TreeVisitor<?, ExecutionContext> precondition) {
+        return precondition instanceof FindTreesOfType ||
+               precondition instanceof Preconditions.Or &&
+               Arrays.stream(((Preconditions.Or) precondition).getVisitors()).allMatch(RpcRecipe::isLanguageGate);
+    }
+
+    /**
+     * Runs {@code gate}, the method {@link #getScanner} or {@link #getVisitor} builds its visitor with,
+     * around a visitor that records being reached in place of the remote call.
+     */
+    private boolean reachesRemote(Function<RpcVisitor, TreeVisitor<?, ExecutionContext>> gate, String visitorName,
+                                  SourceFile source, ExecutionContext ctx, Cursor cursor) {
+        boolean[] reached = {false};
+        TreeVisitor<?, ExecutionContext> gated = gate.apply(new RpcVisitor(rpc, visitorName) {
+            @Override
+            public Tree preVisit(Tree tree, ExecutionContext p) {
+                stopAfterPreVisit();
+                reached[0] = true;
+                return tree;
+            }
+        });
+        if (gated.isAcceptable(source, ctx)) {
+            gated.visit(source, ctx, cursor);
+        }
+        return reached[0];
     }
 
     @Override

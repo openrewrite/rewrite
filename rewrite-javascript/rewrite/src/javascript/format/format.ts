@@ -26,6 +26,7 @@ import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
 import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 import {applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
+import {AsyncLocalStorage} from "node:async_hooks";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
@@ -46,6 +47,31 @@ export const autoFormat = async <J2 extends J, P>(
     styles?: NamedStyles<string>[]
 ): Promise<J2> =>
     (await new AutoformatVisitor(stopAfter, styles).visit(j, p, parent) as J2);
+
+/** `j` re-indented to the style of the file `parent` leads to, with its other whitespace as it is. */
+export const autoIndent = async <J2 extends J, P>(j: J2, p: P, parent?: Cursor): Promise<J2> => {
+    const styleSource = (isSourceFile(j) ? j : parent?.firstEnclosing(isSourceFile)) ?? j;
+    const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource) as TabsAndIndentsStyle;
+    const prettierStyle = getPrettierStyle(j, parent);
+    const style = prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents;
+    return await new TabsAndIndentsVisitor(style).visit(j, p, parent) as J2;
+}
+
+/**
+ * Hears about each request to auto-format a tree made while it listens, so that a test harness can check that a
+ * recipe formats only what it changed.
+ */
+export interface FormattingListener {
+    /** AutoformatVisitor calls this before it formats `tree`, stopping after `stopAfter` when it is given. */
+    onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void;
+}
+
+const formattingListener = new AsyncLocalStorage<FormattingListener>();
+
+/** Runs `run`, telling `listener` about the formatting it requests. */
+export function listenToFormatting<T>(listener: FormattingListener, run: () => Promise<T>): Promise<T> {
+    return formattingListener.run(listener, run);
+}
 
 /**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
@@ -68,6 +94,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
+        formattingListener.getStore()?.onFormat(tree, this.stopAfter, cursor);
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
             const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
@@ -246,6 +273,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         const ret = await super.visitContainer(container, p) as J.Container<T>;
+        if (this.cursor.value?.kind === J.Kind.TypeParameter) {
+            return ret;
+        }
         return produce(ret, draft => {
             if (draft.elements.length > 0) {
                 // Apply beforeComma rule to all elements except the last
@@ -312,7 +342,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
-            draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
+            draft.control.init.forEach((oneInit, index) => {
                 if (oneInit.element.kind === J.Kind.VariableDeclarations) {
                     const vd = oneInit.element as Draft<J.VariableDeclarations>;
                     if (vd.modifiers && vd.modifiers.length > 0) {
@@ -321,8 +351,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 }
                 oneInit.after.whitespace = "";
                 this.spaceBeforeRightPaddedElementDraft(oneInit, index === 0 ? this.style.within.forParentheses : true);
-                return oneInit;
-            }));
+            });
             if (draft.control.condition) {
                 draft.control.condition.element.prefix.whitespace = " ";
                 draft.control.condition.after.whitespace = this.style.other.beforeForSemicolon ? " " : "";
@@ -366,8 +395,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    // `type`, or a default name and its comma, stands between keyword and bindings
-                    const afterClause = draft.importClause.name || draft.importClause.typeOnly ? " " : "";
+                    // `type`, `defer`, or a default name and its comma, stands between keyword and bindings
+                    const clause = draft.importClause;
+                    const afterClause = clause.name || clause.typeOnly || clause.deferred ? " " : "";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
                         // For named imports the space before `{` sits in the container, as the parser
@@ -632,9 +662,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 const hasConstraint = constraintType.element.kind !== J.Kind.Empty;
                 const hasDefault = defaultType.element.kind !== J.Kind.Empty;
 
+                if (hasDefault && !defaultType.element.prefix.whitespace.includes("\n")) {
+                    defaultType.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                }
                 if (hasConstraint) {
-                    // Space before '=' for default type (in the `after` of constraint type)
-                    if (hasDefault && !constraintType.after.whitespace.includes("\n")) {
+                    if (!hasDefault) {
+                        this.spaceAfterRightPaddedDraft(constraintType, this.style.other.beforeComma);
+                    } else if (!constraintType.after.whitespace.includes("\n")) {
+                        // Space before '=' for default type (in the `after` of constraint type)
                         constraintType.after.whitespace = this.style.aroundOperators.assignment ? " " : "";
                     }
                 } else if (hasDefault) {
@@ -1105,7 +1140,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass && grandparent?.kind !== JS.Kind.TypeLiteral ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case && this.isInsideCaseStatements(parent as J.Case, draft))) {
-                if (draft.kind != J.Kind.Case) {
+                if (draft.kind != J.Kind.Case && !this.opensCaseBody(parent, draft)) {
                     this.ensurePrefixHasNewLine(draft);
                 }
             }
@@ -1135,6 +1170,12 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
      * Check if a statement is inside a Case's statements container or body,
      * not inside the caseLabels container.
      */
+    /** A block that opens a case's statements stays on the line of its label, as in `case X: {`. */
+    private opensCaseBody(parent: J | undefined, statement: J): boolean {
+        return parent?.kind === J.Kind.Case && statement.kind === J.Kind.Block &&
+            (parent as J.Case).statements.elements[0]?.element.id === statement.id;
+    }
+
     private isInsideCaseStatements(caseNode: J.Case, statement: J): boolean {
         // Check if statement is in the statements container
         if (caseNode.statements.elements.some(s => s.element.id === statement.id)) {

@@ -17,9 +17,13 @@ package org.openrewrite.javascript.internal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.openrewrite.javascript.internal.lock.StripBom;
+import org.openrewrite.javascript.internal.lock.pnpm.LockfileReader;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -60,6 +64,9 @@ import java.util.Set;
  *     lodash@4.17.21: {}
  *   </pre></li>
  * </ul>
+ * From pnpm 11 the lock may start with an env document (pnpm's own release and config dependencies) ahead of the
+ * lockfile document; only the lockfile document is read, as {@code pnpm list} does.
+ * <p>
  * Top-level packages (those listed at the root or under {@code importers}) get
  * {@code node_modules/&lt;name&gt;} paths; everything else in the {@code packages} map
  * goes to a synthetic nested path so it's preserved in {@code all} but not in
@@ -78,9 +85,12 @@ public final class PnpmLockAdapter {
     public static String toNpmV3(String pnpmLockYaml) {
         Object loaded;
         try {
-            loaded = new Yaml().load(pnpmLockYaml);
+            loaded = new Yaml().load(LockfileReader.extractMainDocument(StripBom.stripBom(pnpmLockYaml)));
         } catch (RuntimeException e) {
             throw new RuntimeException("malformed pnpm-lock.yaml: " + e.getMessage(), e);
+        }
+        if (loaded == null) {
+            loaded = Collections.emptyMap();
         }
         if (!(loaded instanceof Map)) {
             throw new RuntimeException("pnpm-lock.yaml root is not a YAML map");
@@ -91,12 +101,18 @@ public final class PnpmLockAdapter {
         // 9.0 nests them under `importers.<dir>`. Reading both keeps the adapter format-agnostic.
         Set<String> topLevelNames = new LinkedHashSet<>();
         collectAllScopeNames(rootMap, topLevelNames);
+        Map<String, String> rootVersions = new HashMap<>();
+        collectAllScopeVersions(rootMap, rootVersions);
         Object importers = rootMap.get("importers");
         if (importers instanceof Map) {
             for (Object importer : ((Map<String, Object>) importers).values()) {
                 if (importer instanceof Map) {
                     collectAllScopeNames((Map<String, Object>) importer, topLevelNames);
                 }
+            }
+            Object rootImporter = ((Map<String, Object>) importers).get(".");
+            if (rootImporter instanceof Map) {
+                collectAllScopeVersions((Map<String, Object>) rootImporter, rootVersions);
             }
         }
 
@@ -136,8 +152,12 @@ public final class PnpmLockAdapter {
             }
             Map<String, Object> body = (Map<String, Object>) entry.getValue();
 
+            // A lock may hold several versions of a top-level name; the one the root project
+            // resolves is hoisted, whatever its position among the `packages` keys.
+            String rootVersion = rootVersions.get(nv.name);
             String path;
-            if (topLevelNames.contains(nv.name) && seenTopLevel.add(nv.name)) {
+            if (topLevelNames.contains(nv.name) && (rootVersion == null || rootVersion.equals(nv.version)) &&
+                seenTopLevel.add(nv.name)) {
                 path = "node_modules/" + nv.name;
             } else {
                 path = "node_modules/.pnpm/" + (nestedCounter[0]++) + "/node_modules/" + nv.name;
@@ -180,6 +200,44 @@ public final class PnpmLockAdapter {
         if (scope instanceof Map) {
             sink.addAll(((Map<String, Object>) scope).keySet());
         }
+    }
+
+    private static void collectAllScopeVersions(Map<String, Object> source, Map<String, String> sink) {
+        collectScopeVersions(source.get("dependencies"), sink);
+        collectScopeVersions(source.get("devDependencies"), sink);
+        collectScopeVersions(source.get("optionalDependencies"), sink);
+    }
+
+    /**
+     * Reads resolved versions, given either inline ({@code lodash: 4.17.21}, lockfileVersion 5.x) or
+     * as {@code {specifier, version}} (6.0 and later), without any peer-dep suffix.
+     */
+    @SuppressWarnings("unchecked")
+    private static void collectScopeVersions(Object scope, Map<String, String> sink) {
+        if (!(scope instanceof Map)) {
+            return;
+        }
+        for (Map.Entry<String, Object> dep : ((Map<String, Object>) scope).entrySet()) {
+            Object version = dep.getValue() instanceof Map ?
+                    ((Map<String, Object>) dep.getValue()).get("version") :
+                    dep.getValue();
+            if (version != null) {
+                sink.putIfAbsent(dep.getKey(), stripPeerSuffix(version.toString()));
+            }
+        }
+    }
+
+    private static String stripPeerSuffix(String version) {
+        int end = version.length();
+        int paren = version.indexOf('(');
+        if (paren >= 0) {
+            end = paren;
+        }
+        int underscore = version.indexOf('_');
+        if (underscore >= 0 && underscore < end) {
+            end = underscore;
+        }
+        return version.substring(0, end);
     }
 
     /**

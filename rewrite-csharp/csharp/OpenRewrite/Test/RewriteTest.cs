@@ -46,6 +46,7 @@ public abstract class RewriteTest
 
     private static ImmutableArray<MetadataReference> ResolveAssemblies(ReferenceAssemblies assemblies)
     {
+        // Blocks because its callers, RewriteRun and Parse, are synchronous test APIs.
         return ResolvedAssembliesCache.GetOrAdd(assemblies, a =>
             a.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
                 .GetAwaiter()
@@ -61,6 +62,15 @@ public abstract class RewriteTest
     {
         var recipeSpec = new RecipeSpec();
         configure(recipeSpec);
+
+        // An .editorconfig styles the C# sources, as SolutionParser has it do, and is not a source itself
+        var editorConfigSpecs = specs.Where(EditorConfigSources.Is).ToList();
+        if (editorConfigSpecs.Any(s => s.After != null))
+        {
+            throw new ArgumentException("An .editorconfig styles the sources of a test, and no recipe changes it.");
+        }
+        specs = specs.Where(s => !EditorConfigSources.Is(s)).ToArray();
+        using var editorConfigs = editorConfigSpecs.Count > 0 ? new EditorConfigSources(editorConfigSpecs) : null;
 
         var parser = new CSharpParser();
         var printer = new CSharpPrinter<object>();
@@ -101,10 +111,7 @@ public abstract class RewriteTest
 
             if (sharedTrees.Count > 0)
             {
-                sharedCompilation = CSharpCompilation.Create("TestCompilation")
-                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-                    .AddReferences(metadataReferences)
-                    .AddSyntaxTrees(sharedTrees.Values);
+                sharedCompilation = Compile(metadataReferences.Value, sharedTrees.Values);
             }
         }
 
@@ -139,7 +146,8 @@ public abstract class RewriteTest
                     semanticModel = sharedCompilation.GetSemanticModel(syntaxTree);
                 }
 
-                source = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
+                var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
+                source = editorConfigs?.Style(cu, localSourcePath) ?? cu;
 
                 // Verify no non-whitespace content leaked into Space fields
                 if (validations.WhitespaceInSpaces)
@@ -177,51 +185,304 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
+            // Marker placements the inputs already carry were not added by the recipe
+            var inputMarkers = validations.ReportingMarkersOnly ? AddedMarkersCheck.Placements(sources) : null;
+            var expectedCycles = recipeSpec.ExpectedCyclesThatMakeChanges ?? 1;
+            var cycles = recipeSpec.Cycles ?? Math.Max(2, expectedCycles + 1);
+            if (cycles < Math.Max(1, expectedCycles))
+            {
+                throw new ArgumentException(
+                    $"Cycles={cycles} has to be at least 1 and at least ExpectedCyclesThatMakeChanges={expectedCycles}");
+            }
+
             var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
-            List<Result> results;
-            var runCtx = new ExecutionContext();
+            var checks = new RunChecks(validations);
+            var runCtx = checks.Ctx;
+            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
             try
             {
-                results = RecipeScheduler.Run(recipeSpec.Recipe, sources, runCtx);
+                CycleRun run;
+                using (formatting?.Install())
+                {
+                    run = RunCycles(recipeSpec.Recipe, sources, checks, cycles, expectedCycles);
+                }
+                var results = run.Changes;
+
+                if (inputMarkers != null)
+                {
+                    AddedMarkersCheck.Verify(inputMarkers, results);
+                }
+                checks.AssertLightweightAccumulators();
+
+                foreach (var afterRecipe in recipeSpec.AfterRecipe)
+                {
+                    afterRecipe(runCtx);
+                }
+
+                foreach (var (spec, source) in parsed)
+                {
+                    var result = results.FirstOrDefault(r =>
+                        r.Before != null && r.Before.Id == source.Id);
+
+                    if (spec.After != null)
+                    {
+                        // Expected a change
+                        Assert.True(result != null && result.After != null,
+                            $"Recipe was expected to make changes but did not modify the source file.");
+                        var afterPrinted = PrintTree(result.After);
+                        AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
+                            "Unexpected result from recipe");
+                    }
+                    else
+                    {
+                        // Expected no change
+                        Assert.True(result == null || result.After == null || result.Before == result.After,
+                            "Recipe made unexpected changes to a source file that was not expected to change.");
+                    }
+                }
+
+                if (run.Unsettled is var (cycle, changes))
+                {
+                    ExpectNoFurtherChanges(changes,
+                        $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
+                }
+                var fresh = results.Count > 0 && (cycles > expectedCycles || validations.ParserShapedTrees)
+                    ? ParseAgain(run.Finals, metadataReferences)
+                    : null;
+                if (cycles > expectedCycles && fresh != null)
+                {
+                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, fresh, checks);
+                }
+                formatting?.AssertFormattedOnlyWhatChanged(results);
+                if (validations.ParserShapedTrees && fresh != null)
+                {
+                    TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
+                }
+                EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
+                UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);
             }
             finally
             {
                 WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
             }
+        }
+    }
 
-            foreach (var afterRecipe in recipeSpec.AfterRecipe)
+    /// <param name="Changes">The changes of the expected cycles, from the parsed sources to the output of the last of them.</param>
+    /// <param name="Finals">Every source file as the last of the expected cycles left it.</param>
+    /// <param name="Unsettled">The cycle that changed the sources after the expected ones, with its changes.</param>
+    private sealed record CycleRun(
+        List<Result> Changes,
+        List<SourceFile> Finals,
+        (int Cycle, List<Result> Changes)? Unsettled);
+
+    /// <summary>Follows one source file from where it started to where it is now, either end null for a file a cycle generated or deleted.</summary>
+    private sealed class Lineage(SourceFile? origin, SourceFile? latest)
+    {
+        public SourceFile? Origin { get; } = origin;
+        public SourceFile? Latest { get; set; } = latest;
+    }
+
+    /// <summary>Runs the recipe cycle after cycle, each on what the cycle before produced.</summary>
+    private static CycleRun RunCycles(Recipe recipe, List<SourceFile> sources, RunChecks checks,
+        int cycles, int expectedCycles)
+    {
+        var lineages = sources.Select(s => new Lineage(s, s)).ToList();
+        CycleRun Settle(int cycle, List<Result>? changes) => new(
+            lineages.Where(l => !ReferenceEquals(l.Origin, l.Latest)).Select(l => new Result(l.Origin, l.Latest)).ToList(),
+            lineages.Where(l => l.Latest != null).Select(l => l.Latest!).ToList(),
+            changes == null ? null : (cycle, changes));
+
+        var settled = expectedCycles == 0 ? Settle(0, null) : null;
+        var cyclesThatMadeChanges = 0;
+        for (var cycle = 1; cycle <= cycles; cycle++)
+        {
+            var live = lineages.Where(l => l.Latest != null).Select(l => l.Latest!).ToList();
+            var changes = cycle == 1
+                ? checks.Run(recipe, live)
+                : RunWithoutWritingDataTables(recipe, live, checks);
+            if (changes.Count == 0)
             {
-                afterRecipe(runCtx);
+                break;
+            }
+            if (settled != null)
+            {
+                return settled with { Unsettled = (cycle, changes) };
             }
 
-            foreach (var (spec, source) in parsed)
+            cyclesThatMadeChanges++;
+            foreach (var (before, after) in changes)
             {
-                var result = results.FirstOrDefault(r =>
-                    r.Before != null && r.Before.Id == source.Id);
-
-                if (spec.After != null)
+                var lineage = before == null ? null : lineages.Find(l => ReferenceEquals(l.Latest, before));
+                if (lineage != null)
                 {
-                    // Expected a change
-                    Assert.True(result != null && result.After != null,
-                        $"Recipe was expected to make changes but did not modify the source file.");
-                    var afterPrinted = PrintTree(result.After);
-                    AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
-                        "Unexpected result from recipe");
+                    lineage.Latest = after;
                 }
                 else
                 {
-                    // Expected no change
-                    Assert.True(result == null || result.After == null || result.Before == result.After,
-                        "Recipe made unexpected changes to a source file that was not expected to change.");
+                    lineages.Add(new Lineage(null, after));
+                }
+            }
+            if (cycle >= expectedCycles)
+            {
+                settled = Settle(cycle, null);
+            }
+        }
+
+        if (expectedCycles > 1 && cyclesThatMadeChanges < expectedCycles)
+        {
+            Assert.Fail($"Expected recipe to complete in {PluralCycles(expectedCycles)}, but it settled after " +
+                        $"{PluralCycles(cyclesThatMadeChanges)}. Lower ExpectedCyclesThatMakeChanges.");
+        }
+        return settled ?? Settle(0, null);
+    }
+
+    /// <summary>Data tables are written by the first cycle only, as in Java.</summary>
+    private static List<Result> RunWithoutWritingDataTables(Recipe recipe, List<SourceFile> sources, RunChecks checks)
+    {
+        var ctx = checks.Ctx;
+        var dataTables = ctx.ComputeMessageIfAbsent<IDataTableStore>(DataTable<object>.DataTableStoreKey,
+            _ => new InMemoryDataTableStore());
+        ctx.PutMessage(DataTable<object>.DataTableStoreKey, new InMemoryDataTableStore());
+        try
+        {
+            return checks.Run(recipe, sources);
+        }
+        finally
+        {
+            ctx.PutMessage(DataTable<object>.DataTableStoreKey, dataTables);
+        }
+    }
+
+    private static void ExpectNoFurtherChanges(List<Result> changes, string headline, bool sanitized = false)
+    {
+        var markerPrinter = sanitized ? MarkerPrinter.Sanitized : MarkerPrinter.Default;
+        var found = new List<string>();
+        foreach (var (before, after) in changes)
+        {
+            if (before == null)
+            {
+                found.Add($"  {after!.SourcePath}, which it generated");
+            }
+            else if (after == null)
+            {
+                found.Add($"  {before.SourcePath}, which it deleted");
+            }
+            else
+            {
+                var expected = PrintTree(before, markerPrinter);
+                var actual = PrintTree(after, markerPrinter);
+                if (expected != actual)
+                {
+                    found.Add($"  {after.SourcePath}\n{DiffUtils.UnifiedDiff(expected, actual, after.SourcePath)}");
+                }
+                else if (!sanitized)
+                {
+                    found.Add($"  {after.SourcePath}, whose LST it changed without changing the printed source");
                 }
             }
         }
+
+        if (found.Count > 0)
+        {
+            Assert.Fail(string.Join("\n", [
+                $"{headline} the sources again:",
+                ..found,
+                "A recipe should recognize code it has already changed and leave it alone, so that running it " +
+                "again changes nothing. A recipe that is meant to need more cycles declares how many with " +
+                "ExpectedCyclesThatMakeChanges."
+            ]));
+        }
     }
+
+    /// <param name="SyntaxTree">Roslyn's parse of the printed text.</param>
+    /// <param name="Unit">The LST of the printed text, or null when the parser doesn't print it back.</param>
+    internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit);
+
+    /// <summary>The printed text of each compilation unit the cycles left, parsed as the next run reads it.</summary>
+    private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals,
+        ImmutableArray<MetadataReference>? metadataReferences)
+    {
+        var units = finals.OfType<CompilationUnit>()
+            .Select(unit =>
+            {
+                var text = PrintTree(unit, MarkerPrinter.Sanitized);
+                return (Unit: unit, Text: text, Tree: CSharpSyntaxTree.ParseText(text, path: unit.SourcePath));
+            })
+            .ToList();
+        var compilation = metadataReferences != null && units.Count > 0
+            ? Compile(metadataReferences.Value, units.Select(u => u.Tree))
+            : null;
+
+        var parser = new CSharpParser();
+        var fresh = new Dictionary<SourceFile, FreshParse>(ReferenceEqualityComparer.Instance);
+        foreach (var (unit, text, tree) in units)
+        {
+            CompilationUnit? reparsed = null;
+            try
+            {
+                reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
+                    semanticModel: compilation?.GetSemanticModel(tree));
+                if (PrintTree(reparsed, MarkerPrinter.Sanitized) != text)
+                {
+                    reparsed = null;
+                }
+            }
+            catch (Exception)
+            {
+                // A file that does not parse again keeps the LST the recipe produced
+            }
+            fresh[unit] = new FreshParse(tree, reparsed);
+        }
+        return fresh;
+    }
+
+    /// <summary>
+    /// Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
+    /// recipe that recognizes its own output only by the shape of that LST changes it again.
+    /// </summary>
+    private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
+        Dictionary<SourceFile, FreshParse> fresh, RunChecks checks)
+    {
+        if (!fresh.Values.Any(parse => parse.Unit != null))
+        {
+            return;
+        }
+
+        var sources = finals
+            .Select(f => fresh.TryGetValue(f, out var parse) && parse.Unit != null
+                // What the source file carries, like its styles, comes from outside its text
+                ? parse.Unit.WithMarkers(f.Markers)
+                : f)
+            .ToList();
+        ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, checks),
+            "Running the recipe on a fresh parse of its output changed", sanitized: true);
+    }
+
+    private static CSharpCompilation Compile(ImmutableArray<MetadataReference> metadataReferences,
+        IEnumerable<SyntaxTree> syntaxTrees)
+    {
+        return CSharpCompilation.Create("TestCompilation")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddReferences(metadataReferences)
+            .AddSyntaxTrees(syntaxTrees);
+    }
+
+    private static string PluralCycles(int count) => count == 1 ? "1 cycle" : $"{count} cycles";
 
     protected static SourceSpec CSharp(string before, string? after = null)
     {
         return new SourceSpec(before, after);
+    }
+
+    /// <summary>
+    /// An .editorconfig of the project the test's sources belong to. The C# sources take the style it sets for their
+    /// paths, as <see cref="SolutionParser"/> gives them, and no recipe runs on it.
+    /// </summary>
+    protected static SourceSpec EditorConfig(string content, string sourcePath = ".editorconfig")
+    {
+        return new SourceSpec(content, null, sourcePath);
     }
 
     protected static SourceSpec CsProj([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null, string sourcePath = "project.csproj")
@@ -269,15 +530,18 @@ public abstract class RewriteTest
         }
     }
 
-    private static string PrintTree(SourceFile tree)
+    private static string PrintTree(SourceFile tree, IMarkerPrinter? markerPrinter = null)
     {
+        var capture = new PrintOutputCapture<object>(null!, markerPrinter ?? MarkerPrinter.Default);
         if (tree is Xml.Document)
         {
-            var capture = new PrintOutputCapture<object>(null!);
             new XmlPrinter<object>().Visit(tree, capture);
-            return capture.ToString();
         }
-        return new CSharpPrinter<object>().Print(tree);
+        else
+        {
+            new CSharpPrinter<object>().Visit(tree, capture);
+        }
+        return capture.ToString();
     }
 
     private static readonly CsprojParser CsprojParserInstance = new();
@@ -345,9 +609,34 @@ public class RecipeSpec
     /// </summary>
     public IReadOnlyList<Action<ExecutionContext>> AfterRecipe => _afterRecipe;
 
+    /// <summary>
+    /// The cycles to run, by default one more than <see cref="ExpectedCyclesThatMakeChanges"/> and at least two.
+    /// The cycles after the expected ones, and a run on a fresh parse of the output, fail the test if they change
+    /// anything, so setting this to 1 turns the stability checks off.
+    /// </summary>
+    public int? Cycles { get; private set; }
+
+    /// <summary>
+    /// How many cycles a recipe needs to settle, by default 1. A recipe that only reaches its result over several
+    /// cycles declares how many here, and the test then compares the output of the last of them.
+    /// </summary>
+    public int? ExpectedCyclesThatMakeChanges { get; private set; }
+
     public RecipeSpec SetRecipe(Recipe recipe)
     {
         Recipe = recipe;
+        return this;
+    }
+
+    public RecipeSpec SetCycles(int cycles)
+    {
+        Cycles = cycles;
+        return this;
+    }
+
+    public RecipeSpec SetExpectedCyclesThatMakeChanges(int expectedCyclesThatMakeChanges)
+    {
+        ExpectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
         return this;
     }
 

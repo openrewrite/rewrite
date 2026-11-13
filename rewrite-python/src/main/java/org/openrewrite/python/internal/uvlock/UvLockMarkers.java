@@ -15,6 +15,9 @@
  */
 package org.openrewrite.python.internal.uvlock;
 
+import org.openrewrite.python.internal.uvlock.marker.MarkerInterner;
+import org.openrewrite.python.internal.uvlock.marker.MarkerParser;
+import org.openrewrite.python.internal.uvlock.marker.MarkerTree;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.pep440.PythonVersion;
 
@@ -54,58 +57,100 @@ final class UvLockMarkers {
     }
 
     /**
-     * uv's recorded marker form for the cataloged subset: normalized spacing, single
-     * quotes, {@code python_version} to {@code python_full_version} for order-preserving
-     * comparisons, and and-chain clauses sorted by variable. Null when the marker is
-     * outside the subset.
+     * The marker as uv records it, by uv's own marker algebra. Null for a marker uv cannot parse, or one it ignores
+     * entirely, which records no marker.
      */
-    static @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
-        List<String[]> clauses = parseSimpleAndChain(rawMarker);
-        if (clauses == null) {
+    /**
+     * The marker as uv records it where the lock already recorded it. A conjunction of values that never hold
+     * together is pruned by the algebra, so a marker only that pruning would change stands as the lock has it.
+     */
+    static @Nullable String recordMarkerAsRecorded(String recorded) {
+        try {
+            if (recorded.equals(MarkerTree.parse(new MarkerInterner(false), recorded).tryToString())) {
+                return recorded;
+            }
+        } catch (MarkerParser.MarkerSyntaxException e) {
             return null;
         }
-        List<String[]> mapped = new ArrayList<>();
-        for (String[] clause : clauses) {
-            String var = clause[0];
-            String op = clause[1];
-            String value = clause[2];
-            if (value.indexOf('\'') >= 0 || value.indexOf('"') >= 0) {
-                return null;
+        return recordMarker(recorded, null);
+    }
+
+    static @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
+        try {
+            MarkerInterner interner = new MarkerInterner();
+            MarkerTree tree = MarkerTree.parse(interner, rawMarker);
+            if (extraClause != null) {
+                tree = tree.and(MarkerTree.parse(interner, extraClause));
             }
-            if (VERSION_VARS.contains(var)) {
-                // only >= and < survive the python_version -> python_full_version rename unchanged
-                if (!">=".equals(op) && !"<".equals(op)) {
+            return tree.tryToString();
+        } catch (MarkerParser.MarkerSyntaxException e) {
+            return null;
+        }
+    }
+
+    /**
+     * uv's recorded form of a Python version clause, or null outside the reproduced forms. A
+     * {@code python_version} comparison becomes the {@code python_full_version} interval it denotes.
+     * Values keep their release only, with trailing zeros trimmed except before a star.
+     */
+    static @Nullable String[] lowerVersionClause(String var, String op, String value) {
+        boolean wildcard = value.endsWith(".*");
+        PythonVersion v = PythonVersion.parse(wildcard ? value.substring(0, value.length() - 2) : value);
+        if (v == null || "~=".equals(op) || "===".equals(op)) {
+            return null;
+        }
+        long[] release = v.getRelease();
+        if ("python_full_version".equals(var)) {
+            return new String[]{var, op, wildcard ? releaseText(release, release.length) + ".*" : trimmed(release)};
+        }
+        if (wildcard) {
+            if (release.length == 1) {
+                return new String[]{"python_full_version", op, release[0] + ".*"};
+            }
+            for (int i = 2; i < release.length; i++) {
+                if (release[i] != 0) {
                     return null;
                 }
-                mapped.add(new String[]{"python_full_version", op, value});
-            } else if ("platform_system".equals(var) && ("==".equals(op) || "!=".equals(op))) {
-                // uv rewrites platform_system to sys_platform for the three OSes it maps;
-                // other values have no sys_platform equivalent, so fail loud (verified subset)
-                String sysPlatform = platformSystemToSysPlatform(value);
-                if (sysPlatform == null) {
-                    return null;
-                }
-                mapped.add(new String[]{"sys_platform", op, sysPlatform});
-            } else if ("==".equals(op) || "!=".equals(op)) {
-                mapped.add(clause);
-            } else {
-                return null;
             }
+            return new String[]{"python_full_version", op, release[0] + "." + release[1] + ".*"};
         }
-        if (extraClause != null) {
-            List<String[]> extra = parseSimpleAndChain(extraClause);
-            if (extra == null) {
-                return null;
+        int significant = significantLength(release);
+        if (significant > 2) {
+            return null;
+        }
+        long major = release[0];
+        long minor = significant == 2 ? release[1] : 0;
+        switch (op) {
+            case "==": return new String[]{"python_full_version", "==", major + "." + minor + ".*"};
+            case "!=": return new String[]{"python_full_version", "!=", major + "." + minor + ".*"};
+            case ">": return new String[]{"python_full_version", ">=", major + "." + (minor + 1)};
+            case "<=": return new String[]{"python_full_version", "<", major + "." + (minor + 1)};
+            case "<": case ">=": return new String[]{"python_full_version", op, trimmed(new long[]{major, minor})};
+            default: return null;
+        }
+    }
+
+    private static int significantLength(long[] release) {
+        int length = release.length;
+        while (length > 1 && release[length - 1] == 0) {
+            length--;
+        }
+        return length;
+    }
+
+    private static String trimmed(long[] release) {
+        return releaseText(release, significantLength(release));
+    }
+
+    private static String releaseText(long[] release, int length) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            if (i > 0) {
+                b.append('.');
             }
-            mapped.addAll(extra);
+            b.append(release[i]);
         }
-        // stable sort: uv orders and-chains alphabetically by variable
-        mapped.sort(Comparator.comparing(a -> a[0]));
-        List<String> parts = new ArrayList<>(mapped.size());
-        for (String[] clause : mapped) {
-            parts.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");
-        }
-        return String.join(" and ", parts);
+        return b.toString();
     }
 
     private static @Nullable String platformSystemToSysPlatform(String value) {
@@ -122,45 +167,69 @@ final class UvLockMarkers {
     }
 
     /**
-     * Splits a marker into simple {@code var op 'value'} clauses joined by {@code and};
-     * null for anything richer (or-chains, parentheses, reversed operands).
+     * Splits a marker into simple {@code var op 'value'} clauses joined by {@code and}; null for
+     * anything richer (or-chains, reversed operands, nesting beyond one pair of parentheses).
      */
     static @Nullable List<String[]> parseSimpleAndChain(String marker) {
-        List<String> parts = splitTopLevelAnd(marker);
-        if (parts == null) {
-            return null;
-        }
-        List<String[]> clauses = new ArrayList<>(parts.size());
-        for (String part : parts) {
-            Matcher m = SIMPLE_CLAUSE.matcher(part);
-            if (!m.matches()) {
-                return null;
-            }
-            clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
-        }
-        return clauses;
+        List<List<String[]>> terms = parseDisjunction(marker);
+        return terms != null && terms.size() == 1 ? terms.get(0) : null;
     }
 
-    private static @Nullable List<String> splitTopLevelAnd(String marker) {
-        if (marker.indexOf('(') >= 0 || marker.indexOf(')') >= 0) {
+    /**
+     * Splits a marker into the and-chains of its top-level disjunction, each a list of simple
+     * clauses. One pair of parentheses may wrap a whole disjunct or a single clause.
+     */
+    static @Nullable List<List<String[]>> parseDisjunction(String marker) {
+        List<String> terms = splitTopLevel(marker, "or");
+        if (terms == null) {
             return null;
         }
+        List<List<String[]>> result = new ArrayList<>(terms.size());
+        for (String term : terms) {
+            List<String[]> clauses = new ArrayList<>();
+            if (!addConjunction(term, clauses)) {
+                return null;
+            }
+            result.add(clauses);
+        }
+        return result;
+    }
+
+    // a parenthesized conjunction inside a conjunction flattens into it, and a nested disjunction yields no parse
+    private static boolean addConjunction(String text, List<String[]> clauses) {
+        String inner = stripWrappingParens(text);
+        List<String> ors = splitTopLevel(inner, "or");
+        List<String> parts = splitTopLevel(inner, "and");
+        if (ors == null || ors.size() > 1 || parts == null) {
+            return false;
+        }
+        if (parts.size() == 1) {
+            Matcher m = SIMPLE_CLAUSE.matcher(inner);
+            if (!m.matches()) {
+                return false;
+            }
+            clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
+            return true;
+        }
+        for (String part : parts) {
+            if (!addConjunction(part, clauses)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // splits at the operator word outside quotes and parentheses; null when parentheses do not balance
+    private static @Nullable List<String> splitTopLevel(String marker, String operator) {
         List<String> parts = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         char quote = 0;
-        String[] tokens = marker.split("(?<=\\s)|(?=\\s)");
-        // scan word tokens, honoring quoted strings, so "and"/"or" inside values are kept
-        int i = 0;
-        while (i < tokens.length) {
-            String token = tokens[i];
-            if (quote == 0 && ("and".equals(token))) {
+        int depth = 0;
+        for (String token : marker.split("(?<=\\s)|(?=\\s)")) {
+            if (quote == 0 && depth == 0 && operator.equals(token)) {
                 parts.add(current.toString());
                 current.setLength(0);
-                i++;
                 continue;
-            }
-            if (quote == 0 && "or".equals(token)) {
-                return null;
             }
             for (int c = 0; c < token.length(); c++) {
                 char ch = token.charAt(c);
@@ -168,13 +237,45 @@ final class UvLockMarkers {
                     quote = ch;
                 } else if (quote == ch) {
                     quote = 0;
+                } else if (quote == 0 && ch == '(') {
+                    depth++;
+                } else if (quote == 0 && ch == ')' && --depth < 0) {
+                    return null;
                 }
             }
             current.append(token);
-            i++;
+        }
+        if (depth != 0) {
+            return null;
         }
         parts.add(current.toString());
         return parts;
+    }
+
+    private static String stripWrappingParens(String text) {
+        String t = text.trim();
+        while (t.startsWith("(") && t.endsWith(")") && closesAtEnd(t)) {
+            t = t.substring(1, t.length() - 1).trim();
+        }
+        return t;
+    }
+
+    private static boolean closesAtEnd(String t) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < t.length(); i++) {
+            char ch = t.charAt(i);
+            if (quote == 0 && (ch == '\'' || ch == '"')) {
+                quote = ch;
+            } else if (quote == ch) {
+                quote = 0;
+            } else if (quote == 0 && ch == '(') {
+                depth++;
+            } else if (quote == 0 && ch == ')' && --depth == 0) {
+                return i == t.length() - 1;
+            }
+        }
+        return false;
     }
 
     /**

@@ -94,7 +94,7 @@ class _AppendToLiteral(PythonVisitor[ExecutionContext]):
         self._suffix = suffix
 
     def visit_literal(self, literal: j.Literal, p: ExecutionContext) -> j.J:
-        if isinstance(literal.value, str) and literal.value_source:
+        if isinstance(literal.value, str) and literal.value_source and not literal.value.endswith(self._suffix):
             new_value = literal.value + self._suffix
             quote = literal.value_source[0]
             return literal.replace(value=new_value, value_source=f"{quote}{new_value}{quote}")
@@ -259,6 +259,8 @@ class TestScanningPhaseTraversal:
         spec = RecipeSpec(
             recipe=Composite([DeletingScanner(), ScanningEditor()]),
             type_attribution=False,
+            # The scanner deletes the file on purpose, to show what the run does where nothing checks it.
+            check_no_edits_in_scanning_phase=False,
         )
         spec.rewrite_run(
             python('s = "hello"', 's = "hello (count: 1)"')

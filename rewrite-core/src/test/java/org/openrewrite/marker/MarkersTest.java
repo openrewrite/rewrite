@@ -16,9 +16,15 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +60,55 @@ class MarkersTest {
         markers = markers.add(new TextMarker(randomId(), "thing1"));
         markers = markers.add(new TextMarker(randomId(), "thing2"));
         assertThat(markers.findAll(TextMarker.class)).hasSize(2);
+    }
+
+    /**
+     * A stored LST holds null where a marker once could not be decoded, and its printer still reads it.
+     */
+    @Test
+    void nullEntryStaysWhereItIs() {
+        TextMarker text = new TextMarker(randomId(), "text");
+        Markers markers = Markers.build(Arrays.asList(null, text));
+        SearchResult found = new SearchResult(randomId(), "found");
+        TextMarker replaced = new TextMarker(randomId(), "replaced");
+
+        assertThat(markers.add(found).getMarkers()).containsExactly(null, text, found);
+        assertThat(markers.addIfAbsent(found).getMarkers()).containsExactly(null, text, found);
+        assertThat(markers.setByType(found).getMarkers()).containsExactly(null, text, found);
+        assertThat(markers.setByType(replaced).getMarkers()).containsExactly(null, replaced);
+        assertThat(markers.compute(replaced, (a, b) -> b).getMarkers()).containsExactly(null, text, replaced);
+        assertThat(markers.removeByType(TextMarker.class).getMarkers()).hasSize(1).containsOnlyNulls();
+        assertThat(markers.findAll(TextMarker.class)).containsExactly(text);
+    }
+
+    @Test
+    void visitorReplacingAMarkerLeavesANullEntryInPlace() {
+        TextMarker text = new TextMarker(randomId(), "text");
+        TextMarker replaced = new TextMarker(randomId(), "replaced");
+        PlainText before = PlainText.builder()
+          .sourcePath(Paths.get("a.txt"))
+          .markers(Markers.build(Arrays.asList(null, text)))
+          .build();
+
+        PlainText after = new PlainTextVisitor<Integer>() {
+            @Override
+            public <M extends Marker> M visitMarker(Marker marker, Integer p) {
+                //noinspection unchecked
+                return (M) (marker.getId().equals(text.getId()) ? replaced : marker);
+            }
+        }.visitText(before, 0);
+
+        assertThat(after.getMarkers().getMarkers()).containsExactly(null, replaced);
+    }
+
+    @Test
+    void markupWithoutDetailPrintsItsMessageWhenVerbose() {
+        Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
+
+        assertThat(new Markup.Info(randomId(), "message", null).print(cursor, UnaryOperator.identity(), true))
+          .isEqualTo("(message)");
+        assertThat(new Markup.Info(randomId(), "message", "detail").print(cursor, UnaryOperator.identity(), true))
+          .isEqualTo("(detail)");
     }
 
     private static class TextMarker implements Marker {

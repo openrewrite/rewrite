@@ -214,8 +214,7 @@ class AddPlatformDependencyTest implements RewriteTest {
     @Test
     void addsToImplementationScopeWhenNoConfigurationSpecified() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, null, null))
-            .typeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, null, null)),
           mavenProject("project",
             srcMainJava(java(usingGuavaIntMath)),
             buildGradle(
@@ -250,7 +249,8 @@ class AddPlatformDependencyTest implements RewriteTest {
     void onlyAddsToParentConfigurationWhenNoConfigurationSpecified() {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, null, null))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all()
+              .classDeclarations(false).identifiers(false).methodDeclarations(false)),
           mavenProject("project",
             srcMainJava(java(usingGuavaIntMath)),
             srcTestJava(java(usingGuavaIntMath)),

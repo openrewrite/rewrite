@@ -24,6 +24,7 @@ import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import lombok.Getter;
@@ -39,6 +40,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.parser.ClasspathJarIndex;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
@@ -77,15 +79,17 @@ public class ReloadableJava17Parser implements JavaParser {
     @Nullable
     private final Collection<Input> dependsOn;
 
-    private final JavacFileManager pfm;
+    private final ByteArrayCapableJavacFileManager pfm;
     private final Context context;
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+    private final boolean typeAttribution;
 
     private ReloadableJava17Parser(
             boolean logCompilationWarningsAndErrors,
+            boolean typeAttribution,
             @Nullable Collection<Path> classpath,
             Collection<byte[]> classBytesClasspath,
             @Nullable Collection<Input> dependsOn,
@@ -96,6 +100,7 @@ public class ReloadableJava17Parser implements JavaParser {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeAttribution = typeAttribution;
         this.typeCache = typeCache;
         this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
@@ -176,7 +181,13 @@ public class ReloadableJava17Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        compilerLog.compilationErrors = ctx.getMessage(JavaParser.COMPILATION_ERRORS);
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus;
+        try {
+            cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        } finally {
+            compilerLog.compilationErrors = null;
+        }
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
@@ -211,7 +222,8 @@ public class ReloadableJava17Parser implements JavaParser {
             }
 
             try {
-                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
+                pfm.setClasspath(new ArrayList<>(classpath),
+                        Boolean.TRUE.equals(ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -247,9 +259,17 @@ public class ReloadableJava17Parser implements JavaParser {
                 handleParsingException(ctx, t);
             }
 
+            if (!typeAttribution) {
+                compiler.todo.clear();
+            }
             while (!compiler.todo.isEmpty()) {
                 try {
-                    compiler.attribute(compiler.todo);
+                    if (compilerLog.compilationErrors == null) {
+                        compiler.attribute(compiler.todo);
+                    } else {
+                        // javac reports some errors, such as an unreported exception, as it analyzes the flow
+                        compiler.flow(compiler.attribute(compiler.todo));
+                    }
                 } catch (Throwable t) {
                     handleParsingException(ctx, t);
                 }
@@ -334,8 +354,25 @@ public class ReloadableJava17Parser implements JavaParser {
     }
 
     private static class ResettableLog extends Log {
+        @Nullable Collection<Diagnostic<? extends JavaFileObject>> compilationErrors;
+
         protected ResettableLog(Context context) {
             super(context);
+            // Installed first, it stays below the handlers that javac installs and removes, which pass on the
+            // errors of code that javac keeps and discard those of an attribution it only tries.
+            new DiagnosticHandler() {
+                {
+                    install(ResettableLog.this);
+                }
+
+                @Override
+                public void report(JCDiagnostic diagnostic) {
+                    if (compilationErrors != null && diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                        compilationErrors.add(diagnostic);
+                    }
+                    prev.report(diagnostic);
+                }
+            };
         }
 
         public void reset() {
@@ -350,12 +387,13 @@ public class ReloadableJava17Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava17Parser, Builder> {
         @Override
         public ReloadableJava17Parser build() {
-            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
+            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory);
         }
     }
 
     private static class ByteArrayCapableJavacFileManager extends JavacFileManager {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
+        private List<ClasspathJarIndex> indexedJars = emptyList();
 
         public ByteArrayCapableJavacFileManager(Context context,
                                                 boolean register,
@@ -367,18 +405,44 @@ public class ReloadableJava17Parser implements JavaParser {
                     .collect(toList());
         }
 
+        void setClasspath(List<Path> classpath, boolean shareJarIndex) throws IOException {
+            indexedJars = shareJarIndex ? ClasspathJarIndex.indexTrailingJars(classpath) : emptyList();
+            List<Path> searchedByJavac = classpath.subList(0, classpath.size() - indexedJars.size());
+            setLocationFromPaths(StandardLocation.CLASS_PATH, searchedByJavac);
+        }
+
+        @Override
+        public Iterable<? extends File> getLocation(Location location) {
+            Iterable<? extends File> files = super.getLocation(location);
+            return StandardLocation.CLASS_PATH == location ? ClasspathJarIndex.location(files, indexedJars) : files;
+        }
+
         @Override
         public String inferBinaryName(Location location, JavaFileObject file) {
             if (file instanceof PackageAwareJavaFileObject) {
                 return ((PackageAwareJavaFileObject) file).getClassName();
             }
+            String indexed = ClasspathJarIndex.binaryName(file);
+            if (indexed != null) {
+                return indexed;
+            }
             return super.inferBinaryName(location, file);
+        }
+
+        @Override
+        public @Nullable JavaFileObject getJavaFileForInput(Location location, String className,
+                                                            JavaFileObject.Kind kind) throws IOException {
+            JavaFileObject file = super.getJavaFileForInput(location, className, kind);
+            return file == null && StandardLocation.CLASS_PATH == location ?
+                    ClasspathJarIndex.find(indexedJars, className, kind, Charset.forName(getEncodingName())) : file;
         }
 
         @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH == location) {
-                Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
+                Iterable<JavaFileObject> listed = ClasspathJarIndex.list(
+                        super.list(location, packageName, kinds, recurse), indexedJars, packageName, kinds, recurse,
+                        Charset.forName(getEncodingName()));
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()
                                         .filter(jfo -> jfo.getPackage().equals(packageName)),

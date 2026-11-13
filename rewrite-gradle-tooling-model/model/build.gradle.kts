@@ -6,7 +6,19 @@ plugins {
 group = "org.openrewrite.gradle.tooling"
 description = "A model for extracting semantic information out of Gradle build files necessary for refactoring them."
 
-val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
+val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath") {
+    // Each embedded Gradle version instruments the jars it hasn't seen before compiling the init script. The model
+    // builders never load the Groovy or Kotlin parsers, git, JNA or bytecode generation, though production's
+    // init.gradle still puts them on the init-script classpath.
+    exclude(group = "org.openrewrite", module = "rewrite-groovy")
+    exclude(group = "org.openrewrite", module = "rewrite-kotlin")
+    exclude(group = "org.apache.groovy")
+    exclude(group = "org.jetbrains.kotlin")
+    exclude(group = "org.openrewrite.tools", module = "jgit")
+    exclude(group = "net.java.dev.jna")
+    exclude(group = "io.quarkus.gizmo")
+    exclude(group = "org.ow2.asm")
+}
 
 dependencies {
     constraints {
@@ -63,19 +75,21 @@ val testGradle4 = tasks.register<Test>("testGradle4") {
 }
 
 val testManifestFile = layout.buildDirectory.file("test-manifest/test-manifest.txt")
+val buildGradleHome = gradle.gradleHomeDir
 val testManifestTask = tasks.register("testManifest") {
     inputs.files(pluginLocalTestClasspath)
     outputs.file(testManifestFile)
     doLast {
         testManifestFile.get().asFile.writeText(
             pluginLocalTestClasspath.files
-                // Exclude the build's own gradle-api jar (under "generated-gradle-jars"). It leaks in
-                // via `implementation(gradleApi())` on the plugin, but the embedded Gradle build that
-                // applies the plugin already provides its own Gradle API to init scripts. Injecting the
-                // build-time Gradle's gradle-api into an older embedded Gradle's initscript classpath
-                // breaks classpath instrumentation when the two target different Java bytecode versions
-                // (e.g. Gradle 9.5's gradle-api has Java 25 / v69 classes the embedded Gradle can't read).
+                // Exclude the build's own gradle-api jar (under "generated-gradle-jars") and the rest of its
+                // distribution's jars (Groovy, Kotlin, ...). They leak in via `implementation(gradleApi())` on the
+                // plugin, but the embedded Gradle build that applies the plugin already provides its own Gradle
+                // API to init scripts. Injecting the build-time Gradle's gradle-api into an older embedded Gradle's
+                // initscript classpath breaks classpath instrumentation when the two target different Java bytecode
+                // versions (e.g. Gradle 9.5's gradle-api has Java 25 / v69 classes the embedded Gradle can't read).
                 .filter { !it.absolutePath.contains("generated-gradle-jars") }
+                .filter { buildGradleHome == null || !it.startsWith(buildGradleHome) }
                 .joinToString(separator = "\n") { it.absolutePath }
         )
     }

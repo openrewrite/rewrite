@@ -89,6 +89,26 @@ class ChangeKeyTest implements RewriteTest {
     }
 
     @Test
+    void changeKeyToOneThatNeedsEscapes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey(
+            "package.name",
+            "\"say \\\"hi\\\" \\\\ x\""
+          )),
+          toml(
+            """
+              [package]
+              name = "my-package"
+              """,
+            """
+              [package]
+              "say \\"hi\\" \\\\ x" = "my-package"
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotChangeUnmatchedKeys() {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(

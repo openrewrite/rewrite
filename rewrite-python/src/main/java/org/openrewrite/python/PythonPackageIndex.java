@@ -15,9 +15,14 @@
  */
 package org.openrewrite.python;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A Python package index (a pipenv {@code [[source]]}), after environment
@@ -25,6 +30,7 @@ import org.jspecify.annotations.Nullable;
  */
 @Value
 @With
+@AllArgsConstructor
 public class PythonPackageIndex {
     String name;
     String url;
@@ -37,8 +43,21 @@ public class PythonPackageIndex {
     String password;
 
     /**
-     * True when the URL still contains {@code ${VAR}} placeholders whose variables were
-     * unset at discovery time; using such an index is a configuration failure.
+     * True when the URL, outside its credentials, still contains {@code ${VAR}} placeholders
+     * whose variables were unset at discovery time; there is no usable URL to fall back to, so
+     * using such an index is a configuration failure.
      */
     boolean unresolvedPlaceholders;
+
+    /**
+     * Placeholders, verbatim (e.g. {@code ${INDEX_TOKEN}}), in the credentials embedded in the
+     * source URL whose variables were unset at discovery time. Like pipenv, those credentials are
+     * still sent as written, and the placeholders are reported if the index rejects them.
+     */
+    List<String> unresolvedCredentialPlaceholders;
+
+    public PythonPackageIndex(String name, String url, boolean verifySsl, @Nullable String username,
+                              @Nullable String password, boolean unresolvedPlaceholders) {
+        this(name, url, verifySsl, username, password, unresolvedPlaceholders, emptyList());
+    }
 }

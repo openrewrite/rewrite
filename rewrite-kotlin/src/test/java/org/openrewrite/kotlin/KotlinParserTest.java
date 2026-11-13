@@ -18,16 +18,24 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -111,6 +119,46 @@ class KotlinParserTest implements RewriteTest {
         assertThat(results)
           .extracting(SourceFile::getSourcePath)
           .containsExactly(Paths.get("Bad.kt"));
+    }
+
+    @Test
+    void syntaxErrorIsNotLoggedWhenCompilationLoggingIsDisabled() {
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        List<SourceFile> results;
+        try {
+            System.setErr(new PrintStream(err, true));
+            results = KotlinParser.builder()
+              .logCompilationWarningsAndErrors(false)
+              .build()
+              .parseInputs(singletonList(syntaxError()), null, new InMemoryExecutionContext(t -> {
+              }))
+              .collect(toList());
+        } finally {
+            System.setErr(originalErr);
+        }
+
+        assertThat(results).singleElement().isInstanceOf(ParseError.class);
+        assertThat(err.toString()).doesNotContain("SyntaxError.kt");
+    }
+
+    @Test
+    void syntaxErrorsAreReportedOnParseError() {
+        List<SourceFile> results = KotlinParser.builder()
+          .build()
+          .parseInputs(singletonList(syntaxError()), null, new InMemoryExecutionContext(t -> {
+          }))
+          .collect(toList());
+
+        assertThat(results).singleElement().isInstanceOf(ParseError.class);
+        ParseExceptionResult result = results.getFirst().getMarkers().findFirst(ParseExceptionResult.class).orElseThrow();
+        assertThat(result.getMessage())
+          .contains("SyntaxError.kt:2:11: error: expecting ')'")
+          .contains("SyntaxError.kt:3:2: error: missing '}");
+    }
+
+    private static Parser.Input syntaxError() {
+        return Parser.Input.fromString(Paths.get("SyntaxError.kt"), "class A {\n    fun f( {\n}\n");
     }
 
     @Test
@@ -358,4 +406,21 @@ class KotlinParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void cloneDoesNotShareStylesWithOriginal() {
+        // given
+        KotlinParser.Builder original = KotlinParser.builder();
+        NamedStyles styles = new NamedStyles(Tree.randomId(), "test", "test", "test", emptySet(), emptyList());
+
+        // when
+        KotlinParser.Builder clone = original.clone().styles(singletonList(styles));
+
+        // then
+        assertThat(parse(clone, "class A").getMarkers().findFirst(NamedStyles.class)).contains(styles);
+        assertThat(parse(original, "class B").getMarkers().findFirst(NamedStyles.class)).isEmpty();
+    }
+
+    private static SourceFile parse(KotlinParser.Builder builder, String source) {
+        return builder.build().parse(new InMemoryExecutionContext(), source).findFirst().orElseThrow();
+    }
 }

@@ -152,6 +152,32 @@ def test_main_survives_a_handler_result_that_is_not_json_serializable(stdin_pipe
     assert 'error' in written[0]
 
 
+def test_frames_carry_integers_past_64_bits_and_lone_surrogates_exactly(stdin_pipe, stdout,
+                                                                     monkeypatch):
+    # Python source can spell an int literal of any width and a lone surrogate in a str literal.
+    # Each travels in a frame of its own, so neither sends the other down the fallback path.
+    stdout.install(monkeypatch)
+    wide = {'jsonrpc': '2.0', 'id': 1, 'result': [2 ** 70 + 1, -2 ** 63 - 1]}
+    surrogate = {'jsonrpc': '2.0', 'id': 2, 'result': '\ud800'}
+
+    server.write_message(wide)
+    server.write_message(surrogate)
+    stdin_pipe.write(stdout._path.read_bytes())
+
+    received = server.read_message()
+    assert received == wide
+    assert [type(v) for v in received['result']] == [int, int]
+    assert server.read_message() == surrogate
+
+
+def test_a_body_that_is_not_strict_utf_8_is_a_protocol_error(stdin_pipe):
+    body = b'\xef\xbb\xbf' + json.dumps(NEXT_REQUEST).encode('utf-8')
+    stdin_pipe.write(b"Content-Length: %d\r\n\r\n" % len(body) + body)
+
+    with pytest.raises(server._ProtocolError):
+        server.read_message()
+
+
 def test_main_exits_zero_when_the_host_closes_the_stream(stdin_pipe, stdout, monkeypatch):
     stdout.install(monkeypatch)
     stdin_pipe.write(_framed(NEXT_REQUEST))

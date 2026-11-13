@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 import java.io.Serializable;
@@ -37,7 +38,7 @@ import static java.util.Collections.emptyMap;
 @With
 @Builder
 @AllArgsConstructor
-public class SpringDependencyManagementPlugin implements Serializable {
+public class SpringDependencyManagementPlugin implements Heavyweight, Serializable {
 
     /**
      * The BOMs imported into this project, whether by a {@code mavenBom} entry in a script or programmatically.

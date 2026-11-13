@@ -52,9 +52,8 @@ import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
-    private static final String GRADLE_DOWNLOADS_URL = "https://downloads.gradle.org";
-    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_DOWNLOADS_URL + "/distributions";
     private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
+    private static final String GRADLE_DOWNLOADS_URL = "https://downloads.gradle.org";
     private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
@@ -71,7 +70,7 @@ public class GradleWrapper {
 
     /**
      * Construct a Gradle wrapper from a distribution type and version.
-     * Used in contexts where downloads.gradle.org is available.
+     * Used in contexts where services.gradle.org is available.
      */
     public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
         return create(null, distributionTypeName, version, ctx);
@@ -109,18 +108,26 @@ public class GradleWrapper {
             // Only list all versions via services endpoint if a wildcard notation was requested or null, e.g. 8.x
             if (!(versionComparator instanceof ExactVersion)) {
                 List<GradleVersion> allVersions = listAllPublicVersions(ctx);
-                return allVersions.stream()
+                GradleVersion selected = allVersions.stream()
                         .filter(v -> versionComparator.isValid(null, v.version))
                         .filter(v -> v.distributionType == distributionType)
                         .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_DOWNLOADS_URL)));
+                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_VERSIONS_ALL_URL)));
+                return new GradleVersion(
+                        selected.version,
+                        withHostOf(currentDistributionUrl, selected.downloadUrl),
+                        selected.distributionType,
+                        selected.checksumUrl,
+                        selected.wrapperChecksumUrl
+                );
             }
 
+            String distributionPath = "/distributions/gradle-" + version + "-" + distributionType.getFileSuffix() + ".zip";
             return new GradleVersion(version,
-                    GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-" + distributionType.getFileSuffix() +".zip",
+                    withHostOf(currentDistributionUrl, GRADLE_SERVICES_URL + distributionPath),
                     distributionType,
-                    GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-" + distributionType.getFileSuffix() +".zip.sha256",
-                    GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-wrapper.jar.sha256"
+                    GRADLE_DOWNLOADS_URL + distributionPath + ".sha256",
+                    GRADLE_DOWNLOADS_URL + "/distributions/gradle-" + version + "-wrapper.jar.sha256"
             );
         }
 
@@ -194,19 +201,18 @@ public class GradleWrapper {
                         });
                 List<GradleVersion> allGradleVersions = new ArrayList<>(gradleVersions.size() * 2);
                 for (GradleVersion gradleVersion : gradleVersions) {
-                    String downloadUrl = migrateToDownloadsUrl(gradleVersion.downloadUrl);
-                    String checksumUrl = migrateToDownloadsUrl(gradleVersion.checksumUrl);
-                    String wrapperChecksumUrl = migrateToDownloadsUrl(gradleVersion.wrapperChecksumUrl);
+                    String checksumUrl = toDownloadsHost(gradleVersion.checksumUrl);
+                    String wrapperChecksumUrl = toDownloadsHost(gradleVersion.wrapperChecksumUrl);
                     allGradleVersions.add(new GradleVersion(
                             gradleVersion.version,
-                            downloadUrl,
+                            gradleVersion.downloadUrl,
                             DistributionType.Bin,
                             checksumUrl,
                             wrapperChecksumUrl
                     ));
                     allGradleVersions.add(new GradleVersion(
                             gradleVersion.version,
-                            downloadUrl.replace("-bin.zip", "-all.zip"),
+                            gradleVersion.downloadUrl.replace("-bin.zip", "-all.zip"),
                             DistributionType.All,
                             checksumUrl == null ? null : checksumUrl.replace("-bin.zip", "-all.zip"),
                             wrapperChecksumUrl
@@ -261,8 +267,15 @@ public class GradleWrapper {
         }
     }
 
-    private static @Nullable String migrateToDownloadsUrl(@Nullable String url) {
+    // services.gradle.org 301s checksum files here; distribution URLs stay on it to match `gradle wrapper`
+    private static @Nullable String toDownloadsHost(@Nullable String url) {
         return url == null ? null : url.replace(GRADLE_SERVICES_URL, GRADLE_DOWNLOADS_URL);
+    }
+
+    private static String withHostOf(@Nullable String currentDistributionUrl, String distributionUrl) {
+        return currentDistributionUrl != null && currentDistributionUrl.startsWith(GRADLE_DOWNLOADS_URL) ?
+                distributionUrl.replace(GRADLE_SERVICES_URL, GRADLE_DOWNLOADS_URL) :
+                distributionUrl.replace(GRADLE_DOWNLOADS_URL, GRADLE_SERVICES_URL);
     }
 
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
@@ -284,7 +297,7 @@ public class GradleWrapper {
 
     /**
      * Construct a Gradle wrapper from a URI.
-     * Can be used in contexts where downloads.gradle.org, normally used for version lookups, is unavailable.
+     * Can be used in contexts where services.gradle.org, normally used for version lookups, is unavailable.
      */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = versionFromDistributionUrl(fullDistributionUri.toString());

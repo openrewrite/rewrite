@@ -69,7 +69,7 @@ test("empty spaces received over RPC collapse to the shared emptySpace singleton
 
     // when the tree round-trips through the RPC send/receive queues
     const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
-    const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => wireCopy(batch), undefined, false);
+    const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [wireCopy(batch)], undefined, false);
     const received = await q.receive<JS.CompilationUnit>(undefined);
 
     // then every empty Space in the received tree is the one shared singleton, not a per-node object

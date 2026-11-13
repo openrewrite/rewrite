@@ -133,7 +133,9 @@ class MarkerRoundTripTest {
                         new GoResolutionResult.PackageModule("github.com/google/uuid",
                                 "github.com/google/uuid", "v1.6.0", false)
                 ),
-                GoResolutionResult.ResolutionStatus.RESOLVED
+                GoResolutionResult.ResolutionStatus.RESOLVED,
+                emptyList(),
+                null
         );
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
 
@@ -163,7 +165,9 @@ class MarkerRoundTripTest {
                 emptyList(),
                 emptyList(),
                 emptyList(),
-                GoResolutionResult.ResolutionStatus.GO_SUM_ONLY
+                GoResolutionResult.ResolutionStatus.GO_SUM_ONLY,
+                emptyList(),
+                null
         );
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
 
@@ -194,7 +198,9 @@ class MarkerRoundTripTest {
                         emptyList(),
                         emptyList(),
                         emptyList(),
-                        GoResolutionResult.ResolutionStatus.RESOLVED
+                        GoResolutionResult.ResolutionStatus.RESOLVED,
+                        emptyList(),
+                        null
                 ));
         cu = cu.withMarkers(markers);
 
@@ -232,7 +238,9 @@ class MarkerRoundTripTest {
                         singletonList(
                                 new GoResolutionResult.PackageModule("github.com/google/uuid",
                                         "github.com/google/uuid", "v1.6.0", false)),
-                        GoResolutionResult.ResolutionStatus.RESOLVED)));
+                        GoResolutionResult.ResolutionStatus.RESOLVED,
+                        emptyList(),
+                        null)));
 
         var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
         Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());
@@ -265,6 +273,39 @@ class MarkerRoundTripTest {
     }
 
     @Test
+    void roundTripPreservesUnresolvedDiagnosticsViaVisit() {
+        // The diagnostic fields a recipe reads to explain a skipped tidy — the
+        // unresolved import paths (INCOMPLETE) and the toolchain failure reason —
+        // must survive the full Java -> Go -> Java visit path, or a recipes-go
+        // recipe would have nothing to surface.
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+
+        UUID gomodId = UUID.randomUUID();
+        cu = cu.withMarkers(cu.getMarkers()
+                .addIfAbsent(new GoResolutionResult(
+                        gomodId, "example.com/foo", "1.22", null, "go.mod",
+                        emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
+                        GoResolutionResult.ResolutionStatus.INCOMPLETE,
+                        Arrays.asList("github.com/tidwall/redcon", "github.com/valyala/fasthttp"),
+                        "go list -m: 1 module(s) unresolved (build list unreliable): gonum.org/v1/plot")));
+
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());
+        assertThat(result).isInstanceOf(SourceFile.class);
+
+        GoResolutionResult mrr = ((SourceFile) result).getMarkers().findFirst(GoResolutionResult.class).orElseThrow(
+                () -> new AssertionError("GoResolutionResult marker missing from round-trip result"));
+        assertThat(mrr.getResolutionStatus()).isEqualTo(GoResolutionResult.ResolutionStatus.INCOMPLETE);
+        assertThat(mrr.getUnresolvedImports())
+                .containsExactly("github.com/tidwall/redcon", "github.com/valyala/fasthttp");
+        assertThat(mrr.getResolutionError())
+                .isEqualTo("go list -m: 1 module(s) unresolved (build list unreliable): gonum.org/v1/plot");
+    }
+
+    @Test
     void nullResolutionStatusFromOldLstRoundTripsViaVisit() {
         // An LST serialized before resolutionStatus existed deserializes with a null
         // status. It must survive a Java -> Go -> Java visit round-trip: Java sends
@@ -281,7 +322,7 @@ class MarkerRoundTripTest {
                         gomodId, "example.com/foo", "1.22", null, "go.mod",
                         singletonList(new GoResolutionResult.Require("github.com/google/uuid", "v1.6.0", false)),
                         emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
-                        null)));
+                        null, emptyList(), null)));
 
         var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
         Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());

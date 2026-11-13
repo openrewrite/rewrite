@@ -26,11 +26,10 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.javascript.JavaScriptPrinter;
 import org.openrewrite.javascript.JavaScriptVisitor;
-import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.service.JavaScriptAutoFormatService;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -183,16 +182,7 @@ public interface JS extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new JavaScriptPrinter<>();
         }
 
         @Transient
@@ -333,16 +323,16 @@ public interface JS extends J {
         @With
         Markers markers;
 
-        JRightPadded<J.Identifier> propertyName;
+        JRightPadded<Expression> propertyName;
 
         @With
         Expression alias;
 
-        public J.Identifier getPropertyName() {
+        public Expression getPropertyName() {
             return propertyName.getElement();
         }
 
-        public JS.Alias withPropertyName(J.Identifier propertyName) {
+        public JS.Alias withPropertyName(Expression propertyName) {
             return getPadding().withPropertyName(this.propertyName.withElement(propertyName));
         }
 
@@ -353,13 +343,15 @@ public interface JS extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            return propertyName.getElement().getType();
+            return propertyName.getElement() instanceof J.Literal ? alias.getType() : propertyName.getElement().getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public Alias withType(@Nullable JavaType type) {
-            return withPropertyName(propertyName.getElement().withType(type));
+            return propertyName.getElement() instanceof J.Literal ?
+                    withAlias(alias.withType(type)) :
+                    withPropertyName(propertyName.getElement().withType(type));
         }
 
         @Transient
@@ -387,11 +379,11 @@ public interface JS extends J {
         public static class Padding {
             private final JS.Alias t;
 
-            public JRightPadded<J.Identifier> getPropertyName() {
+            public JRightPadded<Expression> getPropertyName() {
                 return t.propertyName;
             }
 
-            public JS.Alias withPropertyName(JRightPadded<J.Identifier> propertyName) {
+            public JS.Alias withPropertyName(JRightPadded<Expression> propertyName) {
                 return t.propertyName == propertyName ? t : new JS.Alias(t.id, t.prefix, t.markers, propertyName, t.alias);
             }
         }
@@ -595,6 +587,7 @@ public interface JS extends J {
     final class ExpressionStatement implements JS, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -754,8 +747,7 @@ public interface JS extends J {
         JContainer<Expression> typeParameters;
 
         public FunctionCall withTypeParameters(@Nullable List<Expression> typeParameters) {
-            return new FunctionCall(this.id, this.prefix, this.markers, this.function,
-                    JContainer.withElementsNullable(this.typeParameters, typeParameters), this.arguments, this.functionType);
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
         public @Nullable List<Expression> getTypeParameters() {
@@ -1338,6 +1330,10 @@ public interface JS extends J {
         @With
         boolean typeOnly;
 
+        @Getter
+        @With
+        boolean deferred;
+
         @Nullable
         JRightPadded<J.Identifier> name;
 
@@ -1384,7 +1380,7 @@ public interface JS extends J {
             }
 
             public ImportClause withName(@Nullable JRightPadded<J.Identifier> name) {
-                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, name, t.namedBindings);
+                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, t.deferred, name, t.namedBindings);
             }
         }
     }
@@ -1828,6 +1824,19 @@ public interface JS extends J {
 
         @Transient
         @Override
+        public List<J> getSideEffects() {
+            List<J> rightSideEffects = right.getSideEffects();
+            if (getOperator() == Type.QuestionQuestion && !rightSideEffects.isEmpty()) {
+                return singletonList(this);
+            }
+            List<J> sideEffects = new ArrayList<>(2);
+            sideEffects.addAll(left.getSideEffects());
+            sideEffects.addAll(rightSideEffects);
+            return sideEffects;
+        }
+
+        @Transient
+        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -1837,7 +1846,8 @@ public interface JS extends J {
             IdentityNotEquals,
             In,
             QuestionQuestion,
-            Comma
+            Comma,
+            Exponentiation
         }
 
         public JS.Binary.Padding getPadding() {
@@ -2697,6 +2707,7 @@ public interface JS extends J {
     final class StatementExpression implements JS, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -5128,6 +5139,10 @@ public interface JS extends J {
             QuestionQuestion,
             And,
             Or,
+            /**
+             * @deprecated {@code a ** b} is a {@link JS.Binary} of type {@link JS.Binary.Type#Exponentiation}.
+             */
+            @Deprecated
             Power,
             Exp
         }

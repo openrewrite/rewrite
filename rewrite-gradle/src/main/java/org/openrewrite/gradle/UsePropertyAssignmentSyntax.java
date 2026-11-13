@@ -88,6 +88,12 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
+                // The deprecated syntax relies on Groovy's property-setter fallback, so it never resolves to a
+                // declared method. A call that does, e.g. `matcher.group(1)`, is a regular method call.
+                if (m.getMethodType() != null) {
+                    return m;
+                }
+
                 // The transformation is purely structural (`name arg` -> `name = arg`, or
                 // `select.name arg` -> `select.name = arg`), so synthesize the assignment
                 // directly rather than going through a parser round-trip. This avoids the

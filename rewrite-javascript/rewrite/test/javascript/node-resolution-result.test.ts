@@ -31,6 +31,16 @@ import {withDir} from "tmp-promise";
 
 describe("NodeResolutionResult marker", () => {
 
+    test("workspace context preserves normalized version-suffixed resolution maps", () => {
+        const marker = createNodeResolutionResultMarker("repo/packages/member/package.json", {
+            dependencies: {"@scope/dep": "^2.0.0"}
+        }, {packages: {
+            "node_modules/@scope/dep@1.0.0": {version: "1.0.0"},
+            "node_modules/@scope/dep@2.0.0": {version: "2.0.0"}
+        }}, undefined, undefined, undefined, "packages/member");
+        expect(marker.dependencies[0].resolved?.version).toBe("2.0.0");
+    });
+
     test.skip("should attach NodeResolutionResult marker to package.json", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {
@@ -895,6 +905,27 @@ describe("NodeResolutionResult marker", () => {
 
         const qsDep = marker.dependencies.find(d => d.name === "qs");
         expect(qsDep?.resolved?.engines).toBeUndefined();
+    });
+
+    test("should drop engines entries whose value is not a string", () => {
+        const engines = {node: ">=12", cordovaDependencies: {"5.0.0": {cordova: ">=9.0.0"}}} as any;
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            {name: "test-project", version: "1.0.0", dependencies: {plugin: "*"}, engines},
+            {
+                name: "test-project",
+                version: "1.0.0",
+                lockfileVersion: 3,
+                packages: {
+                    "": {version: "1.0.0", dependencies: {plugin: "*"}},
+                    "node_modules/plugin": {version: "1.0.0", engines}
+                }
+            }
+        );
+
+        expect(marker.engines).toEqual({node: ">=12"});
+
+        expect(marker.dependencies.find(d => d.name === "plugin")?.resolved?.engines).toEqual({node: ">=12"});
     });
 
     test("should preserve engines list from legacy array of bare names", () => {

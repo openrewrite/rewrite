@@ -641,7 +641,7 @@ class AnnotationTest implements RewriteTest {
     @Test
     void arrayOfCallWithInAnnotation() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               @Target(AnnotationTarget.FUNCTION)
@@ -800,7 +800,7 @@ class AnnotationTest implements RewriteTest {
                     return super.visitMethodInvocation(method, ctx);
                 }
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               fun main() {
@@ -817,6 +817,38 @@ class AnnotationTest implements RewriteTest {
                       bar()
                   } catch (e: Exception) {}
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedFunctionType() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              interface Theme {
+                  fun theme(content: @Ann (() -> Unit))
+                  fun content(body: (@Ann (Int) -> Unit))
+                  fun scoped(body: @Ann (Theme.() -> Unit))
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedTypeArgument() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              class Outer {
+                  class Inner<T>
+              }
+              fun f(): List<@Ann Outer.Inner<String>> = emptyList()
+              fun g(): List<@Ann Outer> = emptyList()
               """
           )
         );

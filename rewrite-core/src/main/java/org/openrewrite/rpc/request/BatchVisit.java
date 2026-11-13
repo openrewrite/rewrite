@@ -24,12 +24,6 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
-import org.openrewrite.scheduling.RecipeRunCycle;
-import org.openrewrite.scheduling.WatchableExecutionContext;
-import org.openrewrite.table.RecipeRunStats;
-import org.openrewrite.table.SearchResults;
-import org.openrewrite.table.SourcesFileErrors;
-import org.openrewrite.table.SourcesFileResults;
 
 import java.util.*;
 import java.util.function.BiFunction;
@@ -69,17 +63,18 @@ public class BatchVisit implements RpcRequest {
 
         private Object doHandle(BatchVisit request) {
             Tree tree = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
-            Object p = getVisitorP(request);
+            Object p = getObject.apply(request.getP(), request.getSourceFileType());
             Cursor cursor = getCursor.apply(request.getCursor(), request.getSourceFileType());
 
             List<BatchVisitResponse.BatchVisitResult> results = new ArrayList<>();
             Set<String> knownIds = collectSearchResultIds(tree);
 
             for (BatchVisitItem item : request.getVisitors()) {
-                // Instantiate and run visitor
+                // Bind each item to its own recipe, while retaining the cycle shared by the batch.
+                Object visitorP = Visit.visitorP(p, item.getVisitor(), preparedRecipes);
                 TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(
                         item.getVisitor(), item.getVisitorOptions());
-                Tree after = visitor.visit(tree, p, cursor);
+                Tree after = visitor.visit(tree, visitorP, cursor);
 
                 boolean modified = after != tree;
                 boolean deleted = after == null;
@@ -100,7 +95,7 @@ public class BatchVisit implements RpcRequest {
 
                 if (deleted) {
                     localObjects.remove(request.getTreeId());
-                    break;
+                    return new BatchVisitResponse(results);
                 }
 
                 if (modified) {
@@ -131,26 +126,5 @@ public class BatchVisit implements RpcRequest {
             }.reduce(tree, new HashSet<>());
         }
 
-        private Object getVisitorP(BatchVisit request) {
-            Object p = getObject.apply(request.getP(), request.getSourceFileType());
-            if (p instanceof ExecutionContext) {
-                // Use the first visitor to determine recipe context
-                if (!request.getVisitors().isEmpty()) {
-                    String visitorName = request.getVisitors().get(0).getVisitor();
-                    if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
-                        Recipe recipe = preparedRecipes.getInstantiated().get(
-                                visitorName.substring("edit:".length()));
-                        WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
-                        ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
-                                new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
-                                new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
-                                LargeSourceSet::edit));
-                        ctx.putCurrentRecipe(recipe);
-                        return ctx;
-                    }
-                }
-            }
-            return p;
-        }
     }
 }

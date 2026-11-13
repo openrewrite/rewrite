@@ -17,7 +17,7 @@ ChangeMethodName recipe for Python that delegates to Java's ChangeMethodName.
 
 This recipe renames method invocations matching a pattern.
 """
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from rewrite import Recipe, option
 from rewrite.decorators import categorize
@@ -26,6 +26,7 @@ from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
+@dataclass
 class ChangeMethodName(Recipe):
     """
     Rename method invocations matching a pattern.
@@ -41,41 +42,29 @@ class ChangeMethodName(Recipe):
         )
     """
 
-    method_pattern: str = field(metadata=option(
+    method_pattern: str = field(default="", metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to rename.",
         example="datetime.datetime utcnow()"
     ))
 
-    new_method_name: str = field(metadata=option(
+    new_method_name: str = field(default="", metadata=option(
         display_name="New method name",
         description="The new name for the method.",
         example="now"
     ))
 
-    match_overrides: bool = field(metadata=option(
+    match_overrides: bool = field(default=False, metadata=option(
         display_name="Match overrides",
         description="When enabled, also match method overrides.",
         required=False
     ))
 
-    ignore_definition: bool = field(metadata=option(
+    ignore_definition: bool = field(default=False, metadata=option(
         display_name="Ignore definition",
         description="When enabled, the method definition itself will not be renamed.",
         required=False
     ))
-
-    def __init__(
-        self,
-        method_pattern: str = "",
-        new_method_name: str = "",
-        match_overrides: bool = False,
-        ignore_definition: bool = False
-    ):
-        self.method_pattern = method_pattern
-        self.new_method_name = new_method_name
-        self.match_overrides = match_overrides
-        self.ignore_definition = ignore_definition
 
     @property
     def name(self) -> str:

@@ -55,14 +55,14 @@ export function omitColon(): OmitColon {
  */
 function registerMarkerCodec<M extends Marker>(kind: M["kind"]) {
     RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+        rpcReceive(before: M, q: RpcReceiveQueue): M {
             return updateIfChanged(before, {
-                id: await q.receive(before.id),
+                id: q.receive(before.id),
             } as Partial<M>);
         },
 
-        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
+        rpcSend(after: M, q: RpcSendQueue): void {
+            q.getAndSend(after, a => a.id);
         }
     });
 }

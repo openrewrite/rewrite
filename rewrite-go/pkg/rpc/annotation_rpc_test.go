@@ -129,7 +129,7 @@ func TestAnnotationRpcRoundTrip_PrefixPreserved(t *testing.T) {
 	litID := uuid.MustParse("11111111-aaaa-bbbb-cccc-111111111111")
 	before := &java.Annotation{
 		ID:             annID,
-		Prefix:         java.Space{Whitespace: " "},
+		Prefix:         java.MakeSpace(nil, " "),
 		AnnotationType: &java.Identifier{ID: typeID, Name: "validate"},
 		Arguments: &java.Container[java.Expression]{
 			Elements: []java.RightPadded[java.Expression]{
@@ -145,5 +145,5 @@ func TestAnnotationRpcRoundTrip_PrefixPreserved(t *testing.T) {
 	seed := &java.Annotation{ID: annID}
 	got := roundTripNode(t, before, seed).(*java.Annotation)
 
-	assert.Equalf(t, " ", got.Prefix.Whitespace, "Prefix.Whitespace: got %q, want %q", got.Prefix.Whitespace, " ")
+	assert.Equalf(t, " ", got.Prefix.Whitespace(), "Prefix.Whitespace: got %q, want %q", got.Prefix.Whitespace(), " ")
 }

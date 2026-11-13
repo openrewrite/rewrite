@@ -30,6 +30,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
@@ -99,8 +100,12 @@ class JavaRewriteRpcTest implements RewriteTest {
 
     static class ChangeName extends JavaIsoVisitor<Integer> {
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-            return identifier.withSimpleName("Changed");
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+            if ("Changed".equals(classDecl.getSimpleName())) {
+                return classDecl;
+            }
+            JavaType.ShallowClass changed = JavaType.ShallowClass.build("Changed");
+            return classDecl.withName(classDecl.getName().withSimpleName("Changed").withType(changed)).withType(changed);
         }
     }
 }

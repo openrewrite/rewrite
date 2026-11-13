@@ -16,7 +16,7 @@ from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Mar
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class AnnotatedType(Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -53,7 +53,7 @@ class AnnotatedType(Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Annotation(Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -116,7 +116,7 @@ class Annotation(Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ArrayAccess(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -160,7 +160,7 @@ class ArrayAccess(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ArrayType(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -211,7 +211,7 @@ class ArrayType(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Assert(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -248,7 +248,7 @@ class Assert(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Assignment(Statement, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -318,7 +318,7 @@ class Assignment(Statement, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class AssignmentOperation(Statement, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -411,7 +411,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Binary(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -509,7 +509,7 @@ class Binary(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Block(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -583,7 +583,7 @@ class Block(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Break(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -613,7 +613,7 @@ class Break(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Case(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -709,7 +709,7 @@ class Case(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ClassDeclaration(Statement, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -802,9 +802,9 @@ class ClassDeclaration(Statement, TypedTree):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Kind(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> ClassDeclaration.Kind:
+        def with_id(self, id: int | UUID) -> ClassDeclaration.Kind:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -906,7 +906,7 @@ class ClassDeclaration(Statement, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class CompilationUnit(JavaSourceFile, SourceFile):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1027,7 +1027,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Continue(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1057,7 +1057,7 @@ class Continue(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class DoWhileLoop(Loop):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1124,7 +1124,7 @@ class DoWhileLoop(Loop):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Empty(Statement, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1147,7 +1147,7 @@ class Empty(Statement, Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class EnumValue(J):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1191,7 +1191,7 @@ class EnumValue(J):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class EnumValueSet(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1254,7 +1254,7 @@ class EnumValueSet(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class FieldAccess(TypeTree, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1324,7 +1324,7 @@ class FieldAccess(TypeTree, Expression, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ForEachLoop(Loop):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1358,9 +1358,9 @@ class ForEachLoop(Loop):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Control(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> ForEachLoop.Control:
+        def with_id(self, id: int | UUID) -> ForEachLoop.Control:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -1464,7 +1464,7 @@ class ForEachLoop(Loop):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ForLoop(Loop):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1498,9 +1498,9 @@ class ForLoop(Loop):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Control(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> ForLoop.Control:
+        def with_id(self, id: int | UUID) -> ForLoop.Control:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -1617,7 +1617,7 @@ class ForLoop(Loop):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ParenthesizedTypeTree(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1654,7 +1654,7 @@ class ParenthesizedTypeTree(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Identifier(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1705,7 +1705,7 @@ class Identifier(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class If(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1746,9 +1746,9 @@ class If(Statement):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Else(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> If.Else:
+        def with_id(self, id: int | UUID) -> If.Else:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -1839,7 +1839,7 @@ class If(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Import(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1913,7 +1913,7 @@ class Import(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class InstanceOf(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1990,7 +1990,7 @@ class InstanceOf(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class DeconstructionPattern(TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2060,7 +2060,7 @@ class DeconstructionPattern(TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class IntersectionType(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2116,7 +2116,7 @@ class IntersectionType(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Label(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2179,7 +2179,7 @@ class Label(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Lambda(Statement, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2227,9 +2227,9 @@ class Lambda(Statement, Expression, TypedTree):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Parameters(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> Lambda.Parameters:
+        def with_id(self, id: int | UUID) -> Lambda.Parameters:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -2303,7 +2303,7 @@ class Lambda(Statement, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Literal(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2374,7 +2374,7 @@ class Literal(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class MemberReference(TypedTree, MethodCall):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2473,7 +2473,7 @@ class MemberReference(TypedTree, MethodCall):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class MethodDeclaration(Statement, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2688,7 +2688,7 @@ class MethodDeclaration(Statement, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class MethodInvocation(Statement, TypedTree, MethodCall):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2785,7 +2785,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Modifier(J):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2849,7 +2849,7 @@ class Modifier(J):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class MultiCatch(TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2905,7 +2905,7 @@ class MultiCatch(TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class NewArray(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2982,7 +2982,7 @@ class NewArray(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ArrayDimension(J):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3038,7 +3038,7 @@ class ArrayDimension(J):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class NewClass(Statement, TypedTree, MethodCall):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3141,7 +3141,7 @@ class NewClass(Statement, TypedTree, MethodCall):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class NullableType(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3204,7 +3204,7 @@ class NullableType(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Package(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3241,7 +3241,7 @@ class Package(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ParameterizedType(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3311,7 +3311,7 @@ class ParameterizedType(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Parentheses(Expression, Generic[J2]):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3341,20 +3341,20 @@ class Parentheses(Expression, Generic[J2]):
         return None
 
     @dataclass
-    class PaddingHelper:
-        _t: Parentheses[J2]
+    class PaddingHelper(Generic[J3]):
+        _t: Parentheses[J3]
 
         @property
-        def tree(self) -> JRightPadded[J2]:
+        def tree(self) -> JRightPadded[J3]:
             return self._t._tree
 
-        def replace(self, **kwargs) -> Parentheses[J2]:
+        def replace(self, **kwargs) -> Parentheses[J3]:
             return replace_if_changed(self._t, **kwargs)
 
-    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
+    _padding: Optional[weakref.ReferenceType[Parentheses.PaddingHelper[J2]]] = None
 
     @property
-    def padding(self) -> PaddingHelper:
+    def padding(self) -> Parentheses.PaddingHelper[J2]:
         if self._padding is None:
             p = Parentheses[J2].PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -3372,7 +3372,7 @@ class Parentheses(Expression, Generic[J2]):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ControlParentheses(Expression, Generic[J2]):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3397,20 +3397,20 @@ class ControlParentheses(Expression, Generic[J2]):
 
 
     @dataclass
-    class PaddingHelper:
-        _t: ControlParentheses[J2]
+    class PaddingHelper(Generic[J3]):
+        _t: ControlParentheses[J3]
 
         @property
-        def tree(self) -> JRightPadded[J2]:
+        def tree(self) -> JRightPadded[J3]:
             return self._t._tree
 
-        def replace(self, **kwargs) -> ControlParentheses[J2]:
+        def replace(self, **kwargs) -> ControlParentheses[J3]:
             return replace_if_changed(self._t, **kwargs)
 
-    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
+    _padding: Optional[weakref.ReferenceType[ControlParentheses.PaddingHelper[J2]]] = None
 
     @property
-    def padding(self) -> PaddingHelper:
+    def padding(self) -> ControlParentheses.PaddingHelper[J2]:
         if self._padding is None:
             p = ControlParentheses[J2].PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -3428,7 +3428,7 @@ class ControlParentheses(Expression, Generic[J2]):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Primitive(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3458,7 +3458,7 @@ class Primitive(TypeTree, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Return(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3488,7 +3488,7 @@ class Return(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Switch(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3525,7 +3525,7 @@ class Switch(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class SwitchExpression(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3569,7 +3569,7 @@ class SwitchExpression(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Synchronized(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3606,7 +3606,7 @@ class Synchronized(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Ternary(Expression, Statement, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3687,7 +3687,7 @@ class Ternary(Expression, Statement, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Throw(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3717,7 +3717,7 @@ class Throw(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Try(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3765,9 +3765,9 @@ class Try(Statement):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Resource(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> Try.Resource:
+        def with_id(self, id: int | UUID) -> Try.Resource:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -3812,9 +3812,9 @@ class Try(Statement):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Catch(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> Try.Catch:
+        def with_id(self, id: int | UUID) -> Try.Catch:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -3892,7 +3892,7 @@ class Try(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TypeCast(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3929,7 +3929,7 @@ class TypeCast(Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TypeParameter(J):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4006,7 +4006,7 @@ class TypeParameter(J):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TypeParameters(J):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4069,7 +4069,7 @@ class TypeParameters(J):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Unary(Statement, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4149,7 +4149,7 @@ class Unary(Statement, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class VariableDeclarations(Statement, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4211,9 +4211,9 @@ class VariableDeclarations(Statement, TypedTree):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class NamedVariable(NameTree):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> VariableDeclarations.NamedVariable:
+        def with_id(self, id: int | UUID) -> VariableDeclarations.NamedVariable:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -4331,7 +4331,7 @@ class VariableDeclarations(Statement, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class WhileLoop(Loop):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4394,7 +4394,7 @@ class WhileLoop(Loop):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Wildcard(Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4461,7 +4461,7 @@ class Wildcard(Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Yield(Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4498,7 +4498,7 @@ class Yield(Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Unknown(Statement, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4525,9 +4525,9 @@ class Unknown(Statement, Expression, TypeTree):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Source(J):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> Unknown.Source:
+        def with_id(self, id: int | UUID) -> Unknown.Source:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -4566,7 +4566,7 @@ class Unknown(Statement, Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Erroneous(Statement, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space

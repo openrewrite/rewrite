@@ -61,9 +61,9 @@ func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
 	}
 	q := p.(*SendQueue)
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
-	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
+	q.GetAndSend(t, func(v any) any { return spaceRef(v.(java.J).GetPrefix()) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(t, func(v any) any { return v.(java.J).GetMarkers() },
+	q.GetAndSend(t, func(v any) any { return AsRef(v.(java.J).GetMarkers()) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	_ = j
 	return t
@@ -86,9 +86,6 @@ func (s *JavaSender) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q.GetAndSendList(id,
 		func(v any) []any {
 			annots := v.(*java.Identifier).Annotations
-			if annots == nil {
-				return nil
-			}
 			result := make([]any, len(annots))
 			for i, a := range annots {
 				result[i] = a
@@ -158,7 +155,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 	q := p.(*SendQueue)
 	// static (right-padded bool) - Java's JRightPadded<Boolean> with element=false
 	// Send manually since Go doesn't have RightPadded[bool]
-	sendRightPaddedBool(false, java.EmptySpace, java.Markers{}, q)
+	sendRightPaddedBool(false, java.EmptySpace, java.EmptyMarkers, q)
 	// statements
 	q.GetAndSendList(b,
 		func(v any) []any {
@@ -172,7 +169,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// end space
-	q.GetAndSend(b, func(v any) any { return v.(*java.Block).End },
+	q.GetAndSend(b, func(v any) any { return spaceRef(v.(*java.Block).End) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	return b
 }
@@ -331,9 +328,8 @@ func (s *JavaSender) VisitForLoop(f *java.ForLoop, p any) java.J {
 		ctrl := v.(*java.ForLoop).Control
 		return &ctrl
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(f, func(v any) any { return v.(*java.ForLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
@@ -344,7 +340,7 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 		func(v any) []any {
 			init := v.(*java.ForControl).Init
 			if init == nil {
-				return nil
+				return []any{}
 			}
 			return []any{*init}
 		},
@@ -363,7 +359,7 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 		func(v any) []any {
 			update := v.(*java.ForControl).Update
 			if update == nil {
-				return nil
+				return []any{}
 			}
 			return []any{*update}
 		},
@@ -378,9 +374,8 @@ func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 		ctrl := v.(*java.ForEachLoop).Control
 		return &ctrl
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForEachLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(f, func(v any) any { return v.(*java.ForEachLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
@@ -413,12 +408,8 @@ func (s *JavaSender) VisitCase(c *java.Case, p any) java.J {
 	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Expressions },
 		func(v any) { sendContainer(s, v, q) })
 	// statements (container)
-	q.GetAndSend(c, func(v any) any {
-		body := v.(*java.Case).Body
-		result := make([]java.RightPadded[java.Statement], len(body))
-		copy(result, body)
-		return java.Container[java.Statement]{Elements: result}
-	}, func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Body },
+		func(v any) { sendContainer(s, v, q) })
 	// body (right-padded, nil for Go-style case)
 	q.GetAndSend(c, func(_ any) any { return nil }, nil)
 	// guard (nil for Go)
@@ -544,7 +535,7 @@ func (s *JavaSender) VisitVariableDeclarations(vd *java.VariableDeclarations, p 
 	q.GetAndSend(vd, func(v any) any {
 		va := v.(*java.VariableDeclarations).Varargs
 		if va != nil {
-			return *va
+			return spaceRef(*va)
 		}
 		return nil
 	}, func(v any) { sendSpace(v.(java.Space), q) })
@@ -606,6 +597,8 @@ func (s *JavaSender) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(aa, func(v any) any { return v.(*java.ArrayAccess).Dimension },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(aa, func(v any) any { return AsRef(v.(*java.ArrayAccess).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return aa
 }
 
@@ -629,7 +622,7 @@ func (s *JavaSender) VisitParameterizedType(pt *java.ParameterizedType, p any) j
 
 func (s *JavaSender) VisitArrayDimension(ad *java.ArrayDimension, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(ad, func(v any) any { return ad.Index },
+	q.GetAndSend(ad, func(v any) any { return v.(*java.ArrayDimension).Index },
 		func(v any) { sendRightPadded(s, v, q) })
 	return ad
 }
@@ -647,9 +640,6 @@ func (s *JavaSender) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree,
 	q.GetAndSendList(ptt,
 		func(v any) []any {
 			annots := v.(*java.ParenthesizedTypeTree).Annotations
-			if annots == nil {
-				return nil
-			}
 			result := make([]any, len(annots))
 			for i, a := range annots {
 				result[i] = a

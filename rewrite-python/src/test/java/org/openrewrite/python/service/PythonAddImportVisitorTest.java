@@ -89,6 +89,11 @@ class PythonAddImportVisitorTest {
     }
 
     @Test
+    void countsAUseOfTheRootPackageAsAReferenceToADottedModule() {
+        assertThat(mightChange("os.path", null, null, true, cu(use("os.getcwd")))).isTrue();
+    }
+
+    @Test
     void doesNotCountAnIdentifierBoundByAnImportAsAReference() {
         assertThat(mightChange("pathlib", null, null, true,
           cu(directImport(member("pathlib", "o", null))))).isFalse();

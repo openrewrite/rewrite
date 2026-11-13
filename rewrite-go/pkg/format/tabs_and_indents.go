@@ -67,11 +67,13 @@ func depthAt(parent *visitor.Cursor, node java.Tree) int {
 	for c := parent; c != nil; c = c.Parent() {
 		chain = append(chain, c.Value())
 	}
+	// A clause's expressions step out a level, to its `case` keyword, but never
+	// past the margin, where reduceIndentDepth stops the keyword too.
 	depth := 0
 	for i := len(chain) - 1; i > 0; i-- {
-		depth += indentDelta(chain[i], chain[i-1])
+		depth = max(0, depth+indentDelta(chain[i], chain[i-1]))
 	}
-	return depth + indentDelta(chain[0], node)
+	return max(0, depth+indentDelta(chain[0], node))
 }
 
 // indentDelta reports how many levels child sits in from parent, mirroring what
@@ -100,6 +102,18 @@ func indentDelta(parent, child java.Tree) int {
 		return listDelta([]java.RightPadded[java.Expression]{
 			{Element: p.Expr, After: p.Clazz.Tree.After},
 		}, child)
+	case *java.Case:
+		// A clause's expressions start at its keyword's level, one out from
+		// its body.
+		for _, rp := range p.Expressions.Elements {
+			if java.Tree(rp.Element) == child {
+				return listDelta(p.Expressions.Elements, child) - 1
+			}
+		}
+	case *golang.CommClause:
+		if p.Comm != nil && java.Tree(p.Comm) == child {
+			return -1
+		}
 	}
 	return 0
 }
@@ -137,16 +151,22 @@ func listDelta[T java.Tree](elements []java.RightPadded[T], child java.Tree) int
 	return 0
 }
 
-// VisitCompilationUnit indents the specs of a parenthesized import
-// declaration.
+// VisitCompilationUnit sets the package clause, the import declarations and
+// the other declarations of the file at the left margin, and indents the specs
+// of a parenthesized import declaration.
 func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = cu.WithPrefix(v.reindentFileStart(cu.Prefix))
 	if cu.Imports != nil {
+		leadIn := v.reindentSpace(cu.Imports.Before)
 		grouped := java.HasMarker[golang.GroupedImport](cu.Imports.Markers)
-		elements := make([]java.RightPadded[*java.Import], len(cu.Imports.Elements))
-		for i, rp := range cu.Imports.Elements {
+		elements := eachPadded(cu.Imports.Elements, func(rp java.RightPadded[*java.Import]) java.RightPadded[*java.Import] {
 			if block := java.FindMarker[golang.ImportBlock](rp.Element.Markers); block != nil {
 				grouped = block.Grouped
-				block.Before = v.reindentSpace(block.Before)
+				if before := v.reindentSpace(block.Before); !java.SpaceEqual(before, block.Before) {
+					reindented := *block
+					reindented.Before = before
+					rp.Element = rp.Element.WithMarkers(withMarker(rp.Element.Markers, reindented))
+				}
 			}
 			if grouped {
 				v.depth++
@@ -156,48 +176,125 @@ func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit,
 				v.depth--
 			}
 			rp.After = v.reindentSpace(rp.After)
-			elements[i] = rp
+			return rp
+		})
+		if !java.SpaceEqual(leadIn, cu.Imports.Before) || !java.SameSlice(elements, cu.Imports.Elements) {
+			imports := *cu.Imports
+			imports.Before = leadIn
+			imports.Elements = elements
+			cu = cu.WithImports(&imports)
 		}
-		imports := *cu.Imports
-		imports.Elements = elements
-		cu = cu.WithImports(&imports)
 	}
+	cu = cu.WithStatements(eachPadded(cu.Statements, func(rp java.RightPadded[java.Statement]) java.RightPadded[java.Statement] {
+		if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Statement); ok {
+			rp.Element = fixed
+		}
+		return rp
+	}))
+	// A comment closing the file is left where it is: gofmt keeps one that
+	// follows a wrapped expression at the expression's indent.
 	return v.GoVisitor.VisitCompilationUnit(cu, p)
 }
 
-// VisitDeclarationBlock indents the specs of a `var (…)` or `const (…)` group.
+// reindentFileStart re-indents the space a file opens with, whose whitespace
+// begins the first line rather than following a line break.
+func (v *TabsAndIndentsVisitor) reindentFileStart(s java.Space) java.Space {
+	out := v.reindentSpace(s)
+	if !strings.Contains(out.Whitespace(), "\n") {
+		out = java.MakeSpace(out.Comments(), strings.Repeat("\t", v.depth))
+	}
+	return unchangedOr(s, out)
+}
+
+// reindentDirectives re-indents the `//go:` directives the parser lifts out of
+// a declaration's prefix into its leading annotations, which print ahead of it.
+func (v *TabsAndIndentsVisitor) reindentDirectives(anns []*java.Annotation) []*java.Annotation {
+	var out []*java.Annotation
+	for i, a := range anns {
+		prefix := v.reindentSpace(a.Prefix)
+		if spaceContentEqual(prefix, a.Prefix) {
+			continue
+		}
+		if out == nil {
+			out = append([]*java.Annotation(nil), anns...)
+		}
+		moved := *a
+		moved.Prefix = prefix
+		out[i] = &moved
+	}
+	if out == nil {
+		return anns
+	}
+	return out
+}
+
+// VisitMethodDeclaration sets a func's directives at its level.
+func (v *TabsAndIndentsVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
+	md = md.WithLeadingAnnotations(v.reindentDirectives(md.LeadingAnnotations))
+	return v.GoVisitor.VisitMethodDeclaration(md, p)
+}
+
+// VisitVariableDeclarations sets a var or const declaration's directives at its
+// level. A struct field's annotations are its tag, which is left as written.
+func (v *TabsAndIndentsVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J {
+	if java.HasMarker[golang.VarKeyword](vd.Markers) || java.HasMarker[golang.ConstDecl](vd.Markers) {
+		vd = vd.WithLeadingAnnotations(v.reindentDirectives(vd.LeadingAnnotations))
+	}
+	return v.GoVisitor.VisitVariableDeclarations(vd, p)
+}
+
+// VisitDeclarationBlock sets a `var (…)` or `const (…)` group's directives at
+// its level, and indents its specs.
 func (v *TabsAndIndentsVisitor) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	db = db.WithLeadingAnnotations(v.reindentDirectives(db.LeadingAnnotations))
 	if db.Specs == nil {
 		return v.GoVisitor.VisitDeclarationBlock(db, p)
 	}
+	specs := v.indentSpecs(db.Specs, p)
+	if specs == db.Specs {
+		return db
+	}
 	out := *db
-	out.Specs = v.indentSpecs(db.Specs, p)
+	out.Specs = specs
 	return &out
 }
 
-// VisitTypeDecl indents the specs of a `type (…)` group. An ungrouped
-// declaration has no Specs and is indented by its enclosing block.
+// VisitTypeDecl sets a type declaration's directives at its level, and indents
+// the specs of a `type (…)` group. An ungrouped declaration has no Specs and is
+// indented by its enclosing block.
 func (v *TabsAndIndentsVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
+	td = td.WithLeadingAnnotations(v.reindentDirectives(td.LeadingAnnotations))
 	if td.Specs == nil {
 		return v.GoVisitor.VisitTypeDecl(td, p)
 	}
+	specs := v.indentSpecs(td.Specs, p)
+	if specs == td.Specs {
+		return td
+	}
 	out := *td
-	out.Specs = v.indentSpecs(td.Specs, p)
+	out.Specs = specs
 	return &out
 }
 
 // VisitComposite indents the elements of a composite literal.
 func (v *TabsAndIndentsVisitor) VisitComposite(c *golang.Composite, p any) java.J {
-	out := *c
+	typeExpr := c.TypeExpr
 	// The type expression sits at the literal's own level — the fields of an
 	// inline struct type line up with the elements, not one level further in.
-	if c.TypeExpr != nil {
-		if typeExpr, ok := v.Visit(c.TypeExpr, p).(java.Expression); ok {
-			out.TypeExpr = typeExpr
+	if typeExpr != nil {
+		if next, ok := v.Visit(typeExpr, p).(java.Expression); ok {
+			typeExpr = next
 		}
 	}
-	out.Elements.Elements = indentSubtrees(v, c.Elements.Elements, p)
-	out.Markers = v.reindentTrailingComma(c.Markers)
+	elements := indentSubtrees(v, c.Elements.Elements, p)
+	markers := v.reindentTrailingComma(c.Markers)
+	if typeExpr == c.TypeExpr && java.SameSlice(elements, c.Elements.Elements) && java.MarkersEqual(markers, c.Markers) {
+		return c
+	}
+	out := *c
+	out.TypeExpr = typeExpr
+	out.Elements.Elements = elements
+	out.Markers = markers
 	return &out
 }
 
@@ -215,19 +312,23 @@ func (v *TabsAndIndentsVisitor) reindentTrailingComma(m java.Markers) java.Marke
 	}
 	updated := *comma
 	updated.After = after
-	entries := append([]java.Marker(nil), m.Entries...)
+	entries := append([]java.Marker(nil), m.Entries()...)
 	for i, e := range entries {
 		if _, isComma := e.(golang.TrailingComma); isComma {
 			entries[i] = updated
 		}
 	}
-	return java.Markers{ID: m.ID, Entries: entries}
+	return java.MakeMarkers(m.GetID(), entries)
 }
 
 // indentSpecs indents the body of a parenthesized declaration group.
 func (v *TabsAndIndentsVisitor) indentSpecs(c *java.Container[java.Statement], p any) *java.Container[java.Statement] {
+	elements := indentSubtrees(v, c.Elements, p)
+	if java.SameSlice(elements, c.Elements) {
+		return c
+	}
 	out := *c
-	out.Elements = indentSubtrees(v, c.Elements, p)
+	out.Elements = elements
 	return &out
 }
 
@@ -248,8 +349,7 @@ func indentSubtrees[T java.Tree](v *TabsAndIndentsVisitor, elements []java.Right
 // ones between elements untouched.
 func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T], p any, descend bool) []java.RightPadded[T] {
 	outer := v.depth
-	out := make([]java.RightPadded[T], len(elements))
-	for i, rp := range elements {
+	out := eachPadded(elements, func(rp java.RightPadded[T]) java.RightPadded[T] {
 		// Elements written alongside the delimiter that opens the list stay on
 		// that line's level; from the first element to start a line of its own,
 		// the rest share the level it set.
@@ -265,8 +365,8 @@ func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPad
 			}
 		}
 		rp.After = v.reindentClosingAt(rp.After, outer)
-		out[i] = rp
-	}
+		return rp
+	})
 	v.depth = outer
 	return out
 }
@@ -277,7 +377,6 @@ func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPad
 func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
 	out := l.WithPrefix(v.reindentClauseLeadIn(l.Prefix))
 
-	copied := *out
 	statement := l.Statement
 	// An empty labelled statement prints nothing, so the whitespace ahead of it
 	// closes the block rather than opening a line of its own.
@@ -289,6 +388,11 @@ func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
 	if next, ok := v.Visit(statement, p).(java.Statement); ok {
 		statement = next
 	}
+	statement = unlessLabelUnchanged(l.Statement, statement)
+	if statement == out.Statement {
+		return out
+	}
+	copied := *out
 	copied.Statement = statement
 	return &copied
 }
@@ -297,8 +401,7 @@ func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
 // statement's Prefix and the closing-brace `End`.
 func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 	v.depth++
-	stmts := make([]java.RightPadded[java.Statement], len(block.Statements))
-	for i, rp := range block.Statements {
+	stmts := eachPadded(block.Statements, func(rp java.RightPadded[java.Statement]) java.RightPadded[java.Statement] {
 		if rp.Element != nil {
 			// A clause aligns with the switch or select that encloses it and
 			// decides its own lead-in, so its prefix is left to it.
@@ -311,8 +414,8 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 				rp.Element = next
 			}
 		}
-		stmts[i] = rp
-	}
+		return rp
+	})
 	v.depth--
 
 	block = block.WithStatements(stmts)
@@ -321,39 +424,46 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 }
 
 // VisitCase indents a switch clause: the lead-in aligns the keyword with the
-// enclosing switch, and the body one level in. It visits Body itself, which
-// GoVisitor.VisitCase does not recurse into.
+// enclosing switch, and the body one level in. It visits Body itself rather
+// than through GoVisitor.VisitCase, so as to re-indent each statement before
+// descending into it.
 func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	c = c.WithPrefix(v.reindentClauseLeadIn(c.Prefix))
 
-	// Expressions that wrap sit one level in from the `case` keyword, which
-	// is the depth the body already runs at.
-	exprs := make([]java.RightPadded[java.Expression], len(c.Expressions.Elements))
-	for i, rp := range c.Expressions.Elements {
-		if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Expression); ok {
-			rp.Element = fixed
-		}
-		exprs[i] = rp
+	// The expressions nest from the `case` keyword's level, and those that
+	// wrap sit one level in from it, which is the depth the body runs at.
+	exprs := atKeywordLevel(v, func() []java.RightPadded[java.Expression] {
+		return indentSubtrees(v, c.Expressions.Elements, p)
+	})
+	body := indentBody(v, c.Body.Elements, p)
+	if java.SameSlice(exprs, c.Expressions.Elements) && java.SameSlice(body, c.Body.Elements) {
+		return c
 	}
-
 	out := *c
 	out.Expressions.Elements = exprs
-	out.Body = indentBody(v, c.Body, p)
+	out.Body.Elements = body
 	return &out
 }
 
 // VisitMethodInvocation indents arguments that wrap onto their own lines.
 func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
-	out := *mi
-	out.Arguments.Elements = indentSubtrees(v, mi.Arguments.Elements, p)
-	out.Markers = v.reindentTrailingComma(mi.Markers)
-	if mi.Select != nil {
-		selected := *mi.Select
-		if next, ok := v.Visit(selected.Element, p).(java.Expression); ok {
-			selected.Element = next
-			out.Select = &selected
+	arguments := indentSubtrees(v, mi.Arguments.Elements, p)
+	markers := v.reindentTrailingComma(mi.Markers)
+	selected := mi.Select
+	if selected != nil {
+		if next, ok := v.Visit(selected.Element, p).(java.Expression); ok && next != selected.Element {
+			copied := *selected
+			copied.Element = next
+			selected = &copied
 		}
 	}
+	if java.SameSlice(arguments, mi.Arguments.Elements) && java.MarkersEqual(markers, mi.Markers) && selected == mi.Select {
+		return mi
+	}
+	out := *mi
+	out.Arguments.Elements = arguments
+	out.Markers = markers
+	out.Select = selected
 	return &out
 }
 
@@ -363,18 +473,26 @@ func (v *TabsAndIndentsVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	if tc.Clazz == nil {
 		return v.GoVisitor.VisitTypeCast(tc, p)
 	}
-	out := *tc
-	if clazz, ok := v.Visit(tc.Clazz, p).(*java.ControlParentheses); ok {
-		out.Clazz = clazz
+	clazz := tc.Clazz
+	if next, ok := v.Visit(tc.Clazz, p).(*java.ControlParentheses); ok {
+		clazz = next
 	}
 	operand := indentSubtrees(v, []java.RightPadded[java.Expression]{
-		{Element: out.Expr, After: out.Clazz.Tree.After},
+		{Element: tc.Expr, After: clazz.Tree.After},
 	}, p)
-	clazz := *out.Clazz
-	clazz.Tree.After = operand[0].After
-	out.Clazz = &clazz
+	if !java.SpaceEqual(operand[0].After, clazz.Tree.After) {
+		copied := *clazz
+		copied.Tree.After = operand[0].After
+		clazz = &copied
+	}
+	markers := v.reindentTrailingComma(tc.Markers)
+	if clazz == tc.Clazz && operand[0].Element == tc.Expr && java.MarkersEqual(markers, tc.Markers) {
+		return tc
+	}
+	out := *tc
+	out.Clazz = clazz
 	out.Expr = operand[0].Element
-	out.Markers = v.reindentTrailingComma(tc.Markers)
+	out.Markers = markers
 	return &out
 }
 
@@ -382,17 +500,21 @@ func (v *TabsAndIndentsVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 // operands sit at the same level however deeply the expression nests, so the
 // depth is taken from the enclosing statement rather than from the operand.
 func (v *TabsAndIndentsVisitor) VisitBinary(b *java.Binary, p any) java.J {
-	out := *b
-	out.Left = v.visitOperand(b.Left, false, p)
-	out.Right = v.visitOperand(b.Right, true, p)
-	return &out
+	left := v.visitOperand(b.Left, false, p)
+	right := v.visitOperand(b.Right, true, p)
+	return b.WithLeft(left).WithRight(right)
 }
 
 // VisitGoBinary applies VisitBinary's rule to Go's own binary expressions.
 func (v *TabsAndIndentsVisitor) VisitGoBinary(b *golang.Binary, p any) java.J {
+	left := v.visitOperand(b.Left, false, p)
+	right := v.visitOperand(b.Right, true, p)
+	if left == b.Left && right == b.Right {
+		return b
+	}
 	out := *b
-	out.Left = v.visitOperand(b.Left, false, p)
-	out.Right = v.visitOperand(b.Right, true, p)
+	out.Left = left
+	out.Right = right
 	return &out
 }
 
@@ -422,29 +544,67 @@ func (v *TabsAndIndentsVisitor) visitOperand(e java.Expression, continues bool, 
 
 // VisitCommClause aligns a select clause the way VisitCase aligns a switch
 // clause: the `case` keyword sits with the enclosing `select`, its body one
-// level in.
+// level in. Like VisitCase, it visits the clause's parts itself, in the order
+// they are written.
 func (v *TabsAndIndentsVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	cc = cc.WithPrefix(v.reindentClauseLeadIn(cc.Prefix))
 
+	comm := cc.Comm
+	if comm != nil {
+		comm = atKeywordLevel(v, func() java.Statement {
+			if next, ok := v.Visit(comm, p).(java.Statement); ok {
+				return next
+			}
+			return comm
+		})
+	}
+	body := indentBody(v, cc.Body, p)
+	if comm == cc.Comm && java.SameSlice(body, cc.Body) {
+		return cc
+	}
 	out := *cc
-	out.Body = indentBody(v, cc.Body, p)
-	return v.GoVisitor.VisitCommClause(&out, p)
+	out.Comm = comm
+	out.Body = body
+	return &out
+}
+
+// atKeywordLevel runs visit at the level of a clause's `case` keyword, one out
+// from the body the clause's depth is set for.
+func atKeywordLevel[T any](v *TabsAndIndentsVisitor, visit func() T) T {
+	body := v.depth
+	v.depth = reduceIndentDepth(body)
+	defer func() { v.depth = body }()
+	return visit()
 }
 
 func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement], p any) []java.RightPadded[java.Statement] {
-	out := make([]java.RightPadded[java.Statement], len(body))
-	for i, rp := range body {
+	return eachPadded(body, func(rp java.RightPadded[java.Statement]) java.RightPadded[java.Statement] {
 		if rp.Element != nil {
+			original := rp.Element
 			if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Statement); ok {
 				rp.Element = fixed
 			}
 			if next, ok := v.Visit(rp.Element, p).(java.Statement); ok {
 				rp.Element = next
 			}
+			rp.Element = unlessLabelUnchanged(original, rp.Element)
 		}
-		out[i] = rp
+		return rp
+	})
+}
+
+// unlessLabelUnchanged returns original when it is a label whose lead-in,
+// indented as a statement and then back out by VisitLabel, ends as it began.
+func unlessLabelUnchanged(original, formatted java.Statement) java.Statement {
+	before, ok := original.(*java.Label)
+	if !ok {
+		return formatted
 	}
-	return out
+	after, ok := formatted.(*java.Label)
+	if ok && after.Statement == before.Statement && spaceContentEqual(after.Prefix, before.Prefix) {
+		return original
+	}
+	return formatted
 }
 
 // ownsItsLeadIn reports whether a statement re-indents the whitespace ahead of
@@ -466,9 +626,9 @@ func (v *TabsAndIndentsVisitor) reindentClauseLeadIn(s java.Space) java.Space {
 	body := strings.Repeat("\t", v.depth)
 	keyword := strings.Repeat("\t", reduceIndentDepth(v.depth))
 
-	segments := make([]string, 0, len(s.Comments)+1)
-	segments = append(segments, s.Whitespace)
-	for _, c := range s.Comments {
+	segments := make([]string, 0, len(s.Comments())+1)
+	segments = append(segments, s.Whitespace())
+	for _, c := range s.Comments() {
 		segments = append(segments, c.Suffix)
 	}
 	for i, segment := range segments {
@@ -481,16 +641,14 @@ func (v *TabsAndIndentsVisitor) reindentClauseLeadIn(s java.Space) java.Space {
 		segments[i] = reindentTail(segment, want)
 	}
 
-	out := s
-	out.Whitespace = segments[0]
-	if len(s.Comments) > 0 {
-		comments := append([]java.Comment(nil), s.Comments...)
+	comments := s.Comments()
+	if len(comments) > 0 {
+		comments = append([]java.Comment(nil), comments...)
 		for i := range comments {
 			comments[i].Suffix = segments[i+1]
 		}
-		out.Comments = comments
 	}
-	return out
+	return unchangedOr(s, java.MakeSpace(comments, segments[0]))
 }
 
 // indentOf reports the whitespace after the last line break in ws, which is the
@@ -519,7 +677,7 @@ func (v *TabsAndIndentsVisitor) reindentClosing(s java.Space) java.Space {
 // reindentClosingAt re-indents a closing delimiter that sits at the given
 // depth, whatever level the elements ahead of it reached.
 func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.Space {
-	if len(s.Comments) == 0 {
+	if len(s.Comments()) == 0 {
 		saved := v.depth
 		v.depth = depth
 		out := v.reindentSpace(s)
@@ -529,8 +687,8 @@ func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.
 	inner := strings.Repeat("\t", depth+1)
 	outer := strings.Repeat("\t", depth)
 
-	s.Whitespace = reindentTail(s.Whitespace, inner)
-	comments := append([]java.Comment(nil), s.Comments...)
+	whitespace := reindentTail(s.Whitespace(), inner)
+	comments := append([]java.Comment(nil), s.Comments()...)
 	for i := range comments {
 		indent := inner
 		if i == len(comments)-1 {
@@ -538,8 +696,7 @@ func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.
 		}
 		comments[i].Suffix = reindentTail(comments[i].Suffix, indent)
 	}
-	s.Comments = comments
-	return s
+	return unchangedOr(s, java.MakeSpace(comments, whitespace))
 }
 
 // reindentSpace rewrites to `\t × v.depth` the indent of everything s
@@ -548,33 +705,34 @@ func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.
 // those segments ends in the indent of whatever comes next.
 func (v *TabsAndIndentsVisitor) reindentSpace(s java.Space) java.Space {
 	want := strings.Repeat("\t", v.depth)
-	s.Whitespace = reindentTail(s.Whitespace, want)
+	whitespace := reindentTail(s.Whitespace(), want)
 
-	var comments []java.Comment
-	for i, c := range s.Comments {
+	comments := s.Comments()
+	var newComments []java.Comment
+	for i, c := range comments {
 		suffix := reindentTail(c.Suffix, want)
 		if suffix == c.Suffix {
 			continue
 		}
-		if comments == nil {
-			comments = append([]java.Comment(nil), s.Comments...)
+		if newComments == nil {
+			newComments = append([]java.Comment(nil), comments...)
 		}
-		comments[i].Suffix = suffix
+		newComments[i].Suffix = suffix
 	}
-	if comments != nil {
-		s.Comments = comments
+	if newComments != nil {
+		comments = newComments
 	}
-	return s
+	return java.MakeSpace(comments, whitespace)
 }
 
 // breaksLine reports whether s puts what follows it on a new line. The break
 // can sit in the whitespace or in the suffix of a comment s carries, as it does
 // when the previous line ends in a trailing comment.
 func breaksLine(s java.Space) bool {
-	if strings.Contains(s.Whitespace, "\n") {
+	if strings.Contains(s.Whitespace(), "\n") {
 		return true
 	}
-	for _, c := range s.Comments {
+	for _, c := range s.Comments() {
 		if strings.Contains(c.Suffix, "\n") {
 			return true
 		}

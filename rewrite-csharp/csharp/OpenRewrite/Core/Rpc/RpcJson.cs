@@ -30,7 +30,8 @@ namespace OpenRewrite.Core.Rpc;
 /// </para>
 /// <para>
 /// The shape matches what the Java peer expects: camelCase property names, enum
-/// values as strings, and omitted nulls.
+/// values as strings, omitted nulls, and non-finite floating-point values as the
+/// <c>"NaN"</c>/<c>"Infinity"</c>/<c>"-Infinity"</c> strings Jackson writes for them.
 /// </para>
 /// </summary>
 public static class RpcJson
@@ -52,6 +53,7 @@ public static class RpcJson
             // other characters for HTML safety, which is unnecessary over a private
             // RPC pipe and would alter (and inflate) the payload.
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         };
         options.Converters.Add(new JsonStringEnumConverter());
         return options;

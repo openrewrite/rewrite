@@ -39,6 +39,33 @@ class UvLockWriterTest {
     }
 
     @Test
+    void optionsAndManifestEntriesRoundTripInUvsOrder() {
+        // an older uv stored the computed timestamp beside a relative span, where uv 0.13.4 writes the sentinel
+        String lock = """
+          version = 1
+          revision = 3
+          requires-python = ">=3.12"
+
+          [options]
+          resolution-mode = "lowest-direct"
+          prerelease-mode = "allow"
+          fork-strategy = "fewest"
+          exclude-newer = "2026-04-16T16:29:01.518541933Z"
+          exclude-newer-span = "P7D"
+
+          [manifest]
+          constraints = [{ name = "six", specifier = ">=1" }]
+          overrides = [{ name = "h2", specifier = ">=4.4.1,<4.4.2" }]
+
+          [[package]]
+          name = "proj"
+          version = "0.1.0"
+          source = { virtual = "." }
+          """;
+        assertThat(UvLockWriter.write(UvLockReader.parse(lock))).isEqualTo(lock);
+    }
+
+    @Test
     void uploadTimeEmittedVerbatim() {
         // uv trims trailing fractional zeros; the writer must never reformat the stored string
         UvLockPackage pkg = minimalPackage().withWheels(singletonList(

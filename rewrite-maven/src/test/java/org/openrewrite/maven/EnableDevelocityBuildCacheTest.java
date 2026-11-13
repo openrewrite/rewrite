@@ -55,6 +55,37 @@ class EnableDevelocityBuildCacheTest implements RewriteTest {
     }
 
     @Test
+    void keepFormattingOfExistingConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new EnableDevelocityBuildCache("true", null, null)),
+          xml(
+            """
+              <develocity>
+                <server>
+                   <url>https://ge.example.com</url>
+                </server>
+                <projectId>demo</projectId>
+              </develocity>
+              """,
+            """
+              <develocity>
+                <server>
+                   <url>https://ge.example.com</url>
+                </server>
+                <projectId>demo</projectId>
+                <buildCache>
+                  <local>
+                    <enabled>true</enabled>
+                  </local>
+                </buildCache>
+              </develocity>
+              """,
+            spec -> spec.path(".mvn/develocity.xml")
+          )
+        );
+    }
+
+    @Test
     void requireAtLeastOneOption() {
         Validated<Object> validate = new EnableDevelocityBuildCache(null, null, null).validate(new InMemoryExecutionContext());
         assertThat(validate.isValid()).isFalse();

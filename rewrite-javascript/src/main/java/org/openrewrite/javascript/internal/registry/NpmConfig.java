@@ -18,8 +18,10 @@ package org.openrewrite.javascript.internal.registry;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -162,7 +164,7 @@ final class NpmConfig {
             Auth auth = new Auth();
             EnvExpansion.Expansion e = EnvExpansion.expand(globalAuthBase64Raw, env);
             auth.authBase64 = e.value;
-            auth.unresolvedPlaceholders = e.unresolvedPlaceholders;
+            auth.addUnresolved(e);
             return auth;
         }
         return null;
@@ -172,19 +174,19 @@ final class NpmConfig {
         Auth auth = new Auth();
         EnvExpansion.Expansion token = EnvExpansion.expand(attrs.get("_authToken"), env);
         auth.authToken = token.value;
-        auth.unresolvedPlaceholders |= token.unresolvedPlaceholders;
+        auth.addUnresolved(token);
 
         EnvExpansion.Expansion authBase64 = EnvExpansion.expand(attrs.get("_auth"), env);
         auth.authBase64 = authBase64.value;
-        auth.unresolvedPlaceholders |= authBase64.unresolvedPlaceholders;
+        auth.addUnresolved(authBase64);
 
         EnvExpansion.Expansion user = EnvExpansion.expand(attrs.get("username"), env);
         auth.username = user.value;
-        auth.unresolvedPlaceholders |= user.unresolvedPlaceholders;
+        auth.addUnresolved(user);
 
         EnvExpansion.Expansion password = EnvExpansion.expand(attrs.get("_password"), env);
         auth.password = password.value == null ? null : decodeBase64(password.value);
-        auth.unresolvedPlaceholders |= password.unresolvedPlaceholders;
+        auth.addUnresolved(password);
 
         auth.alwaysAuth = parseBool(EnvExpansion.expand(attrs.get("always-auth"), env).value);
         return auth;
@@ -214,8 +216,16 @@ final class NpmConfig {
         boolean alwaysAuth;
         boolean unresolvedPlaceholders;
 
+        /** Placeholders in these credentials whose variables are unset, verbatim, e.g. {@code ${NPM_TOKEN}}. */
+        final List<String> unresolved = new ArrayList<>();
+
         boolean hasAny() {
             return authToken != null || authBase64 != null || username != null || password != null;
+        }
+
+        void addUnresolved(EnvExpansion.Expansion expansion) {
+            unresolved.addAll(expansion.unresolved);
+            unresolvedPlaceholders = !unresolved.isEmpty();
         }
     }
 }

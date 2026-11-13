@@ -224,7 +224,7 @@ class BlankLinesTest implements RewriteTest {
 
                   }
 
-                  enum Test {
+                  enum TheEnum {
                       FIRST,
                       SECOND
 
@@ -239,7 +239,7 @@ class BlankLinesTest implements RewriteTest {
                       field1 = 2;
                   }
 
-                  enum Test {
+                  enum TheEnum {
                       FIRST,
                       SECOND
                   }

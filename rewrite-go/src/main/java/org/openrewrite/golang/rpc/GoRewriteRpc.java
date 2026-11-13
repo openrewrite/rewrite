@@ -25,6 +25,8 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.internal.GoExecutor;
+import org.openrewrite.golang.tree.GoMod;
+import org.openrewrite.golang.tree.GoSum;
 import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
@@ -57,7 +59,9 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -278,6 +282,10 @@ public class GoRewriteRpc extends RewriteRpc {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
                     response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
+                    // Module files carry the resolved module graph, so a consumer can read it before the sources.
+                    response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
+                            !GoMod.class.getName().equals(item.getSourceFileType()) &&
+                            !GoSum.class.getName().equals(item.getSourceFileType())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -481,14 +489,14 @@ public class GoRewriteRpc extends RewriteRpc {
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-            process.environment().putAll(environment);
-            ensureGoRoot(process.environment());
+            Map<String, String> env = new LinkedHashMap<>(environment);
+            ensureGoRoot(env);
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("go")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {

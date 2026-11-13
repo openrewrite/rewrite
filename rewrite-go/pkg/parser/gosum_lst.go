@@ -30,7 +30,7 @@ import (
 func ParseGoSumFile(path, content string) (*golang.GoSum, error) {
 	gs := &golang.GoSum{
 		Ident:      uuid.New(),
-		Markers:    java.Markers{ID: uuid.New()},
+		Markers:    java.EmptyMarkers,
 		SourcePath: path,
 		Charset:    "UTF-8",
 	}
@@ -65,7 +65,7 @@ func ParseGoSumFile(path, content string) (*golang.GoSum, error) {
 		line := &golang.GoSumLine{
 			Ident:      uuid.New(),
 			Prefix:     java.ParseSpace(content[cursor:moduleStart]),
-			Markers:    java.Markers{ID: uuid.New()},
+			Markers:    java.EmptyMarkers,
 			ModulePath: lineText[m[2]:m[3]],
 			Version:    lineText[m[4]:m[5]],
 			GoMod:      m[6] != -1,
@@ -74,7 +74,7 @@ func ParseGoSumFile(path, content string) (*golang.GoSum, error) {
 		lines = append(lines, java.RightPadded[*golang.GoSumLine]{
 			Element: line,
 			After:   java.ParseSpace(content[hashEnd:lineEnd]),
-			Markers: java.Markers{ID: uuid.New()},
+			Markers: java.EmptyMarkers,
 		})
 		cursor = lineEnd
 		i = lineEnd

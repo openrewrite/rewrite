@@ -307,6 +307,35 @@ describe("Lock file parsing", () => {
             expect(marker).not.toBeNull();
             expect(marker!.packageManager).toBe(PackageManager.Bun);
         });
+
+        test("should keep the scope of scoped packages, top-level and nested", async () => {
+            const marker = await parseAndGetMarker("bun-scoped");
+            expect(marker).not.toBeNull();
+            const resolved = marker!.resolvedDependencies.map(d => `${d.name}@${d.version}`).sort();
+            expect(resolved).toEqual([
+                "@inquirer/confirm@5.1.21",
+                "@inquirer/core@10.3.2",
+                "@inquirer/core@9.2.1",
+                "is-odd@0.1.2",
+                "is-odd@3.0.1"
+            ]);
+        });
+
+        test("should resolve dependencies nested under a scoped package", async () => {
+            const marker = await parseAndGetMarker("bun-scoped");
+            expect(marker).not.toBeNull();
+
+            const confirm = marker!.dependencies.find(d => d.name === "@inquirer/confirm");
+            expect(confirm?.resolved?.version).toBe("5.1.21");
+
+            // @inquirer/confirm's own is-odd is the copy bun nests under it, not the top-level one
+            const nestedIsOdd = confirm!.resolved!.dependencies!.find(d => d.name === "is-odd");
+            expect(nestedIsOdd?.resolved?.version).toBe("0.1.2");
+
+            // and that copy's @inquirer/core is nested under it in turn
+            const nestedCore = nestedIsOdd!.resolved!.dependencies!.find(d => d.name === "@inquirer/core");
+            expect(nestedCore?.resolved?.version).toBe("9.2.1");
+        });
     });
 
     // pnpm and yarn tests require CLI to be available and packages installed

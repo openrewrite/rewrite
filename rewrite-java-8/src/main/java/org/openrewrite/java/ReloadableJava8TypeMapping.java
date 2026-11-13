@@ -192,6 +192,11 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             name = type.tsym.name.toString();
         }
         return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
+            if (type instanceof Type.CapturedType && !((Type.CapturedType) type).lower.hasTag(TypeTag.BOT)) {
+                // a capture of `? super String` is denoted by its lower bound, not by the declared bound it has above
+                gtv.unsafeSet(gtv.getName(), CONTRAVARIANT, singletonList(type(((Type.CapturedType) type).lower)));
+                return;
+            }
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
@@ -220,6 +225,11 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
+        // Taken before the initializer may complete the symbol, matching the signature built from the same state.
+        // A generic class arrives through its own symbol type only once javac has completed it, since javac
+        // completes an owner before its nested classes and a class before any of its members.
+        boolean parameterized = classType.typarams_field != null && classType.typarams_field.length() > 0;
+        // flags_field is empty until javac completes the symbol, so the initializer sets flags and kind again.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), c -> {
             completeClassSymbol(sym);
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
@@ -279,12 +289,11 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     typeParameters.add(type(tParam));
                 }
             }
-            c.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            c.unsafeSet(sym.flags_field, getKind(sym), fqn, typeParameters, supertype, owner, listAnnotations(sym),
+                    interfaces, fields, methods);
         });
 
-        if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
-            // NOTE because of completion that happens when building the base type,
-            // the signature may shift from when it was first calculated.
+        if (parameterized) {
             JavaType.Class finalClazz = clazz;
             return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());

@@ -21,12 +21,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Validated;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
+import org.openrewrite.javascript.semver.NodeSemver;
 import org.openrewrite.semver.LatestRelease;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -70,10 +68,12 @@ public final class LockFileParser {
         }
 
         // Node-style resolution: nearest node_modules first, then walking up. Falls back
-        // to semver matching among all versions of the name for paths the walk cannot
-        // reach, since the yarn/pnpm adapters park duplicate versions under synthetic
-        // paths that are not on any walk-up chain.
+        // to semver matching among all versions of the name when the walk finds nothing
+        // satisfying the constraint, since the yarn/pnpm adapters park duplicate versions
+        // under synthetic paths that are not on any walk-up chain.
         @Nullable ResolvedDependency resolve(String name, String versionConstraint, String contextPath) {
+            boolean validConstraint = NodeSemver.validRange(versionConstraint, NodeSemver.Options.DEFAULT) != null;
+            ResolvedDependency nearest = null;
             String currentPath = contextPath;
             while (true) {
                 String candidatePath = currentPath.isEmpty()
@@ -81,7 +81,11 @@ public final class LockFileParser {
                         : currentPath + "/node_modules/" + name;
                 ResolvedDependency resolved = byPath.get(candidatePath);
                 if (resolved != null) {
-                    return resolved;
+                    if (!validConstraint || satisfies(resolved, versionConstraint)) {
+                        return resolved;
+                    }
+                    nearest = resolved;
+                    break;
                 }
                 if (currentPath.isEmpty()) {
                     break;
@@ -92,20 +96,25 @@ public final class LockFileParser {
 
             List<ResolvedDependency> candidates = byName.get(name);
             if (candidates == null || candidates.isEmpty()) {
-                return null;
+                return nearest;
+            }
+            if (validConstraint) {
+                ResolvedDependency best = null;
+                for (ResolvedDependency candidate : candidates) {
+                    if (satisfies(candidate, versionConstraint) && (best == null ||
+                            NodeSemver.compare(candidate.getVersion(), best.getVersion(), NodeSemver.Options.DEFAULT) > 0)) {
+                        best = candidate;
+                    }
+                }
+                if (best != null) {
+                    return best;
+                }
+            }
+            if (nearest != null) {
+                return nearest;
             }
             if (candidates.size() == 1) {
                 return candidates.get(0);
-            }
-            Validated<VersionComparator> constraint =
-                    Semver.validate(versionConstraint, null, Semver.Ecosystem.NODE);
-            if (constraint.isValid()) {
-                for (ResolvedDependency candidate : candidates) {
-                    if (candidate.getVersion() != null &&
-                            constraint.getValue().isValid(null, candidate.getVersion())) {
-                        return candidate;
-                    }
-                }
             }
             // No version satisfies the constraint: fall back to the highest version.
             ResolvedDependency max = candidates.get(0);
@@ -117,6 +126,11 @@ public final class LockFileParser {
                 }
             }
             return max;
+        }
+
+        private static boolean satisfies(ResolvedDependency dependency, String versionConstraint) {
+            return dependency.getVersion() != null &&
+                    NodeSemver.satisfies(dependency.getVersion(), versionConstraint, NodeSemver.Options.DEFAULT);
         }
     }
 

@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -242,7 +241,7 @@ class PyProjectTomlParserTest {
         Files.createDirectories(sitePackages.resolve("click-8.1.7.dist-info"));
         Files.createDirectories(sitePackages.resolve("colorama-0.4.6.dist-info"));
 
-        PyProjectTomlParser parser = new PyProjectTomlParser(emptyMap(), venv);
+        PyProjectTomlParser parser = new PyProjectTomlParser(venv);
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
           singletonList(input),

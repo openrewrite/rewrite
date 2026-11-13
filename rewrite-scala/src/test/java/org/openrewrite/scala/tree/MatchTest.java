@@ -60,11 +60,11 @@ class MatchTest implements RewriteTest {
 
                 assertThat(binding.get()).isNotNull();
                 assertThat(binding.get().getName().getSimpleName()).isEqualTo("p");
-                assertThat(binding.get().getPattern()).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation pattern = (J.MethodInvocation) binding.get().getPattern();
-                assertThat(pattern.getSelect()).isInstanceOf(J.Identifier.class);
-                assertThat(((J.Identifier) pattern.getSelect()).getSimpleName()).isEqualTo("Person");
-                assertThat(pattern.getArguments()).hasSize(2);
+                assertThat(binding.get().getPattern()).isInstanceOf(J.DeconstructionPattern.class);
+                J.DeconstructionPattern pattern = (J.DeconstructionPattern) binding.get().getPattern();
+                assertThat(pattern.getDeconstructor()).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) pattern.getDeconstructor()).getSimpleName()).isEqualTo("Person");
+                assertThat(pattern.getNested()).hasSize(2);
             })
           )
         );
@@ -600,6 +600,33 @@ class MatchTest implements RewriteTest {
             val r = 1 match {
               case x // =>
               => x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonAfterBracedCaseBody() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Int) = x match { case 1 => { 1 }; case _ => 2 }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonBetweenCasesOnNextLine() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Int) = x match { case 1 => 1
+                ; case _ => 2 }
             }
             """
           )

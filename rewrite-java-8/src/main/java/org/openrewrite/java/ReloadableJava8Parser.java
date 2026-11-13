@@ -22,6 +22,7 @@ import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import lombok.Getter;
@@ -76,18 +77,21 @@ class ReloadableJava8Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+    private final boolean typeAttribution;
 
     ReloadableJava8Parser(@Nullable Collection<Path> classpath,
                           Collection<byte[]> classBytesClasspath,
                           @Nullable Collection<Input> dependsOn,
                           Charset charset,
                           boolean logCompilationWarningsAndErrors,
+                          boolean typeAttribution,
                           Collection<NamedStyles> styles,
                           JavaTypeCache typeCache,
                           @Nullable JavaTypeFactory typeFactory) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeAttribution = typeAttribution;
         this.typeCache = typeCache;
         this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
@@ -166,7 +170,13 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        compilerLog.compilationErrors = ctx.getMessage(JavaParser.COMPILATION_ERRORS);
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus;
+        try {
+            cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        } finally {
+            compilerLog.compilationErrors = null;
+        }
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
@@ -224,9 +234,17 @@ class ReloadableJava8Parser implements JavaParser {
             try {
                 enterAll(cus.values());
                 JavaCompiler delegate = annotationProcessors.isEmpty() ? compiler : compiler.processAnnotations(jcCompilationUnits, nil());
+                if (!typeAttribution) {
+                    delegate.todo.clear();
+                }
                 while (!delegate.todo.isEmpty()) {
                     try {
-                        delegate.attribute(delegate.todo);
+                        if (compilerLog.compilationErrors == null) {
+                            delegate.attribute(delegate.todo);
+                        } else {
+                            // javac reports some errors, such as an unreported exception, as it analyzes the flow
+                            delegate.flow(delegate.attribute(delegate.todo));
+                        }
                     } catch (Throwable t) {
                         handleParsingException(ctx, t);
                     }
@@ -295,8 +313,25 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     private static class ResettableLog extends Log {
+        @Nullable Collection<Diagnostic<? extends JavaFileObject>> compilationErrors;
+
         protected ResettableLog(Context context) {
             super(context);
+            // Installed first, it stays below the handlers that javac installs and removes, which pass on the
+            // errors of code that javac keeps and discard those of an attribution it only tries.
+            new DiagnosticHandler() {
+                {
+                    install(ResettableLog.this);
+                }
+
+                @Override
+                public void report(JCDiagnostic diagnostic) {
+                    if (compilationErrors != null && diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                        compilationErrors.add(diagnostic);
+                    }
+                    prev.report(diagnostic);
+                }
+            };
         }
 
         public void reset() {

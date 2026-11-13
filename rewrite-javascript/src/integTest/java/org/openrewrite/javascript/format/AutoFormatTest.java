@@ -21,9 +21,15 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.javascript.style.BlankLinesStyle;
+import org.openrewrite.javascript.style.TabsAndIndentsStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.javascript.Assertions.typescript;
 
@@ -98,6 +104,60 @@ class AutoFormatTest implements RewriteTest {
                   const x = 1;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void stylesOnTheSourceFileReachTheTypeScriptFormatter() {
+        NamedStyles twoSpaceIndent = new NamedStyles(randomId(), "test", "test", null, emptySet(),
+          singletonList(new TabsAndIndentsStyle(false, 2, 2, 4, false, true, false)));
+
+        rewriteRun(
+          typescript(
+            """
+              function test() {
+                          const x = 1;
+              }
+              """,
+            """
+              function test() {
+                const x = 1;
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> cu.withMarkers(cu.getMarkers().add(twoSpaceIndent)))
+          )
+        );
+    }
+
+    @Test
+    void blankLinesStyleOnTheSourceFileReachesTheTypeScriptFormatter() {
+        NamedStyles twoBlankLinesAroundMethods = new NamedStyles(randomId(), "test", "test", null, emptySet(),
+          singletonList(new BlankLinesStyle(
+            new BlankLinesStyle.KeepMaximum(2),
+            new BlankLinesStyle.Minimum(1, 1, 0, 0, 1, 2, 1))));
+
+        rewriteRun(
+          typescript(
+            """
+              class A {
+                  a() {
+                  }
+                  b() {
+                  }
+              }
+              """,
+            """
+              class A {
+                  a() {
+                  }
+
+
+                  b() {
+                  }
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> cu.withMarkers(cu.getMarkers().add(twoBlankLinesAroundMethods)))
           )
         );
     }

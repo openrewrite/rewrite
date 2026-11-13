@@ -87,9 +87,36 @@ describe('arithmetic operator mapping', () => {
         ));
 
     test('power operation', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript('2 ** 3'),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const binary = (cu.statements[0].element as JS.ExpressionStatement).expression as JS.Binary;
+                expect(binary.kind).toBe(JS.Kind.Binary);
+                expect(binary.operator.element).toBe(JS.Binary.Type.Exponentiation);
+            }
+        }));
+
+    test('power operation is right-associative', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript('a ** b ** c'),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const binary = (cu.statements[0].element as JS.ExpressionStatement).expression as JS.Binary;
+                expect(binary.kind).toBe(JS.Kind.Binary);
+                expect(binary.left.kind).toBe(J.Kind.Identifier);
+                expect((binary.right as JS.Binary).operator.element).toBe(JS.Binary.Type.Exponentiation);
+            }
+        }));
+
+    test('power operation with parenthesized operands', () =>
         spec.rewriteRun(
             //language=typescript
-            typescript('2 ** 3')
+            typescript(`
+                (a ** b) ** c;
+                (-a) ** b;
+                -(a ** b);
+            `)
         ));
 
     test('exponentiation operation', () =>

@@ -20,6 +20,7 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {withMetrics} from "./metrics";
 import * as path from "path";
+import {XmlParser} from "../../xml/parser";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
@@ -39,6 +40,8 @@ export class Parse {
         const fileName = path.basename(filePath);
         if (fileName === 'package.json') {
             return "packageJson";
+        } else if (XmlParser.accept(filePath)) {
+            return "xml";
         }
         return "javascript";
     }
@@ -67,7 +70,10 @@ export class Parse {
                         relativeTo: request.relativeTo
                     })!;
 
-                    const generator = parser.parse(...request.inputs);
+                    // an input without its text names a file for the parser to read
+                    const inputs = request.inputs.map(input =>
+                        typeof input === 'object' && input.text == null ? input.sourcePath : input);
+                    const generator = parser.parse(...inputs);
                     const resultIds: UUID[] = [];
 
                     for (let i = 0; i < request.inputs.length; i++) {

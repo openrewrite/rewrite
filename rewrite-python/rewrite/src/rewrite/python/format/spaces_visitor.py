@@ -9,7 +9,7 @@ from rewrite.java import (J, Assignment, JLeftPadded, AssignmentOperation, Membe
 from rewrite.python import (PythonVisitor, SpacesStyle, Binary, ChainedAssignment, Slice, CollectionLiteral,
                              DictLiteral, KeyValue, TypeHint, MultiImport, ExpressionTypeTree,
                              ComprehensionExpression, NamedArgument, TypeAlias)
-from rewrite.visitor import P, Cursor
+from rewrite.visitor import P, T, Cursor
 
 J2 = TypeVar('J2', bound=J)
 
@@ -19,6 +19,7 @@ class SpacesVisitor(PythonVisitor):
         self._style = style
         self._before_parentheses = style.before_parentheses
         self._stop_after = stop_after
+        self._stop = False
 
     def visit_class_declaration(self, class_decl: ClassDeclaration, p: P) -> J:
         c = cast(ClassDeclaration, super().visit_class_declaration(class_decl, p))
@@ -138,8 +139,9 @@ class SpacesVisitor(PythonVisitor):
             return v
 
         if v.padding.initializer is not None and v.padding.initializer.element is not None:
-            use_space = self._style.around_operators.eq_in_named_parameter or v.variable_type is not None
-            use_space |= self.cursor.first_enclosing_or_throw(VariableDeclarations).type_expression is not None
+            # As PEP 8 asks, an annotated parameter's default takes spaces
+            use_space = self._style.around_operators.eq_in_named_parameter or \
+                self.cursor.first_enclosing_or_throw(VariableDeclarations).type_expression is not None
 
             v = v.padding.replace(
                 initializer=space_before_left_padded(v.padding.initializer, use_space))
@@ -289,6 +291,11 @@ class SpacesVisitor(PythonVisitor):
 
         return b
 
+    def visit_unary(self, unary: j.Unary, p: P) -> J:
+        u: j.Unary = cast(j.Unary, super().visit_unary(unary, p))
+        # `not` is a keyword, so its separator is not style-configurable.
+        return u.replace(expression=space_before(u.expression, u.operator == j.Unary.Type.Not))
+
     def visit_if(self, if_: If, p: P) -> J:
         if_: j.If = cast(If, super().visit_if(if_, p))
 
@@ -348,7 +355,8 @@ class SpacesVisitor(PythonVisitor):
 
             if last:
                 arg = space_after(arg, use_space and arg.markers.find_first(TrailingComma) is None)
-                arg = arg.replace(markers=arg.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                arg = arg.replace(markers=arg.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, use_space)))
             else:
                 arg = space_after(arg, self._style.other.before_comma)
 
@@ -383,7 +391,8 @@ class SpacesVisitor(PythonVisitor):
 
             if index == args_size - 1:
                 arg = space_after(arg, use_space and arg.markers.find_first(TrailingComma) is None)
-                arg = arg.replace(markers=arg.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                arg = arg.replace(markers=arg.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, use_space)))
             else:
                 arg = space_after(arg, self._style.other.before_comma)
 
@@ -423,7 +432,8 @@ class SpacesVisitor(PythonVisitor):
                 c = space_before_right_padded_element(c, self._style.other.after_comma)
 
             if idx == arg_size - 1:
-                c = c.replace(markers=c.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                c = c.replace(markers=c.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, self._style.within.braces)))
 
             return c
 
@@ -522,8 +532,19 @@ class SpacesVisitor(PythonVisitor):
         cc = cc.padding.replace(iterated_list=space_before_left_padded_element(cc.padding.iterated_list, True))
         return cc
 
-    def _remap_trailing_comma_space(self, tc: TrailingComma) -> TrailingComma:
-        return tc.replace(suffix=update_space(tc.suffix, self._style.other.after_comma))
+    def post_visit(self, tree: T, p: P) -> Optional[T]:
+        if self._stop_after and tree == self._stop_after:
+            self._stop = True
+        return tree
+
+    def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
+
+
+def _trailing_comma_suffix(tc: TrailingComma, within: bool) -> TrailingComma:
+    # The suffix runs up to the closing bracket, so the space inside the brackets governs it.
+    # A tuple without parentheses has no closing bracket, and the token after it brings its own space.
+    return tc.replace(suffix=update_space(tc.suffix, within))
 
 
 def space_before(j: J2, add_space: bool) -> J2:

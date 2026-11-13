@@ -17,6 +17,7 @@ package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Heavyweight;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -24,7 +25,7 @@ import java.util.UUID;
 
 @Value
 @With
-public class FileListing implements Marker {
+public class FileListing implements Marker, Heavyweight {
     UUID id;
     List<Path> files;
 }

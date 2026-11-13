@@ -61,7 +61,6 @@ class GoParenthesizedConversionTypeIntegTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
         spec.typeValidationOptions(TypeValidation.builder()
-                .allowNonWhitespaceInWhitespace(true)
                 .build());
     }
 

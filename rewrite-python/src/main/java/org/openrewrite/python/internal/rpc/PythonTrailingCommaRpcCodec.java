@@ -25,6 +25,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 /**
  * Python-specific codec for TrailingComma that uses PythonReceiver.visitSpace
  * to properly handle PyComment in the suffix.
@@ -45,7 +48,7 @@ public class PythonTrailingCommaRpcCodec extends DynamicDispatchRpcCodec<Trailin
     @Override
     public void rpcSend(TrailingComma after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, TrailingComma::getSuffix, space -> new PythonSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getSuffix()), space -> new PythonSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

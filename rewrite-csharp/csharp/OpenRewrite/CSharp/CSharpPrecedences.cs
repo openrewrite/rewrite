@@ -48,6 +48,7 @@ internal static class CSharpPrecedences
         Unary => 13,
         CsUnary => 13,
         TypeCast => 13,
+        InstanceOf => 7,
         IsPattern ip => GetIsPatternPrecedence(ip),
         RangeExpression => 12,
         SwitchExpression => 11,
@@ -66,9 +67,11 @@ internal static class CSharpPrecedences
         int parentPrec = GetPrecedence(parent);
         if (childPrec > parentPrec) return false;
         if (childPrec < parentPrec) return true;
-        if (isRightOperand && IsRightAssociative(child) && IsRightAssociative(parent)) return false;
-        if (IsSameOperator(child, parent) && IsAssociative(child)) return false;
-        if (IsInSameMathGroup(child, parent)) return isRightOperand;
+        // Right-associative: the left operand of an equally binding operator needs parentheses
+        if (IsRightAssociative(child) && IsRightAssociative(parent)) return !isRightOperand;
+        // Left-associative: the right operand of an equally binding operator needs parentheses
+        if (isRightOperand) return true;
+        if (IsInSameMathGroup(child, parent)) return false;
         return !IsSameOperator(child, parent);
     }
 
@@ -98,17 +101,6 @@ internal static class CSharpPrecedences
         }
         return 7;
     }
-
-    public static bool IsAssociative(Expression expr) => expr switch
-    {
-        Binary b => b.Operator.Element is
-            Binary.OperatorType.Addition or Binary.OperatorType.Multiplication or
-            Binary.OperatorType.BitAnd or Binary.OperatorType.BitOr or Binary.OperatorType.BitXor or
-            Binary.OperatorType.And or Binary.OperatorType.Or,
-        Ternary t when t.Markers.MarkerList.Any(m => m is NullCoalescing) => true,
-        CsBinary csb => csb.Operator.Element is CsBinary.OperatorType.NullCoalescing,
-        _ => false
-    };
 
     private static bool IsRightAssociative(Expression expr) => expr switch
     {

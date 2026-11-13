@@ -1,8 +1,13 @@
 import {Json} from "../../src/json";
-import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
+import {asRef, ReferenceMap, RpcCodecs, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
-import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
+import {IntelliJ, JavaScriptParser, JS, sourceFileCache, SpacesStyleDetailKind, StyleKind} from "../../src/javascript";
+import {MarkersKind} from "../../src/markers";
+import {NamedStyles} from "../../src/style";
 import {TreePrinters} from "../../src/print";
+import {ExecutionContext} from "../../src/execution";
+import {isRef} from "../../src/reference";
+import {J} from "../../src/java";
 
 describe("RPC queues", () => {
 
@@ -47,6 +52,85 @@ describe("RPC queues", () => {
         expect(batch[1].value).toEqual([0, -1, -1, 2]);
     });
 
+    test("null is sent as an absent value, never as an ADD that carries nothing", async () => {
+        const send = (after: any, before: any) =>
+            new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
+
+        expect(await send(null, undefined)).toEqual([
+            {state: RpcObjectState.NO_CHANGE}, {state: RpcObjectState.END_OF_OBJECT}]);
+        expect(await send(null, "before")).toEqual([
+            {state: RpcObjectState.DELETE}, {state: RpcObjectState.END_OF_OBJECT}]);
+        expect((await send("after", null))[0].state).toEqual(RpcObjectState.ADD);
+    });
+
+    test("the execution context is sent under the name Java knows it by", async () => {
+        const batch = await new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(new ExecutionContext(), undefined);
+        expect(batch[0]).toEqual({state: RpcObjectState.ADD, valueType: "org.openrewrite.InMemoryExecutionContext"});
+    });
+
+    test("an inline value from Java loses the keys its serializer added", async () => {
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: "org.openrewrite.rpc.RpcMarker", value: {"@c": "org.openrewrite.rpc.RpcMarker", "@ref": 1, id: "1", tool: "example"}},
+            {state: RpcObjectState.ADD, value: null},
+        ];
+        const queue = new RpcReceiveQueue(new Map(), undefined, [batch.splice(0)], undefined, false);
+
+        expect(await queue.receive(undefined)).toEqual({kind: "org.openrewrite.rpc.RpcMarker", id: "1", tool: "example"});
+        expect(await queue.receive(undefined)).toBeNull();
+    });
+
+    test("a set of styles changed here travels with its type, in the shape Java decodes", async () => {
+        const before: NamedStyles = {
+            kind: MarkersKind.NamedStyles,
+            id: "1",
+            name: "example",
+            displayName: "Example",
+            tags: [],
+            styles: [IntelliJ.TypeScript.tabsAndIndents()]
+        };
+        const after: NamedStyles = {...before, styles: [{...IntelliJ.TypeScript.tabsAndIndents(), indentSize: 2} as any]};
+
+        const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(after, before);
+
+        expect(batch[0]).toEqual({
+            state: RpcObjectState.CHANGE,
+            valueType: MarkersKind.NamedStyles,
+            value: {
+                ...before, styles: [{
+                    "@c": StyleKind.TabsAndIndentsStyle,
+                    "@ref": 2,
+                    useTabCharacter: false,
+                    tabSize: 4,
+                    indentSize: 2,
+                    continuationIndent: 4,
+                    keepIndentsOnEmptyLines: false,
+                    indentChainedMethods: true,
+                    indentAllChainedCallsInAGroup: false
+                }]
+            }
+        });
+    });
+
+    test("a set of styles from Java has the kinds the styles here are found by", async () => {
+        const batch: RpcObjectData[] = [{
+            state: RpcObjectState.ADD,
+            valueType: MarkersKind.NamedStyles,
+            value: {
+                "@c": MarkersKind.NamedStyles, "@ref": 1, id: "1", name: "example", displayName: "Example", tags: [],
+                styles: [
+                    {"@c": StyleKind.SpacesStyle, "@ref": 2, within: {es6ImportExportBraces: true}},
+                    {"@c": "org.openrewrite.style.GeneralFormatStyle", "@ref": 3, useCRLFNewLines: false}
+                ]
+            }
+        }];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch.splice(0)], undefined, false);
+
+        expect((await q.receive<NamedStyles>(undefined)).styles).toEqual([
+            {kind: StyleKind.SpacesStyle, within: {kind: SpacesStyleDetailKind.SpacesStyleWithin, es6ImportExportBraces: true}},
+            {kind: "org.openrewrite.style.GeneralFormatStyle", useCRLFNewLines: false}
+        ]);
+    });
+
     test("an unchanged list is a single NO_CHANGE", async () => {
         const before = ["A", "B"];
         const batch = await sendList(before, before);
@@ -56,13 +140,104 @@ describe("RPC queues", () => {
         ]);
     });
 
+    const document = "test.ReplacementDocument";
+    const leaf = "test.ReplacementLeaf";
+
+    function registerReplacementDocument() {
+        RpcCodecs.registerCodec(document, {
+            rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, leaf: q.receive(before.leaf)};
+            },
+            rpcSend(after: any, q: RpcSendQueue) {
+                q.getAndSend(after, d => d.leaf);
+            }
+        }, document);
+        RpcCodecs.registerCodec(leaf, {
+            rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, text: q.receive(before.text)};
+            },
+            rpcSend(after: any, q: RpcSendQueue) {
+                q.getAndSend(after, l => l.text);
+            }
+        }, document);
+    }
+
+    test("a source file of another type than requested is received with its own codecs", async () => {
+        // given
+        registerReplacementDocument();
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: document},
+            {state: RpcObjectState.ADD, valueType: leaf},
+            {state: RpcObjectState.ADD, value: "Goodbye"},
+        ];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch.splice(0)], undefined, false);
+
+        // when
+        const received = await q.receive<any>({kind: JS.Kind.CompilationUnit});
+
+        // then
+        expect(received).toEqual({kind: document, leaf: {kind: leaf, text: "Goodbye"}});
+    });
+
+    test("a changed source file of another type than requested is received with its own codecs", async () => {
+        // given
+        registerReplacementDocument();
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.CHANGE},
+            {state: RpcObjectState.CHANGE},
+            {state: RpcObjectState.CHANGE, value: "Goodbye"},
+        ];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch.splice(0)], undefined, false);
+
+        // when
+        const received = await q.receive<any>({kind: document, leaf: {kind: leaf, text: "Hello"}});
+
+        // then
+        expect(received).toEqual({kind: document, leaf: {kind: leaf, text: "Goodbye"}});
+    });
+
+    test("a source file of another type than requested is sent with its own codecs", async () => {
+        // given
+        registerReplacementDocument();
+        const q = new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false);
+
+        // when
+        const batch = await q.generate({kind: document, leaf: {kind: leaf, text: "Goodbye"}}, {kind: JS.Kind.CompilationUnit});
+
+        // then
+        expect(batch).toEqual([
+            {state: RpcObjectState.ADD, valueType: document},
+            {state: RpcObjectState.ADD, valueType: leaf},
+            {state: RpcObjectState.ADD, valueType: undefined, value: "Goodbye"},
+            {state: RpcObjectState.END_OF_OBJECT},
+        ]);
+    });
+
+    test("a codec that returns a Promise fails on either side instead of desynchronizing the stream", () => {
+        const kind = "test.AsyncCodecNode";
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive(before: any) {
+                return before;
+            },
+            async rpcSend() {
+            }
+        } as any);
+
+        expect(() => new RpcSendQueue(new ReferenceMap(), undefined, false).generate({kind}, undefined))
+            .toThrow(/must be synchronous/);
+
+        const batch = [{state: RpcObjectState.ADD, valueType: kind}, {state: RpcObjectState.END_OF_OBJECT}] as RpcObjectData[];
+        expect(() => new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false).receive(undefined))
+            .toThrow(/must be synchronous/);
+    });
+
     test("reading past END_OF_OBJECT fails rather than re-serving the batch", async () => {
         const batch = await sendList(["A"], []);
-        const q = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const q = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
 
         await q.receiveList<string>(undefined);
         expect((await q.take()).state).toBe(RpcObjectState.END_OF_OBJECT);
-        await expect(q.take()).rejects.toThrow(/past END_OF_OBJECT/);
+        expect(() => q.take()).toThrow(/past END_OF_OBJECT/);
     });
 
     test("asRef doesn't create a new instance", () => {
@@ -137,7 +312,7 @@ describe("RPC queues", () => {
         const batch = await sq.generate(afterWrapper, beforeWrapper);
         expect(batch.length).toBeGreaterThan(0);
 
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
         const received = await rq.receive(beforeWrapper) as Wrapper;
 
         // Verify the wrapper's id stayed the same
@@ -157,7 +332,7 @@ describe("RPC queues", () => {
         await sq.sendList(after, before, m => m.id);
         const batch = sq.finish();
 
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
         const received = await rq.receiveList(before);
 
         expect(received![0].version).toBe("8.0");
@@ -171,7 +346,7 @@ describe("RPC queues", () => {
 
         // when
         const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
-        const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch, undefined, false)
+        const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch], undefined, false)
             .receive<JS.CompilationUnit>(undefined);
 
         // then
@@ -211,9 +386,9 @@ describe("RPC queues", () => {
         const emptyBatch = await sendList<string>([], undefined);
 
         // when
-        const first = await new RpcReceiveQueue(new Map(), undefined, async () => emptyBatch, undefined, false)
+        const first = await new RpcReceiveQueue(new Map(), undefined, [emptyBatch], undefined, false)
             .receiveList<string>(undefined);
-        const second = await new RpcReceiveQueue(new Map(), undefined, async () => emptyBatch, undefined, false)
+        const second = await new RpcReceiveQueue(new Map(), undefined, [emptyBatch], undefined, false)
             .receiveList<string>(undefined);
 
         // then
@@ -227,11 +402,51 @@ describe("RPC queues", () => {
         const batch: RpcObjectData[] = [
             {state: RpcObjectState.ADD, valueType: "com.example.UnknownMarker", value: undefined},
         ];
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
 
         // when / then
-        await expect(rq.receive(undefined)).rejects.toThrow(
+        expect(() => rq.receive(undefined)).toThrow(
             "No RPC codec registered on the TypeScript side for 'com.example.UnknownMarker'"
         );
     });
+
+    test("a copy of a ref is not a ref", () => {
+        const shared = asRef({kind: J.Kind.Space, comments: [], whitespace: "  "});
+
+        expect(isRef({...shared, whitespace: "   "})).toBe(false);
+    });
+
+    test("a short comment-free space travels as a ref and arrives as one instance, others by value", async () => {
+        // given
+        const source = `/* c */ const a = 1, b =${" ".repeat(51)}2;`;
+        const parser = new JavaScriptParser({sourceFileCache});
+        const parsed = (await parser.parse({text: source, sourcePath: "t.ts"}).next()).value as JS.CompilationUnit;
+
+        // when
+        const batch = new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
+        const received = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch], undefined, false)
+            .receive<JS.CompilationUnit>(undefined);
+
+        // then
+        const spaceAdds = batch.filter(d => d.state === RpcObjectState.ADD && d.valueType === J.Kind.Space);
+        expect(spaceAdds.filter(d => d.ref === undefined)).toHaveLength(2);
+        const shared = new Set(spacesOf(parsed).filter(s => s.comments.length === 0 && s.whitespace.length <= 50).map(s => s.whitespace));
+        expect(spaceAdds.filter(d => d.ref !== undefined)).toHaveLength(shared.size);
+        expect(new Set(spacesOf(received).filter(s => s.whitespace === " ")).size).toBe(1);
+        expect(await TreePrinters.print(received)).toBe(source);
+    });
 });
+
+function spacesOf(tree: any, seen = new Set<any>(), found: J.Space[] = []): J.Space[] {
+    if (tree === null || typeof tree !== "object" || seen.has(tree)) {
+        return found;
+    }
+    seen.add(tree);
+    if (tree.kind === J.Kind.Space) {
+        found.push(tree);
+    }
+    for (const value of Object.values(tree)) {
+        spacesOf(value, seen, found);
+    }
+    return found;
+}

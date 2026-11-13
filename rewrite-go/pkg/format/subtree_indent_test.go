@@ -82,6 +82,16 @@ func wrapped(n int) string {
 	select {
 	case v := <-ch:
 		joined += fmt.Sprint(v)
+	case <-func() chan int {
+		return ch
+	}():
+	}
+	switch {
+	case strings.HasPrefix(
+		joined,
+		"a",
+	), n > 1:
+		joined += "b"
 	}
 	return fmt.Sprintf(
 		"%s-%d",
@@ -117,7 +127,7 @@ func walkNodes(root java.Tree) *nodeWalk {
 // whitespace is set by whoever places it, not by formatting it, so it is not
 // part of what the two paths have to agree on.
 func printBody(t java.Tree) string {
-	return printer.Print(transformPrefix(t, func(java.Space) java.Space { return java.Space{} }))
+	return printer.Print(transformPrefix(t, func(java.Space) java.Space { return java.EmptySpace }))
 }
 
 func TestSubtreeIndentMatchesWholeFile(t *testing.T) {

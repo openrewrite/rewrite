@@ -17,9 +17,23 @@ package org.openrewrite.table;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FindSourceFiles;
+import org.openrewrite.Recipe;
+import org.openrewrite.RenameFile;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.text.ChangeText;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
+
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.test.SourceSpecs.other;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class SourceFileResultsTest implements RewriteTest {
@@ -98,5 +112,93 @@ class SourceFileResultsTest implements RewriteTest {
             "Hello!"
           )
         );
+    }
+
+    @Test
+    void noRowForAnEditThatOnlyChangesAMarker() {
+        rewriteRun(
+          spec -> spec
+            .recipe(recordGradleVersion("9.8.1"))
+            // The marker is a change to the tree, so the cycle made one
+            .expectedCyclesThatMakeChanges(1)
+            .afterRecipe(run -> assertThat(run.getDataTableStore().getDataTables())
+              .noneMatch(dt -> dt.getName().equals(SourcesFileResults.class.getName()))),
+          // The file prints the same, so it has no diff
+          text("Hi", SourceFileResultsTest::builtWithGradle8)
+        );
+    }
+
+    @Test
+    void onlyTheRecipeThatChangedTheFileHasARow() {
+        rewriteRun(
+          spec -> spec
+            .recipes(recordGradleVersion("9.8.1"), new ChangeText("Hello!"))
+            .dataTable(SourcesFileResults.Row.class, rows ->
+              assertThat(rows).extracting(SourcesFileResults.Row::getRecipe)
+                .containsExactly("org.openrewrite.text.ChangeText")),
+          text(
+            "Hi",
+            "Hello!",
+            SourceFileResultsTest::builtWithGradle8
+          )
+        );
+    }
+
+    @Test
+    void searchResultOnAQuarkHasARow() {
+        // A quark is compared by its path alone, so it is the search result that keeps the row
+        rewriteRun(
+          spec -> spec
+            .recipe(new FindSourceFiles("**/*.jks"))
+            .dataTable(SourcesFileResults.Row.class, rows ->
+              assertThat(rows).extracting(SourcesFileResults.Row::getSourcePath)
+                .containsExactly("keystore.jks")),
+          other(
+            "this text will not be read because this is a quark",
+            "~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛",
+            spec -> spec.path("keystore.jks")
+          )
+        );
+    }
+
+    @Test
+    void renameThatKeepsTheTextHasARow() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new RenameFile("hello.txt", "goodbye.txt"))
+            .dataTable(SourcesFileResults.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.getFirst().getSourcePath()).isEqualTo("hello.txt");
+                assertThat(rows.getFirst().getAfterSourcePath()).isEqualTo("goodbye.txt");
+                assertThat(rows.getFirst().getEstimatedTimeSaving()).isEqualTo(300L);
+            }),
+          text(
+            "Hi",
+            "Hi",
+            spec -> spec
+              .path("hello.txt")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("goodbye.txt")))
+          )
+        );
+    }
+
+    static void builtWithGradle8(SourceSpec<PlainText> spec) {
+        spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "8.14.3"));
+    }
+
+    /**
+     * Records a Gradle version in the {@link BuildTool} marker, as a Gradle upgrade does, which changes the tree but
+     * not what the file prints.
+     */
+    static Recipe recordGradleVersion(String version) {
+        return toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (text.getMarkers().findFirst(BuildTool.class).filter(tool -> version.equals(tool.getVersion())).isPresent()) {
+                    return text;
+                }
+                return text.withMarkers(text.getMarkers().setByType(new BuildTool(randomId(), BuildTool.Type.Gradle, version)));
+            }
+        });
     }
 }

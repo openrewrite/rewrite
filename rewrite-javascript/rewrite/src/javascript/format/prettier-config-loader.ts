@@ -275,6 +275,23 @@ export class PrettierConfigLoader {
         return undefined;
     }
 
+    private hasDirectPrettierDependency(filePath: string): boolean {
+        let dir = path.dirname(filePath);
+        while (true) {
+            const packageJsonPath = path.join(dir, 'package.json');
+            if (fs.existsSync(packageJsonPath)) {
+                const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                return !!(pkg.dependencies?.prettier || pkg.devDependencies?.prettier ||
+                    pkg.optionalDependencies?.prettier);
+            }
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                return false;
+            }
+            dir = parent;
+        }
+    }
+
     /**
      * Finds the .prettierignore file by scanning upward from projectRoot.
      * Returns undefined if no .prettierignore file is found.
@@ -324,9 +341,11 @@ export class PrettierConfigLoader {
                 ignored = fileInfo.ignored;
             }
 
-            // Resolve config for this specific file (applies overrides)
-            // If no config file exists, use empty config (Prettier defaults)
-            const config = await this.detection.bundledPrettier.resolveConfig(absolutePath) ?? {};
+            const resolvedConfig = await this.detection.bundledPrettier.resolveConfig(absolutePath);
+            if (resolvedConfig === null && !this.hasDirectPrettierDependency(absolutePath)) {
+                return undefined;
+            }
+            const config = resolvedConfig ?? {};
 
             // Create a cache key from the resolved config + version + ignored status
             const configKey = JSON.stringify({ config, version: this.detection.version, ignored });

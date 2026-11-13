@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -92,6 +93,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             if (!(cu instanceof J.CompilationUnit)) {
                 return cu;
             }
+            FormattingListener.beforeFormat(cu, stopAfter, getCursor());
             List<NamedStyles> activeStyles = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
             activeStyles.addAll(styles);
 

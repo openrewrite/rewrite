@@ -490,6 +490,28 @@ class GitProvenanceTest {
         assertThat(prov.getChange()).isEqualTo("287364287357");
     }
 
+    @ParameterizedTest
+    @CsvSource({
+      "https://gitlab-ci-token:glcbt-64_abc123@gitlab.example.com/group/project.git, https://gitlab-ci-token@gitlab.example.com/group/project.git",
+      "http://gitlab-ci-token:glcbt-64_abc123@gitlab.example.com:8080/group/project.git, http://gitlab-ci-token@gitlab.example.com:8080/group/project.git",
+      "https://gitlab-ci-token@gitlab.example.com/group/project.git, https://gitlab-ci-token@gitlab.example.com/group/project.git",
+      "https://gitlab.example.com/group/user@project.git, https://gitlab.example.com/group/user@project.git",
+      "git@gitlab.example.com:group/project.git, git@gitlab.example.com:group/project.git"
+    })
+    void gitLabRepositoryUrlDropsJobToken(String repositoryUrl, String expected, @TempDir Path projectDir) {
+        Map<String, String> envVars = new HashMap<>();
+        envVars.put("CI_REPOSITORY_URL", repositoryUrl);
+        envVars.put("CI_COMMIT_REF_NAME", "main");
+        envVars.put("CI_COMMIT_SHA", "287364287357");
+
+        GitlabBuildEnvironment environment = GitlabBuildEnvironment.build(envVars::get);
+        GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir, environment);
+
+        assertThat(environment.getCiRepositoryUrl()).isEqualTo(expected);
+        assertThat(prov).isNotNull();
+        assertThat(prov.getOrigin()).isEqualTo(expected);
+    }
+
     @Test
     void supportsDrone(@TempDir Path projectDir) {
         Map<String, String> envVars = new HashMap<>();

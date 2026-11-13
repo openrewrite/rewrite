@@ -15,12 +15,27 @@
  */
 package org.openrewrite.maven;
 
+import okhttp3.OkHttpClient;
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.test.RewriteTest;
+
+import java.net.InetAddress;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -81,6 +96,74 @@ class UpgradePluginVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${lombok.version}.0", "${major}.${minor}.${patch}.0", "1.${minor}.${patch}.0"})
+    void replaceCompositeVersionWithoutChangingSharedProperties(String expression) {
+        String before = lombokPluginPom(expression);
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.projectlombok", "lombok-maven-plugin",
+            "1.18.20.0", null, null, null)),
+          pomXml(before, before.replace("<version>" + expression + "</version>", "<version>1.18.20.0</version>"))
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${lombok.version}.0", "${major}.${minor}.${patch}.0", "1.${minor}.${patch}.0"})
+    void compareResolvedCompositeVersionBeforeUpgrading(String expression) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.projectlombok", "lombok-maven-plugin",
+            "1.18.18.0", null, null, null)),
+          pomXml(lombokPluginPom(expression)
+            .replace("<lombok.version>1.18.18</lombok.version>", "<lombok.version>1.18.20</lombok.version>")
+            .replace("<patch>18</patch>", "<patch>20</patch>"))
+        );
+    }
+
+    @Test
+    void retainWholePropertyReferenceWhenUpgradingPlugin() {
+        String before = lombokPluginPom("${plugin.version}");
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.projectlombok", "lombok-maven-plugin",
+            "1.18.20.0", null, null, null)),
+          pomXml(before, before.replace("<plugin.version>1.18.18.0</plugin.version>",
+            "<plugin.version>1.18.20.0</plugin.version>"))
+        );
+    }
+
+    private static String lombokPluginPom(String expression) {
+        return """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.example</groupId>
+              <artifactId>lombok-example</artifactId>
+              <version>1</version>
+              <properties>
+                  <lombok.version>1.18.18</lombok.version>
+                  <plugin.version>1.18.18.0</plugin.version>
+                  <major>1</major>
+                  <minor>18</minor>
+                  <patch>18</patch>
+              </properties>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.projectlombok</groupId>
+                      <artifactId>lombok</artifactId>
+                      <version>${lombok.version}</version>
+                  </dependency>
+              </dependencies>
+              <build>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.projectlombok</groupId>
+                          <artifactId>lombok-maven-plugin</artifactId>
+                          <version>%s</version>
+                      </plugin>
+                  </plugins>
+              </build>
+          </project>
+          """.formatted(expression);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
@@ -147,63 +230,115 @@ class UpgradePluginVersionTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5065")
         @Test
-        void update() {
-            rewriteRun(
-              spec -> spec.recipe(new UpgradePluginVersion(
-                "io.quarkus",
-                "quarkus-maven-plugin",
-                "3.15.3.redhat-00002",
-                null,
-                null,
-                null
-              )),
-              pomXml(
-                """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>io.quarkus</groupId>
-                          <artifactId>quarkus-maven-plugin</artifactId>
-                          <version>3.14.0</version>
-                         </plugin>
-                      </plugins>
-                    </build>
-                    <pluginRepositories>
-                      <pluginRepository>
-                        <id>redhat-ga</id>
-                        <url>https://maven.repository.redhat.com/ga/</url>
-                      </pluginRepository>
-                    </pluginRepositories>
-                  </project>
-                  """,
-                """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>io.quarkus</groupId>
-                          <artifactId>quarkus-maven-plugin</artifactId>
-                          <version>3.15.3.redhat-00002</version>
-                         </plugin>
-                      </plugins>
-                    </build>
-                    <pluginRepositories>
-                      <pluginRepository>
-                        <id>redhat-ga</id>
-                        <url>https://maven.repository.redhat.com/ga/</url>
-                      </pluginRepository>
-                    </pluginRepositories>
-                  </project>
-                  """
-              )
-            );
+        void update() throws Exception {
+            // Stands in for Red Hat's repository, which CI's Artifactory cache must not proxy: when it did, Red Hat
+            // rebuilds such as snakeyaml 2.7.0.redhat-00001 won this build's own latest.release resolution
+            HeldCertificate certificate = new HeldCertificate.Builder()
+              .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+              .build();
+            HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+              .heldCertificate(certificate)
+              .build();
+            HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+              .addTrustedCertificate(certificate.certificate())
+              .build();
+
+            try (var mockRepo = new MockWebServer()) {
+                mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        if (!"/ga/io/quarkus/quarkus-maven-plugin/maven-metadata.xml".equals(request.getPath())) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-maven-plugin</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>3.14.0</version>
+                                <version>3.15.3.redhat-00002</version>
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """);
+                    }
+                });
+                mockRepo.start();
+                String redhatGa = "https://%s:%d/ga/".formatted(mockRepo.getHostName(), mockRepo.getPort());
+
+                OkHttpClient client = new OkHttpClient.Builder()
+                  .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+                  .connectTimeout(Duration.ofSeconds(1))
+                  .readTimeout(Duration.ofSeconds(1))
+                  .build();
+
+                rewriteRun(
+                  spec -> spec
+                    .recipe(new UpgradePluginVersion(
+                      "io.quarkus",
+                      "quarkus-maven-plugin",
+                      "3.15.3.redhat-00002",
+                      null,
+                      null,
+                      null
+                    ))
+                    // Empty settings keep the machine's own mirrors (CI mirrors every repository) away from
+                    // the plugin repository, and leaving out Maven Central means the version can only come from it
+                    .executionContext(MavenExecutionContextView.view(
+                        HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                          .setHttpSender(new OkHttpSender(client)))
+                      .setMavenSettings(new MavenSettings(null, null, null, null, null))
+                      .setAddCentralRepository(false)),
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>org.openrewrite.example</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <build>
+                          <plugins>
+                            <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-maven-plugin</artifactId>
+                              <version>3.14.0</version>
+                             </plugin>
+                          </plugins>
+                        </build>
+                        <pluginRepositories>
+                          <pluginRepository>
+                            <id>redhat-ga</id>
+                            <url>%s</url>
+                          </pluginRepository>
+                        </pluginRepositories>
+                      </project>
+                      """.formatted(redhatGa),
+                    """
+                      <project>
+                        <groupId>org.openrewrite.example</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <build>
+                          <plugins>
+                            <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-maven-plugin</artifactId>
+                              <version>3.15.3.redhat-00002</version>
+                             </plugin>
+                          </plugins>
+                        </build>
+                        <pluginRepositories>
+                          <pluginRepository>
+                            <id>redhat-ga</id>
+                            <url>%s</url>
+                          </pluginRepository>
+                        </pluginRepositories>
+                      </project>
+                      """.formatted(redhatGa)
+                  )
+                );
+            }
         }
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5065")

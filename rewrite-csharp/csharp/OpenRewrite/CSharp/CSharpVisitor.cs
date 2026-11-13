@@ -47,6 +47,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             IsPattern ip => VisitIsPattern(ip, p),
             StatementExpression se => VisitStatementExpression(se, p),
             SizeOf sof => VisitSizeOf(sof, p),
+            TypeOf tof => VisitTypeOf(tof, p),
             UnsafeStatement us => VisitUnsafeStatement(us, p),
             FixedStatement fs => VisitFixedStatement(fs, p),
             PointerType pt => VisitPointerType(pt, p),
@@ -163,6 +164,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (marker is TrailingComma trailingComma)
         {
             return trailingComma.WithSuffix(VisitSpace(trailingComma.Suffix, p));
+        }
+        if (marker is Struct structMarker)
+        {
+            return structMarker.WithPrefix(VisitSpace(structMarker.Prefix, p));
+        }
+        if (marker is RecordClass recordClass)
+        {
+            return recordClass.WithPrefix(VisitSpace(recordClass.Prefix, p));
         }
 
         return base.VisitMarker(marker, p);
@@ -324,7 +333,21 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (exprResult is not SizeOf node) return exprResult;
 
         return node
-            .WithExpression((Expression)Visit(node.Expression, p)!)
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
+            .WithType((JavaType?)VisitType(node.Type, p));
+    }
+
+    public virtual J VisitTypeOf(TypeOf typeOf, P p)
+    {
+        typeOf = typeOf
+            .WithPrefix(VisitSpace(typeOf.Prefix, p))
+            .WithMarkers(VisitMarkers(typeOf.Markers, p));
+
+        var exprResult = VisitExpression(typeOf, p);
+        if (exprResult is not TypeOf node) return exprResult;
+
+        return node
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
             .WithType((JavaType?)VisitType(node.Type, p));
     }
 
@@ -893,7 +916,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not UsingStatement node) return stmtResult;
 
         return node
-            .WithExpressionPadded(VisitLeftPadded(node.ExpressionPadded, p)!)
+            .WithExpression((ControlParentheses<Expression>)Visit(node.Expression, p)!)
             .WithStatement((Statement)Visit(node.Statement, p)!);
     }
 
@@ -1209,7 +1232,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithReturnType(VisitLeftPadded(node.ReturnType, p)!)
             .WithParameters(VisitContainer(node.Parameters, p)!)
             .WithExpressionBody(VisitLeftPadded(node.ExpressionBody, p))
-            .WithBody((Block?)Visit(node.Body, p));
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
     public virtual J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
@@ -1558,13 +1582,20 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
+        FormattingListener.BeforeFormat(tree, null, cursor);
+
         // Full CU formatting — do it immediately, no benefit to deferring
         if (tree is CompilationUnit cu)
             return (T)(J)RoslynFormatter.Format(cu);
 
-        _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
-        _deferredFormat.Add(tree);
-        MaybeDoAfterVisit(_deferredFormat);
+        // One per source file: what an earlier file registered must not format or restore nodes of this one
+        var deferredFormat = GetAfterVisit().OfType<RoslynFormatter.DeferredFormatVisitor<P>>().FirstOrDefault();
+        if (deferredFormat == null)
+        {
+            deferredFormat = new RoslynFormatter.DeferredFormatVisitor<P>();
+            DoAfterVisit(deferredFormat);
+        }
+        deferredFormat.Add(tree, cursor);
         return tree;
     }
 
@@ -1588,8 +1619,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var visitor = new AutoFormatVisitor<int>(stopAfter);
         return visitor.Format(after, cursor) as T ?? after;
     }
-
-    private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
 }
 
 /// <summary>

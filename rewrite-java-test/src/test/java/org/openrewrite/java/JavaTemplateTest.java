@@ -21,6 +21,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -116,6 +117,7 @@ class JavaTemplateTest implements RewriteTest {
                     return JavaTemplate.apply("#{any()}", getCursor(), parens.getCoordinates().replace(), parens.getTree());
                 }
             }))
+            // the visitor rebuilds the parentheses it replaces in every cycle
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
           java(
@@ -139,11 +141,12 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                    if (binary.getOperator() != J.Binary.Type.Addition) {
+                        return binary;
+                    }
                     return JavaTemplate.apply("#{any(int)} * 3", getCursor(), binary.getCoordinates().replace(), binary);
                 }
-            }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            })),
           java(
             """
               public class A {
@@ -153,6 +156,202 @@ class JavaTemplateTest implements RewriteTest {
             """
               public class A {
                   int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizeParameterOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"shift".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("#{any(int)} << #{any(int)}", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0), method.getArguments().get(1));
+                }
+            })),
+          java(
+            """
+              class A {
+                  int a = shift(1, 2 << 3);
+
+                  static int shift(int value, int distance) {
+                      return value << distance;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int a = 1 << (2 << 3);
+
+                  static int shift(int value, int distance) {
+                      return value << distance;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizeReplacementOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"either".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("#{any(boolean)} || #{any(boolean)}", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0), method.getArguments().get(1));
+                }
+            })),
+          java(
+            """
+              class A {
+                  boolean test(boolean x, boolean y, boolean z) {
+                      return x || either(y, z);
+                  }
+
+                  static boolean either(boolean a, boolean b) {
+                      return a || b;
+                  }
+              }
+              """,
+            """
+              class A {
+                  boolean test(boolean x, boolean y, boolean z) {
+                      return x || (y || z);
+                  }
+
+                  static boolean either(boolean a, boolean b) {
+                      return a || b;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizeParameterThatIsCast() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"toInt".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("(int) #{any(long)}", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0));
+                }
+            })),
+          java(
+            """
+              class A {
+                  int test(long x, long y) {
+                      return toInt(x + y);
+                  }
+
+                  static int toInt(long value) {
+                      return (int) value;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int test(long x, long y) {
+                      return (int) (x + y);
+                  }
+
+                  static int toInt(long value) {
+                      return (int) value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizeParameterThatIsAFieldAccessTarget() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"length".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("#{any(int[])}.length", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0));
+                }
+            })),
+          java(
+            """
+              class A {
+                  int test(boolean x, int[] a, int[] b) {
+                      return length(x ? a : b);
+                  }
+
+                  static int length(int[] array) {
+                      return array.length;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int test(boolean x, int[] a, int[] b) {
+                      return (x ? a : b).length;
+                  }
+
+                  static int length(int[] array) {
+                      return array.length;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceofParameterAsArgumentNeedsNoParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"isString".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("String.valueOf(#{any(boolean)})", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0));
+                }
+            })),
+          java(
+            """
+              class A {
+                  Object test(Object o) {
+                      return isString(o instanceof String);
+                  }
+
+                  static boolean isString(boolean value) {
+                      return value;
+                  }
+              }
+              """,
+            """
+              class A {
+                  Object test(Object o) {
+                      return String.valueOf(o instanceof String);
+                  }
+
+                  static boolean isString(boolean value) {
+                      return value;
+                  }
               }
               """
           )
@@ -430,7 +629,9 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void replaceAnonymousClassObject() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template writes a local or anonymous class as its supertype, so it infers that type
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("asList".equals(method.getSimpleName())) {
@@ -580,14 +781,13 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
                       var mi = (J.MethodInvocation) binary.getLeft();
-                      return JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
-                  } else if (binary.getLeft() instanceof J.Unary) {
-                      return binary.getLeft();
+                      J.Binary b = JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
+                      return b.getLeft();
                   }
                   return binary;
               }
@@ -830,7 +1030,7 @@ class JavaTemplateTest implements RewriteTest {
                   public enum Type {
                       One;
 
-                      public Type(String t) {
+                      Type() {
                       }
 
                       String t;
@@ -853,7 +1053,7 @@ class JavaTemplateTest implements RewriteTest {
                   public enum Type {
                       One;
 
-                      public Type(String t) {
+                      Type() {
                       }
 
                       String t;
@@ -1340,7 +1540,10 @@ class JavaTemplateTest implements RewriteTest {
                     return super.visitMethodInvocation(method, ctx);
                 }
             }))
-            .afterTypeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()) // Unclear why
+            // Unclear why
+            .recipeQualityValidation(RecipeQualityValidation.builder()
+              .types(TypeValidation.builder().constructorInvocations(false).build())
+              .build())
             .parser(JavaParser.fromJavaVersion().dependsOn(
                 """
                   package batch;
@@ -1414,6 +1617,693 @@ class JavaTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceVarargsArgumentsWithAnotherOverloadsArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Foo bar(String...)").matches(mi)) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}.length()", new Cursor(getCursor().getParent(), mi),
+                        mi.getCoordinates().replaceArguments(), mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              class Foo {
+                  void foo() {
+                      bar("Hello");
+                  }
+                  void bar(String... arg) {}
+                  void bar(int length) {}
+              }
+              """,
+            """
+              class Foo {
+                  void foo() {
+                      bar("Hello".length());
+                  }
+                  void bar(String... arg) {}
+                  void bar(int length) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVarargsArgumentsWithAFixedArityOverloadsArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Loader using(Object...)").matches(mi) && mi.getArguments().size() == 2) {
+                      maybeAddImport("java.util.Map");
+                      return JavaTemplate.builder("Map.of(#{any()}, #{any()})")
+                        .imports("java.util.Map")
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                          mi.getArguments().toArray());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              import java.util.Map;
+
+              interface Loader<T> {
+                  Loader<T> using(Object... values);
+                  Loader<T> using(Map<String, ?> values);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Loader<Integer> loader) {
+                      loader.using("a", "x");
+                      loader.using(1, 2);
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class Test {
+                  void test(Loader<Integer> loader) {
+                      loader.using(Map.of("a", "x"));
+                      loader.using(Map.of(1, 2));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVarargsArgumentsWithTheMostSpecificFixedArityOverloadsArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log debug(String, Object...)").matches(mi) && mi.getArguments().size() == 3) {
+                      return JavaTemplate.apply("\"failed\", #{any(java.lang.RuntimeException)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        mi.getArguments().getLast());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void debug(String format, Object arg);
+                  void debug(String message, Exception e);
+                  void debug(String message, Throwable t);
+                  void debug(String format, Object... args);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, RuntimeException e) {
+                      log.debug("{} {}", "a", e);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, RuntimeException e) {
+                      log.debug("failed", e);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAnotherOverloadsArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log info(String)").matches(mi)) {
+                      return JavaTemplate.apply("\"{}\", #{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void info(String message);
+                  void info(String format, Object arg);
+                  void info(String format, Object... args);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.info(name);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.info("{}", name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAnOverloadTakingThemByBoxing() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log info(String)").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().get(1)
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("\"{}\", #{any(int)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void info(String message);
+                  void info(String format, Object arg);
+                  void info(String format, Object... args);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, int count) {
+                      log.info("none");
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, int count) {
+                      log.info("{}", count);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAVarargsOverloadsArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log info(String)").matches(mi)) {
+                      return JavaTemplate.apply("\"{} {}\", #{any(java.lang.String)}, \"x\"",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void info(String message);
+                  void info(String format, Object arg);
+                  void info(String format, Object... args);
+                  void info(Object... args);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.info(name);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.info("{} {}", name, "x");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAVarargsOverloadWhoseEmptyVarargsAreMoreSpecific() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Sink put(int)").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().getFirst()
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Sink {
+                  void put(int index);
+                  void put(String key, Object... values);
+                  void put(String key, Integer... values);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(String key, Sink sink) {
+                      sink.put(0);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String key, Sink sink) {
+                      sink.put(key);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAnOverloadTakingThemWithoutBoxing() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("* remove(int)").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().get(0)
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.Integer)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Bag {
+                  void remove(int index);
+                  void remove(Object o);
+              }
+              """
+          ),
+          java(
+            """
+              interface Sack {
+                  void remove(Object o);
+                  void remove(int index);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Integer i, Bag bag, Sack sack) {
+                      bag.remove(0);
+                      sack.remove(0);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Integer i, Bag bag, Sack sack) {
+                      bag.remove(i);
+                      sack.remove(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAnOverloadReturningAnotherType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Names name(int)").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().get(1)
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Names {
+                  String name(int index);
+                  int name(String key);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Names names, String key) {
+                      names.name(0);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Names names, String key) {
+                      names.name(key);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsOnARawReceiverKeepsTheErasedTypes() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Box names(int)").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().get(1)
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+
+              interface Box<T> {
+                  List<String> names(int index);
+                  List<String> names(String key);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Box box, String key) {
+                      box.names(0);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Box box, String key) {
+                      box.names(key);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceArgumentsWithAnOverloadThatNamesATypeVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if ((new MethodMatcher("Sink put(Object)").matches(mi) ||
+                       new MethodMatcher("Sink take(int)").matches(mi)) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().get(1)
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Sink {
+                  <T extends CharSequence> void put(T value);
+                  void put(Object value);
+                  Object take(int index);
+                  <T> T take(String key);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Sink sink, String name) {
+                      sink.put(0);
+                      sink.take(0);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Sink sink, String name) {
+                      sink.put(name);
+                      sink.take(name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVarargsArgumentsWithAFixedArityOverloadBesideAGenericOne() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Sink add(Object[])").matches(mi) &&
+                      getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class).getParameters().get(1)
+                        instanceof J.VariableDeclarations param) {
+                      return JavaTemplate.apply("#{any(java.lang.String)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        param.getVariables().getFirst().getName());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Sink {
+                  void add(Object... values);
+                  void add(Object value);
+                  <T extends Number> void add(T value);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Sink sink, String name) {
+                      sink.add(1, 2);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Sink sink, String name) {
+                      sink.add(name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodWithAnOverloadTakingTheNewArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("IOUtils write(StringBuffer, java.io.OutputStream)").matches(mi)) {
+                      maybeAddImport("java.nio.charset.StandardCharsets");
+                      return JavaTemplate.builder("write(#{any(java.lang.StringBuffer)}, #{any(java.io.OutputStream)}, StandardCharsets.#{})")
+                        .imports("java.nio.charset.StandardCharsets")
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceMethod(),
+                          mi.getArguments().get(0), mi.getArguments().get(1), "UTF_8");
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              import java.io.OutputStream;
+              import java.nio.charset.Charset;
+
+              class IOUtils {
+                  static void write(StringBuffer data, OutputStream output) {
+                  }
+
+                  static void write(CharSequence data, OutputStream output, Charset charset) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import java.io.OutputStream;
+
+              class Test {
+                  void test(StringBuffer data, OutputStream output) {
+                      IOUtils.write(data, output);
+                  }
+              }
+              """,
+            """
+              import java.io.OutputStream;
+              import java.nio.charset.StandardCharsets;
+
+              class Test {
+                  void test(StringBuffer data, OutputStream output) {
+                      IOUtils.write(data, output, StandardCharsets.UTF_8);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodWithARenamedMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log warning(String)").matches(mi)) {
+                      return JavaTemplate.apply("warn(#{any(java.lang.String)})",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceMethod(),
+                        mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void warning(String message);
+                  void warn(Object message);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warning(name);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warn(name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodWithARenamedVarargsMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log warning(String[])").matches(mi)) {
+                      return JavaTemplate.apply("warn(#{any(java.lang.String)})",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceMethod(),
+                        mi.getArguments().getFirst());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void warning(String... messages);
+                  void warn(Object... messages);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warning(name);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, String name) {
+                      log.warn(name);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableDeclarationWithFinalVar() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -1459,10 +2349,14 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void recursiveType() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+          // a context-sensitive template types a lambda argument by a placeholder method's parameter
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    if (!(lambda.getBody() instanceof J.Block)) {
+                        return lambda;
+                    }
                     var param = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
                     J.VariableDeclarations.NamedVariable variable = param.getVariables().getFirst();
 

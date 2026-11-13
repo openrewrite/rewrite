@@ -599,6 +599,24 @@ expect(recipe).toBeNull(); // Multiple matches`
         )
     })
 
+    test('a generator with a bare yield', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `function*myGenerator() {
+    yield;
+    yield 1;
+}`,
+                `function* myGenerator() {
+    yield;
+    yield 1;
+}`
+            )
+            // @formatter:on
+        )
+    })
+
     test('async generator method with space before asterisk should be fixed', () => {
         return spec.rewriteRun(
             // @formatter:off

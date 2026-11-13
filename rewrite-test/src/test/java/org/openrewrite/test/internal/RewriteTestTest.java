@@ -19,31 +19,92 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.AddImport;
+import org.openrewrite.java.ChangeMethodName;
+import org.openrewrite.java.ChangeMethodTargetToStatic;
+import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaParserExecutionContextView;
+import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.NoStaticImport;
+import org.openrewrite.java.OrderImports;
+import org.openrewrite.java.RemoveUnusedImports;
+import org.openrewrite.java.UseStaticImport;
+import org.openrewrite.java.format.AutoFormat;
+import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.internal.parser.TypeTable;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.BuildMetadata;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
+import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.YamlParser;
+import org.openrewrite.yaml.tree.Yaml;
 
+import javax.tools.ToolProvider;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.javaVersion;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 class RewriteTestTest implements RewriteTest {
 
@@ -108,20 +169,34 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void generatedAndDeletedFilesAreNotCountedAsChangedAgainInLaterCycles() {
+        rewriteRun(
+          spec -> spec.recipe(new DeletesObsoleteGeneratesPlaceholderThenFillsIt())
+            .expectedCyclesThatMakeChanges(2),
+          text("obsolete", null, spec -> spec.path("obsolete.txt")),
+          text(null, "filled", spec -> spec.path("placeholder.txt"))
+        );
+    }
+
+    @Test
+    void runVerificationCycleAfterExpectedCycles() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AppendExclamationMark()),
+          text("a", "a!!")
+        ));
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle");
+    }
+
+    @Test
     void cursorValidation() {
-        assertThrows(AssertionError.class, () ->
+        AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
             spec -> spec.recipe(new ImproperCursorUsage()),
             text("")
           )
         );
-
-        rewriteRun(
-          spec -> spec.recipe(new ImproperCursorUsage()).typeValidationOptions(TypeValidation.builder()
-            .cursorAcyclic(false)
-            .build()),
-          text("")
-        );
+        assertThat(e).hasStackTraceContaining("is a cursor on the same PlainText")
+          .hasStackTraceContaining("getCursor().getParentOrThrow()");
     }
 
 
@@ -143,19 +218,54 @@ class RewriteTestTest implements RewriteTest {
 
     @Test
     void rejectExecutionContextMutation() {
-        assertThrows(AssertionError.class, () ->
+        AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
             spec -> spec.recipe(new MutateExecutionContext()),
             text("irrelevant")
           ));
+        assertThat(e).hasStackTraceContaining("in a ScanningRecipe's accumulator")
+          .hasStackTraceContaining("in Cursor messages")
+          .hasStackTraceContaining("executionContextUnchanged(false)");
     }
 
     @Test
     void rejectScannerEdit() {
-        assertThrows(AssertionError.class, () -> rewriteRun(
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
           spec -> spec.recipe(new ScannerEdit()),
           text("foo")
         ));
+        assertThat(e).hasStackTraceContaining("make the edits in getVisitor(acc)")
+          .hasStackTraceContaining("noEditsInScanningPhase(false)");
+    }
+
+    @Test
+    void recipeFailureOnUnprintableTreeKeepsCause() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  return super.visitBlock(block.withStatements(ListUtils.map(block.getStatements(), s ->
+                    s instanceof J.If ? ((J.If) s).getPadding().withThenPart(null) : s)), ctx);
+              }
+
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  throw new IllegalStateException("boom");
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(boolean b) {
+                      if (b) m(b);
+                  }
+              }
+              """
+          )
+        ));
+        assertThat(e).hasMessageStartingWith("Failed to run recipe at Cursor{")
+          .hasRootCauseInstanceOf(IllegalStateException.class)
+          .hasRootCauseMessage("boom");
     }
 
     @Test
@@ -178,10 +288,2946 @@ class RewriteTestTest implements RewriteTest {
     void allowScannerEdit() {
         rewriteRun(
           spec -> spec
-            .typeValidationOptions(TypeValidation.builder().immutableScanning(false).build())
+            .recipeQualityValidation(RecipeQualityValidation.builder().noEditsInScanningPhase(false).build())
             .recipe(new ScannerEdit()),
           text("foo")
         );
+    }
+
+    @Nested
+    class AddedMarkers {
+
+        @Test
+        void rejectCustomMarkerAddedAlongsideChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      if (!"foo".equals(m.getSimpleName())) {
+                          return m;
+                      }
+                      return m.withName(m.getName().withSimpleName("bar"))
+                        .withMarkers(m.getMarkers().add(new Visited(Tree.randomId())));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void bar() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {}
+                      void bar() {}
+                      void test() { bar(); }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("The recipe added markers to the LST")
+              .hasMessageContaining("org.openrewrite.test.internal.Visited on J.MethodInvocation `bar()`");
+        }
+
+        @Test
+        void rejectCustomMarkerAddedWithoutChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      return c.getMarkers().findFirst(Visited.class).isPresent() ? c :
+                        c.withMarkers(c.getMarkers().add(new Visited(Tree.randomId())));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("The recipe added markers to the LST")
+              .hasMessageContaining("A.java (the printed source is unchanged)")
+              .hasMessageContaining("org.openrewrite.test.internal.Visited on J.ClassDeclaration `class A {...`");
+        }
+
+        @Test
+        void rejectSourceFileMarkerAttachedToElement() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return m.getMarkers().findFirst(BuildMetadata.class).isPresent() ? m :
+                        m.withMarkers(m.getMarkers().add(new BuildMetadata(Tree.randomId(), Map.of("origin", "foo"))));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                spec -> spec.markers(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))
+              )
+            ));
+            assertThat(e).hasMessageContaining("org.openrewrite.marker.BuildMetadata on J.MethodInvocation `foo()`");
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none())
+                .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                        return c.getMarkers().findFirst(Visited.class).isPresent() ? c :
+                          c.withMarkers(c.getMarkers().add(new Visited(Tree.randomId())));
+                    }
+                })),
+              java(
+                """
+                  class A {
+                  }
+                  """
+              )
+            ));
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().reportingMarkersOnly(false).build())
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                        return c.getMarkers().findFirst(Visited.class).isPresent() ? c :
+                          c.withMarkers(c.getMarkers().add(new Visited(Tree.randomId())));
+                    }
+                })),
+              java(
+                """
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSearchResult() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      return SearchResult.found(super.visitMethodInvocation(method, ctx));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {}
+                      void test() { /*~~>*/foo(); }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSyntaxMarkerTheParserProduces() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return m.withArguments(ListUtils.map(m.getArguments(), arg ->
+                        arg.getMarkers().findFirst(OmitParentheses.class).isPresent() ? arg :
+                          arg.withPrefix(Space.SINGLE_SPACE)
+                            .withMarkers(arg.getMarkers().add(new OmitParentheses(Tree.randomId())))));
+                  }
+              })),
+              groovy(
+                """
+                  println("hello")
+                  """,
+                """
+                  println "hello"
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSyntaxMarkersOfTheLanguageASourceIsConvertedTo() {
+            rewriteRun(
+              spec -> spec.parser(GroovyParser.builder())
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(toRecipe(() -> new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (!(tree instanceof PlainText text)) {
+                            return tree;
+                        }
+                        return GroovyParser.builder().build().parse(text.getText())
+                          .findFirst()
+                          .<Tree>map(g -> ((SourceFile) g.withId(text.getId())).withSourcePath(text.getSourcePath()))
+                          .orElse(text);
+                    }
+                })),
+              text("println \"hello\"")
+            );
+        }
+    }
+
+    @Nested
+    class UnchangedTreeIdentity {
+
+        @Test
+        void rejectEqualCopyOfUnchangedFile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("it must return the LST it was given, not an equal copy")
+              .hasMessageContaining("org.openrewrite.test.AdHocRecipe returned an equal copy of A.java in cycle 1")
+              .hasMessageContaining("J.ClassDeclaration `public class A {}` > modifiers: " +
+                                    "a new ArrayList with the same 1 elements");
+        }
+
+        @Test
+        void rejectEqualCopyWhateverTheCycleSettings() {
+            // these settings accept a change in the only cycle, but an equal copy is not one
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 1");
+        }
+
+        @Test
+        void rejectEqualCopyAfterRealChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                      // changes 1 to 2, then keeps returning 2 with a recomputed String
+                      Object value = literal.getValue();
+                      if (Integer.valueOf(1).equals(value) || Integer.valueOf(2).equals(value)) {
+                          return literal.withValue(2).withValueSource(String.valueOf(2));
+                      }
+                      return literal;
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      int i = 1;
+                  }
+                  """,
+                """
+                  class A {
+                      int i = 2;
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 2")
+              .hasMessageContaining("J.Literal `2` > valueSource: an equal String that is not the same instance \"2\"");
+        }
+
+        @Test
+        void acceptOriginalTree() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      // ListUtils.map returns the original list when it changes no element
+                      return c.withModifiers(ListUtils.map(c.getModifiers(), m -> m));
+                  }
+              })),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptEqualCopyInsideChangedFile() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      // copying an unrelated list is harmless when the class changes anyway
+                      return c.getBody() == classDecl.getBody() ? c :
+                        c.withModifiers(new ArrayList<>(c.getModifiers()));
+                  }
+
+                  @Override
+                  public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                      return Integer.valueOf(1).equals(literal.getValue()) ?
+                        literal.withValue(2).withValueSource("2") : literal;
+                  }
+              })),
+              java(
+                """
+                  public class A {
+                      int i = 1;
+                  }
+                  """,
+                """
+                  public class A {
+                      int i = 2;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptEqualCopyOfFileGeneratedInSameCycle() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      return text.withSourcePath(Path.of(text.getSourcePath().toString()));
+                  }
+              }).withMaxCycles(1).withGenerator(() -> List.of(PlainText.builder()
+                .sourcePath(Path.of("generated.txt"))
+                .text("generated")
+                .build()))),
+              text(null, "generated", spec -> spec.path("generated.txt"))
+            );
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 1");
+        }
+
+        private Recipe copiesModifiers() {
+            return toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                    return c.withModifiers(new ArrayList<>(c.getModifiers()));
+                }
+            });
+        }
+    }
+
+    @Nested
+    class FormattingScope {
+
+        // Formatted, except for one line away from the call the recipes rename
+        private static final String BEFORE = """
+          class A {
+              void foo() {
+              }
+
+              void bar() {
+              }
+
+              void test() {
+                  foo();
+              }
+
+              void other() {
+                    int unrelated = 1;
+              }
+          }
+          """;
+
+        @Test
+        void rejectFormattingTheWholeFileAfterOneLineEdit() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      return maybeAutoFormat(cu, super.visitCompilationUnit(cu, ctx), ctx);
+                  }
+
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      return renameFooToBar(super.visitMethodInvocation(method, ctx));
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Format only what the recipe changed")
+              .hasMessageContaining("$1.visitCompilationUnit(RewriteTestTest.java:")
+              .hasMessageContaining("called maybeAutoFormat on\n    all of A.java");
+        }
+
+        @Test
+        void acceptFormattingOnlyTheChangedElement() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return maybeAutoFormat(m, renameFooToBar(m), ctx);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                            int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectFormattingTheWholeClassAfterAddingAnAnnotation() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      return maybeAutoFormat(c, deprecate(c, getCursor()), ctx);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  @Deprecated
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("called maybeAutoFormat on\n    class `A` of A.java")
+              .hasMessageContaining("JavaTemplate and its coordinates (addAnnotation, addStatement) already format");
+        }
+
+        @Test
+        void rejectFormattingTheWholeClassEvenWhenTheTestsClassIsEmpty() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      return maybeAutoFormat(c, deprecate(c, getCursor()), ctx);
+                  }
+              })),
+              java(
+                """
+                  class A {
+                  }
+                  """,
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """
+              )
+            ));
+        }
+
+        @Test
+        void acceptFormattingOnlyTheClassHeader() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      J.ClassDeclaration deprecated = deprecate(c, getCursor());
+                      return maybeAutoFormat(c, deprecated, deprecated.getName(), ctx,
+                        getCursor().getParentTreeCursor());
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  @Deprecated
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                            int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptFormattingTheClassWithItsBodySetAside() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      J.ClassDeclaration deprecated = deprecate(c, getCursor());
+                      if (deprecated == c) {
+                          return c;
+                      }
+                      J.Block body = deprecated.getBody();
+                      return maybeAutoFormat(c, deprecated.withBody(body.withStatements(emptyList())), ctx)
+                        .withBody(body);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  @Deprecated
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                            int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectAutoFormatVisitorRunAfterTheVisit() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      J.MethodInvocation renamed = renameFooToBar(m);
+                      if (renamed != m) {
+                          doAfterVisit(new AutoFormatVisitor<>());
+                      }
+                      return renamed;
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e)
+              .hasMessageContaining("A visitor's doAfterVisit(new AutoFormatVisitor<>()) ran on\n    all of A.java");
+        }
+
+        @Test
+        void acceptFormattingRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(new AutoFormat(null)),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptFormattingThatOnlyChangesWhitespace() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      return autoFormat(cu, ctx);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none())
+                .recipe(formatWholeClassAfterRename()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false).build())
+                .recipe(formatWholeClassAfterRename()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private Recipe formatWholeClassAfterRename() {
+            return toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                    J.MethodInvocation renamed = renameFooToBar(m);
+                    if (renamed != m) {
+                        getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "renamed", true);
+                    }
+                    return renamed;
+                }
+
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                    return getCursor().getMessage("renamed", false) ? autoFormat(c, ctx) : c;
+                }
+            });
+        }
+
+        private J.MethodInvocation renameFooToBar(J.MethodInvocation m) {
+            return "foo".equals(m.getSimpleName()) ? m.withName(m.getName().withSimpleName("bar")) : m;
+        }
+
+        private J.ClassDeclaration deprecate(J.ClassDeclaration c, Cursor cursor) {
+            if (!c.getLeadingAnnotations().isEmpty()) {
+                return c;
+            }
+            return JavaTemplate.apply("@Deprecated", cursor,
+              c.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+        }
+    }
+
+    @Nested
+    class MatchesByType {
+
+        @Test
+        void rejectRecipeThatThrowsOnFullyQualifiedType() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindCallsOnImportedType("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~(Collections)~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check the shape of the code the recipe edits before casting it")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindCallsOnImportedType), " +
+                                    "`Collections` written `java.util.Collections`:\n" +
+                                    "    java.lang.ClassCastException")
+              .hasMessageContaining("at org.openrewrite.test.internal.FindCallsOnImportedType$1.visitMethodInvocation(" +
+                                    "RewriteTestTest.java:")
+              .hasMessageNotContaining("Match the code the recipe changes by its type attribution");
+        }
+
+        @Test
+        void rejectRecipeThatMissesStaticallyImportedCall() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindQualifiedCallsByName): " +
+                                    "`Collections.emptyList()` written `emptyList()`")
+              .hasMessageContaining("matchByTypeNotName(false)");
+        }
+
+        @Test
+        void rejectRecipeThatMissesQualifiedCall() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindUnqualifiedCallsByName("emptyList")),
+              java(
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = /*~~>*/emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`emptyList()` written `Collections.emptyList()`");
+        }
+
+        @Test
+        void importCleanupDoesNotCountAsTheChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipes(new FindQualifiedCallsByName("Collections", "emptyList"), new RemoveUnusedImports()),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`Collections.emptyList()` written `emptyList()`");
+        }
+
+        @Test
+        void rejectRecipeThatMissesFullyQualifiedType() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindAnnotationsByPrintedType("Deprecated")),
+              java(
+                """
+                  class A {
+                      @Deprecated
+                      void old() {
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      /*~~>*/@Deprecated
+                      void old() {
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`Deprecated` written `java.lang.Deprecated`");
+        }
+
+        @Test
+        void nameTheRespellingTheRecipeMisses() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindCallsWithPrintedArgument("Boolean.TRUE")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<Boolean> list = Collections.singletonList(Boolean.TRUE);
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<Boolean> list = /*~~>*/Collections.singletonList(Boolean.TRUE);
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("A.java (changed by org.openrewrite.test.internal." +
+                                               "FindCallsWithPrintedArgument): `Boolean` written `java.lang.Boolean`\n");
+        }
+
+        @Test
+        void acceptRecipeThatMatchesAnnotationsByType() {
+            rewriteRun(
+              spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
+              java(
+                """
+                  class A {
+                      @Deprecated
+                      void old() {
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      /*~~>*/@Deprecated
+                      void old() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptTypesDeclaredInSkippedSources() {
+            rewriteRun(
+              spec -> spec.recipe(new FindAnnotations("@org.example.Foo", null)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                  }
+                  """,
+                SourceSpec::skip
+              ),
+              java(
+                """
+                  import org.example.Foo;
+
+                  @Foo
+                  class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+
+                  /*~~>*/@Foo
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptRecipeThatMatchesCallsByType() {
+            rewriteRun(
+              spec -> spec.recipe(new FindCallsByType("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              ),
+              java(
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class B {
+                      List<String> list = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class B {
+                      List<String> list = /*~~>*/emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptRecipeWhoseChangeIsTheRespelling() {
+            rewriteRun(
+              spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                  }
+                  """
+              )
+            );
+            rewriteRun(
+              spec -> spec.recipe(new NoStaticImport("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptImportOnlyChanges() {
+            rewriteRun(
+              spec -> spec.recipe(new OrderImports(false, null)),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.ArrayList;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                      List<String> other = new ArrayList<>();
+                  }
+                  """,
+                """
+                  import java.util.ArrayList;
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                      List<String> other = new ArrayList<>();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptChangeToTheTypeOfAStaticallyImportedCall() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("java.util.Collections", "com.example.Lists", true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import com.example.Lists;
+
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Lists.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptImportChangesThatMoveComments() {
+            rewriteRun(
+              spec -> spec.recipe(new OrderImports(true, null)),
+              java(
+                """
+                  import static java.util.Collections.*; // helpers
+                  import java.util.List;
+
+                  class A {
+                      List<String> empty = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList; // helpers
+
+                  class A {
+                      List<String> empty = emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchByTypeNotNameTurnedOff() {
+            rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void notCheckedWithoutTypeValidation() {
+            rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
+                .typeValidationOptions(TypeValidation.none()),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void adHocRecipesAreNotChecked() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return m.getSelect() != null && "emptyList".equals(m.getSimpleName()) ? SearchResult.found(m) : m;
+                  }
+              })),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class EmptySources {
+
+        @Test
+        void rejectRecipeThatThrowsOnAnEmptyFile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("rejected", null)),
+              yaml(
+                "key: value",
+                "key: rejected",
+                spec -> spec.path("application.yml").markers(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check for the structure the recipe edits before using it")
+              .hasMessageContaining("org.openrewrite.test.internal.ChangeFirstValue threw when run on an empty " +
+                                    "Yaml.Documents at application.yml with the markers of the test's source (BuildMetadata):\n" +
+                                    "    java.lang.IndexOutOfBoundsException")
+              .hasMessageContaining("at org.openrewrite.test.internal.ChangeFirstValue$1.visitDocument(RewriteTestTest.java:")
+              .hasRootCauseInstanceOf(IndexOutOfBoundsException.class);
+        }
+
+        @Test
+        void acceptRecipeThatChecksTheStructure() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("checked", true)),
+              yaml(
+                "key: value",
+                "key: checked"
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new YamlIsoVisitor<>() {
+                  @Override
+                  public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                      Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+                      Yaml.Scalar scalar = (Yaml.Scalar) mapping.getEntries().get(0).getValue();
+                      return document.withBlock(mapping.withEntries(ListUtils.mapFirst(mapping.getEntries(),
+                        entry -> entry.withValue(scalar.withValue("adhoc")))));
+                  }
+              })),
+              yaml(
+                "key: value",
+                "key: adhoc"
+              )
+            );
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none())
+                .recipe(new ChangeFirstValue("none", null)),
+              yaml(
+                "key: value",
+                "key: none"
+              )
+            ));
+        }
+
+        @Test
+        void toleratedByTheTestsErrorHandler() {
+            rewriteRun(
+              spec -> spec.executionContext(new InMemoryExecutionContext())
+                .recipe(new ChangeFirstValue("tolerated", null)),
+              yaml(
+                "key: value",
+                "key: tolerated"
+              )
+            );
+        }
+
+        @Test
+        void emptyFileHasTheMarkersHooksGaveTheSource() {
+            rewriteRun(
+              spec -> spec.recipe(new RequiresBuildMetadata())
+                .beforeRecipe(sources -> sources.replaceAll(source ->
+                  source.withMarkers(source.getMarkers().add(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))))),
+              text(
+                "original",
+                "changed"
+              )
+            );
+        }
+    }
+
+    @Nested
+    class ImportsReferencedTypes {
+
+        @Test
+        void rejectRecipeThatNamesATypeWithoutImportingIt() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new UseObjectsIsNull(null)),
+              java(
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return o == null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Import the types and static members the code the recipe writes names")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.UseObjectsIsNull): " +
+                                    "`Objects` (java.util.Objects)")
+              .hasMessageContaining("importReferencedTypes(false)");
+        }
+
+        @Test
+        void acceptRecipeThatImportsWhatItNames() {
+            rewriteRun(
+              spec -> spec.recipe(new UseObjectsIsNull(true)),
+              java(
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return o == null;
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Objects;
+
+                  class A {
+                      boolean test(Object o) {
+                          return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectTemplateThatReliesOnTheFilesImports() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ReturnEmptyList(null)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return null;
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return Collections.emptyList();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Declare the types and static members a template names with imports(..)")
+              .hasMessageContaining("`Collections` (java.util.Collections) in a template applied at " +
+                                    "org.openrewrite.test.internal.ReturnEmptyList$1.visitLiteral(RewriteTestTest.java:")
+              .hasMessageNotContaining("Import the types and static members the code the recipe writes names");
+        }
+
+        @Test
+        void acceptTemplateThatDeclaresWhatItNames() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnEmptyList(true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return null;
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return Collections.emptyList();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new UseObjectsIsNull(null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build()),
+              java(
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return o == null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class RemovesUnusedImports {
+
+        @Test
+        void rejectImportsTheRecipeLeavesOrAddsUnused() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveCalls("emptyList", "java.util.Set")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+                  import java.util.Set;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Remove the imports the recipe leaves unused")
+              .hasMessageContaining(": import java.util.Collections, import java.util.Set\n")
+              .hasMessageContaining("removeUnusedImports(false)");
+        }
+
+        @Test
+        void acceptImportsThatWereUnusedBefore() {
+            rewriteRun(
+              spec -> spec.recipe(new RenameListImportAndRebuildTheOthers()),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.Map;
+
+                  class A {
+                  }
+                  """,
+                """
+                  import java.util.Set;
+                  import java.util.Map;
+
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipImportsOfAnInputWithMissingTypes() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(new RemoveCalls("call", null)),
+              java(
+                """
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                          Unknown.call();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new RemoveCalls("emptyList", null).getVisitor())),
+              java(
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new RemoveCalls("emptyList", null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().removeUnusedImports(false).build()),
+              java(
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class ParserShapedTrees {
+
+        @Test
+        void rejectNodeTheParserBuildsDifferently() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(null)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.ReturnNullByHand):\n" +
+                                    "    `null` has the String value \"null\" of type null where the parser makes the " +
+                                    "value null of type null")
+              .hasMessageContaining("parserShapedTrees(false)");
+        }
+
+        @Test
+        void acceptNodeTheParserBuildsTheSame() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(true)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipCodeNewerThanTheParser() {
+            // the Java 21 parser this module tests with reads `_` as an error, which Java 25 code can declare
+            rewriteRun(
+              spec -> spec.recipe(new NameUnusedLoopVariable()),
+              java(
+                """
+                  import java.util.List;
+                  class A {
+                      void f(List<String> names) {
+                          for (String unused : names) {
+                          }
+                      }
+                  }
+                  """,
+                """
+                  import java.util.List;
+                  class A {
+                      void f(List<String> names) {
+                          for (String _ : names) {
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.markers(javaVersion(25))
+              )
+            );
+        }
+
+        @Test
+        void rejectDuplicateKey() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RepeatFirstEntry()),
+              yaml(
+                "key: value",
+                """
+                  key: value
+                  key: value
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("the key `key` appears twice in one mapping, which YAML doesn't allow");
+        }
+
+        @Test
+        void rejectStatementThatLeavesIfWithoutThenPart() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveThenPart()),
+              java(
+                """
+                  class A {
+                      void f(boolean b) {
+                          if (b) g(); else h();
+                      }
+                      void g() {}
+                      void h() {}
+                  }
+                  """,
+                """
+                  class A {
+                      void f(boolean b) {
+                          if (b) else h();
+                      }
+                      void g() {}
+                      void h() {}
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.RemoveThenPart):\n" +
+                                    "    the text it prints doesn't parse: the parser recovered from a syntax " +
+                                    "error near `h();`");
+        }
+
+        @Test
+        void rejectLiteralWhoseSourceDoesNotParse() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new QuoteToStringByHand()),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return '"';
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return \"\"\";
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.QuoteToStringByHand):\n" +
+                                    "    the text it prints doesn't parse: the parser recovered from a syntax " +
+                                    "error near `return \"\"\"`");
+        }
+
+        @Test
+        void acceptSourceThatAlreadyDidNotParse() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(true))
+                .typeValidationOptions(TypeValidation.all().erroneous(false)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          owner
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          owner
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void reparseConvertedSourceWithItsNewLanguage() {
+            rewriteRun(
+              spec -> spec.recipe(new YamlToJava()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class ParserTypedTrees {
+
+        @Test
+        void rejectTypeTheParserGivesDifferently() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Give the code the recipe writes the types its parser gives that code")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.DeclareLongByHand):\n" +
+                                    "    `x = 1` has the variable int x where the parser gives long x")
+              .hasMessageContaining("parserTypedTrees(false)");
+
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder()
+                  .parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+              java("class A { void f() { int x = 1; } }", "class A { void f() { long x = 1; } }")
+            ));
+        }
+
+        @Test
+        void suggestTheErasureLevelThatAcceptsDifferentThrownExceptions() {
+            //language=java
+            String before = """
+              class A {
+                  void m(int i) throws Exception {}
+                  void f() throws Exception {
+                      m(1);
+                  }
+              }
+              """;
+            //language=java
+            String after = """
+              class A {
+                  void m(int i) throws Exception {}
+                  void f() throws Exception {
+                      m(2);
+                  }
+              }
+              """;
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new CallWithTwoThrowingNothingByHand()),
+              java(before, after)
+            ));
+            assertThat(e).hasMessageContaining("throwing nothing where the parser gives")
+              .hasMessageContaining("parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure)")
+              .hasMessageNotContaining("parserTypedTrees(false)");
+
+            rewriteRun(
+              spec -> spec.recipe(new CallWithTwoThrowingNothingByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder()
+                  .parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+              java(before, after)
+            );
+        }
+
+        @Test
+        void acceptStringTypedAsThePrimitiveString() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareStringAsPrimitiveByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          String o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipTypeTheParserCannotResolve() {
+            // a recipe can write code that uses a library the test's parser doesn't have on its classpath
+            rewriteRun(
+              spec -> spec.recipe(new DeclareUnresolvedTypeByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          Missing o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipWhenTheTestDoesNotValidateTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .typeValidationOptions(TypeValidation.all().identifiers(false)),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class CompilableOutput {
+        private final RecipeQualityValidation compilableOutput =
+          RecipeQualityValidation.builder().compilableOutput(true).build();
+
+        @Test
+        void rejectOutputThatDoesNotCompile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles")
+              .hasMessageContaining("A.java (changed by org.openrewrite.java.ChangeMethodName):\n" +
+                                    "    `String s = String.join(1);` ")
+              .hasMessageContaining("int cannot be converted to java.lang.CharSequence")
+              .hasMessageContaining("spec.afterParser(")
+              .hasMessageContaining("compilableOutput(false)");
+        }
+
+        @Test
+        void acceptErrorsThatTheSourceHadBeforeTheRecipeRan() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "strip", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      void a(String o) {
+                          String s = o.trim().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void a(String o) {
+                          String s = o.strip().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectOnlyTheErrorsThatTheSourceDidNotHaveBeforeTheRecipeRan() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length();
+                      String t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length();
+                      String t = "b".length();
+                  }
+                  """
+              )
+            ));
+            // javac says the same about both lines, and only the second is the recipe's
+            assertThat(e).hasMessageContaining("`String t = \"b\".length();` incompatible types")
+              .hasMessageNotContaining("\"a\".length()");
+        }
+
+        @Test
+        void rejectASecondErrorWithTheSameMessageOnTheSameLine() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length(), t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length(), t = "b".length();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles");
+        }
+
+        @Test
+        void compileWithTheAfterParser() {
+            //language=java
+            String before = """
+              import a.A;
+
+              class Test {
+                  A a;
+              }
+              """;
+            //language=java
+            String after = """
+              import b.B;
+
+              class Test {
+                  B a;
+              }
+              """;
+            JavaParser.Builder<?, ?> parserOfA = JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class A {
+                }
+                """
+            );
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeType("a.A", "b.B", null))
+                .parser(parserOfA)
+                .recipeQualityValidation(compilableOutput),
+              java(before, after)
+            ));
+            assertThat(e.getMessage()).containsOnlyOnce("`import b.B;` package b does not exist");
+
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("a.A", "b.B", null))
+                .parser(parserOfA)
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                    }
+                    """
+                ))
+                .recipeQualityValidation(compilableOutput),
+              java(before, after)
+            );
+        }
+
+        @Test
+        void skipWhenTheTestDoesNotValidateTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .typeValidationOptions(TypeValidation.all().identifiers(false))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectUnchangedSourceThatTheAfterParserDoesNotCompile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "strip", null, null))
+                .afterParser(JavaParser.fromJavaVersion())
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class Unchanged {
+                      String s = "a".length();
+                  }
+                  """
+              ),
+              java(
+                """
+                  class A {
+                      String t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String t = "b".strip();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("Unchanged.java:\n    `String s = \"a\".length();` incompatible types")
+              .hasMessageNotContaining("spec.afterParser(");
+        }
+    }
+
+    @Nested
+    class AfterParser {
+        //language=java
+        private static final String INSTANCE_METHOD = """
+          package a;
+          public class A {
+              public void method() {}
+          }
+          """;
+
+        //language=java
+        private static final String STATIC_METHOD = """
+          package a;
+          public class A {
+              public static void method() {}
+          }
+          """;
+
+        //language=java
+        private static final String BEFORE = """
+          import a.A;
+          class Test {
+              void test() {
+                  new A().method();
+              }
+          }
+          """;
+
+        //language=java
+        private static final String AFTER = """
+          import a.A;
+          class Test {
+              void test() {
+                  A.method();
+              }
+          }
+          """;
+
+        @Test
+        void compareTypesWithTheAfterParserTypedAfresh(@TempDir Path dir) throws Exception {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(dir.toFile());
+            Path resources = dir.resolve("resources");
+            Path typeTable = resources.resolve("META-INF/rewrite/classpath.tsv.gz");
+            Files.createDirectories(typeTable.getParent());
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(typeTable))) {
+                writer.jar("a", "lib", "1.0").write(jarOf(INSTANCE_METHOD, dir.resolve("1.0")));
+                writer.jar("a", "lib", "2.0").write(jarOf(STATIC_METHOD, dir.resolve("2.0")));
+            }
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            try (URLClassLoader withTypeTable = new URLClassLoader(new URL[]{resources.toUri().toURL()},
+              contextClassLoader)) {
+                Thread.currentThread().setContextClassLoader(withTypeTable);
+                JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().classpathFromResources(ctx, "lib-1");
+                // the first run fills the builder's type cache with the input's a.A, which a clone reads through to
+                for (int run = 0; run < 2; run++) {
+                    rewriteRun(
+                      spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                        .parser(parser)
+                        .afterParser(parser.clone().classpathFromResources(ctx, "lib-2")),
+                      java(BEFORE, AFTER)
+                    );
+                }
+            } finally {
+                Thread.currentThread().setContextClassLoader(contextClassLoader);
+            }
+        }
+
+        private Path jarOf(String stub, Path dir) throws Exception {
+            Path source = dir.resolve("a/A.java");
+            Files.createDirectories(source.getParent());
+            Files.writeString(source, stub);
+            assertThat(ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", dir.toString(),
+              source.toString())).isZero();
+            Path jar = dir.resolve("lib.jar");
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+                out.putNextEntry(new JarEntry("a/A.class"));
+                out.write(Files.readAllBytes(dir.resolve("a/A.class")));
+                out.closeEntry();
+            }
+            return jar;
+        }
+
+        @Test
+        void reportTypeTheAfterParserGivesDifferently() {
+            // the input parser can't resolve b.B, so only the after parser has types to compare with
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "b.B", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                        public void method() {}
+                    }
+                    """
+                )),
+              java(
+                BEFORE,
+                """
+                  import b.B;
+
+                  class Test {
+                      void test() {
+                          B.method();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`B.method()` has the method void b.B.method() with the flags " +
+                                               "[Public, Static] where the parser gives void b.B.method() with " +
+                                               "the flags [Public]");
+        }
+
+        @Test
+        void respellTheInputWithTheInputParser() {
+            // the after parser lacks a.A, so a respelled input it parsed would be dropped for its lost types
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("A", "method"))
+                .parser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                    }
+                    """
+                )),
+              java(
+                AFTER,
+                """
+                  import a.A;
+                  class Test {
+                      void test() {
+                          /*~~>*/A.method();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
+              .hasMessageContaining("`A.method()` written `method()`");
+        }
+
+        @Test
+        void rejectAfterParserOfADslNoSourceIsIn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "other",
+                  () -> JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD).build())),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of other sources parses nothing");
+        }
+
+        @Test
+        void rejectSecondAfterParserOfADsl() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))
+                .afterParser(JavaParser.fromJavaVersion()),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources parses nothing");
+        }
+
+        @Test
+        void rejectAfterParserOfTheLanguageTheRecipeTurnsEachSourceFrom() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new YamlToJava())
+                .afterParser(YamlParser.builder()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of yaml sources parses nothing");
+        }
+
+        @Test
+        void reportUnexpectedOutputBeforeTheAfterParserItLeavesWithNothingToParse() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("changed", true))
+                .afterParser(JavaParser.fromJavaVersion()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageContaining("deprecated: changed").hasMessageNotContaining("after parser");
+        }
+
+        @Test
+        void acceptAfterParserOfSourcesTheRecipeLeaves() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD)),
+              java("class Unchanged {}")
+            );
+        }
+
+        @Test
+        void parseSourceTurnedIntoAnotherLanguageWithTheAfterParserOfItsKind() {
+            // the test has no parser of Java sources whose DSL could tell that the after parser is for the output
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new YamlToJava())
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "java", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources threw");
+        }
+
+        @Test
+        void rejectAfterParserThatThrows() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "java", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources threw")
+              .hasRootCauseMessage("no classpath");
+        }
+
+        @Test
+        void explainMarkersWithTheInputParserWhenTheAfterParserFails() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        return m.withArguments(ListUtils.map(m.getArguments(), arg ->
+                          arg.getMarkers().findFirst(OmitParentheses.class).isPresent() ? arg :
+                            arg.withPrefix(Space.SINGLE_SPACE)
+                              .withMarkers(arg.getMarkers().add(new OmitParentheses(Tree.randomId())))));
+                    }
+                }))
+                .afterParser(new ParserBuilderOfDsl(GroovyParser.builder().getSourceFileType(), "groovy", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              groovy(
+                """
+                  println("hello")
+                  """,
+                """
+                  println "hello"
+                  """
+              )
+            );
+        }
+
+        @Nested
+        class InDefaults implements RewriteTest {
+
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.afterParser(JavaParser.fromJavaVersion());
+            }
+
+            @Test
+            void acceptAfterParserOfADslNoSourceIsIn() {
+                rewriteRun(
+                  spec -> spec.recipe(new ChangeFirstValue("changed", true)),
+                  yaml("key: value", "key: changed")
+                );
+            }
+        }
+    }
+
+    @Nested
+    class NoStaticVisitors {
+
+        @Test
+        void rejectVisitorInStaticFieldOfRecipe() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsVisitorInStaticField()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageStartingWith(
+                "A recipe should create its visitors in getVisitor() and keep none in static fields")
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor")
+              .hasMessageContaining("noStaticVisitors(false)");
+        }
+
+        @Test
+        void rejectPreconditionInStaticField() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsPreconditionInStaticField()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsPreconditionInStaticField.PRECONDITION -> Preconditions.Or");
+        }
+
+        @Test
+        void rejectVisitorInStaticFieldOfNestedClass() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsVisitorInStaticFieldOfNestedClass()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining(
+                "KeepsVisitorInStaticFieldOfNestedClass.Outer.INNER -> KeepsVisitorInStaticFieldOfNestedClass.Inner");
+        }
+
+        @Test
+        void rejectVisitorsInStaticList() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsVisitorsInStaticList()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorsInStaticList.VISITORS[1] -> PlainTextVisitor");
+        }
+
+        @Test
+        void rejectVisitorInStaticFieldOfDeclarativeRecipeStep() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipeFromYaml("""
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.test.ListsRecipeWithStaticVisitor
+                displayName: Lists a recipe with a static visitor
+                description: Lists a recipe that keeps a visitor in a static field.
+                recipeList:
+                  - org.openrewrite.test.internal.KeepsVisitorInStaticField
+                """, "org.openrewrite.test.ListsRecipeWithStaticVisitor"),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+        }
+
+        @Test
+        void rejectVisitorInStaticFieldOfDeclarativeRecipePrecondition() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipeFromYaml("""
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.test.PreconditionWithStaticVisitor
+                displayName: Has a precondition with a static visitor
+                description: Has a precondition that keeps a visitor in a static field.
+                preconditions:
+                  - org.openrewrite.test.internal.KeepsVisitorInStaticField
+                recipeList:
+                  - org.openrewrite.test.internal.KeepsMatchersInStaticFields
+                """, "org.openrewrite.test.PreconditionWithStaticVisitor"),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+        }
+
+        @Test
+        void acceptVisitorInStaticFieldOfRecipeFromDependencyJar(@TempDir Path dir) throws Exception {
+            try (URLClassLoader dependency = loadFromJar(dir, KeepsVisitorInStaticField.class)) {
+                Constructor<?> constructor = dependency.loadClass(KeepsVisitorInStaticField.class.getName())
+                  .getDeclaredConstructor();
+                constructor.setAccessible(true);
+                Recipe recipe = (Recipe) constructor.newInstance();
+                assertThat(recipe.getClass()).isNotEqualTo(KeepsVisitorInStaticField.class);
+                rewriteRun(
+                  spec -> spec.recipe(recipe).validateRecipeSerialization(false),
+                  text("foo")
+                );
+            }
+        }
+
+        private URLClassLoader loadFromJar(Path dir, Class<?> recipeClass) throws Exception {
+            Path jar = dir.resolve("dependency.jar");
+            List<Class<?>> classes = new ArrayList<>(List.of(recipeClass));
+            for (int i = 0; i < classes.size(); i++) {
+                classes.addAll(List.of(classes.get(i).getDeclaredClasses()));
+            }
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+                for (Class<?> c : classes) {
+                    String entry = c.getName().replace('.', '/') + ".class";
+                    out.putNextEntry(new JarEntry(entry));
+                    try (InputStream in = recipeClass.getClassLoader().getResourceAsStream(entry)) {
+                        assertThat(in).isNotNull();
+                        in.transferTo(out);
+                    }
+                    out.closeEntry();
+                }
+            }
+            return new URLClassLoader(new URL[]{jar.toUri().toURL()}, recipeClass.getClassLoader()) {
+                @Override
+                protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                    if (!name.equals(recipeClass.getName()) && !name.startsWith(recipeClass.getName() + "$")) {
+                        return super.loadClass(name, resolve);
+                    }
+                    synchronized (getClassLoadingLock(name)) {
+                        Class<?> loaded = findLoadedClass(name);
+                        return loaded != null ? loaded : findClass(name);
+                    }
+                }
+            };
+        }
+
+        @Test
+        void acceptMatchersInStaticFields() {
+            rewriteRun(
+              spec -> spec.recipe(new KeepsMatchersInStaticFields()),
+              text("foo")
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec
+                .recipeQualityValidation(RecipeQualityValidation.builder().noStaticVisitors(false).build())
+                .recipe(new KeepsVisitorInStaticField()),
+              text("foo")
+            );
+        }
+    }
+
+    @Nested
+    class OrderStepsForEarlierChanges {
+        private static final String RECURSIVE_FIRST = """
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.test.MovePackagesBroadFirst
+          displayName: Move packages
+          description: Moves a package and one of its subpackages.
+          recipeList:
+            - org.openrewrite.java.ChangePackage:
+                oldPackageName: a
+                newPackageName: x
+                recursive: true
+            - org.openrewrite.java.ChangePackage:
+                oldPackageName: a.b
+                newPackageName: y
+          """;
+
+        @Test
+        void rejectStepThatAnEarlierRenameShadows() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipeFromYaml(RECURSIVE_FIRST, "org.openrewrite.test.MovePackagesBroadFirst"),
+              java(
+                """
+                  package a.b;
+                  class C {
+                  }
+                  """,
+                """
+                  package x.b;
+                  class C {
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Order the steps of a composite so that a step runs before the steps " +
+                                                 "that rename what it looks for")
+              .hasMessageContaining("ChangePackage `a.b` to `y` (step 2 of org.openrewrite.test.MovePackagesBroadFirst): " +
+                                    "ChangePackage `a` to `x` (step 1 of org.openrewrite.test.MovePackagesBroadFirst) " +
+                                    "renamed `a.b` to `x.b` first, so code that named it ends up as `x.b`, not `y`")
+              .hasMessageContaining("orderStepsForEarlierChanges(false)");
+
+            // every test that runs the composite fails, not just the first
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipeFromYaml(RECURSIVE_FIRST, "org.openrewrite.test.MovePackagesBroadFirst")
+            ));
+        }
+
+        @Test
+        void acceptStepWhoseRenamedNameALaterStepRenames() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.MovePackageThenRenameEitherWay
+                  displayName: Move a package and rename a type in it
+                  description: Renames the type under its old package and under its new one.
+                  recipeList:
+                    - org.openrewrite.java.ChangePackage:
+                        oldPackageName: a
+                        newPackageName: x
+                    - org.openrewrite.java.ChangeType:
+                        oldFullyQualifiedTypeName: a.C
+                        newFullyQualifiedTypeName: a.D
+                    - org.openrewrite.java.ChangeType:
+                        oldFullyQualifiedTypeName: x.C
+                        newFullyQualifiedTypeName: x.D
+                  """, "org.openrewrite.test.MovePackageThenRenameEitherWay")
+            );
+        }
+
+        @Test
+        void acceptNarrowRenameFirst() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.MovePackagesNarrowFirst
+                  displayName: Move packages
+                  description: Moves a subpackage and then the package it was in.
+                  recipeList:
+                    - org.openrewrite.java.ChangePackage:
+                        oldPackageName: a.b
+                        newPackageName: y
+                    - org.openrewrite.java.ChangePackage:
+                        oldPackageName: a
+                        newPackageName: x
+                        recursive: true
+                  """, "org.openrewrite.test.MovePackagesNarrowFirst"),
+              java(
+                """
+                  package a.b;
+                  class C {
+                  }
+                  """,
+                """
+                  package y;
+                  class C {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml(RECURSIVE_FIRST.replace("MovePackagesBroadFirst", "MovePackagesOptOut"),
+                  "org.openrewrite.test.MovePackagesOptOut")
+                .recipeQualityValidation(RecipeQualityValidation.builder().orderStepsForEarlierChanges(false).build()),
+              java(
+                """
+                  package a.b;
+                  class C {
+                  }
+                  """,
+                """
+                  package x.b;
+                  class C {
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class UnparsedSources {
+
+        @Test
+        void rejectRecipeThatThrowsOnAFileItsParserFailedOn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeApplicationYml(null)),
+              yaml(
+                "key: value",
+                "key: changed",
+                spec -> spec.path("application.yml").markers(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check the kind of source file before casting it")
+              .hasMessageContaining("org.openrewrite.test.internal.ChangeApplicationYml threw when application.yml " +
+                                    "was a ParseError (a file its parser failed on) with the markers of the test's " +
+                                    "source (BuildMetadata):\n    java.lang.ClassCastException")
+              .hasMessageContaining("at org.openrewrite.test.internal.ChangeApplicationYml$1.visit(RewriteTestTest.java:")
+              .hasRootCauseInstanceOf(ClassCastException.class);
+        }
+
+        @Test
+        void acceptRecipeThatChecksTheKindOfSourceFile() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeApplicationYml(true)),
+              yaml(
+                "key: value",
+                "key: changed",
+                spec -> spec.path("application.yml")
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new TreeVisitor<Tree, ExecutionContext>() {
+                  @Override
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      return tree instanceof SourceFile sourceFile && sourceFile.getSourcePath().endsWith("adhoc.yml") ?
+                        new ChangeFirstValue("adhoc", true).getVisitor().visit((Yaml.Documents) tree, ctx) : tree;
+                  }
+              })),
+              yaml(
+                "key: value",
+                "key: adhoc",
+                spec -> spec.path("adhoc.yml")
+              )
+            );
+        }
+
+        @Test
+        void toleratedByTheTestsErrorHandler() {
+            rewriteRun(
+              spec -> spec.executionContext(new InMemoryExecutionContext())
+                .recipe(new ChangeApplicationYml(null)),
+              yaml(
+                "key: value",
+                "key: changed",
+                spec -> spec.path("application.yml")
+              )
+            );
+        }
+    }
+
+    @Nested
+    class LightweightAccumulators {
+
+        @Test
+        void rejectSourceFileKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScans()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("A ScanningRecipe's accumulator should keep the values the recipe needs")
+              .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItScans keeps\n" +
+                                    "    KeepsWhatItScans.Scanned.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning")
+              .hasMessageContaining("lightweightAccumulators(false)");
+        }
+
+        @Test
+        void rejectHeavyweightMarkerKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsHeavyweightMarker()),
+              text("foo", spec -> spec.markers(new Classpath(randomId(), List.of("a.jar"))))
+            ));
+            assertThat(e).hasMessageContaining("AtomicReference.get() -> Classpath, after scanning");
+        }
+
+        @Test
+        void rejectCursorKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsCursor()),
+              text("foo")
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[0] -> Cursor, after scanning");
+        }
+
+        @Test
+        void rejectSourceFileKeptWhileEditing() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItEdits()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[0] -> PlainText foo.txt, after editing");
+        }
+
+        @Test
+        void rejectSourceFileKeptInCollectionOfItsOwn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScansInItsOwnMap()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsWhatItScansInItsOwnMap.Index.files[foo.txt] -> PlainText foo.txt, after scanning");
+        }
+
+        @Test
+        void acceptValuesAndSmallMarkersKeptInAccumulator() {
+            rewriteRun(
+              spec -> spec.recipe(new KeepsPathsByProject()),
+              text("foo", spec -> spec.markers(new JavaProject(randomId(), "demo", null)))
+            );
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec
+                .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false).build())
+                .recipe(new KeepsWhatItScans()),
+              text("foo")
+            );
+        }
     }
 
     @Nested
@@ -235,6 +3281,594 @@ class RewriteTestTest implements RewriteTest {
                   """, "org.openrewrite.test.internal.StillValidated")
               ));
         }
+    }
+}
+
+@Value
+@With
+class Visited implements Marker {
+    UUID id;
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ChangeFirstValue extends Recipe {
+
+    @Option(displayName = "Value",
+      description = "The value to set.",
+      example = "changed")
+    String value;
+
+    @Option(displayName = "Check the document",
+      description = "Leave a document unchanged unless its first entry has a scalar value.",
+      required = false)
+    @Nullable
+    Boolean checked;
+
+    String displayName = "Change the first value";
+
+    String description = "Sets the value of the first entry of each YAML document.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new YamlIsoVisitor<>() {
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                if (Boolean.TRUE.equals(checked) && !(document.getBlock() instanceof Yaml.Mapping m &&
+                                                      !m.getEntries().isEmpty() &&
+                                                      m.getEntries().getFirst().getValue() instanceof Yaml.Scalar)) {
+                    return document;
+                }
+                Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+                Yaml.Scalar scalar = (Yaml.Scalar) mapping.getEntries().get(0).getValue();
+                return document.withBlock(mapping.withEntries(ListUtils.mapFirst(mapping.getEntries(),
+                  entry -> entry.withValue(scalar.withValue(value)))));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ChangeApplicationYml extends Recipe {
+
+    @Option(displayName = "Check the kind of source file",
+      description = "Leave a source unchanged unless it is YAML.",
+      required = false)
+    @Nullable
+    Boolean checked;
+
+    String displayName = "Change the first value in application.yml";
+
+    String description = "Sets the first value of each document in application.yml, which it finds by its path.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile sourceFile) || !sourceFile.getSourcePath().endsWith("application.yml") ||
+                    Boolean.TRUE.equals(checked) && !(tree instanceof Yaml.Documents)) {
+                    return tree;
+                }
+                return new ChangeFirstValue("changed", true).getVisitor().visit((Yaml.Documents) tree, ctx);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class UseObjectsIsNull extends Recipe {
+
+    @Option(displayName = "Add the import",
+      description = "Add an import of `java.util.Objects` to the file.",
+      required = false)
+    @Nullable
+    Boolean addImport;
+
+    String displayName = "Use `Objects.isNull`";
+
+    String description = "Replaces comparisons with `null` by `Objects.isNull`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                J j = super.visitBinary(binary, ctx);
+                if (!(j instanceof J.Binary b) || b.getOperator() != J.Binary.Type.Equal ||
+                    !J.Literal.isLiteralValue(b.getRight(), null)) {
+                    return j;
+                }
+                if (Boolean.TRUE.equals(addImport)) {
+                    maybeAddImport("java.util.Objects");
+                }
+                return JavaTemplate.builder("Objects.isNull(#{any()})")
+                  .imports("java.util.Objects")
+                  .build()
+                  .apply(getCursor(), b.getCoordinates().replace(), b.getLeft());
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ReturnEmptyList extends Recipe {
+
+    @Option(displayName = "Declare the import",
+      description = "Declare the template's import of `java.util.Collections`.",
+      required = false)
+    @Nullable
+    Boolean declared;
+
+    String displayName = "Return an empty list";
+
+    String description = "Replaces `return null` by `return Collections.emptyList()`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (literal.getValue() != null || !(getCursor().getParentTreeCursor().getValue() instanceof J.Return)) {
+                    return literal;
+                }
+                JavaTemplate.Builder template = JavaTemplate.builder("Collections.emptyList()").contextSensitive();
+                if (Boolean.TRUE.equals(declared)) {
+                    template.imports("java.util.Collections");
+                }
+                return template.build().apply(getCursor(), literal.getCoordinates().replace());
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ReturnNullByHand extends Recipe {
+
+    @Option(displayName = "Build the literal as the parser does",
+      description = "Give the literal the value null, as parsing `null` does.",
+      required = false)
+    @Nullable
+    Boolean parserShaped;
+
+    String displayName = "Return null";
+
+    String description = "Replaces `return 0` by `return null`, building the literal by hand.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (!Integer.valueOf(0).equals(literal.getValue()) ||
+                    !(getCursor().getParentTreeCursor().getValue() instanceof J.Return)) {
+                    return literal;
+                }
+                return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
+                  Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+class ParserBuilderOfDsl extends Parser.Builder {
+    private final String dslName;
+    private final Supplier<Parser> parser;
+
+    ParserBuilderOfDsl(Class<? extends SourceFile> sourceFileType, String dslName, Supplier<Parser> parser) {
+        super(sourceFileType);
+        this.dslName = dslName;
+        this.parser = parser;
+    }
+
+    @Override
+    public Parser build() {
+        return parser.get();
+    }
+
+    @Override
+    public String getDslName() {
+        return dslName;
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareLongByHand extends Recipe {
+
+    String displayName = "Declare `long`";
+
+    String description = "Replaces the `int` of a variable declaration by `long`, leaving the variable typed `int`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Primitive visitPrimitive(J.Primitive primitive, ExecutionContext ctx) {
+                return primitive.getType() == JavaType.Primitive.Int &&
+                       getCursor().getParentTreeCursor().getValue() instanceof J.VariableDeclarations ?
+                  primitive.withType(JavaType.Primitive.Long) : primitive;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareStringAsPrimitiveByHand extends Recipe {
+
+    String displayName = "Declare `String`";
+
+    String description = "Replaces the `Object` of a variable declaration by `String`, typed as the primitive `String`, " +
+                         "which `TypeUtils.isOfType` takes to be the class `java.lang.String`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                if (type == null || !TypeUtils.isOfClassType(type.getType(), "java.lang.Object")) {
+                    return multiVariable;
+                }
+                return multiVariable
+                  .withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY, emptyList(),
+                    "String", JavaType.Primitive.String, null))
+                  .withVariables(ListUtils.map(multiVariable.getVariables(), v -> {
+                      J.VariableDeclarations.NamedVariable typed = v.withType(JavaType.Primitive.String);
+                      return typed.withName(typed.getName().withType(JavaType.Primitive.String)
+                        .withFieldType(typed.getVariableType()));
+                  }));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareUnresolvedTypeByHand extends Recipe {
+
+    String displayName = "Declare `Missing`";
+
+    String description = "Replaces the `Object` of a variable declaration by `Missing`, a class the parser can't resolve.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                return type != null && TypeUtils.isOfClassType(type.getType(), "java.lang.Object") ?
+                  multiVariable.withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY,
+                    emptyList(), "Missing", JavaType.ShallowClass.build("Missing"), null)) : multiVariable;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveThenPart extends Recipe {
+
+    String displayName = "Remove the then-part of an `if`";
+
+    String description = "Removes a method call that is the whole then-part of an `if`, leaving the `if` without one.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                return getCursor().getParentTreeCursor().getValue() instanceof J.If ? null : method;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class QuoteToStringByHand extends Recipe {
+
+    String displayName = "Replace a quote character with a string";
+
+    String description = "Replaces `'\"'` by a string literal, writing its source without escaping the quote.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (!Character.valueOf('"').equals(literal.getValue())) {
+                    return literal;
+                }
+                return literal.withValue("\"").withValueSource("\"\"\"").withType(JavaType.Primitive.String);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class NameUnusedLoopVariable extends Recipe {
+
+    String displayName = "Name an unused variable `_`";
+
+    String description = "Renames a variable named `unused` to `_`, as Java 22 allows.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable,
+                                                                     ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+                if (!"unused".equals(v.getSimpleName())) {
+                    return v;
+                }
+                JavaType.Variable type = v.getVariableType() == null ? null : v.getVariableType().withName("_");
+                return v.withName(v.getName().withSimpleName("_").withFieldType(type)).withVariableType(type);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RepeatFirstEntry extends Recipe {
+
+    String displayName = "Repeat the first entry";
+
+    String description = "Adds a copy of the first entry of a mapping that has one entry.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new YamlIsoVisitor<>() {
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                if (m.getEntries().size() != 1) {
+                    return m;
+                }
+                return m.withEntries(ListUtils.concat(m.getEntries(), m.getEntries().getFirst().copyPaste().withPrefix("\n")));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class YamlToJava extends Recipe {
+
+    String displayName = "Replace YAML with Java";
+
+    String description = "Replaces a YAML document with a Java source that keeps its id, as converters do.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof Yaml.Documents yaml)) {
+                    return tree;
+                }
+                return JavaParser.fromJavaVersion().build().parse(ctx, "@Deprecated\nclass A {\n}")
+                  .findFirst()
+                  .<Tree>map(java -> java
+                    .withSourcePath(yaml.getSourcePath().resolveSibling("A.java"))
+                    .withId(yaml.getId()))
+                  .orElse(yaml);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsOnImportedType extends Recipe {
+
+    @Option(displayName = "Method pattern",
+      description = "A method pattern to match calls against.",
+      example = "java.util.Collections emptyList()")
+    String methodPattern;
+
+    String displayName = "Find calls on an imported type";
+
+    String description = "Finds calls by method type, but takes the select of a qualified call to be a name.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher matcher = new MethodMatcher(methodPattern);
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (!matcher.matches(m)) {
+                    return m;
+                }
+                String on = m.getSelect() == null ? null : ((J.Identifier) m.getSelect()).getSimpleName();
+                return SearchResult.found(m, on);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RequiresBuildMetadata extends Recipe {
+
+    String displayName = "Require build metadata";
+
+    String description = "Changes text, and throws on a source without build metadata as recipes that need a project marker do.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (!text.getMarkers().findFirst(BuildMetadata.class).isPresent()) {
+                    throw new IllegalStateException("Unable to find BuildMetadata marker.");
+                }
+                return text.withText("changed");
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsWithPrintedArgument extends Recipe {
+
+    @Option(displayName = "Argument",
+      description = "How an argument of the call prints.",
+      example = "Boolean.TRUE")
+    String argument;
+
+    String displayName = "Find calls with a printed argument";
+
+    String description = "Finds calls by how one of their arguments prints, so it misses other spellings of it.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return m.getArguments().stream().anyMatch(arg -> argument.equals(arg.toString())) ?
+                  SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindQualifiedCallsByName extends Recipe {
+
+    @Option(displayName = "Select",
+      description = "How the select of the call prints.",
+      example = "Collections")
+    String select;
+
+    @Option(displayName = "Method name",
+      description = "The name of the method to find.",
+      example = "emptyList")
+    String methodName;
+
+    String displayName = "Find qualified calls by name";
+
+    String description = "Finds calls by name and by how their select prints, so it misses statically imported calls.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return methodName.equals(m.getSimpleName()) && m.getSelect() != null &&
+                       select.equals(m.getSelect().toString()) ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindUnqualifiedCallsByName extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the method to find.",
+      example = "emptyList")
+    String methodName;
+
+    String displayName = "Find unqualified calls by name";
+
+    String description = "Finds calls by name that have no select, so it misses qualified calls.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return methodName.equals(m.getSimpleName()) && m.getSelect() == null ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindAnnotationsByPrintedType extends Recipe {
+
+    @Option(displayName = "Annotation type",
+      description = "How the annotation's type prints.",
+      example = "Deprecated")
+    String annotationType;
+
+    String displayName = "Find annotations by printed type";
+
+    String description = "Finds annotations by how their type prints, so it misses fully qualified ones.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                J.Annotation a = super.visitAnnotation(annotation, ctx);
+                return annotationType.equals(a.getAnnotationType().toString()) ? SearchResult.found(a) : a;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsByType extends Recipe {
+
+    @Option(displayName = "Method pattern",
+      description = "A method pattern to match calls against.",
+      example = "java.util.Collections emptyList()")
+    String methodPattern;
+
+    String displayName = "Find calls by method type";
+
+    String description = "Finds calls whose method type matches the pattern, however they are spelled.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher matcher = new MethodMatcher(methodPattern);
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return matcher.matches(m) ? SearchResult.found(m) : m;
+            }
+        };
     }
 }
 
@@ -549,5 +4183,433 @@ class RecipeWithOptionalOrValidation extends Recipe {
         return super.validate().and(
           Validated.required("optionA", optionA)
             .or(Validated.required("optionB", optionB)));
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class DeletesObsoleteGeneratesPlaceholderThenFillsIt extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Deletes an obsolete file and generates a placeholder, then fills it";
+
+    String description = "A recipe that deletes a file and generates a placeholder in one cycle and fills the placeholder in the next.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean placeholderExists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("placeholder.txt".equals(text.getSourcePath().toString())) {
+                    placeholderExists.set(true);
+                }
+                return text;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean placeholderExists, ExecutionContext ctx) {
+        return placeholderExists.get() ? emptyList() : List.of(PlainText.builder()
+          .text("placeholder")
+          .sourcePath(Path.of("placeholder.txt"))
+          .build());
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean placeholderExists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public @Nullable PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("obsolete.txt".equals(text.getSourcePath().toString())) {
+                    return null;
+                }
+                // Filling only what the scan already saw defers it to the cycle after generation
+                return placeholderExists.get() && "placeholder".equals(text.getText()) ? text.withText("filled") : text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class AppendExclamationMark extends Recipe {
+
+    String displayName = "Append an exclamation mark";
+
+    String description = "Appends an exclamation mark to every plain text file, in every cycle.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return text.withText(text.getText() + "!");
+            }
+        };
+    }
+}
+
+@Value
+@With
+class Classpath implements Marker, Heavyweight {
+    UUID id;
+    List<String> jars;
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScans extends ScanningRecipe<KeepsWhatItScans.Scanned> {
+
+    String displayName = "Keeps the source files it scans";
+
+    String description = "Keeps each source file it scans in its accumulator.";
+
+    static class Scanned {
+        final Map<Path, SourceFile> sourceFiles = new HashMap<>();
+    }
+
+    @Override
+    public Scanned getInitialValue(ExecutionContext ctx) {
+        return new Scanned();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.sourceFiles.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScansInItsOwnMap extends ScanningRecipe<KeepsWhatItScansInItsOwnMap.Index> {
+
+    String displayName = "Keeps the source files it scans in a map of its own";
+
+    String description = "Keeps each source file it scans in an accumulator that is a map, which the check must not call.";
+
+    static class Index extends AbstractMap<Path, SourceFile> {
+        final Map<Path, SourceFile> files = new HashMap<>();
+
+        @Override
+        public Set<Entry<Path, SourceFile>> entrySet() {
+            throw new UnsupportedOperationException("The check ran code of the accumulator's own");
+        }
+    }
+
+    @Override
+    public Index getInitialValue(ExecutionContext ctx) {
+        return new Index();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Index acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.files.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsHeavyweightMarker extends ScanningRecipe<AtomicReference<@Nullable Classpath>> {
+
+    String displayName = "Keeps a heavyweight marker";
+
+    String description = "Keeps the classpath marker of a source file it scans in its accumulator.";
+
+    @Override
+    public AtomicReference<@Nullable Classpath> getInitialValue(ExecutionContext ctx) {
+        return new AtomicReference<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<@Nullable Classpath> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(Classpath.class).ifPresent(acc::set);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsCursor extends ScanningRecipe<List<Cursor>> {
+
+    String displayName = "Keeps a cursor";
+
+    String description = "Keeps the cursor of each text it scans in its accumulator.";
+
+    @Override
+    public List<Cursor> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<Cursor> acc) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                acc.add(getCursor());
+                return text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItEdits extends ScanningRecipe<List<SourceFile>> {
+
+    String displayName = "Keeps the source files it edits";
+
+    String description = "Keeps each source file it visits in the edit phase in its accumulator.";
+
+    @Override
+    public List<SourceFile> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<SourceFile> acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(List<SourceFile> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.add(s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsPathsByProject extends ScanningRecipe<Map<JavaProject, Set<Path>>> {
+
+    String displayName = "Keeps paths by project";
+
+    String description = "Keeps the path of each source file it scans in its accumulator, by project.";
+
+    @Override
+    public Map<JavaProject, Set<Path>> getInitialValue(ExecutionContext ctx) {
+        return new HashMap<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<JavaProject, Set<Path>> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(JavaProject.class).ifPresent(project ->
+                      acc.computeIfAbsent(project, p -> new HashSet<>()).add(s.getSourcePath()));
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveCalls extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the method whose call statements are removed.")
+    String methodName;
+
+    @Option(displayName = "Import to add",
+      description = "A type to import whether or not the file uses it.",
+      required = false)
+    @Nullable
+    String addImport;
+
+    String displayName = "Remove calls";
+
+    String description = "Removes the statements that call a method, without removing the imports they used.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                if (addImport != null) {
+                    doAfterVisit(new AddImport<>(addImport, null, false));
+                }
+                J.Block b = super.visitBlock(block, ctx);
+                return b.withStatements(ListUtils.map(b.getStatements(), s ->
+                  s instanceof J.MethodInvocation m && methodName.equals(m.getSimpleName()) ? null : s));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RenameListImportAndRebuildTheOthers extends Recipe {
+
+    String displayName = "Rename the `List` import and rebuild the others";
+
+    String description = "Renames an import of `java.util.List` to `java.util.Set`, and gives the other imports new ids.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                if (cu.getImports().stream().noneMatch(i -> "List".equals(i.getQualid().getSimpleName()))) {
+                    return cu;
+                }
+                return cu.withImports(ListUtils.map(cu.getImports(), anImport -> {
+                    J.FieldAccess q = anImport.getQualid();
+                    if ("List".equals(q.getSimpleName())) {
+                        JavaType.ShallowClass set = JavaType.ShallowClass.build("java.util.Set");
+                        return anImport.withQualid(q.withName(q.getName().withSimpleName("Set").withType(set))
+                          .withType(set));
+                    }
+                    return anImport.withId(Tree.randomId());
+                }));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsVisitorInStaticField extends Recipe {
+
+    private static final TreeVisitor<?, ExecutionContext> VISITOR = new Visitor();
+
+    String displayName = "Keeps a visitor in a static field";
+
+    String description = "Keeps the visitor it returns in a static field.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return VISITOR;
+    }
+
+    private static class Visitor extends PlainTextVisitor<ExecutionContext> {
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsPreconditionInStaticField extends Recipe {
+
+    private static final TreeVisitor<?, ExecutionContext> PRECONDITION =
+      Preconditions.or(new PlainTextVisitor<>(), new PlainTextVisitor<>());
+
+    String displayName = "Keeps a precondition in a static field";
+
+    String description = "Keeps the visitor of its precondition in a static field.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(PRECONDITION, new PlainTextVisitor<>());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsVisitorInStaticFieldOfNestedClass extends Recipe {
+
+    String displayName = "Keeps a visitor in a static field of a nested class";
+
+    String description = "Keeps a visitor that its visitor delegates to in a static field.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new Outer();
+    }
+
+    private static class Outer extends PlainTextVisitor<ExecutionContext> {
+        private static final Inner INNER = new Inner();
+
+        @Override
+        public PlainText visitText(PlainText text, ExecutionContext ctx) {
+            return (PlainText) INNER.visitNonNull(text, ctx, getCursor().getParentOrThrow());
+        }
+    }
+
+    private static class Inner extends PlainTextVisitor<ExecutionContext> {
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsVisitorsInStaticList extends Recipe {
+
+    private static final List<Object> VISITORS = List.of("not a visitor", new PlainTextVisitor<ExecutionContext>());
+
+    String displayName = "Keeps visitors in a static list";
+
+    String description = "Keeps the visitors it runs in a static list.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>();
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsMatchersInStaticFields extends Recipe {
+
+    private static final MethodMatcher MATCHER = new MethodMatcher("java.util.List add(..)");
+
+    private static final List<String> TYPES = List.of("java.util.List");
+
+    String displayName = "Keeps matchers in static fields";
+
+    String description = "Keeps what its visitors are built from in static fields, and creates the visitors in getVisitor().";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>();
     }
 }

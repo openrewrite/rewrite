@@ -151,7 +151,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var indexed = q.Receive((J)arrayAccess.Indexed, el => (J)VisitNonNull(el, q));
         var dimension = q.Receive((J)arrayAccess.Dimension, el => (J)VisitNonNull(el, q));
-        return arrayAccess.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithIndexed((Expression)indexed!).WithDimension((ArrayDimension)dimension!);
+        var type = q.Receive(arrayAccess.Type, t => VisitType(t, q)!);
+        return arrayAccess.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithIndexed((Expression)indexed!).WithDimension((ArrayDimension)dimension!).WithType(type);
     }
 
     public override J VisitArrayDimension(ArrayDimension arrayDimension, RpcReceiveQueue q)
@@ -530,8 +531,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     private J VisitControlParenthesesUntyped(ControlParentheses<J> shell, RpcReceiveQueue q)
     {
-        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
-        var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q))!;
+        // received on its own, only what the parentheses hold says which kind they are
+        if (tree.Element is VariableDeclarations declarations)
+        {
+            return new ControlParentheses<VariableDeclarations>(_pvId, _pvPrefix, _pvMarkers,
+                new JRightPadded<VariableDeclarations>(declarations, tree.After, tree.Markers));
+        }
+        var rp = new JRightPadded<Expression>((Expression)tree.Element, tree.After, tree.Markers);
         return new ControlParentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
     }
 
@@ -714,9 +721,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             var multiline = q.Receive(c.Multiline);
             var text = q.Receive(c.Text);
             var suffix = q.Receive(c.Suffix);
-            // C# Comment doesn't have Markers; consume and discard
-            q.Receive<Markers>(Markers.Empty);
-            return new TextComment(text!, suffix!, multiline);
+            var markers = q.Receive((c as TextComment)?.Markers);
+            return new TextComment(text!, suffix!, multiline, markers);
         });
         var whitespace = q.Receive(space.Whitespace);
         return space.WithComments(comments!).WithWhitespace(whitespace!);
@@ -811,6 +817,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
                 break;
 
             case JavaType.Variable variable:
+                variable.FlagsBitMap = q.Receive(variable.FlagsBitMap);
                 variable.Name = q.Receive(variable.Name)!;
                 variable.Owner = q.Receive(variable.Owner, t => VisitType(t, q)!);
                 variable.Type = q.Receive(variable.Type, t => VisitType(t, q)!);

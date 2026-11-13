@@ -21,7 +21,6 @@ import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -29,7 +28,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
@@ -356,40 +354,6 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
-        }
-
-        @Override
-        public J visitImport(J.Import importStmt, RpcReceiveQueue q) {
-            importStmt = importStmt.getPadding().withStatic(
-                    q.receive(importStmt.getPadding().getStatic(), s -> visitLeftPadded(s, q)));
-
-            // Go sends qualid as a Literal (import path string). Convert to FieldAccess for Java model.
-            // Use raw types to bypass UnaryOperator bridge method ClassCastException
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            J.FieldAccess qualid = (J.FieldAccess) ((RpcReceiveQueue) q).receive(
-                    (Object) importStmt.getQualid(),
-                    (java.util.function.UnaryOperator) id -> {
-                        J received = visitNonNull((J) id, q);
-                        if (received instanceof J.FieldAccess) {
-                            return received;
-                        }
-                        // Convert Literal to FieldAccess for Java model
-                        J.Literal lit = (J.Literal) received;
-                        String name = lit.getValueSource() != null ?
-                                lit.getValueSource().replaceAll("^\"|\"$", "") :
-                                String.valueOf(lit.getValue());
-                        return new J.FieldAccess(
-                                lit.getId(), lit.getPrefix(), lit.getMarkers(),
-                                new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY),
-                                JLeftPadded.build(new J.Identifier(
-                                        Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                                        emptyList(), name, null, null)),
-                                null);
-                    });
-            importStmt = importStmt.withQualid(qualid);
-
-            return importStmt.getPadding().withAlias(
-                    q.receive(importStmt.getPadding().getAlias(), a -> visitLeftPadded(a, q)));
         }
     }
 }

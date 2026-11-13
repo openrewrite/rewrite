@@ -64,4 +64,24 @@ class TypeNameMatcherTest {
         assertThat(matcher.matches("java.util.List.remove")).isTrue();
         assertThat(matcher.matches("java.util.List.add")).isFalse();
     }
+
+    @Test
+    void doubleDotSpansWholeSegments() {
+        TypeNameMatcher matcher = TypeNameMatcher.fromPattern("com..Serializable");
+        assertThat(matcher.matches("com.foo.Serializable")).isTrue();
+        assertThat(matcher.matches("com.Serializable")).isTrue();
+        assertThat(matcher.matches("com.foo.MySerializable")).isFalse();
+        assertThat(matcher.matches("comX.Serializable")).isFalse();
+        assertThat(TypeNameMatcher.fromPattern("*..List").matches("java.util.ArrayList")).isFalse();
+        assertThat(TypeNameMatcher.fromPattern("java.util..*").matches("java.utilities.Foo")).isFalse();
+
+        assertThat(TypeNameMatcher.fromPattern("com..*Serializable").matches("com.foo.MySerializable")).isTrue();
+        assertThat(TypeNameMatcher.fromPattern("*..*List").matches("java.util.ArrayList")).isTrue();
+    }
+
+    @Test
+    void doubleDotTreatsDollarAsSegmentBoundary() {
+        assertThat(TypeNameMatcher.fromPattern("java..Map.Entry").matches("java.util.Map$Entry")).isTrue();
+        assertThat(TypeNameMatcher.fromPattern("java..Entry").matches("java.util.Map$Entry")).isTrue();
+    }
 }

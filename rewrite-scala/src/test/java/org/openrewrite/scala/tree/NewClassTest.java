@@ -364,4 +364,31 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void semicolonSeparatedAnonymousClassMembers() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  val x = new Object { val a = 1; val b = 2 }
+                  val r = new Runnable { def run() = (); val y = 1 }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInAnonymousClass() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  val x = new Object { ; val a = 1;; val b = 2; }
+                }
+                """
+            )
+        );
+    }
 }

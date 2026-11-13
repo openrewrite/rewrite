@@ -106,7 +106,7 @@ public class TildeRange extends LatestRelease {
         if (!NODE_TILDE_PATTERN.matcher(pattern.trim()).matches()) {
             return Validated.invalid("tildeRange", pattern, "not a node tilde range");
         }
-        UnionRange node = UnionRange.parse(pattern, false);
+        UnionRange node = UnionRange.parse(pattern);
         if (node == null) {
             return Validated.invalid("tildeRange", pattern, "not a valid node range");
         }
@@ -114,26 +114,25 @@ public class TildeRange extends LatestRelease {
     }
 
     // Port of node-semver range.js replaceTilde; non-tilde tokens pass through.
-    static String replaceTilde(String token, boolean incPre) {
+    static String replaceTilde(String token) {
         Matcher m = NODE_TILDE_PATTERN.matcher(token);
         if (!m.matches()) {
             return token;
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
-        String z = incPre ? "-0" : "";
         if (XRange.isX(mj)) {
             return "";
         }
         if (XRange.isX(mn)) {
-            return ">=" + mj + ".0.0" + z + " <" + NodeComparand.incr(mj) + ".0.0-0";
+            return ">=" + mj + ".0.0 <" + NodeComparand.incr(mj) + ".0.0-0";
         }
         if (XRange.isX(p)) {
-            return ">=" + mj + "." + mn + ".0" + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+            return ">=" + mj + "." + mn + ".0 <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
         if (pr != null) {
             return ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
-        return ">=" + mj + "." + mn + "." + p + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+        return ">=" + mj + "." + mn + "." + p + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
     }
 
     @Override

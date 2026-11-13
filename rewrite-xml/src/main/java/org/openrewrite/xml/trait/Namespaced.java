@@ -24,6 +24,7 @@ import org.openrewrite.trait.Trait;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import javax.xml.XMLConstants;
 import java.util.*;
 
 import static java.util.Collections.*;
@@ -73,8 +74,27 @@ public class Namespaced implements Trait<Xml> {
                 Optional.of(extractedNamespacePrefix);
     }
 
+    /**
+     * @return The namespace URI bound to this tag's or attribute's prefix in the current scope. An
+     * unprefixed tag is in the default namespace, and an unprefixed attribute is in no namespace.
+     * Reserved bindings need no declaration. A namespace declaration is in the xmlns namespace, and
+     * the xml prefix is bound to the XML namespace.
+     */
     public Optional<String> getNamespaceUri() {
-        return getNamespacePrefix().map(s -> getAllNamespaces().get(s));
+        Object value = cursor.getValue();
+        if (value instanceof Xml.Attribute && isNamespaceDefinitionAttribute(((Xml.Attribute) value).getKeyAsString())) {
+            return Optional.of(XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
+        }
+        String prefix = getNamespacePrefix().orElse("");
+        if (prefix.isEmpty() && !(value instanceof Xml.Tag)) {
+            return Optional.empty();
+        }
+        String uri = getAllNamespaces().get(prefix);
+        if (uri == null && XMLConstants.XML_NS_PREFIX.equals(prefix)) {
+            return Optional.of(XMLConstants.XML_NS_URI);
+        }
+        // An empty namespace name, as in xmlns="", undeclares the binding
+        return Optional.ofNullable(uri).filter(u -> !u.isEmpty());
     }
 
     public Map<String, String> getNamespaces() {
@@ -93,9 +113,10 @@ public class Namespaced implements Trait<Xml> {
             }
         } else if (cursor.getValue() instanceof Xml.Attribute) {
             Xml.Attribute attribute = cursor.getValue();
-            namespaces = singletonMap(
-                    extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
-                    attribute.getValueAsString());
+            String prefix = extractPrefixFromNamespaceDefinition(attribute.getKeyAsString());
+            if (prefix != null) {
+                namespaces = singletonMap(prefix, attribute.getValueAsString());
+            }
         }
         return namespaces;
     }
@@ -107,9 +128,10 @@ public class Namespaced implements Trait<Xml> {
                 return emptyList();
             }
             List<Xml.Attribute> schemaLocations = new ArrayList<>();
-            Map<String, String> namespaces = getAllNamespaces();
             for (Xml.Attribute attribute : tag.getAttributes()) {
-                if (XML_SCHEMA_INSTANCE_URI.equals(namespaces.get(extractNamespacePrefix(attribute.getKeyAsString())))) {
+                String localName = extractLocalName(attribute.getKeyAsString());
+                if (("schemaLocation".equals(localName) || "noNamespaceSchemaLocation".equals(localName)) &&
+                    XML_SCHEMA_INSTANCE_URI.equals(new Namespaced(new Cursor(cursor, attribute)).getNamespaceUri().orElse(null))) {
                     schemaLocations.add(attribute);
                 }
             }
@@ -139,18 +161,19 @@ public class Namespaced implements Trait<Xml> {
     }
 
     /**
-     * @return All namespaces in the current scope, including those defined in parent scopes.
+     * @return All namespaces in the current scope, including those defined in parent scopes. A
+     * declaration overrides one of the same prefix in an enclosing scope.
      */
     public Map<String, String> getAllNamespaces() {
-        Map<String, String> result = new LinkedHashMap<>(getNamespaces());
-        if (cursor.getParent() != null) {
-            result.putAll(new Namespaced(cursor.getParent()).getAllNamespaces());
-        }
+        Map<String, String> result = cursor.getParent() == null ?
+                new LinkedHashMap<>() :
+                new LinkedHashMap<>(new Namespaced(cursor.getParent()).getAllNamespaces());
+        result.putAll(getNamespaces());
         return result;
     }
 
     public static boolean isNamespaceDefinitionAttribute(String name) {
-        return name.startsWith("xmlns");
+        return "xmlns".equals(name) || name.startsWith("xmlns:");
     }
 
     public static String getAttributeNameForPrefix(String namespacePrefix) {

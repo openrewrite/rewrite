@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.json.JsonParser;
@@ -65,6 +66,16 @@ class PackageJsonHelperTest {
 
         assertThat(deps).extracting(Dependency::getName).containsExactly("lodash", "uuid");
         assertThat(deps).extracting(Dependency::getVersionConstraint).containsExactly("^4.17.21", "^9.0.0");
+    }
+
+    @Test
+    void aDeclaredValueThatIsNoStringIsNoDependency() {
+        Json.Document doc = parsePackageJson("{\"dependencies\": {\"a\": \"^1.0.0\", \"b\": null, \"c\": 1, " +
+                                             "\"d\": {}}, \"devDependencies\": {\"e\": null}}");
+        assertThat(PackageJsonHelper.declaredDependencies(doc))
+          .containsOnlyKeys("dependencies", "devDependencies")
+          .containsEntry("dependencies", Collections.singletonMap("a", "^1.0.0"))
+          .containsEntry("devDependencies", Collections.emptyMap());
     }
 
     @Test
@@ -211,9 +222,8 @@ class PackageJsonHelperTest {
                 "{\n" +
                 "  \"dependencies\": { \"lodash\": \"^4.17.20\" }\n" +
                 "}\n");
-        Json.Document modified = PackageJsonHelper.upgradeTransitive(
-                doc, NodeResolutionResult.PackageManager.Npm, "lodash", "^4.17.21",
-                java.util.Collections.<DependencyPathSegment>emptyList());
+        Json.Document modified = PackageJsonOverrides.of(NodeResolutionResult.PackageManager.Npm, doc, null,
+                "lodash", "^4.17.21", java.util.Collections.<DependencyPathSegment>emptyList()).apply(doc);
         assertThat(modified.printAll()).contains("\"overrides\"");
         assertThat(modified.printAll()).contains("\"lodash\": \"^4.17.21\"");
     }
@@ -360,11 +370,7 @@ class PackageJsonHelperTest {
 
     @Test
     void editAndRegenerateSkipsOverlayForUnsupportedPm() {
-        // For yarn/pnpm, regen happens (or fails) but no overlay runs — marker resolvedDependencies
-        // stays as it was. We test the npm/Bun positive path via integTest in Task 9/10.
-        // This unit test pins the negative path: an edit of a YarnClassic package.json should
-        // leave the marker's resolvedDependencies untouched even when overlayResolvedDeps would
-        // throw on the lock content (we pass "no lock" so no overlay is even attempted).
+        // a Yarn classic edit keeps the marker's resolved dependencies: no lock, so no overlay
         String json = "{\n" +
                 "  \"name\": \"x\",\n" +
                 "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
@@ -390,7 +396,9 @@ class PackageJsonHelperTest {
         PackageJsonHelper.EditAndRegenerateResult result = PackageJsonHelper.editAndRegenerate(
                 withMarker,
                 d -> PackageJsonHelper.addDependency(d, "uuid", "^9.0.0", "dependencies"),
+                Collections.emptyMap(),
                 null,
+                NodeDependencyScan.ProjectFiles.NONE,
                 new InMemoryExecutionContext());
 
         assertThat(result.isChanged()).isTrue();

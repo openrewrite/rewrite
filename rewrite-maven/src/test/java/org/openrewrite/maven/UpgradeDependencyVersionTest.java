@@ -687,6 +687,116 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"${project.parent.version}", "${current.version}"})
+    void doNotDowngradePluginDependencyWithNestedVersionProperty(String currentVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.5", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>5.0.6</version>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>5.0.6</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <current.version>5.0.6</current.version>
+                        <dependency.version>%s</dependency.version>
+                    </properties>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>rewrite-maven-plugin</artifactId>
+                                <version>5.4.1</version>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.recipe</groupId>
+                                        <artifactId>rewrite-spring</artifactId>
+                                        <version>${dependency.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """.formatted(currentVersion)
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${project.parent.version}", "${current.version}"})
+    void upgradePluginDependencyWithNestedVersionProperty(String currentVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>5.0.5</version>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>5.0.5</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <current.version>5.0.5</current.version>
+                        <dependency.version>%s</dependency.version>
+                    </properties>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>rewrite-maven-plugin</artifactId>
+                                <version>5.4.1</version>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.recipe</groupId>
+                                        <artifactId>rewrite-spring</artifactId>
+                                        <version>${dependency.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """.formatted(currentVersion),
+              spec -> spec.after(actual -> {
+                  assertThat(actual).contains("<version>5.0.5</version>")
+                    .contains("<current.version>5.0.5</current.version>")
+                    .contains("<dependency.version>5.0.6</dependency.version>");
+                  return actual;
+              })
+            )
+          )
+        );
+    }
+
     @Test
     void upgradePluginDependencies() {
         rewriteRun(
@@ -1975,69 +2085,79 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void deriveFromNexus() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.saxon</groupId>
-                              <artifactId>saxon</artifactId>
-                              <version>9.1.0.8</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
+    void deriveFromNexus() throws IOException {
+        try (MockWebServer repository = directoryListingRepository()) {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                .executionContext(directoryListingContext(repository))
+                .recipeExecutionContext(directoryListingContext(repository)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.saxon</groupId>
+                                  <artifactId>saxon</artifactId>
+                                  <version>9.1.0.8</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+            assertThat(repository.getRequestCount()).isGreaterThanOrEqualTo(2);
+        }
     }
 
     @Test
-    void deriveFromNexusUpgrade() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.orbroker</groupId>
-                              <artifactId>orbroker</artifactId>
-                              <version>2.0.3</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.orbroker</groupId>
-                              <artifactId>orbroker</artifactId>
-                              <version>2.0.4</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
+    void deriveFromNexusUpgrade() throws IOException {
+        try (MockWebServer repository = directoryListingRepository()) {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                .executionContext(directoryListingContext(repository))
+                .recipeExecutionContext(directoryListingContext(repository)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.orbroker</groupId>
+                                  <artifactId>orbroker</artifactId>
+                                  <version>2.0.3</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.orbroker</groupId>
+                                  <artifactId>orbroker</artifactId>
+                                  <version>2.0.4</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+            assertThat(repository.getRequestCount()).isGreaterThanOrEqualTo(2);
+        }
     }
 
     @Test
@@ -2065,28 +2185,76 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void badManagedVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.orbroker</groupId>
-                              <artifactId>orbroker</artifactId>
-                              <version>blah</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
+    void badManagedVersion() throws IOException {
+        try (MockWebServer repository = directoryListingRepository()) {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                .executionContext(directoryListingContext(repository))
+                .recipeExecutionContext(directoryListingContext(repository)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.orbroker</groupId>
+                                  <artifactId>orbroker</artifactId>
+                                  <version>blah</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+            assertThat(repository.getRequestCount()).isGreaterThanOrEqualTo(2);
+        }
+    }
+
+    // Deliberately omit maven-metadata.xml so these tests exercise the HTTP directory-listing fallback.
+    // Artifact mirrors need not serve Central's HTML listings, so serve the historical fixtures locally.
+    private static MockWebServer directoryListingRepository() throws IOException {
+        MockWebServer repository = new MockWebServer();
+        repository.setDispatcher(new Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                if ("/net/sourceforge/orbroker/orbroker/".equals(request.getPath())) {
+                    return new MockResponse().setBody("""
+                      <html><body>
+                      <a href="../">../</a>
+                      <a href="2.0.3/">2.0.3/</a>
+                      <a href="2.0.4/">2.0.4/</a>
+                      </body></html>
+                      """);
+                }
+                if ("/net/sourceforge/saxon/saxon/".equals(request.getPath())) {
+                    return new MockResponse().setBody("""
+                      <html><body>
+                      <a href="../">../</a>
+                      <a href="9.1.0.8/">9.1.0.8/</a>
+                      <a href="9.2.0.0/">9.2.0.0/</a>
+                      </body></html>
+                      """);
+                }
+                return new MockResponse().setResponseCode(404);
+            }
+        });
+        repository.start();
+        return repository;
+    }
+
+    private static MavenExecutionContextView directoryListingContext(MockWebServer repository) {
+        String uri = repository.url("/").toString();
+        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setAddCentralRepository(false)
+          .setRepositories(singletonList(MavenRepository.builder()
+            .id("directory-listing-fixture")
+            .uri(uri)
+            .knownToExist(true)
+            .build()));
     }
 
     @Test
@@ -2273,6 +2441,96 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2418")
     @Nested
     class RetainVersions {
+        @Test
+        void retainDependencyUsedOnlyInChildOfBomImporter() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies",
+                "4.2.0-RC1", null, true, singletonList("org.codehaus.janino:*"))),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                      <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-dependencies</artifactId>
+                          <version>4.1.0</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                      <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.codehaus.janino</groupId>
+                          <artifactId>janino</artifactId>
+                          <version>3.1.12</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-dependencies</artifactId>
+                          <version>4.2.0-RC1</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pom -> {
+                    var result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(result.getPom().getManagedVersion("org.codehaus.janino", "janino", null, null))
+                      .isEqualTo("3.1.12");
+                    assertThat(result.getModules()).singleElement().satisfies(module ->
+                      assertThat(module.findDependencies("org.codehaus.janino", "janino", null))
+                        .isNotEmpty().allSatisfy(dependency -> assertThat(dependency.getVersion()).isEqualTo("3.1.12")));
+                })
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.codehaus.janino</groupId>
+                          <artifactId>janino</artifactId>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
         @DocumentExample
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
@@ -3687,13 +3945,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             Files.createDirectories(parentDir);
             Files.writeString(parentDir.resolve("remote-parent-1.0.0.pom"), REMOTE_PARENT_POM);
 
-            return MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
-              .setLocalRepository(MavenRepository.builder()
-                .id("local")
-                .uri(localRepository.toUri().toString())
-                .snapshots(false)
-                .knownToExist(true)
-                .build());
+            return MavenCentralMirrorExtension.withMavenCentralMirror(
+              MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
+                .setLocalRepository(MavenRepository.builder()
+                  .id("local")
+                  .uri(localRepository.toUri().toString())
+                  .snapshots(false)
+                  .knownToExist(true)
+                  .build()));
         }
 
         @Test

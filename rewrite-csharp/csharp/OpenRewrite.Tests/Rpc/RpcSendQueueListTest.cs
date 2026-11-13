@@ -79,6 +79,23 @@ public class RpcSendQueueListTest
         Assert.Equal([NO_CHANGE], SendList(before, before).Select(d => d.State));
     }
 
+    [Fact]
+    public void NullElementsRoundTrip()
+    {
+        string?[] after = [null, "A", null];
+
+        Assert.Equal(after, RoundTripList<string?>(after, []));
+        Assert.Equal(after, RoundTripList<string?>(after, ["B", "A"]));
+    }
+
+    [Fact]
+    public void ElementReplacedByNullRoundTrips()
+    {
+        string?[] after = [null];
+
+        Assert.Equal(after, RoundTripList<string?>(after, ["A"], _ => "same"));
+    }
+
     private static List<RpcObjectData> SendList(IList<string> after, IList<string> before)
     {
         var batch = new List<RpcObjectData>();
@@ -90,15 +107,15 @@ public class RpcSendQueueListTest
         return batch;
     }
 
-    private static IList<string>? RoundTripList(IList<string> after, IList<string> before)
+    private static IList<T>? RoundTripList<T>(IList<T> after, IList<T> before, Func<T, object>? id = null)
     {
         var batches = new Queue<List<RpcObjectData>>();
         var sq = new RpcSendQueue(1, batches.Enqueue,
             new RpcRefs(), null, false);
         var rq = new RpcReceiveQueue(new Dictionary<int, object>(), batches.Dequeue, null);
 
-        sq.SendList(after, before, x => x, null, false);
+        sq.SendList(after, before, id ?? (x => (object?)x ?? "null"), null, false);
         sq.Flush();
-        return rq.ReceiveList(before, (Func<string, string>?)null);
+        return rq.ReceiveList(before, (Func<T, T>?)null);
     }
 }
