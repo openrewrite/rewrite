@@ -443,6 +443,37 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void replaceImportedNestedTypeWithNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A.B", "b.X.Y", true)),
+          java(
+            """
+              package a;
+              public class A {
+                  public static class B {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.A.B;
+
+              class Test {
+                  B b;
+              }
+              """,
+            """
+              import b.X.Y;
+
+              class Test {
+                  Y b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void moveNestedTypeImportedThroughItsOuterTypeToAnotherOuterType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategies.Snake", true)),
@@ -1145,6 +1176,33 @@ class ChangeTypeTest implements RewriteTest {
               class D {
                   Builder x;
                   Foo.Builder y;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifiedNameWithoutTypeReplacedByTopLevelType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo$Builder", "b.Target", true))
+            // a.Foo is not on the classpath, so `Foo.Builder` has no type
+            .typeValidationOptions(TypeValidation.none())
+            .afterTypeValidationOptions(TypeValidation.none().identifiers(true)),
+          java(
+            """
+              import a.Foo;
+              import a.Foo.Builder;
+
+              class D {
+                  Foo.Builder y;
+              }
+              """,
+            """
+              import b.Target;
+
+              class D {
+                  Target y;
               }
               """
           )
