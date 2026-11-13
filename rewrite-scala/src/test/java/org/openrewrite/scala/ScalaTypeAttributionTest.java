@@ -601,6 +601,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
             """,
             spec -> spec.afterRecipe(cu -> {
                 J.Assignment assignment = find(cu, J.Assignment.class, a -> !(a.getVariable() instanceof J.Identifier));
+                // Pending https://github.com/openrewrite/rewrite/issues/9918
                 assertThat(assignment.getVariable()).isInstanceOf(J.FieldAccess.class);
                 J.FieldAccess toUpperCase = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toUpperCase"));
                 EtaExpansion eta = toUpperCase.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
