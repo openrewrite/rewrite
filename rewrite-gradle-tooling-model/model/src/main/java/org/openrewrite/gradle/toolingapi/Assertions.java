@@ -37,7 +37,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.*;
@@ -244,9 +246,32 @@ public class Assertions {
      * {@code org.openrewrite.gradle.local.gradle-user-homes} system property, or null if unset. Left for the build to
      * clean up, as the home's daemons are still writing to it after this JVM exits.
      */
-    private static @Nullable File testGradleUserHome() {
+    private static @Nullable File testGradleUserHome() throws IOException {
         String homes = System.getProperty("org.openrewrite.gradle.local.gradle-user-homes");
-        return homes == null ? null : new File(homes, System.getProperty("org.gradle.test.worker", "0"));
+        if (homes == null) {
+            return null;
+        }
+        Path home = Paths.get(homes, System.getProperty("org.gradle.test.worker", "0"));
+        linkDependencyCache(home, OpenRewriteModelBuilder.defaultGradleUserHome().toPath());
+        return home.toFile();
+    }
+
+    /**
+     * Links the home's dependency cache to the default home's, so that the test JVMs download each dependency once
+     * between them. Where the link can't be made, as on Windows without the privilege, the home keeps a cache of its own.
+     */
+    static void linkDependencyCache(Path gradleUserHome, Path defaultGradleUserHome) throws IOException {
+        Path link = gradleUserHome.resolve("caches/modules-2");
+        if (Files.exists(link, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        Path target = Files.createDirectories(defaultGradleUserHome.resolve("caches/modules-2"));
+        Files.createDirectories(link.getParent());
+        try {
+            Files.createSymbolicLink(link, target);
+        } catch (IOException | UnsupportedOperationException ignored) {
+            // Another test in this JVM may have linked it first
+        }
     }
 
     private static void deleteDirectory(File directoryToBeDeleted) {

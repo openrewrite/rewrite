@@ -91,7 +91,8 @@ public class OpenRewriteModelBuilder {
     /**
      * As {@link #forProjectDirectory(File, File, String)}, but builds in the given Gradle user home, like TestKit's
      * {@code GradleRunner.withTestKitDir}. Builds in separate homes don't wait on each other's cache locks.
-     * Distributions stay in the default home.
+     * Distributions stay in the default home. A fresh home has no {@code gradle.properties} or {@code init.d}, so the
+     * default init script finds no {@code codegenomeUsername} and {@code codegenomePassword} there for plugin snapshots.
      *
      * @param gradleUserHome The Gradle user home to build in, or null for the default one.
      */
@@ -335,7 +336,7 @@ public class OpenRewriteModelBuilder {
         return null;
     }
 
-    private static File defaultGradleUserHome() {
+    static File defaultGradleUserHome() {
         String home = System.getProperty("gradle.user.home");
         if (home == null) {
             home = System.getenv("GRADLE_USER_HOME");
