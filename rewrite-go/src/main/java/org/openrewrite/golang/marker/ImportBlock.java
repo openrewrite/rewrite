@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 @Value
 @With
 public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
@@ -40,9 +43,9 @@ public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
     public void rpcSend(ImportBlock after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
         q.getAndSend(after, ImportBlock::isClosePrevious);
-        q.getAndSend(after, ImportBlock::getBefore, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
         q.getAndSend(after, ImportBlock::isGrouped);
-        q.getAndSend(after, ImportBlock::getGroupedBefore, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getGroupedBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

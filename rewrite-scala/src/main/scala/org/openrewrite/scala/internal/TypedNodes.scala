@@ -23,6 +23,7 @@ import dotty.tools.dotc.typer.{Typer, TyperPhase}
 
 import java.util.{Collections, IdentityHashMap}
 import scala.collection.mutable
+import scala.util.control.NonFatal
 
 /**
  * What the typer made of a node of the untyped tree: `own` is the node typed on its own,
@@ -75,7 +76,10 @@ object TypedNodes {
   }
 }
 
-/** The nodes of an untyped tree that have a source range, by range and kind, in pre-order. */
+/**
+ * The nodes of an untyped tree that have a source range, by range and kind, in pre-order. The
+ * annotations of definitions are included, though the trees' own traversal leaves them out.
+ */
 private[internal] final class UntypedNodeIndex private (nodes: mutable.Map[UntypedNodeIndex.Key, mutable.ArrayBuffer[untpd.Tree]]) {
   def at(key: UntypedNodeIndex.Key): collection.Seq[untpd.Tree] = nodes.getOrElse(key, Nil)
 
@@ -93,11 +97,17 @@ private[internal] object UntypedNodeIndex {
           if (tree.span.exists) {
             nodes.getOrElseUpdate((tree.span.start, tree.span.end, tree.getClass), mutable.ArrayBuffer.empty) += tree
           }
+          tree match {
+            case member: untpd.MemberDef => member.mods.annotations.foreach(traverse)
+            case _ =>
+          }
           traverseChildren(tree)
         }
       }.traverse(tree)
     } catch {
-      case _: Throwable =>
+      // A long infix chain parses fine but can be too deep to traverse. compileAll keeps each
+      // source's unit, entry and tree in parallel lists, which a throw here would put out of step.
+      case NonFatal(_) | _: StackOverflowError =>
     }
     new UntypedNodeIndex(nodes)
   }

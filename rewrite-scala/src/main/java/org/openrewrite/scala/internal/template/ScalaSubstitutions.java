@@ -15,7 +15,10 @@
  */
 package org.openrewrite.scala.internal.template;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.scala.ScalaParenthesizeVisitor;
 
 import static java.util.Collections.emptySet;
 
@@ -32,5 +35,10 @@ public class ScalaSubstitutions extends Substitutions {
     @Override
     protected String newPrimitiveParameter(String fqn, int index) {
         return newObjectParameter(Character.toUpperCase(fqn.charAt(0)) + fqn.substring(1), index);
+    }
+
+    @Override
+    public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
+        return ScalaParenthesizeVisitor.maybeParenthesize(newTree, cursor);
     }
 }

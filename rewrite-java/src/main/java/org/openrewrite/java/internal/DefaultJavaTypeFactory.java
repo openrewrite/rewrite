@@ -18,6 +18,7 @@ package org.openrewrite.java.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -97,6 +98,19 @@ public class DefaultJavaTypeFactory implements JavaTypeFactory {
             return cached;
         }
         JavaType.GenericTypeVariable stub = new JavaType.GenericTypeVariable(null, name, variance, null);
+        cache.put(signature, stub);
+        initializer.accept(stub);
+        return stub;
+    }
+
+    @Override
+    public JavaType.MultiCatch computeMultiCatch(String signature,
+                                                 Consumer<JavaType.MultiCatch> initializer) {
+        JavaType.MultiCatch cached = cache.get(signature);
+        if (cached != null) {
+            return cached;
+        }
+        JavaType.MultiCatch stub = new JavaType.MultiCatch((List<JavaType>) null);
         cache.put(signature, stub);
         initializer.accept(stub);
         return stub;

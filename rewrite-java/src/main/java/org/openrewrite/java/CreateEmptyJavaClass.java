@@ -101,11 +101,16 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(cu.getSourcePath())) {
+                if (Boolean.TRUE.equals(overwriteExisting) && path.equals(cu.getSourcePath()) &&
+                    !cu.printAll().equals(emptyClassSource())) {
                     Optional<SourceFile> sourceFile = createEmptyClass().findFirst();
                     if (sourceFile.isPresent() && sourceFile.get() instanceof J.CompilationUnit) {
                         J.CompilationUnit newCu = (J.CompilationUnit) sourceFile.get();
-                        return cu.withClasses(newCu.getClasses()).withSourcePath(path);
+                        return cu.withPrefix(newCu.getPrefix())
+                                .getPadding().withPackageDeclaration(newCu.getPadding().getPackageDeclaration())
+                                .getPadding().withImports(newCu.getPadding().getImports())
+                                .withClasses(newCu.getClasses())
+                                .withEof(newCu.getEof());
                     }
                 }
 
@@ -115,10 +120,14 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     }
 
     private Stream<SourceFile> createEmptyClass() {
-        String packageModifier = "package-private".equals(modifier) ? "" : modifier + " ";
         return JavaParser.fromJavaVersion().build()
-                .parse(String.format(CreateEmptyJavaClass.NEW_CLASS_TEMPLATE, packageName, packageModifier, className))
+                .parse(emptyClassSource())
                 .map(brandNewFile -> brandNewFile.withSourcePath(getSourcePath()));
+    }
+
+    private String emptyClassSource() {
+        String packageModifier = "package-private".equals(modifier) ? "" : modifier + " ";
+        return String.format(CreateEmptyJavaClass.NEW_CLASS_TEMPLATE, packageName, packageModifier, className);
     }
 
     @SuppressWarnings("java:S1075")

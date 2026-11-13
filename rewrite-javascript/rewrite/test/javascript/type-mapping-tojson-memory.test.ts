@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {execFileSync} from "node:child_process";
 import v8 from "node:v8";
 import vm from "node:vm";
 import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
@@ -41,6 +42,39 @@ function forceGc(): void {
     } finally {
         v8.setFlagsFromString("--no-expose_gc");
     }
+}
+
+/**
+ * The heap that `instances` class types retain, each given its `toJSON` by the expression `toJSON`, and how many
+ * distinct functions they hold. It is measured in a node process of its own, since a test worker's heap grows and
+ * shrinks by megabytes with what its other tests leave behind, which is more than the closures cost.
+ */
+function retained(toJSON: string, instances: number): { bytes: number, functions: number } {
+    const shape = {
+        kind: Type.Kind.Class,
+        flags: 0,
+        classKind: Type.Class.Kind.Class,
+        fullyQualifiedName: "com.example.Sample",
+        typeParameters: [],
+        annotations: [],
+        interfaces: [],
+        members: [],
+        methods: []
+    };
+    const script = `
+        const signature = type => type.fullyQualifiedName;
+        const shared = function () { return signature(this); };
+        gc();
+        const before = process.memoryUsage().heapUsed;
+        const types = [];
+        for (let i = 0; i < ${instances}; i++) {
+            types.push({...${JSON.stringify(shape)}, toJSON: ${toJSON}});
+        }
+        gc();
+        const bytes = process.memoryUsage().heapUsed - before;
+        console.log(JSON.stringify({bytes, functions: new Set(types.map(type => type.toJSON)).size}));
+    `;
+    return JSON.parse(execFileSync(process.execPath, ["--expose-gc", "-e", script], {encoding: "utf8"}));
 }
 
 function collectDistinctToJSON(root: unknown, into: Set<Function>): void {
@@ -87,54 +121,19 @@ test("parsing the same file repeatedly does not accumulate distinct toJSON closu
 }, 300000);
 
 test("per-instance toJSON closures retain heap that a shared function does not", () => {
-    // given
-    const instances = 10_000;
-    const classShape = () => ({
-        kind: Type.Kind.Class,
-        flags: 0,
-        classKind: Type.Class.Kind.Class,
-        fullyQualifiedName: "com.example.Sample",
-        typeParameters: [],
-        annotations: [],
-        interfaces: [],
-        members: [],
-        methods: []
-    });
+    // given: enough closures that their cost, about 6 MB, dwarfs how far a fresh process's heap moves between runs
+    const instances = 100_000;
 
-    // when: the pre-fix shape mints a fresh closure per instance
-    forceGc();
-    const baseline = process.memoryUsage().heapUsed;
-    let perInstance: object[] | null = [];
-    const perInstanceFns = new Set<Function>();
-    for (let i = 0; i < instances; i++) {
-        const type = {...classShape(), toJSON: function (this: Type) { return Type.signature(this); }} as Type.Class;
-        perInstance.push(type);
-        perInstanceFns.add(type.toJSON as Function);
-    }
-    forceGc();
-    const perInstanceBytes = process.memoryUsage().heapUsed - baseline;
+    // when: the pre-fix shape mints a fresh closure per instance, and the post-fix shape shares one hoisted function
+    const perInstance = retained("function () { return signature(this); }", instances);
+    const shared = retained("shared", instances);
 
-    perInstance = null;
-    forceGc();
-
-    // and: the post-fix shape references one hoisted function
-    const shared = function (this: Type) { return Type.signature(this); };
-    const beforeShared = process.memoryUsage().heapUsed;
-    let sharedInstances: object[] | null = [];
-    const sharedFns = new Set<Function>();
-    for (let i = 0; i < instances; i++) {
-        const type = {...classShape(), toJSON: shared} as Type.Class;
-        sharedInstances.push(type);
-        sharedFns.add(type.toJSON as Function);
-    }
-    forceGc();
-    const sharedBytes = process.memoryUsage().heapUsed - beforeShared;
-
-    console.log(`[toJSON] ${instances} instances -> per-instance: ${perInstanceFns.size} closures, ${(perInstanceBytes / (1024 * 1024)).toFixed(2)} MB; shared: ${sharedFns.size} closure, ${(sharedBytes / (1024 * 1024)).toFixed(2)} MB`);
-    void sharedInstances;
+    const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2);
+    console.log(`[toJSON] ${instances} instances -> per-instance: ${perInstance.functions} closures, ` +
+        `${mb(perInstance.bytes)} MB; shared: ${shared.functions} closure, ${mb(shared.bytes)} MB`);
 
     // then
-    expect(perInstanceFns.size).toBe(instances);
-    expect(sharedFns.size).toBe(1);
-    expect(perInstanceBytes).toBeGreaterThan(sharedBytes);
+    expect(perInstance.functions).toBe(instances);
+    expect(shared.functions).toBe(1);
+    expect(perInstance.bytes).toBeGreaterThan(shared.bytes);
 }, 120000);

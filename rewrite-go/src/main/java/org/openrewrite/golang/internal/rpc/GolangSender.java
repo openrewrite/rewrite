@@ -29,8 +29,9 @@ import org.openrewrite.rpc.Reference;
 
 import java.util.Objects;
 
-import static org.openrewrite.rpc.Reference.getValueNonNull;
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 public class GolangSender extends GolangVisitor<RpcSendQueue> {
     private final GolangSenderDelegate delegate = new GolangSenderDelegate(this);
@@ -46,7 +47,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+        q.getAndSend(j, x -> spaceRef(x.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(j, mk -> asRef(withoutNulls(mk.getMarkers())));
         return j;
     }
@@ -68,7 +69,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(cu, c -> c.getPadding().getPackageDecl(), el -> visitRightPadded(el, q));
         q.getAndSend(cu, Go.CompilationUnit::getImportsContainer, c -> visitContainer(c, q));
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, Go.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, x -> spaceRef(x.getEof()), space -> visitSpace(getValueNonNull(space), q));
         return cu;
     }
 
@@ -120,11 +121,11 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitSliceExpr(Go.SliceExpr slice, RpcSendQueue q) {
         q.getAndSend(slice, Go.SliceExpr::getIndexed, el -> visit(el, q));
-        q.getAndSend(slice, Go.SliceExpr::getOpenBracket, space -> visitSpace(space, q));
+        q.getAndSend(slice, x -> spaceRef(x.getOpenBracket()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(slice, s -> s.getPadding().getLow(), el -> visitRightPadded(el, q));
         q.getAndSend(slice, s -> s.getPadding().getHigh(), el -> visitRightPadded(el, q));
         q.getAndSend(slice, Go.SliceExpr::getMax, el -> visit(el, q));
-        q.getAndSend(slice, Go.SliceExpr::getCloseBracket, space -> visitSpace(space, q));
+        q.getAndSend(slice, x -> spaceRef(x.getCloseBracket()), space -> visitSpace(getValueNonNull(space), q));
         return slice;
     }
 
@@ -138,7 +139,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
 
     @Override
     public J visitMapType(Go.MapType mapType, RpcSendQueue q) {
-        q.getAndSend(mapType, Go.MapType::getOpenBracket, space -> visitSpace(space, q));
+        q.getAndSend(mapType, x -> spaceRef(x.getOpenBracket()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
         q.getAndSend(mapType, Go.MapType::getValue, el -> visit(el, q));
         q.getAndSend(mapType, m -> Reference.asRef(m.getType()), type -> visitType(getValueNonNull(type), q));
@@ -278,7 +279,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitCommClause(Go.CommClause commClause, RpcSendQueue q) {
         q.getAndSend(commClause, Go.CommClause::getComm, el -> visit(el, q));
-        q.getAndSend(commClause, Go.CommClause::getColon, space -> visitSpace(space, q));
+        q.getAndSend(commClause, x -> spaceRef(x.getColon()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(commClause, c -> c.getPadding().getBody(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         return commClause;
     }
@@ -319,7 +320,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitGoVariadic(Go.Variadic variadic, RpcSendQueue q) {
         q.getAndSend(variadic, Go.Variadic::getElement, el -> visit(el, q));
-        q.getAndSend(variadic, Go.Variadic::getDots, space -> visitSpace(space, q));
+        q.getAndSend(variadic, x -> spaceRef(x.getDots()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(variadic, Go.Variadic::isPostfix);
         q.getAndSend(variadic, v -> Reference.asRef(v.getType()), type -> visitType(getValueNonNull(type), q));
         return variadic;

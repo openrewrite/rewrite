@@ -86,8 +86,7 @@ public class UsesImport extends Recipe {
                     return tree;
                 }
                 Py.CompilationUnit cu = (Py.CompilationUnit) tree;
-                AtomicBoolean found = new AtomicBoolean(false);
-                new PythonIsoVisitor<AtomicBoolean>() {
+                AtomicBoolean found = new PythonIsoVisitor<AtomicBoolean>() {
                     @Override
                     public Py.MultiImport visitMultiImport(Py.MultiImport multiImport, AtomicBoolean f) {
                         if (f.get()) {
@@ -124,7 +123,7 @@ public class UsesImport extends Recipe {
                         }
                         return import_;
                     }
-                }.visit(cu, found);
+                }.reduce(cu, new AtomicBoolean(false));
                 return found.get() ? SearchResult.found(cu) : cu;
             }
         };

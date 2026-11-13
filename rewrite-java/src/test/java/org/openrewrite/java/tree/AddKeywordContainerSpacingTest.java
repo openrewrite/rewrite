@@ -22,6 +22,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
@@ -47,11 +49,13 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                       return method;
                   }
                   maybeAddImport("java.io.IOException");
+                  JavaType.FullyQualified ioExceptionType = JavaType.ShallowClass.build("java.io.IOException");
                   J.Identifier ioException = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          emptyList(), "IOException",
-                          JavaType.ShallowClass.build("java.io.IOException"), null);
-                  return method.withThrows(singletonList(ioException));
+                          emptyList(), "IOException", ioExceptionType, null);
+                  J.MethodDeclaration m = method.withThrows(singletonList(ioException));
+                  return m.getMethodType() == null ? m :
+                          m.withMethodType(m.getMethodType().withThrownExceptions(singletonList(ioExceptionType)));
               }
           })),
           //language=java
@@ -217,6 +221,22 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                           emptyList(), "Comparable",
                           JavaType.ShallowClass.build("java.lang.Comparable"), null);
                   return typeParam.withBounds(singletonList(comparable));
+              }
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                  if (c == classDecl || !(c.getType() instanceof JavaType.Parameterized) ||
+                      !(((JavaType.Parameterized) c.getType()).getType() instanceof JavaType.Class)) {
+                      return c;
+                  }
+                  List<JavaType> typeParameters = singletonList(new JavaType.GenericTypeVariable(null, "T",
+                          JavaType.GenericTypeVariable.Variance.COVARIANT,
+                          singletonList(JavaType.ShallowClass.build("java.lang.Comparable"))));
+                  JavaType.Class classType = (JavaType.Class) ((JavaType.Parameterized) c.getType()).getType();
+                  JavaType.Parameterized type = new JavaType.Parameterized(null,
+                          classType.withTypeParameters(typeParameters), typeParameters);
+                  return c.withType(type).withName(c.getName().withType(type));
               }
           })),
           //language=java

@@ -637,7 +637,7 @@ public interface JavaType {
             if (!(o instanceof Class)) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                   (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
+                   getTypeParameters().equals(aClass.getTypeParameters());
         }
 
         @Override
@@ -994,7 +994,7 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof Parameterized)) return false;
             Parameterized that = (Parameterized) o;
-            return Objects.equals(type, that.type) && Arrays.equals(typeParameters, that.typeParameters);
+            return Objects.equals(getType(), that.getType()) && getTypeParameters().equals(that.getTypeParameters());
         }
 
         @Override
@@ -1077,13 +1077,43 @@ public interface JavaType {
             return this;
         }
 
+        // Bound containers call equals without a context, so carry active pairs through those calls.
+        // Each top-level comparison releases its thread-local state, including on failure.
+        private static final ThreadLocal<TypeUtils.ComparisonContext> EQUALITY_CONTEXT = new ThreadLocal<>();
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof GenericTypeVariable)) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
-            return name.equals(that.name) && variance == that.variance &&
-                   (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
+            if (!name.equals(that.name) || variance != that.variance) {
+                return false;
+            }
+            List<JavaType> bounds = getBounds(), thatBounds = that.getBounds();
+            if (bounds.isEmpty() || thatBounds.isEmpty()) {
+                return variance == Variance.INVARIANT && bounds.isEmpty() && thatBounds.isEmpty();
+            }
+            TypeUtils.ComparisonContext parent = EQUALITY_CONTEXT.get();
+            TypeUtils.ComparisonContext context = parent == null ? TypeUtils.ComparisonContext.BOUND : parent;
+            if (context.isComparing(this, that)) {
+                return true;
+            }
+            EQUALITY_CONTEXT.set(context.enterComparison(this, that));
+            try {
+                return bounds.equals(thatBounds);
+            } finally {
+                if (parent == null) {
+                    EQUALITY_CONTEXT.remove();
+                } else {
+                    EQUALITY_CONTEXT.set(parent);
+                }
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            // Bounds may be cyclic. Equal variables always have the same name and variance.
+            return 31 * name.hashCode() + variance.hashCode();
         }
 
         @Override
@@ -1157,7 +1187,7 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof Array)) return false;
             Array array = (Array) o;
-            return Objects.equals(elemType, array.elemType);
+            return Objects.equals(getElemType(), array.getElemType());
         }
 
         @Override
@@ -1652,7 +1682,8 @@ public interface JavaType {
         }
 
         public Method withFlags(Set<Flag> flags) {
-            return withFlagsBitMap(Flag.flagsToBitMap(flags));
+            // the mark of a C# extension method isn't one of the flags
+            return withFlagsBitMap(Flag.flagsToBitMap(flags) | flagsBitMap & EXTENSION_METHOD_FLAG);
         }
 
         /**
@@ -1668,9 +1699,9 @@ public interface JavaType {
             if (!(o instanceof Method)) return false;
             Method method = (Method) o;
             return Objects.equals(name, method.name) &&
-                   Objects.equals(declaringType, method.declaringType) &&
-                   Objects.equals(returnType, method.returnType) &&
-                   Arrays.equals(parameterTypes, method.parameterTypes);
+                   Objects.equals(getDeclaringType(), method.getDeclaringType()) &&
+                   Objects.equals(getReturnType(), method.getReturnType()) &&
+                   getParameterTypes().equals(method.getParameterTypes());
         }
 
         @Override
@@ -1799,7 +1830,7 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof Variable)) return false;
             Variable variable = (Variable) o;
-            return Objects.equals(name, variable.name) && Objects.equals(owner, variable.owner);
+            return Objects.equals(name, variable.name) && Objects.equals(getOwner(), variable.getOwner());
         }
 
         @Override

@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -615,6 +616,96 @@ class UsesTypeTest implements RewriteTest {
               <!--~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
                   <bean id="abc" class="a.b.Outer$Inner"/>
               </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedImportCountsAsUse() {
+        // Spring Boot 4's migration removed spring-boot-starter-aop when AspectJ types did not resolve
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.ProceedingJoinPoint", false)))
+            .typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)), // no AspectJ
+          java(
+            """
+              import org.aspectj.lang.ProceedingJoinPoint;
+              import org.aspectj.lang.annotation.Around;
+
+              class LoggingAspect {
+                  @Around("execution(* *(..))")
+                  Object log(ProceedingJoinPoint pjp) throws Throwable {
+                      return pjp.proceed();
+                  }
+              }
+              """,
+            """
+              /*~~>*/import org.aspectj.lang.ProceedingJoinPoint;
+              import org.aspectj.lang.annotation.Around;
+
+              class LoggingAspect {
+                  @Around("execution(* *(..))")
+                  Object log(ProceedingJoinPoint pjp) throws Throwable {
+                      return pjp.proceed();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"org.aspectj..*", "org.aspectj.lang.annotation.*", "org.aspectj.lang.annotation.A*"})
+    void unresolvedImportMatchesPatterns(String pattern) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(pattern, false)))
+            .typeValidationOptions(TypeValidation.all().identifiers(false)), // no AspectJ
+          java(
+            """
+              import org.aspectj.lang.annotation.Aspect;
+
+              @Aspect
+              class LoggingAspect {
+              }
+              """,
+            """
+              /*~~>*/import org.aspectj.lang.annotation.Aspect;
+
+              @Aspect
+              class LoggingAspect {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedImportOfAnotherTypeOrAPackageIsNotAUse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.annotation.Aspect", false))),
+          java(
+            """
+              import org.aspectj.lang.annotation.*;
+              import org.aspectj.lang.ProceedingJoinPoint;
+
+              class NotQuiteAnAspect {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void resolvedImportIsMatchedByTypeAsBefore() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collections", false))),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
+              }
               """
           )
         );

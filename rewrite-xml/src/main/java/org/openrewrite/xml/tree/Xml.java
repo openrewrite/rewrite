@@ -352,7 +352,7 @@ public interface Xml extends Tree {
                 return this;
             }
             CharData charData;
-            if (content != null && content.get(0) instanceof CharData) {
+            if (content != null && !content.isEmpty() && content.get(0) instanceof CharData) {
                 charData = ((CharData) content.get(0)).withText(value);
             } else {
                 charData = new CharData(randomId(), "", Markers.EMPTY,
@@ -869,7 +869,7 @@ public interface Xml extends Tree {
         String type;
 
         public JspDirective withType(String type) {
-            if (this.type.equals(type)) {
+            if (type.equals(this.type)) {
                 return this;
             }
             return new JspDirective(id, prefixUnsafe, markers, beforeTypePrefix, type, attributes,

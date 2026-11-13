@@ -32,9 +32,7 @@ public class FindInheritedFields {
     }
 
     public static Set<JavaType.Variable> find(J j, String clazz) {
-        Set<JavaType.Variable> fields = new HashSet<>();
-        new FindInheritedFieldsVisitor(clazz).visit(j, fields);
-        return fields;
+        return new FindInheritedFieldsVisitor(clazz).reduce(j, new HashSet<>());
     }
 
     private static class FindInheritedFieldsVisitor extends JavaIsoVisitor<Set<JavaType.Variable>> {

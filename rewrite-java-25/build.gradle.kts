@@ -39,6 +39,10 @@ java {
 
 tasks.named("licenseFormat") { enabled = false }
 
+// Lombok calls sun.misc.Unsafe, which JDK 25 warns about in every compiler and test JVM that loads it. This also
+// hides rewrite's own Unsafe use, so drop it once Lombok stops, and before any JDK that denies Unsafe by default.
+val allowSunMiscUnsafe = "--sun-misc-unsafe-memory-access=allow"
+
 tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_25.toString()
     targetCompatibility = JavaVersion.VERSION_25.toString()
@@ -55,6 +59,11 @@ tasks.withType<JavaCompile>().configureEach {
             "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
         )
     )
+    options.forkOptions.jvmArgs!!.add(allowSunMiscUnsafe)
+}
+
+tasks.withType<Test>().configureEach {
+    jvmArgs(allowSunMiscUnsafe)
 }
 
 //Javadoc compiler will complain about the use of the internal types.
@@ -70,7 +79,7 @@ tasks.withType<Javadoc>().configureEach {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class)
+        val test = getByName<JvmTestSuite>("test")
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
@@ -86,7 +95,7 @@ testing {
                     testTask.configure {
                         useJUnitPlatform()
                         testClassesDirs += javaTckClasses
-                        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+                        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames", allowSunMiscUnsafe)
                         shouldRunAfter(test)
                     }
                 }
@@ -108,6 +117,11 @@ normalization {
             ignoreCompletely()
         }
     }
+}
+
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
 }
 
 tasks.named("check") {

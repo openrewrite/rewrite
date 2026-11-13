@@ -58,8 +58,8 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
 
     @Override
     public Py.CompilationUnit visitCompilationUnit(Py.CompilationUnit compilationUnit, P p) {
-        ListUtils.map(compilationUnit.getImports(), el -> visitAndValidateNonNull(el, J.Import.class, p));
-        ListUtils.map(compilationUnit.getStatements(), el -> visitAndValidateNonNull(el, Statement.class, p));
+        visitAndValidate(compilationUnit.getImports(), J.Import.class, p);
+        visitAndValidate(compilationUnit.getStatements(), Statement.class, p);
         return compilationUnit;
     }
 
@@ -84,7 +84,7 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
 
     @Override
     public Py.ChainedAssignment visitChainedAssignment(Py.ChainedAssignment chainedAssignment, P p) {
-        ListUtils.map(chainedAssignment.getVariables(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        visitAndValidate(chainedAssignment.getVariables(), Expression.class, p);
         visitAndValidateNonNull(chainedAssignment.getAssignment(), Expression.class, p);
         return chainedAssignment;
     }
@@ -110,7 +110,7 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
     @Override
     public Py.ComprehensionExpression visitComprehensionExpression(Py.ComprehensionExpression comprehensionExpression, P p) {
         visitAndValidateNonNull(comprehensionExpression.getResult(), Expression.class, p);
-        ListUtils.map(comprehensionExpression.getClauses(), el -> visitAndValidateNonNull(el, Py.ComprehensionExpression.Clause.class, p));
+        visitAndValidate(comprehensionExpression.getClauses(), Py.ComprehensionExpression.Clause.class, p);
         return comprehensionExpression;
     }
 
@@ -136,19 +136,19 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
 
     @Override
     public Py.UnionType visitUnionType(Py.UnionType unionType, P p) {
-        ListUtils.map(unionType.getTypes(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        visitAndValidate(unionType.getTypes(), Expression.class, p);
         return unionType;
     }
 
     @Override
     public Py.VariableScope visitVariableScope(Py.VariableScope variableScope, P p) {
-        ListUtils.map(variableScope.getNames(), el -> visitAndValidateNonNull(el, J.Identifier.class, p));
+        visitAndValidate(variableScope.getNames(), J.Identifier.class, p);
         return variableScope;
     }
 
     @Override
     public Py.Del visitDel(Py.Del del, P p) {
-        ListUtils.map(del.getTargets(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        visitAndValidate(del.getTargets(), Expression.class, p);
         return del;
     }
 
@@ -194,7 +194,7 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
 
     @Override
     public Py.MatchCase.Pattern visitMatchCasePattern(Py.MatchCase.Pattern pattern, P p) {
-        ListUtils.map(pattern.getChildren(), el -> visitAndValidateNonNull(el, J.class, p));
+        visitAndValidate(pattern.getChildren(), J.class, p);
         return pattern;
     }
 
@@ -229,19 +229,19 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
 
     @Override
     public Py.DictLiteral visitDictLiteral(Py.DictLiteral dictLiteral, P p) {
-        ListUtils.map(dictLiteral.getElements(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        visitAndValidate(dictLiteral.getElements(), Expression.class, p);
         return dictLiteral;
     }
 
     @Override
     public Py.CollectionLiteral visitCollectionLiteral(Py.CollectionLiteral collectionLiteral, P p) {
-        ListUtils.map(collectionLiteral.getElements(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        visitAndValidate(collectionLiteral.getElements(), Expression.class, p);
         return collectionLiteral;
     }
 
     @Override
     public Py.FormattedString visitFormattedString(Py.FormattedString formattedString, P p) {
-        ListUtils.map(formattedString.getParts(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        visitAndValidate(formattedString.getParts(), Expression.class, p);
         return formattedString;
     }
 
@@ -269,7 +269,7 @@ public class PythonValidator<P> extends PythonIsoVisitor<P> {
 
     @Override
     public J.Block visitBlock(J.Block block, P p) {
-        ListUtils.map(block.getStatements(), el -> visitAndValidateNonNull(el, Statement.class, p));
+        visitAndValidate(block.getStatements(), Statement.class, p);
         return block;
     }
 

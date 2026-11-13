@@ -18,6 +18,7 @@ package org.openrewrite.gradle.gradle9;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -28,11 +29,15 @@ import org.openrewrite.groovy.marker.StarDot;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.Space;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
@@ -51,8 +56,8 @@ public class RewriteSpreadAllInConfigurationsBlock extends Recipe {
         return "Gradle 9 throws `Cannot mutate the dependencies of configuration ':all' after the configuration was resolved.` " +
                 "when a `configurations { }` closure uses Groovy's spread-dot form `all*.<method>(args)`. " +
                 "Rewrite each such call to the closure form `configurations.all { <method>(args) }`, which preserves " +
-                "eager-`all` semantics but is accepted by Gradle 9. Only applied when every statement in the " +
-                "`configurations { }` block uses the spread form; mixed blocks are left untouched for manual review.";
+                "eager-`all` semantics but is accepted by Gradle 9. In mixed blocks, contiguous spread calls are " +
+                "grouped in `all { }` closures, leaving named configurations and other statements in place.";
     }
 
     @Override
@@ -72,8 +77,37 @@ public class RewriteSpreadAllInConfigurationsBlock extends Recipe {
                 J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
                 J.Block body = (J.Block) lambda.getBody();
                 List<Statement> statements = body.getStatements();
-                if (statements.isEmpty() || !statements.stream().allMatch(RewriteSpreadAllInConfigurationsBlock::isSpreadAll)) {
+                if (statements.stream().noneMatch(RewriteSpreadAllInConfigurationsBlock::isSpreadAll)) {
                     return m;
+                }
+                if (!statements.stream().allMatch(RewriteSpreadAllInConfigurationsBlock::isSpreadAll)) {
+                    List<Statement> mixed = new ArrayList<>();
+                    Cursor bodyCursor = new Cursor(new Cursor(getCursor(), lambda), body);
+                    for (int i = 0; i < statements.size();) {
+                        if (!isSpreadAll(statements.get(i))) {
+                            mixed.add(statements.get(i++));
+                            continue;
+                        }
+                        int start = i++;
+                        while (i < statements.size() && isSpreadAll(statements.get(i))) {
+                            i++;
+                        }
+                        List<Statement> group = ListUtils.map(statements.subList(start, i),
+                                RewriteSpreadAllInConfigurationsBlock::stripSpread);
+                        J.MethodInvocation all = GroovyTemplate.builder("all {\n}")
+                                .build()
+                                .apply(getCursor(), m.getCoordinates().replace());
+                        J.Lambda allLambda = (J.Lambda) all.getArguments().get(0);
+                        J.Block allBody = (J.Block) allLambda.getBody();
+                        // A group's leading comments belong before its new all block, not inside it.
+                        all = all.withPrefix(group.get(0).getPrefix());
+                        group = ListUtils.mapFirst(group, first -> first.withPrefix(Space.format("\n")));
+                        allBody = allBody.getPadding().withStatements(JRightPadded.withElements(
+                                body.getPadding().getStatements().subList(start, i), group));
+                        all = all.withArguments(singletonList(allLambda.withBody(allBody)));
+                        mixed.add(autoIndent(all, ctx, bodyCursor));
+                    }
+                    return m.withArguments(singletonList(lambda.withBody(body.withStatements(mixed))));
                 }
                 List<Statement> stripped = ListUtils.map(statements, RewriteSpreadAllInConfigurationsBlock::stripSpread);
 
@@ -117,7 +151,13 @@ public class RewriteSpreadAllInConfigurationsBlock extends Recipe {
             return (J.MethodInvocation) statement;
         }
         if (statement instanceof J.Return) {
-            Expression expression = ((J.Return) statement).getExpression();
+            J.Return ret = (J.Return) statement;
+            // Moving an explicit return into a new closure changes which closure it exits.
+            if (!ret.getMarkers().findFirst(ImplicitReturn.class).isPresent() &&
+                !ret.getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isPresent()) {
+                return null;
+            }
+            Expression expression = ret.getExpression();
             if (expression instanceof J.MethodInvocation) {
                 return (J.MethodInvocation) expression;
             }

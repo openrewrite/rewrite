@@ -233,6 +233,29 @@ export function namesReferencedWithin(node: unknown, cacheKey: object = node as 
     return names;
 }
 
+/**
+ * As {@link namesReferencedWithin}, less the names read only as values. An export clause reads
+ * with any meaning, so its names are kept.
+ */
+export function namesReferencedAsTypesWithin(node: unknown): ReadonlySet<string> {
+    const names = new Set<string>();
+    treesIn(node).forEach(tree => readReferences(tree, undefined, undefined, 'value', (identifier, reading, scopes) => {
+        if (reading !== undefined && reading !== 'value' && reading !== 'write' &&
+            !bindingFrame(scopes, identifier.simpleName, reading)) {
+            names.add(identifier.simpleName);
+        }
+    }));
+    return names;
+}
+
+/** The values a file's own top-level declarations bind, leaving out what its imports bind. */
+export function valuesDeclaredAtTopLevel(cu: JS.CompilationUnit): ReadonlySet<string> {
+    const statements = cu.statements.filter(s => s.element?.kind !== JS.Kind.Import);
+    return new Set([...declaredNames(statements), ...hoistedNames(statements)]
+        .filter(declaration => declaration.meanings.includes('value'))
+        .map(declaration => declaration.identifier.simpleName));
+}
+
 /** The scopes enclosing a node, innermost first, each paired with what {@link frameBindings} reads. */
 interface Frames {
     node: Tree;
@@ -388,8 +411,11 @@ function writes(node: Tree, key: string): boolean {
     switch (node.kind) {
         case J.Kind.Assignment:
         case J.Kind.AssignmentOperation:
-        case JS.Kind.AssignmentOperation:
             return key === 'variable';
+        case JS.Kind.AssignmentOperation:
+            // `a ** b` as parsed before it was a JS.Binary assigns nothing
+            return key === 'variable' &&
+                (node as JS.AssignmentOperation).operator.element !== JS.AssignmentOperation.Type.Power;
         case J.Kind.Unary:
             return key === 'expression' && incrementing.has((node as J.Unary).operator.element);
         case J.Kind.ForEachLoopControl:
@@ -760,8 +786,8 @@ function enumMemberNames(body: J.Block): Bound[] {
     });
 }
 
-/** The identifier a dotted name `A.B.C` declares, which is `A`: the rest are members of it. */
-function rootName(name: J | undefined): J | undefined {
+/** The root of a dotted name: `A` in `A.B.C`. */
+export function rootName(name: J | undefined): J | undefined {
     return name?.kind === J.Kind.FieldAccess ? rootName((name as J.FieldAccess).target) : name;
 }
 
@@ -1076,6 +1102,15 @@ export function resolve(cursor: Cursor, identifier: J.Identifier): J | undefined
 }
 
 /**
+ * Whether the identifier reads a name nothing in the file binds where it stands, a global or nothing
+ * at all. An identifier that names rather than reads is not free. The cursor is as {@link resolve} takes it.
+ */
+export function isFree(cursor: Cursor, identifier: J.Identifier): boolean {
+    const [scopes, reading] = position(pathTo(cursor, identifier), identifier);
+    return reading !== undefined && bindingFrame(scopes, identifier.simpleName, reading) === undefined;
+}
+
+/**
  * Whether the identifier is assigned to where it stands. An assignment's target, plain or compound,
  * is, and so are the operand of `++` or `--`, the head of a for-in or for-of declaring nothing, and
  * a name in such a target's destructuring pattern. A write resolves as a value read, since
@@ -1083,6 +1118,19 @@ export function resolve(cursor: Cursor, identifier: J.Identifier): J | undefined
  */
 export function isWrite(cursor: Cursor, identifier: J.Identifier): boolean {
     return position(pathTo(cursor, identifier), identifier)[1] === 'write';
+}
+
+/**
+ * Whether the node at the cursor is assigned to, in the positions {@link isWrite} names, for any node
+ * rather than only an identifier: `x.y` in `x.y = 1`, or a whole destructuring target and each part
+ * of it, as `[a = 1]` and `a = 1` are in `[a = 1] = list` and `for ([a = 1] of lists)`. A `J.Assignment`
+ * that is one is a destructuring default, ESTree's `AssignmentPattern`. A declaration's pattern, as in
+ * `const [a = 1] = list`, names rather than assigns, and so does not count.
+ */
+export function isAssignmentTarget(cursor: Cursor): boolean {
+    const path = treePath(cursor);
+    const node = path.pop();
+    return node !== undefined && node === cursor.value && path.length > 0 && position(path, node)[1] === 'write';
 }
 
 /** One identifier referring to a binding, from {@link referencesOf}. */

@@ -52,36 +52,10 @@ class RequirementsTxtParserTest {
     }
 
     @Test
-    void parsesFreezeOutputIncludingTransitives() {
-        String freezeContent = """
-                certifi==2024.2.2
-                charset-normalizer==3.3.2
-                idna==3.6
-                requests==2.31.0
-                urllib3==2.2.1
-                """;
-
-        List<ResolvedDependency> resolved = RequirementsTxtParser.parseFreezeLines(freezeContent);
-        assertThat(resolved).hasSize(5);
-        assertThat(resolved.get(0).getName()).isEqualTo("certifi");
-        assertThat(resolved.get(0).getVersion()).isEqualTo("2024.2.2");
-        assertThat(resolved.get(3).getName()).isEqualTo("requests");
-        assertThat(resolved.get(3).getVersion()).isEqualTo("2.31.0");
-
-        // pip freeze is flat — no transitive dependency graph info
-        for (ResolvedDependency dep : resolved) {
-            assertThat(dep.getDependencies()).isNull();
-        }
-    }
-
-    @Test
     void dependenciesFromResolvedWithoutGraphTreatsAllAsDirect() {
-        String freezeContent = """
-                certifi==2024.2.2
-                requests==2.31.0
-                """;
-
-        List<ResolvedDependency> resolved = RequirementsTxtParser.parseFreezeLines(freezeContent);
+        List<ResolvedDependency> resolved = List.of(
+                new ResolvedDependency("certifi", "2024.2.2", null, null),
+                new ResolvedDependency("requests", "2.31.0", null, null));
         // Without a linked graph (dependencies are null), all are treated as direct
         List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolved);
 
@@ -160,110 +134,35 @@ class RequirementsTxtParserTest {
     }
 
     @Test
-    void linkDependenciesFromMetadataBuildsGraph(@TempDir Path tempDir) throws Exception {
-        // Create a fake site-packages with METADATA files
-        Path sitePackages = tempDir.resolve(".venv/lib/python3.12/site-packages");
+    void aFileDeclaresWhatItsIncludesDeclare(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("requirements.txt"), "-r requirements/base.txt\n");
+        Files.createDirectories(tempDir.resolve("requirements"));
+        Files.writeString(tempDir.resolve("requirements/base.txt"), "click\n");
+        Path venv = tempDir.resolve(".venv");
+        Path distInfo = venv.resolve("lib/python3.12/site-packages/click-8.1.7.dist-info");
+        Files.createDirectories(distInfo);
+        Files.writeString(distInfo.resolve("METADATA"), "Metadata-Version: 2.4\nName: click\nVersion: 8.1.7\n");
 
-        Path requestsDist = sitePackages.resolve("requests-2.31.0.dist-info");
-        Files.createDirectories(requestsDist);
-        Files.write(requestsDist.resolve("METADATA"), """
-                Metadata-Version: 2.4
-                Name: requests
-                Version: 2.31.0
-                Requires-Dist: certifi>=2017.4.17
-                Requires-Dist: charset_normalizer<4,>=2
-                Requires-Dist: PySocks!=1.5.7,>=1.5.6; extra == "socks"
-                """.getBytes(StandardCharsets.UTF_8));
+        SourceFile parsed = new RequirementsTxtParser(venv).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("requirements.txt"))), tempDir,
+                new InMemoryExecutionContext()).findFirst().orElseThrow();
 
-        Path certifiDist = sitePackages.resolve("certifi-2024.2.2.dist-info");
-        Files.createDirectories(certifiDist);
-        Files.write(certifiDist.resolve("METADATA"), """
-                Metadata-Version: 2.4
-                Name: certifi
-                Version: 2024.2.2
-                """.getBytes(StandardCharsets.UTF_8));
-
-        Path charsetDist = sitePackages.resolve("charset_normalizer-3.3.2.dist-info");
-        Files.createDirectories(charsetDist);
-        Files.write(charsetDist.resolve("METADATA"), """
-                Metadata-Version: 2.4
-                Name: charset-normalizer
-                Version: 3.3.2
-                """.getBytes(StandardCharsets.UTF_8));
-
-        List<ResolvedDependency> resolved = RequirementsTxtParser.parseFreezeLines("""
-                certifi==2024.2.2
-                charset-normalizer==3.3.2
-                requests==2.31.0
-                """);
-
-        List<ResolvedDependency> linked = RequirementsTxtParser.linkDependenciesFromMetadata(resolved, tempDir);
-
-        assertThat(linked).hasSize(3);
-
-        // requests should have certifi and charset_normalizer as dependencies
-        ResolvedDependency requests = linked.stream()
-                .filter(d -> d.getName().equals("requests")).findFirst().orElseThrow();
-        assertThat(requests.getDependencies()).hasSize(2);
-        assertThat(requests.getDependencies().stream().map(ResolvedDependency::getName))
-                .containsExactlyInAnyOrder("certifi", "charset-normalizer");
-
-        // certifi should have no dependencies
-        ResolvedDependency certifi = linked.stream()
-                .filter(d -> d.getName().equals("certifi")).findFirst().orElseThrow();
-        assertThat(certifi.getDependencies()).isNull();
-
-        // charset-normalizer should have no dependencies
-        ResolvedDependency charset = linked.stream()
-                .filter(d -> d.getName().equals("charset-normalizer")).findFirst().orElseThrow();
-        assertThat(charset.getDependencies()).isNull();
+        assertThat(parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow().getDependencies())
+                .extracting(Dependency::getName).containsExactly("click");
     }
 
     @Test
-    void linkDependenciesFromMetadataLinksDeepChains(@TempDir Path tempDir) throws Exception {
-        Path sitePackages = tempDir.resolve(".venv/lib/python3.12/site-packages");
+    void anEnvWithoutPackagesLeavesTheFileWithoutAMarker(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("requirements.txt"), "six ; python_version < '3.0'\n");
+        Path venv = tempDir.resolve(".venv");
+        Files.createDirectories(venv.resolve("lib/python3.12/site-packages"));
 
-        Path aDist = sitePackages.resolve("a-1.0.0.dist-info");
-        Files.createDirectories(aDist);
-        Files.write(aDist.resolve("METADATA"), """
-                Metadata-Version: 2.4
-                Name: a
-                Version: 1.0.0
-                Requires-Dist: b>=1.0
-                """.getBytes(StandardCharsets.UTF_8));
+        SourceFile parsed = new RequirementsTxtParser(venv).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("requirements.txt"))), tempDir,
+                new InMemoryExecutionContext()).findFirst().orElseThrow();
 
-        Path bDist = sitePackages.resolve("b-1.0.0.dist-info");
-        Files.createDirectories(bDist);
-        Files.write(bDist.resolve("METADATA"), """
-                Metadata-Version: 2.4
-                Name: b
-                Version: 1.0.0
-                Requires-Dist: c>=1.0
-                """.getBytes(StandardCharsets.UTF_8));
-
-        Path cDist = sitePackages.resolve("c-1.0.0.dist-info");
-        Files.createDirectories(cDist);
-        Files.write(cDist.resolve("METADATA"), """
-                Metadata-Version: 2.4
-                Name: c
-                Version: 1.0.0
-                """.getBytes(StandardCharsets.UTF_8));
-
-        List<ResolvedDependency> resolved = RequirementsTxtParser.parseFreezeLines("""
-                a==1.0.0
-                b==1.0.0
-                c==1.0.0
-                """);
-
-        List<ResolvedDependency> linked = RequirementsTxtParser.linkDependenciesFromMetadata(resolved, tempDir);
-
-        assertThat(linked).hasSize(3);
-        ResolvedDependency a = linked.get(0);
-        ResolvedDependency b = linked.get(1);
-        ResolvedDependency c = linked.get(2);
-        assertThat(a.getDependencies().get(0)).isSameAs(b);
-        assertThat(b.getDependencies().get(0)).isSameAs(c);
-        assertThat(a.getDependencies().get(0).getDependencies().get(0)).isSameAs(c);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+        assertThat(parsed.getMarkers().findFirst(PythonResolutionResult.class)).isEmpty();
     }
 
     @Test

@@ -24,20 +24,24 @@ import org.openrewrite.hcl.format.AutoFormatVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 
+import javax.annotation.CheckReturnValue;
 import java.util.List;
 
 @SuppressWarnings("unused")
 public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
 
+    @CheckReturnValue
     public <H extends Hcl> H autoFormat(H h, P p) {
         return autoFormat(h, p, getCursor());
     }
 
+    @CheckReturnValue
     public <H extends Hcl> H autoFormat(H h, P p, Cursor cursor) {
         return autoFormat(h, null, p, cursor);
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @CheckReturnValue
     public <H extends Hcl> H autoFormat(H h, @Nullable Hcl stopAfter, P p, Cursor cursor) {
         FormattingListener.beforeFormat(h, stopAfter, cursor);
         return (H) new AutoFormatVisitor<>(stopAfter).visit(h, p, cursor);

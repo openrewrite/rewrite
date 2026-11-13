@@ -17,9 +17,11 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeQualityValidation;
@@ -72,6 +74,52 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
+    void removeImportOfTypeTheSourceNeverNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """,
+            """
+              import java.util.Collections;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveImportOfTypeOnlyJavadocNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.List;
+              class A {
+                 /** Returns a {@link List}. */
+                 Object list() {
+                    return null;
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void leaveWildcardImportIfRemovedTypeIsStillReferredTo() {
         rewriteRun(
           spec -> spec.recipe(removeImport("java.util.*")),
@@ -117,6 +165,125 @@ class RemoveImportTest implements RewriteTest {
 
               class A {
                  Collection<Integer> c;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportOnlyIntoTypesTheSourceNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.nio.charset.CodingErrorAction")),
+          java(
+            """
+              import java.nio.charset.*;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """,
+            """
+              import java.nio.charset.CharsetDecoder;
+              import java.nio.charset.StandardCharsets;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportIntoOuterTypeOfQualifiedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Import visitImport(J.Import import_, ExecutionContext ctx) {
+                  maybeRemoveImport("java.util.List");
+                  return import_;
+              }
+
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  // only the nested type is attributed
+                  return "Map".equals(identifier.getSimpleName()) ? identifier.withType(null) : identifier;
+              }
+          })),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStarImportOfThePackageWhenRemovingANestedTypeNamedWithDollar() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.*;
+              import java.util.Map.Entry;
+
+              class A {
+                 List<String> l;
+              }
+              """,
+            """
+              import java.util.*;
+
+              class A {
+                 List<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedStarImportOfThePackageWhenRemovingANestedTypeNamedWithDollar() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.*;
+              import java.util.Map.Entry;
+
+              class A {
+              }
+              """,
+            """
+              class A {
               }
               """
           )
@@ -1241,6 +1408,36 @@ class RemoveImportTest implements RewriteTest {
               import static java.util.Collections.*;
 
               class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticImportOfAFieldNamedLikeTheRemovedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("a.Outer$Inner")),
+          java(
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+
+                  public static Inner Inner;
+              }
+              """
+          ),
+          java(
+            """
+              package c;
+
+              import static a.Outer.Inner;
+
+              class C {
+                  Object o = Inner;
               }
               """
           )

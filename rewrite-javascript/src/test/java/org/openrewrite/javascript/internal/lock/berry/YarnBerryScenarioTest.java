@@ -200,7 +200,11 @@ class YarnBerryScenarioTest extends LockScenarioTest {
 
     private void replay(Edit edit) {
         BerryScenarios.Scenario scenario = edit.getScenario();
-        Expect expect = Expect.of(edit.getExpect());
+        // The pinned corpus predates these native capabilities; require its actual Yarn output now.
+        String name = scenario.getName();
+        boolean nativeArchive = "cachekey-change".equals(name) || "compat-patch-typescript-bump".equals(name) ||
+                "patch-user-changed".equals(name) || "small-compat-patch-carried".equals(name);
+        Expect expect = Expect.of(nativeArchive ? "exact" : edit.getExpect());
         skipUnlessReplayed(edit.getLabel(), scenario, expect);
         BerryScenarios.ScenarioRegistry http = scenario.registry();
         Result result = new YarnBerryLockRegenerator(scenario.installInputs(edit.getPhase(), edit.getStart(),

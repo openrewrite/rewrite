@@ -24,14 +24,17 @@ import {
     JS,
     LstDebugPrinter,
     renderType,
+    sourceFileCache,
     typescript
 } from "../../src/javascript";
 import {main} from "../../src/javascript/type-report-cli";
 import {Type} from "../../src/java";
 import {RecipeSpec} from "../../src/test";
 
+const parser = new JavaScriptParser({sourceFileCache});
+
 const parse = async (text: string) =>
-    (await new JavaScriptParser().parse({text, sourcePath: "t.ts"}).next()).value as JS.CompilationUnit;
+    (await parser.parse({text, sourcePath: "t.ts"}).next()).value as JS.CompilationUnit;
 
 const UNTYPED_RECEIVER = `
 function f(arr) {

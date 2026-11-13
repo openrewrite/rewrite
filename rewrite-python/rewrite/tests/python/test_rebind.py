@@ -19,7 +19,7 @@ import dataclasses
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import pytest
 
@@ -34,6 +34,8 @@ from rewrite.python.ty_client import TyTypesClient
 from rewrite.python.visitor import PythonVisitor
 from rewrite.recipe import Recipe
 from rewrite.test import RecipeSpec, dedent, from_visitor, python
+
+from ._parse_shape import parse_shape
 
 requires_ty = pytest.mark.skipif(shutil.which('ty-types') is None,
                                  reason="ty-types CLI is not installed")
@@ -141,10 +143,11 @@ def _run(recipes: Sequence[Recipe], before: str, packages: Dict[str, str] = _PAC
 
 def _assert_attributed_as_parsed(recipes: Sequence[Recipe], before: str, after: str,
                                  packages: Dict[str, str] = _PACKAGES) -> None:
-    """Expects ``recipes`` to turn ``before`` into ``after``, with every type in the result read
-    as a parse of ``after`` attributes it."""
+    """Expects ``recipes`` to turn ``before`` into ``after``, with every node kind and type in the
+    result read as a parse of ``after`` has it."""
     cu = _run(recipes, before, packages)
     assert cu.print_all() == dedent(after)
+    parse_shape(after)(cu)
     assert _attribution(cu) == _attribution(_parse(after, packages))
 
 
@@ -217,6 +220,163 @@ def test_a_member_read_through_its_module_is_attributed_as_a_parse_of_the_result
 
 
 @requires_ty
+def test_a_function_local_move_renames_the_class_its_import_names():
+    # A parse names `HttpClient` after the private module the package re-exports it from.
+    _assert_attributed_as_parsed(
+        [ChangeImport(old_module='acme_common.http', old_name='HttpClient', new_module='legacy_http',
+                      new_name='Http')],
+        '''
+        def send(c) -> None:
+            from acme_common.http import HttpClient
+            x: HttpClient = c
+        ''',
+        '''
+        def send(c) -> None:
+            from legacy_http import Http
+            x: Http = c
+        ''',
+    )
+
+
+# The package imports its submodule, as `os` does `os.path`.
+_DOTTED = {**_PACKAGES, 'legacy/__init__.py': 'from legacy import http',
+           'legacy/http.py': _PACKAGES['legacy_http/__init__.py'], 'legacy/auth.py': 'def login() -> None: ...',
+           'vendor/__init__.py': '', 'vendor/http.py': 'class Http: ...'}
+
+
+def _move_http() -> List[Recipe]:
+    return [ChangeImport(old_module='legacy.http', old_name='Http',
+                         new_module='acme_common.http', new_name='HttpClient',
+                         new_declaring_module='acme_common.http._client')]
+
+
+@requires_ty
+def test_a_member_read_through_a_dotted_module_import_moves():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy.http
+        client = legacy.http.Http()
+        ''',
+        '''
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+    # The old import stays while another member is read through it.
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy.http
+        client = legacy.http.Http()
+        h = legacy.http.make_headers()
+        ''',
+        '''
+        import legacy.http
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        h = legacy.http.make_headers()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_a_member_read_through_a_from_imported_submodule_moves():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        from legacy import http
+        client = http.Http()
+        ''',
+        '''
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_a_member_read_through_its_parent_package_moves():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy
+        client = legacy.http.Http()
+        ''',
+        '''
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_every_binding_the_member_is_read_through_moves():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy
+        from legacy import http
+        a = legacy.http.Http()
+        b = http.Http()
+        ''',
+        '''
+        import acme_common.http
+        a = acme_common.http.HttpClient()
+        b = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_a_move_removes_the_imports_that_load_the_module_and_no_other():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy.auth
+        import legacy.http
+        client = legacy.http.Http()
+        ''',
+        '''
+        import legacy.auth
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy
+        import legacy.http
+        client = legacy.http.Http()
+        ''',
+        '''
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_a_shadowed_import_of_the_module_reads_nothing():
+    before = '''
+        from legacy import http
+        from vendor import http
+        client = http.Http()
+        '''
+    assert _run(_move_http(), before, _DOTTED).print_all() == dedent(before)
+
+
+@requires_ty
 def test_a_moved_constant_leaves_the_type_of_its_value_alone():
     _assert_attributed_as_parsed(
         [ChangeImport(old_module='legacy_http', old_name='NAMES', new_module='acme_common.http',
@@ -276,9 +436,14 @@ def test_a_second_binding_of_the_member_stays_and_keeps_its_types():
 def _visiting(record: List[Optional[str]], *calls: Any) -> RecipeSpec:
     """A spec whose recipe makes ``calls`` on visiting a file, recording what each answers."""
 
+    visited: Set[Path] = set()
+
     class Calls(PythonVisitor[Any]):
         def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
-            record.extend(call(self) for call in calls)
+            answers = [call(self) for call in calls]
+            if cu.source_path not in visited:
+                visited.add(cu.source_path)
+                record.extend(answers)
             return cu
 
     return RecipeSpec(recipe=from_visitor(Calls()), type_attribution=False)
@@ -327,11 +492,12 @@ def test_the_moved_binding_keeps_its_name_where_the_new_one_is_spelled():
             def f(HttpClient):
                 return Http(HttpClient)
             '''))
-    # Nor is it one where a rebind queued earlier in the visit moves that import away.
-    _visiting(answers,
-              lambda v: maybe_rebind(v, 'acme', 'other', from_member='HttpClient'),
-              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
-                                     to_member='HttpClient')).rewrite_run(
+    # Nor is it one where a rebind queued earlier in the visit moves that import away. A second run
+    # moves the import the first run bound on to `other` too, so this checks the first run alone.
+    dataclasses.replace(_visiting(answers,
+                                  lambda v: maybe_rebind(v, 'acme', 'other', from_member='HttpClient'),
+                                  lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
+                                                         to_member='HttpClient')), cycles=1).rewrite_run(
         python(
             '''
             from acme import HttpClient
@@ -423,9 +589,11 @@ def test_a_queued_module_import_claims_its_name():
 
 
 def test_the_answered_module_is_imported_where_the_caller_writes_the_reference():
+    answers: List[Optional[str]] = []
+
     class WritesTheAnswer(PythonVisitor[Any]):
         def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
-            assert maybe_rebind(self, 'legacy', 'acme', from_member='Http') == 'acme.Http'
+            answers.append(maybe_rebind(self, 'legacy', 'acme', from_member='Http'))
             return super().visit_compilation_unit(cu, p)
 
         def visit_method_invocation(self, method: Any, p: Any) -> Any:
@@ -444,6 +612,7 @@ def test_the_answered_module_is_imported_where_the_caller_writes_the_reference()
             import acme
             h = acme.Http()
             '''))
+    assert answers[0] == 'acme.Http'
 
 
 def test_the_import_a_move_rewrites_is_the_one_binding_it():
@@ -523,3 +692,34 @@ def test_maybe_bind_answers_with_the_files_name_for_a_module():
     # type-checking import of `Client` binds the same member, so a runtime import may share its
     # name. `X` is claimed by the import queued for `a`.
     assert answers == ['h', 'h', 'json', None, 'Client', 'X', None]
+
+
+def test_moving_one_of_two_modules_leaves_the_other_a_bare_import():
+    after = '''
+        import sys
+        import pathlib
+        '''
+    RecipeSpec(recipe=ChangeImport(old_module='os', new_module='pathlib')).rewrite_run(
+        python(
+            '''
+            import os, sys
+            import pathlib
+            ''',
+            after,
+            after_recipe=parse_shape(after)))
+
+
+def test_a_dropped_imports_comment_moves_onto_the_reduced_import_after_it():
+    RecipeSpec(recipe=ChangeImport(old_module='os', new_module='pathlib')).rewrite_run(
+        python(
+            '''
+            # c
+            import os
+            import os, sys
+            import pathlib
+            ''',
+            '''
+            # c
+            import sys
+            import pathlib
+            '''))

@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, List, Optional, TypeVar, Union
+from typing import Callable, List, Optional, TypeVar, Union
 
 from rewrite import Cursor, Marker, Markers, Tree
 from rewrite.java import (
@@ -39,9 +39,8 @@ from rewrite.python.markers import (
     LegacyNotEqual, RaiseTuple, TupleExceptClause,
 )
 
-if TYPE_CHECKING:
-    from rewrite.python import tree as py
-    from rewrite.java import tree as j
+from rewrite.python import tree as py
+from rewrite.java import tree as j
 
 P = TypeVar("P")
 
@@ -137,7 +136,6 @@ def _quotes_around(tree: Union[Py, J]) -> Optional[str]:
     quoted = tree.markers.find_first(Quoted)
     if quoted is None:
         return None
-    from rewrite.java import tree as j
     return None if isinstance(tree, j.Literal) else quoted.style.quote
 
 
@@ -180,94 +178,13 @@ class PythonPrinter:
         self.set_cursor(Cursor(self.get_cursor(), tree))
 
         try:
-            if isinstance(tree, Py):
-                return self._visit_python(tree, p)
-            else:
-                # Delegate to Java printer for non-Python nodes
-                return self._delegate.visit(tree, p)
+            if _is_python(tree):
+                return tree.accept_python(self, p)  # ty: ignore[unresolved-attribute]  # the printer duck-types as a PythonVisitor
+            return self._delegate.visit(tree, p)
         finally:
             # Restore cursor
             parent = self.get_cursor().parent
             self.set_cursor(parent)
-
-    def _visit_python(self, tree: Py, p: PrintOutputCapture) -> Optional[J]:
-        """Visit a Python-specific node."""
-        from rewrite.python import tree as py
-
-        if isinstance(tree, py.CompilationUnit):
-            return self.visit_compilation_unit(tree, p)
-        elif isinstance(tree, py.Async):
-            return self.visit_async(tree, p)
-        elif isinstance(tree, py.Await):
-            return self.visit_await(tree, p)
-        elif isinstance(tree, py.Binary):
-            return self.visit_binary(tree, p)
-        elif isinstance(tree, py.ChainedAssignment):
-            return self.visit_chained_assignment(tree, p)
-        elif isinstance(tree, py.CollectionLiteral):
-            return self.visit_collection_literal(tree, p)
-        elif isinstance(tree, py.ComprehensionExpression):
-            return self.visit_comprehension_expression(tree, p)
-        elif isinstance(tree, py.ComprehensionExpression.Clause):
-            return self.visit_comprehension_clause(tree, p)
-        elif isinstance(tree, py.ComprehensionExpression.Condition):
-            return self.visit_comprehension_condition(tree, p)
-        elif isinstance(tree, py.Del):
-            return self.visit_del(tree, p)
-        elif isinstance(tree, py.DictLiteral):
-            return self.visit_dict_literal(tree, p)
-        elif isinstance(tree, py.ErrorFrom):
-            return self.visit_error_from(tree, p)
-        elif isinstance(tree, py.ExceptionType):
-            return self.visit_exception_type(tree, p)
-        elif isinstance(tree, py.ExpressionStatement):
-            return self.visit_expression_statement(tree, p)
-        elif isinstance(tree, py.ExpressionTypeTree):
-            return self.visit_expression_type_tree(tree, p)
-        elif isinstance(tree, py.FormattedString):
-            return self.visit_formatted_string(tree, p)
-        elif isinstance(tree, py.FormattedString.Value):
-            return self.visit_formatted_string_value(tree, p)
-        elif isinstance(tree, py.KeyValue):
-            return self.visit_key_value(tree, p)
-        elif isinstance(tree, py.LiteralType):
-            return self.visit_literal_type(tree, p)
-        elif isinstance(tree, py.MatchCase):
-            return self.visit_match_case(tree, p)
-        elif isinstance(tree, py.MatchCase.Pattern):
-            return self.visit_match_case_pattern(tree, p)
-        elif isinstance(tree, py.MultiImport):
-            return self.visit_multi_import(tree, p)
-        elif isinstance(tree, py.NamedArgument):
-            return self.visit_named_argument(tree, p)
-        elif isinstance(tree, py.Pass):
-            return self.visit_pass(tree, p)
-        elif isinstance(tree, py.Shebang):
-            return self.visit_shebang(tree, p)
-        elif isinstance(tree, py.Slice):
-            return self.visit_slice(tree, p)
-        elif isinstance(tree, py.SpecialParameter):
-            return self.visit_special_parameter(tree, p)
-        elif isinstance(tree, py.Star):
-            return self.visit_star(tree, p)
-        elif isinstance(tree, py.StatementExpression):
-            return self.visit_statement_expression(tree, p)
-        elif isinstance(tree, py.TrailingElseWrapper):
-            return self.visit_trailing_else_wrapper(tree, p)
-        elif isinstance(tree, py.TypeAlias):
-            return self.visit_type_alias(tree, p)
-        elif isinstance(tree, py.TypeHint):
-            return self.visit_type_hint(tree, p)
-        elif isinstance(tree, py.TypeHintedExpression):
-            return self.visit_type_hinted_expression(tree, p)
-        elif isinstance(tree, py.UnionType):
-            return self.visit_union_type(tree, p)
-        elif isinstance(tree, py.VariableScope):
-            return self.visit_variable_scope(tree, p)
-        elif isinstance(tree, py.YieldFrom):
-            return self.visit_yield_from(tree, p)
-        else:
-            raise ValueError(f"Unknown Python node type: {type(tree)}")
 
     # -------------------------------------------------------------------------
     # Helper methods
@@ -444,6 +361,7 @@ class PythonPrinter:
         self._before_syntax(async_, p)
         p.append("async")
         self.visit(async_.statement, p)
+        self._after_syntax(async_, p)
         return async_
 
     def visit_shebang(self, shebang: 'py.Shebang', p: PrintOutputCapture) -> J:
@@ -460,9 +378,10 @@ class PythonPrinter:
         operand_start = len(p._out)
         self.visit(await_.expression, p)
         _separate_keyword_from_operand(p, operand_start)
+        self._after_syntax(await_, p)
         return await_
 
-    def visit_binary(self, binary: 'py.Binary', p: PrintOutputCapture) -> J:
+    def visit_python_binary(self, binary: 'py.Binary', p: PrintOutputCapture) -> J:
         """Visit a Python-specific binary expression."""
         from rewrite.python.tree import Binary as PyBinary
         self._before_syntax(binary, p)
@@ -581,6 +500,7 @@ class PythonPrinter:
         if clause.conditions:
             for condition in clause.conditions:
                 self.visit(condition, p)
+        self._after_syntax(clause, p)
         return clause
 
     def visit_comprehension_condition(self, condition: 'py.ComprehensionExpression.Condition', p: PrintOutputCapture) -> J:
@@ -588,6 +508,7 @@ class PythonPrinter:
         self._before_syntax(condition, p)
         p.append("if")
         self.visit(condition.expression, p)
+        self._after_syntax(condition, p)
         return condition
 
     def visit_del(self, del_: 'py.Del', p: PrintOutputCapture) -> J:
@@ -599,6 +520,7 @@ class PythonPrinter:
             ",",
             p
         )
+        self._after_syntax(del_, p)
         return del_
 
     def visit_dict_literal(self, dict_: 'py.DictLiteral', p: PrintOutputCapture) -> J:
@@ -615,6 +537,7 @@ class PythonPrinter:
         self._visit_space(expr.padding.from_.before, p)
         p.append("from")
         self.visit(expr.from_, p)
+        self._after_syntax(expr, p)
         return expr
 
     def visit_exception_type(self, type_: 'py.ExceptionType', p: PrintOutputCapture) -> J:
@@ -623,6 +546,7 @@ class PythonPrinter:
         if type_.exception_group:
             p.append("*")
         self.visit(type_.expression, p)
+        self._after_syntax(type_, p)
         return type_
 
     def visit_expression_statement(self, stmt: 'py.ExpressionStatement', p: PrintOutputCapture) -> J:
@@ -649,6 +573,7 @@ class PythonPrinter:
             idx = max(fstring.delimiter.find("'"), fstring.delimiter.find('"'))
             if idx >= 0:
                 p.append(fstring.delimiter[idx:])
+        self._after_syntax(fstring, p)
         return fstring
 
     def visit_formatted_string_value(self, value: 'py.FormattedString.Value', p: PrintOutputCapture) -> J:
@@ -675,6 +600,7 @@ class PythonPrinter:
             p.append(':')
             self.visit(value.format, p)
         p.append('}')
+        self._after_syntax(value, p)
         return value
 
     def visit_key_value(self, kv: 'py.KeyValue', p: PrintOutputCapture) -> J:
@@ -701,6 +627,7 @@ class PythonPrinter:
             self._visit_space(match.padding.guard.before, p)
             p.append("if")
             self.visit(match.guard, p)
+        self._after_syntax(match, p)
         return match
 
     def visit_match_case_pattern(self, pattern: 'py.MatchCase.Pattern', p: PrintOutputCapture) -> J:
@@ -744,6 +671,7 @@ class PythonPrinter:
         elif kind == MatchCase.Pattern.Kind.WILDCARD:
             self._visit_container("_", children, "", "", p)
 
+        self._after_syntax(pattern, p)
         return pattern
 
     def visit_multi_import(self, multi: 'py.MultiImport', p: PrintOutputCapture) -> J:
@@ -765,6 +693,7 @@ class PythonPrinter:
         self._before_syntax(arg, p)
         self.visit(arg.name, p)
         self._visit_left_padded("=", arg.padding.value, p)
+        self._after_syntax(arg, p)
         return arg
 
     def visit_pass(self, pass_: 'py.Pass', p: PrintOutputCapture) -> J:
@@ -800,6 +729,7 @@ class PythonPrinter:
             p.append(':')
             self._visit_right_padded(slice_.padding.step, p)
 
+        self._after_syntax(slice_, p)
         return slice_
 
     def visit_special_parameter(self, param: 'py.SpecialParameter', p: PrintOutputCapture) -> J:
@@ -894,6 +824,7 @@ class PythonPrinter:
         elif scope.kind == VariableScope.Kind.NONLOCAL:
             p.append("nonlocal")
         self._visit_right_padded_list(scope.padding.names, ",", p)
+        self._after_syntax(scope, p)
         return scope
 
     def visit_yield_from(self, yield_: 'py.YieldFrom', p: PrintOutputCapture) -> J:
@@ -901,6 +832,7 @@ class PythonPrinter:
         self._before_syntax(yield_, p)
         p.append("from")
         self.visit(yield_.expression, p)
+        self._after_syntax(yield_, p)
         return yield_
 
 
@@ -931,7 +863,7 @@ class PythonJavaPrinter:
         if tree is None:
             return None
 
-        if isinstance(tree, Py):
+        if _is_python(tree):
             # Route back to Python printer (which handles cursor)
             return self._python_printer.visit(tree, p)
 
@@ -941,115 +873,16 @@ class PythonJavaPrinter:
 
         if current_cursor.value is tree:
             # Already set by PythonPrinter.visit delegation
-            return self._visit_java(tree, p)
+            return tree.accept_java(self, p)  # ty: ignore[unresolved-attribute]  # the printer duck-types as a JavaVisitor
 
         # Update cursor for internal visit calls
         self.set_cursor(Cursor(current_cursor, tree))
         try:
-            return self._visit_java(tree, p)
+            return tree.accept_java(self, p)  # ty: ignore[unresolved-attribute]
         finally:
             # Restore cursor
             parent = self.get_cursor().parent
             self.set_cursor(parent)
-
-    def _visit_java(self, tree: J, p: PrintOutputCapture) -> Optional[J]:
-        """Visit a Java node with Python syntax."""
-        from rewrite.java import tree as j
-
-        if isinstance(tree, j.Annotation):
-            return self.visit_annotation(tree, p)
-        elif isinstance(tree, j.ArrayAccess):
-            return self.visit_array_access(tree, p)
-        elif isinstance(tree, j.ArrayDimension):
-            return self.visit_array_dimension(tree, p)
-        elif isinstance(tree, j.Assert):
-            return self.visit_assert(tree, p)
-        elif isinstance(tree, j.Assignment):
-            return self.visit_assignment(tree, p)
-        elif isinstance(tree, j.AssignmentOperation):
-            return self.visit_assignment_operation(tree, p)
-        elif isinstance(tree, j.Binary):
-            return self.visit_binary(tree, p)
-        elif isinstance(tree, j.Block):
-            return self.visit_block(tree, p)
-        elif isinstance(tree, j.Break):
-            return self.visit_break(tree, p)
-        elif isinstance(tree, j.Case):
-            return self.visit_case(tree, p)
-        elif isinstance(tree, j.Try.Catch):
-            return self.visit_catch(tree, p)
-        elif isinstance(tree, j.ClassDeclaration):
-            return self.visit_class_declaration(tree, p)
-        elif isinstance(tree, j.Continue):
-            return self.visit_continue(tree, p)
-        elif isinstance(tree, j.ControlParentheses):
-            return self.visit_control_parentheses(tree, p)
-        elif isinstance(tree, j.If.Else):
-            return self.visit_else(tree, p)
-        elif isinstance(tree, j.Empty):
-            return self.visit_empty(tree, p)
-        elif isinstance(tree, j.FieldAccess):
-            return self.visit_field_access(tree, p)
-        elif isinstance(tree, j.ForEachLoop.Control):
-            return self.visit_for_each_control(tree, p)
-        elif isinstance(tree, j.ForEachLoop):
-            return self.visit_for_each_loop(tree, p)
-        elif isinstance(tree, j.Identifier):
-            return self.visit_identifier(tree, p)
-        elif isinstance(tree, j.If):
-            return self.visit_if(tree, p)
-        elif isinstance(tree, j.Import):
-            return self.visit_import(tree, p)
-        elif isinstance(tree, j.Lambda):
-            return self.visit_lambda(tree, p)
-        elif isinstance(tree, j.Lambda.Parameters):
-            return self.visit_lambda_parameters(tree, p)
-        elif isinstance(tree, j.Literal):
-            return self.visit_literal(tree, p)
-        elif isinstance(tree, j.MethodDeclaration):
-            return self.visit_method_declaration(tree, p)
-        elif isinstance(tree, j.MethodInvocation):
-            return self.visit_method_invocation(tree, p)
-        elif isinstance(tree, j.Modifier):
-            return self.visit_modifier(tree, p)
-        elif isinstance(tree, j.NewArray):
-            return self.visit_new_array(tree, p)
-        elif isinstance(tree, j.ParameterizedType):
-            return self.visit_parameterized_type(tree, p)
-        elif isinstance(tree, j.Parentheses):
-            return self.visit_parentheses(tree, p)
-        elif isinstance(tree, j.Return):
-            return self.visit_return(tree, p)
-        elif isinstance(tree, j.Switch):
-            return self.visit_switch(tree, p)
-        elif isinstance(tree, j.Ternary):
-            return self.visit_ternary(tree, p)
-        elif isinstance(tree, j.Throw):
-            return self.visit_throw(tree, p)
-        elif isinstance(tree, j.TypeParameter):
-            return self.visit_type_parameter(tree, p)
-        elif isinstance(tree, j.TypeParameters):
-            return self.visit_type_parameters(tree, p)
-        elif isinstance(tree, j.Try):
-            return self.visit_try(tree, p)
-        elif isinstance(tree, j.Try.Resource):
-            return self.visit_try_resource(tree, p)
-        elif isinstance(tree, j.Unary):
-            return self.visit_unary(tree, p)
-        elif isinstance(tree, j.VariableDeclarations.NamedVariable):
-            return self.visit_variable(tree, p)
-        elif isinstance(tree, j.VariableDeclarations):
-            return self.visit_variable_declarations(tree, p)
-        elif isinstance(tree, j.WhileLoop):
-            return self.visit_while_loop(tree, p)
-        elif isinstance(tree, j.Yield):
-            return self.visit_yield(tree, p)
-        elif isinstance(tree, j.Unknown):
-            return self.visit_unknown(tree, p)
-        elif isinstance(tree, j.Unknown.Source):
-            return self.visit_unknown_source(tree, p)
-        else:
-            raise ValueError(f"Unknown Java node type: {type(tree)}")
 
     # -------------------------------------------------------------------------
     # Helper methods
@@ -1254,8 +1087,6 @@ class PythonJavaPrinter:
 
     def visit_assignment(self, assignment: 'j.Assignment', p: PrintOutputCapture) -> J:
         """Visit an assignment."""
-        from rewrite.python import tree as py
-        from rewrite.java import tree as j
 
         # Determine if this is a walrus operator (:=) or regular assignment (=)
         parent_value = _enclosing_tree(self.get_cursor())
@@ -1367,7 +1198,6 @@ class PythonJavaPrinter:
 
     def visit_case(self, case: 'j.Case', p: PrintOutputCapture) -> J:
         """Visit a case (match case in Python)."""
-        from rewrite.java import tree as j
         self._before_syntax(case, p)
         elem = case.case_labels[0] if case.case_labels else None
         if not (isinstance(elem, j.Identifier) and elem.simple_name == "default"):
@@ -1462,7 +1292,6 @@ class PythonJavaPrinter:
 
     def visit_else(self, else_: 'j.If.Else', p: PrintOutputCapture) -> J:
         """Visit an else clause."""
-        from rewrite.java import tree as j
 
         self._before_syntax(else_, p)
         parent_value = _enclosing_tree(self.get_cursor())
@@ -1526,7 +1355,6 @@ class PythonJavaPrinter:
 
     def visit_if(self, if_: 'j.If', p: PrintOutputCapture) -> J:
         """Visit an if statement."""
-        from rewrite.java import tree as j
 
         self._before_syntax(if_, p)
         p.append("if")
@@ -1543,12 +1371,10 @@ class PythonJavaPrinter:
 
     def visit_import(self, import_: 'j.Import', p: PrintOutputCapture) -> J:
         """Visit an import statement."""
-        from rewrite.java import tree as j
 
         self._before_syntax(import_, p)
 
-        from rewrite.python import tree as _py
-        is_standalone = not self.get_cursor().first_enclosing(_py.MultiImport)
+        is_standalone = not self.get_cursor().first_enclosing(py.MultiImport)
         if is_standalone:
             p.append("import")
 
@@ -1772,7 +1598,6 @@ class PythonJavaPrinter:
         the operands inline (comma-separated, no parens) when that marker
         is present.
         """
-        from rewrite.python import tree as py
         self._before_syntax(throw, p)
         p.append("raise")
         if (throw.markers.find_first(RaiseTuple) is not None
@@ -1791,7 +1616,6 @@ class PythonJavaPrinter:
 
     def visit_type_parameter(self, type_param: 'j.TypeParameter', p: PrintOutputCapture) -> J:
         """Visit a type parameter (Python 3.12+ PEP 695, 3.13+ PEP 696 defaults)."""
-        from rewrite.java import tree as j
         self._before_syntax(type_param, p)
         # Visit modifiers (for * and ** prefixes)
         for mod in type_param.modifiers:
@@ -1823,8 +1647,6 @@ class PythonJavaPrinter:
 
     def visit_try(self, try_: 'j.Try', p: PrintOutputCapture) -> J:
         """Visit a try statement (or with statement in Python)."""
-        from rewrite.python import tree as py
-        from rewrite.java import tree as j
 
         is_with_statement = try_.resources and len(try_.resources) > 0
 
@@ -1922,8 +1744,6 @@ class PythonJavaPrinter:
 
     def visit_variable(self, variable: 'j.VariableDeclarations.NamedVariable', p: PrintOutputCapture) -> J:
         """Visit a named variable."""
-        from rewrite.java import tree as j
-        from rewrite.python import tree as py
 
         self._before_syntax(variable, p)
 
@@ -2007,7 +1827,6 @@ class PythonJavaPrinter:
         return while_loop
 
     def _visit_loop_body(self, body: Statement, p: PrintOutputCapture) -> None:
-        from rewrite.java import tree as j
         # a block prints its own colon
         if not isinstance(body, j.Block):
             p.append(":")
@@ -2034,3 +1853,15 @@ class PythonJavaPrinter:
         self.visit(yield_.value, p)
         self._after_syntax(yield_, p)
         return yield_
+
+
+# Py is an ABC, so an isinstance check against it runs ABCMeta.__instancecheck__ on every node.
+# The answer is cached per concrete type.
+_IS_PYTHON: dict = {}
+
+
+def _is_python(tree: Tree) -> bool:
+    is_python = _IS_PYTHON.get(type(tree))
+    if is_python is None:
+        is_python = _IS_PYTHON[type(tree)] = isinstance(tree, Py)
+    return is_python

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.scala.style;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -27,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
 
+import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE;
 import static java.util.Collections.emptySet;
 
 public class Autodetect extends NamedStyles {
@@ -43,8 +46,18 @@ public class Autodetect extends NamedStyles {
         return new Detector();
     }
 
+    /**
+     * Serializable and mergeable in the same way as the {@link org.openrewrite.java.style.Autodetect.Detector} it wraps.
+     */
+    @JsonAutoDetect(fieldVisibility = NONE, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     public static class Detector {
+        @JsonProperty
         org.openrewrite.java.style.Autodetect.Detector javaDetector = new org.openrewrite.java.style.Autodetect.Detector();
+
+        public Detector merge(Detector other) {
+            javaDetector.merge(other.javaDetector);
+            return this;
+        }
 
         public void sample(SourceFile cu) {
             if (cu instanceof S.CompilationUnit) {

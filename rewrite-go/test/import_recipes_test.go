@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/openrewrite/rewrite/rewrite-go/internal/testrecipes"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
@@ -1095,7 +1096,7 @@ func (r *wrapThenRemoveUnused) Description() string {
 	return "Wraps errors with context, then removes unused imports."
 }
 func (r *wrapThenRemoveUnused) RecipeList() []recipe.Recipe {
-	return []recipe.Recipe{&recipes.WrapErrorWithContext{}, &recipes.RemoveUnusedImports{}}
+	return []recipe.Recipe{&testrecipes.WrapErrorWithContext{}, &recipes.RemoveUnusedImports{}}
 }
 
 func TestRemoveUnusedImports_KeepsImportAddedByEarlierRecipe(t *testing.T) {

@@ -17,11 +17,19 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+
 /**
  * What a Yarn install reads from the network: packuments and tarballs, each with the Authorization header the port
  * computes as its package manager does, null for none.
  */
 public interface RegistrySource {
+
+    /** Bind the manager's resolved network policy; recorded sources already define their request behavior. */
+    default RegistrySource withNetworkSettings(String manager, Map<String, ?> settings) {
+        return this;
+    }
+
 
     /**
      * {@code GET <registry><name>}: the full packument, or the abbreviated one yarn 1 asks for; null when the

@@ -16,7 +16,7 @@
 import {JS} from '../tree';
 import {J, Statement} from '../../java';
 import {Cursor, Tree} from '../../tree';
-import {TreePrinters} from '../../print';
+import {MarkerPrinter, PrintOutputCapture, TreePrinters} from '../../print';
 import {JavaScriptParser} from '../parser';
 import {WhitespaceReconciler} from './whitespace-reconciler';
 import {randomId} from '../../uuid';
@@ -108,7 +108,8 @@ export interface PrettierFormatOptions {
  * 4. Reconciles the whitespace from the formatted AST back into the original AST
  *
  * The result preserves the original AST's structure, types, and markers while
- * applying Prettier's formatting rules for whitespace.
+ * applying Prettier's formatting rules for whitespace. Where Prettier changes more than
+ * whitespace, such as removing redundant parentheses, the original is returned unchanged.
  *
  * @param sourceFile The source file to format
  * @param options Prettier formatting options
@@ -121,6 +122,26 @@ export async function prettierFormat(
     options: PrettierFormatOptions = {},
     stopAfter?: J
 ): Promise<JS.CompilationUnit> {
+    const formattedCu = await parsePrettierFormatted(sourceFile, options);
+    if (!formattedCu) {
+        return sourceFile;
+    }
+
+    const reconciler = new WhitespaceReconciler();
+    const result = reconciler.reconcile(sourceFile, formattedCu, undefined, stopAfter);
+    return reconciler.isCompatible() ? result as JS.CompilationUnit : sourceFile;
+}
+
+/**
+ * Formats the printed source file with Prettier and parses the result, which has neither the
+ * original's type attribution, ids nor markers.
+ *
+ * @returns The parsed Prettier output, or `undefined` where it does not parse
+ */
+async function parsePrettierFormatted(
+    sourceFile: JS.CompilationUnit,
+    options: PrettierFormatOptions
+): Promise<JS.CompilationUnit | undefined> {
     // Load Prettier - either specific version or bundled
     let prettier: typeof import('prettier');
 
@@ -133,8 +154,8 @@ export async function prettierFormat(
         );
     }
 
-    // Step 1: Print the AST to string
-    const originalSource = await TreePrinters.print(sourceFile);
+    // Step 1: Print the AST to string, leaving out what markers would print, such as search results
+    const originalSource = await TreePrinters.print(sourceFile, new PrintOutputCapture(MarkerPrinter.SANITIZED));
 
     // Step 2: Determine parser based on source path
     const parser = getParserForPath(sourceFile.sourcePath);
@@ -161,23 +182,11 @@ export async function prettierFormat(
         text: formattedSource
     });
 
-    if (!formattedAst) {
+    if (formattedAst?.kind !== JS.Kind.CompilationUnit) {
         console.warn('Prettier formatting: Failed to parse formatted output, returning original');
-        return sourceFile;
+        return undefined;
     }
-
-    // Step 5: Reconcile whitespace from formatted AST to original AST
-    // Note: For subtree formatting with pruned trees, the structure may differ
-    // (e.g., Prettier removes empty placeholder statements). In such cases,
-    // we return the formatted AST directly and let the caller handle
-    // subtree-level reconciliation.
-    const reconciler = new WhitespaceReconciler();
-    const formattedCu = formattedAst as JS.CompilationUnit;
-    const result = reconciler.reconcile(sourceFile, formattedCu, undefined, stopAfter);
-
-    // If reconciliation succeeded, return the reconciled original with updated whitespace
-    // If it failed (structure mismatch), return the formatted AST for subtree reconciliation
-    return reconciler.isCompatible() ? result as JS.CompilationUnit : formattedCu;
+    return formattedAst as JS.CompilationUnit;
 }
 
 /**
@@ -494,8 +503,12 @@ export async function prettierFormatSubtree<T extends J>(
     // we format the modified content, not the original from the cursor.
     const prunedCu = pruneTreeForSubtree(cu, path, target);
 
-    // Format the pruned compilation unit with Prettier
-    const formattedPrunedCu = await prettierFormat(prunedCu, options);
+    // Format the pruned compilation unit with Prettier. Only the target's own subtree is reconciled,
+    // so Prettier may change the code around it, the placeholders standing in for its siblings say.
+    const formattedPrunedCu = await parsePrettierFormatted(prunedCu, options);
+    if (!formattedPrunedCu) {
+        return undefined;
+    }
 
     // Find the target node in the formatted tree using the path
     const formattedTarget = findByPath(formattedPrunedCu, path);

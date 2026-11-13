@@ -23,6 +23,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -59,7 +60,7 @@ public final class NpmLockRegenerator {
      * What the engine is given for an npm project.
      */
     @Value
-    @Builder
+    @Builder(toBuilder = true)
     public static class Inputs {
         /**
          * The npm release that installs the project: the one that built its LST ({@link NpmReleases#installedAs}).
@@ -175,7 +176,62 @@ public final class NpmLockRegenerator {
         this.registry = registry;
     }
 
+    /**
+     * A migration may replace several peer-coupled packages together. Only retry a peer rejection from an existing
+     * lock, first proving that the final manifests resolve without any lock. A forced candidate must then pass a
+     * plain install with the original configuration; the mode never changes a user's npmrc.
+     */
+    public Result regenerateForUpdate() {
+        Result original = regenerate();
+        Failure failure = original.getFailure();
+        if (inputs.getLock() == null || failure == null || failure.getKind() !=
+                Kind.PM_REJECTS ||
+                failure.getReason() != Reason.PEER_CONFLICT) {
+            return original;
+        }
+        Set<String> paths = inputs.getPaths() == null ? null : new LinkedHashSet<>(inputs.getPaths());
+        if (paths != null) {
+            paths.remove("package-lock.json");
+            paths.remove("yarn.lock");
+        }
+        Inputs fresh = inputs.toBuilder().lock(null).yarnLock(null).paths(paths).build();
+        Result checked = stable(fresh, null, true);
+        if (!checked.isSuccess()) {
+            return checked;
+        }
+        Result forced = stable(inputs, true, false);
+        if (!forced.isSuccess()) {
+            return forced;
+        }
+        return stable(inputs.toBuilder().lock(forced.getLockFileContent())
+                .yarnLock(forced.getFiles().getOrDefault("yarn.lock", inputs.getYarnLock())).build(), null, false);
+    }
+
+    private Result stable(Inputs current, @Nullable Boolean force, boolean allowNoLock) {
+        Set<String> seen = new LinkedHashSet<>();
+        if (current.getLock() != null) {
+            seen.add(current.getLock());
+        }
+        Result result = new NpmLockRegenerator(current, registry).regenerate(force, allowNoLock);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Failure failure = result.getFailure();
+            if (failure == null || failure.getKind() !=
+                    Kind.SECOND_INSTALL ||
+                    failure.getReason() != Reason.RESOLUTION_REQUIRED || failure.getWritten() == null ||
+                    !seen.add(failure.getWritten())) {
+                return result;
+            }
+            current = current.toBuilder().lock(failure.getWritten()).build();
+            result = new NpmLockRegenerator(current, registry).regenerate(force, false);
+        }
+        return result;
+    }
+
     public Result regenerate() {
+        return regenerate(null, false);
+    }
+
+    private Result regenerate(@Nullable Boolean force, boolean allowNoLock) {
         NpmOptions options;
         String path;
         String written;
@@ -192,7 +248,8 @@ public final class NpmLockRegenerator {
             }
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
-            options = NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc());
+            NpmOptions configured = NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc());
+            options = force == null ? configured : configured.toBuilder().force(force).build();
             if (!options.isGlobal()) {
                 checkDevEngines(inputs.getManifests().get(""), options, inputs.getHost());
             }
@@ -202,7 +259,8 @@ public final class NpmLockRegenerator {
             VirtualTreeLoader.ProjectFiles files = projectFiles(truthy(inputs.getLock()) ?
                 new LockFile(inputs.getLock()) : null, inputs.getManifests());
             path = projectPath(files);
-            IdealTreeBuilder arb = arborist(path, files, options);
+            IdealTreeBuilder arb = new IdealTreeBuilder(path, files, options, registry.withOptions(options), inputs.getHost(),
+                    inputs.getNow(), allowNoLock);
             arb.buildIdealTree();
             if (!options.isSave() || options.isDryRun()) {
                 return Result.success(Objects.requireNonNull(inputs.getLock()));
@@ -235,7 +293,7 @@ public final class NpmLockRegenerator {
 
     /**
      * Where npm {@code release} run in {@code runsIn} installs and writes its lock, by {@link
-     * Inputs#getParentTrees()}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
+     * Inputs#parentTrees}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
      */
     public static InstallRoot installRoot(NpmRelease release, String runsIn, Map<String, String> manifests,
                                           Map<String, Map<String, @Nullable String>> parentTrees) {
@@ -458,7 +516,7 @@ public final class NpmLockRegenerator {
     }
 
     private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
-        return new IdealTreeBuilder(path, files, options, registry, inputs.getHost(), inputs.getNow());
+        return new IdealTreeBuilder(path, files, options, registry.withOptions(options), inputs.getHost(), inputs.getNow());
     }
 
     // reify.js #saveIdealTree: the lock takes the indent of the root package.json, two spaces when it has none

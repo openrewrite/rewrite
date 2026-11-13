@@ -110,6 +110,15 @@ final class CompositeOrder {
         return renamed;
     }
 
+    /**
+     * Whether a recipe from this source comes from the module under test and not from a dependency jar, whose
+     * violations fail in the build of the project that owns it.
+     */
+    static boolean fromModuleUnderTest(@Nullable URI source) {
+        return source != null && !"jar".equals(source.getScheme()) &&
+               (source.getPath() == null || !source.getPath().endsWith(".jar"));
+    }
+
     private static boolean same(String a, String b) {
         return a.replace('$', '.').equals(b.replace('$', '.'));
     }
@@ -178,9 +187,7 @@ final class CompositeOrder {
             if (owner instanceof CompositeRecipe) {
                 return false;
             }
-            URI source = owner.getDescriptor().getSource();
-            return source != null && !"jar".equals(source.getScheme()) &&
-                   (source.getPath() == null || !source.getPath().endsWith(".jar"));
+            return fromModuleUnderTest(owner.getDescriptor().getSource());
         }
 
         @Override

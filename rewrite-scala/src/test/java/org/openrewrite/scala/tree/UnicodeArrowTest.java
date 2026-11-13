@@ -335,8 +335,7 @@ class UnicodeArrowTest implements RewriteTest {
     }
 
     private static List<Class<?>> unicodeArrowOwners(Tree tree) {
-        List<Class<?>> owners = new ArrayList<>();
-        new ScalaIsoVisitor<List<Class<?>>>() {
+        return new ScalaIsoVisitor<List<Class<?>>>() {
             @Override
             public @Nullable J preVisit(J t, List<Class<?>> acc) {
                 if (t.getMarkers().findFirst(UnicodeArrow.class).isPresent()) {
@@ -344,7 +343,6 @@ class UnicodeArrowTest implements RewriteTest {
                 }
                 return t;
             }
-        }.visit(tree, owners);
-        return owners;
+        }.reduce(tree, new ArrayList<>());
     }
 }

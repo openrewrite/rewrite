@@ -23,6 +23,7 @@ import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.internal.ImportComments;
+import org.openrewrite.java.internal.StaticImportBindings;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -104,6 +105,9 @@ public class OrderImports extends Recipe {
                 parent.putMessage(ImportComments.CURSOR_MESSAGE_KEY, comments);
                 try {
                     J result = super.visit(comments.getPrepared(), ctx);
+                    if (result instanceof J.CompilationUnit) {
+                        result = StaticImportBindings.preserve(comments.getPrepared(), (J.CompilationUnit) result);
+                    }
                     if (result == comments.getPrepared()) {
                         return (J.CompilationUnit) tree;
                     }
@@ -125,6 +129,7 @@ public class OrderImports extends Recipe {
 
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
                 List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty, getCursor());
+                orderedImports = preserveNestedStaticStarImports(cu.getPadding().getImports(), orderedImports);
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {
@@ -155,6 +160,51 @@ public class OrderImports extends Recipe {
                 return withStyles(cu, namedStyles);
             }
         };
+    }
+
+    private static List<JRightPadded<J.Import>> preserveNestedStaticStarImports(
+            List<JRightPadded<J.Import>> original, List<JRightPadded<J.Import>> ordered) {
+        Set<String> before = new HashSet<>();
+        Set<String> after = new HashSet<>();
+        for (JRightPadded<J.Import> anImport : original) {
+            if (anImport.getElement().isStatic()) {
+                before.add(importPath(anImport.getElement()));
+            }
+        }
+        for (JRightPadded<J.Import> anImport : ordered) {
+            if (anImport.getElement().isStatic()) {
+                after.add(importPath(anImport.getElement()));
+            }
+        }
+        for (String name : before) {
+            int memberSeparator = name.lastIndexOf('.');
+            if (memberSeparator > 0) {
+                String nestedType = name.substring(0, memberSeparator);
+                int separator = nestedType.lastIndexOf('.');
+                if (before.contains(nestedType) && separator > 0 &&
+                        after.contains(nestedType.substring(0, separator) + ".*") &&
+                        !after.contains(name) && !after.contains(nestedType + ".*")) {
+                    // Styles can be supplied by a legacy shared model runtime. An outer type's
+                    // wildcard imports its nested type, but not that nested type's members.
+                    return original;
+                }
+            }
+        }
+        return ordered;
+    }
+
+    private static String importPath(J.Import anImport) {
+        StringBuilder path = new StringBuilder();
+        J qualifier = anImport.getQualid();
+        while (qualifier instanceof J.FieldAccess) {
+            J.FieldAccess access = (J.FieldAccess) qualifier;
+            path.insert(0, "." + access.getSimpleName());
+            qualifier = access.getTarget();
+        }
+        if (qualifier instanceof J.Identifier) {
+            path.insert(0, ((J.Identifier) qualifier).getSimpleName());
+        }
+        return path.toString();
     }
 
     private List<NamedStyles> styleFromYaml(@Nullable String style) {

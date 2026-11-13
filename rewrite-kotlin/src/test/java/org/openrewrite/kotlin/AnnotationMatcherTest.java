@@ -68,15 +68,11 @@ class AnnotationMatcherTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 var javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension.class)");
-                var foundJavaStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                var foundJavaStyle = getMatcherVisitor(javaStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundJavaStyle.get()).isTrue();
 
                 var kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
-                var foundKotlinStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                var foundKotlinStyle = getMatcherVisitor(kotlinStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundKotlinStyle.get()).isTrue();
             })
           )
@@ -97,15 +93,11 @@ class AnnotationMatcherTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 var javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension.class)");
-                var foundJavaStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                var foundJavaStyle = getMatcherVisitor(javaStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundJavaStyle.get()).isTrue();
 
                 var kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension::class.java)");
-                var foundKotlinStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                var foundKotlinStyle = getMatcherVisitor(kotlinStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundKotlinStyle.get()).isTrue();
             })
           )

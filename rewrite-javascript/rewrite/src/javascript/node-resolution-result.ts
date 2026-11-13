@@ -19,6 +19,7 @@ import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {castDraft} from "mutative";
 import {updateIfChanged} from "../util";
+import {registerHeavyweight} from "../heavyweight";
 import * as semver from "semver";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -48,6 +49,8 @@ export interface PackageJsonContent {
  * Package entry in a package-lock.json packages map.
  */
 export interface PackageLockEntry {
+    readonly name?: string;
+    readonly link?: boolean;
     readonly version?: string;
     readonly resolved?: string;
     readonly integrity?: string;
@@ -259,6 +262,8 @@ export interface NodeResolutionResult extends Marker {
     readonly npmrcConfigs?: Npmrc[];
 }
 
+registerHeavyweight(NodeResolutionResultKind);
+
 /**
  * Creates a NodeResolutionResult marker from a package.json file.
  * Should be called during parsing to attach to JS.CompilationUnit.
@@ -272,6 +277,7 @@ export interface NodeResolutionResult extends Marker {
  * @param workspacePackagePaths Optional resolved paths to workspace package.json files (only for workspace root)
  * @param packageManager Optional package manager that was detected from lock file
  * @param npmrcConfigs Optional npm configuration from various scopes
+ * @param packagePath Manifest directory relative to the selected lock root, never the marker/source root
  */
 export function createNodeResolutionResultMarker(
     path: string,
@@ -279,7 +285,10 @@ export function createNodeResolutionResultMarker(
     packageLockContent?: PackageLockContent,
     workspacePackagePaths?: string[],
     packageManager?: PackageManager,
-    npmrcConfigs?: Npmrc[]
+    npmrcConfigs?: Npmrc[],
+    // Construction-only context: directory of the manifest relative to the selected lock root.
+    // Marker paths are relative to the source root, which may contain independent lock roots.
+    packagePath: string = ""
 ): NodeResolutionResult {
     // Cache for deduplicating resolved dependencies with the same name+version.
     const resolvedDependencyCache = new Map<string, ResolvedDependency>();
@@ -303,7 +312,8 @@ export function createNodeResolutionResultMarker(
      * out of sync for every subsequent file in the build.
      *
      * Shapes seen in the wild and what we do with them:
-     *  - object: pass through.
+     *  - object: keep the string-valued entries. Cordova nests an object
+     *      under `cordovaDependencies`, which npm does not read.
      *  - ["node >=0.6.0"]: split on the first space → {node: ">=0.6.0"}.
      *  - ["node", "rhino"]: bare names with no version. Preserve the
      *      engine list as {node: "*", rhino: "*"}.
@@ -328,7 +338,13 @@ export function createNodeResolutionResultMarker(
             return Object.keys(result).length > 0 ? result : undefined;
         }
         if (typeof engines !== 'object') return undefined;
-        return engines as Record<string, string>;
+        const result: Record<string, string> = {};
+        for (const [name, constraint] of Object.entries(engines)) {
+            if (typeof constraint === 'string') {
+                result[name] = constraint;
+            }
+        }
+        return result;
     }
 
     /**
@@ -462,12 +478,13 @@ export function createNodeResolutionResultMarker(
                 break; // Already at root
             }
 
-            // Remove the last /node_modules/pkg segment to go up one level
-            const lastNodeModules = currentPath.lastIndexOf('/node_modules/');
-            if (lastNodeModules === -1) {
-                currentPath = ''; // Try root level next
-            } else {
-                currentPath = currentPath.substring(0, lastNodeModules);
+            // NODE_MODULES_PATHS visits every directory ancestor, including workspace
+            // directories, but never looks inside node_modules/node_modules.
+            const slash = currentPath.lastIndexOf('/');
+            currentPath = slash < 0 ? '' : currentPath.substring(0, slash);
+            if (currentPath === 'node_modules' || currentPath.endsWith('/node_modules')) {
+                const parentSlash = currentPath.lastIndexOf('/');
+                currentPath = parentSlash < 0 ? '' : currentPath.substring(0, parentSlash);
             }
         }
 
@@ -583,14 +600,23 @@ export function createNodeResolutionResultMarker(
             : convertV1DependencyTree(lockContent.dependencies);
         if (!packages) return [];
 
+        // npm may omit a workspace target's name when it matches its directory.
+        // The node_modules link records the installed (possibly scoped) package name.
+        const linkedNames = new Map<string, string>();
+        for (const [pkgPath, entry] of Object.entries(packages)) {
+            if (entry.link && entry.resolved) linkedNames.set(entry.resolved, extractPackageInfo(pkgPath).name);
+        }
+
         // First pass: Create all ResolvedDependency placeholders and build path map
         const packageInfos: Array<{ path: string; name: string; version: string; entry: PackageLockEntry }> = [];
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
-            if (pkgPath === '') continue;
+            if (pkgPath === '' || pkgEntry.link) continue;
 
             const pkgInfo = extractPackageInfo(pkgPath);
-            const name = pkgInfo.name;
+            const name = pkgPath.includes('node_modules/')
+                ? pkgInfo.name
+                : pkgEntry.name || linkedNames.get(pkgPath) || pkgInfo.name;
             // Use version from path if available, otherwise from entry
             const version = pkgInfo.version || pkgEntry.version;
 
@@ -598,6 +624,24 @@ export function createNodeResolutionResultMarker(
                 const resolved = getOrCreateResolvedDependency(name, version, pkgEntry);
                 pathToResolved.set(pkgPath, resolved);
                 packageInfos.push({path: pkgPath, name, version, entry: pkgEntry});
+            }
+        }
+
+        // npm workspace/file links resolve from the target's real directory. Alias
+        // the link to the target placeholder before resolving any dependency edges.
+        for (const [pkgPath, entry] of Object.entries(packages)) {
+            if (!entry.link) continue;
+            let target = entry.resolved;
+            const seen = new Set<string>([pkgPath]);
+            while (target && !seen.has(target)) {
+                seen.add(target);
+                const resolved = pathToResolved.get(target);
+                if (resolved) {
+                    pathToResolved.set(pkgPath, resolved);
+                    break;
+                }
+                const next = packages[target];
+                target = next?.link ? next.resolved : undefined;
             }
         }
 
@@ -633,14 +677,14 @@ export function createNodeResolutionResultMarker(
     // Parse resolved dependencies first (before dependencies) so we can link them
     const resolvedDependencies = packageLockContent ? parseResolutions(packageLockContent) : [];
 
-    // Now parse dependencies from package.json - they resolve from root context ("")
-    const dependencies = parseDependencies(packageJsonContent.dependencies, '');
-    const devDependencies = parseDependencies(packageJsonContent.devDependencies, '');
-    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies, '');
-    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies, '');
+    // Resolve manifest dependencies relative to the selected lock root.
+    const dependencies = parseDependencies(packageJsonContent.dependencies, packagePath);
+    const devDependencies = parseDependencies(packageJsonContent.devDependencies, packagePath);
+    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies, packagePath);
+    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies, packagePath);
     const bundledDependencies = parseBundledDependencies(
         packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies,
-        ''
+        packagePath
     );
 
     return {
@@ -934,16 +978,16 @@ export namespace NodeResolutionResultQueries {
  * Register RPC codec for Npmrc.
  */
 RpcCodecs.registerCodec(NpmrcKind, {
-    async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
+    rpcReceive(before: Npmrc, q: RpcReceiveQueue): Npmrc {
         return updateIfChanged(before, {
-            scope: await q.receive(before.scope),
-            properties: await q.receive(before.properties),
+            scope: q.receive(before.scope),
+            properties: q.receive(before.properties),
         });
     },
 
-    async rpcSend(after: Npmrc, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.scope);
-        await q.getAndSend(after, a => a.properties);
+    rpcSend(after: Npmrc, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.scope);
+        q.getAndSend(after, a => a.properties);
     }
 });
 
@@ -951,20 +995,20 @@ RpcCodecs.registerCodec(NpmrcKind, {
  * Register RPC codec for Dependency.
  */
 RpcCodecs.registerCodec(DependencyKind, {
-    async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
+    rpcReceive(before: Dependency, q: RpcReceiveQueue): Dependency {
         // Populated in place: the receive queue registered this instance for the ref before calling
         // the codec, so a back-reference closing a cycle resolves to the finished object.
         const dep = castDraft(before);
-        dep.name = await q.receive(before.name);
-        dep.versionConstraint = await q.receive(before.versionConstraint);
-        dep.resolved = await q.receive(before.resolved);
+        dep.name = q.receive(before.name);
+        dep.versionConstraint = q.receive(before.versionConstraint);
+        dep.resolved = q.receive(before.resolved);
         return before;
     },
 
-    async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.versionConstraint);
-        await q.getAndSend(after, a => asRef(a.resolved));
+    rpcSend(after: Dependency, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.versionConstraint);
+        q.getAndSend(after, a => asRef(a.resolved));
     }
 });
 
@@ -972,32 +1016,32 @@ RpcCodecs.registerCodec(DependencyKind, {
  * Register RPC codec for ResolvedDependency.
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
-    async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
+    rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): ResolvedDependency {
         const resolved = castDraft(before);
-        resolved.name = await q.receive(before.name);
-        resolved.version = await q.receive(before.version);
-        resolved.dependencies = (await q.receiveList(before.dependencies)) || undefined;
-        resolved.devDependencies = (await q.receiveList(before.devDependencies)) || undefined;
-        resolved.peerDependencies = (await q.receiveList(before.peerDependencies)) || undefined;
-        resolved.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || undefined;
-        resolved.engines = await q.receive(before.engines);
-        resolved.license = await q.receive(before.license);
+        resolved.name = q.receive(before.name);
+        resolved.version = q.receive(before.version);
+        resolved.dependencies = (q.receiveList(before.dependencies)) || undefined;
+        resolved.devDependencies = (q.receiveList(before.devDependencies)) || undefined;
+        resolved.peerDependencies = (q.receiveList(before.peerDependencies)) || undefined;
+        resolved.optionalDependencies = (q.receiveList(before.optionalDependencies)) || undefined;
+        resolved.engines = q.receive(before.engines);
+        resolved.license = q.receive(before.license);
         return before;
     },
 
-    async rpcSend(after: ResolvedDependency, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.version);
-        await q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
+    rpcSend(after: ResolvedDependency, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.version);
+        q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => (a.devDependencies || []).map(d => asRef(d)),
+        q.getAndSendList(after, a => (a.devDependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => (a.peerDependencies || []).map(d => asRef(d)),
+        q.getAndSendList(after, a => (a.peerDependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => (a.optionalDependencies || []).map(d => asRef(d)),
+        q.getAndSendList(after, a => (a.optionalDependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSend(after, a => a.engines);
-        await q.getAndSend(after, a => a.license);
+        q.getAndSend(after, a => a.engines);
+        q.getAndSend(after, a => a.license);
     }
 });
 
@@ -1006,51 +1050,52 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
  * This handles serialization/deserialization for communication between JS and Java.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
-    async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
+    rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): NodeResolutionResult {
+        let npmrcConfigs: Npmrc[] | undefined;
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            description: await q.receive(before.description),
-            path: await q.receive(before.path),
-            workspacePackagePaths: await q.receive(before.workspacePackagePaths),
-            dependencies: (await q.receiveList(before.dependencies)) || [],
-            devDependencies: (await q.receiveList(before.devDependencies)) || [],
-            peerDependencies: (await q.receiveList(before.peerDependencies)) || [],
-            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || [],
-            bundledDependencies: (await q.receiveList(before.bundledDependencies)) || [],
-            resolvedDependencies: (await q.receiveList(before.resolvedDependencies)) || [],
-            packageManager: await q.receive(before.packageManager),
-            engines: await q.receive(before.engines),
+            id: q.receive(before.id),
+            name: q.receive(before.name),
+            version: q.receive(before.version),
+            description: q.receive(before.description),
+            path: q.receive(before.path),
+            workspacePackagePaths: q.receive(before.workspacePackagePaths),
+            dependencies: (q.receiveList(before.dependencies)) || [],
+            devDependencies: (q.receiveList(before.devDependencies)) || [],
+            peerDependencies: (q.receiveList(before.peerDependencies)) || [],
+            optionalDependencies: (q.receiveList(before.optionalDependencies)) || [],
+            bundledDependencies: (q.receiveList(before.bundledDependencies)) || [],
+            resolvedDependencies: (q.receiveList(before.resolvedDependencies)) || [],
+            packageManager: q.receive(before.packageManager),
+            engines: q.receive(before.engines),
             // an empty list is how having none is sent
-            npmrcConfigs: await q.receiveList(before.npmrcConfigs).then(configs => configs?.length ? configs : undefined),
+            npmrcConfigs: (npmrcConfigs = q.receiveList(before.npmrcConfigs))?.length ? npmrcConfigs : undefined,
         });
     },
 
-    async rpcSend(after: NodeResolutionResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.version);
-        await q.getAndSend(after, a => a.description);
-        await q.getAndSend(after, a => a.path);
-        await q.getAndSend(after, a => a.workspacePackagePaths);
+    rpcSend(after: NodeResolutionResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.version);
+        q.getAndSend(after, a => a.description);
+        q.getAndSend(after, a => a.path);
+        q.getAndSend(after, a => a.workspacePackagePaths);
 
-        await q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.devDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.devDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.peerDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.peerDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.optionalDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.optionalDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)),
+        q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)),
             resolved => `${resolved.name}@${resolved.version}`);
 
-        await q.getAndSend(after, a => a.packageManager);
-        await q.getAndSend(after, a => a.engines);
-        await q.getAndSendList(after, a => a.npmrcConfigs || [],
+        q.getAndSend(after, a => a.packageManager);
+        q.getAndSend(after, a => a.engines);
+        q.getAndSendList(after, a => a.npmrcConfigs || [],
             npmrc => npmrc.scope);
     }
 });

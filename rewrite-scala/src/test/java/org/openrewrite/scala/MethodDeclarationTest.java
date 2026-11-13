@@ -1139,4 +1139,43 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void semicolonSeparatedBracedExtensionMethods() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  extension (x: Int) { def a = 1; def b = 2 }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInBracedExtension() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  extension (x: Int) { ; def a = 1;; def b = 2; }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void auxiliaryConstructorWithTrailingSemicolons() {
+        rewriteRun(
+            scala(
+                """
+                class A(x: Int) {
+                  def this() = { this(1);; }
+                }
+                """
+            )
+        );
+    }
 }

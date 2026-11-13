@@ -64,6 +64,11 @@ public class RecipeSpec {
     List<Parser.Builder> parsers = new ArrayList<>();
 
     /**
+     * Parsers of the recipe's output, where it needs another classpath than its input.
+     */
+    List<Parser.Builder> afterParsers = new ArrayList<>();
+
+    /**
      * Used for both parsing and recipe execution unless an alternative recipe execution context is set with
      * {@link #recipeExecutionContext(ExecutionContext)}.
      */
@@ -196,6 +201,26 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * The parser of the recipe's output, for a recipe whose output needs another classpath than its input, such as
+     * one that migrates from one version of a library to the next. The checks that parse the text the output prints,
+     * such as {@link RecipeQualityValidation#parserTypedTrees()}, parse it with this parser in place of the input's
+     * parser of the same language, so that the types they compare the output with are those of the classpath it is
+     * written for. It parses the output together with the sources the recipe left unchanged, so a class that differs
+     * between the two classpaths belongs on them and not among the test's sources. A type it doesn't resolve isn't
+     * compared, so it needs the whole classpath of the output and not only the libraries that change.
+     * <p>
+     * A source that the recipe turns into another language is parsed with the after parser of that language. A test
+     * fails when an after parser of its own spec parses nothing, as when none of its sources and none of the
+     * recipe's output is in the parser's language.
+     *
+     * @return The current recipe spec.
+     */
+    public RecipeSpec afterParser(Parser.Builder parser) {
+        this.afterParsers.add(parser);
+        return this;
+    }
+
     public RecipeSpec executionContext(ExecutionContext ctx) {
         this.executionContext = ctx;
         return this;
@@ -216,6 +241,9 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * The cycles to run, by default one more than {@link #expectedCyclesThatMakeChanges(int)} and at least two.
+     */
     public RecipeSpec cycles(int cycles) {
         this.cycles = cycles;
         return this;
@@ -293,6 +321,10 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * Whether the recipe is checked to serialize, load and describe itself as recipes must. See
+     * {@link #typeValidationOptions(TypeValidation)} for finding opt-outs that a test no longer needs.
+     */
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
@@ -309,15 +341,22 @@ public class RecipeSpec {
         return this;
     }
 
-    int getCycles() {
-        return cycles == null ? 2 : cycles;
-    }
-
     int getExpectedCyclesThatMakeChanges(int cycles) {
         return expectedCyclesThatMakeChanges == null ? cycles - 1 :
                 expectedCyclesThatMakeChanges;
     }
 
+    /**
+     * Checks of the LST the test parses, and of what the recipe produces unless {@link #afterTypeValidationOptions} or
+     * the types of {@link #recipeQualityValidation} are set.
+     * <p>
+     * To find opt-outs that tests no longer need, set the system property
+     * {@code org.openrewrite.test.failOnUnneededOptOuts} to {@code all}, or to the options to look at, such as
+     * {@code methodInvocations,unknown}. Then a test that turns off checks that pass on its sources fails, and says
+     * which opt-outs it needs instead. This covers this option, {@link #afterTypeValidationOptions},
+     * {@link #recipeQualityValidation} and {@link #validateRecipeSerialization}, whether a test or its class's defaults
+     * set them.
+     */
     public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
         this.typeValidation = typeValidation;
         return this;
@@ -334,7 +373,8 @@ public class RecipeSpec {
     }
 
     /**
-     * Checks of how the recipe behaves and what it produces, including the type attribution of its output.
+     * Checks of how the recipe behaves and what it produces, including the type attribution of its output. See
+     * {@link #typeValidationOptions(TypeValidation)} for finding opt-outs that a test no longer needs.
      */
     public RecipeSpec recipeQualityValidation(RecipeQualityValidation recipeQualityValidation) {
         this.recipeQualityValidation = recipeQualityValidation;

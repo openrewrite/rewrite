@@ -14,6 +14,7 @@
 
 """Tests for Template class."""
 
+import copy
 import dataclasses
 from typing import Any, Optional
 from rewrite import random_id
@@ -30,6 +31,7 @@ from rewrite.python.template.coordinates import PythonCoordinates
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.precedence import enclosing_tree, maybe_parenthesize
 from rewrite.python.template.replacement import SubstitutedValue
+from rewrite.python.tree import StatementExpression, YieldFrom
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 from rewrite.tree import Tree
@@ -963,3 +965,161 @@ class TestTypeAttributedPatternMatching:
                 """,
             ),
         )
+
+
+def _kinds(tree) -> list:
+    kinds = []
+
+    class _Collector(PythonVisitor):
+        def visit(self, t, p, parent=None):
+            if t is not None:
+                kinds.append(type(t).__name__)
+            return super().visit(t, p, parent)
+
+    _Collector().visit(tree, None)
+    return kinds
+
+
+def _parse(source: str):
+    import ast
+    from rewrite.python._parser_visitor import ParserVisitor
+    return ParserVisitor(source, "expected.py", None).visit(ast.parse(source))
+
+
+class _ReplaceSize(Recipe):
+    def __init__(self, replacement: str, coordinates_on_a_copy: bool = False):
+        self._replacement = replacement
+        self._coordinates_on_a_copy = coordinates_on_a_copy
+
+    @property
+    def name(self) -> str:
+        return "test.ReplaceSize"
+
+    @property
+    def display_name(self) -> str:
+        return "Replace size()"
+
+    @property
+    def description(self) -> str:
+        return "Replaces `x.size()` with a template over `x`."
+
+    def editor(self):
+        x = capture('x')
+        pat = pattern("{x}.size()", x=x)
+        tmpl = template(self._replacement, x=x)
+        on_a_copy = self._coordinates_on_a_copy
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, method, p):
+                method = super().visit_method_invocation(method, p)
+                match = pat.match(method, self.cursor)
+                if not match:
+                    return method
+                # A visitor that rebuilt the node names it by a new object with the same id.
+                coordinates = PythonCoordinates.replace(copy.copy(method)) if on_a_copy else None
+                return tmpl.apply(self.cursor, values=match, coordinates=coordinates)
+        return Visitor()
+
+
+class _AwaitYieldFrom(Recipe):
+    @property
+    def name(self) -> str:
+        return "test.AwaitYieldFrom"
+
+    @property
+    def display_name(self) -> str:
+        return "Await instead of yield from"
+
+    @property
+    def description(self) -> str:
+        return "Replaces `yield from x` with `await x`."
+
+    def editor(self):
+        x = capture('x')
+        tmpl = template("await {x}", x=x)
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_statement_expression(self, statement_expression, p):
+                statement_expression = super().visit_statement_expression(statement_expression, p)
+                if not isinstance(statement_expression, StatementExpression):
+                    return statement_expression
+                yield_ = statement_expression.statement
+                if not isinstance(yield_, j.Yield) or not isinstance(yield_.value, YieldFrom):
+                    return statement_expression
+                return tmpl.apply(self.cursor, values={'x': yield_.value.expression})
+        return Visitor()
+
+
+class _ReplaceLiteral(Recipe):
+    def __init__(self, literal: str, replacement: str):
+        self._literal = literal
+        self._replacement = replacement
+
+    @property
+    def name(self) -> str:
+        return "test.ReplaceLiteral"
+
+    @property
+    def display_name(self) -> str:
+        return "Replace a literal"
+
+    @property
+    def description(self) -> str:
+        return "Replaces a literal, found by its source text, with a template."
+
+    def editor(self):
+        tmpl = template(self._replacement)
+        source = self._literal
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_literal(self, literal, p):
+                literal = super().visit_literal(literal, p)
+                if not isinstance(literal, j.Literal) or literal.value_source != source:
+                    return literal
+                return tmpl.apply(self.cursor)
+        return Visitor()
+
+
+class TestTemplateApplySlotShape:
+    """The tree `apply` leaves behind has the node kinds a parse of the printed result has."""
+
+    @staticmethod
+    def _run(replacement: str, before: str, after: str, coordinates_on_a_copy: bool = False) -> None:
+        TestTemplateApplySlotShape._run_recipe(_ReplaceSize(replacement, coordinates_on_a_copy), before, after)
+
+    @staticmethod
+    def _run_recipe(recipe: Recipe, before: str, after: str) -> None:
+        def same_kinds_as_parse(cu):
+            assert _kinds(cu) == _kinds(_parse(after))
+
+        RecipeSpec(recipe=recipe).rewrite_run(python(before, after, after_recipe=same_kinds_as_parse))
+
+    def test_replaced_call_in_an_expression_slot_stays_bare(self):
+        self._run("len({x})", "b = a.size()", "b = len(a)")
+
+        self._run("len({x})", "f(a.size())", "f(len(a))")
+
+    def test_replaced_statement_level_call_is_wrapped_only_when_not_a_statement(self):
+        self._run("len({x})", "a.size()", "len(a)")
+
+        self._run("{x} + 1", "a.size()", "a + 1")
+
+    def test_coordinates_on_a_rebuilt_node_find_its_slot(self):
+        self._run("{x} + 1", "f(a.size())", "f(a + 1)", coordinates_on_a_copy=True)
+
+    def test_replaced_yield_is_wrapped_only_at_statement_level(self):
+        self._run_recipe(_AwaitYieldFrom(),
+                         "def f():\n    result = yield from step()\n",
+                         "def f():\n    result = await step()\n")
+
+        self._run_recipe(_AwaitYieldFrom(),
+                         "def f():\n    yield from step()\n",
+                         "def f():\n    await step()\n")
+
+    def test_replaced_right_operand_of_the_same_operator_is_parenthesized(self):
+        self._run_recipe(_DeMorganRecipe(), "result = z and not (x or y)", "result = z and (not x and not y)")
+
+    def test_replaced_string_of_a_concatenation_stays_bare(self):
+        self._run_recipe(_ReplaceLiteral("'b'", "'c'"), "a = 'a' 'b'", "a = 'a' 'c'")
+
+        self._run_recipe(_ReplaceLiteral("'b'", "'d'"), "a = 'a' 'b' 'c'", "a = 'a' 'd' 'c'")

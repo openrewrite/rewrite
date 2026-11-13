@@ -19,7 +19,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-tck"))
 
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

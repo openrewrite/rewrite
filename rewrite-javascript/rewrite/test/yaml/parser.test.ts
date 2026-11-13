@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
-import {findMarker, printer} from "../../src";
-import {RecipeSpec} from "../../src/test";
+import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser, YamlVisitor} from "../../src/yaml";
+import {ExecutionContext, findMarker, printer, randomId} from "../../src";
+import {dedent, fromVisitor, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -514,4 +514,225 @@ host: {C App}.colruyt.int/{C App}`;
         const result = await parseAndPrint(yaml);
         expect(result).toBe(yaml);
     });
+});
+
+describe('Multi-line flow scalars', () => {
+    const spec = new RecipeSpec();
+
+    test('plain scalar continued on the following lines', () =>
+        spec.rewriteRun(
+            yaml(`
+                build:
+                  - script: npm ci &&
+                            npm test &&
+                            npm run build
+            `)
+        ));
+
+    test('plain scalar with a blank line and extra indentation', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: one
+                  two
+
+                    three
+            `)
+        ));
+
+    test('plain scalars in flow collections', () =>
+        spec.rewriteRun(
+            yaml(`
+                seq: [one
+                  two, three]
+                map: {a: one
+                  two}
+            `)
+        ));
+
+    test('single-quoted scalar with an escaped quote and a line break', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: 'it''s
+                  continued'
+            `)
+        ));
+
+    test('double-quoted scalar with escapes and an escaped line break', () =>
+        spec.rewriteRun(
+            yaml(String.raw`
+                a: "tab\t, quote \", escaped \
+                  line break"
+            `)
+        ));
+
+    test('scalar value is the source text between any quotes', async () => {
+        const docs = await parseYaml(dedent(String.raw`
+            plain: one
+              two
+            single: 'it''s'
+            double: "a\tb"
+        `));
+        const [plain, single, double] = (docs.documents[0].block as Yaml.Mapping).entries
+            .map(e => (e.value as Yaml.Scalar).value);
+
+        expect(plain).toBe(dedent(`
+            one
+              two`));
+        expect(single).toBe("it''s");
+        expect(double).toBe(String.raw`a\tb`);
+    });
+});
+
+describe('Anchor and tag on a scalar', () => {
+    const spec = new RecipeSpec();
+
+    test('either order, on every scalar style and position', () =>
+        spec.rewriteRun(
+            yaml(`
+                plain: &a !!str one
+                single: &b !!str 'two'
+                double: &c !!str "three"
+                literal: &d !!str |
+                  four
+                folded: &e !!str >-
+                  five
+                tagFirst: !!str &f six
+                seq:
+                  - &g !!str seven
+                  - !!str &h eight
+                flowSeq: [&i !!str nine, !!str &j ten]
+                flowMap: {k: &k !!str eleven}
+                &l !!str key: twelve
+                aliases: [*a, *d, *g]
+            `)
+        ));
+});
+
+describe('Tag on a mapping or sequence', () => {
+    const spec = new RecipeSpec();
+
+    test('block and flow collections, with and without an anchor', () =>
+        spec.rewriteRun(
+            yaml(`
+                map: !!map
+                  k: v
+                anchoredMap: &m !!map
+                  k: v
+                seq: !!seq
+                  - x
+                anchoredSeq: &s !!seq
+                  - x
+                flowMap: !!map {k: v}
+                flowSeq: &f !!seq [x]
+                local: !custom
+                  k: v
+                entries:
+                  - !!map
+                    k: v
+                  - !!seq [x]
+                aliases: [*m, *s, *f]
+            `)
+        ));
+});
+
+describe('Text after the last document', () => {
+    const spec = new RecipeSpec();
+
+    test('newline, blank lines and comments after the last document end marker', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: b
+                ...
+            `),
+            yaml(`
+                ---
+                a: b
+                ...
+
+
+            `),
+            yaml(`
+                a: b
+                ...
+                ---
+                c: d
+                ...
+                # trailing
+            `)
+        ));
+
+    test('file with only a comment', () =>
+        spec.rewriteRun(
+            yaml(`
+                # only a comment
+            `)
+        ));
+});
+
+describe('Comment after the last entry of a block sequence', () => {
+    const spec = new RecipeSpec();
+    spec.recipe = fromVisitor(new class extends YamlVisitor<ExecutionContext> {
+        protected async visitSequence(sequence: Yaml.Sequence, p: ExecutionContext): Promise<Yaml | undefined> {
+            const first = sequence.entries[0];
+            if ((sequence.entries[sequence.entries.length - 1].block as Yaml.Scalar).value === 'c') {
+                return sequence;
+            }
+            const appended: Yaml.Sequence = {
+                ...sequence,
+                entries: [...sequence.entries, {...first, id: randomId(), block: {...first.block as Yaml.Scalar, id: randomId(), value: 'c'}}]
+            };
+            return appended;
+        }
+    });
+
+    test('an appended entry goes before the comment', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                `
+            )
+        ));
+
+    test('comment at the sequence indent before the next key', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                other: d
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                other: d
+                `
+            )
+        ));
+
+    test('an empty last entry stays an entry', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  -`,
+                `
+                steps:
+                  - a
+                  -
+                  - c`
+            )
+        ));
 });

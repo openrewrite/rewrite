@@ -42,15 +42,13 @@ class MergeSpacesVisitorTest {
     }
 
     private static J.Parentheses<?> parentheses(J.CompilationUnit cu) {
-        AtomicReference<J.Parentheses<?>> parentheses = new AtomicReference<>();
-        new JavaIsoVisitor<AtomicReference<J.Parentheses<?>>>() {
+        return new JavaIsoVisitor<AtomicReference<J.Parentheses<?>>>() {
             @Override
             public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens,
                                                                     AtomicReference<J.Parentheses<?>> found) {
                 found.set(parens);
                 return super.visitParentheses(parens, found);
             }
-        }.visit(cu, parentheses);
-        return parentheses.get();
+        }.reduce(cu, new AtomicReference<>()).get();
     }
 }

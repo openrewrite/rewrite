@@ -11,7 +11,7 @@
 <div align="center">
 
 <!-- Keep the gap above this line, otherwise they won't render correctly! -->
-[![ci](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml/badge.svg)](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml)
+[![ci](https://codegenomeproject.org/ci/modules/openrewrite/rewrite/badge.svg)](https://codegenomeproject.org/ci/modules/openrewrite/rewrite/builds/latest)
 [![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Revved up by Develocity](https://img.shields.io/badge/Revved%20up%20by-Develocity-06A0CE?logo=Gradle&labelColor=02303A)](https://community.develocity.cloud/scans?search.rootProjectNames=rewrite)
 [![Contributing Guide](https://img.shields.io/badge/Contributing-Guide-informational)](https://github.com/openrewrite/.github/blob/main/CONTRIBUTING.md)
@@ -46,9 +46,9 @@ See how Moderne and OpenRewrite work in different ways to transform your code:
 
 [![Moderne](./doc/openrewrite_v_moderne.png)](https://www.youtube.com/watch?v=Q-ej2lCJHRs)
 
-Moderne also includes a [multi-repo command line interface (CLI)](https://docs.moderne.io/user-documentation/moderne-cli/getting-started/cli-intro) for building LSTs, running recipes locally, and developing custom recipes across many repositories.
+Moderne also includes a [multi-repo command line interface (CLI)](https://docs.moderne.io/user-documentation/moderne-cli/getting-started/cli-getting-started/) for building LSTs, running recipes locally, and developing custom recipes across many repositories.
 
-[![Moderne](./doc/moderne_cli.png)](https://www.youtube.com/watch?v=fdPX9e2vsFw)
+[![Moderne](./doc/moderne_cli.png)](https://www.youtube.com/watch?v=maZDbrvc3u0)
 
 Moderne runs a free [public service](https://www.moderne.io/try-moderne) for the benefit of tens of thousands of open source projects. To learn more about how Moderne can help your team, [contact us](https://www.moderne.io/contact-us).
 

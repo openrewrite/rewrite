@@ -19,6 +19,7 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Position;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
@@ -125,6 +126,9 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
+        if (generic instanceof Type.CapturedType && !((Type.CapturedType) generic).lower.hasTag(TypeTag.BOT)) {
+            return "Generic{? super " + signature(((Type.CapturedType) generic).lower) + "}";
+        }
         String name = generic instanceof Type.CapturedType ? "?" : generic.tsym.name.toString();
 
         if (typeVariableNameStack == null) {
@@ -300,6 +304,11 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             }
         }
 
-        return owner + "{name=" + symbol.name.toString() + ",type=" + signature(symbol.type) + '}';
+        String signature = owner + "{name=" + symbol.name.toString() + ",type=" + signature(symbol.type);
+        if (!(symbol.owner instanceof Symbol.ClassSymbol) && symbol instanceof Symbol.VarSymbol &&
+            ((Symbol.VarSymbol) symbol).pos != Position.NOPOS) {
+            signature += ",pos=" + ((Symbol.VarSymbol) symbol).pos;
+        }
+        return signature + '}';
     }
 }

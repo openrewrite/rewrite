@@ -461,4 +461,47 @@ public class EditorConfigResolverTests : IDisposable
         Assert.False(style.WrappingPreserveSingleLine);
         Assert.False(style.WrappingKeepStatementsOnSingleLine);
     }
+
+    [Fact]
+    public void IndentsAsTheFileDoesWhenEditorConfigSetsNoIndentation()
+    {
+        CreateFile(".editorconfig", """
+            root = true
+
+            [*.cs]
+            csharp_new_line_before_else = false
+            """);
+        var csFile = CreateFile("Program.cs", "");
+        var resolver = new EditorConfigResolver(_tempDir);
+
+        var tabs = resolver.Resolve(csFile, new CSharpParser().Parse("class C\n{\n\tint x;\n}\n"));
+        var twoSpaces = resolver.Resolve(csFile, new CSharpParser().Parse("class C\n{\n  int x;\n}\n"));
+
+        Assert.True(tabs.UseTabs);
+        Assert.False(tabs.NewLineBeforeElse);
+        Assert.False(twoSpaces.UseTabs);
+        Assert.Equal(2, twoSpaces.IndentSize);
+        Assert.Same(twoSpaces, resolver.Resolve(csFile, new CSharpParser().Parse("class D\n{\n  int y;\n}\n")));
+    }
+
+    [Fact]
+    public void EditorConfigIndentationWinsOverTheFiles()
+    {
+        CreateFile(".editorconfig", """
+            root = true
+
+            [*.cs]
+            indent_style = space
+            """);
+        var csFile = CreateFile("Program.cs", "");
+        var resolver = new EditorConfigResolver(_tempDir);
+
+        var tabs = resolver.Resolve(csFile, new CSharpParser().Parse("class C\n{\n\tint x;\n}\n"));
+        var twoSpaces = resolver.Resolve(csFile, new CSharpParser().Parse("class C\n{\n  int x;\n}\n"));
+
+        Assert.False(tabs.UseTabs);
+        Assert.Equal(4, tabs.IndentSize);
+        Assert.False(twoSpaces.UseTabs);
+        Assert.Equal(2, twoSpaces.IndentSize);
+    }
 }

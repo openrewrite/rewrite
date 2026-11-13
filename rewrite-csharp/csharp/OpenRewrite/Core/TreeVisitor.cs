@@ -27,7 +27,7 @@ namespace OpenRewrite.Core;
 /// a visitor without binding to a specific tree type (equivalent to
 /// Java's TreeVisitor&lt;?, P&gt;).
 /// </summary>
-public interface ITreeVisitor<P>
+public interface ITreeVisitor<P> : IHeavyweight
 {
     Tree? Visit(Tree? tree, P p);
 

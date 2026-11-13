@@ -159,6 +159,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         p.append("begin");
         visit(begin.getBody(), p);
         p.append("end");
+        afterSyntax(begin, p);
         return begin;
     }
 
@@ -660,7 +661,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitYield(Rb.Yield yield, PrintOutputCapture<P> p) {
         beforeSyntax(yield, RubySpace.Location.YIELD_DATA, p);
         p.append("yield");
-        JContainer<Statement> args = yield.getPadding().getData();
+        JContainer<Expression> args = yield.getPadding().getData();
         if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             visitContainer("", args, RubyContainer.Location.YIELD_DATA, ",", "", p);
         } else {
@@ -1091,7 +1092,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, PrintOutputCapture<P> p) {
-            visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            beforeSyntax(controlParens, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
             visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p);
             if (controlParens.getMarkers().findFirst(ExplicitThen.class).isPresent()) {
                 p.append("then");

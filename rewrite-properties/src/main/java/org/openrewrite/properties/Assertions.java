@@ -21,8 +21,10 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import javax.annotation.CheckReturnValue;
 import java.util.function.Consumer;
 
+@CheckReturnValue
 public class Assertions {
     private Assertions() {}
 

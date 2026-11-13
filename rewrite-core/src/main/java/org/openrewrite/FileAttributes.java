@@ -93,6 +93,6 @@ public class FileAttributes implements RpcCodec<FileAttributes> {
                 .withReadable(q.receive(before.isReadable()))
                 .withWritable(q.receive(before.isWritable()))
                 .withExecutable(q.receive(before.isExecutable()))
-                .withSize(q.receive(before.getSize()));
+                .withSize(q.receive((Number) before.getSize()).longValue());
     }
 }

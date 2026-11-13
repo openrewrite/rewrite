@@ -620,8 +620,18 @@
   suggestedReplacement: 
 
 - imageName: nginx
+  tagPatterns: ["1.7", "1.7.*", "1.7-*"]
+  eolDate: "2015-04-28"
+  suggestedReplacement: 
+
+- imageName: nginx
   tagPatterns: ["1.8", "1.8.*", "1.8-*"]
   eolDate: "2016-04-26"
+  suggestedReplacement: 
+
+- imageName: nginx
+  tagPatterns: ["1.9", "1.9.*", "1.9-*"]
+  eolDate: "2016-05-24"
   suggestedReplacement: 
 
 - imageName: nginx
@@ -630,8 +640,18 @@
   suggestedReplacement: 
 
 - imageName: nginx
+  tagPatterns: ["1.11", "1.11.*", "1.11-*"]
+  eolDate: "2017-04-25"
+  suggestedReplacement: 
+
+- imageName: nginx
   tagPatterns: ["1.12", "1.12.*", "1.12-*"]
   eolDate: "2018-04-17"
+  suggestedReplacement: 
+
+- imageName: nginx
+  tagPatterns: ["1.13", "1.13.*", "1.13-*"]
+  eolDate: "2018-06-05"
   suggestedReplacement: 
 
 - imageName: nginx
@@ -640,8 +660,18 @@
   suggestedReplacement: 
 
 - imageName: nginx
+  tagPatterns: ["1.15", "1.15.*", "1.15-*"]
+  eolDate: "2019-05-21"
+  suggestedReplacement: 
+
+- imageName: nginx
   tagPatterns: ["1.16", "1.16.*", "1.16-*"]
   eolDate: "2020-04-20"
+  suggestedReplacement: 
+
+- imageName: nginx
+  tagPatterns: ["1.17", "1.17.*", "1.17-*"]
+  eolDate: "2020-05-26"
   suggestedReplacement: 
 
 - imageName: nginx

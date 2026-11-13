@@ -86,7 +86,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("wrappy", null)).cycles(2).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)),
           packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
             .noTrim().after(actual -> actual).afterRecipe(doc -> {
                 assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
@@ -115,7 +115,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("wrappy", null)).cycles(2).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)),
           packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
             .noTrim().after(actual -> actual).afterRecipe(doc -> assertThat(doc.getMarkers()
               .findFirst(Markup.Warn.class)).hasValueSatisfying(w -> assertThat(w.getMessage())
@@ -218,7 +218,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("wrappy", null)).cycles(2).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)),
           packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
             .noTrim().after(actual -> actual).afterRecipe(doc -> {
                 assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
@@ -265,6 +265,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
               new AddDependency("right-pad", "^1.0.0", null), new RemoveDependency("left-pad", null))
+            // the addition restores what the removal of the previous cycle took away
             .cycles(1).expectedCyclesThatMakeChanges(1),
           packageJson("""
             {

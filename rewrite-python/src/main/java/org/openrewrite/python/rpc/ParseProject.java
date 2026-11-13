@@ -35,9 +35,8 @@ class ParseProject implements RpcRequest {
     Path projectPath;
 
     /**
-     * Optional glob patterns matched against directory names, not paths.
-     * These extend the parser's built-in exclusions (__pycache__, .venv, etc.)
-     * rather than replacing them.
+     * Optional glob patterns of directories and files to leave out, as described on
+     * {@code exclusions} in {@link ParseProjectOptions}.
      */
     @Nullable
     List<String> exclusions;
@@ -51,13 +50,10 @@ class ParseProject implements RpcRequest {
     Path relativeTo;
 
     /**
-     * Optional path to a virtual environment with the project's dependencies installed.
-     * <p>
-     * The caller (e.g. a CLI build step) provisions this environment and forwards its
-     * path so the parser can point ty-types at it, allowing supertypes that reach into
-     * third-party packages to resolve (e.g. a first-party class extending
-     * {@code pydantic.BaseModel}). The parser never provisions dependencies itself.
-     * When {@code null}, parsing proceeds without dependency-backed type resolution.
+     * Optional path to a virtual environment with the project's dependencies installed, which the
+     * server points ty-types at so that supertypes reaching into third-party packages resolve (e.g. a
+     * first-party class extending {@code pydantic.BaseModel}). The server never provisions dependencies
+     * itself. When {@code null}, parsing proceeds without dependency-backed type resolution.
      */
     @Nullable
     Path dependencyPath;

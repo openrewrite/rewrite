@@ -396,6 +396,46 @@ public class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddImportIfOnlyReferencedThroughVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeAddImport("a.Node");
+                  return cu;
+              }
+          })),
+          kotlin(
+            """
+              package a
+
+              class Node {
+                  val next: Node? = null
+              }
+              """
+          ),
+          kotlin(
+            """
+              package a
+
+              open class Base {
+                  val node: Node = Node()
+              }
+              """
+          ),
+          kotlin(
+            """
+              package b
+
+              class B : a.Base() {
+                  fun next() = node.next
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noImportOfImplicitTypes() {
         rewriteRun(
           spec -> spec.recipe(importTypeRecipe("kotlin.Pair")),
@@ -554,6 +594,80 @@ public class AddImportTest implements RewriteTest {
                   val x: Foo = Foo()
                   val y: b.Foo = b.Foo()
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addImportKeepsTopLevelDeclarationOrder() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              package a
+
+              val first = 1
+
+              fun second(): ArrayList<Int>? = null
+
+              class Third
+
+              val fourth = first
+
+              data class Fifth(val a: Int)
+              """,
+            """
+              package a
+
+              import java.util.ArrayList
+
+              val first = 1
+
+              fun second(): ArrayList<Int>? = null
+
+              class Third
+
+              val fourth = first
+
+              data class Fifth(val a: Int)
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportKeepsTopLevelDeclarationOrder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeRemoveImport("java.nio.file.Paths");
+                  return cu;
+              }
+          })),
+          kotlin(
+            """
+              package a
+
+              import java.nio.file.Paths
+
+              private fun first() = 1
+
+              /** Documents Second. */
+              class Second
+
+              internal fun third() = first()
+              """,
+            """
+              package a
+
+              private fun first() = 1
+
+              /** Documents Second. */
+              class Second
+
+              internal fun third() = first()
               """
           )
         );

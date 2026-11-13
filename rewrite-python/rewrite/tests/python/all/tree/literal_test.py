@@ -1,5 +1,7 @@
 from typing import Type, Optional, TypeVar
 
+import pytest
+
 from rewrite import Tree
 from rewrite.java import Literal, JavaType
 from rewrite.python import PythonVisitor
@@ -264,6 +266,20 @@ def test_token_types(self, code, types):
     assert actual_types == types + [ENDMARKER]
 '''
     ))
+
+
+def _parenthesized_concatenation(count: int) -> str:
+    return "X = (\n" + "    'a'\n" * count + ")\n"
+
+
+def _backslash_continued_concatenation(count: int) -> str:
+    return "X = \\\n" + "b'00' \\\n" * (count - 1) + "b'00'\n"
+
+
+@pytest.mark.parametrize("count", [200, 1_000, 10_000])
+@pytest.mark.parametrize("source", [_parenthesized_concatenation, _backslash_continued_concatenation])
+def test_long_implicit_concatenation(source, count):
+    RecipeSpec().rewrite_run(python(source(count)))
 
 
 def find_first(tree: Tree, clazz: Type[T]) -> T:

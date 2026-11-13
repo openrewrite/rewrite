@@ -47,6 +47,7 @@ final class Package {
         int os = Negatable.OPERATING_SYSTEM.allValue;
         int id = INVALID_PACKAGE_ID;
         Integrity integrity = Integrity.UNKNOWN;
+        int libc = Negatable.NONE;
         boolean hasInstallScript;
 
         Meta copy(int id) {
@@ -56,6 +57,7 @@ final class Package {
             m.os = os;
             m.id = id;
             m.integrity = integrity;
+            m.libc = libc;
             m.hasInstallScript = hasInstallScript;
             return m;
         }
@@ -484,6 +486,7 @@ final class Package {
         pkg.meta.arch = packageVersion.cpu;
         pkg.meta.os = packageVersion.os;
         pkg.meta.integrity = packageVersion.integrity;
+        pkg.meta.libc = packageVersion.libc;
         pkg.meta.hasInstallScript = packageVersion.hasInstallScript;
         pkg.dependenciesOff = lockfile.dependencies.size();
         pkg.dependenciesLen = dependencies.size();

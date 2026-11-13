@@ -104,10 +104,46 @@ public class EcmaScript {
      */
     public static @Nullable Object jsonParse(String text) {
         try {
-            return jsonValue(MAPPER.readValue(text, Object.class));
+            return ownedJsonValue(MAPPER.readValue(text, Object.class));
         } catch (JsonProcessingException e) {
             throw new JsonSyntaxError(e);
         }
+    }
+
+    // Only jsonParse owns these mutable Jackson containers. Public jsonValue must still copy its input.
+    @SuppressWarnings("unchecked")
+    private static @Nullable Object ownedJsonValue(@Nullable Object value) {
+        if (value instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) value;
+            long previousIndex = -1;
+            boolean sawOtherKey = false;
+            boolean reorder = false;
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                long index = arrayIndex(entry.getKey());
+                if (index >= 0) {
+                    reorder |= sawOtherKey || index < previousIndex;
+                    previousIndex = index;
+                } else {
+                    sawOtherKey = true;
+                }
+                entry.setValue(ownedJsonValue(entry.getValue()));
+            }
+            if (reorder) {
+                Map<String, Object> ordered = new LinkedHashMap<>();
+                for (String key : keys(map)) {
+                    ordered.put(key, map.get(key));
+                }
+                return ordered;
+            }
+        } else if (value instanceof List) {
+            List<Object> list = (List<Object>) value;
+            for (int i = 0; i < list.size(); i++) {
+                list.set(i, ownedJsonValue(list.get(i)));
+            }
+        } else if (value instanceof Number && !(value instanceof Double)) {
+            return ((Number) value).doubleValue();
+        }
+        return value;
     }
 
     /**

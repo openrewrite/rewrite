@@ -18,6 +18,7 @@ package org.openrewrite.json;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.tree.Json;
 
 @Value
@@ -52,7 +53,7 @@ public class ChangeKey extends Recipe {
                 if (matcher.matches(getCursor())) {
                     String value = ChangeKey.this.newKey;
                     if (value.startsWith("'") || value.startsWith("\"")) {
-                        value = value.substring(1, value.length() - 1);
+                        value = JsonString.decode(value);
                     }
                     m = m.withKey(
                             m.getKey() instanceof Json.Literal ?

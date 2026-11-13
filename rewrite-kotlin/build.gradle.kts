@@ -77,18 +77,12 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_1_8)
-        // Required to override `FirPropertyChecker.check`, whose signature uses
-        // context parameters as of Kotlin 2.2. Scoped to this module because the
-        // recipe DSL compiler plugin in `org.openrewrite.kotlin.recipe.internal`
-        // depends on it.
-        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
-        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
@@ -110,7 +104,7 @@ val generatedScopesDir = layout.buildDirectory.dir("generated/source/recipeDsl/m
 // (java/yaml/xml/maven/json/properties/toml/hcl/python/csharp/scala/javascript/groovy)
 // are codegen'd from their `.class` files on the compile classpath.
 
-val generateLanguageScopes by tasks.registering(GenerateLanguageScopesTask::class) {
+val generateLanguageScopes = tasks.register<GenerateLanguageScopesTask>("generateLanguageScopes") {
     visitorClasspath.from(configurations.named("compileClasspath"))
     outputDir.set(generatedScopesDir)
     languages.set(listOf(
@@ -146,7 +140,7 @@ sourceSets.named("main") {
 
 val generatedCompilerVersionDir = layout.buildDirectory.dir("generated/source/compilerVersion/main/kotlin")
 
-val generateCompilerVersion by tasks.registering {
+val generateCompilerVersion = tasks.register("generateCompilerVersion") {
     val outputDir = generatedCompilerVersionDir
     val version = kotlinVersion
     inputs.property("kotlinVersion", version)

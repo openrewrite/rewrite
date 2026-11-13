@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
@@ -59,10 +60,19 @@ public class FindMissingTypes extends Recipe {
         J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
+            Set<UUID> preexistingSearchResults = new JavaIsoVisitor<Set<UUID>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ids) {
+                    if (marker instanceof SearchResult) {
+                        ids.add(marker.getId());
+                    }
+                    return super.visitMarker(marker, ids);
+                }
+            }.reduce(j, new HashSet<>());
             new JavaIsoVisitor<List<MissingTypeResult>>() {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
-                    if (marker instanceof SearchResult) {
+                    if (marker instanceof SearchResult && !preexistingSearchResults.contains(marker.getId())) {
                         String message = ((SearchResult) marker).getDescription();
                         String path = getCursor()
                                 .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
@@ -288,7 +298,7 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName() ||
-                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isMethodName(ident) || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
                     isInJavaDoc(ident);
         }
@@ -306,9 +316,10 @@ public class FindMissingTypes extends Recipe {
             return parent != null && parent.getValue() instanceof J.ClassDeclaration;
         }
 
-        private boolean isMethodName() {
+        private boolean isMethodName(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.MethodDeclaration;
+            return parent != null && parent.getValue() instanceof J.MethodDeclaration &&
+                    ident == ((J.MethodDeclaration) parent.getValue()).getName();
         }
 
         private boolean isMethodInvocationName() {

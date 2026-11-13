@@ -19,10 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
@@ -156,11 +156,33 @@ class CacheTest {
     }
 
     @Test
-    void anyOtherLevelIsSomethingTheEngineCannotKnow() {
-        assertThatThrownBy(() -> Cache.checksum(new byte[0], StructUtils.makeIdent(null, "ms"),
-                options("compressionLevel: mixed\n")))
-                .isInstanceOf(CannotKnow.class)
-                .hasMessageContaining("compressionLevel mixed");
+    void reproducesYarn402MixedPrettierArchive() throws IOException {
+        byte[] tgz;
+        try (InputStream in = CacheTest.class.getResourceAsStream("/lock/support/yarn-berry/compression/prettier-3.9.10.tgz")) {
+            tgz = in.readAllBytes();
+        }
+        byte[] expected;
+        try (InputStream in = CacheTest.class.getResourceAsStream("/lock/support/yarn-berry/compression/prettier-3.9.10-mixed.zip")) {
+            expected = in.readAllBytes();
+        }
+        assertThat(TgzUtils.convertToZip(tgz, "node_modules/prettier", 1).toByteArray("mixed")).isEqualTo(expected);
+        assertThat(Cache.checksum(tgz, StructUtils.parseIdent("prettier"), options("compressionLevel: mixed\n")))
+                .isEqualTo("10/" + HashUtils.sha512Hex(expected));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"mixed", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"})
+    void reproducesEveryCompressionLevel(String level) throws IOException {
+        byte[] tgz;
+        try (InputStream in = CacheTest.class.getClassLoader().getResourceAsStream("lock/yarn-berry/checksum/ms-2.1.3.tgz")) {
+            tgz = in.readAllBytes();
+        }
+        byte[] expected;
+        try (InputStream in = CacheTest.class.getResourceAsStream("/lock/support/yarn-berry/compression/ms-2.1.3-" + level + ".zip")) {
+            expected = in.readAllBytes();
+        }
+        Object compression = "mixed".equals(level) ? level : Integer.valueOf(level);
+        assertThat(TgzUtils.convertToZip(tgz, "node_modules/ms", 1).toByteArray(compression)).isEqualTo(expected);
     }
 
     /**

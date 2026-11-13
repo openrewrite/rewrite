@@ -24,6 +24,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.format.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import javax.annotation.CheckReturnValue;
+
 public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     @Override
@@ -36,14 +38,17 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return "xml";
     }
 
+    @CheckReturnValue
     public <X extends Xml> X maybeAutoFormat(X before, X after, P p) {
         return maybeAutoFormat(before, after, p, getCursor());
     }
 
+    @CheckReturnValue
     public <X extends Xml> X maybeAutoFormat(X before, X after, P p, Cursor cursor) {
         return maybeAutoFormat(before, after, null, p, cursor);
     }
 
+    @CheckReturnValue
     public <X extends Xml> X maybeAutoFormat(X before, X after, @Nullable Xml stopAfter, P p, Cursor cursor) {
         if (before != after) {
             FormattingListener.beforeFormat(after, stopAfter, cursor);
@@ -53,14 +58,17 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         return after;
     }
 
+    @CheckReturnValue
     public <X extends Xml> X autoFormat(X j, P p) {
         return autoFormat(j, p, getCursor().getParentOrThrow());
     }
 
+    @CheckReturnValue
     public <X extends Xml> X autoFormat(X j, P p, Cursor cursor) {
         return autoFormat(j, null, p, cursor);
     }
 
+    @CheckReturnValue
     public <X extends Xml> X autoFormat(X j, @Nullable Xml stopAfter, P p, Cursor cursor) {
         FormattingListener.beforeFormat(j, stopAfter, cursor);
         //noinspection unchecked

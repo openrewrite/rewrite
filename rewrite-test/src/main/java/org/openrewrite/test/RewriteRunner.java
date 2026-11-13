@@ -49,7 +49,7 @@ public interface RewriteRunner {
      * Out-of-process runners override this.
      */
     default RecipeRun run(Recipe recipe, Context context) {
-        return UnchangedTreeIdentity.schedulerFor(context.getSources()).scheduleRun(recipe, context.getSources(),
+        return CheckingScheduler.of(context.getSources()).scheduleRun(recipe, context.getSources(),
                 context.getExecutionContext(), context.getCycles(), context.getExpectedCyclesThatMakeChanges() + 1);
     }
 

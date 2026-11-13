@@ -19,11 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -38,12 +40,13 @@ import static org.openrewrite.Tree.randomId;
 public class AddKeyValue extends Recipe {
 
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate the *parent* JSON entry.",
-            example = "'$.subjects.*' or '$' or '$.x[1].y.*' etc.")
+            description = "A JsonPath expression to locate the *parent* JSON object, either the object itself or the key holding it. " +
+                          "A trailing `.*` is ignored, so `$.x.y.*` is the same as `$.x.y`.",
+            example = "'$.subjects' or '$' or '$.x[1].y' etc.")
     String keyPath;
 
     @Option(displayName = "Key",
-            description = "The key to create.",
+            description = "The key to create, as the text it stands for. It is written with the escapes JSON needs, so `\\.` is written `\\\\.`.",
             example = "myKey")
     String key;
 
@@ -68,13 +71,14 @@ public class AddKeyValue extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JsonIsoVisitor<ExecutionContext>() {
-            private final JsonPathMatcher pathMatcher = new JsonPathMatcher(keyPath);
+            private final JsonPathMatcher pathMatcher = new JsonPathMatcher(
+                    keyPath.endsWith(".*") && !keyPath.endsWith("..*") ? keyPath.substring(0, keyPath.length() - 2) : keyPath);
 
             @Override
             public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext ctx) {
                 obj = super.visitObject(obj, ctx);
 
-                if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
+                if (matchesKeyPath() && objectDoesNotContainKey(obj, key)) {
                     List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
                     boolean jsonIsEmpty = members.isEmpty() || members.get(0).getElement() instanceof Json.Empty;
                     Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ?
@@ -100,6 +104,14 @@ public class AddKeyValue extends Recipe {
                 return obj;
             }
 
+            private boolean matchesKeyPath() {
+                if (pathMatcher.matches(getCursor())) {
+                    return true;
+                }
+                Cursor parent = getCursor().getParentTreeCursor();
+                return parent.getValue() instanceof Json.Member && pathMatcher.matches(parent);
+            }
+
             private JsonValue parsedValue() {
                 Json.Document parsedDoc = (Json.Document) JsonParser.builder().build()
                         .parse(value.trim()).findFirst().get();
@@ -109,7 +121,7 @@ public class AddKeyValue extends Recipe {
 
             private JsonRightPadded<JsonKey> rightPaddedKey() {
                 return new JsonRightPadded<>(
-                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "\"" + key + "\"", key),
+                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, JsonString.quote(key), key),
                         Space.EMPTY, Markers.EMPTY
                 );
             }

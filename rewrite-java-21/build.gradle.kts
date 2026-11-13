@@ -67,7 +67,7 @@ tasks.withType<Javadoc>().configureEach {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class)
+        val test = getByName<JvmTestSuite>("test")
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
@@ -84,6 +84,8 @@ testing {
                         useJUnitPlatform()
                         testClassesDirs += javaTckClasses
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+                        // Open java.lang as Gradle daemons do, so JavaTypeCache uses its fast path for String keys
+                        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
                         shouldRunAfter(test)
                     }
                 }
@@ -105,6 +107,11 @@ normalization {
             ignoreCompletely()
         }
     }
+}
+
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
 }
 
 tasks.named("check") {

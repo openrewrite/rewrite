@@ -217,6 +217,179 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void wildcardAfterKeyIncludesItemsOfSequenceValues() {
+        assertMatched(
+          "$.root.*.*",
+          simple,
+          List.of(
+            "literal: $.root.object.literal",
+            """
+                  list:
+                      - literal: $.root.object.list[0]
+              """,
+            "literal: $.root.list[0]"
+          )
+        );
+    }
+
+    @Test
+    void wildcardAfterSequenceKeySelectsEachItem() {
+        assertMatched(
+          "$.list.*",
+          sliceList,
+          List.of(
+            """
+              item1: index0
+              property: property
+              """,
+            """
+              item2: index1
+              property: property
+              """,
+            """
+              item3: index2
+              property: property
+              """
+          )
+        );
+    }
+
+    @Test
+    void wildcardAfterSequenceKeySelectsEachScalarItem() {
+        assertMatched(
+          "$.list.*",
+          listOfScalars,
+          List.of("item 1", "item 2", "item 3")
+        );
+    }
+
+    @Test
+    void wildcardAfterScalarKeySelectsNothing() {
+        assertNotMatched(
+          "$.root.literal.*",
+          simple
+        );
+    }
+
+    @Test
+    void wildcardAfterAllElementsSelectsEntriesOfEachItem() {
+        assertMatched(
+          "$.list[*].*",
+          sliceList,
+          List.of(
+            "item1: index0",
+            "property: property",
+            "item2: index1",
+            "property: property",
+            "item3: index2",
+            "property: property"
+          )
+        );
+    }
+
+    @Test
+    void wildcardAfterIndexSelectsEntriesOfThatItem() {
+        assertMatched(
+          "$.list[1].*",
+          sliceList,
+          List.of("item2: index1", "property: property")
+        );
+    }
+
+    @Test
+    void wildcardAtDocumentLevelSequenceSelectsEachItem() {
+        assertMatched(
+          "$[*].*",
+          List.of(
+            """
+              - id: 0
+              - - nested
+              - plain
+              """
+          ),
+          List.of("id: 0", "nested")
+        );
+    }
+
+    @Test
+    void recursiveWildcardSelectsEveryEntryAndItem() {
+        assertMatched(
+          "$..*",
+          List.of(
+            """
+              a:
+                b: 1
+                l:
+                  - x: y
+                  - z
+              """
+          ),
+          List.of(
+            "b: 1",
+            "x: y",
+            "x: y",
+            "z",
+            """
+              l:
+                - x: y
+                - z
+              """,
+            """
+              a:
+                b: 1
+                l:
+                  - x: y
+                  - z
+              """
+          )
+        );
+    }
+
+    @Test
+    void scopedRecursiveWildcardSelectsEveryDescendant() {
+        assertMatched(
+          "$.a..*",
+          List.of(
+            """
+              a:
+                b: 1
+                c:
+                  d: 2
+                l:
+                  - x: y
+                  - z
+              other: 3
+              """
+          ),
+          List.of(
+            "b: 1",
+            "d: 2",
+            """
+              c:
+                d: 2
+              """,
+            "x: y",
+            "x: y",
+            "z",
+            """
+              l:
+                - x: y
+                - z
+              """
+          )
+        );
+    }
+
+    @Test
+    void indexAfterWildcardIndexesTheWildcardResults() {
+        assertMatched(
+          "$.root.*[0]",
+          simple,
+          List.of("literal: $.root.literal")
+        );
+    }
+
+    @Test
     void allPropertiesInKeyFromRoot() {
         assertMatched(
           // This produces two false positives from $.literal and $.list.literal.

@@ -18,6 +18,7 @@ from .discovery import (
 )
 from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, \
     RecipeRunException, LargeSourceSet, InMemoryLargeSourceSet, Result
+from .heavyweight import Heavyweight
 from .marketplace import RecipeMarketplace, Python
 from .recipe import Recipe, ScanningRecipe, option, OptionDescriptor, RecipeDescriptor
 from .markers import *
@@ -60,6 +61,7 @@ __all__ = [
     # Recipe
     'Recipe',
     'ScanningRecipe',
+    'Heavyweight',
     'option',
     'OptionDescriptor',
     'RecipeDescriptor',

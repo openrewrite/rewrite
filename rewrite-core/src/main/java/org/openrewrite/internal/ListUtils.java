@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
+import javax.annotation.CheckReturnValue;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -41,6 +42,7 @@ import static java.util.Collections.singletonList;
  * ensuring unnecessary memory allocations are avoided,
  * See also <a href="https://docs.openrewrite.org/authoring-recipes/recipe-conventions-and-best-practices#recipes-must-not-mutate-lsts">Recipes must not mutate LSTs</a>.
  */
+@CheckReturnValue
 public final class ListUtils {
     private ListUtils() {
     }

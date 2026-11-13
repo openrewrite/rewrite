@@ -15,16 +15,61 @@
  */
 package org.openrewrite.ipc.http;
 
+import com.sun.net.httpserver.HttpServer;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.SocketTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HttpUrlConnectionSenderTest {
+
+    @Test
+    void explicitRoutePreservesTimeoutsAndRequestOverrides() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        var executor = Executors.newCachedThreadPool();
+        server.setExecutor(executor);
+        server.createContext("/", exchange -> {
+            try {
+                Thread.sleep(200);
+                exchange.sendResponseHeaders(200, -1);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        try {
+            String url = "http://127.0.0.1:" + server.getAddress().getPort();
+            HttpSender sender = new HttpUrlConnectionSender(Duration.ofSeconds(2), Duration.ofMillis(30))
+                    .withProxy(Proxy.NO_PROXY);
+            assertThatThrownBy(() -> sender.send(sender.get(url).build())).hasRootCauseInstanceOf(SocketTimeoutException.class);
+            try (HttpSender.Response response = sender.send(sender.get(url).withReadTimeout(Duration.ofSeconds(3)).build())) {
+                assertThat(response.getCode()).isEqualTo(200);
+            }
+        } finally {
+            server.stop(0);
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void aCustomSubclassIsNotReplacedWithABaseSender() {
+        HttpUrlConnectionSender custom = new HttpUrlConnectionSender() { };
+        assertThatThrownBy(() -> custom.withProxy(Proxy.NO_PROXY)).isInstanceOf(UnsupportedOperationException.class);
+    }
+
 
     @Test
     void withMultipartContentWithApplicationJsonType() throws Exception {

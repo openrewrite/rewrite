@@ -144,7 +144,18 @@ class PnpmScenarioTest extends LockScenarioTest {
      */
     static @Nullable String expected(PnpmScenarios.Scenario scenario) {
         String release = recordedRelease(scenario);
-        return PnpmReleases.isProven(release) ? scenario.expect() : "cannot-know the lock pnpm " + release + " writes";
+        if (!PnpmReleases.isProven(release)) {
+            return "cannot-know the lock pnpm " + release + " writes";
+        }
+        return profileExpectation(scenario, scenario.file("before"), release, scenario.expect());
+    }
+
+    // A native outcome outside the bounded 10.x profile is still retained, but held to an explicit refusal.
+    // This verifies the guard is enforced rather than accepting a lock written by a different upstream path.
+    private static @Nullable String profileExpectation(PnpmScenarios.Scenario scenario, String lock, String release,
+                                                        @Nullable String recorded) {
+        String unsupported = Pnpm10Profile.unsupported(inputs(scenario, lock), PnpmRelease.of(release));
+        return unsupported == null ? recorded : "cannot-know " + unsupported;
     }
 
     // the scenario's own edit as another release, or another outcome: the edit over the lock that release wrote first,
@@ -305,7 +316,7 @@ class PnpmScenarioTest extends LockScenarioTest {
     @MethodSource("releaseEdits")
     void regeneratesWhatEachReleaseWrote(String name, Edit edit) {
         PnpmScenarios.Scenario scenario = edit.getScenario();
-        Expect expect = Expect.of(edit.getExpect());
+        Expect expect = Expect.of(profileExpectation(scenario, edit.getStart(), edit.getRelease(), edit.getExpect()));
         skipUnlessReplayed(name, scenario, expect);
         ScenarioRegistry http = new ScenarioRegistry(recording(scenario), "after");
         Result result;
