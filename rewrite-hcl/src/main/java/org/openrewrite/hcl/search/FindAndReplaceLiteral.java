@@ -25,13 +25,9 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.marker.AlreadyReplaced;
 
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -65,16 +61,15 @@ public class FindAndReplaceLiteral extends Recipe {
     Boolean caseSensitive;
 
     @Override
+    public int maxCycles() {
+        return 1;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new HclIsoVisitor<ExecutionContext>() {
             @Override
             public Hcl.Literal visitLiteral(final Hcl.Literal literal, final ExecutionContext ctx) {
-                for (AlreadyReplaced alreadyReplaced : literal.getMarkers().findAll(AlreadyReplaced.class)) {
-                    if (Objects.equals(find, alreadyReplaced.getFind()) &&
-                        Objects.equals(replace, alreadyReplaced.getReplace())) {
-                        return literal;
-                    }
-                }
                 String searchStr = find;
                 if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
@@ -96,8 +91,7 @@ public class FindAndReplaceLiteral extends Recipe {
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
-                return withWritten(literal, matcher.replaceAll(replacement), parent)
-                        .withMarkers(literal.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
+                return withWritten(literal, matcher.replaceAll(replacement), parent);
             }
 
             // a string is matched as written, without the quotes a block label's source holds
