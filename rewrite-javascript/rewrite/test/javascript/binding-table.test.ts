@@ -1,8 +1,9 @@
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../src/test";
 import {
-    AddImport, AddImportOptions, bindingTable, javascript, JavaScriptVisitor, JS, maybeBind, MaybeBindOptions, ModuleBinding,
-    maybeRebind, MaybeRebindOptions, moduleBindings, moduleScopeBindings, ModuleScopeBinding, typescript
+    AddImport, AddImportOptions, javascript, JavaScriptVisitor, JS, maybeBind, MaybeBindOptions, maybeRebind,
+    MaybeRebindOptions, moduleBindings, moduleScopeBindings, ModuleScopeBinding, typescript
 } from "../../src/javascript";
+import {bindingTable, ModuleBinding} from "../../src/javascript/binding-table";
 import {J} from "../../src/java";
 
 /** A row without the nodes it points at, which a test spells as the rest of it. */
