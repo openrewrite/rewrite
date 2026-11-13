@@ -1106,6 +1106,61 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should not merge into an import under // @ts-ignore, first in the file or not', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'b', onlyIfReferenced: false}));
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                    // @ts-ignore
+                    import {a} from 'm';
+                    `,
+                    `
+                    // @ts-ignore
+                    import {a} from 'm';
+                    import {b} from 'm';
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                    import {x} from 'x';
+                    // @ts-expect-error
+                    import D from 'm';
+                    `,
+                    `
+                    import {x} from 'x';
+                    // @ts-expect-error
+                    import D from 'm';
+                    import {b} from 'm';
+                    `
+                )
+            );
+        });
+
+        test('should merge into the import of the module that is not under // @ts-ignore', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'b', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    // @ts-ignore
+                    import {a} from 'm';
+                    import {c} from 'm';
+                    `,
+                    `
+                    // @ts-ignore
+                    import {a} from 'm';
+                    import {b, c} from 'm';
+                    `
+                )
+            );
+        });
+
         test('should reuse a binding the file already has, whatever attributes load it', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'a', onlyIfReferenced: false}));

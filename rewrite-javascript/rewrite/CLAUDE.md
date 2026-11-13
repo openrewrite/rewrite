@@ -257,7 +257,7 @@ else, since a rename onto a name already in use would capture its references or 
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
 
 A name the file spells is still not taken when it is a value import of `to`'s named member, and the
-moved binding is a value too, loaded with the same import attributes. Outside the imports and `export {…}` clauses the file may spell it only
+moved binding is a value too, loaded with the same import attributes, neither under `// @ts-ignore`. Outside the imports and `export {…}` clauses the file may spell it only
 as a reference, and no queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
 alias or not, and `RebindImport` merges into that import. A `type` import on either side, or a
 default or namespace target, would get a second declaration of the name instead, so the name stays
@@ -354,14 +354,30 @@ import {                        import {Button} from '@acme/ui/button';
 
 Rebinds from separate visits each lay out their own import, as a lone move would.
 
-### Import attributes
+### Which statement a member joins
+
+A member that `maybeBind` adds or `maybeRebind` moves joins an existing import or `require` of its
+module, and a moved re-export joins an existing `export {…} from` of it. Two things give it a
+statement of its own instead.
 
 A module is loaded per specifier and attributes (`with {type: "json"}`, `with {"resolution-mode": …}`),
-so an import joins another only where the two carry the same attributes, compared by the keys and
+so an import or re-export joins another only where the two carry the same attributes, compared by the keys and
 values they spell. `with` and the legacy `assert` count as different. A moved binding keeps the
 attributes of the import it leaves, whether its statement is rewritten in place or it is bound again
 in another. A `maybeBind` request carries none, so it joins only an import without them, though it
 still reuses an existing binding of its member whatever loads it.
+
+A `// @ts-ignore` or `// @ts-expect-error` comment hides the errors of the statement below it, so
+nothing joins an import, a `require` or a re-export under one: the comment would hide the new
+member's errors too, such as the module not exporting it. A binding that has such a statement to
+itself stays in it, so the comment keeps covering what it covered.
+
+```ts
+// m.Old → m2.New
+import {Old} from "m";        →  import {New} from "m2";
+// @ts-ignore                    // @ts-ignore
+import {Other} from "m2";        import {Other} from "m2";
+```
 
 ### A rebind of a `require`
 

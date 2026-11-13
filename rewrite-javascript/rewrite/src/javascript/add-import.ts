@@ -1033,7 +1033,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
             if (statement?.kind === JS.Kind.Import) {
                 const jsImport = statement as JS.Import;
-                if (!acceptsNamedMember(jsImport, this.module, this.typeOnly, this.attributes)) {
+                if (!acceptsNamedMember(compilationUnit, jsImport, this.module, this.typeOnly, this.attributes)) {
                     continue;
                 }
                 const importClause = jsImport.importClause!;
@@ -2046,7 +2046,7 @@ export function requireJoinTarget(cu: JS.CompilationUnit, module: string): J.Var
     const {start, end} = leadingRequires(cu);
     return cu.statements.slice(start, end)
         .map(s => requireDeclarationOf(s.element))
-        .find(declaration => declaration !== undefined && joins(declaration, module));
+        .find(declaration => declaration !== undefined && joins(declaration, module) && !errorsSuppressed(cu, declaration));
 }
 
 function keywordsOf(declaration: J.VariableDeclarations): string {
@@ -2180,9 +2180,10 @@ function importedModule(jsImport: JS.Import): string | undefined {
 
 /**
  * Whether `AddImport` merges a named member of `module`, loaded with `attributes`, into `jsImport`
- * rather than adding a statement.
+ * rather than adding a statement. An import under `// @ts-ignore` takes none in, see {@link errorsSuppressed}.
  */
 function acceptsNamedMember(
+    cu: JS.CompilationUnit,
     jsImport: JS.Import,
     module: string,
     typeOnly: boolean,
@@ -2191,7 +2192,8 @@ function acceptsNamedMember(
     const clause = jsImport.importClause;
     const specifier = jsImport.moduleSpecifier?.element;
     if (!clause || clause.typeOnly !== typeOnly || specifier?.kind !== J.Kind.Literal ||
-        !sameModule(moduleNameOf(specifier as J.Literal), module) || !sameAttributes(jsImport.attributes, attributes)) {
+        !sameModule(moduleNameOf(specifier as J.Literal), module) || !sameAttributes(jsImport.attributes, attributes) ||
+        errorsSuppressed(cu, jsImport)) {
         return false;
     }
     if (clause.typeOnly && clause.name !== undefined) {
@@ -2236,6 +2238,28 @@ function attributeEntries(attributes: JS.ImportAttributes | undefined): Map<stri
         entries.set(moduleExportName(name as J.Identifier | J.Literal), (literal as J.Literal).value as string);
     }
     return entries;
+}
+
+/**
+ * Whether a `// @ts-ignore` or `// @ts-expect-error` comment sits above `statement`, one of `cu`'s own.
+ * TypeScript then reports no error on the statement's first line, so a member joined into the statement
+ * would have its errors hidden too, such as the module not exporting it. The comments above a file's
+ * first statement are the file's prefix.
+ */
+export function errorsSuppressed(cu: JS.CompilationUnit, statement: J): boolean {
+    return statement.prefix.comments.some(suppressesErrors) ||
+        (cu.statements[0]?.element === statement && cu.prefix.comments.some(suppressesErrors));
+}
+
+/** As TypeScript reads a directive: `// @ts-ignore`, `/// @ts-ignore: why`, or one on the last line of a block comment. */
+function suppressesErrors(comment: Comment): boolean {
+    if (comment.kind !== J.Kind.TextComment) {
+        return false;
+    }
+    const {text, multiline} = comment as TextComment;
+    return multiline
+        ? /^[/*]*\s*@ts-(?:expect-error|ignore)/.test(text.slice(text.lastIndexOf("\n") + 1).trimStart())
+        : /^\/?\s*@ts-(?:expect-error|ignore)/.test(text);
 }
 
 /** Which of an import clause's three slots `member` binds — `import`, `import *`, or `import {}`. */
@@ -2455,7 +2479,7 @@ export function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.Compilati
 /**
  * Whether moving the only binding of `jsImport` to `to` replaces the statement rather than rewriting
  * it in place. A different shape needs a different clause, and another import of `to` with the same
- * attributes takes it in.
+ * attributes takes it in. An import under `// @ts-ignore` keeps its binding, so the comment stays with it.
  */
 function replacesStatement(
     cu: JS.CompilationUnit,
@@ -2465,9 +2489,9 @@ function replacesStatement(
     typeOnly: boolean
 ): boolean {
     const shape = bindingShape(to.member);
-    return shape !== bindingShape(from.member) || (shape === "named" && cu.statements.some(s =>
-        s.element !== jsImport && s.element?.kind === JS.Kind.Import &&
-        acceptsNamedMember(s.element as JS.Import, to.module, typeOnly, jsImport.attributes)));
+    return shape !== bindingShape(from.member) || (shape === "named" && !errorsSuppressed(cu, jsImport) &&
+        cu.statements.some(s => s.element !== jsImport && s.element?.kind === JS.Kind.Import &&
+            acceptsNamedMember(cu, s.element as JS.Import, to.module, typeOnly, jsImport.attributes)));
 }
 
 const esmStyle = {default: ImportStyle.ES6Default, namespace: ImportStyle.ES6Namespace, named: ImportStyle.ES6Named};
@@ -2735,7 +2759,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             return withPattern(rebound, withoutElement(pattern as JS.ObjectBindingPattern, index));
         }
         // `AddImport` merges the binding into the target's require where `requireJoinTarget` finds one.
-        if (!isIdentifier(binding) && keywordsOf(declaration) === 'const' &&
+        if (!isIdentifier(binding) && keywordsOf(declaration) === 'const' && !errorsSuppressed(this.cu!, declaration) &&
             requireJoinTarget(this.cu!, this.to.module) !== undefined) {
             this.dropped = rebound.id;
             return rebound;

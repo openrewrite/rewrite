@@ -22,9 +22,10 @@ import {
 } from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
-    AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
-    isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindGroup, RebindImport, requireBinds,
-    requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget, sameAttributes
+    AddImportOptions, bindImport, bindingShape, errorsSuppressed, existingImportBinding, ExistingImportBinding,
+    hasEsmSyntax, ImportStyle, isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindGroup,
+    RebindImport, requireBinds, requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget,
+    sameAttributes
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {RenameMemberSpellings} from "./member-spellings";
@@ -500,7 +501,7 @@ const noNames: ReadonlySet<string> = new Set();
 
 /**
  * Whether the moved binding can merge into a value import of `to`'s named member that `name` binds,
- * loaded with the same attributes.
+ * loaded with the same attributes. Neither statement may sit under `// @ts-ignore`.
  */
 function reusesTargetImport(
     cu: JS.CompilationUnit,
@@ -516,7 +517,8 @@ function reusesTargetImport(
         requireBinds(joinTarget, to.module, to.member) === name);
     return target?.localName === name && target.viaRequire === moved.viaRequire && joined &&
         bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly &&
-        sameAttributes(attributesOf(target), attributesOf(moved)) && onlyReferences(cu, name);
+        sameAttributes(attributesOf(target), attributesOf(moved)) &&
+        !errorsSuppressed(cu, target.statement) && !errorsSuppressed(cu, moved.statement) && onlyReferences(cu, name);
 }
 
 /** The `with {…}` clause of the import that binds it. A `require` has none. */
