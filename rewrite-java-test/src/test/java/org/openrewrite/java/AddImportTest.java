@@ -1695,6 +1695,44 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void existingStaticImportOfNestedTypeMatchesDottedName() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeAddImport("b", "New.Typing", "STATIC", null, true);
+                  maybeAddImport("b.New.Typing", "dynamic");
+                  return cu;
+              }
+          })).parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package b;
+
+              public class New {
+                  public enum Typing {
+                      STATIC;
+                      public static Typing dynamic() {
+                          return STATIC;
+                      }
+                  }
+              }
+              """
+          )),
+          java(
+            """
+              import static b.New.Typing.STATIC;
+              import static b.New.Typing.dynamic;
+
+              class Test {
+                  Object s = STATIC;
+                  Object d = dynamic();
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/pull/5530")
     @Test
     void importWithNestedClass() {
