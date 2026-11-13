@@ -22,10 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.service.ImportService;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -92,9 +89,19 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 JavaType.FullyQualified originalType = multiVariable.getTypeAsFullyQualified();
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
-                boolean initializedByMatch = mv.getVariables().stream()
-                        .anyMatch(v -> isInitializedByMatch(v.getInitializer()));
-                if (!methodUpdated || !initializedByMatch || mv.getTypeExpression() == null) {
+                JavaType matchReturnType = null;
+                for (J.VariableDeclarations.NamedVariable variable : mv.getVariables()) {
+                    matchReturnType = matchReturnType(variable.getInitializer());
+                    if (matchReturnType != null) {
+                        break;
+                    }
+                }
+                if (matchReturnType == null || mv.getTypeExpression() == null) {
+                    return mv;
+                }
+                // A matching call may have the new return type already, as one renamed by `ChangeMethodName` does.
+                // Then only a declaration that can't hold that type is retyped.
+                if (!methodUpdated && !isKnownMisfit(mv.getTypeExpression(), matchReturnType)) {
                     return mv;
                 }
 
@@ -125,20 +132,37 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 }));
             }
 
-            private boolean isInitializedByMatch(@Nullable Expression expression) {
-                if (expression == null) {
+            private boolean isKnownMisfit(TypeTree declared, JavaType returnType) {
+                JavaType declaredType = declared.getType();
+                // The return type this recipe gives a call is shallow, and nothing is assignable to that.
+                if (declaredType == null || declaredType instanceof JavaType.Unknown ||
+                        returnType instanceof JavaType.ShallowClass ||
+                        declared.getMarkers().findFirst(JavaVarKeyword.class).isPresent()) {
                     return false;
+                }
+                if (declaredType instanceof JavaType.Parameterized && returnType instanceof JavaType.Class) {
+                    // an unchecked conversion from the raw type
+                    declaredType = ((JavaType.Parameterized) declaredType).getType();
+                }
+                return !TypeUtils.isAssignableTo(declaredType, returnType);
+            }
+
+            private @Nullable JavaType matchReturnType(@Nullable Expression expression) {
+                if (expression == null) {
+                    return null;
                 }
                 Expression unwrapped = expression.unwrap();
                 if (unwrapped instanceof J.MethodInvocation) {
-                    return methodMatcher.matches((J.MethodInvocation) unwrapped);
+                    J.MethodInvocation call = (J.MethodInvocation) unwrapped;
+                    return methodMatcher.matches(call) && call.getMethodType() != null ?
+                            call.getMethodType().getReturnType() : null;
                 }
                 if (unwrapped instanceof J.Ternary) {
                     J.Ternary ternary = (J.Ternary) unwrapped;
-                    return isInitializedByMatch(ternary.getTruePart()) ||
-                            isInitializedByMatch(ternary.getFalsePart());
+                    JavaType truePart = matchReturnType(ternary.getTruePart());
+                    return truePart != null ? truePart : matchReturnType(ternary.getFalsePart());
                 }
-                return false;
+                return null;
             }
         });
     }
