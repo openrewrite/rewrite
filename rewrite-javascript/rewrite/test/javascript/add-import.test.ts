@@ -681,6 +681,35 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('code on the last import\'s line moves to its own line, with a block comment ahead of it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; /* x */ a();
+                    `,
+                    `
+                        import {a} from "a";
+                        import {b} from "b";
+                        /* x */ a();
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; a();
+                    `,
+                    `
+                        import {a} from "a";
+                        import {b} from "b";
+                        a();
+                    `
+                )
+            );
+        });
+
         test('a comment ending a directive\'s line stays on it, and one after a shebang stays with the code', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
