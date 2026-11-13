@@ -63,7 +63,7 @@ export {
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
 export type {
-    ExportOfOptions, MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings, ModuleExport
+    ImportedAtOptions, ImportedMember, MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings
 } from "./binding";
 export {maybeBind, maybeUnbind, maybeRebind, moduleBindings, isAmdBlock, maybeRemoveImport, maybeAddImport} from "./binding";
 export * from "./remove-import";

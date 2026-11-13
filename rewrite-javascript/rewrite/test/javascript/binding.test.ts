@@ -5,7 +5,7 @@ import * as path from "path";
 import {
     JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
     maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, MaybeRebindOptions, maybeRemoveImport,
-    removeNewlyUnusedAmdBindings, ImportStyle, ExportOfOptions, ModuleExport, JavaScriptParser, sourceFileCache
+    removeNewlyUnusedAmdBindings, ImportStyle, ImportedAtOptions, ImportedMember, JavaScriptParser, sourceFileCache
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded, TextComment, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -211,29 +211,29 @@ async function parse(source: string, sourcePath = "test.ts"): Promise<JS.Compila
     return (await parser.parse({text: source, sourcePath}).next()).value as JS.CompilationUnit;
 }
 
-/** The nodes `exportOf` reads. */
+/** The nodes `importedAt` reads. */
 const READS = new Set<string>([
     J.Kind.Identifier, J.Kind.FieldAccess, J.Kind.MethodInvocation, J.Kind.ArrayAccess, JS.Kind.FunctionCall,
     JS.Kind.ImportType
 ]);
 
-// What `exportOf` answers at each /*mark*/ in `source`, keyed by the mark:
+// What `importedAt` answers at each /*mark*/ in `source`, keyed by the mark:
 // `let a: /*inType*/ NS.Old;` → `{inType: {module: "m", member: "Old", ...}}`.
-// The parser puts a comment in the prefix of the outermost node after it, which can be one `exportOf` doesn't read,
-// such as a statement or a type annotation, so the mark goes to the first node inside it that `exportOf` reads:
+// The parser puts a comment in the prefix of the outermost node after it, which can be one `importedAt` doesn't read,
+// such as a statement or a type annotation, so the mark goes to the first node inside it that `importedAt` reads:
 // `/*call*/ f()` asks about the call. Put a mark right before what it asks about, not before a declaration
 // holding it, where the first such node is the declared name.
-async function exportsAt(source: string, options?: ExportOfOptions, sourcePath = "test.ts"):
-    Promise<Record<string, ModuleExport | undefined>> {
+async function importedAtMarks(source: string, options?: ImportedAtOptions, sourcePath = "test.ts"):
+    Promise<Record<string, ImportedMember | undefined>> {
     const cu = await parse(source, sourcePath);
-    const answers: Record<string, ModuleExport | undefined> = {};
+    const answers: Record<string, ImportedMember | undefined> = {};
     await new class extends JavaScriptVisitor<undefined> {
         private pending?: string;
 
         protected override async preVisit(tree: J, p: undefined): Promise<J | undefined> {
             this.pending = markOf(tree) ?? this.pending;
             if (this.pending !== undefined && READS.has(tree.kind)) {
-                answers[this.pending] = moduleBindings(this).exportOf(tree, options);
+                answers[this.pending] = moduleBindings(this).importedAt(tree, options);
                 this.pending = undefined;
             }
             return tree;
@@ -251,10 +251,10 @@ function markOf(tree: J): string | undefined {
         .find(text => text !== undefined && /^\w+$/.test(text));
 }
 
-describe("exportOf", () => {
+describe("importedAt", () => {
     test("each binding shape reaches the member it names", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             import {a} from "m";
             import {b as B} from "m";
             import * as NS from "m";
@@ -279,22 +279,22 @@ describe("exportOf", () => {
         `);
 
         expect(answers).toEqual({
-            named:             {module: "m", member: "a", typeOnly: false, via: {kind: "named", name: "a"}},
-            aliased:           {module: "m", member: "b", typeOnly: false, via: {kind: "named", name: "B"}},
-            namespace:         {module: "m", member: "c", typeOnly: false, via: {kind: "namespace", name: "NS"}},
-            importEquals:      {module: "m", member: "e", typeOnly: false, via: {kind: "require", name: "X"}},
-            literalName:       {module: "m", member: "*", typeOnly: false, via: {kind: "named", name: "star"}},
-            require:           {module: "m", member: "f", typeOnly: false, via: {kind: "require", name: "R"}},
-            requireMember:     {module: "m", member: "d", typeOnly: false, via: {kind: "named", name: "D"}},
-            letRequire:        {module: "m", member: "g", typeOnly: false, via: {kind: "require", name: "L"}},
+            named:             {module: "m", member: "a", via: {kind: "named", name: "a", typeOnly: false}},
+            aliased:           {module: "m", member: "b", via: {kind: "named", name: "B", typeOnly: false}},
+            namespace:         {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            importEquals:      {module: "m", member: "e", via: {kind: "require", name: "X", typeOnly: false}},
+            literalName:       {module: "m", member: "*", via: {kind: "named", name: "star", typeOnly: false}},
+            require:           {module: "m", member: "f", via: {kind: "require", name: "R", typeOnly: false}},
+            requireMember:     {module: "m", member: "d", via: {kind: "named", name: "D", typeOnly: false}},
+            letRequire:        {module: "m", member: "g", via: {kind: "require", name: "L", typeOnly: false}},
             reassignedRequire: undefined,   // W may no longer be the module
-            exportClause:      {module: "m", member: "a", typeOnly: false, via: {kind: "named", name: "a"}},
+            exportClause:      {module: "m", member: "a", via: {kind: "named", name: "a", typeOnly: false}},
         });
     });
 
     test("a member read through a module object, however it is spelled", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             import * as NS from "m";
             const {h: H} = NS;
 
@@ -307,18 +307,18 @@ describe("exportOf", () => {
         `);
 
         expect(answers).toEqual({
-            inType:         {module: "m", member: "T", typeOnly: false, via: {kind: "namespace", name: "NS"}},
-            parentheses:    {module: "m", member: "c", typeOnly: false, via: {kind: "namespace", name: "NS"}},
-            brackets:       {module: "m", member: "c", typeOnly: false, via: {kind: "namespace", name: "NS"}},
-            bracketsCalled: {module: "m", member: "c", typeOnly: false, via: {kind: "namespace", name: "NS"}},
-            destructured:   {module: "m", member: "h", typeOnly: false, via: {kind: "destructured", name: "H"}},
-            reExport:       {module: "m", member: "k", typeOnly: false, via: {kind: "re-export"}},
+            inType:         {module: "m", member: "T", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            parentheses:    {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            brackets:       {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            bracketsCalled: {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            destructured:   {module: "m", member: "h", via: {kind: "destructured", name: "H", typeOnly: false}},
+            reExport:       {module: "m", member: "k", via: {kind: "re-export", typeOnly: false}},
         });
     });
 
     test("a nearer binding hides the import, where it binds the meaning the position reads", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             import {f, Props, X} from "m";
 
             function param(f: number) {
@@ -338,17 +338,17 @@ describe("exportOf", () => {
         expect(answers).toEqual({
             parameter:               undefined,
             typeOverLocalValue:
-                {module: "m", member: "Props", typeOnly: false, via: {kind: "named", name: "Props"}},
+                {module: "m", member: "Props", via: {kind: "named", name: "Props", typeOnly: false}},
             localValue:              undefined,
             typeParameter:           undefined,
-            valueUnderTypeParameter: {module: "m", member: "X", typeOnly: false, via: {kind: "named", name: "X"}},
-            closure:                 {module: "m", member: "f", typeOnly: false, via: {kind: "named", name: "f"}},
+            valueUnderTypeParameter: {module: "m", member: "X", via: {kind: "named", name: "X", typeOnly: false}},
+            closure:                 {module: "m", member: "f", via: {kind: "named", name: "f", typeOnly: false}},
         });
     });
 
     test("type-only bindings and import() types stand for no value", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             import type {A} from "m";
             import {type B} from "m";
             import type * as T from "m";
@@ -361,11 +361,11 @@ describe("exportOf", () => {
         `);
 
         expect(answers).toEqual({
-            typeOnlyImport:    {module: "m", member: "A", typeOnly: true, via: {kind: "named", name: "A"}},
-            inlineType:        {module: "m", member: "B", typeOnly: true, via: {kind: "named", name: "B"}},
-            typeOnlyNamespace: {module: "m", member: "D", typeOnly: true, via: {kind: "namespace", name: "T"}},
-            importType:        {module: "m", member: "E", typeOnly: true, via: {kind: "import-type"}},
-            typeOnlyReExport:  {module: "m", member: "F", typeOnly: true, via: {kind: "re-export"}},
+            typeOnlyImport:    {module: "m", member: "A", via: {kind: "named", name: "A", typeOnly: true}},
+            inlineType:        {module: "m", member: "B", via: {kind: "named", name: "B", typeOnly: true}},
+            typeOnlyNamespace: {module: "m", member: "D", via: {kind: "namespace", name: "T", typeOnly: true}},
+            importType:        {module: "m", member: "E", via: {kind: "import-type", typeOnly: true}},
+            typeOnlyReExport:  {module: "m", member: "F", via: {kind: "re-export", typeOnly: true}},
         });
     });
 
@@ -380,22 +380,22 @@ describe("exportOf", () => {
             const s = /*destructured*/ useState(0);
         `;
 
-        expect(await exportsAt(source)).toEqual({
+        expect(await importedAtMarks(source)).toEqual({
             member:       undefined,   // reads a property of the default export
-            ownName:      {module: "react", member: "default", typeOnly: false, via: {kind: "default", name: "React"}},
+            ownName:      {module: "react", member: "default", via: {kind: "default", name: "React", typeOnly: false}},
             destructured: undefined,
         });
-        expect(await exportsAt(source, {defaultIsModule: ["react"]})).toEqual({
-            member:       {module: "react", member: "FC", typeOnly: false, via: {kind: "default", name: "React"}},
+        expect(await importedAtMarks(source, {defaultIsModule: ["react"]})).toEqual({
+            member:       {module: "react", member: "FC", via: {kind: "default", name: "React", typeOnly: false}},
             ownName:      undefined,   // the module itself, which no one export is
             destructured:
-                {module: "react", member: "useState", typeOnly: false, via: {kind: "destructured", name: "useState"}},
+                {module: "react", member: "useState", via: {kind: "destructured", name: "useState", typeOnly: false}},
         });
     });
 
     test("a global stands for a module where the caller maps it and nothing in the file binds it", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             const Vue = {};
             namespace Lib { export type T = number; }
 
@@ -407,7 +407,7 @@ describe("exportOf", () => {
 
         expect(answers).toEqual({
             valueDoesNotHideType:
-                {module: "vue", member: "Component", typeOnly: false, via: {kind: "global", name: "Vue"}},
+                {module: "vue", member: "Component", via: {kind: "global", name: "Vue", typeOnly: false}},
             parameter:            undefined,
             declaredNamespace:    undefined,
             unmapped:             undefined,
@@ -416,7 +416,7 @@ describe("exportOf", () => {
 
     test("a name that declares, or reads past an export, names none", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             import {/*importedName*/ f} from "m";
             import * as NS from "m";
             type Local = number;
@@ -438,11 +438,11 @@ describe("exportOf", () => {
         });
     });
 
-    // maybeRebind moves this one. exportOf reads only the top level's bindings, since `resolve` names the
+    // maybeRebind moves this one. importedAt reads only the top level's bindings, since `resolve` names the
     // function binding `useState`, not the declaration that would say it comes from React.
     test.fails("a name a function destructures from a module object", async () => {
         //language=typescript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             import * as React from "react";
             function useToggle() {
                 const {useState} = React;
@@ -452,33 +452,33 @@ describe("exportOf", () => {
 
         expect(answers).toEqual({
             destructuredInFunction:
-                {module: "react", member: "useState", typeOnly: false, via: {kind: "destructured", name: "useState"}},
+                {module: "react", member: "useState", via: {kind: "destructured", name: "useState", typeOnly: false}},
         });
     });
 
     test("a member read through an AMD factory parameter", async () => {
         //language=javascript
-        const answers = await exportsAt(`
+        const answers = await importedAtMarks(`
             sap.ui.define(["sap/m/Button"], function (Button) {
                 return /*amd*/ Button.extend("my.Button", {});
             });
         `, undefined, "test.js");
 
         expect(answers).toEqual({
-            amd: {module: "sap/m/Button", member: "extend", typeOnly: false, via: {kind: "amd", name: "Button"}},
+            amd: {module: "sap/m/Button", member: "extend", via: {kind: "amd", name: "Button", typeOnly: false}},
         });
     });
 
     test("a cursor in place of the visitor, for a node the visitor's node holds", async () => {
-        const seen: (ModuleExport | undefined)[] = [];
+        const seen: (ImportedMember | undefined)[] = [];
         await new class extends JavaScriptVisitor<undefined> {
             override async visitParameterizedType(type: J.ParameterizedType, p: undefined): Promise<J | undefined> {
-                seen.push(moduleBindings(new Cursor(type.class, this.cursor)).exportOf(type.class));
+                seen.push(moduleBindings(new Cursor(type.class, this.cursor)).importedAt(type.class));
                 return type;
             }
         }().visit(await parse(`import {SFC} from "m"; let a: SFC<{}>;`), undefined);
 
-        expect(seen).toEqual([{module: "m", member: "SFC", typeOnly: false, via: {kind: "named", name: "SFC"}}]);
+        expect(seen).toEqual([{module: "m", member: "SFC", via: {kind: "named", name: "SFC", typeOnly: false}}]);
     });
 });
 

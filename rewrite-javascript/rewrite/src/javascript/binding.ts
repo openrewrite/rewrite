@@ -98,29 +98,23 @@ export interface ModuleBindings {
     readonly moduleSystem: "esm" | "amd" | "commonjs" | "none";
 
     /**
-     * The export of a module that `ref` names, read where the cursor (or the visitor's) stands on it
-     * or on the node holding it, or undefined where it names none: a local, a binding nearer than the
-     * module's, an unbound global, or a module object's own name. `ref` is an identifier, a member
-     * read through a module object (`NS.X`, `(NS).X`, `NS["X"]`, `NS.f()`), the `X` of
+     * The module member `ref` reads, where the cursor (or the visitor's) stands on it or on the node
+     * holding it, and how the file reaches it. Undefined where it reads none: a local, a binding nearer
+     * than the module's, an unbound global, or a module object's own name. `ref` is an identifier, a
+     * member read through a module object (`NS.X`, `(NS).X`, `NS["X"]`, `NS.f()`), the `X` of
      * `export {X} from "m"`, or an `import()` type: the spellings `maybeRebind` moves.
      * `S` with `import {SFC as S} from "react"`, `R.SFC` with `import * as R from "react"`, and
      * `import("react").SFC` → `{module: "react", member: "SFC"}`
      */
-    exportOf(ref: J, options?: ExportOfOptions): ModuleExport | undefined;
+    importedAt(ref: J, options?: ImportedAtOptions): ImportedMember | undefined;
 }
 
-/** A module export a reference names, and the binding the file reaches it through. */
-export interface ModuleExport {
+/** A module member a reference reads, and the binding the file reaches it through. */
+export interface ImportedMember {
     module: string;
 
     /** `"SFC"` for `SFC`, for `S` of `{SFC as S}` and for `R.SFC`; `"default"` for a default import's own name. */
     member: string;
-
-    /**
-     * A type-only import or re-export binds it, or an `import()` type spells it, so it stands for no
-     * value at runtime.
-     */
-    typeOnly: boolean;
 
     /**
      * How the file reaches it, so a replacement can be spelled alike: `{kind: "namespace", name: "R"}`
@@ -132,11 +126,17 @@ export interface ModuleExport {
         kind: "named" | "default" | "namespace" | "require" | "amd" | "global" | "import-type" | "destructured" |
             "re-export";
         name?: string;
+
+        /**
+         * A type-only import or re-export binds it, or an `import()` type spells it, so it stands for no
+         * value at runtime.
+         */
+        typeOnly: boolean;
     };
 }
 
-/** What `exportOf` reads as a module object beyond the bindings that are one by their syntax. */
-export interface ExportOfOptions {
+/** What `importedAt` reads as a module object beyond the bindings that are one by their syntax. */
+export interface ImportedAtOptions {
     /**
      * Modules whose default import is the module itself, as `export =` typings make it under
      * `esModuleInterop`: with `["react"]`, `React.SFC` reads `SFC` through `import React from "react"`.
@@ -168,8 +168,8 @@ export function moduleBindings(
                 const index = module === "" ? -1 : modules.indexOf(module);
                 return index < 0 ? undefined : bindings[index];
             },
-            // A factory parameter binds a whole module, so only a member read through it names an export
-            exportOf: (ref, options) => exportRead(from, ref, amd.block.factory, () => undefined, name => {
+            // A factory parameter binds a whole module, so only a member read through it reads one
+            importedAt: (ref, options) => readImported(from, ref, amd.block.factory, () => undefined, name => {
                 const index = bindings.indexOf(name);
                 return index < 0 || modules[index] === "" ? undefined : {module: modules[index], kind: "amd", typeOnly: false};
             }, options)
@@ -177,12 +177,12 @@ export function moduleBindings(
     }
 
     const cu = compilationUnitOf(from);
-    // Read on first use: `exportOf` on a name a nearer scope binds, the commonest question, never needs the table
+    // Read on first use: `importedAt` on a name a nearer scope binds, the commonest question, never needs the table
     let rows: ModuleBinding[] | undefined;
     let wholeRows: WholeModuleBinding[] | undefined;
     const table = () => rows ??= cu === undefined ? [] : bindingTable(cu);
     const bound = () => wholeRows ??= wholeModuleBindings(table());
-    const defaultIsModule = (b: WholeModuleBinding, options?: ExportOfOptions) =>
+    const defaultIsModule = (b: WholeModuleBinding, options?: ImportedAtOptions) =>
         options?.defaultIsModule?.some(module => sameModule(module, b.module)) ?? false;
     return {
         // Read on demand, so a caller asking only for bindings never reads the file's module syntax.
@@ -191,7 +191,7 @@ export function moduleBindings(
         },
         moduleOf: localName => bound().find(b => b.name === localName)?.module,
         bindingOf: module => bound().find(b => sameModule(b.module, module))?.name,
-        exportOf: (ref, options) => {
+        importedAt: (ref, options) => {
             if (cu === undefined) {
                 return undefined;
             }
@@ -201,19 +201,21 @@ export function moduleBindings(
                     ? undefined
                     : {module: object.module, kind: viaKindOf(object), typeOnly: object.typeOnly};
             };
-            return exportRead(from, ref, cu, name => {
+            return readImported(from, ref, cu, name => {
                 const object = bound().find(b => b.name === name);
                 if (object !== undefined) {
-                    // A module object's own name names no one export, unless it is a default that is not the module
+                    // A module object's own name reads no one member, unless it is a default that is not the module
                     return object.form === "default" && !defaultIsModule(object, options)
-                        ? {module: object.module, member: "default", typeOnly: object.typeOnly, via: {kind: "default", name}}
+                        ? {module: object.module, member: "default",
+                            via: {kind: "default", name, typeOnly: object.typeOnly}}
                         : undefined;
                 }
                 const named = table().find((b): b is MemberBinding => b.name === name &&
                     (b.form === "named" || b.form === "require-member"));
                 return named === undefined
-                    ? destructuredExport(cu, name, moduleObject)
-                    : {module: named.module, member: named.member, typeOnly: named.typeOnly, via: {kind: "named", name}};
+                    ? importedByDestructuring(cu, name, moduleObject)
+                    : {module: named.module, member: named.member,
+                        via: {kind: "named", name, typeOnly: named.typeOnly}};
             }, moduleObject, options);
         }
     };
@@ -223,11 +225,11 @@ export function moduleBindings(
  * What `name` reads where the file's top level destructures it from a module object:
  * `s` in `const {useState: s} = React` → `useState` of React's module. Only the top level, as with imports.
  */
-function destructuredExport(
+function importedByDestructuring(
     cu: JS.CompilationUnit,
     name: string,
     moduleObject: (name: string) => ModuleObjectRead | undefined
-): ModuleExport | undefined {
+): ImportedMember | undefined {
     // At the top level nothing nearer can bind `NS`, so its name is enough
     const root = new Cursor(cu);
     for (const statement of cu.statements) {
@@ -237,8 +239,8 @@ function destructuredExport(
                 const object = objectRead(variable.element.initializer?.element, root)?.object;
                 const read = member === undefined || object === undefined ? undefined : moduleObject(object.simpleName);
                 if (read !== undefined) {
-                    return {module: read.module, member: member!, typeOnly: read.typeOnly,
-                        via: {kind: "destructured", name}};
+                    return {module: read.module, member: member!,
+                        via: {kind: "destructured", name, typeOnly: read.typeOnly}};
                 }
             }
         }
@@ -250,7 +252,7 @@ function destructuredExport(
  * `X` in `export {X} from "m"` and `export {X as Y} from "m"`, which reads `X` of `m` with no binding in the file.
  * `Y` is the name the file publishes, so it reads nothing.
  */
-function reExportRead(at: Cursor): ModuleExport | undefined {
+function importedByReExport(at: Cursor): ImportedMember | undefined {
     const specifier = [at.parentTree(), at.parentTree(2)].find(c => c?.value.kind === JS.Kind.ExportSpecifier);
     const read = specifier === undefined ? undefined : reExportedName(specifier.value);
     if (specifier === undefined || read?.id !== (at.value as J).id) {
@@ -260,41 +262,43 @@ function reExportRead(at: Cursor): ModuleExport | undefined {
     const reExport = reExportDeclaration(specifier.parentTree(2)?.value);
     return reExport && {
         module: reExport.module, member: moduleExportName(read),
-        typeOnly: reExport.declaration.typeOnly.element || (specifier.value as JS.ExportSpecifier).typeOnly.element,
-        via: {kind: "re-export"}
+        via: {
+            kind: "re-export",
+            typeOnly: reExport.declaration.typeOnly.element || (specifier.value as JS.ExportSpecifier).typeOnly.element
+        }
     };
 }
 
 /** A binding of a whole module, which a member is read through: `NS` of `import * as NS`. */
 interface ModuleObjectRead {
     module: string;
-    kind: ModuleExport["via"]["kind"];
+    kind: ImportedMember["via"]["kind"];
     typeOnly: boolean;
 }
 
 /**
- * `exportOf` for a lane whose bindings `owner`'s scope declares: the compilation unit's, or an AMD
+ * `importedAt` for a lane whose bindings `owner`'s scope declares: the compilation unit's, or an AMD
  * factory's. A name resolving to `owner` reads its binding there; one resolving nowhere may be a
- * module's global. `namedExport` answers a name bound to a member, `moduleObject` one bound to a module.
+ * module's global. `namedMember` answers a name bound to a member, `moduleObject` one bound to a module.
  */
-function exportRead(
+function readImported(
     from: Cursor | JavaScriptVisitor<any>,
     ref: J,
     owner: J,
-    namedExport: (name: string) => ModuleExport | undefined,
+    namedMember: (name: string) => ImportedMember | undefined,
     moduleObject: (name: string) => ModuleObjectRead | undefined,
-    options: ExportOfOptions = {}
-): ModuleExport | undefined {
+    options: ImportedAtOptions = {}
+): ImportedMember | undefined {
     const cursor = from instanceof Cursor ? from : cursorOf(from);
     if (cursor === undefined) {
         return undefined;
     }
     if (ref.kind === JS.Kind.ImportType) {
-        return importTypeExport(ref as JS.ImportType);
+        return importedByImportType(ref as JS.ImportType);
     }
     // By id, so a visitor's own copy of the node it stands on is that node
     let at = (cursor.value as J | undefined)?.id === ref.id ? cursor : new Cursor(ref, cursor);
-    const reExported = reExportRead(at);
+    const reExported = importedByReExport(at);
     if (reExported !== undefined) {
         return reExported;
     }
@@ -308,7 +312,7 @@ function exportRead(
     const name = callee ?? ref;
     // `resolve` answers nothing for a name that declares or names rather than reads
     if (isIdentifier(name)) {
-        return resolve(at, name)?.id === owner.id ? namedExport(name.simpleName) : undefined;
+        return resolve(at, name)?.id === owner.id ? namedMember(name.simpleName) : undefined;
     }
     // `NS.X`, `(NS).X`, `NS["X"]` and `NS.X()`, as `maybeRebind` reads them
     const read = memberRead(name, at);
@@ -320,14 +324,14 @@ function exportRead(
     const reached = resolve(objectAt, object)?.id === owner.id ? moduleObject(object.simpleName) :
         global !== undefined && isFree(objectAt, object) ? {module: global, kind: "global" as const, typeOnly: false} :
             undefined;
-    return reached && {module: reached.module, member, typeOnly: reached.typeOnly,
-        via: {kind: reached.kind, name: object.simpleName}};
+    return reached && {module: reached.module, member,
+        via: {kind: reached.kind, name: object.simpleName, typeOnly: reached.typeOnly}};
 }
 
 /** `import("m").X`, which names `X` of `m` with no binding in the file; `import("m").X.Y` names `X` too. */
-function importTypeExport(importType: JS.ImportType): ModuleExport | undefined {
+function importedByImportType(importType: JS.ImportType): ImportedMember | undefined {
     const named = importTypeMember(importType);
-    return named && {...named, typeOnly: true, via: {kind: "import-type"}};
+    return named && {...named, via: {kind: "import-type", typeOnly: true}};
 }
 
 export function isAmdBlock(node: J, options?: AmdCalleeOptions): boolean {
@@ -356,7 +360,7 @@ function wholeModuleBindings(table: readonly ModuleBinding[]): WholeModuleBindin
 }
 
 /**
- * `exportOf`'s `via.kind` for a read through `binding`: `import X = require` reads as the `require` it spells,
+ * `importedAt`'s `via.kind` for a read through `binding`: `import X = require` reads as the `require` it spells,
  * and `await import` as the namespace object it resolves to. `import * as R` → `"namespace"`.
  */
 function viaKindOf(binding: WholeModuleBinding): "default" | "namespace" | "require" {

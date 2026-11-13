@@ -359,7 +359,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
     /**
      * Whether this removal asks for `binding`: every binding of the module when no member is given, else the one
-     * {@link bindsMember} reads for the member, and the module objects any member is read through, as `exportOf`
+     * {@link bindsMember} reads for the member, and the module objects any member is read through, as `importedAt`
      * reads `fs.readFile`: a namespace import, `import X = require` and whole `require`. `'default'` asks for `D` of
      * `import D from "m"`, while `"D"` and `"readFile"` do not.
      */

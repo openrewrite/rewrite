@@ -265,7 +265,7 @@ const {...rest} = require("m") // require-pattern: no one member, as `{a: {b}}` 
 const X = await import("m")    // dynamic-import: the namespace object
 ```
 
-`RemoveImport` removes the unused rows a request asks for. A member also asks for the module objects `exportOf`
+`RemoveImport` removes the unused rows a request asks for. A member also asks for the module objects `importedAt`
 reads it through, so a recipe that has rewritten the file's last `fs.readFile` asks for `"readFile"`, and an unused
 `import * as fs from "fs"` goes too. A default import is not one of them, but its own local name asks for it, as
 recipes do with `maybeRemoveImport(this, "vue", "Vue")`. What a request removes, when unused:
@@ -335,9 +335,9 @@ They move even where nothing binds `from`, and `maybeRebind` still returns `unde
 move is refused, none of them move. Left alone: `D.Old` after `import D from "m"`, since the default
 export is the module only with `export =`, and `NS.Old` where the file reassigns a `let` or `var` `NS`.
 
-### Which export a reference names
+### Which module member a reference reads
 
-`moduleBindings(visitor).exportOf(ref)` answers which module export `ref` names where the cursor
+`moduleBindings(visitor).importedAt(ref)` answers which module member `ref` reads where the cursor
 stands, through whatever binding the file reaches it by: a named import (aliased or type-only too), a
 namespace import, `import X = require`, a `require` the file never reassigns, an AMD factory parameter, or an
 `import("m").X` type. It reads the member's other spellings as `maybeRebind` moves them, except a

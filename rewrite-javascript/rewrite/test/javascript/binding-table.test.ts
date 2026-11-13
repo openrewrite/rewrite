@@ -450,7 +450,7 @@ describe("the earliest whole-module binding answers for its module", () => {
 describe("a named import of an export literally called \"*\"", () => {
     // Wanted: `{"*" as star}` binds the export named "*", not the namespace, so a namespace request binds anew.
     // Not fixed: `moduleScopeBindings` spells a namespace import's member "*" too, and telling the two apart would
-    // take code for a specifier hardly anyone writes. `exportOf` already reads it as the export.
+    // take code for a specifier hardly anyone writes. `importedAt` already reads it as that member.
     test.fails("maybeBind of the namespace does not answer with it", async () => {
         const bound: {name?: string} = {};
         await binding({module: "./exports-star", member: "*", preferredName: "ns"}, bound).rewriteRun(
