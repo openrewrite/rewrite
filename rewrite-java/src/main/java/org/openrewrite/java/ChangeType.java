@@ -430,8 +430,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             .withPrefix(fieldAccess.getPrefix()));
                     if (!(qualified instanceof J.FieldAccess)) {
                         // a type in the default package has no qualifier to shorten, and no import can name it
-                        return getCursor().firstEnclosing(J.Import.class) == null ?
-                                qualified.withType(targetType) : fieldAccess;
+                        return getCursor().firstEnclosing(J.Import.class) == null ? qualified : fieldAccess;
                     }
                     J.FieldAccess fa = (J.FieldAccess) qualified;
                     if (getCursor().firstEnclosing(J.Import.class) == null &&
@@ -470,14 +469,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 JavaType.Class oldType = JavaType.ShallowClass.build(originalType.getFullyQualifiedName());
                 if (maybeClass.toString().equals(oldType.getClassName())) {
                     maybeRemoveImport(oldType.getOwningClass());
-                    Expression e = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
+                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
                             .withPrefix(fieldAccess.getPrefix()));
-                    // If a FieldAccess like Map.Entry has been replaced with an Identifier, ensure that identifier has the correct type
-                    if (e instanceof J.Identifier && e.getType() == null) {
-                        J.Identifier i = (J.Identifier) e;
-                        e = i.withType(targetType);
-                    }
-                    return e;
                 }
             }
             return super.visitFieldAccess(fieldAccess, ctx);
@@ -645,8 +638,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 oldNameToChangedType.put(updatedFieldAccessType, updatedFieldAccessType);
             }
 
-            // Clear the inner identifier's type (matching updateOuterClassTypes) so AddImport does not
-            // import the inner class directly and strip the parameterized outer class (see #9291)
+            // Clear the name's type, which updateOuterClassTypes also leaves unset in a qualified name, so AddImport
+            // does not import the inner class directly and strip the parameterized outer class (see #9291)
             String newSimpleName = targetFq.getFullyQualifiedName().substring(targetOwner.getFullyQualifiedName().length() + 1);
             return fieldAccess
                     .withTarget(target)
@@ -765,6 +758,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
                 assert attributed != null;
                 return attributed;
+            } else if (typeTree instanceof J.Identifier) {
+                return typeTree.withType(type);
             }
             return typeTree;
         }
