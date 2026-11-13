@@ -2351,9 +2351,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     private static <T extends J> List<T> findAll(J cu, Class<T> type, Predicate<T> matching) {
-        List<T> found = collect(cu, type, matching);
-        assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
-        return found;
+        return List.copyOf(assertThat(collect(cu, type, matching))
+          .as("%s matching in %s", type.getSimpleName(), cu.printTrimmed())
+          .isNotEmpty()
+          .actual());
     }
 
     private static <T extends J> List<T> collect(J cu, Class<T> type, Predicate<T> matching) {
