@@ -362,7 +362,8 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
 
                 // Check each varargs element is assignable to the element type
-                if (!isAssignableTo(elementType, actualArg.getType())) {
+                if (!(actualArg instanceof TypedTree || actualArg instanceof J.Parentheses) ||
+                    !isAssignableTo(elementType, actualArg.getType())) {
                     return false;
                 }
                 varargsElements.add(actualArg);

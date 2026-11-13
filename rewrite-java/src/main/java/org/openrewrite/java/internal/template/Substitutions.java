@@ -296,11 +296,13 @@ public class Substitutions {
     }
 
     /**
-     * A parenthesized expression, like a few others, is an {@link Expression} but not a {@link TypedTree}.
+     * A parenthesized expression is not a {@link TypedTree}, but has the type of what it encloses. Other expressions
+     * that aren't, such as a Kotlin expression statement, are declared as {@code Object}, so a template can call a
+     * method on one whose type is a primitive.
      */
     private static @Nullable JavaType typeOf(@Nullable Object tree) {
-        if (tree instanceof Expression) {
-            return ((Expression) tree).getType();
+        if (tree instanceof J.Parentheses) {
+            return ((J.Parentheses<?>) tree).getType();
         }
         return tree instanceof TypedTree ? ((TypedTree) tree).getType() : null;
     }
