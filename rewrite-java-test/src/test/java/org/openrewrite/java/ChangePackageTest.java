@@ -2700,4 +2700,35 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeArgumentsWithinTypeArguments() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter, spec -> spec.path("org/openrewrite/Test.java")),
+          java(
+            """
+              import org.openrewrite.Test;
+
+              import java.util.List;
+
+              class B {
+                  List<List<Test>> nested;
+                  List<? extends List<Test>> bound;
+                  List<Test[]> array;
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+
+              import java.util.List;
+
+              class B {
+                  List<List<Test>> nested;
+                  List<? extends List<Test>> bound;
+                  List<Test[]> array;
+              }
+              """
+          )
+        );
+    }
+
 }

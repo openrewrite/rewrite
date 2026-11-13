@@ -2399,7 +2399,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void missingTypeReturnValueOfMethodWithArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all().methodDeclarations(false)),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodDeclarations(false).identifiers(false)),
           // method with argument should still remove unused import
           java(
             """

@@ -2096,6 +2096,52 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('should map a variable read through a namespace import with the module as owner', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'ajax') {
+                    const owner = (node as J.Identifier).fieldType?.owner;
+                    return `Variable<owner=${Type.isFullyQualified(owner) ? Type.FullyQualified.getFullyQualifiedName(owner) : 'no-owner'}>`;
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {ajax} from 'rxjs/ajax';
+                                import * as requests from 'rxjs/ajax';
+
+                                const named = ajax;
+                                const qualified = requests.ajax;
+                            `,
+                            `
+                                import {/*~~(Variable<owner=rxjs/ajax>)~~>*/ajax} from 'rxjs/ajax';
+                                import * as requests from 'rxjs/ajax';
+
+                                const named = /*~~(Variable<owner=rxjs/ajax>)~~>*/ajax;
+                                const qualified = requests./*~~(Variable<owner=rxjs/ajax>)~~>*/ajax;
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "rxjs": "^7.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('should map variable used as standalone assignment', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -3198,7 +3244,7 @@ describe('JavaScript type mapping', () => {
                 //@formatter:off
                 `
                     import * as ns from './local';
-                    ns./*~~(<unknown>#bar)~~>*/bar.length;
+                    ns./*~~(./local#bar)~~>*/bar.length;
                 `
                 //@formatter:on
             );

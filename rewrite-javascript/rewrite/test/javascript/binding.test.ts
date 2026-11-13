@@ -1900,8 +1900,8 @@ describe("maybeRebind", () => {
 
             a(b);`,
             `
-            import {x as b} from "m3";
             import {x} from "m2";
+            import {x as b} from "m3";
             import {x as x_1} from "m4";
 
             x(b);`
@@ -2490,7 +2490,7 @@ describe("maybeRebind", () => {
             `const modules = [${module}];\n` +
             `export {${http === "Http" ? http : `${http} as Http`}};\n`;
         const after = `import {request} from 'legacy-http';\n` +
-            `import {HttpClient, HttpClientModule, HttpHeaders} from '@acme/common/http';\n\n` +
+            `import {HttpHeaders, HttpClient, HttpClientModule} from '@acme/common/http';\n\n` +
             body("HttpClient", "HttpHeaders", "HttpClientModule");
         let rebound: string[] = [];
         let parsed: string[] = [];
@@ -2897,7 +2897,6 @@ describe("maybeRebind", () => {
             //language=javascript
             `
             import act from "new";
-
             const fs = require("fs");
 
             act();`
@@ -3029,6 +3028,215 @@ describe("maybeRebind", () => {
             import {b} from "n";
 
             const x = [a, b];`
+        ));
+    });
+});
+
+describe("maybeRebind keeps the file's import layout", () => {
+    /** One `maybeRebind` per move, in the order given, all in one visit. */
+    function rebinding(...moves: [from: string, to: string, member: string, toMember?: string][]) {
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                for (const [from, to, member, toMember] of moves) {
+                    maybeRebind(this, {from: {module: from, member}, to: {module: to, member: toMember ?? member}});
+                }
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+    }
+
+    test("members split across modules land where their import was, in the order written, one line per lone member", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(
+            ["@acme/ui", "@acme/ui/dialog", "DialogModule"],
+            ["@acme/ui", "@acme/ui/button", "ButtonModule"],
+            ["@acme/ui", "@acme/ui/dialog", "Dialog"]
+        );
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {Module} from '@acme/core';
+            import {
+                DialogModule,
+                ButtonModule,
+                Dialog,
+            } from '@acme/ui';
+            import {Other} from 'other';
+
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`,
+            `
+            import {Module} from '@acme/core';
+            import {ButtonModule} from '@acme/ui/button';
+            import {
+                DialogModule,
+                Dialog,
+            } from '@acme/ui/dialog';
+            import {Other} from 'other';
+
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`
+        ));
+    });
+
+    test("the member left last in a multi-line import collapses onto one line, sorted among the imports split from it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(
+            ["@acme/ui", "@acme/ui/card", "CardModule"],
+            ["@acme/ui", "@acme/ui/tooltip", "Tooltip"],
+            ["@acme/ui", "@acme/ui/core", "DATE_FORMATS"]
+        );
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                Tooltip as Tip,
+                DATE_FORMATS,
+                CardModule
+            } from "@acme/ui";
+            import {Other} from "other";
+
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`,
+            `
+            import {CardModule} from "@acme/ui/card";
+            import {DATE_FORMATS} from "@acme/ui/core";
+            import {Tooltip as Tip} from "@acme/ui/tooltip";
+            import {Other} from "other";
+
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`
+        ));
+    });
+
+    test("an import that replaces a dropped one takes its place", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["old", "new", "act", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {a} from "first";
+            import {act} from "old";
+            import {z} from "last";
+
+            act(a, z);`,
+            `
+            import {a} from "first";
+            import act from "new";
+            import {z} from "last";
+
+            act(a, z);`
+        ));
+    });
+
+    test("imports split from a dropped statement keep the comment before it, sorted below it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "z", "A"], ["m", "a", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A, B} from "m";
+
+            use(x, A, B);`,
+            `
+            import {x} from "first";
+            // ui
+            import B from "a";
+            import {A} from "z";
+
+            use(x, A, B);`
+        ));
+    });
+
+    test("a named member moved beside a default of the same module goes on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A"], ["m", "n", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                A,
+                B,
+            } from "m";
+
+            use(A, B);`,
+            `
+            import {A} from "n";
+            import B from "n";
+
+            use(A, B);`
+        ));
+    });
+
+    test("an import that replaces the file's last statement takes its place and its comment", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A} from "m";`,
+            `
+            import {x} from "first";
+            // ui
+            import A from "n";`
+        ));
+    });
+
+    test("a type-only member and a value moved to one module each go on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "T"], ["m", "n", "V"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                type T,
+                V,
+            } from "m";
+
+            let t: T = V;`,
+            `
+            import {V} from "n";
+            import type {T} from "n";
+
+            let t: T = V;`
+        ));
+    });
+
+    test("members renamed within their module keep the order written, whichever rename runs first", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["lodash", "lodash", "zeta", "zed"], ["lodash", "lodash", "extend", "assign"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {zeta, extend, alpha} from "lodash";
+
+            zeta(extend, alpha);`,
+            `
+            import {zed, assign, alpha} from "lodash";
+
+            zed(assign, alpha);`
+        ));
+    });
+
+    test("an import split from a multi-line list spaces its braces as the file's export lists do", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "b"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                a,
+                b,
+            } from "m";
+
+            export { a, b };`,
+            `
+            import {
+                a,
+            } from "m";
+            import { b } from "n";
+
+            export { a, b };`
         ));
     });
 });
@@ -4107,42 +4315,42 @@ describe("a node: specifier and the bare name of its built-in", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "_stream_duplex"}, to: {module: "stream", member: "Duplex"}});
-                maybeRebind(this, {from: {module: "_tls_wrap"}, to: {module: "tls"}});
+                maybeRebind(this, {from: {module: "assert"}, to: {module: "assert/strict", member: "strict"}});
+                maybeRebind(this, {from: {module: "net"}, to: {module: "tls"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import D from 'node:_stream_duplex';
-            import tlsWrap from 'node:_tls_wrap';
+            import a from 'node:assert';
+            import net from 'node:net';
 
-            new D(tlsWrap);`,
+            a(net);`,
             `
-            import tlsWrap from 'node:tls';
-            import {Duplex as D} from 'node:stream';
+            import {strict as a} from 'node:assert/strict';
+            import net from 'node:tls';
 
-            new D(tlsWrap);`
+            a(net);`
         ));
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "_stream_duplex", member: "Duplex"}, to: {module: "stream", member: "Duplex"}});
+                maybeRebind(this, {from: {module: "assert", member: "strict"}, to: {module: "assert/strict", member: "strict"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import {Duplex, x} from 'node:_stream_duplex';
+            import {strict, ok} from 'node:assert';
 
-            new Duplex(x);`,
+            strict(ok);`,
             `
-            import {x} from 'node:_stream_duplex';
-            import {Duplex} from 'node:stream';
+            import {ok} from 'node:assert';
+            import {strict} from 'node:assert/strict';
 
-            new Duplex(x);`
+            strict(ok);`
         ));
     });
 });
@@ -4166,28 +4374,28 @@ describe("maybeRebind on a require", () => {
 
     test("a whole module moves to a member, keeping the name the file chose and its node: spelling", async () => {
         const bound: (string | undefined)[] = [];
-        const spec = rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound);
+        const spec = rebind({module: "assert"}, {module: "assert/strict", member: "strict"}, bound);
         await spec.rewriteRun(
             //language=javascript
             javascript(`
-                const Duplex = require('_stream_duplex');
+                const strict = require('assert');
 
-                new Duplex();`,
+                strict(true);`,
                 `
-                const {Duplex} = require('stream');
+                const {strict} = require('assert/strict');
 
-                new Duplex();`),
+                strict(true);`),
             //language=javascript
             javascript(`
-                const D = require('node:_stream_duplex');
+                const a = require('node:assert');
 
-                new D();`,
+                a(true);`,
                 `
-                const {Duplex: D} = require('node:stream');
+                const {strict: a} = require('node:assert/strict');
 
-                new D();`)
+                a(true);`)
         );
-        expect(bound).toEqual(["Duplex", "D"]);
+        expect(bound).toEqual(["strict", "a"]);
     });
 
     test("a whole module moves to a whole module, and a member to a member", async () => {

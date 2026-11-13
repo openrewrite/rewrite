@@ -30,6 +30,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.test.internal.CallWithTwoThrowingNothingByHand;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
@@ -171,6 +172,20 @@ class UnneededOptOutsTest implements RewriteTest {
           spec -> spec.recipe(new DescribedWithoutPeriod()).validateRecipeSerialization(false),
           text("a")
         ));
+
+        RewriteTest optsOutInDefaults = new RewriteTest() {
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.validateRecipeSerialization(false);
+            }
+        };
+        AssertionError both = withOptOutsChecked("all", () -> assertThrows(AssertionError.class, () ->
+          optsOutInDefaults.rewriteRun(
+            spec -> spec.recipe(new ChangeText("b")).validateRecipeSerialization(false),
+            text("a", "b")
+          )));
+        assertThat(both).hasMessageContaining("validateRecipeSerialization(false) in the test's RecipeSpec turns off")
+          .hasMessageContaining("validateRecipeSerialization(false) in defaults(RecipeSpec) turns off");
     }
 
     @Test
@@ -325,6 +340,36 @@ class UnneededOptOutsTest implements RewriteTest {
         assertThat(e)
           .hasMessageContaining("With the type checks on, compilableOutput runs and fails")
           .hasMessageContaining(".compilableOutput(false).build())");
+    }
+
+    @Test
+    void narrowParserTypedTreesToTheErasureLevel() {
+        AssertionError e = withOptOutsChecked("all", () -> withParserTypedTrees(() ->
+          assertThrows(AssertionError.class, () -> rewriteRun(
+            spec -> spec.recipe(new CallWithTwoThrowingNothingByHand())
+              .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+            java(
+              """
+                class A {
+                    void m(int i) throws Exception {}
+                    void f() throws Exception {
+                        m(1);
+                    }
+                }
+                """,
+              """
+                class A {
+                    void m(int i) throws Exception {}
+                    void f() throws Exception {
+                        m(2);
+                    }
+                }
+                """
+            )
+          ))));
+        assertThat(e).hasMessageContaining("Replace recipeQualityValidation(..) in the test's RecipeSpec with:\n" +
+                                           "    spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
+                                           ".parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build())");
     }
 
     private void retypeIntAsLongWithoutIdentifiersChecked(Consumer<RecipeSpec> options) {

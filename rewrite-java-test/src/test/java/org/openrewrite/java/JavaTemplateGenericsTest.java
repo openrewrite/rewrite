@@ -589,6 +589,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   <T extends Number> int firstInt(List<T> list) {
                       return list.iterator().next().intValue();
                   }
+
+                  String parenthesized(List<String> list) {
+                      return (list).iterator().next();
+                  }
               }
               """,
             """
@@ -601,6 +605,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
 
                   <T extends Number> int firstInt(List<T> list) {
                       return list.get(0).intValue();
+                  }
+
+                  String parenthesized(List<String> list) {
+                      return (list).get(0);
                   }
               }
               """

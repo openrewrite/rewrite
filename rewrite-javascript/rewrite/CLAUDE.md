@@ -90,7 +90,7 @@ rewrite-javascript/rewrite/
 │   │   └── templating/                  # Template engine
 │   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
 │   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
-│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions)
+│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions, XPathMatcher)
 │   ├── search/                          # Cross-language search utilities
 │   ├── text/                            # Plain text support
 │   ├── rpc/                             # RPC infrastructure
@@ -334,6 +334,25 @@ Each rebind decides between rewriting its statement in place and replacing it wh
 sees what the rebinds before it left: a statement another rebind emptied, or an import of the
 target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
 renames only the types naming its own member, so a later rebind still finds its own.
+
+Rebinds queued in one visit out of one import statement keep its layout:
+
+```ts
+import {                        import {Button} from '@acme/ui/button';
+    DialogModule,               import {
+    Button,             →           DialogModule,
+    Dialog,                         Dialog,
+} from '@acme/ui';              } from '@acme/ui/dialog';
+```
+
+- An import they create takes the statement's place: right after it while it stands, in its place
+  once it is dropped. The imports split from it sort by module among themselves.
+- A list made of its members keeps the order written there. A merge into any other import is alphabetical.
+- Several members moved to one module keep a multi-line list's line breaks and trailing comma. A member
+  moved out alone, or the last one rewritten where it stands, goes on one line. A member that stays
+  keeps the list as written.
+
+Rebinds from separate visits each lay out their own import, as a lone move would.
 
 ### A rebind of a `require`
 

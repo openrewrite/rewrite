@@ -222,7 +222,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 continue;
             }
             if (imp.isStatic()) {
-                if (imp.getTypeName().equals(fullyQualifiedName)) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(imp.getTypeName(), fullyQualifiedName)) {
                     if (ending.equals(member)) {
                         return ImportStatus.EXPLICITLY_IMPORTED;
                     } else if ("*".equals(ending)) {

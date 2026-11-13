@@ -23,8 +23,8 @@ import {
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
-    isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindImport, requireBinds, requireDeclarationOf,
-    requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
+    isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindGroup, RebindImport, requireBinds,
+    requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {RenameMemberSpellings} from "./member-spellings";
@@ -415,10 +415,19 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     if (boundName === undefined) {
         return undefined;
     }
-    if (!(visitor.afterVisit || []).some(v => v instanceof RebindImport &&
+    const queued = visitor.afterVisit || [];
+    if (!queued.some(v => v instanceof RebindImport &&
         sameModule(v.from.module, options.from.module) && v.from.member === options.from.member &&
         v.localName === existing.localName)) {
-        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
+        const statement = existing.statement;
+        let group: RebindGroup | undefined;
+        if (statement.kind === JS.Kind.Import) {
+            group = queued.find((v): v is RebindImport<any> =>
+                    v instanceof RebindImport && v.group?.sourceId === statement.id)?.group ??
+                new RebindGroup(statement.id, statement as JS.Import);
+            group.add(existing.localName, boundName, options.to, existing.typeOnly);
+        }
+        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, group));
     }
     queueRenameMemberSpellings(visitor, cu, options);
     return boundName;

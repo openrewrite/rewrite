@@ -25,6 +25,7 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
@@ -35,6 +36,7 @@ import org.openrewrite.test.TypeValidation;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
@@ -42,6 +44,7 @@ import static org.openrewrite.java.Assertions.markSourceSetDirty;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -367,6 +370,136 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   Map.Entry p;
               }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations p = (J.VariableDeclarations) cu.getClasses().getFirst().getBody()
+                  .getStatements().getFirst();
+                J.FieldAccess entry = (J.FieldAccess) requireNonNull(p.getTypeExpression());
+                assertThat(TypeUtils.isOfClassType(entry.getName().getType(), "java.util.Map$Entry")).isTrue();
+                assertThat(TypeUtils.isOfClassType(entry.getTarget().getType(), "java.util.Map")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void qualifiedJavadocReferenceToNestedTargetAddsNoImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Inner", true)),
+          java(
+            """
+              package a;
+              public class Old {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              /**
+               * {@link a.Old}
+               */
+              class Qualified {
+              }
+              """,
+            """
+              /**
+               * {@link b.Outer.Inner}
+               */
+              class Qualified {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void javadocReferenceQualifiedForAnImportedNameAddsNoImport() {
+        rewriteRun(
+          // the second recipe imports `b.Outer` wherever it finds a name of that type
+          spec -> spec.recipes(
+            new ChangeType("a.Old", "b.Outer$Inner", true),
+            new ChangeType("d.Other", "b.Outer", true)
+          ),
+          java("package a; public class Old {}", SourceSpec::skip),
+          java("package c; public class Outer { public static class Inner {} }", SourceSpec::skip),
+          java("package d; public class Other {}", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+              import c.Outer.Inner;
+
+              /**
+               * {@link Old} and {@link d.Other}
+               */
+              class Test {
+                  Inner inner;
+              }
+              """,
+            """
+              import c.Outer.Inner;
+
+              /**
+               * {@link b.Outer.Inner} and {@link b.Outer}
+               */
+              class Test {
+                  Inner inner;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTargetKeepsItsOuterClassWhereAnotherTypeHasItsSimpleName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Inner", true)),
+          java("package a; public class Old<T> {}", SourceSpec::skip),
+          java("package b; public class Outer { public static class Inner<T> {} }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  static class Inner<T> {}
+                  Old<String> moved;
+                  Inner<String> local;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  static class Inner<T> {}
+                  Outer.Inner<String> moved;
+                  Inner<String> local;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTargetIsWrittenThroughItsOuterClassHoweverTheOriginalWasWritten() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Inner", true)),
+          java("package a; public class Old<T> {}", SourceSpec::skip),
+          java("package b; public class Outer { public static class Inner<T> {} }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Old<String> simple;
+                  a.Old<String> qualified;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Outer.Inner<String> simple;
+                  Outer.Inner<String> qualified;
+              }
               """
           )
         );
@@ -441,6 +574,37 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void replaceImportedNestedTypeWithNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A.B", "b.X.Y", true)),
+          java(
+            """
+              package a;
+              public class A {
+                  public static class B {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.A.B;
+
+              class Test {
+                  B b;
+              }
+              """,
+            """
+              import b.X.Y;
+
+              class Test {
+                  Y b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void moveNestedTypeImportedThroughItsOuterTypeToAnotherOuterType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.Strategy.Snake", "a.Strategies.Snake", true)),
@@ -469,10 +633,10 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import a.Strategies.Snake;
+              import a.Strategies;
 
               class A {
-                  Snake s = new Snake();
+                  Strategies.Snake s = new Strategies.Snake();
               }
               """
           )
@@ -497,10 +661,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.*;
-              import a.Strategies.Snake;
 
               class A {
-                  Snake s = new Snake();
+                  Strategies.Snake s = new Strategies.Snake();
                   Other o;
               }
               """
@@ -525,10 +688,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.Strategies;
-              import a.Strategies.Snake;
 
               class A {
-                  Snake s = new Snake();
+                  Strategies.Snake s = new Strategies.Snake();
               }
               """
           )
@@ -549,10 +711,10 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import a.Strategy.Python;
+              import a.Strategy;
 
               class A {
-                  Python s = new Python();
+                  Strategy.Python s = new Strategy.Python();
               }
               """
           )
@@ -576,10 +738,9 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import a.*;
-              import a.Strategy.Python;
 
               class A {
-                  Python s = new Python();
+                  Strategy.Python s = new Strategy.Python();
                   Other o;
               }
               """
@@ -1150,6 +1311,33 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedNameWithoutTypeReplacedByTopLevelType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo$Builder", "b.Target", true))
+            // a.Foo is not on the classpath, so `Foo.Builder` has no type
+            .typeValidationOptions(TypeValidation.none())
+            .afterTypeValidationOptions(TypeValidation.none().identifiers(true)),
+          java(
+            """
+              import a.Foo;
+              import a.Foo.Builder;
+
+              class D {
+                  Foo.Builder y;
+              }
+              """,
+            """
+              import b.Target;
+
+              class D {
+                  Target y;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeArgumentsWithinTypeArguments() {
         rewriteRun(
           java(a1),
@@ -1279,6 +1467,108 @@ class ChangeTypeTest implements RewriteTest {
                   public void test() {
                       stat();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticImportsNextToImportOfTheType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java("package a; public class Old { public static Old of() { return null; } public static final int MAX = 1; }", SourceSpec::skip),
+          java("package b; public class New { public static New of() { return null; } public static final int MAX = 1; }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              import static a.Old.MAX;
+              import static a.Old.of;
+
+              class Test {
+                  Old method = of();
+                  int field = MAX;
+              }
+              """,
+            """
+              import b.New;
+
+              import static b.New.MAX;
+              import static b.New.of;
+
+              class Test {
+                  New method = of();
+                  int field = MAX;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declarationKeepsItsNameWhereAMoveKeepsTheSimpleNameAndTheFileHasAnother() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "b.Foo", false)),
+          java(
+            """
+              package a;
+
+              public class Foo {
+                  <Foo> void m(Foo t) {}
+              }
+              """,
+            """
+              package b;
+
+              public class Foo {
+                  <Foo> void m(Foo t) {}
+              }
+              """,
+            spec -> spec.path("a/Foo.java")
+          )
+        );
+    }
+
+    @Test
+    void staticImportOfAConstantOfANestedTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old$Typing", "b.New$Typing", true)),
+          java("package a; public class Old { public enum Typing { STATIC } }", SourceSpec::skip),
+          java("package b; public class New { public enum Typing { STATIC } }", SourceSpec::skip),
+          java(
+            """
+              import static a.Old.Typing.STATIC;
+
+              class Test {
+                  Object typing = STATIC;
+              }
+              """,
+            """
+              import static b.New.Typing.STATIC;
+
+              class Test {
+                  Object typing = STATIC;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old.Typing;
+
+              import static a.Old.Typing.STATIC;
+
+              class AlsoImportsTheType {
+                  Typing typing = STATIC;
+              }
+              """,
+            """
+              import b.New;
+
+              import static b.New.Typing.STATIC;
+
+              class AlsoImportsTheType {
+                  New.Typing typing = STATIC;
               }
               """
           )
@@ -2482,6 +2772,88 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void nameOfUnknownTypeImportedAsTheOriginalLeavesTheOuterClassNameFree() {
+        rewriteRun(
+          spec -> spec.recipes(
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                      // like a template that makes the method return the target's outer class, unattributed
+                      TypeTree returnType = method.getReturnTypeExpression();
+                      JavaType.Method methodType = method.getMethodType();
+                      if (returnType == null || methodType == null ||
+                          returnType.getType() instanceof JavaType.Unknown) {
+                          return method;
+                      }
+                      methodType = methodType.withReturnType(JavaType.ShallowClass.build("b.Response"));
+                      return method.withReturnTypeExpression(returnType.withType(JavaType.Unknown.getInstance()))
+                        .withMethodType(methodType)
+                        .withName(method.getName().withType(methodType));
+                  }
+              }),
+              new ChangeType("a.Response", "b.Response$Builder", true)
+            )
+            .afterTypeValidationOptions(TypeValidation.none()),
+          java("package a; public class Response {}"),
+          java("package b; public class Response { public static class Builder {} }"),
+          java(
+            """
+              import a.Response;
+
+              class Test {
+                  Response response() {
+                      return null;
+                  }
+
+                  Response builder = new Response();
+              }
+              """,
+            """
+              import b.Response;
+
+              class Test {
+                  Response response() {
+                      return null;
+                  }
+
+                  Response.Builder builder = new Response.Builder();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nameOfUnknownTypeThatNoImportExplainsTakesTheOuterClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Response$Builder", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java("package a; public class Old {}"),
+          // c.Response, like a class generated into package c, is on no classpath, so its name has an unknown type
+          java(
+            """
+              package c;
+
+              import a.Old;
+
+              class Test {
+                  Response response;
+                  Old old = new Old();
+              }
+              """,
+            """
+              package c;
+
+              class Test {
+                  Response response;
+                  b.Response.Builder old = new b.Response.Builder();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void fileDeclaringANestedTypeThatStaysIsUnchanged() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", false)),
@@ -3055,13 +3427,13 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import b.Outer.Inner;
+              import b.Outer;
 
               import java.util.List;
 
               class C {
-                  Inner i;
-                  List<Inner.Deep> l;
+                  Outer.Inner i;
+                  List<Outer.Inner.Deep> l;
               }
               """,
             spec -> spec.afterRecipe(cu -> {
@@ -4353,6 +4725,42 @@ class ChangeTypeTest implements RewriteTest {
 
               public enum Bar {
                   Foo, B
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepImportOfTheOuterClassWhenTheTypeMovesWithinIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Old", "a.Outer$New", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+
+                public class Outer {
+                    public static class Old {
+                    }
+
+                    public static class New {
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import a.Outer;
+
+              class Test {
+                  Outer.Old o;
+              }
+              """,
+            """
+              import a.Outer;
+
+              class Test {
+                  Outer.New o;
               }
               """
           )
