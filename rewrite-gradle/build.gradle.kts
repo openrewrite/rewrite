@@ -97,8 +97,21 @@ java {
     }
 }
 
+interface InjectedFileSystemOperations {
+    @get:Inject
+    val fs: FileSystemOperations
+}
+
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
+    // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi). Deleting the homes as
+    // the task starts bounds them to one run, and keeps each home younger than the age at which its cache cleanup would
+    // delete from the dependency cache it links to. FileSystemOperations.delete doesn't follow that link.
+    val userHomes = temporaryDir.resolve("gradle-user-homes")
+    val fileSystem = objects.newInstance<InjectedFileSystemOperations>().fs
+    doFirst {
+        fileSystem.delete { delete(userHomes) }
+    }
     val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
@@ -111,13 +124,12 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifest: File = manifestFile
 
-        // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi)
         @get:Internal
-        val userHomes: File = temporaryDir.resolve("gradle-user-homes")
+        val gradleUserHomes: File = userHomes
 
         override fun asArguments() = listOf(
             "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}",
-            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${userHomes.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${gradleUserHomes.absolutePath}"
         )
     })
     maxHeapSize = "2g"

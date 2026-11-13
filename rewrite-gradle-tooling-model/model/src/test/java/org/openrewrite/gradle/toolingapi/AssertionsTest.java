@@ -18,6 +18,9 @@ package org.openrewrite.gradle.toolingapi;
 import org.gradle.util.GradleVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.test.RewriteTest;
@@ -25,6 +28,7 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 
@@ -40,6 +44,20 @@ class AssertionsTest implements RewriteTest {
     // nothing, and the tests that use one share a daemon
     private static final URI CURRENT_GRADLE_DISTRIBUTION = URI.create(
       "https://services.gradle.org/distributions/gradle-" + GradleVersion.current().getVersion() + "-bin.zip");
+
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "Creating a symbolic link takes a privilege")
+    @Test
+    void testGradleUserHomeSharesTheDefaultHomesDependencyCache(@TempDir Path tmp) throws IOException {
+        Path home = tmp.resolve("home");
+        Path defaultHome = tmp.resolve("default-home");
+
+        Assertions.linkDependencyCache(home, defaultHome);
+        // Every withToolingApi build in the test JVM links the same home again
+        Assertions.linkDependencyCache(home, defaultHome);
+
+        assertThat(home.resolve("caches/modules-2")).isSymbolicLink();
+        assertThat(Files.isSameFile(home.resolve("caches/modules-2"), defaultHome.resolve("caches/modules-2"))).isTrue();
+    }
 
     @Test
     void withToolingApi() {
