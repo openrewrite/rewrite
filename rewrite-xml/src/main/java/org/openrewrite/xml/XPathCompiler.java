@@ -223,10 +223,10 @@ final class XPathCompiler {
                 CompiledExpr[] predicates = compilePredicates(bracketed.predicate());
 
                 // Check for trailing path
-                String trailingPath = null;
+                CompiledStep[] trailingPath = null;
                 boolean trailingIsDescendant = false;
                 if (pathExpr.pathSeparator() != null && pathExpr.relativeLocationPath() != null) {
-                    trailingPath = pathExpr.relativeLocationPath().getText();
+                    trailingPath = compileRelativeSteps(pathExpr.relativeLocationPath());
                     trailingIsDescendant = pathExpr.pathSeparator().DOUBLE_SLASH() != null;
                 }
 
@@ -678,12 +678,16 @@ final class XPathCompiler {
                 return CompiledExpr.child(getNodeTestName(step.nodeTest()));
             }
         }
-        CompiledStep[] compiledSteps = new CompiledStep[steps.size()];
-        for (int i = 0; i < steps.size(); i++) {
-            compiledSteps[i] = CompiledStep.fromStepContext(steps.get(i),
+        return CompiledExpr.path(compileRelativeSteps(relPath));
+    }
+
+    private static CompiledStep[] compileRelativeSteps(XPathParser.RelativeLocationPathContext relPath) {
+        CompiledStep[] steps = new CompiledStep[relPath.step().size()];
+        for (int i = 0; i < steps.length; i++) {
+            steps[i] = CompiledStep.fromStepContext(relPath.step(i),
                     i > 0 && relPath.pathSeparator(i - 1).DOUBLE_SLASH() != null);
         }
-        return CompiledExpr.path(compiledSteps);
+        return steps;
     }
 
     /**
@@ -898,11 +902,11 @@ final class XPathCompiler {
     public static final class CompiledFilterExpr {
         final String pathExpr;                    // The path inside parentheses
         final CompiledExpr[] predicates;          // Predicates to apply
-        final @Nullable String trailingPath;      // Optional trailing path after predicates
+        final CompiledStep @Nullable [] trailingPath;
         final boolean trailingIsDescendant;       // Is trailing path preceded by //?
 
         CompiledFilterExpr(String pathExpr, CompiledExpr[] predicates,
-                           @Nullable String trailingPath, boolean trailingIsDescendant) {
+                           CompiledStep @Nullable [] trailingPath, boolean trailingIsDescendant) {
             this.pathExpr = pathExpr;
             this.predicates = predicates;
             this.trailingPath = trailingPath;
@@ -1110,7 +1114,8 @@ final class XPathCompiler {
                 }
 
                 return new CompiledStep(StepType.AXIS_STEP, isDescendant, nodeTestName,
-                        axisType, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        axisType, step.nodeTest().nodeType() == null ? NodeTypeTestType.UNKNOWN :
+                        nodeTypeTestType(step.nodeTest().nodeType().getText()), predicates, flags,
                         computeStrategy(StepType.AXIS_STEP, nodeTestName, predicates));
             }
 
@@ -1121,23 +1126,7 @@ final class XPathCompiler {
                 // Check if it's a node type test: text(), comment(), node(), processing-instruction()
                 if (nodeTest.nodeType() != null) {
                     String functionName = nodeTest.nodeType().getText();
-                    NodeTypeTestType testType;
-                    switch (functionName) {
-                        case "text":
-                            testType = NodeTypeTestType.TEXT;
-                            break;
-                        case "comment":
-                            testType = NodeTypeTestType.COMMENT;
-                            break;
-                        case "node":
-                            testType = NodeTypeTestType.NODE;
-                            break;
-                        case "processing-instruction":
-                            testType = NodeTypeTestType.PROCESSING_INSTRUCTION;
-                            break;
-                        default:
-                            testType = NodeTypeTestType.UNKNOWN;
-                    }
+                    NodeTypeTestType testType = nodeTypeTestType(functionName);
                     return new CompiledStep(StepType.NODE_TYPE_TEST, isDescendant, null,
                             AxisType.OTHER, testType, predicates, flags,
                             computeStrategy(StepType.NODE_TYPE_TEST, null, predicates));
@@ -1154,6 +1143,21 @@ final class XPathCompiler {
             return new CompiledStep(StepType.NODE_TEST, isDescendant, null,
                     AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
                     computeStrategy(StepType.NODE_TEST, null, predicates));
+        }
+
+        private static NodeTypeTestType nodeTypeTestType(String name) {
+            switch (name) {
+                case "text":
+                    return NodeTypeTestType.TEXT;
+                case "comment":
+                    return NodeTypeTestType.COMMENT;
+                case "node":
+                    return NodeTypeTestType.NODE;
+                case "processing-instruction":
+                    return NodeTypeTestType.PROCESSING_INSTRUCTION;
+                default:
+                    return NodeTypeTestType.UNKNOWN;
+            }
         }
 
         /**
@@ -1385,18 +1389,23 @@ final class XPathCompiler {
          * Check if this expression needs position/size context to evaluate.
          */
         public boolean needsPosition() {
-            switch (type) {
-                case NUMERIC:
+            return type == ExprType.NUMERIC || usesPosition();
+        }
+
+        private boolean usesPosition() {
+            if (type == ExprType.FUNCTION) {
+                if (functionType == FunctionType.POSITION || functionType == FunctionType.LAST) {
                     return true;
-                case FUNCTION:
-                    return functionType == FunctionType.POSITION || functionType == FunctionType.LAST;
-                case COMPARISON:
-                case AND:
-                case OR:
-                    return (left != null && left.needsPosition()) || (right != null && right.needsPosition());
-                default:
-                    return false;
+                }
+                if (args != null) {
+                    for (CompiledExpr arg : args) {
+                        if (arg.usesPosition()) {
+                            return true;
+                        }
+                    }
+                }
             }
+            return (left != null && left.usesPosition()) || (right != null && right.usesPosition());
         }
 
         /**

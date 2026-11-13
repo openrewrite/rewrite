@@ -113,6 +113,53 @@ class XPathMatcherTest {
 
 
     @Test
+    void numericCoercionRejectsJavaNumberSyntax() {
+        SourceFile doc = new XmlParser().parse(
+          "<root><n>10f</n><n>1e1</n><n>0x1.4p3</n><n>+10</n><n>10</n><n>10.0</n></root>"
+        ).findFirst().orElseThrow();
+        assertThat(matchCount("//n[text() = 10]", doc)).isEqualTo(2);
+        assertThat(matchCount("//n[text() > 9]", doc)).isEqualTo(2);
+    }
+
+    @Test
+    void numericArgumentsUseXPathStringValues() {
+        assertThat(matchCount("//dependency[contains('1', 1)]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[string-length(123) = 3]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[substring-after('v1', 1) = '']", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[starts-with(1.5, '1.5')]", xmlDoc)).isEqualTo(2);
+    }
+
+    @Test
+    void positionInsideFunctionArguments() {
+        assertThat(matchCount("//dependency[not(position() = 1)]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//dependency[contains('2', position())]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//dependency[not(position() = last())]", xmlDoc)).isEqualTo(1);
+    }
+
+    @Test
+    void filterTrailingParentPathsPreserveChildTests() {
+        assertThat(matchCount("(//dependency)[1]/missing/..", xmlDoc)).isZero();
+        assertThat(matchCount("(//dependency)[1]/artifactId/..", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency)[1]/artifactId[@scope='missing']/..", xmlDoc)).isZero();
+    }
+
+    @Test
+    void predicateParentAxisHonorsNameTest() {
+        assertThat(matchCount("//dependency[artifactId/parent::missing]", xmlDoc)).isZero();
+        assertThat(matchCount("//dependency[artifactId/parent::dependency]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[artifactId/parent::node()]", xmlDoc)).isEqualTo(2);
+    }
+
+    @Test
+    void axisNameTestsDistinguishNodeFromNodeType() {
+        assertThat(matchCount("//dependency[self::node]", xmlDoc)).isZero();
+        assertThat(matchCount("//dependency[self::node()]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[self::text()]", xmlDoc)).isZero();
+        assertThat(matchCount("(//artifactId)[1]/@scope/self::missing", xmlDoc)).isZero();
+        assertThat(matchCount("(//artifactId)[1]/@scope/self::node()", xmlDoc)).isEqualTo(1);
+    }
+
+    @Test
     void rejectTrailingInput() {
         assertThatThrownBy(() -> XPathCompiler.compile("foo bar")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> XPathCompiler.compile("//dependency]")).isInstanceOf(IllegalArgumentException.class);

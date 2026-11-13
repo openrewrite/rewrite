@@ -21,10 +21,12 @@ import org.openrewrite.xml.XPathCompiler.*;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.xml.XPathCompiler.FLAG_ABSOLUTE_PATH;
@@ -39,6 +41,8 @@ import static org.openrewrite.xml.XPathCompiler.FLAG_ABSOLUTE_PATH;
  */
 @SuppressWarnings("BooleanMethodIsAlwaysInverted")
 public class XPathMatcher {
+
+    private static final Pattern NUMBER = Pattern.compile("-?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)");
 
     private final String expression;
     @SuppressWarnings("NotNullFieldNotInitialized")
@@ -139,7 +143,7 @@ public class XPathMatcher {
                 return false;
             }
             Xml.Tag tag = (Xml.Tag) cursorValue;
-            if (lastStep.getType() == StepType.AXIS_STEP && !matchesElementName(lastStep.getName(), tag.getName())) {
+            if (lastStep.getType() == StepType.AXIS_STEP && !matchesElementName(lastStep, tag.getName())) {
                 return false;
             }
             // Continue matching from current position (don't go up)
@@ -174,7 +178,7 @@ public class XPathMatcher {
         Xml.Tag currentTag = (Xml.Tag) cursorValue;
 
         // Check node test name for parent:: axis
-        if (parentStep.type == StepType.AXIS_STEP && !matchesElementName(parentStep.name, currentTag.getName())) {
+        if (parentStep.type == StepType.AXIS_STEP && !matchesElementName(parentStep, currentTag.getName())) {
             return false;
         }
 
@@ -386,7 +390,7 @@ public class XPathMatcher {
                 // Check node test name first
                 if (cursor != null && cursor.getValue() instanceof Xml.Tag) {
                     Xml.Tag tag = cursor.getValue();
-                    if (!matchesElementName(step.name, tag.getName())) {
+                    if (!matchesElementName(step, tag.getName())) {
                         return false;
                     }
                 }
@@ -399,7 +403,7 @@ public class XPathMatcher {
                 // Actually, self:: doesn't consume a level - it's like . with a name test
                 if (cursor != null && cursor.getValue() instanceof Xml.Tag) {
                     Xml.Tag tag = cursor.getValue();
-                    if (!matchesElementName(step.name, tag.getName())) {
+                    if (!matchesElementName(step, tag.getName())) {
                         return false;
                     }
                 }
@@ -559,7 +563,7 @@ public class XPathMatcher {
         List<Cursor> candidates = new ArrayList<>();
         if (parent != null && parent.getValue() instanceof Xml.Tag) {
             for (Xml.Tag child : ((Xml.Tag) parent.getValue()).getChildren()) {
-                if (step.type == StepType.AXIS_STEP ? matchesElementName(step.name, child.getName()) :
+                if (step.type == StepType.AXIS_STEP ? matchesElementName(step, child.getName()) :
                         matchesName(step.name, child.getName())) {
                     candidates.add(new Cursor(parent, child));
                 }
@@ -835,7 +839,7 @@ public class XPathMatcher {
             case STRING_LENGTH:
                 if (expr.args != null && expr.args.length > 0) {
                     Object val = resolveValue(expr.args[0], tag, attr, cursor, position, size);
-                    String str = val != null ? val.toString() : null;
+                    String str = functionStringValue(val);
                     return str != null ? str.length() : 0;
                 }
                 return 0;
@@ -844,8 +848,8 @@ public class XPathMatcher {
                 if (expr.args != null && expr.args.length >= 2) {
                     Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
                     Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    String str = val0 != null ? val0.toString() : null;
-                    String delim = val1 != null ? val1.toString() : null;
+                    String str = functionStringValue(val0);
+                    String delim = functionStringValue(val1);
                     String result = substringBefore(str, delim);
                     return result != null ? result : "";
                 }
@@ -855,8 +859,8 @@ public class XPathMatcher {
                 if (expr.args != null && expr.args.length >= 2) {
                     Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
                     Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    String str = val0 != null ? val0.toString() : null;
-                    String delim = val1 != null ? val1.toString() : null;
+                    String str = functionStringValue(val0);
+                    String delim = functionStringValue(val1);
                     String result = substringAfter(str, delim);
                     return result != null ? result : "";
                 }
@@ -879,8 +883,8 @@ public class XPathMatcher {
                 if (expr.args != null && expr.args.length >= 2) {
                     Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
                     Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    String str = val0 != null ? val0.toString() : null;
-                    String substr = val1 != null ? val1.toString() : null;
+                    String str = functionStringValue(val0);
+                    String substr = functionStringValue(val1);
                     return str != null && substr != null && str.contains(substr);
                 }
                 return false;
@@ -889,8 +893,8 @@ public class XPathMatcher {
                 if (expr.args != null && expr.args.length >= 2) {
                     Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
                     Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    String str = val0 != null ? val0.toString() : null;
-                    String prefix = val1 != null ? val1.toString() : null;
+                    String str = functionStringValue(val0);
+                    String prefix = functionStringValue(val1);
                     return str != null && prefix != null && str.startsWith(prefix);
                 }
                 return false;
@@ -899,8 +903,8 @@ public class XPathMatcher {
                 if (expr.args != null && expr.args.length >= 2) {
                     Object val0 = resolveValue(expr.args[0], tag, attr, cursor, position, size);
                     Object val1 = resolveValue(expr.args[1], tag, attr, cursor, position, size);
-                    String str = val0 != null ? val0.toString() : null;
-                    String suffix = val1 != null ? val1.toString() : null;
+                    String str = functionStringValue(val0);
+                    String suffix = functionStringValue(val1);
                     return str != null && suffix != null && str.endsWith(suffix);
                 }
                 return false;
@@ -1238,7 +1242,7 @@ public class XPathMatcher {
         List<Cursor> nodes = findNodesByPath(root, compiled.filterExpr.pathExpr);
         nodes = filterCandidates(nodes, compiled.filterExpr.predicates);
         if (compiled.filterExpr.trailingPath != null) {
-            CompiledStep[] steps = XPathCompiler.compile(compiled.filterExpr.trailingPath).steps;
+            CompiledStep[] steps = compiled.filterExpr.trailingPath;
             if (compiled.filterExpr.trailingIsDescendant) {
                 List<Cursor> contexts = new ArrayList<>();
                 for (Cursor node : nodes) {
@@ -1328,14 +1332,14 @@ public class XPathMatcher {
                     Object value = origin.getValue();
                     if (step.type == StepType.ABBREVIATED_DOT ||
                             step.type == StepType.AXIS_STEP && step.axisType == AxisType.SELF) {
-                        if (step.type == StepType.ABBREVIATED_DOT || !(value instanceof Xml.Tag) ||
-                                matchesElementName(step.name, ((Xml.Tag) value).getName())) {
+                        if (step.type == StepType.ABBREVIATED_DOT || matchesNodeTest(step, value)) {
                             candidates.add(origin);
                         }
                     } else if (step.type == StepType.ABBREVIATED_DOTDOT ||
                             step.type == StepType.AXIS_STEP && step.axisType == AxisType.PARENT) {
                         Cursor parent = getParentTagCursor(origin);
-                        if (parent != null) {
+                        if (parent != null && (step.type == StepType.ABBREVIATED_DOTDOT ||
+                                matchesElementName(step, ((Xml.Tag) parent.getValue()).getName()))) {
                             candidates.add(parent);
                         }
                     } else if (value instanceof Xml.Tag) {
@@ -1349,16 +1353,14 @@ public class XPathMatcher {
                         } else if (step.type == StepType.NODE_TYPE_TEST) {
                             if (tag.getContent() != null) {
                                 for (Content content : tag.getContent()) {
-                                    if (step.nodeTypeTestType == NodeTypeTestType.NODE ||
-                                            step.nodeTypeTestType == NodeTypeTestType.TEXT && content instanceof Xml.CharData ||
-                                            step.nodeTypeTestType == NodeTypeTestType.COMMENT && content instanceof Xml.Comment) {
+                                    if (matchesNodeTest(step, content)) {
                                         candidates.add(new Cursor(origin, content));
                                     }
                                 }
                             }
                         } else {
                             for (Xml.Tag child : tag.getChildren()) {
-                                if (step.type == StepType.AXIS_STEP ? matchesElementName(step.name, child.getName()) :
+                                if (step.type == StepType.AXIS_STEP ? matchesElementName(step, child.getName()) :
                                         matchesName(step.name, child.getName())) {
                                     candidates.add(new Cursor(origin, child));
                                 }
@@ -1408,28 +1410,49 @@ public class XPathMatcher {
         return value.toString();
     }
 
+    private static boolean matchesNodeTest(CompiledStep step, Object value) {
+        switch (step.nodeTypeTestType) {
+            case NODE:
+                return true;
+            case TEXT:
+                return value instanceof Xml.CharData;
+            case COMMENT:
+                return value instanceof Xml.Comment;
+            case PROCESSING_INSTRUCTION:
+                return value instanceof Xml.ProcessingInstruction;
+            default:
+                return value instanceof Xml.Tag && matchesName(step.name, ((Xml.Tag) value).getName());
+        }
+    }
+
+    private static @Nullable String functionStringValue(@Nullable Object value) {
+        if (value instanceof Double) {
+            double number = (Double) value;
+            if (Double.isFinite(number)) {
+                return BigDecimal.valueOf(number).stripTrailingZeros().toPlainString();
+            }
+        }
+        return value == null ? null : value.toString();
+    }
+
     private static double numberValue(Object value) {
         if (value instanceof Number) {
             return ((Number) value).doubleValue();
         }
+        String text = value.toString().trim();
+        if (!NUMBER.matcher(text).matches()) {
+            return Double.NaN;
+        }
         try {
-            return Double.parseDouble(value.toString().trim());
+            return Double.parseDouble(text);
         } catch (NumberFormatException e) {
             return Double.NaN;
         }
     }
 
-    /**
-     * Check if a name pattern matches an actual element name in an axis context.
-     * Handles wildcards (*), node() tests, and null patterns.
-     * Use this for element names where node() is a valid node type test.
-     *
-     * @param pattern    the XPath name pattern (may be null, "*", "node", or a specific name)
-     * @param actualName the actual element name to match against
-     * @return true if the pattern matches the actual name
-     */
-    private static boolean matchesElementName(@Nullable String pattern, String actualName) {
-        return pattern == null || "*".equals(pattern) || "node".equals(pattern) || actualName.equals(pattern);
+    private static boolean matchesElementName(CompiledStep step, String actualName) {
+        return step.nodeTypeTestType == NodeTypeTestType.NODE ||
+                step.nodeTypeTestType == NodeTypeTestType.UNKNOWN && matchesName(step.name, actualName);
     }
 
     /**
