@@ -602,7 +602,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.Assignment assignment = find(cu, J.Assignment.class, a -> !(a.getVariable() instanceof J.Identifier));
                 assertThat(assignment.getVariable()).isInstanceOf(J.FieldAccess.class);
-                assertThat(collect(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("toUpperCase"))).isEmpty();
+                J.FieldAccess toUpperCase = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toUpperCase"));
+                EtaExpansion eta = toUpperCase.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
+                assertThat(eta.getMethod().getName()).isEqualTo("toUpperCase");
+                assertThat(TypeUtils.asFullyQualified(eta.getType()).getFullyQualifiedName()).isEqualTo("scala.Function0");
             })
           )
         );
