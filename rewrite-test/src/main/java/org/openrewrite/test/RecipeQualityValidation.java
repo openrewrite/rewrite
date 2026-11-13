@@ -104,15 +104,17 @@ public class RecipeQualityValidation {
     private boolean parserShapedTrees = true;
 
     /**
-     * Controls whether the source files the recipe changes are validated to have the types that their parser gives the
-     * text they print, such as a variable's declared type and not its initializer's. Types the parser doesn't resolve,
-     * such as those of a library missing from the test's classpath, aren't compared. Skipped when the test doesn't
-     * validate the type attribution of the recipe's input and output. Off by default until recipes give their output
-     * these types, unless the system property {@code org.openrewrite.test.parserTypedTrees} is {@code true}, which a
-     * build sets for its tests to find the recipes that don't.
+     * Controls how much of the types of the source files the recipe changes has to match the types that their parser
+     * gives the text they print, such as a variable's declared type and not its initializer's. Types the parser
+     * doesn't resolve, such as those of a library missing from the test's classpath, aren't compared. Skipped when the
+     * test doesn't validate the type attribution of the recipe's input and output. {@link ParserTypes#Off} by default
+     * until recipes give their output these types, unless the system property
+     * {@code org.openrewrite.test.parserTypedTrees} is {@code true}, which a build sets for its tests to find the
+     * recipes that don't.
      */
     @Builder.Default
-    private boolean parserTypedTrees = Boolean.getBoolean("org.openrewrite.test.parserTypedTrees");
+    private ParserTypes parserTypedTrees = Boolean.getBoolean("org.openrewrite.test.parserTypedTrees") ?
+            ParserTypes.Exact : ParserTypes.Off;
 
     /**
      * Controls whether the source files the recipe leaves are validated to compile, with the test's
@@ -139,6 +141,40 @@ public class RecipeQualityValidation {
      */
     @Builder.Default
     private boolean noStaticVisitors = true;
+
+    /**
+     * How much of a type {@link #parserTypedTrees} compares with the type the parser gives, from least to most.
+     */
+    @Incubating(since = "8.108.0")
+    public enum ParserTypes {
+        Off,
+
+        /**
+         * Compares the names of members, the number of a method's parameters, and the classes that types erase to,
+         * with every bound of an intersection. A type variable only matches one of the same name and bounds. Leaves
+         * out type arguments, flags and thrown exceptions.
+         */
+        Erasure,
+
+        Exact
+    }
+
+    @SuppressWarnings("unused")
+    public static class RecipeQualityValidationBuilder {
+        /**
+         * @param on {@link ParserTypes#Exact} when {@code true}, else {@link ParserTypes#Off}.
+         */
+        public RecipeQualityValidationBuilder parserTypedTrees(boolean on) {
+            return parserTypedTrees(on ? ParserTypes.Exact : ParserTypes.Off);
+        }
+
+        // Lombok leaves out the setter of a name the builder already has, and keeps a default's value in these fields
+        public RecipeQualityValidationBuilder parserTypedTrees(ParserTypes level) {
+            this.parserTypedTrees$value = level;
+            this.parserTypedTrees$set = true;
+            return this;
+        }
+    }
 
     /**
      * The recipe quality checks that are on by default, which are all of them except {@link #parserTypedTrees()} and

@@ -137,7 +137,7 @@ final class UnneededOptOuts {
             return checked.contains(check) && !asRun.serializes();
         }
         return (checked.contains(check) || NEED_TYPES.contains(check) && checksTypeValidation()) &&
-               !asRun.runs(check);
+               asRun.strictness(check) < strictest(field(RecipeQualityValidation.class, check));
     }
 
     /**
@@ -164,6 +164,15 @@ final class UnneededOptOuts {
     void checkOnTheSideLater(String check, Runnable assertion) {
         if (runsOnTheSide(check)) {
             checksOnTheSide.put(check, assertion);
+        }
+    }
+
+    /**
+     * Keeps the assertion of the check at {@code level} to run on the side, if the test runs the check less strictly.
+     */
+    void checkOnTheSideLater(String check, Enum<?> level, Runnable assertion) {
+        if (runsOnTheSide(check) && asRun.strictness(check) < level.ordinal()) {
+            checksOnTheSide.put(sideCheck(field(RecipeQualityValidation.class, check), level.ordinal()), assertion);
         }
     }
 
@@ -217,7 +226,12 @@ final class UnneededOptOuts {
         List<OptOut> unneeded = new ArrayList<>();
         Map<Boolean, Set<String>> turnedOffInstead = new HashMap<>();
         Options current = asRun;
+        Set<String> turnedOn = new HashSet<>();
         for (OptOut optOut : asRun.optOuts(checked)) {
+            // a check with levels is turned back on to each, the strictest first, and stays at the first that passes
+            if (turnedOn.contains(turnedOnKey(optOut))) {
+                continue;
+            }
             Options candidate = current.turnOn(optOut);
             List<String> failed = failures(candidate, current);
             // the type checks may pass while the checks that need types, which they kept from running, fail
@@ -234,11 +248,16 @@ final class UnneededOptOuts {
             if (failed.isEmpty()) {
                 current = candidate;
                 unneeded.add(optOut);
+                turnedOn.add(turnedOnKey(optOut));
             }
         }
         if (!unneeded.isEmpty()) {
             fail(message(unneeded, turnedOffInstead, current));
         }
+    }
+
+    private static String turnedOnKey(OptOut optOut) {
+        return optOut.isInDefaults() + optOut.getOption() + optOut.getCheck();
     }
 
     /**
@@ -257,7 +276,8 @@ final class UnneededOptOuts {
         }
         for (Field option : options(RecipeQualityValidation.class)) {
             String check = option.getName();
-            if (candidate.runs(check) && !current.runs(check) && !passesOnTheSide(check)) {
+            int strictness = candidate.strictness(check);
+            if (strictness > current.strictness(check) && !passesOnTheSide(sideCheck(option, strictness))) {
                 failed.add(check);
             }
         }
@@ -307,7 +327,8 @@ final class UnneededOptOuts {
             Map<String, List<String>> checksByOption = new LinkedHashMap<>();
             for (OptOut optOut : unneeded) {
                 if (optOut.isInDefaults() == inDefaults) {
-                    checksByOption.computeIfAbsent(optOut.getOption(), o -> new ArrayList<>()).add(optOut.getCheck());
+                    checksByOption.computeIfAbsent(optOut.getOption(), o -> new ArrayList<>()).add(optOut.getCheck() +
+                            (optOut.getLevel() == null ? "" : " at " + optOut.getLevel()));
                 }
             }
             Set<String> instead = turnedOffInstead.getOrDefault(inDefaults, emptySet());
@@ -461,7 +482,45 @@ final class UnneededOptOuts {
 
     private static String value(Object options, Field option) {
         Object value = get(options, option);
+        if (value instanceof Enum) {
+            Object[] levels = value.getClass().getEnumConstants();
+            // the builder takes a check's lowest and highest levels as false and true
+            if (value == levels[0] || value == levels[levels.length - 1]) {
+                return String.valueOf(value == levels[levels.length - 1]);
+            }
+            return "RecipeQualityValidation." + value.getClass().getSimpleName() + "." + value;
+        }
         return value instanceof Boolean ? value.toString() : "..";
+    }
+
+    /**
+     * How strictly a recipe quality check runs with {@code value}, off being 0. The levels of a check that has them,
+     * such as {@link RecipeQualityValidation.ParserTypes}, are in the order of their strictness.
+     */
+    private static int strictness(@Nullable Object value) {
+        if (value instanceof Enum) {
+            return ((Enum<?>) value).ordinal();
+        }
+        return Boolean.TRUE.equals(value) ? 1 : 0;
+    }
+
+    private static int strictest(Field option) {
+        Object[] levels = option.getType().getEnumConstants();
+        return levels == null ? 1 : levels.length - 1;
+    }
+
+    private static Object off(Field option) {
+        Object[] levels = option.getType().getEnumConstants();
+        return levels == null ? false : levels[0];
+    }
+
+    /**
+     * The key of the assertion that runs a check at a strictness on the side.
+     */
+    private static String sideCheck(Field option, int strictness) {
+        Object[] levels = option.getType().getEnumConstants();
+        return levels == null || strictness == levels.length - 1 ? option.getName() :
+                option.getName() + "=" + levels[strictness];
     }
 
     /**
@@ -497,8 +556,9 @@ final class UnneededOptOuts {
         for (Field option : options(options.getClass())) {
             // a recipe quality check that is off by default and that the test turns on isn't an opt-out
             if (checked.contains(option.getName()) && !NO_EFFECT.equals(option.getName()) &&
-                !isDefault(options, option) &&
-                !(options instanceof RecipeQualityValidation && Boolean.TRUE.equals(get(options, option)))) {
+                (options instanceof RecipeQualityValidation ?
+                        strictness(get(options, option)) < strictness(get(defaults(options), option)) :
+                        !isDefault(options, option))) {
                 turnedOff.add(option.getName());
             }
         }
@@ -549,6 +609,13 @@ final class UnneededOptOuts {
         boolean inDefaults;
         String option;
         String check;
+
+        /**
+         * The level of a check that has levels that it is turned back on to, or null for the check's default.
+         */
+        @Nullable
+        Object level;
+
         UnaryOperator<RecipeSpec> turnOn;
     }
 
@@ -594,10 +661,14 @@ final class UnneededOptOuts {
             return testMethodSpec.serializationValidation && testClassSpec.serializationValidation;
         }
 
-        boolean runs(String check) {
+        /**
+         * How strictly the recipe quality check runs, which is not at all when it needs types the test doesn't
+         * validate.
+         */
+        int strictness(String check) {
             RecipeQualityValidation quality = RecipeQualityValidation.of(testMethodSpec, testClassSpec);
-            return Boolean.TRUE.equals(get(quality, field(RecipeQualityValidation.class, check))) &&
-                   (!NEED_TYPES.contains(check) || validatesTypes());
+            return NEED_TYPES.contains(check) && !validatesTypes() ? 0 :
+                    UnneededOptOuts.strictness(get(quality, field(RecipeQualityValidation.class, check)));
         }
 
         /**
@@ -609,7 +680,7 @@ final class UnneededOptOuts {
             TypeValidation before = spec(beforeInDefaults).typeValidation;
             if (before != null) {
                 for (String check : turnedOff(before, checked)) {
-                    optOuts.add(new OptOut(beforeInDefaults, "typeValidationOptions(..)", check, spec -> {
+                    optOuts.add(new OptOut(beforeInDefaults, "typeValidationOptions(..)", check, null, spec -> {
                         spec.typeValidation = withDefault(spec.typeValidation, check);
                         return spec;
                     }));
@@ -619,7 +690,7 @@ final class UnneededOptOuts {
                 RecipeQualityValidation quality = spec(inDefaults).recipeQualityValidation;
                 if (quality != null && quality.types() != null) {
                     for (String check : turnedOff(quality.types(), checked)) {
-                        optOuts.add(new OptOut(inDefaults, "recipeQualityValidation(..)", "types." + check, spec -> {
+                        optOuts.add(new OptOut(inDefaults, "recipeQualityValidation(..)", "types." + check, null, spec -> {
                             spec.recipeQualityValidation = with(spec.recipeQualityValidation, "types",
                                     withDefault(spec.recipeQualityValidation.types(), check));
                             return spec;
@@ -630,7 +701,7 @@ final class UnneededOptOuts {
                 TypeValidation after = spec(inDefaults).afterTypeValidation;
                 if (after != null) {
                     for (String check : turnedOff(after, checked)) {
-                        optOuts.add(new OptOut(inDefaults, "afterTypeValidationOptions(..)", check, spec -> {
+                        optOuts.add(new OptOut(inDefaults, "afterTypeValidationOptions(..)", check, null, spec -> {
                             spec.afterTypeValidation = withDefault(spec.afterTypeValidation, check);
                             return spec;
                         }));
@@ -642,15 +713,29 @@ final class UnneededOptOuts {
             RecipeQualityValidation quality = spec(qualityInDefaults).recipeQualityValidation;
             if (quality != null) {
                 for (String check : turnedOff(quality, checked)) {
-                    optOuts.add(new OptOut(qualityInDefaults, "recipeQualityValidation(..)", check, spec -> {
+                    optOuts.add(new OptOut(qualityInDefaults, "recipeQualityValidation(..)", check, null, spec -> {
                         spec.recipeQualityValidation = withDefault(spec.recipeQualityValidation, check);
                         return spec;
                     }));
+                    Field option = field(RecipeQualityValidation.class, check);
+                    Object[] levels = option.getType().getEnumConstants();
+                    if (levels != null) {
+                        for (int s = UnneededOptOuts.strictness(get(RecipeQualityValidation.all(), option)) - 1;
+                             s > UnneededOptOuts.strictness(get(quality, option)); s--) {
+                            Object level = levels[s];
+                            optOuts.add(new OptOut(qualityInDefaults, "recipeQualityValidation(..)", check, level,
+                                    spec -> {
+                                        spec.recipeQualityValidation = with(spec.recipeQualityValidation, check,
+                                                level);
+                                        return spec;
+                                    }));
+                        }
+                    }
                 }
             }
             for (boolean inDefaults : new boolean[]{false, true}) {
                 if (!spec(inDefaults).serializationValidation && checked.contains(SERIALIZATION)) {
-                    optOuts.add(new OptOut(inDefaults, "validateRecipeSerialization(false)", SERIALIZATION, spec -> {
+                    optOuts.add(new OptOut(inDefaults, "validateRecipeSerialization(false)", SERIALIZATION, null, spec -> {
                         spec.serializationValidation = true;
                         return spec;
                     }));
@@ -715,7 +800,7 @@ final class UnneededOptOuts {
             RecipeQualityValidation quality = spec.recipeQualityValidation == null ?
                     RecipeQualityValidation.all() : spec.recipeQualityValidation;
             for (String check : checks) {
-                quality = with(quality, check, false);
+                quality = with(quality, check, off(field(RecipeQualityValidation.class, check)));
             }
             spec.recipeQualityValidation = quality;
             return new Options(inDefaults ? testMethodSpec : spec, inDefaults ? spec : testClassSpec);

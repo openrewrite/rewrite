@@ -38,23 +38,26 @@ final class TreeShapes {
     private static final int SNIPPET_LENGTH = 60;
 
     private final boolean shapes;
-    private final boolean types;
+    private final RecipeQualityValidation.ParserTypes types;
+    private final boolean typed;
     private final boolean compiles;
     private final Function<SourceFile, List<Parser.Builder>> afterParsersFor;
     private final Collection<Parser.Builder> specAfterParsers;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
+    private boolean beyondErasure;
 
     /**
      * @param afterParsersFor  The parsers to parse a source the recipe returned with, which are those of its input
      *                         where the test gives no after parser of its language.
      * @param specAfterParsers Those of them that the test gave as after parsers.
      */
-    TreeShapes(boolean shapes, boolean types, boolean compiles,
+    TreeShapes(boolean shapes, RecipeQualityValidation.ParserTypes types, boolean compiles,
                Function<SourceFile, List<Parser.Builder>> afterParsersFor,
                Collection<Parser.Builder> specAfterParsers, @Nullable Path relativeTo, ExecutionContext parseCtx) {
         this.shapes = shapes;
         this.types = types;
+        this.typed = types != RecipeQualityValidation.ParserTypes.Off;
         this.compiles = compiles;
         this.afterParsersFor = afterParsersFor;
         this.specAfterParsers = specAfterParsers;
@@ -89,7 +92,7 @@ final class TreeShapes {
      *                can refer to the others, as a Maven module does to its parent.
      */
     void assertParserShaped(Collection<Result> results, List<SourceFile> sources) {
-        if (!shapes && !types && !compiles) {
+        if (!shapes && !typed && !compiles) {
             return;
         }
         List<SourceFile> current = current(results, sources);
@@ -152,7 +155,7 @@ final class TreeShapes {
             for (SourceFile source : current) {
                 append(foundErrors, source, results, errors.get(source.getId()));
             }
-            if (!shapes && !types) {
+            if (!shapes && !typed) {
                 continue;
             }
             for (Result result : group.getValue()) {
@@ -186,11 +189,14 @@ final class TreeShapes {
                  "spec.recipeQualityValidation(RecipeQualityValidation.builder().compilableOutput(false).build()).");
         }
         if (foundTypes.length() > 0) {
+            boolean erasureDoes = types == RecipeQualityValidation.ParserTypes.Exact && !beyondErasure;
             fail("Give the code the recipe writes the types its parser gives that code. The recipe's output holds " +
                  "types that a parse of the text it prints doesn't:\n" + foundTypes +
                  "A recipe that runs after it matches code by its types, so it misses or mistakes code whose types " +
-                 "are wrong. If the output is meant to differ from parsed code, add " +
-                 "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()).");
+                 "are wrong. If the output is meant to differ from parsed code" +
+                 (erasureDoes ? " only in type arguments, flags or thrown exceptions" : "") + ", add " +
+                 "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(" +
+                 (erasureDoes ? "RecipeQualityValidation.ParserTypes.Erasure" : "false") + ").build()).");
         }
     }
 
@@ -236,7 +242,7 @@ final class TreeShapes {
             return;
         }
         compare(service, skeleton(service, after), skeleton(service, Objects.requireNonNull(reparsed.sourceFile)),
-                shapes ? shapeProblems : null, types ? typeProblems : null);
+                shapes ? shapeProblems : null, typed ? typeProblems : null);
         // a file that already broke its language's rules, such as JSON5 in a .json file, follows other ones
         TreeShapeValidationService beforeService = before == null ? null : service(before);
         if (shapes && (before == null || beforeService == null || beforeService.invalid(before).isEmpty())) {
@@ -252,9 +258,13 @@ final class TreeShapes {
      * Types are compared only between nodes of the same shape, as a node the parser builds differently has no
      * counterpart to compare with.
      */
-    private static void compare(TreeShapeValidationService service, Node node, Node parsed,
-                                @Nullable List<String> shapeProblems, @Nullable Set<String> typeProblems) {
-        if (full(shapeProblems) && full(typeProblems)) {
+    private void compare(TreeShapeValidationService service, Node node, Node parsed,
+                         @Nullable List<String> shapeProblems, @Nullable Set<String> typeProblems) {
+        // the problems listed are capped, but whether any of them differs beyond the erasure decides the opt-out to
+        // suggest
+        boolean erasureToCheck = typeProblems != null && types == RecipeQualityValidation.ParserTypes.Exact &&
+                                 !beyondErasure;
+        if (full(shapeProblems) && full(typeProblems) && !erasureToCheck) {
             return;
         }
         if (node.tree.getClass() != parsed.tree.getClass()) {
@@ -269,13 +279,20 @@ final class TreeShapes {
         if (!full(shapeProblems) && !Objects.equals(value, parsedValue)) {
             shapeProblems.add(node + " has " + value + " where the parser makes " + parsedValue);
         }
+        boolean differs = true;
         if (!full(typeProblems)) {
-            for (String difference : service.typeDifferences(node.tree, parsed.tree)) {
+            List<String> differences = service.typeDifferences(node.tree, parsed.tree,
+                    types == RecipeQualityValidation.ParserTypes.Exact);
+            for (String difference : differences) {
                 if (full(typeProblems)) {
                     break;
                 }
                 typeProblems.add(node + " has " + difference);
             }
+            differs = !differences.isEmpty();
+        }
+        if (erasureToCheck && differs && !service.typeDifferences(node.tree, parsed.tree, false).isEmpty()) {
+            beyondErasure = true;
         }
         if (node.children.size() != parsed.children.size()) {
             if (!full(shapeProblems) && !service.equivalent(node.tree, parsed.tree)) {
@@ -364,7 +381,7 @@ final class TreeShapes {
         // types. An after parser types the output afresh, as a clone of the input's parser holds the input
         // classpath's types under the output's names.
         Parser.Builder reparser = service == null ? builder :
-                !types && !compiles ? service.untypedParser(builder) :
+                !typed && !compiles ? service.untypedParser(builder) :
                         afterParser ? service.typedParser(builder) : service.typedParser(builder, parsedAndOutput);
         ExecutionContext ctx = parseContext(errors);
         if (compiles && service != null) {
