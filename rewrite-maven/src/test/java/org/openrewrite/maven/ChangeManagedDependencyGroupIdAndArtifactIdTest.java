@@ -759,4 +759,63 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void globSkipsManagedDependenciesWhoseNewCoordinatesDoNotResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-*",
+            "org.hibernate.orm",
+            null,
+            "6.0.x"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hibernate</groupId>
+                              <artifactId>hibernate-core</artifactId>
+                              <version>5.6.15.Final</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.hibernate</groupId>
+                              <artifactId>hibernate-search-orm</artifactId>
+                              <version>5.11.12.Final</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hibernate.orm</groupId>
+                              <artifactId>hibernate-core</artifactId>
+                              <version>6.0.2.Final</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.hibernate</groupId>
+                              <artifactId>hibernate-search-orm</artifactId>
+                              <version>5.11.12.Final</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }
