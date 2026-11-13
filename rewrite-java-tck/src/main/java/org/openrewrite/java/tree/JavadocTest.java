@@ -2779,6 +2779,152 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void tabAfterMarginOnLaterLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * \tmore
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabsAfterMarginBeforeHtml() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * \t\t<b>bold</b>
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnPreCodeLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * <pre><code>
+                   * \tcode
+                   * </code></pre>
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginInMultiLineInlineCode() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text {@code a
+                   * \tb}
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginInParamContinuation() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * @param x desc
+                   * \tmore
+                   */
+                  void m(int x) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginBelowWhitespaceOnlyLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * \t
+                   * \tmore
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnLaterLineWithoutLeadingAsterisk() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                     Text.
+                     \tmore
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnLaterLineWithCrlf() {
+        rewriteRun(
+          java("" +
+               "class Test {\r\n" +
+               "    /**\r\n" +
+               "     * Text.\r\n" +
+               "     * \tmore\r\n" +
+               "     */\r\n" +
+               "    void m() {\r\n" +
+               "    }\r\n" +
+               "}\r\n"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {
@@ -3175,6 +3321,40 @@ class JavadocTest implements RewriteTest {
     @Nested
     @MinimumJava25
     class MarkdownDocComment {
+        @Test
+        void tripleSlashTabAfterMarginOnLaterLine() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /// Text.
+                      /// \tmore
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashTabInFencedCodeBlock() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /// Text.
+                      /// ```
+                      /// \tcode
+                      /// ```
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
         @Test
         void tripleSlashDoubledCarriageReturnBeforeLineFeed() {
             rewriteRun(
