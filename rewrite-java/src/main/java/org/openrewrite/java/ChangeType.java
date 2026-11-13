@@ -333,9 +333,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             return i;
                         }
                         if (!"*".equals(i.getQualid().getSimpleName())) {
-                            JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
-                            maybeAddImport(target.getPackageName(), target.getClassName(),
-                                    i.getQualid().getSimpleName(), null, true);
+                            // AddImport recognises a static import of a nested type only by its `$` name
+                            maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(),
+                                    i.getQualid().getSimpleName());
                             return i;
                         }
                         return visitImportInPlace(i, ctx);
