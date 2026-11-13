@@ -5169,24 +5169,6 @@ describe("maybeBind on a CommonJS file", () => {
         )).toBe("rm");
     });
 
-    test("a member joins no require under // @ts-ignore", async () => {
-        expect(await bindWith({module: "node:fs/promises", member: "rm"},
-            //language=javascript
-            `
-            // @ts-ignore
-            const {readFile} = require('node:fs/promises');
-
-            target();`,
-            //language=javascript
-            `
-            // @ts-ignore
-            const {readFile} = require('node:fs/promises');
-            const {rm} = require('node:fs/promises');
-
-            rm.target();`
-        )).toBe("rm");
-    });
-
     test("a member joins a const destructuring require of its module that has no rest element", async () => {
         expect(await bindWith({module: "fs/promises", member: "rm"},
             //language=javascript
@@ -5213,6 +5195,24 @@ describe("maybeBind on a CommonJS file", () => {
             const {a, ...rest} = require('fs/promises');
             let {b} = require('fs/promises');
             const {rm} = require('fs/promises');
+
+            rm.target();`
+        )).toBe("rm");
+    });
+
+    test("a member joins no require under // @ts-ignore", async () => {
+        expect(await bindWith({module: "node:fs/promises", member: "rm"},
+            //language=javascript
+            `
+            // @ts-ignore
+            const {readFile} = require('node:fs/promises');
+
+            target();`,
+            //language=javascript
+            `
+            // @ts-ignore
+            const {readFile} = require('node:fs/promises');
+            const {rm} = require('node:fs/promises');
 
             rm.target();`
         )).toBe("rm");
