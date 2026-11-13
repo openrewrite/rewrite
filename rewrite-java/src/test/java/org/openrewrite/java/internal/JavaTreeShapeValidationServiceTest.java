@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -108,7 +109,7 @@ class JavaTreeShapeValidationServiceTest {
         J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
                 .withReturnType(JavaType.Primitive.Long));
 
-        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed))
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, true))
                 .contains("the method long A.m() where the parser gives int A.m()");
     }
 
@@ -119,9 +120,77 @@ class JavaTreeShapeValidationServiceTest {
         J.MethodDeclaration recipes = parsed.withMethodType(methodType.withThrownExceptions(
                 List.of(methodType.getThrownExceptions().get(0), JavaType.ShallowClass.build("java.lang.Exception"))));
 
-        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed)).containsExactly(
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, true)).containsExactly(
                 "the method void A.m() throwing {undefined}, java.lang.Exception " +
                 "where the parser gives void A.m() throwing {undefined}, java.io.IOException");
+    }
+
+    @Test
+    void erasureLeavesOutTypeArgumentsFlagsAndThrownExceptions() {
+        J.MethodDeclaration parsed = method("class A { java.util.List<String> m() throws java.io.IOException { return null; } }");
+        JavaType.Method methodType = requireNonNull(parsed.getMethodType());
+        JavaType.Parameterized listOfString = requireNonNull(TypeUtils.asParameterized(methodType.getReturnType()));
+        J.MethodDeclaration recipes = parsed.withMethodType(methodType
+                .withReturnType(listOfString.withTypeParameters(List.of(JavaType.ShallowClass.build("java.lang.Object"))))
+                .withFlags(Set.of(Flag.Public, Flag.Static))
+                .withThrownExceptions(List.of()));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, true)).isNotEmpty();
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, false)).isEmpty();
+    }
+
+    @Test
+    void erasureTakesANestedClassNamedWithADotAsExactDoes() {
+        J.MethodDeclaration parsed = method("class A { Thread.State m() { return null; } }");
+        J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
+                .withReturnType(JavaType.ShallowClass.build("java.lang.Thread.State")));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, true)).isEmpty();
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, false)).isEmpty();
+    }
+
+    @Test
+    void erasureComparesTheErasedClassATypeVariableAndAMultiCatch() {
+        J.MethodDeclaration parsed = method("class A { java.util.List<String> m() { return null; } }");
+        JavaType.Method methodType = requireNonNull(parsed.getMethodType());
+        J.MethodDeclaration recipes = parsed.withMethodType(methodType.withReturnType(
+                JavaType.ShallowClass.build("java.util.Collection")).withFlags(Set.of(Flag.Static)));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed, false))
+                .contains("the method java.util.Collection A.m() where the parser gives java.util.List<java.lang.String> A.m()");
+
+        J.MethodDeclaration generic = method("class A { <T> void m(T t) {} }");
+        JavaType.Method genericType = requireNonNull(generic.getMethodType());
+        J.MethodDeclaration takesObject = generic.withMethodType(genericType.withParameterTypes(
+                List.of(JavaType.ShallowClass.build("java.lang.Object"))));
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(takesObject, generic, false))
+                .anyMatch(difference -> difference.startsWith("the method "));
+
+        J.MethodDeclaration takesU = generic.withMethodType(genericType.withParameterTypes(List.of(
+                new JavaType.GenericTypeVariable(null, "U", JavaType.GenericTypeVariable.Variance.INVARIANT, null))));
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(takesU, generic, false))
+                .anyMatch(difference -> difference.startsWith("the method "));
+
+        J.MethodDeclaration bounded = method("class A { <T extends Number & Comparable<T>> void m(T t) {} }");
+        JavaType.Method boundedType = requireNonNull(bounded.getMethodType());
+        JavaType.GenericTypeVariable t = (JavaType.GenericTypeVariable) boundedType.getParameterTypes().get(0);
+        J.MethodDeclaration boundedOtherwise = bounded.withMethodType(boundedType.withParameterTypes(List.of(
+                t.withBounds(List.of(t.getBounds().get(0), JavaType.ShallowClass.build("java.io.Serializable"))))));
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(boundedOtherwise, bounded, false))
+                .anyMatch(difference -> difference.startsWith("the method "));
+
+        J.Try tryCatch = (J.Try) requireNonNull(method(
+                "class A { void m() { try {} catch (IllegalStateException | IllegalArgumentException e) {} } }")
+                .getBody()).getStatements().get(0);
+        J.Identifier e = tryCatch.getCatches().get(0).getParameter().getTree().getVariables().get(0).getName();
+        J.Identifier caught = e.withType(new JavaType.MultiCatch(List.of(
+                JavaType.ShallowClass.build("java.lang.IllegalStateException"),
+                JavaType.ShallowClass.build("java.lang.IllegalArgumentException"))));
+        J.Identifier caughtElse = e.withType(new JavaType.MultiCatch(List.of(
+                JavaType.ShallowClass.build("java.lang.RuntimeException"), JavaType.ShallowClass.build("java.lang.Error"))));
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(caughtElse, caught, false)).isNotEmpty();
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(caught.withType(new JavaType.MultiCatch(
+                ((JavaType.MultiCatch) requireNonNull(caught.getType())).getThrowableTypes())), caught, false)).isEmpty();
     }
 
     private static J.MethodDeclaration method(String source) {

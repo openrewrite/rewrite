@@ -2171,6 +2171,49 @@ class RewriteTestTest implements RewriteTest {
               .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.DeclareLongByHand):\n" +
                                     "    `x = 1` has the variable int x where the parser gives long x")
               .hasMessageContaining("parserTypedTrees(false)");
+
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder()
+                  .parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+              java("class A { void f() { int x = 1; } }", "class A { void f() { long x = 1; } }")
+            ));
+        }
+
+        @Test
+        void suggestTheErasureLevelThatAcceptsDifferentThrownExceptions() {
+            //language=java
+            String before = """
+              class A {
+                  void m(int i) throws Exception {}
+                  void f() throws Exception {
+                      m(1);
+                  }
+              }
+              """;
+            //language=java
+            String after = """
+              class A {
+                  void m(int i) throws Exception {}
+                  void f() throws Exception {
+                      m(2);
+                  }
+              }
+              """;
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new CallWithTwoThrowingNothingByHand()),
+              java(before, after)
+            ));
+            assertThat(e).hasMessageContaining("throwing nothing where the parser gives")
+              .hasMessageContaining("parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure)")
+              .hasMessageNotContaining("parserTypedTrees(false)");
+
+            rewriteRun(
+              spec -> spec.recipe(new CallWithTwoThrowingNothingByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder()
+                  .parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+              java(before, after)
+            );
         }
 
         @Test

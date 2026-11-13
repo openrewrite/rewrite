@@ -179,7 +179,7 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
-    public List<String> typeDifferences(Tree tree, Tree parsed) {
+    public List<String> typeDifferences(Tree tree, Tree parsed, boolean exact) {
         Map<String, @Nullable JavaType> parsedTypes = types(parsed);
         List<String> differences = new ArrayList<>();
         types(tree).forEach((of, type) -> {
@@ -188,9 +188,11 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             String parsedWritten = written(parsedType);
             // A type the parser can't resolve has nothing to compare with. One the recipe leaves out is
             // TypeValidation's to report.
-            if (written != null && parsedWritten != null && !same(type, parsedType)) {
-                differences.add("the " + of + " " + written + unwritten(type, parsedType) +
-                                " where the parser gives " + parsedWritten + unwritten(parsedType, type));
+            if (written != null && parsedWritten != null &&
+                !(exact ? same(type, parsedType) : sameErasure(type, parsedType))) {
+                differences.add("the " + of + " " + written + (exact ? unwritten(type, parsedType) : "") +
+                                " where the parser gives " + parsedWritten +
+                                (exact ? unwritten(parsedType, type) : ""));
             }
         });
         return differences;
@@ -238,6 +240,82 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                    sameThrown(method.getThrownExceptions(), parsedMethod.getThrownExceptions());
         }
         return TypeUtils.isOfType(type, parsed);
+    }
+
+    private static boolean sameErasure(@Nullable JavaType type, @Nullable JavaType parsed) {
+        if (type instanceof JavaType.Variable && parsed instanceof JavaType.Variable) {
+            JavaType.Variable variable = (JavaType.Variable) type;
+            JavaType.Variable parsedVariable = (JavaType.Variable) parsed;
+            return variable.getName().equals(parsedVariable.getName()) &&
+                   sameErased(variable.getType(), parsedVariable.getType());
+        }
+        if (type instanceof JavaType.Method && parsed instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            JavaType.Method parsedMethod = (JavaType.Method) parsed;
+            if (!method.getName().equals(parsedMethod.getName()) ||
+                method.getParameterTypes().size() != parsedMethod.getParameterTypes().size() ||
+                !sameErased(method.getDeclaringType(), parsedMethod.getDeclaringType()) ||
+                !sameErased(method.getReturnType(), parsedMethod.getReturnType())) {
+                return false;
+            }
+            for (int i = 0; i < method.getParameterTypes().size(); i++) {
+                if (!sameErased(method.getParameterTypes().get(i), parsedMethod.getParameterTypes().get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return sameErased(type, parsed);
+    }
+
+    private static boolean sameErased(@Nullable JavaType type, @Nullable JavaType parsed) {
+        if (type instanceof JavaType.Array && parsed instanceof JavaType.Array) {
+            return sameErased(((JavaType.Array) type).getElemType(), ((JavaType.Array) parsed).getElemType());
+        } else if (type instanceof JavaType.GenericTypeVariable || parsed instanceof JavaType.GenericTypeVariable) {
+            if (!(type instanceof JavaType.GenericTypeVariable && parsed instanceof JavaType.GenericTypeVariable)) {
+                return false;
+            }
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            JavaType.GenericTypeVariable parsedVariable = (JavaType.GenericTypeVariable) parsed;
+            if (!variable.getName().equals(parsedVariable.getName()) ||
+                variable.getVariance() != parsedVariable.getVariance() ||
+                variable.getBounds().size() != parsedVariable.getBounds().size()) {
+                return false;
+            }
+            for (int i = 0; i < variable.getBounds().size(); i++) {
+                if (!sameErased(variable.getBounds().get(i), parsedVariable.getBounds().get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        String erasure = erasure(type);
+        // a type that erases to no class, such as a multi-catch, is compared whole
+        return erasure == null ? TypeUtils.isOfType(type, parsed) :
+                TypeUtils.fullyQualifiedNamesAreEqual(erasure, erasure(parsed));
+    }
+
+    /**
+     * The class {@code type} erases to, with every bound of an intersection, or null when it erases to none.
+     */
+    private static @Nullable String erasure(@Nullable JavaType type) {
+        if (type instanceof JavaType.Intersection) {
+            StringJoiner bounds = new StringJoiner(" & ");
+            for (JavaType bound : ((JavaType.Intersection) type).getBounds()) {
+                String erased = erasure(bound);
+                if (erased == null) {
+                    return null;
+                }
+                bounds.add(erased);
+            }
+            return bounds.length() == 0 ? null : bounds.toString();
+        } else if (type == JavaType.Primitive.String) {
+            return "java.lang.String";
+        } else if (type instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) type).getKeyword();
+        }
+        JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(type);
+        return fullyQualified == null ? null : fullyQualified.getFullyQualifiedName();
     }
 
     /**
