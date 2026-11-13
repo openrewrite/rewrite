@@ -17,15 +17,20 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ClassInitializerMayBeStatic")
 class FindMissingTypesTest implements RewriteTest {
@@ -266,4 +271,78 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parameterizedTypeClazzDisagreesWithType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+                    J.ParameterizedType p = super.visitParameterizedType(type, ctx);
+                    if (p.getClazz() instanceof J.Identifier && "List".equals(((J.Identifier) p.getClazz()).getSimpleName())) {
+                        return p.withClazz(((J.Identifier) p.getClazz())
+                          .withSimpleName("ArrayList")
+                          .withType(JavaType.ShallowClass.build("java.util.ArrayList")));
+                    }
+                    return p;
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class A {
+                  List<String> l;
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class A {
+                  /*~~(ParameterizedType#clazz type does not match the raw type of ParameterizedType#type)~~>*/ArrayList<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodReturnTypeExpressionDisagreesWithMethodType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                    if (m.getReturnTypeExpression() instanceof J.Identifier) {
+                        return m.withReturnTypeExpression(new J.Primitive(Tree.randomId(),
+                          m.getReturnTypeExpression().getPrefix(), Markers.EMPTY, JavaType.Primitive.Int));
+                    }
+                    return m;
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              class A {
+                  Integer foo() {
+                      return 1;
+                  }
+              }
+              """,
+            """
+              class A {
+                  /*~~(MethodDeclaration#returnTypeExpression type does not match the return type of the MethodType)~~>*/int foo() {
+                      return 1;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
