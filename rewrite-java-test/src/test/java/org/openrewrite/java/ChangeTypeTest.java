@@ -36,6 +36,7 @@ import org.openrewrite.test.TypeValidation;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
@@ -368,6 +369,109 @@ class ChangeTypeTest implements RewriteTest {
 
               class Test {
                   Map.Entry p;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations p = (J.VariableDeclarations) cu.getClasses().getFirst().getBody()
+                  .getStatements().getFirst();
+                J.FieldAccess entry = (J.FieldAccess) requireNonNull(p.getTypeExpression());
+                assertThat(TypeUtils.isOfClassType(entry.getName().getType(), "java.util.Map$Entry")).isTrue();
+                assertThat(TypeUtils.isOfClassType(entry.getTarget().getType(), "java.util.Map")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void qualifiedJavadocReferenceToNestedTargetAddsNoImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Inner", true)),
+          java(
+            """
+              package a;
+              public class Old {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              /**
+               * {@link a.Old}
+               */
+              class Qualified {
+              }
+              """,
+            """
+              /**
+               * {@link b.Outer.Inner}
+               */
+              class Qualified {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void javadocReferenceQualifiedForAnImportedNameAddsNoImport() {
+        rewriteRun(
+          // the second recipe imports `b.Outer` wherever it finds a name of that type
+          spec -> spec.recipes(
+            new ChangeType("a.Old", "b.Outer$Inner", true),
+            new ChangeType("d.Other", "b.Outer", true)
+          ),
+          java("package a; public class Old {}", SourceSpec::skip),
+          java("package c; public class Outer { public static class Inner {} }", SourceSpec::skip),
+          java("package d; public class Other {}", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+              import c.Outer.Inner;
+
+              /**
+               * {@link Old} and {@link d.Other}
+               */
+              class Test {
+                  Inner inner;
+              }
+              """,
+            """
+              import c.Outer.Inner;
+
+              /**
+               * {@link b.Outer.Inner} and {@link b.Outer}
+               */
+              class Test {
+                  Inner inner;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTargetKeepsItsOuterClassWhereAnotherTypeHasItsSimpleName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Inner", true)),
+          java("package a; public class Old<T> {}", SourceSpec::skip),
+          java("package b; public class Outer { public static class Inner<T> {} }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  static class Inner<T> {}
+                  Old<String> moved;
+                  Inner<String> local;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  static class Inner<T> {}
+                  Outer.Inner<String> moved;
+                  Inner<String> local;
               }
               """
           )
