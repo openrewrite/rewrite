@@ -425,6 +425,8 @@ def test_a_splice_reads_the_scope_it_lands_in_not_the_one_the_visitor_stands_in(
                     body = method.body
                     padded = list(body.padding.statements)
                     last = padded[-1]
+                    if last.element.expression.name.simple_name == 'run':
+                        return cu
                     at = Cursor(Cursor(Cursor(self.cursor, method), body), last.element)
                     padded[-1] = last.replace(element=tmpl.apply(at, visitor=self))
                     outer = list(cu.padding.statements)

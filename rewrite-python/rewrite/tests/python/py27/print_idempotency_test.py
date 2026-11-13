@@ -14,18 +14,38 @@
 
 """Py2 sources that previously failed the print-idempotency check."""
 
+import ast
+
 import pytest
 
 from rewrite.java import tree as j
 from rewrite.java.markers import OmitParentheses
 from rewrite.python import tree as py
+from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
 from rewrite.python.printer import PythonPrinter
+from rewrite.python.visitor import PythonVisitor
 from tests.python.py27.expressions_test import _collect_placeholders
 
 
 def _parse(src: str) -> py.CompilationUnit:
     return Py2ParserVisitor(src, "<test>", "2.7").parse()
+
+
+def _slices(cu: py.CompilationUnit) -> list:
+    found = []
+
+    def shape(padded):
+        return padded and (type(padded.element).__name__, padded.element.prefix.whitespace, padded.after.whitespace)
+
+    class Slices(PythonVisitor):
+        def visit_slice(self, slice_, p):
+            found.append((slice_.prefix.whitespace,
+                          shape(slice_.padding.start), shape(slice_.padding.stop), shape(slice_.padding.step)))
+            return super().visit_slice(slice_, p)
+
+    Slices().visit(cu, None)
+    return found
 
 
 def _assigned_value(cu: py.CompilationUnit):
@@ -67,6 +87,13 @@ def _assigned_value(cu: py.CompilationUnit):
     "def f():  # c\n    # d\n    b\n",
     "x = 1;  # c\n",
     "x = 1;\n\n# e\n",
+    "if x: a; b;  # c\n",
+    "if x: a = 1",
+
+    "x = a[...]\n",
+    "x = a[. . .]\n",
+    "x = a[1:2, ..., :, 3]\n",
+    "x = [y for y in 1, 2]\n",
 ])
 def test_round_trip(src):
     cu = _parse(src)
@@ -121,3 +148,36 @@ def test_generator_argument_omits_parentheses():
     assert isinstance(arg, py.ComprehensionExpression)
     assert arg.kind == py.ComprehensionExpression.Kind.GENERATOR
     assert arg.markers.find_first(OmitParentheses) is not None
+
+
+@pytest.mark.parametrize("src", [
+    "@d  # c\n@e  # d\ndef f():\n    pass\n",
+    "@d  # c\nclass A:\n    pass\n",
+], ids=["def", "class"])
+def test_decorator_line_comments_round_trip_as_comments(src):
+    cu = _parse(src)
+    assert PythonPrinter().print(cu) == src
+
+    texts = []
+
+    class Spaces(PythonVisitor):
+        def visit_space(self, space, p):
+            texts.append(space.whitespace)
+            texts.extend(comment.suffix for comment in space.comments)
+            return space
+
+    Spaces().visit(cu, None)
+    assert not [text for text in texts if '#' in text]
+
+
+@pytest.mark.parametrize("src", [
+    "x = a[x, :]\n",
+    "x = a[1:]\n",
+    "x = a[::]\n",
+    "x = a[x, ::2]\n",
+    "x = a[ 1 : 2 :3]\n",
+])
+def test_slices_take_the_shape_the_python_3_parser_gives_them(src):
+    cu = _parse(src)
+    assert PythonPrinter().print(cu) == src
+    assert _slices(cu) == _slices(ParserVisitor(src, "<test>", None).visit_Module(ast.parse(src)))

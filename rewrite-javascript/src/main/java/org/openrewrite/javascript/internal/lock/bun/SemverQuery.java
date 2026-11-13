@@ -260,6 +260,28 @@ final class SemverQuery {
             }
             long major = version.major == null ? 0 : version.major;
             long minor = version.minor == null ? 0 : version.minor;
+            if (release.usesNpmRangeBounds() && wildcard != Wildcard.NONE) {
+                if (wildcard == Wildcard.MAJOR) {
+                    return tag == TokenTag.GT || tag == TokenTag.LT ?
+                            new SemverRange(SemverRange.Comparator.nullSet()) :
+                            SemverRange.initWildcard(version.min(), wildcard, release);
+                }
+                if (tag == TokenTag.LT) {
+                    return left(SemverRange.Op.LT, new SemverVersion(major, minor, 0, "0", ""));
+                }
+                if (tag == TokenTag.LTE) {
+                    return new SemverRange(wildcard == Wildcard.MINOR ?
+                            SemverRange.Comparator.ltNextMajor(major, release) :
+                            SemverRange.Comparator.ltNextMinor(major, minor, release));
+                }
+                if (tag == TokenTag.GT) {
+                    if (wildcard == Wildcard.MINOR || minor == MAX) {
+                        return major == MAX ? new SemverRange(SemverRange.Comparator.nullSet()) :
+                                left(SemverRange.Op.GTE, SemverVersion.of(major + 1, 0, 0));
+                    }
+                    return left(SemverRange.Op.GTE, SemverVersion.of(major, minor + 1, 0));
+                }
+            }
             switch (wildcard) {
                 case MAJOR:
                     return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version.min()),
@@ -328,6 +350,7 @@ final class SemverQuery {
         int count = 0;
         boolean skipRound;
         boolean isOr = false;
+        boolean afterComparator = false;
 
         while (i < input.length()) {
             skipRound = false;
@@ -356,7 +379,7 @@ final class SemverQuery {
                 case '=':
                 case 'v':
                     token.tag = TokenTag.VERSION;
-                    isOr = true;
+                    isOr |= !release.usesNpmRangeBounds() || !afterComparator;
                     i++;
                     i = skipSpaces(input, i);
                     break;
@@ -395,10 +418,11 @@ final class SemverQuery {
                 default:
                     if (c >= '0' && c <= '9' || c == 'X' || c == 'x' || c == '*') {
                         token.tag = TokenTag.VERSION;
-                        isOr = true;
+                        isOr |= !release.usesNpmRangeBounds() || !afterComparator;
                     } else {
                         i++;
                         token.tag = TokenTag.NONE;
+                        afterComparator = false;
                         while (i < input.length() && input.charAt(i) != ' ' && input.charAt(i) != '|') {
                             i++;
                         }
@@ -411,6 +435,13 @@ final class SemverQuery {
                 continue;
             }
             SemverVersion.ParseResult parseResult = SemverVersion.parse(input.substring(i), release);
+            if (parseResult.overflow) {
+                list.head.head.range = new SemverRange(SemverRange.Comparator.nullSet());
+                list.head.next = null;
+                list.head.head.next = null;
+                list.tail = null;
+                return list;
+            }
             SemverVersion version = parseResult.version.min();
             if (version.hasBuild()) {
                 list.flags |= Group.FLAG_BUILD;
@@ -476,14 +507,14 @@ final class SemverQuery {
                     case MINOR:
                         // the bound keeps the second version's tag, but not at the ceiling
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
-                                inclusiveCeiling && second.major == MAX ?
+                                release.usesNpmRangeBounds() || inclusiveCeiling && second.major == MAX ?
                                         SemverRange.Comparator.ltNextMajor(second.major, release) :
                                         new SemverRange.Comparator(SemverRange.Op.LT,
                                                 second.with(saturatingIncrement(second.major, release), 0, 0)));
                         break;
                     case PATCH:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
-                                inclusiveCeiling && second.minor == MAX ?
+                                release.usesNpmRangeBounds() || inclusiveCeiling && second.minor == MAX ?
                                         SemverRange.Comparator.ltNextMinor(second.major, second.minor, release) :
                                         new SemverRange.Comparator(SemverRange.Op.LT,
                                                 second.with(second.major, saturatingIncrement(second.minor, release),
@@ -530,6 +561,8 @@ final class SemverQuery {
 
             isOr = false;
             count++;
+            afterComparator = parseResult.valid && !hyphenate && rollback < input.length() &&
+                    input.charAt(rollback) == ' ';
             token.wildcard = Wildcard.NONE;
             prevToken.tag = token.tag;
         }

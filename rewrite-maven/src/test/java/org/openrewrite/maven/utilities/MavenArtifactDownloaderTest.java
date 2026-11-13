@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.openrewrite.maven.MavenSettingsAutoLoadingExtension.withMavenCentralMirror;
+import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
 
 class MavenArtifactDownloaderTest {
 

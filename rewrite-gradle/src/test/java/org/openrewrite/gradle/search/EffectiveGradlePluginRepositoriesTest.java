@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.expectedWithUrls;
 import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.gradlePluginPortal;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.withoutTrailingSlashes;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.maven.search.EffectiveMavenRepositoriesTable.Row;
 
@@ -141,7 +142,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new EffectiveGradlePluginRepositories(false))
-            .dataTable(Row.class, rows -> assertThat(rows).contains(
+            .dataTable(Row.class, rows -> assertThat(withoutTrailingSlashes(rows)).contains(
               new Row("settings.gradle", "https://repo.spring.io/milestone"),
               new Row("settings.gradle", gradlePluginPortal()),
               new Row("build.gradle", "https://repo.spring.io/milestone"),
@@ -155,8 +156,6 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-
-              include 'module'
               """,
             spec -> spec.path("settings.gradle")
           ),

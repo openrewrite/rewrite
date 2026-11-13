@@ -611,6 +611,13 @@ class TestAddImportGrouping:
             )
         )
 
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\nimport plugin_host  # isort: skip\nimport requests\n\nx = 1\n",
+                "import os\nimport plugin_host  # isort: skip\nimport requests\nimport json\n\nx = 1\n",
+            )
+        )
+
     def test_crlf(self, arm):
         RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
             python(
@@ -657,5 +664,182 @@ class TestAddImportGrouping:
                 "import os\n\nimport requests  # pinned\n\nx = 1\n",
                 "import os\n\nimport requests  # pinned\n\nimport mypkg\n\nx = 1\n",
                 path=Path('mypkg/mod.py'),
+            )
+        )
+
+    def test_a_future_import_precedes_every_statement_but_the_header(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, '__future__', 'annotations'))).rewrite_run(
+            python(
+                '#!/usr/bin/env python\n"""Doc."""\nimport os\nimport requests\n\nx = 1\n',
+                '#!/usr/bin/env python\n"""Doc."""\nfrom __future__ import annotations\nimport os\nimport requests\n\n'
+                'x = 1\n',
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, '__future__', 'annotations'))).rewrite_run(
+            python(
+                '"""Doc."""\n__version__ = "1"\nimport os\n\nimport requests\n',
+                '"""Doc."""\nfrom __future__ import annotations\n__version__ = "1"\nimport os\n\nimport requests\n',
+            )
+        )
+
+    def test_a_comment_directly_above_an_import_stays_with_it_unless_it_heads_the_file(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'attr'))).rewrite_run(
+            python(
+                "import os\n\n# registers the codecs\nimport requests\n\nx = 1\n",
+                "import os\n\nimport attr\n# registers the codecs\nimport requests\n\nx = 1\n",
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "#!/usr/bin/env python\n# Copyright the authors\n# Licensed under the Apache License\n"
+                "import os\n\nimport requests\n",
+                "#!/usr/bin/env python\n# Copyright the authors\n# Licensed under the Apache License\n"
+                "import json\nimport os\n\nimport requests\n",
+            )
+        )
+
+    def test_an_import_goes_below_a_shebang(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os'))).rewrite_run(
+            python(
+                "#!/usr/bin/env python\nx = 1\n",
+                "#!/usr/bin/env python\nimport os\nx = 1\n",
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os'))).rewrite_run(
+            python(
+                "#!/usr/bin/env python\n\nx = 1\n",
+                "#!/usr/bin/env python\n\nimport os\n\nx = 1\n",
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os'))).rewrite_run(
+            python(
+                "#!/usr/bin/env python\n",
+                "#!/usr/bin/env python\nimport os\n",
+            )
+        )
+
+    def test_the_first_import_of_a_file_goes_below_its_header_comments_apart_from_the_code(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os'))).rewrite_run(
+            python(
+                '"""Doc."""\n\n# set up logging first\nsetup()\n',
+                '"""Doc."""\n\n# set up logging first\nimport os\n\nsetup()\n',
+            )
+        )
+
+    def test_a_from_import_joins_the_from_run_it_sorts_into(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'collections.abc', 'Iterable'))).rewrite_run(
+            python(
+                "import os\nimport sys\n\nfrom typing import Any\n\nx = 1\n",
+                "import os\nimport sys\n\nfrom collections.abc import Iterable\nfrom typing import Any\n\nx = 1\n",
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'zlib', 'crc32'))).rewrite_run(
+            python(
+                "import os\n\nfrom abc import ABC\n\nfrom typing import Any\n\nimport requests\n",
+                "import os\n\nfrom abc import ABC\n\nfrom typing import Any\nfrom zlib import crc32\n\n"
+                "import requests\n",
+            )
+        )
+
+    def test_first_party_packages_are_the_top_level_and_src_directories(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'google.cloud', 'storage'))).rewrite_run(
+            python(
+                "import os\n\nimport requests\n\nx = 1\n",
+                "import os\n\nimport requests\nfrom google.cloud import storage\n\nx = 1\n",
+                path=Path('providers/google/hook.py'),
+            )
+        )
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'mypkg'))).rewrite_run(
+            python(
+                "import os\n\nimport requests\n\nx = 1\n",
+                "import os\n\nimport requests\n\nimport mypkg\n\nx = 1\n",
+                path=Path('src/mypkg/mod.py'),
+            )
+        )
+
+
+class TestAddImportIsortActionComments:
+    SKIPPED = (
+        "import os\n"
+        "from pathlib import Path\n"
+        "\n"
+        "import plugin_host  # isort: skip  (registers plugin_api)\n"
+        "import plugin_api\n"
+        "from plugin_tools import helper\n"
+        "\n"
+        "x = 1\n"
+    )
+
+    def test_a_new_import_goes_below_an_import_isort_skips_even_where_its_section_is_above(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'attr'))).rewrite_run(
+            python(
+                self.SKIPPED,
+                "import os\nfrom pathlib import Path\n\nimport plugin_host  # isort: skip  (registers plugin_api)\n"
+                "import attr\nimport plugin_api\nfrom plugin_tools import helper\n\nx = 1\n",
+            )
+        )
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                self.SKIPPED,
+                "import os\nfrom pathlib import Path\n\nimport plugin_host  # isort: skip  (registers plugin_api)\n"
+                "import json\n\nimport plugin_api\nfrom plugin_tools import helper\n\nx = 1\n",
+            )
+        )
+
+    def test_a_comment_above_the_import_after_a_skipped_one_stays_with_it(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'attr'))).rewrite_run(
+            python(
+                "import os\n\nimport plugin_host  # isort: skip\n# needs plugin_host\nimport plugin_api\n\nx = 1\n",
+                "import os\n\nimport plugin_host  # isort: skip\nimport attr\n# needs plugin_host\nimport plugin_api\n"
+                "\nx = 1\n",
+            )
+        )
+
+    def test_only_the_first_line_of_a_parenthesized_import_can_skip_it(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'attr'))).rewrite_run(
+            python(
+                "import os\n\nfrom plugin_host import (  # isort:skip\n    register,\n)\nimport plugin_api\n\nx = 1\n",
+                "import os\n\nfrom plugin_host import (  # isort:skip\n    register,\n)\nimport attr\n"
+                "import plugin_api\n\nx = 1\n",
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'attr'))).rewrite_run(
+            python(
+                "import os\n\nfrom plugin_api import (\n    a,  # isort: skip\n    b,\n)\n"
+                "from plugin_tools import helper\n\nx = 1\n",
+                "import os\n\nimport attr\nfrom plugin_api import (\n    a,  # isort: skip\n    b,\n)\n"
+                "from plugin_tools import helper\n\nx = 1\n",
+            )
+        )
+
+    def test_a_split_line_keeps_the_new_import_below_it(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'abc'))).rewrite_run(
+            python(
+                "import os\nimport sys\n\n# isort: split\nimport json\n\nimport requests\n\nx = 1\n",
+                "import os\nimport sys\n\n# isort: split\nimport abc\nimport json\n\nimport requests\n\nx = 1\n",
+            )
+        )
+
+    def test_imports_between_off_and_on_stay_above_the_new_import(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'abc'))).rewrite_run(
+            python(
+                "import os\n\n# isort: off\nimport zz_patch\nimport aa_patched\n# isort: on\nimport json\n\n"
+                "import requests\n\nx = 1\n",
+                "import os\n\n# isort: off\nimport zz_patch\nimport aa_patched\n# isort: on\nimport abc\n"
+                "import json\n\nimport requests\n\nx = 1\n",
+            )
+        )
+
+    def test_a_file_isort_skips_takes_the_new_import_last(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                '"""Tests.\n\nisort:skip_file\n"""\nimport os\n\nimport requests\n\nx = 1\n',
+                '"""Tests.\n\nisort:skip_file\n"""\nimport os\n\nimport requests\nimport json\n\nx = 1\n',
             )
         )

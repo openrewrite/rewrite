@@ -27,7 +27,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 
     // Not latest.release: log4j publishes 3.0.0 betas as releases
@@ -95,4 +95,10 @@ tasks.named<JavaCompile>("compileJava") {
     dependsOn("compileScala")
     // Exclude Java files from Java compilation since Scala already compiled them
     exclude("**/*.java")
+}
+
+// A test JVM doesn't live long enough for C2 to pay for compiling the Scala compiler, which cost more CPU
+// than the tests themselves, and its small heap needs no concurrent collector.
+tasks.named<Test>("test") {
+    jvmArgs("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC")
 }

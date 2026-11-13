@@ -70,6 +70,12 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
     /**
+     * An {@link ExecutionContext} message. When {@code true}, the parser attaches a
+     * {@link org.openrewrite.javascript.marker.ResolvedNames} to each compilation unit.
+     */
+    public static final String RESOLVE_NAMES = "org.openrewrite.javascript.resolveNames";
+
+    /**
      * The command used to start the RPC process. Useful for logging and diagnostics.
      */
     private final String command;
@@ -115,6 +121,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.reset();
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
@@ -123,10 +133,18 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         );
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(String packageName) {
         return installRecipes(packageName, null);
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
         return send(
                 "InstallRecipes",
@@ -138,11 +156,16 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     /**
      * Parser options forwarded to the Node server with every parse request, carrying this context's
-     * {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     * {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} and {@link #RESOLVE_NAMES} settings.
      */
     public static Map<String, String> parseOptions(ExecutionContext ctx) {
-        return Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+        Map<String, String> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
                 String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+        if (ctx.getMessage(RESOLVE_NAMES, false)) {
+            options.put("resolveNames", "true");
+        }
+        return options;
     }
 
     /**

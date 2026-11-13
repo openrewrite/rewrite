@@ -151,7 +151,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var indexed = q.Receive((J)arrayAccess.Indexed, el => (J)VisitNonNull(el, q));
         var dimension = q.Receive((J)arrayAccess.Dimension, el => (J)VisitNonNull(el, q));
-        return arrayAccess.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithIndexed((Expression)indexed!).WithDimension((ArrayDimension)dimension!);
+        var type = q.Receive(arrayAccess.Type, t => VisitType(t, q)!);
+        return arrayAccess.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithIndexed((Expression)indexed!).WithDimension((ArrayDimension)dimension!).WithType(type);
     }
 
     public override J VisitArrayDimension(ArrayDimension arrayDimension, RpcReceiveQueue q)

@@ -50,6 +50,16 @@ class UvLockReaderTest {
     }
 
     @Test
+    void uploadTimeIsAlsoReadUnderItsUnderscoredName() {
+        // uv reads upload_time, which some locks record, as an alias of upload-time
+        UvLock lock = UvLockReader.parse(resource("a-multi-package/uv.lock").replace("upload-time", "upload_time"));
+        UvLockPackage pkg = Objects.requireNonNull(lock.getPackage("charset-normalizer"));
+        assertThat(Objects.requireNonNull(pkg.getWheels()))
+          .extracting(UvLockArtifact::getUploadTime)
+          .contains("2026-07-07T14:33:57.9Z");
+    }
+
+    @Test
     void forkDuplicatesAndResolutionMarkers() {
         UvLock lock = UvLockReader.parse(resource("e2-true-fork/uv.lock"));
         assertThat(lock.getResolutionMarkers()).containsExactly(

@@ -49,6 +49,8 @@ public class UpdateJavaCompatibility extends Recipe {
     private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setTargetCompatibility(..)", true);
     private static final MethodMatcher SOURCE_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project sourceCompatibility(..)", true);
     private static final MethodMatcher TARGET_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project targetCompatibility(..)", true);
+    private static final MethodMatcher ANDROID_SOURCE_COMPATIBILITY = new MethodMatcher("com.android.build.api.dsl.CompileOptions sourceCompatibility(..)");
+    private static final MethodMatcher ANDROID_TARGET_COMPATIBILITY = new MethodMatcher("com.android.build.api.dsl.CompileOptions targetCompatibility(..)");
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -89,7 +91,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(Validated.test("version", "Version must be > 0.", version, v -> v > 0));
+        return super.validate().and(Validated.test("version", "Version must be > 0.", version, v -> v != null && v > 0));
     }
 
     @Override
@@ -165,13 +167,15 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (SOURCE_COMPATIBILITY_METHOD.matches(m) || SOURCE_COMPATIBILITY_DSL.matches(m)) {
+                boolean matchedSourceCompatibility = SOURCE_COMPATIBILITY_DSL.matches(m) || ANDROID_SOURCE_COMPATIBILITY.matches(m);
+                boolean matchedTargetCompatibility = TARGET_COMPATIBILITY_DSL.matches(m) || ANDROID_TARGET_COMPATIBILITY.matches(m);
+                if (matchedSourceCompatibility || SOURCE_COMPATIBILITY_METHOD.matches(m)) {
                     sourceCompatibilityFound = true;
                 }
-                if (TARGET_COMPATIBILITY_METHOD.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+                if (matchedTargetCompatibility || TARGET_COMPATIBILITY_METHOD.matches(m)) {
                     targetCompatibilityFound = true;
                 }
-                return handleMethodInvocation(m);
+                return handleMethodInvocation(m, matchedSourceCompatibility, matchedTargetCompatibility);
             }
         });
     }
@@ -298,7 +302,7 @@ public class UpdateJavaCompatibility extends Recipe {
         return declarationStyle != null && declarationStyle != currentStyle;
     }
 
-    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m) {
+    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m, boolean matchedSourceCompatibility, boolean matchedTargetCompatibility) {
         if ("jvmToolchain".equals(m.getSimpleName()) || isMethodInvocation(m, "JavaLanguageVersion", "of")) {
             List<Expression> args = m.getArguments();
 
@@ -331,10 +335,10 @@ public class UpdateJavaCompatibility extends Recipe {
             return m;
         }
 
-        if (SOURCE_COMPATIBILITY_DSL.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+        if (matchedSourceCompatibility || matchedTargetCompatibility) {
             if (compatibilityType != null && (
-                    (compatibilityType == CompatibilityType.source && !SOURCE_COMPATIBILITY_DSL.matches(m)) ||
-                            (compatibilityType == CompatibilityType.target && !TARGET_COMPATIBILITY_DSL.matches(m)))) {
+                    (compatibilityType == CompatibilityType.source && !matchedSourceCompatibility) ||
+                            (compatibilityType == CompatibilityType.target && !matchedTargetCompatibility))) {
                 return m;
             }
 
@@ -432,6 +436,16 @@ public class UpdateJavaCompatibility extends Recipe {
         return version.substring(version.indexOf(".") + 1);
     }
 
+    private static boolean isJavaVersionConstant(J.FieldAccess fieldAccess) {
+        if ("majorVersion".equals(fieldAccess.getSimpleName()) && fieldAccess.getTarget() instanceof J.FieldAccess) {
+            return isJavaVersionConstant((J.FieldAccess) fieldAccess.getTarget());
+        }
+        Expression target = fieldAccess.getTarget();
+        String targetName = target instanceof J.Identifier ? ((J.Identifier) target).getSimpleName() :
+                target instanceof J.FieldAccess ? ((J.FieldAccess) target).getSimpleName() : null;
+        return "JavaVersion".equals(targetName) && fieldAccess.getSimpleName().startsWith("VERSION_");
+    }
+
     private Expression changeJavaVersion(Expression expression, @Nullable DeclarationStyle style) {
         String newJavaVersion = version <= 8 ? "1." + version : String.valueOf(version);
         String newJavaVersionEnum = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
@@ -462,6 +476,11 @@ public class UpdateJavaCompatibility extends Recipe {
             }
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) expression;
+            if (!isJavaVersionConstant(fieldAccess)) {
+                // Versions.java, rootProject.ext.javaVersion and the like are the build's own properties, whose value
+                // is set elsewhere and which have no VERSION_N member to rename them to.
+                return expression;
+            }
             if (style == DeclarationStyle.String) {
                 expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
             } else if (style == DeclarationStyle.Enum) {

@@ -291,7 +291,8 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
     private @Nullable String tryGetFamilyVersion() {
         if (familyRegex != null) {
-            return findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches()).stream()
+            return findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches() &&
+                    !(groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()))).stream()
                     .max(Comparator.comparing(d -> new Version(d.getVersion())))
                     .map(d -> d.getRequested().getVersion())
                     .orElse(null);

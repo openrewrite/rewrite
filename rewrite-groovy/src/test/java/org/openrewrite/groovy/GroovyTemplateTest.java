@@ -543,6 +543,109 @@ class GroovyTemplateTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizeReplacementOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(replacePlaceholderWithArguments("#{any()} == #{any()}")),
+          groovy(
+            """
+              def flag = true
+              def a = 1
+              def b = 1
+              def same = flag == placeholder(a, b)
+              """,
+            """
+              def flag = true
+              def a = 1
+              def b = 1
+              def same = flag == (a == b)
+              """
+          ));
+    }
+
+    @Test
+    void parenthesizeCastOperandWithGroovyPrecedence() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "asInt" -> "#{any()} as int";
+                      case "asBoolean" -> "#{any()} as boolean";
+                      case "toInteger" -> "(Integer) #{any()}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return GroovyTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+              }
+          })),
+          groovy(
+            """
+              def a = 1
+              def b = 2
+              def l = [1]
+              def sum = asInt(a + b)
+              def shifted = asInt(a << b)
+              def negated = toInteger(-a)
+              def member = asBoolean(a in l)
+              def less = asBoolean(a < b)
+              """,
+            """
+              def a = 1
+              def b = 2
+              def l = [1]
+              def sum = a + b as int
+              def shifted = a << b as int
+              def negated = (Integer) -a
+              def member = (a in l) as boolean
+              def less = (a < b) as boolean
+              """
+          ));
+    }
+
+    @Test
+    void parenthesizeOperandThatACastWouldCutShort() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "toInteger" -> "(Integer) #{any()}";
+                      case "toList" -> "(List) #{any()}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return GroovyTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+              }
+          })),
+          groovy(
+            """
+              def a = 1
+              def b = 2
+              def squared = toInteger(-a ** 2)
+              def coerced = toInteger(a as Integer)
+              def range = toList(a..b)
+              def negated = toInteger(-a)
+              """,
+            """
+              def a = 1
+              def b = 2
+              def squared = (Integer) (-a ** 2)
+              def coerced = (Integer) (a as Integer)
+              def range = (List) (a..b)
+              def negated = (Integer) -a
+              """
+          ));
+    }
+
+    @Test
     void replaceArgumentsOfExplicitConstructorInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {

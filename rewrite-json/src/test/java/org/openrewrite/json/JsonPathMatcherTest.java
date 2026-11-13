@@ -346,6 +346,123 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void wildcardAfterKeySelectsMembersOfItsObject() {
+        assertMatched(
+          "$.root.*",
+          simple,
+          List.of(
+            "\"literal\": \"$.root.literal\"",
+            """
+                  "object": {
+                    "literal": "$.root.object.literal",
+                    "list": [{
+                      "literal": "$.root.object.list[0]"
+                    }]
+                  }
+              """,
+            """
+                  "list": [{
+                    "literal": "$.root.list[0]"
+                  }]
+              """)
+        );
+    }
+
+    @Test
+    void wildcardAfterNestedKeySelectsMembersOfItsObject() {
+        assertMatched(
+          "$.root.object.*",
+          simple,
+          List.of(
+            "\"literal\": \"$.root.object.literal\"",
+            """
+                  "list": [{
+                    "literal": "$.root.object.list[0]"
+                  }]
+              """)
+        );
+    }
+
+    @Test
+    void wildcardAfterKeySelectsElementsOfItsArray() {
+        assertMatched(
+          "$.list.*",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item1": "index0",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Test
+    void wildcardAfterQuotedKeysSelectsEachMember() {
+        assertMatched(
+          "$['sap.ui5'].dependencies.libs.*",
+          List.of(
+            //language=json
+            """
+              {
+                "sap.ui5": {
+                  "dependencies": {
+                    "libs": {
+                      "sap.m": {},
+                      "sap.f": {}
+                    }
+                  }
+                }
+              }
+              """
+          ),
+          List.of("\"sap.m\": {}", "\"sap.f\": {}")
+        );
+    }
+
+    @Test
+    void recursiveWildcardSelectsEveryMemberAndElement() {
+        assertMatched(
+          "$..*",
+          List.of(
+            //language=json
+            """
+              {"a": {"b": 1}, "c": [{"d": 2}]}
+              """
+          ),
+          List.of("\"b\": 1", "\"a\": {\"b\": 1}", "\"d\": 2", "{\"d\": 2}", "\"c\": [{\"d\": 2}]")
+        );
+    }
+
+    @Test
+    void scopedRecursiveWildcardSelectsEveryDescendant() {
+        assertMatched(
+          "$.a..*",
+          List.of(
+            //language=json
+            """
+              {"a": {"b": 1, "c": {"d": 2}, "l": [{"x": "y"}, "z"]}, "other": 3}
+              """
+          ),
+          List.of("\"b\": 1", "\"d\": 2", "\"c\": {\"d\": 2}", "\"x\": \"y\"", "{\"x\": \"y\"}", "\"z\"", "\"l\": [{\"x\": \"y\"}, \"z\"]")
+        );
+    }
+
+    @Test
     void allPropertiesInKeyFromRoot() {
         assertMatched(
           // This produces two false positives from $.literal and $.list.literal.
@@ -780,6 +897,65 @@ class JsonPathMatcherTest {
           "$.list[?(@ == 'item 1')]",
           listOfScalars,
           List.of("\"item 1\"")
+        );
+    }
+
+    @Test
+    void quotedNamesAndFilterStringsMatchByTheTextTheEscapesStandFor() {
+        List<String> jest = List.of(
+          //language=json
+          """
+            {
+              "moduleNameMapper": {
+                "\\\\.(css|less)$": "identity-obj-proxy"
+              },
+              "testRegex": ["\\\\.test\\\\.js$"]
+            }
+            """
+        );
+        assertMatched(
+          "$.moduleNameMapper['\\\\.(css|less)$']",
+          jest,
+          List.of("\"\\\\.(css|less)$\": \"identity-obj-proxy\"")
+        );
+        assertMatched(
+          "$.testRegex[?(@ == '\\\\.test\\\\.js$')]",
+          jest,
+          List.of("\"testRegex\": [\"\\\\.test\\\\.js$\"]")
+        );
+    }
+
+    @Test
+    void quotedNamesAndFilterStringsMatchSurrogateEscapes() {
+        List<String> surrogates = List.of(
+          //language=json
+          """
+            {
+              "\\uD800": "unpaired",
+              "strings": ["a\\ud800b"],
+              "emoji": ["\\ud83d\\ude00"]
+            }
+            """
+        );
+        assertMatched(
+          "$['\\\\ud800']",
+          surrogates,
+          List.of("\"\\uD800\": \"unpaired\"")
+        );
+        assertMatched(
+          "$.strings[?(@ == 'a\\\\ud800b')]",
+          surrogates,
+          List.of("\"strings\": [\"a\\ud800b\"]")
+        );
+        assertMatched(
+          "$.strings[?(@ =~ '.*ud800.*')]",
+          surrogates,
+          List.of("\"a\\ud800b\"")
+        );
+        assertMatched(
+          "$.emoji[?(@ == '😀')]",
+          surrogates,
+          List.of("\"emoji\": [\"\\ud83d\\ude00\"]")
         );
     }
 

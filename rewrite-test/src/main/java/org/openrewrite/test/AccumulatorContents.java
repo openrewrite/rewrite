@@ -295,7 +295,7 @@ final class AccumulatorContents {
         return jdk == type || !SKELETONS.contains(jdk);
     }
 
-    private static boolean isJdk(Class<?> type) {
+    static boolean isJdk(Class<?> type) {
         String name = type.getName();
         return name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") ||
                name.startsWith("sun.") || name.startsWith("com.sun.");

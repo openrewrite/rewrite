@@ -1506,7 +1506,7 @@ class MavenParserTest implements RewriteTest {
                 """
             ), mavenCtx);
             mavenCtx.setMavenSettings(settings);
-            MavenSettingsAutoLoadingExtension.withMavenCentralMirror(mavenCtx);
+            MavenCentralMirrorExtension.withMavenCentralMirror(mavenCtx);
 
             rewriteRun(
               recipeSpec -> recipeSpec.executionContext(mavenCtx),
@@ -2813,7 +2813,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void notInheritedPluginFromParent() {
+    void notInheritedPluginsApplyOnlyToTheDeclaringPom() {
         rewriteRun(
           mavenProject("a",
             pomXml(
@@ -2828,10 +2828,11 @@ class MavenParserTest implements RewriteTest {
                       <artifactId>a</artifactId>
                   </project>
                 """,
-              spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins())
-                  .isEmpty()
-              )
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).isEmpty();
+                  assertThat(pom.getPluginManagement()).isEmpty();
+              })
             )
           ),
           mavenProject("b",
@@ -2845,6 +2846,15 @@ class MavenParserTest implements RewriteTest {
                         <packaging>pom</packaging>
 
                         <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <inherited>false</inherited>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <version>3.2.5</version>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
                           <plugins>
                               <plugin>
                                   <inherited>false</inherited>
@@ -2857,7 +2867,12 @@ class MavenParserTest implements RewriteTest {
                           </plugins>
                         </build>
                     </project>
-                """
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).extracting(Plugin::getArtifactId).containsExactly("maven-compiler-plugin");
+                  assertThat(pom.getPluginManagement()).extracting(Plugin::getArtifactId).containsExactly("maven-surefire-plugin");
+              })
             )
           )
         );
@@ -3772,7 +3787,7 @@ class MavenParserTest implements RewriteTest {
           // Suppress test framework's usual error handler because we expect an error resolving coherence
           spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().dependencyModel(false)),
           mavenProject("a",
             pomXml("""
                 <project>
@@ -3832,7 +3847,7 @@ class MavenParserTest implements RewriteTest {
           // Suppress test framework's usual error handler because we expect an error resolving coherence
           spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().dependencyModel(false)),
           mavenProject("x",
             pomXml("""
                 <project>
@@ -3928,6 +3943,30 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void projectPropertyTakesPrecedenceOverJvmDefinedProperty() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <java.version>11</java.version>
+                </properties>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var pom = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getValue("${java.version}")).isEqualTo("11");
+                  assertThat(pom.getValue("${java.home}")).isEqualTo(System.getProperty("java.home"));
+              }
+            )
           )
         );
     }

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type, Self
 from uuid import UUID
 
+from .heavyweight import Heavyweight
 from .markers import Markers
 from .style import NamedStyles, Style
 from .utils import id_to_int, replace_if_changed
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 P = TypeVar('P')
 
 
-class Tree(ABC):
+class Tree(Heavyweight, ABC):
     __slots__ = ()
 
     # Identity is stored on subclasses as a 128-bit int in `_id` (the UUID's own

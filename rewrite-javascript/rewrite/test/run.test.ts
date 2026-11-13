@@ -166,6 +166,8 @@ describe("scheduleRun", () => {
 
             const spec = new RecipeSpec();
             spec.recipe = new Composite([new DeletingScanner(), new ScanningEditor()]);
+            // the scanner's deletion, which the harness would otherwise reject, is what this test runs
+            spec.checkNoEditsInScanningPhase = false;
             await spec.rewriteRun(
                 text("hello", "hello (count: 1)")
             );

@@ -223,10 +223,10 @@ final class XPathCompiler {
                 CompiledExpr[] predicates = compilePredicates(bracketed.predicate());
 
                 // Check for trailing path
-                String trailingPath = null;
+                CompiledStep[] trailingPath = null;
                 boolean trailingIsDescendant = false;
                 if (pathExpr.pathSeparator() != null && pathExpr.relativeLocationPath() != null) {
-                    trailingPath = pathExpr.relativeLocationPath().getText();
+                    trailingPath = compileRelativeSteps(pathExpr.relativeLocationPath());
                     trailingIsDescendant = pathExpr.pathSeparator().DOUBLE_SLASH() != null;
                 }
 
@@ -420,7 +420,7 @@ final class XPathCompiler {
         if (attrStep.NCNAME() != null) {
             return attrStep.NCNAME().getText();
         }
-        return "*";
+        return attrStep.getText().substring(1);
     }
 
     // ==================== Predicate Compilation ====================
@@ -666,60 +666,28 @@ final class XPathCompiler {
      */
     static CompiledExpr compileRelativePathAsExpr(XPathParser.RelativeLocationPathContext relPath) {
         List<XPathParser.StepContext> steps = relPath.step();
-        if (steps.isEmpty()) {
-            return CompiledExpr.unsupported("empty path");
-        }
-
-        // Check if last step is a node type test (like text())
-        XPathParser.StepContext lastStep = steps.get(steps.size() - 1);
-        FunctionType terminalFunction = null;
-        int elementStepCount = steps.size();
-
-        if (lastStep.nodeTest() != null && lastStep.nodeTest().nodeType() != null) {
-            String funcName = lastStep.nodeTest().nodeType().getText();
-            terminalFunction = getNodeTypeAsFunctionType(funcName);
-            elementStepCount = steps.size() - 1;
-        }
-
-        // Single element step with no terminal function -> CHILD
-        if (elementStepCount == 1 && terminalFunction == null) {
+        if (steps.size() == 1 && steps.get(0).predicate().isEmpty() && steps.get(0).axisSpecifier() == null) {
             XPathParser.StepContext step = steps.get(0);
             if (step.abbreviatedStep() != null) {
-                if (step.abbreviatedStep().DOTDOT() != null) {
-                    return CompiledExpr.parent();
-                }
-                if (step.abbreviatedStep().DOT() != null) {
-                    return CompiledExpr.self();
-                }
-            }
-            if (step.nodeTest() != null) {
-                return CompiledExpr.child(getNodeTestName(step.nodeTest()));
+                return step.abbreviatedStep().DOTDOT() != null ? CompiledExpr.parent() : CompiledExpr.self();
             }
             if (step.attributeStep() != null) {
                 return CompiledExpr.attribute(getAttributeStepName(step.attributeStep()));
             }
-        }
-
-        // Build array of child expressions for each element step
-        CompiledExpr[] pathSteps = new CompiledExpr[elementStepCount];
-        for (int i = 0; i < elementStepCount; i++) {
-            XPathParser.StepContext step = steps.get(i);
-            if (step.nodeTest() != null) {
-                pathSteps[i] = CompiledExpr.child(getNodeTestName(step.nodeTest()));
-            } else if (step.abbreviatedStep() != null) {
-                if (step.abbreviatedStep().DOTDOT() != null) {
-                    pathSteps[i] = CompiledExpr.parent();
-                } else {
-                    pathSteps[i] = CompiledExpr.self();
-                }
-            } else if (step.attributeStep() != null) {
-                pathSteps[i] = CompiledExpr.attribute(getAttributeStepName(step.attributeStep()));
-            } else {
-                return CompiledExpr.unsupported("complex step in path");
+            if (step.nodeTest() != null && step.nodeTest().nameTest() != null) {
+                return CompiledExpr.child(getNodeTestName(step.nodeTest()));
             }
         }
+        return CompiledExpr.path(compileRelativeSteps(relPath));
+    }
 
-        return CompiledExpr.path(pathSteps, terminalFunction);
+    private static CompiledStep[] compileRelativeSteps(XPathParser.RelativeLocationPathContext relPath) {
+        CompiledStep[] steps = new CompiledStep[relPath.step().size()];
+        for (int i = 0; i < steps.length; i++) {
+            steps[i] = CompiledStep.fromStepContext(relPath.step(i),
+                    i > 0 && relPath.pathSeparator(i - 1).DOUBLE_SLASH() != null);
+        }
+        return steps;
     }
 
     /**
@@ -767,7 +735,7 @@ final class XPathCompiler {
         }
         if (literalOrNum.NUMBER() != null) {
             try {
-                int value = Integer.parseInt(literalOrNum.NUMBER().getText());
+                double value = Double.parseDouble(literalOrNum.NUMBER().getText());
                 return CompiledExpr.numeric(value);
             } catch (NumberFormatException e) {
                 return CompiledExpr.unsupported("invalid number: " + literalOrNum.NUMBER().getText());
@@ -934,11 +902,11 @@ final class XPathCompiler {
     public static final class CompiledFilterExpr {
         final String pathExpr;                    // The path inside parentheses
         final CompiledExpr[] predicates;          // Predicates to apply
-        final @Nullable String trailingPath;      // Optional trailing path after predicates
+        final CompiledStep @Nullable [] trailingPath;
         final boolean trailingIsDescendant;       // Is trailing path preceded by //?
 
         CompiledFilterExpr(String pathExpr, CompiledExpr[] predicates,
-                           @Nullable String trailingPath, boolean trailingIsDescendant) {
+                           CompiledStep @Nullable [] trailingPath, boolean trailingIsDescendant) {
             this.pathExpr = pathExpr;
             this.predicates = predicates;
             this.trailingPath = trailingPath;
@@ -1124,7 +1092,8 @@ final class XPathCompiler {
 
             // Axis step with specifier: parent::node(), self::element, etc.
             // In the new grammar: step = axisSpecifier? nodeTest predicate*
-            if (step.axisSpecifier() != null && step.nodeTest() != null) {
+            if (step.axisSpecifier() != null && step.nodeTest() != null &&
+                    !"child".equals(step.axisSpecifier().axisName().getText())) {
                 XPathParser.AxisSpecifierContext axisSpec = step.axisSpecifier();
                 String axisName = axisSpec.axisName().NCNAME().getText();
                 String nodeTestName = getNodeTestName(step.nodeTest());
@@ -1145,7 +1114,8 @@ final class XPathCompiler {
                 }
 
                 return new CompiledStep(StepType.AXIS_STEP, isDescendant, nodeTestName,
-                        axisType, NodeTypeTestType.UNKNOWN, predicates, flags,
+                        axisType, step.nodeTest().nodeType() == null ? NodeTypeTestType.UNKNOWN :
+                        nodeTypeTestType(step.nodeTest().nodeType().getText()), predicates, flags,
                         computeStrategy(StepType.AXIS_STEP, nodeTestName, predicates));
             }
 
@@ -1156,23 +1126,7 @@ final class XPathCompiler {
                 // Check if it's a node type test: text(), comment(), node(), processing-instruction()
                 if (nodeTest.nodeType() != null) {
                     String functionName = nodeTest.nodeType().getText();
-                    NodeTypeTestType testType;
-                    switch (functionName) {
-                        case "text":
-                            testType = NodeTypeTestType.TEXT;
-                            break;
-                        case "comment":
-                            testType = NodeTypeTestType.COMMENT;
-                            break;
-                        case "node":
-                            testType = NodeTypeTestType.NODE;
-                            break;
-                        case "processing-instruction":
-                            testType = NodeTypeTestType.PROCESSING_INSTRUCTION;
-                            break;
-                        default:
-                            testType = NodeTypeTestType.UNKNOWN;
-                    }
+                    NodeTypeTestType testType = nodeTypeTestType(functionName);
                     return new CompiledStep(StepType.NODE_TYPE_TEST, isDescendant, null,
                             AxisType.OTHER, testType, predicates, flags,
                             computeStrategy(StepType.NODE_TYPE_TEST, null, predicates));
@@ -1189,6 +1143,21 @@ final class XPathCompiler {
             return new CompiledStep(StepType.NODE_TEST, isDescendant, null,
                     AxisType.OTHER, NodeTypeTestType.UNKNOWN, predicates, flags,
                     computeStrategy(StepType.NODE_TEST, null, predicates));
+        }
+
+        private static NodeTypeTestType nodeTypeTestType(String name) {
+            switch (name) {
+                case "text":
+                    return NodeTypeTestType.TEXT;
+                case "comment":
+                    return NodeTypeTestType.COMMENT;
+                case "node":
+                    return NodeTypeTestType.NODE;
+                case "processing-instruction":
+                    return NodeTypeTestType.PROCESSING_INSTRUCTION;
+                default:
+                    return NodeTypeTestType.UNKNOWN;
+            }
         }
 
         /**
@@ -1290,8 +1259,10 @@ final class XPathCompiler {
     public static final class CompiledExpr {
         final ExprType type;
 
+        final CompiledStep @Nullable [] pathSteps;
+
         // For NUMERIC
-        final int numericValue;
+        final double numericValue;
 
         // For STRING
         final @Nullable String stringValue;
@@ -1312,10 +1283,18 @@ final class XPathCompiler {
         final boolean booleanValue;
 
         // Private constructor - use factory methods
-        private CompiledExpr(ExprType type, int numericValue, @Nullable String stringValue,
+        private CompiledExpr(ExprType type, double numericValue, @Nullable String stringValue,
                              @Nullable CompiledExpr left, @Nullable ComparisonOp op, @Nullable CompiledExpr right,
                              @Nullable FunctionType functionType, CompiledExpr @Nullable [] args,
                              @Nullable String name, boolean booleanValue) {
+            this(type, numericValue, stringValue, left, op, right, functionType, args, name, booleanValue, null);
+        }
+
+        private CompiledExpr(ExprType type, double numericValue, @Nullable String stringValue,
+                             @Nullable CompiledExpr left, @Nullable ComparisonOp op, @Nullable CompiledExpr right,
+                             @Nullable FunctionType functionType, CompiledExpr @Nullable [] args,
+                             @Nullable String name, boolean booleanValue, CompiledStep @Nullable [] pathSteps) {
+            this.pathSteps = pathSteps;
             this.type = type;
             this.numericValue = numericValue;
             this.stringValue = stringValue;
@@ -1330,6 +1309,10 @@ final class XPathCompiler {
 
         // Factory methods
         public static CompiledExpr numeric(int value) {
+            return numeric((double) value);
+        }
+
+        public static CompiledExpr numeric(double value) {
             return new CompiledExpr(ExprType.NUMERIC, value, null, null, null, null, null, null, null, false);
         }
 
@@ -1378,6 +1361,10 @@ final class XPathCompiler {
             return new CompiledExpr(ExprType.PATH, 0, null, null, null, null, terminalFunction, steps, null, false);
         }
 
+        public static CompiledExpr path(CompiledStep[] steps) {
+            return new CompiledExpr(ExprType.PATH, 0, null, null, null, null, null, null, null, false, steps);
+        }
+
         public static CompiledExpr bool(boolean value) {
             return new CompiledExpr(ExprType.BOOLEAN, 0, null, null, null, null, null, null, null, value);
         }
@@ -1402,18 +1389,23 @@ final class XPathCompiler {
          * Check if this expression needs position/size context to evaluate.
          */
         public boolean needsPosition() {
-            switch (type) {
-                case NUMERIC:
+            return type == ExprType.NUMERIC || usesPosition();
+        }
+
+        private boolean usesPosition() {
+            if (type == ExprType.FUNCTION) {
+                if (functionType == FunctionType.POSITION || functionType == FunctionType.LAST) {
                     return true;
-                case FUNCTION:
-                    return functionType == FunctionType.POSITION || functionType == FunctionType.LAST;
-                case COMPARISON:
-                case AND:
-                case OR:
-                    return (left != null && left.needsPosition()) || (right != null && right.needsPosition());
-                default:
-                    return false;
+                }
+                if (args != null) {
+                    for (CompiledExpr arg : args) {
+                        if (arg.usesPosition()) {
+                            return true;
+                        }
+                    }
+                }
             }
+            return (left != null && left.usesPosition()) || (right != null && right.usesPosition());
         }
 
         /**

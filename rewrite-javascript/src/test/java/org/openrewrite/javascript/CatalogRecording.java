@@ -345,8 +345,8 @@ final class CatalogRecording {
     }
 
     /**
-     * The pnpm files as the package manager's command left them, where the install over them fails with
-     * {@code failure}: each manifest the command changed and the lock, left as it was, marked with it.
+     * A rejected pnpm install leaves the complete manifest/catalog/lock group unchanged. Manifests the command
+     * would change and the lock retain the failure diagnostic.
      */
     SourceSpecs[] sourcesWhoseInstallFails(String failure) {
         List<SourceSpecs> sources = new ArrayList<>();
@@ -364,8 +364,7 @@ final class CatalogRecording {
         for (String path : members) {
             sources.add(failing(before.get(path), after.get(path), nodeResolutionResult(pm), path, failure));
         }
-        sources.add(yamlFile(read("workspace-before"), changed(read("workspace-before"), read("workspace")),
-                "pnpm-workspace.yaml"));
+        sources.add(yamlFile(read("workspace-before"), null, "pnpm-workspace.yaml"));
         sources.add(pnpmLock(read("before"), null, s -> s.noTrim().after(actual -> actual).afterRecipe(doc -> {
             assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
                     .isEqualTo(read("before"));
@@ -383,7 +382,7 @@ final class CatalogRecording {
         return packageJson(before, null, marker, s -> s.path(path).noTrim().after(actual -> actual)
                 .afterRecipe(doc -> {
                     assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
-                            .isEqualTo(after);
+                            .isEqualTo(before);
                     assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                             .hasValueSatisfying(w -> assertThat(w.getMessage()).contains(failure));
                 }));

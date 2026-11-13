@@ -61,11 +61,11 @@ class DependencyWorkspaceIntegTest implements RewriteTest {
         // This requires:
         // 1. Creating a workspace with the requests package installed
         // 2. ty using that workspace for type resolution
-        // 3. MethodMatcher matching requests.get()
+        // 3. MethodMatcher matching requests.get() by the module defining it, which `requests` re-exports
         rewriteRun(
           spec -> spec
             .typeValidationOptions(TypeValidation.none())
-            .recipe(new FindMethods("requests get(..)", false)),
+            .recipe(new FindMethods("requests.api get(..)", false)),
           uv(
             tempDir,
             python(

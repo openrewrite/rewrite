@@ -98,12 +98,36 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     long sourceFileTimeoutNanos = -1;
 
-    @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
     @Getter
     @NonFinal
     boolean causesAnotherCycle;
+
+    /// @deprecated Adding a recipe here doesn't cause another cycle, and fails in tests. A recipe that needs another
+    /// cycle returns true from [Recipe#causesAnotherCycle()].
+    @Deprecated
+    public Set<Recipe> getMadeChangesInThisCycle() {
+        return new AbstractSet<Recipe>() {
+            @Override
+            public Iterator<Recipe> iterator() {
+                return madeChangesInThisCycle.iterator();
+            }
+
+            @Override
+            public int size() {
+                return madeChangesInThisCycle.size();
+            }
+
+            @Override
+            public boolean add(Recipe recipe) {
+                assert false : "Adding " + recipe.getName() + " to the recipes that made changes in this cycle " +
+                               "doesn't cause another cycle. A recipe that needs another cycle returns true from " +
+                               "Recipe#causesAnotherCycle().";
+                return madeChangesInThisCycle.add(recipe);
+            }
+        };
+    }
 
     /**
      * Scanning recipes whose accumulator is incomplete because a scan was abandoned at the source file timeout.
@@ -227,12 +251,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 boolean isInBatch = nextRpc == currentRpc && nextScanVisitor != null || scanBatch.rpc == currentRpc;
 
                                 if (isInBatch) {
-                                    scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
-                                    scanBatch.recipeStacks.add(recipeStack);
-                                    if (scanBatch.originalBeforeBatch == null) {
-                                        scanBatch.originalBeforeBatch = source;
+                                    if (((RpcRecipe) recipe).reachesScanVisitor(source, ctx, rootCursor)) {
+                                        scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
+                                        scanBatch.recipeStacks.add(recipeStack);
+                                        scanBatch.rpc = currentRpc;
                                     }
-                                    scanBatch.rpc = currentRpc;
 
                                     // If this is the last recipe in the batch, flush now
                                     if (nextRpc != currentRpc || nextScanVisitor == null) {
@@ -250,6 +273,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
                                     Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                    if (maybeMutated != source) {
+                                        recordScannerEdit(scanningRecipe, source);
+                                    }
                                     assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
                                             scanningRecipe.getName() + "'s scanner changed " + source.getSourcePath() +
                                             ", and the scanning phase discards edits. Record what the scanner finds " +
@@ -446,8 +472,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
             captureRpc(currentRpc, touched, refCheckpoints);
 
-            // Flush batch if switching to a different RPC or non-RPC recipe
-            if (batch.rpc != null && batch.rpc != currentRpc) {
+            // Flush before a different RPC, a non-RPC recipe, or a precondition that reads the batch's edits
+            if (batch.rpc != null && (batch.rpc != currentRpc || ((RpcRecipe) recipe).editPreconditionReadsContent())) {
                 source = flushBatch(batch, source);
                 if (source == null) {
                     return null;
@@ -481,41 +507,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
                 if (isInBatch) {
                     // Batch path: accumulate visitor names instead of executing.
-                    // Only batch if the remote actually has a codec for this source file type;
-                    // otherwise the BatchVisit RPC fails on the remote side and the resulting
-                    // exception gets attached to the source as a Markup$Error, falsely marking
-                    // the file as modified.
-                    //
-                    // Compare against the canonical source file type, not the raw class name:
-                    // lazily-loaded LSTs (e.g. the Moderne CLI's V3 format) hand the scheduler
-                    // generated subclasses of the real tree type, whose getClass().getName() is
-                    // the subclass name. getLanguages() reports canonical type names (the same
-                    // ones used as the RPC sourceFileType), so a raw name comparison never
-                    // matches for those, silently dropping every batched recipe but the last.
-                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(src.getClass()))) {
-                        RpcRecipe rpcRecipe = (RpcRecipe) recipe;
-                        // Evaluate the precondition locally before batching. The non-batch
-                        // path runs the precondition via getVisitor()'s Preconditions.check
-                        // wrapper; the batch path bypasses that wrapper because it dispatches
-                        // editVisitor names directly. Without this gate, every batched recipe
-                        // would visit every file regardless of preconditions, defeating the
-                        // optimization.
-                        TreeVisitor<?, ExecutionContext> precondition = rpcRecipe.getEditPreconditionVisitor();
-                        boolean preconditionPasses = true;
-                        if (precondition != null) {
-                            //noinspection unchecked
-                            TreeVisitor<Tree, ExecutionContext> typed =
-                                    (TreeVisitor<Tree, ExecutionContext>) precondition;
-                            preconditionPasses = typed.visit(src, ctx, rootCursor) != src;
+                    RpcRecipe rpcRecipe = (RpcRecipe) recipe;
+                    if (rpcRecipe.reachesEditVisitor(src, ctx, rootCursor)) {
+                        batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
+                        batch.recipeStacks.add(recipeStack);
+                        if (batch.originalBeforeBatch == null) {
+                            batch.originalBeforeBatch = src;
                         }
-                        if (preconditionPasses) {
-                            batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
-                            batch.recipeStacks.add(recipeStack);
-                            if (batch.originalBeforeBatch == null) {
-                                batch.originalBeforeBatch = src;
-                            }
-                            batch.rpc = currentRpc;
-                        }
+                        batch.rpc = currentRpc;
                     }
 
                     // If this is the last recipe in the batch, flush now
@@ -555,7 +554,15 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
             } catch (Throwable t) {
                 if (isInBatch) {
-                    batch.clear();
+                    // The recipes queued before this one run first, as they would unbatched
+                    SourceFile flushed = flushBatch(batch, src);
+                    if (flushed == null) {
+                        return null;
+                    }
+                    SourceFile marked = handleError(recipe, flushed, flushed, t);
+                    return marked != null && marked != flushed ?
+                            addRecipesThatMadeChanges(recipeStack, marked) :
+                            marked;
                 }
                 after = handleError(recipe, src, after, t);
             }
@@ -576,8 +583,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile flushBatch(BatchState batch, SourceFile source) {
-        if (batch.rpc == null || batch.items.isEmpty()) {
+        try {
+            return sendBatch(batch, source);
+        } finally {
+            // Emptied even when recording the results throws, so editSource's catch doesn't send the batch twice
             batch.clear();
+        }
+    }
+
+    private @Nullable SourceFile sendBatch(BatchState batch, SourceFile source) {
+        if (batch.rpc == null || batch.items.isEmpty()) {
             return source;
         }
 
@@ -633,7 +648,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     recordSourceFileResultAndSearchResults(originalBefore, null, batch.recipeStacks.get(i), emptyList(), ctx);
                 }
             }
-            batch.clear();
             return null;
         }
 
@@ -671,7 +685,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
         }
 
-        batch.clear();
         return fetched;
     }
 
@@ -697,7 +710,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
             }
         }
-        batch.clear();
         return source;
     }
 
@@ -823,6 +835,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // Use the attribution map: only include search results created by this recipe
         recordSourceFileResultAndSearchResults(before, after, recipeStack,
                 collectSearchResults(before, after, leaf(recipeStack).getName(), attributionMap), ctx);
+    }
+
+    /**
+     * Called when a recipe's scanner returns a tree other than the source file it visited. The scanning phase
+     * discards that tree.
+     */
+    @Incubating(since = "8.106.0")
+    protected void recordScannerEdit(Recipe recipe, SourceFile source) {
     }
 
     protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {

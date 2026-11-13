@@ -70,9 +70,14 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
             Set<String> originalImports = new HashSet<>();
             boolean starImportOfOwner = false;
+            boolean memberImportOfType = false;
             for (J.Import cuImport : cu.getImports()) {
-                if (cuImport.getQualid().getType() != null) {
-                    originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName().replace("$", "."));
+                JavaType.FullyQualified importedType = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
+                if (importedType != null) {
+                    originalImports.add(importedType.getFullyQualifiedName().replace("$", "."));
+                }
+                if (isMemberImportOf(cuImport)) {
+                    memberImportOfType = true;
                 }
                 if (!cuImport.isStatic() && "*".equals(cuImport.getClassName()) &&
                         cuImport.getPackageName().equals(owner)) {
@@ -87,6 +92,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
             }
+            // a static import of a nested type also imports a field of the same name
+            boolean fieldNamedLikeTypeUsed = cu.getTypesInUse().getVariables().stream().anyMatch(variable -> {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+                return simpleName.equals(variable.getName()) && fq != null &&
+                       TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName() + "." + simpleName, type);
+            });
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -127,7 +138,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
             // The names only confirm an attributed type or its alias and filter a star import's unfold candidates.
             boolean typeImportMayStay = !force && typeInUse;
-            Set<String> namesInSource = typeImportMayStay || starImportOfOwner && !otherTypesInPackageUsed.isEmpty() ?
+            Set<String> namesInSource = typeImportMayStay || !force && memberImportOfType ||
+                    starImportOfOwner && !otherTypesInPackageUsed.isEmpty() ?
                     namesInSource(cu) : Collections.emptySet();
             boolean typeUsed = typeImportMayStay && namesInSource.contains(simpleName);
             otherTypesInPackageUsed.retainAll(namesInSource);
@@ -147,7 +159,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 J.Identifier alias = import_.getAlias();
                 if (import_.isStatic()) {
                     String imported = import_.getQualid().getSimpleName();
-                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) && (force || !methodsAndFieldsUsed.contains(imported))) {
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) &&
+                            (force || !methodsAndFieldsUsed.contains(imported) && !fieldNamedLikeTypeUsed)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
@@ -166,6 +179,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     }
+                } else if (isMemberImportOf(import_)) {
+                    String name = alias != null ? alias.getSimpleName() : import_.getQualid().getSimpleName();
+                    if (force || !namesInSource.contains(name)) {
+                        spaceForNextImport.set(import_.getPrefix());
+                        return null;
+                    }
                 } else if (alias != null && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
                     if (!typeImportMayStay || !namesInSource.contains(alias.getSimpleName())) {
                         spaceForNextImport.set(import_.getPrefix());
@@ -181,6 +200,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (otherTypesInPackageUsed.isEmpty()) {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
+                    } else if (type.lastIndexOf('$') > type.lastIndexOf('.')) {
+                        // the star import never provided a nested type, so it has no reason to change while in use
+                        return import_;
                     } else {
                         return unfoldStarImport(import_, otherTypesInPackageUsed, cu);
                     }
@@ -210,6 +232,17 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    // Java member imports are always static; other languages, e.g. Scala, can import a member without `static`
+    private boolean isMemberImportOf(J.Import import_) {
+        JavaType importedType = import_.getQualid().getType();
+        if (import_.isStatic() || !(importedType instanceof JavaType.Method || importedType instanceof JavaType.Variable)) {
+            return false;
+        }
+        String typeName = import_.getTypeName();
+        String memberOwner = typeName.substring(0, Math.max(0, Math.max(typeName.lastIndexOf('.'), typeName.lastIndexOf('$'))));
+        return TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) || TypeUtils.fullyQualifiedNamesAreEqual(memberOwner, type);
     }
 
     /**
@@ -324,7 +357,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             if (javaType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
                 if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
-                    return fq;
+                    // an import names the raw type, not the parameterization of it that the source uses
+                    return fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq;
                 }
             }
         }

@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -32,6 +33,10 @@ import static org.openrewrite.test.SourceSpecs.dir;
 
 @CheckReturnValue
 public class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+    }
+
 
     private Assertions() {
     }

@@ -291,8 +291,7 @@ export function isMember(json: Json): json is Json.Member {
 }
 
 /**
- * Gets the key name from a Json.Member.
- * Handles both string literals (quoted keys) and identifiers (unquoted keys).
+ * Gets the key name from a Json.Member, with a quoted key's escapes decoded.
  *
  * @param member The JSON member to extract the key name from
  * @returns The key name as a string, or undefined if extraction fails
@@ -300,12 +299,15 @@ export function isMember(json: Json): json is Json.Member {
 export function getMemberKeyName(member: Json.Member): string | undefined {
     const key = member.key.element;
     if (isLiteral(key)) {
-        const source = key.source;
-        // Remove quotes from string literal
-        if (source.startsWith('"') && source.endsWith('"')) {
-            return source.slice(1, -1);
+        if (key.source.startsWith('"')) {
+            // Decoded from source, since LSTs serialized by older Java JSON parsers keep a string's escapes in `value`.
+            try {
+                return JSON.parse(key.source);
+            } catch {
+                // a JSON5 escape such as `\x41`, which JSON.parse rejects
+            }
         }
-        return source;
+        return String(key.value);
     } else if (isIdentifier(key)) {
         return key.name;
     }

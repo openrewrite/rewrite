@@ -71,10 +71,14 @@ public enum DependencyManifest {
     /**
      * The env's Python is the lowest from 3.12 up that the project allows, since a project's pins more often
      * lack wheels for the newest Pythons than for 3.12. When the project excludes all of those, the newest
-     * Python it allows below 3.12 is taken, down to 3.10.
+     * Python it allows below 3.12 is taken.
      */
     private static final int FIRST_MINOR = 12;
-    private static final int OLDEST_MINOR = 10;
+    /**
+     * The oldest CPython uv downloads. typeshed's stubs have no branch for a Python below 3.10, so the standard
+     * library of a 3.8 or 3.9 env is typed approximately. The env's third-party packages resolve as installed.
+     */
+    private static final int OLDEST_MINOR = 8;
     private static final int NEWEST_MINOR = 20;
 
     /**
@@ -255,7 +259,7 @@ public enum DependencyManifest {
 
     /**
      * The Python minor version, such as {@code 3.12}, to build an env with that satisfies all of
-     * {@code requiresPython}, or null when none from 3.10 up does.
+     * {@code requiresPython}, or null when none from 3.8 up does.
      */
     public static @Nullable String pythonVersion(List<String> requiresPython) {
         List<PythonVersionSpecifierSet> specifiers = new ArrayList<>();

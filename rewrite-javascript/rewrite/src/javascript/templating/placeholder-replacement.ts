@@ -41,6 +41,25 @@ export class SubstitutedValue implements Marker {
 /** Chooses a substituted value's prefix, and says whether it is the source's own. */
 type MergePrefix = (sourcePrefix: J.Space, templatePrefix: J.Space) => [J.Space, boolean];
 
+/** Whether `value` is a property, method or spread of an object literal. */
+function isObjectMember(value: unknown): value is J {
+    switch (isTree(value) && value.kind) {
+        case JS.Kind.PropertyAssignment:
+        case JS.Kind.Spread:
+        case J.Kind.MethodDeclaration:
+        case JS.Kind.ComputedPropertyMethodDeclaration:
+            return true;
+    }
+    return false;
+}
+
+/** `padded` less the trailing comma it brought from the end of the list it was taken from. */
+function withoutTrailingComma(padded: J.RightPadded<J>): J.RightPadded<J> {
+    const markers = padded.markers?.markers;
+    return markers?.some(m => m.kind === J.Markers.TrailingComma) ?
+        {...padded, markers: {...padded.markers, markers: markers.filter(m => m.kind !== J.Markers.TrailingComma)}} : padded;
+}
+
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
  */
@@ -319,6 +338,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                     const param = this.substitutions.get(placeholderText);
                     if (param) {
                         let arrayToExpand: J[] | J.RightPadded<J>[] | undefined = undefined;
+                        const member = element.kind === JS.Kind.PropertyAssignment ? this.objectMember(param.value) : undefined;
 
                         // Check if it's a J.Container
                         const isContainer = param.value && typeof param.value === 'object' &&
@@ -330,6 +350,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                         // Check if it's a direct Tree[] array
                         else if (Array.isArray(param.value)) {
                             arrayToExpand = param.value as J[];
+                        }
+                        // One member of an object literal fills the slot of a member, not the name of a property
+                        else if (member) {
+                            arrayToExpand = [member] as J[] | J.RightPadded<J>[];
                         }
                         // Check if it's a CaptureValue
                         else if (param.value instanceof CaptureValue) {
@@ -435,7 +459,20 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             }
         }
 
-        return newElements;
+        // Only the last element prints the trailing comma that a given or captured padding brings along
+        return newElements.map((padded, i) => i === newElements.length - 1 ? padded : withoutTrailingComma(padded));
+    }
+
+    /** The member of an object literal, padded or not, that a parameter is or is bound to, if it is one. */
+    private objectMember(value: any): J | J.RightPadded<J> | undefined {
+        if (value instanceof CaptureValue) {
+            value = value.resolve(this.values);
+        } else if (value instanceof TemplateParamImpl) {
+            value = this.values.get(value.name);
+        } else if (value instanceof CaptureImpl || (value && typeof value === 'object' && value[CAPTURE_NAME_SYMBOL])) {
+            value = this.values.get(value[CAPTURE_NAME_SYMBOL] || value.name);
+        }
+        return isObjectMember(value?.kind === J.Kind.RightPadded ? value.element : value) ? value : undefined;
     }
 
     /** As `visit` on a placeholder, with `merge` choosing the replacement's prefix. */

@@ -16,7 +16,8 @@
 /**
  * Yarn classic's lockfile and resolver model, ported from yarn 1.22.22 (yarnpkg/yarn, tag v1.22.22), with what each
  * release of {@code YarnClassicReleases.PROVEN} does otherwise beside it ({@code YarnClassicRelease}): src/lockfile,
- * src/package-resolver.js, src/package-request.js, src/package-reference.js, src/resolution-map.js,
+ * src/package-resolver.js, src/package-request.js, src/package-reference.js,
+ * src/package-linker.js, src/package-hoister.js, src/util/semver.js, src/resolution-map.js,
  * src/workspace-layout.js, src/package-compatibility.js, src/package-fetcher.js, src/fetchers, src/resolvers,
  * src/util/normalize-manifest, src/util/normalize-pattern.js, src/util/fs.js, the config that reaches a lock
  * (src/config.js, src/rc.js, src/registries), src/cli/index.js and src/cli/commands/install.js. It is distributed under

@@ -332,7 +332,6 @@ class SingletonTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(recipe)
-            .validateRecipeSerialization(false)
             .afterRecipe(run -> assertThat(CountingScanRecipe.SCAN_COUNT.get())
               .as("scanner should run once per file exactly once across the whole tree; nested occurrence must be filtered by recursive singleton deduplication")
               .isEqualTo(2)),

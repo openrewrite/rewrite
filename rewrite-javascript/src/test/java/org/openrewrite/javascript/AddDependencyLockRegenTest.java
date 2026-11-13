@@ -315,7 +315,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
                         s -> s.after(actual -> {
-                            assertThat(actual).contains("\"needs-transitive\": \"^1.0.0\"");
+                            assertThat(actual).endsWith(pkgBefore.trim()).doesNotContain("\"needs-transitive\":");
                             return actual;
                         }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("manifest carries the lock-regen-failure warning").isPresent())),

@@ -42,6 +42,30 @@ from .replacement import substitution_marker
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 
 
+_stdlib_venv: Optional[str] = None
+
+
+def _stdlib_only_venv() -> str:
+    """An empty venv of the running interpreter, for templates that declare no dependencies.
+
+    Given no venv, ty resolves against an inherited ``VIRTUAL_ENV``, the parser's own venv or the
+    ``python3`` on ``PATH``, whose packages vary with where the recipe runs. ty fails to start on
+    a venv without its ``pyvenv.cfg``, which a temp cleaner can remove while the process runs.
+    """
+    global _stdlib_venv
+    if _stdlib_venv is None or not os.path.isfile(os.path.join(_stdlib_venv, "pyvenv.cfg")):
+        import atexit
+        import shutil
+        import tempfile
+        import venv
+
+        path = tempfile.mkdtemp(prefix="openrewrite-template-stdlib-")
+        atexit.register(shutil.rmtree, path, ignore_errors=True)
+        venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(path)
+        _stdlib_venv = path
+    return _stdlib_venv
+
+
 @dataclass(frozen=True)
 class TemplateOptions:
     """Configuration options for template parsing.
@@ -56,7 +80,9 @@ class TemplateOptions:
         dependencies: PyPI ``(package, version)`` pairs (use explicit
             operators like ``">=2.31.0"``; bare versions default to ``>=``).  When set, the
             template is parsed inside a cached virtualenv that has these
-            packages installed, enabling type attribution.
+            packages installed, enabling type attribution. Without them only
+            the standard library resolves, whatever the running interpreter
+            has installed.
         context_sensitive: Whether the template requires cursor context
             for correct parsing.
     """
@@ -72,8 +98,7 @@ def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor'
     target = coordinates.tree
     if not isinstance(target, Statement):
         return False
-    ambiguous = isinstance(target, Expression) and \
-        not isinstance(target, (py.ExpressionStatement, py.StatementExpression))
+    ambiguous = isinstance(target, Expression) and not isinstance(target, py.ExpressionStatement)
     if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
             or cursor is None or getattr(cursor.value, 'id', None) != target.id:
         return True
@@ -300,10 +325,8 @@ class TemplateEngine:
         """
         Parse Python code into an LST CompilationUnit.
 
-        Always attempts type attribution via ``TyTypesClient``.  When
-        *options* specifies dependencies, a cached virtualenv workspace is
-        used; otherwise a temporary directory suffices (enough for stdlib
-        and already-installed packages).
+        Always attempts type attribution via ``TyTypesClient``, in the
+        environment ``TemplateOptions.dependencies`` describes.
 
         Args:
             code: Python source code.
@@ -325,14 +348,16 @@ class TemplateEngine:
                 import tempfile as _tmpmod
                 from rewrite.python.ty_client import TyTypesClient
 
+                virtual_env = None
                 if options and options.dependencies:
                     from .dependency_workspace import DependencyWorkspace
                     workspace = DependencyWorkspace.get_or_create(options.dependencies)
                 else:
                     workspace = _tmpmod.mkdtemp()
                     owns_workspace = True
+                    virtual_env = _stdlib_only_venv()
 
-                ty_client = TyTypesClient()
+                ty_client = TyTypesClient(virtual_env=virtual_env)
                 ty_client.initialize(workspace)
 
                 # ty needs a real file path for type resolution
@@ -471,13 +496,18 @@ class TemplateEngine:
         unformatted = _SubstitutedValues()
         unformatted.visit(result, None)
 
+        # A replacement keeps the blank lines before the code it replaces and the indentation of the line
+        # that code starts, which may align to a bracket that formatting the result alone can't see.
+        keep_indent = coordinates.mode == CoordinateMode.REPLACEMENT
+
         # Auto-format the result
         try:
             from ..format import maybe_auto_format
             original = coordinates.tree
             result = maybe_auto_format(
                 original, result, None, None,
-                cursor.parent if cursor.parent is not None else None
+                cursor.parent if cursor.parent is not None else None,
+                keep_indent=keep_indent
             )
         except (ValueError, AttributeError):
             # No CompilationUnit in cursor ancestry — skip formatting
@@ -486,7 +516,8 @@ class TemplateEngine:
         if unformatted.values:
             result = _SubstitutedLayout(unformatted.values).visit(result, None)
             from ..format import minimally_format
-            result = minimally_format(result, None, cursor.parent if cursor is not None else None)
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None,
+                                      keep_indent=keep_indent)
         return result
 
     @classmethod

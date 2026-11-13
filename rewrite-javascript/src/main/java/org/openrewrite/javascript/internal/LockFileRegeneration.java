@@ -31,11 +31,13 @@ import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
@@ -335,6 +337,43 @@ public final class LockFileRegeneration {
      */
     public boolean writesBesideLock(String fileName) {
         return port.writesBesideLock(fileName);
+    }
+
+    /**
+     * Regenerate a lock for a recipe, including npm's normalization on subsequent installs. Each candidate must
+     * still pass the port's unchanged-install check. Rejections, missing inputs, cycles and a bounded failure to
+     * converge retain their original diagnostics.
+     */
+    public Result regenerateStable(Request request, ExecutionContext ctx) {
+        return regenerateStable(request, ctx, false);
+    }
+
+    /** Only opted-in coordinated updates may recover a peer conflict caused by a stale npm lock. */
+    public Result regenerateStable(Request request, ExecutionContext ctx, boolean reconcileNpmPeerDependencies) {
+        return pm == PackageManager.Npm ? stabilize(request,
+                r -> NativeLockEngine.regenerate(port, r, ctx, reconcileNpmPeerDependencies)) : regenerate(request, ctx);
+    }
+
+    static Result stabilize(Request request, Function<Request, Result> regenerate) {
+        Set<String> seen = new HashSet<>();
+        if (request.lock != null) {
+            seen.add(request.lock);
+        }
+        Result result = regenerate.apply(request);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Failure failure = result.failure;
+            if (failure == null || failure.kind != Kind.SECOND_INSTALL ||
+                failure.reason != Reason.RESOLUTION_REQUIRED || failure.written == null ||
+                !seen.add(failure.written)) {
+                return result;
+            }
+            request = Request.builder().packageJson(request.packageJson).lock(failure.written)
+                    .marker(request.marker).runtime(request.runtime).packageJsonPath(request.packageJsonPath)
+                    .manifests(request.manifests).packageManagerFiles(request.packageManagerFiles)
+                    .projectPaths(request.projectPaths).build();
+            result = regenerate.apply(request);
+        }
+        return result;
     }
 
     /**

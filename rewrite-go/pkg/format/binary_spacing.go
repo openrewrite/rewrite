@@ -68,28 +68,38 @@ func (v *BinarySpacingVisitor) Visit(t java.Tree, p any) java.Tree {
 
 func (v *BinarySpacingVisitor) VisitBinary(bin *java.Binary, p any) java.J {
 	prec := javaPrecedence(bin.Operator.Element)
-	out := *bin
-	out.Operator.Before, out.Right = v.spaceOperands(
-		operandsOf(bin), prec, bin.Operator.Before, bin.Right)
+	before, right := v.spaceOperands(operandsOf(bin), prec, bin.Operator.Before, bin.Right)
 
 	depth := v.depth
-	out.Left = v.operand(bin.Left, depth+diffPrec(bin.Left, prec))
-	out.Right = v.operand(out.Right, depth+1)
+	left := v.operand(bin.Left, depth+diffPrec(bin.Left, prec))
+	right = v.operand(right, depth+1)
 	v.depth = depth
+	if left == bin.Left && java.SpaceEqual(before, bin.Operator.Before) && right == bin.Right {
+		return bin
+	}
+	out := *bin
+	out.Left = left
+	out.Operator.Before = before
+	out.Right = right
 	return &out
 }
 
 func (v *BinarySpacingVisitor) VisitGoBinary(bin *golang.Binary, p any) java.J {
 	// `&^` is the only operator golang.Binary carries, at the tightest level.
 	const prec = 5
-	out := *bin
-	out.Operator.Before, out.Right = v.spaceOperands(
-		operandsOf(bin), prec, bin.Operator.Before, bin.Right)
+	before, right := v.spaceOperands(operandsOf(bin), prec, bin.Operator.Before, bin.Right)
 
 	depth := v.depth
-	out.Left = v.operand(bin.Left, depth+diffPrec(bin.Left, prec))
-	out.Right = v.operand(out.Right, depth+1)
+	left := v.operand(bin.Left, depth+diffPrec(bin.Left, prec))
+	right = v.operand(right, depth+1)
 	v.depth = depth
+	if left == bin.Left && java.SpaceEqual(before, bin.Operator.Before) && right == bin.Right {
+		return bin
+	}
+	out := *bin
+	out.Left = left
+	out.Operator.Before = before
+	out.Right = right
 	return &out
 }
 
@@ -97,24 +107,36 @@ func (v *BinarySpacingVisitor) VisitGoBinary(bin *golang.Binary, p any) java.J {
 // group what the depth is standing in for.
 func (v *BinarySpacingVisitor) VisitParentheses(parens *java.Parentheses, p any) java.J {
 	depth := v.depth
-	out := *parens
-	out.Tree.Element = v.operand(parens.Tree.Element, reduceDepth(depth))
+	element := v.operand(parens.Tree.Element, reduceDepth(depth))
 	v.depth = depth
+	if element == parens.Tree.Element {
+		return parens
+	}
+	out := *parens
+	out.Tree.Element = element
 	return &out
 }
 
 // VisitArrayAccess descends into an index one level deeper, matching the
 // nesting an index expression introduces in gofmt.
 func (v *BinarySpacingVisitor) VisitArrayAccess(access *java.ArrayAccess, p any) java.J {
-	out := *access
 	depth := v.depth
-	out.Indexed = v.operand(access.Indexed, depth)
-	if access.Dimension != nil {
-		dimension := *access.Dimension
-		dimension.Index.Element = v.operand(access.Dimension.Index.Element, depth+1)
-		out.Dimension = &dimension
+	indexed := v.operand(access.Indexed, depth)
+	dimension := access.Dimension
+	if dimension != nil {
+		if index := v.operand(dimension.Index.Element, depth+1); index != dimension.Index.Element {
+			copied := *dimension
+			copied.Index.Element = index
+			dimension = &copied
+		}
 	}
 	v.depth = depth
+	if indexed == access.Indexed && dimension == access.Dimension {
+		return access
+	}
+	out := *access
+	out.Indexed = indexed
+	out.Dimension = dimension
 	return &out
 }
 
@@ -126,9 +148,13 @@ func (v *BinarySpacingVisitor) VisitGoUnary(u *golang.Unary, p any) java.J {
 		return v.GoVisitor.VisitGoUnary(u, p)
 	}
 	depth := v.depth
-	out := *u
-	out.Expression = v.operand(u.Expression, 1)
+	expression := v.operand(u.Expression, 1)
 	v.depth = depth
+	if expression == u.Expression {
+		return u
+	}
+	out := *u
+	out.Expression = expression
 	return &out
 }
 
@@ -168,6 +194,10 @@ func (v *BinarySpacingVisitor) VisitSlice(sl *golang.Slice, p any) java.J {
 		out.Max = withPrefix(out.Max, spaceOrNothing(getPrefix(out.Max), blanks))
 	}
 	v.depth = depth
+	if out.Indexed == sl.Indexed && java.RightPaddedEqual(out.Low, sl.Low) &&
+		java.RightPaddedEqual(out.High, sl.High) && out.Max == sl.Max {
+		return sl
+	}
 	return &out
 }
 
@@ -185,12 +215,18 @@ func isPresentIndex(e java.Expression) bool {
 // literal itself sits, which is gofmt's rule for a composite literal.
 func (v *BinarySpacingVisitor) VisitComposite(c *golang.Composite, p any) java.J {
 	depth := v.depth
-	out := *c
-	if c.TypeExpr != nil {
-		out.TypeExpr = v.operand(c.TypeExpr, depth)
+	typeExpr := c.TypeExpr
+	if typeExpr != nil {
+		typeExpr = v.operand(typeExpr, depth)
 	}
-	out.Elements.Elements = v.operandList(c.Elements.Elements, 1)
+	elements := v.operandList(c.Elements.Elements, 1)
 	v.depth = depth
+	if typeExpr == c.TypeExpr && java.SameSlice(elements, c.Elements.Elements) {
+		return c
+	}
+	out := *c
+	out.TypeExpr = typeExpr
+	out.Elements.Elements = elements
 	return &out
 }
 
@@ -213,9 +249,14 @@ func (v *BinarySpacingVisitor) VisitMultiAssignment(assign *golang.MultiAssignme
 	if len(assign.Variables) > 1 && len(assign.Values) > 1 {
 		depth = 2
 	}
+	variables := v.operandList(assign.Variables, depth)
+	values := v.operandList(assign.Values, depth)
+	if java.SameSlice(variables, assign.Variables) && java.SameSlice(values, assign.Values) {
+		return assign
+	}
 	out := *assign
-	out.Variables = v.operandList(assign.Variables, depth)
-	out.Values = v.operandList(assign.Values, depth)
+	out.Variables = variables
+	out.Values = values
 	return &out
 }
 
@@ -232,10 +273,10 @@ func (v *BinarySpacingVisitor) operand(e java.Expression, depth int) java.Expres
 
 func (v *BinarySpacingVisitor) operandList(elements []java.RightPadded[java.Expression], depth int) []java.RightPadded[java.Expression] {
 	outer := v.depth
-	out := append([]java.RightPadded[java.Expression](nil), elements...)
-	for i := range out {
-		out[i].Element = v.operand(out[i].Element, depth)
-	}
+	out := eachPadded(elements, func(rp java.RightPadded[java.Expression]) java.RightPadded[java.Expression] {
+		rp.Element = v.operand(rp.Element, depth)
+		return rp
+	})
 	v.depth = outer
 	return out
 }

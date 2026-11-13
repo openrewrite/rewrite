@@ -117,8 +117,15 @@ func HasMarker[T any](markers Markers) bool {
 	return false
 }
 
+// AddMarker returns markers with marker added, or markers itself when it
+// already holds an equal marker.
 func AddMarker(markers Markers, marker Marker) Markers {
 	existing := markers.Entries()
+	for _, m := range existing {
+		if sameReport(m, marker) {
+			return markers
+		}
+	}
 	entries := make([]Marker, len(existing)+1)
 	copy(entries, existing)
 	entries[len(existing)] = marker
@@ -127,6 +134,35 @@ func AddMarker(markers Markers, marker Marker) Markers {
 		id = uuid.New()
 	}
 	return &markersData{id: id, entries: entries}
+}
+
+// sameReport tells whether a and b report the same finding or problem, as the
+// equality of SearchResult and Markup on the Java side does regardless of id.
+func sameReport(a, b Marker) bool {
+	a, b = reportValue(a), reportValue(b)
+	switch a := a.(type) {
+	case SearchResult:
+		b, ok := b.(SearchResult)
+		return ok && a.Description == b.Description
+	case Markup:
+		b, ok := b.(Markup)
+		return ok && a.Level == b.Level && a.Message == b.Message && a.Detail == b.Detail
+	}
+	return false
+}
+
+func reportValue(m Marker) Marker {
+	switch p := m.(type) {
+	case *SearchResult:
+		if p != nil {
+			return *p
+		}
+	case *Markup:
+		if p != nil {
+			return *p
+		}
+	}
+	return m
 }
 
 // SearchResult is a marker indicating that a search recipe found a match.

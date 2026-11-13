@@ -33,6 +33,27 @@ initscript {
             maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
             mavenCentral()
         }
+        // Snapshots of the plugin, behind the credentials openrewrite/rewrite's own build reads. Gradle before 6.2 has no
+        // provider for Gradle properties, so this reads the user home's gradle.properties and the ORG_GRADLE_PROJECT_
+        // environment variables itself; the latter are how the Code Genome Project's CI hands Gradle builds the credential.
+        def gradleProperties = new Properties()
+        def gradlePropertiesFile = new File(gradle.gradleUserHomeDir, "gradle.properties")
+        if (gradlePropertiesFile.isFile()) {
+            gradlePropertiesFile.withInputStream { gradleProperties.load(it) }
+        }
+        def codegenomeUsername = gradleProperties.getProperty("codegenomeUsername") ?:
+                System.getenv("ORG_GRADLE_PROJECT_codegenomeUsername") ?: System.getenv("CODEGENOME_USERNAME")
+        def codegenomePassword = gradleProperties.getProperty("codegenomePassword") ?:
+                System.getenv("ORG_GRADLE_PROJECT_codegenomePassword") ?: System.getenv("CODEGENOME_TOKEN")
+        if (codegenomeUsername && codegenomePassword) {
+            maven {
+                url = uri("https://artifacts.codegenomeproject.org/maven")
+                credentials {
+                    username = codegenomeUsername
+                    password = codegenomePassword
+                }
+            }
+        }
     }
 
     configurations.all {

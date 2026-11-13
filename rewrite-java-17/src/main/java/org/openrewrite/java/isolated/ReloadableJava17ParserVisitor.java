@@ -53,8 +53,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.lang.Math.max;
@@ -105,7 +103,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     @Nullable
     private Throwable reportedException;
 
-    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava17ParserVisitor(Path sourcePath,
                                          @Nullable FileAttributes fileAttributes,
@@ -855,8 +852,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
         J clazz = convertInstanceOfTree(node);
         if (node.getPattern() instanceof JCBindingPattern b) {
+            JavaType.Variable variableType = typeMapping.variableType(b.var.sym);
             pattern = new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
+                    variableType != null ? variableType.getType() : null, variableType);
         }
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
@@ -1314,7 +1312,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case SWITCH:
             case SWITCH_EXPRESSION:
             case SYNCHRONIZED:
-            case TYPE_CAST:
             case WHILE_LOOP:
                 return new J.ControlParentheses<Expression>(randomId(), fmt, Markers.EMPTY,
                         convert(node.getExpression(), t -> sourceBefore(")")));
@@ -2109,13 +2106,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                JCTree first = (JCTree) treeGroup.get(0);
+                String prefix = source.substring(cursor, max(first.getStartPosition(), cursor));
                 cursor += prefix.length();
 
                 Tree last = treeGroup.get(treeGroup.size() - 1);
 
                 @SuppressWarnings("unchecked")
-                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup,
+                        formatWithCommentTree(prefix, first, docCommentTable.getCommentTree(first)));
                 JRightPadded<Statement> paddedVars = padRight(vars, semiDelim.apply(last));
                 cursor(max(endPos(last), cursor));
                 converted.add(paddedVars);

@@ -691,7 +691,8 @@ class PythonRpcReceiver:
     def _visit_j_array_access(self, arr, q: RpcReceiveQueue):
         indexed = q.receive(arr.indexed)
         dimension = q.receive(arr.dimension)
-        return q.apply(arr, indexed=indexed, dimension=dimension)
+        type_ = q.receive(arr.type)
+        return q.apply(arr, indexed=indexed, dimension=dimension, type=type_)
 
     def _visit_j_array_dimension(self, dim, q: RpcReceiveQueue):
         index = q.receive(dim.padding.index)

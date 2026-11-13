@@ -24,6 +24,7 @@ import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -145,10 +146,11 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 }
 
                 // Determine whether to process main source/target → release
+                ResolvedPom pom = getResolutionResult().getPom();
                 boolean processMain = hasMainConfig &&
-                        !versionNewerThanProposed(source) &&
-                        !versionNewerThanProposed(target) &&
-                        !versionNewerThanProposed(release);
+                        !versionNewerThanProposed(source.map(pom::getValue)) &&
+                        !versionNewerThanProposed(target.map(pom::getValue)) &&
+                        !versionNewerThanProposed(release.map(pom::getValue));
 
                 // Determine test handling: whether testRelease is needed after removing testSource/testTarget
                 boolean testNeedsOwnRelease = false;

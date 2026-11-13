@@ -83,4 +83,33 @@ class ModuleHasPluginTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * `matchesGlob` answers true for a null pattern, so an unset `pluginClass` once matched every plugin in the
+     * `GradleProject` marker, marking every module that applied any plugin at all.
+     */
+    @Test
+    void doesNotMatchAModuleApplyingOnlyOtherPlugins() {
+        rewriteRun(
+          spec -> spec.recipe(new ModuleHasPlugin("org.openrewrite.rewrite", null))
+            .beforeRecipe(withToolingApi()),
+          mavenProject("other-project",
+            settingsGradle("""
+              rootProject.name = 'other-project'
+              """),
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+                """
+            ),
+            srcMainJava(
+              java("""
+                class B {}
+                """)
+            )
+          )
+        );
+    }
 }

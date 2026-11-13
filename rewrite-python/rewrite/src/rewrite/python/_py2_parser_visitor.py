@@ -292,6 +292,7 @@ class Py2ParserVisitor:
             'power': self._convert_power,
             'testlist_star_expr': self._convert_testlist,
             'testlist': self._convert_testlist,
+            'testlist_safe': self._convert_testlist,
             'test': self._convert_test,
             'or_test': self._convert_or_test,
             'and_test': self._convert_and_test,
@@ -845,16 +846,14 @@ class Py2ParserVisitor:
 
         annotations = []
         outer_prefix = None
-        trailing = ''  # accumulator of newlines emitted between decorators
+        trailing = ''  # the line end of the decorator before, with its comment
         for dec_node in decorator_nodes:
             ann = self._convert_decorator(dec_node)
             if ann is None:
                 return self._convert_generic(node)
-            # Prepend any pending newline-between-decorators to this
-            # annotation's prefix so the printer reproduces line breaks.
+            # Prepend the previous decorator's line end to this annotation's prefix.
             if trailing:
-                existing = ann.prefix.whitespace if ann.prefix else ''
-                ann = ann.replace(_prefix=Space([], trailing + existing))
+                ann = ann.replace(_prefix=self._concat_space(self._parse_space(trailing), ann.prefix or Space.EMPTY))
                 trailing = ''
             if outer_prefix is None:
                 outer_prefix = ann.prefix
@@ -863,14 +862,13 @@ class Py2ParserVisitor:
                 annotations.append(ann.replace(_prefix=Space.EMPTY))
             else:
                 annotations.append(ann)
-            # parso emits the trailing newline as the decorator's last
-            # child. Capture it so it can land on the next annotation /
-            # def-modifier prefix.
+            # parso ends a decorator with a newline leaf, whose prefix holds the line's comment. Both
+            # land on the next annotation's or def-modifier's prefix.
             if dec_node.children:
                 last = dec_node.children[-1]
                 if (isinstance(last, parso_tree.PythonLeaf)
                         and getattr(last, 'type', None) == 'newline'):
-                    trailing += last.value
+                    trailing += last.prefix + last.value
 
         body = children[body_idx] if body_idx < len(children) else None
         if body is None:
@@ -969,8 +967,8 @@ class Py2ParserVisitor:
         if outer_prefix is not None:
             modifier_prefix = def_prefix
         if extra_modifier_prefix:
-            existing = modifier_prefix.whitespace if modifier_prefix is not None else ''
-            modifier_prefix = Space([], extra_modifier_prefix + existing)
+            modifier_prefix = self._concat_space(self._parse_space(extra_modifier_prefix),
+                                                 modifier_prefix or Space.EMPTY)
 
         modifiers = [j.Modifier(
             random_id(),
@@ -1278,8 +1276,7 @@ class Py2ParserVisitor:
         prefix = outer_prefix if outer_prefix is not None else class_prefix
         kind_prefix = class_prefix if outer_prefix is not None else Space.EMPTY
         if extra_modifier_prefix:
-            existing = kind_prefix.whitespace if kind_prefix is not None else ''
-            kind_prefix = Space([], extra_modifier_prefix + existing)
+            kind_prefix = self._concat_space(self._parse_space(extra_modifier_prefix), kind_prefix or Space.EMPTY)
 
         name_ident = j.Identifier(
             random_id(),
@@ -1524,7 +1521,9 @@ class Py2ParserVisitor:
         :attr:`j.Block.end` (the printer renders ``.after`` before
         markers, so it can't live in the last statement's ``.after``).
         """
-        statements, end_ws = self._convert_stmt_block_children(suite_node.children)
+        # A suite on its header's line is a lone statement rather than a list of statements.
+        children = suite_node.children if suite_node.type == 'suite' else [suite_node]
+        statements, end_ws = self._convert_stmt_block_children(children)
         return j.Block(
             random_id(),
             block_prefix,
@@ -2473,7 +2472,7 @@ class Py2ParserVisitor:
 
         return clauses
 
-    def _pad_comma_list(self, items, before_close) -> Optional[list]:
+    def _pad_comma_list(self, items, before_close, convert=None) -> Optional[list]:
         """Turn a ``[item, ',', item, ',', ...]`` flat parso list into
         :class:`JRightPadded` entries.
 
@@ -2490,7 +2489,7 @@ class Py2ParserVisitor:
             if getattr(child, 'value', None) == ',':
                 i += 1
                 continue
-            expr = self._convert_node(child)
+            expr = (convert or self._convert_node)(child)
             if expr is None:
                 return None
             if i + 1 < len(items) and getattr(items[i + 1], 'value', None) == ',':
@@ -2681,13 +2680,11 @@ class Py2ParserVisitor:
             inner = trailer.children[1] if len(trailer.children) == 3 else None
             if inner is None:
                 return None
-            if getattr(inner, 'type', None) == 'subscript':
-                index = self._convert_slice(inner)
-            elif getattr(inner, 'type', None) == 'subscriptlist':
+            if getattr(inner, 'type', None) == 'subscriptlist':
                 # Multi-element subscript ``a[i, j]`` — render as a tuple.
-                index = self._convert_bare_tuple(inner.children)
+                index = self._convert_bare_tuple(inner.children, self._convert_subscript)
             else:
-                index = self._convert_node(inner)
+                index = self._convert_subscript(inner)
             if index is None:
                 return None
             return j.ArrayAccess(
@@ -2706,45 +2703,52 @@ class Py2ParserVisitor:
 
         return None
 
-    def _convert_slice(self, subscript_node) -> Optional[j.J]:
-        """Convert a parso ``subscript`` (start[:stop[:step]]) to :class:`py.Slice`.
+    def _convert_subscript(self, node) -> Optional[j.J]:
+        """Convert one item between a subscript's brackets, which can be a slice or ``...``."""
+        if getattr(node, 'value', None) == ':':
+            return py.Slice(random_id(), self._parse_space(node.prefix), Markers.EMPTY, None,
+                            JRightPadded(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY, Markers.EMPTY),
+                            None)
+        if getattr(node, 'type', None) != 'subscript':
+            return self._convert_node(node)
+        first, *dots = node.children
+        if getattr(first, 'value', None) == '.':
+            # Python 2 spells the ellipsis as three '.' operators, which only a subscript holds.
+            return j.Literal(random_id(), self._parse_space(first.prefix), Markers.EMPTY,
+                             None, '.' + ''.join(dot.prefix + dot.value for dot in dots), None, None)
+        return self._convert_slice(node)
 
-        Each component is optional; absent components produce ``None`` slots.
-        ``a[::2]`` parses as ``[':', sliceop[':', 2]]`` — no start and no stop.
+    def _convert_slice(self, subscript_node) -> Optional[j.J]:
+        """Convert a parso ``subscript`` (start[:stop[:step]]) to :class:`py.Slice`, shaped as the Python 3 parser
+        shapes one. ``a[::2]`` parses as ``[':', sliceop[':', 2]]``, and ``a[::]`` as ``[':', ':']``.
         """
-        children = subscript_node.children
+        children = list(subscript_node.children)
         start = None
-        stop = None
-        step = None
-        idx = 0
-        # Parse optional start (any non-':' child before the first ':').
-        if idx < len(children) and getattr(children[idx], 'value', None) != ':':
-            expr = self._convert_node(children[idx])
-            if expr is None:
+        if getattr(children[0], 'value', None) == ':':
+            prefix = self._parse_space(children[0].prefix)
+        else:
+            expr = self._convert_node(children.pop(0))
+            if expr is None or not children:
                 return None
-            start = JRightPadded(expr, Space.EMPTY, Markers.EMPTY)
-            idx += 1
-        # First ':'.
-        if idx >= len(children) or getattr(children[idx], 'value', None) != ':':
+            prefix = expr.prefix
+            start = JRightPadded(expr.replace(prefix=Space.EMPTY), self._parse_space(children[0].prefix), Markers.EMPTY)
+        children.pop(0)
+        stop_expr: Optional[j.J] = j.Empty(random_id(), Space.EMPTY, Markers.EMPTY)
+        if children and getattr(children[0], 'value', None) != ':' and getattr(children[0], 'type', None) != 'sliceop':
+            stop_expr = self._convert_node(children.pop(0))
+            if stop_expr is None:
+                return None
+        if not children:
+            return py.Slice(random_id(), prefix, Markers.EMPTY, start,
+                            JRightPadded(stop_expr, Space.EMPTY, Markers.EMPTY), None)
+        colon, *step_nodes = children[0].children if getattr(children[0], 'type', None) == 'sliceop' else children
+        step_expr = self._convert_node(step_nodes[0]) if step_nodes \
+            else j.Empty(random_id(), Space.EMPTY, Markers.EMPTY)
+        if step_expr is None:
             return None
-        idx += 1
-        # Optional stop.
-        if idx < len(children) and getattr(children[idx], 'value', None) != ':' \
-                and getattr(children[idx], 'type', None) != 'sliceop':
-            expr = self._convert_node(children[idx])
-            if expr is None:
-                return None
-            stop = JRightPadded(expr, Space.EMPTY, Markers.EMPTY)
-            idx += 1
-        # Optional sliceop = [':' [expr]].
-        if idx < len(children) and getattr(children[idx], 'type', None) == 'sliceop':
-            sop = children[idx]
-            if len(sop.children) >= 2:
-                expr = self._convert_node(sop.children[1])
-                if expr is None:
-                    return None
-                step = JRightPadded(expr, Space.EMPTY, Markers.EMPTY)
-        return py.Slice(random_id(), Space.EMPTY, Markers.EMPTY, start, stop, step)
+        return py.Slice(random_id(), prefix, Markers.EMPTY, start,
+                        JRightPadded(stop_expr, self._parse_space(colon.prefix), Markers.EMPTY),
+                        JRightPadded(step_expr, Space.EMPTY, Markers.EMPTY))
 
     def _convert_call_args(self, inner, close_paren, leading_space) -> Optional[JContainer]:
         """Build the JContainer holding a function call's arguments.
@@ -2901,11 +2905,11 @@ class Py2ParserVisitor:
             return self._convert_generic(node)
         return tuple_lit
 
-    def _convert_bare_tuple(self, children) -> Optional[py.CollectionLiteral]:
+    def _convert_bare_tuple(self, children, convert=None) -> Optional[py.CollectionLiteral]:
         """Convert a comma-separated parso list written without parentheses
         (``testlist``, ``exprlist``, ``subscriptlist``) to a ``TUPLE``
         :class:`py.CollectionLiteral` marked with ``OmitParentheses``."""
-        items = self._pad_comma_list(children, Space.EMPTY)
+        items = self._pad_comma_list(children, Space.EMPTY, convert)
         if items is None:
             return None
         return py.CollectionLiteral(

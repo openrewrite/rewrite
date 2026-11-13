@@ -1,6 +1,8 @@
 import pytest
 
-from rewrite.python import IntelliJ
+from rewrite import ExecutionContext
+from rewrite.java import J
+from rewrite.python import CompilationUnit, IntelliJ, PythonVisitor
 from rewrite.python.format import TabsAndIndentsVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
@@ -967,6 +969,74 @@ def test_docstring_alignment():
             '''
         ),
         spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_a_realigned_docstring_holds_the_string_its_text_spells():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
+    values = []
+    rewrite_run(
+        # language=python
+        python(
+            '''
+            def my_function():
+              """
+              Aligned with the body.
+              """
+              return None
+            ''',
+            '''
+            def my_function():
+                """
+                Aligned with the body.
+                """
+                return None
+            ''',
+            after_recipe=lambda cu: values.append(cu.statements[0].body.statements[0].expression.value)
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+    assert values == ["\n    Aligned with the body.\n    "]
+
+
+def test_an_over_indented_docstring_moves_left():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            '''
+            def my_function():
+                    """
+                    Over-indented.
+                    """
+                    return None
+            ''',
+            '''
+            def my_function():
+                """
+                Over-indented.
+                """
+                return None
+            '''
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_indentation_stops_after_the_given_tree():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
+
+    class IndentTheFirstFunction(PythonVisitor[ExecutionContext]):
+        def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+            return TabsAndIndentsVisitor(style, stop_after=cu.statements[0]).visit(cu, ctx)
+
+    rewrite_run(
+        # language=python
+        python(
+            "def f():\n  return 1\n\ndef g():\n  return 2\n",
+            "def f():\n    return 1\n\ndef g():\n  return 2\n",
+        ),
+        spec=RecipeSpec().with_recipe(from_visitor(IndentTheFirstFunction()))
     )
 
 

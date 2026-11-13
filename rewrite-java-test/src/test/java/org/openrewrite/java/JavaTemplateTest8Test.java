@@ -24,9 +24,14 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -340,7 +345,6 @@ class JavaTemplateTest8Test implements RewriteTest {
         rewriteRun(
           spec -> spec
             .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
-            .typeValidationOptions(org.openrewrite.test.TypeValidation.builder().methodInvocations(false).build())
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -643,7 +647,9 @@ class JavaTemplateTest8Test implements RewriteTest {
     @Test
     void replaceContextSensitiveMethodInvocationInAssignmentWithLocalClassType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template writes a local or anonymous class as its supertype, so it infers that type
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
@@ -908,4 +914,167 @@ class JavaTemplateTest8Test implements RewriteTest {
           .hasMessageContaining("requires a template that produces an `if`");
     }
 
+    @Test
+    void contextSensitiveTemplateGivesArrayVariablesTheirDeclaredDimensions() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("clear")) {
+                      return JavaTemplate.builder("reset(a, b, c, d)")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  private int[] a, b[];
+                  private int c[];
+                  void reset(int[] a, int[][] b, int[] c, int[][] d) {}
+                  void clear() {}
+                  void test() {
+                      int[][] d = new int[2][3];
+                      clear();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private int[] a, b[];
+                  private int c[];
+                  void reset(int[] a, int[][] b, int[] c, int[][] d) {}
+                  void clear() {}
+                  void test() {
+                      int[][] d = new int[2][3];
+                      reset(a, b, c, d);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateStubDeclaresVarargsParameterAsArray() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  if ("unused".equals(literal.getValue())) {
+                      return JavaTemplate.builder("\"all\"")
+                        .contextSensitive()
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), literal.getCoordinates().replace());
+                  }
+                  return literal;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(@SuppressWarnings("unused") String... args) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(@SuppressWarnings("all") String... args) {
+                  }
+              }
+              """
+          )
+        );
+        // an annotation argument cannot refer to the parameter, so only the stub shows the type it is declared with
+        assertThat(stubs)
+          .isNotEmpty()
+          .allSatisfy(stub -> assertThat(stub).contains("String[] args"));
+    }
+
+    @Test
+    void contextSensitiveTemplateInitializingOneOfSeveralVariablesTakesThatVariablesType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("make")) {
+                      return JavaTemplate.builder("java.util.Collections.emptyList()")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<String> make() { return null; }
+                  void test() {
+                      List<String> a = make(), b[] = null;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<String> make() { return null; }
+                  void test() {
+                      List<String> a = java.util.Collections.emptyList(), b[] = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateSeesVarLocalsWithTheirInferredTypes() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("clear")) {
+                      return JavaTemplate.builder("take(arr, n)")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void take(int[] a, int n) {}
+                  void take(int[] a, long n) {}
+                  void clear() {}
+                  void test() {
+                      var arr = new int[3];
+                      var n = 1L;
+                      clear();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void take(int[] a, int n) {}
+                  void take(int[] a, long n) {}
+                  void clear() {}
+                  void test() {
+                      var arr = new int[3];
+                      var n = 1L;
+                      take(arr, n);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

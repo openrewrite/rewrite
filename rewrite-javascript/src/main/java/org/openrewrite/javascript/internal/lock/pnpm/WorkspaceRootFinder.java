@@ -46,8 +46,15 @@ public final class WorkspaceRootFinder {
      * found, or null.
      */
     public static @Nullable String findWorkspaceManifest(Predicate<String> holds, String cwd) {
+        return findWorkspaceManifest(holds, cwd, PnpmRelease.PORTED);
+    }
+
+    private static @Nullable String findWorkspaceManifest(Predicate<String> holds, String cwd, PnpmRelease release) {
         for (String dir = cwd; ; dir = RootRelativePath.dirname(dir)) {
             for (String name : WORKSPACE_MANIFEST_FILENAMES) {
+                if (name.startsWith(".") && !release.detectsDotPrefixedWorkspaceManifests()) {
+                    continue;
+                }
                 String path = dir.isEmpty() ? name : dir + "/" + name;
                 if (holds.test(path)) {
                     return path;
@@ -64,6 +71,11 @@ public final class WorkspaceRootFinder {
      * workspace manifest, else that of the one found from cwd, or null; an unknown environment (null) sets no variable.
      */
     static @Nullable String findWorkspaceDir(Predicate<String> holds, String cwd, @Nullable Map<String, String> env) {
+        return findWorkspaceDir(holds, cwd, env, PnpmRelease.PORTED);
+    }
+
+    static @Nullable String findWorkspaceDir(Predicate<String> holds, String cwd, @Nullable Map<String, String> env,
+                                              PnpmRelease release) {
         String workspaceManifestDirEnvVar = env == null ? null : env.containsKey(WORKSPACE_DIR_ENV_VAR) ?
                 env.get(WORKSPACE_DIR_ENV_VAR) : env.get(WORKSPACE_DIR_ENV_VAR.toLowerCase(Locale.ROOT));
         String workspaceManifestLocation;
@@ -76,7 +88,7 @@ public final class WorkspaceRootFinder {
             }
             workspaceManifestLocation = RootRelativePath.join(dir, WORKSPACE_MANIFEST_FILENAME);
         } else {
-            workspaceManifestLocation = findWorkspaceManifest(holds, cwd);
+            workspaceManifestLocation = findWorkspaceManifest(holds, cwd, release);
         }
         if (workspaceManifestLocation == null) {
             return null;

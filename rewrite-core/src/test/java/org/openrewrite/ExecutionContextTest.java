@@ -84,4 +84,45 @@ class ExecutionContextTest implements RewriteTest {
           .hasMessageContaining("put \"test\" on the ExecutionContext");
         assertThat(ctx.<String>getMessage("test")).isNull();
     }
+
+    @Test
+    void computeMessageIfAbsentFunctionMayWriteToContext() {
+        var ctx = new InMemoryExecutionContext();
+
+        String computed = ctx.computeMessageIfAbsent("computed", k -> {
+            ctx.computeMessageIfAbsent("nested", k2 -> "nested");
+            // More messages than a default ConcurrentHashMap holds before it resizes
+            for (int i = 0; i < 16; i++) {
+                ctx.putMessage("written" + i, i);
+            }
+            return "computed";
+        });
+
+        assertThat(computed).isEqualTo("computed");
+        assertThat(ctx.getMessages())
+          .containsEntry("computed", "computed")
+          .containsEntry("nested", "nested")
+          .containsEntry("written15", 15);
+    }
+
+    @Test
+    void computeMessageIfAbsentReturnsValueStoredWhileFunctionRan() {
+        var ctx = new InMemoryExecutionContext();
+
+        // The function's own write stands in for another thread winning the race on the key
+        String computed = ctx.computeMessageIfAbsent("key", k -> {
+            ctx.putMessage("key", "stored first");
+            return "computed";
+        });
+
+        assertThat(computed).isEqualTo("stored first");
+        assertThat(ctx.<String>getMessage("key")).isEqualTo("stored first");
+    }
+
+    @Test
+    void computeMessageIfAbsentReturnsNullResultWithoutStoringIt() {
+        var ctx = new InMemoryExecutionContext();
+        assertThat(ctx.<String>computeMessageIfAbsent("absent", k -> null)).isNull();
+        assertThat(ctx.getMessages()).doesNotContainKey("absent");
+    }
 }

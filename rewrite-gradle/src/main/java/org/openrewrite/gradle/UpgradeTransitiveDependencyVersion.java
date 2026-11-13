@@ -244,8 +244,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    gradleProject = tree.getMarkers().findFirst(GradleProject.class)
-                            .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
+                    Optional<GradleProject> maybeGradleProject = tree.getMarkers().findFirst(GradleProject.class);
+                    if (!maybeGradleProject.isPresent()) {
+                        return (JavaSourceFile) tree;
+                    }
+                    gradleProject = maybeGradleProject.get();
                     acc.updatesPerProject.putIfAbsent(getGradleProjectKey(gradleProject), new HashMap<>());
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);

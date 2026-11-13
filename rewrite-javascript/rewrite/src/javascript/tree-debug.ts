@@ -423,6 +423,10 @@ function escapeString(str: string): string {
 /**
  * Format a literal value for inline display.
  */
+function formatScalar(value: unknown): string {
+    return typeof value === 'bigint' ? `${value}n` : JSON.stringify(value);
+}
+
 function formatLiteralValue(lit: J.Literal): string {
     let value: string;
     if (lit.valueSource !== undefined) {
@@ -749,7 +753,7 @@ export class LstDebugPrinter {
 
         // Primitive or unknown type
         if (typeof node !== 'object') {
-            this.outputLines.push(`${this.indent(depth)}${JSON.stringify(node)}`);
+            this.outputLines.push(`${this.indent(depth)}${formatScalar(node)}`);
             return;
         }
 
@@ -851,7 +855,7 @@ export class LstDebugPrinter {
                 // Skip complex objects that aren't J nodes
                 this.outputLines.push(`${this.indent(depth)}${key}: <object>`);
             } else {
-                this.outputLines.push(`${this.indent(depth)}${key}: ${JSON.stringify(value)}`);
+                this.outputLines.push(`${this.indent(depth)}${key}: ${formatScalar(value)}`);
             }
         }
     }
@@ -934,7 +938,7 @@ export class LstDebugPrinter {
             if (typeof value === 'object' && value !== null) {
                 this.outputLines.push(`${this.indent(depth + 1)}${key}: <object>`);
             } else {
-                this.outputLines.push(`${this.indent(depth + 1)}${key}: ${JSON.stringify(value)}`);
+                this.outputLines.push(`${this.indent(depth + 1)}${key}: ${formatScalar(value)}`);
             }
         }
         this.outputLines.push(`${this.indent(depth)}}`);

@@ -15,8 +15,11 @@
  */
 package org.openrewrite.internal;
 
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.jgit.api.ApplyResult;
@@ -34,8 +37,10 @@ import org.openrewrite.text.PlainTextParser;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,6 +48,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
+import static org.junit.jupiter.api.condition.OS.WINDOWS;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
@@ -579,6 +585,61 @@ class InMemoryDiffEntryTest {
             db.close();
         } finally {
             FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+        }
+    }
+
+    @DisabledOnOs(value = WINDOWS, disabledReason = "Backslash is a path separator on Windows")
+    @Test
+    void renameKeepsBackslashInFileName() {
+        try (var entry = new InMemoryDiffEntry(
+          Path.of("dir/a\\b.txt"), Path.of("dir/c\\d.txt"), null,
+          "hello", "hello", emptySet())) {
+            assertThat(entry.getOldPath()).isEqualTo("dir/a\\b.txt");
+            assertThat(entry.getNewPath()).isEqualTo("dir/c\\d.txt");
+        }
+    }
+
+    @DisabledOnOs(value = WINDOWS, disabledReason = "Backslash is a path separator on Windows")
+    @Test
+    void diffOfFileNameWithBackslashCanBeAppliedByJgit() throws Exception {
+        File trash = Files.createTempDirectory("backslash-diff-test").toFile();
+        try (Git git = Git.init().setDirectory(trash).call()) {
+            Path file = trash.toPath().resolve("dir").resolve("a\\b.txt");
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, "hello\n");
+            git.add().addFilepattern("dir/a\\b.txt").call();
+            git.commit().setMessage("initial").call();
+
+            PlainText before = PlainTextParser.builder().build()
+              .parse("hello\n").findFirst().get()
+              .withSourcePath(file);
+            PlainText after = before.withText("goodbye\n");
+
+            String diff;
+            try (var entry = new InMemoryDiffEntry(before, after, trash.toPath(), null, emptySet(), false)) {
+                diff = entry.getDiff();
+            }
+
+            ApplyResult result = git.apply()
+              .setPatch(new ByteArrayInputStream(diff.getBytes(StandardCharsets.UTF_8)))
+              .call();
+
+            assertThat(result.getUpdatedFiles()).containsExactly(file.toFile());
+            assertThat(file).hasContent("goodbye");
+            assertThat(trash.toPath().resolve("dir/a/b.txt")).doesNotExist();
+        } finally {
+            FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+        }
+    }
+
+    @Test
+    void windowsPathsUseForwardSlashes() throws IOException {
+        try (FileSystem windows = Jimfs.newFileSystem(Configuration.windows());
+             var entry = new InMemoryDiffEntry(
+               windows.getPath("C:\\repo\\src\\A.java"), windows.getPath("C:\\repo\\src\\B.java"), windows.getPath("C:\\repo"),
+               "hello", "hello", emptySet())) {
+            assertThat(entry.getOldPath()).isEqualTo("src/A.java");
+            assertThat(entry.getNewPath()).isEqualTo("src/B.java");
         }
     }
 

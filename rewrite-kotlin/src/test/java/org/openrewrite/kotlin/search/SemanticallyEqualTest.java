@@ -31,6 +31,42 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SemanticallyEqualTest {
 
     @Test
+    void extensionCallsCompareTheirReceivers() {
+        List<J.Try.Catch> catches = catches("""
+          fun f(username: String?, password: String?) {
+              try {
+                  println("credentials")
+              } catch (e: IllegalStateException) {
+                  !username.isNullOrBlank()
+              } catch (e: Exception) {
+                  !password.isNullOrBlank()
+              }
+          }
+          """);
+
+        assertThat(SemanticallyEqual.areEqual(catches.get(0).getBody(), catches.get(1).getBody())).isFalse();
+        assertThat(SemanticallyEqual.areEqual(catches.get(1).getBody(), catches.get(0).getBody())).isFalse();
+    }
+
+    @Test
+    void extensionCallsOnTheSameReceiverAreEqual() {
+        List<J.Try.Catch> catches = catches("""
+          fun f(username: String?) {
+              try {
+                  println("credentials")
+              } catch (e: IllegalStateException) {
+                  !username.isNullOrBlank()
+              } catch (e: Exception) {
+                  !username.isNullOrBlank()
+              }
+          }
+          """);
+
+        assertThat(SemanticallyEqual.areEqual(catches.get(0).getBody(), catches.get(1).getBody())).isTrue();
+        assertThat(SemanticallyEqual.areEqual(catches.get(1).getBody(), catches.get(0).getBody())).isTrue();
+    }
+
+    @Test
     void elvisWithThrowIsNotEqualToThrow() {
         // given
         List<J.Try.Catch> catches = catches("""

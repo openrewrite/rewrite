@@ -394,6 +394,20 @@ class JsonPathMatcherTest implements RewriteTest {
     }
 
     @Test
+    void labelsAndFilterStringsMatchByTheTextTheEscapesStandFor() {
+        List<String> escaped = List.of(
+          """
+            resource "a\\\\b" "x" {
+              v = "c\\\\d"
+            }
+            """
+        );
+        assertMatched(escaped, List.of("v = \"c\\\\d\""), "$.resource['a\\\\b'].v", false);
+
+        assertMatched(escaped, List.of("v = \"c\\\\d\""), "$.resource[?(@.v == 'c\\\\d')].v", false);
+    }
+
+    @Test
     void matchByLabelInBracketNotation() {
         assertMatched(
           List.of(RESOURCES),

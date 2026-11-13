@@ -381,8 +381,12 @@ describe('MethodMatcher', () => {
         //language=typescript
         await spec.rewriteRun(
             typescript(
-                `declare const a: any;\na.baz();`,
-                `declare const a: any;\n/*~~>*/a.baz();`
+                `
+                declare const a: any;
+                a.baz();`,
+                `
+                declare const a: any;
+                /*~~>*/a.baz();`
             )
         );
     });

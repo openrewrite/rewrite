@@ -137,7 +137,9 @@ final class PackageDiff {
             }
             int matched = toI;
             toI++;
-            if (toDeps.get(matched).eql(fromDep, release)) {
+            if (toDeps.get(matched).eql(fromDep, release) &&
+                    (!release.keepsChangedRangeLiterals() ||
+                     toDeps.get(matched).version.literal.equals(fromDep.version.literal))) {
                 if (idMapping != null) {
                     boolean updateMapping = true;
                     // before 1.2.19 a member is diffed again where the dependency is a workspace spec

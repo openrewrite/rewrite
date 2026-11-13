@@ -117,6 +117,52 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void rightOperandOfAnEquallyBindingOperator() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(int a, int b, int c, boolean x, boolean y, boolean z, String s) {
+                      int d = a + (b + c);
+                      int e = a * (b * c);
+                      int f = a & (b & c);
+                      int g = a | (b | c);
+                      int h = a ^ (b ^ c);
+                      int i = a << (b << c);
+                      boolean j = x && (y && z);
+                      boolean k = x || (y || z);
+                      boolean l = x == (y == z);
+                      String m = s + (a + b);
+                      String n = s + (s + a);
+                      int o = (a + b) + c;
+                      boolean p = (x || y) || z;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(int a, int b, int c, boolean x, boolean y, boolean z, String s) {
+                      int d = a + (b + c);
+                      int e = a * (b * c);
+                      int f = a & (b & c);
+                      int g = a | (b | c);
+                      int h = a ^ (b ^ c);
+                      int i = a << (b << c);
+                      boolean j = x && (y && z);
+                      boolean k = x || (y || z);
+                      boolean l = x == (y == z);
+                      String m = s + (a + b);
+                      String n = s + (s + a);
+                      int o = a + b + c;
+                      boolean p = x || y || z;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void unaryOperatorsWithBinaries() {
         rewriteRun(
           java(
@@ -205,6 +251,92 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void castAndInstanceofOperands() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(long x, long y, int i, Object o, Object p) {
+                      int a = (int) (x + y);
+                      Object b = (Object) (o = p);
+                      long c = (long) (i += 1);
+                      Object d = (Object) (o instanceof String);
+                      Integer e = (Integer) (-i);
+                      Integer f = (Integer) (++i);
+                      int g = (int) (-i);
+                      boolean h = (o = p) instanceof String;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(long x, long y, int i, Object o, Object p) {
+                      int a = (int) (x + y);
+                      Object b = (Object) (o = p);
+                      long c = (long) (i += 1);
+                      Object d = (Object) (o instanceof String);
+                      Integer e = (Integer) (-i);
+                      Integer f = (Integer) (++i);
+                      int g = (int) -i;
+                      boolean h = (o = p) instanceof String;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void selectsTargetsAndQualifiers() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.IntSupplier;
+
+              class Test {
+                  int f;
+                  void run() {}
+
+                  void method(Object o, String s, String t, int[] arr, int[] other, boolean x) {
+                      int a = ((Test) o).f;
+                      int b = ((int[]) o)[0];
+                      Runnable c = ((Test) o)::run;
+                      int d = (x ? arr : other)[0];
+                      int e = (x ? arr : other).length;
+                      int g = (arr = other).length;
+                      int h = (s = t).length();
+                      int i = (s += t).length();
+                      IntSupplier j = (s + t)::length;
+                      int k = (s).length();
+                  }
+              }
+              """,
+            """
+              import java.util.function.IntSupplier;
+
+              class Test {
+                  int f;
+                  void run() {}
+
+                  void method(Object o, String s, String t, int[] arr, int[] other, boolean x) {
+                      int a = ((Test) o).f;
+                      int b = ((int[]) o)[0];
+                      Runnable c = ((Test) o)::run;
+                      int d = (x ? arr : other)[0];
+                      int e = (x ? arr : other).length;
+                      int g = (arr = other).length;
+                      int h = (s = t).length();
+                      int i = (s += t).length();
+                      IntSupplier j = (s + t)::length;
+                      int k = s.length();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void instanceofExpressions() {
         rewriteRun(
           java(
@@ -215,6 +347,10 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean b = obj != null && (obj instanceof String);
                       boolean c = (!obj) instanceof String;
                       boolean d = (obj instanceof String) ? true : false;
+                      String e = (obj instanceof String) + "";
+                      String f = "" + (obj instanceof String);
+                      String g = String.valueOf((obj instanceof String));
+                      Boolean h = new Boolean((obj instanceof String));
                   }
               }
               """,
@@ -225,6 +361,10 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean b = obj != null && obj instanceof String;
                       boolean c = !obj instanceof String;
                       boolean d = obj instanceof String ? true : false;
+                      String e = (obj instanceof String) + "";
+                      String f = "" + (obj instanceof String);
+                      String g = String.valueOf(obj instanceof String);
+                      Boolean h = new Boolean(obj instanceof String);
                   }
               }
               """
@@ -272,7 +412,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       // String concatenation with mixed types
                       String a = "Calculation: " + 1.5 * 2;
                       String b = "Item " + 1 + ": detail";
-                      String c = "Item " + 1 + ": detail";
+                      String c = "Item " + (1 + ": detail");
 
                       // String concatenation in conditions
                       boolean test1 = ("a" + "b").equals("ab");
@@ -315,6 +455,36 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean e = (b = 2) > 0;
                       c = a > b ? (a = 3) : (b = 4);
                       int f = a += 2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compoundAssignmentExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(int a, int b) {
+                      int c = (a += 1) + 1;
+                      boolean d = (b -= 2) > 0;
+                      int e = -(a *= 2);
+                      int f = a > b ? (a += 3) : (b -= 4);
+                      a = (b += 5);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(int a, int b) {
+                      int c = (a += 1) + 1;
+                      boolean d = (b -= 2) > 0;
+                      int e = -(a *= 2);
+                      int f = a > b ? (a += 3) : (b -= 4);
+                      a = b += 5;
                   }
               }
               """
@@ -543,9 +713,17 @@ class ParenthesizeVisitorTest implements RewriteTest {
 
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
+                      int result10 = (a += b) + c;
 
                       // Switch expression
                       int result7 = (switch(a) { default -> "one";}).length();
+
+                      // Associative operations, which the parser still groups to the left
+                      int result8 = a + (b + c);
+                      boolean result9 = a > b || (b > c || c > a);
+
+                      // Cast operand
+                      long result11 = (long) (a + b);
                   }
               }
               """,
@@ -574,9 +752,17 @@ class ParenthesizeVisitorTest implements RewriteTest {
 
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
+                      int result10 = (a += b) + c;
 
                       // Switch expression
                       int result7 = (switch(a) { default -> "one";}).length();
+
+                      // Associative operations, which the parser still groups to the left
+                      int result8 = a + (b + c);
+                      boolean result9 = a > b || (b > c || c > a);
+
+                      // Cast operand
+                      long result11 = (long) (a + b);
                   }
               }
               """

@@ -235,4 +235,25 @@ public class MethodMatcherTests
             parameterTypes: [MakeClass("System.String")]);
         Assert.True(mm.Matches(method));
     }
+
+    [Fact]
+    public void NameOnlyFallbackMatchesVerbatimInvocationName()
+    {
+        var mm = new MethodMatcher("* event(..)");
+        var mi = new MethodInvocation(
+            Guid.NewGuid(), OpenRewrite.Core.Space.Empty, OpenRewrite.Core.Markers.Empty,
+            null, TestHelpers.MakeId("@event"), null,
+            new JContainer<Expression>(OpenRewrite.Core.Space.Empty, [], OpenRewrite.Core.Markers.Empty),
+            null);
+        Assert.True(mm.Matches(mi));
+    }
+
+    [Fact]
+    public void NameOnlyFallbackMatchesEscapedDeclarationName()
+    {
+        var mm = new MethodMatcher("* ab(..)");
+        var cu = new CSharpParser().Parse("class A { void \\u0061b() { } }");
+        var md = (MethodDeclaration)((ClassDeclaration)cu.Members[0].Element).Body.Statements[0].Element;
+        Assert.True(mm.Matches(md.WithMethodType(null)));
+    }
 }

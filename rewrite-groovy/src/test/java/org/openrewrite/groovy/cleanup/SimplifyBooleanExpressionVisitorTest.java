@@ -18,6 +18,7 @@ package org.openrewrite.groovy.cleanup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
@@ -29,6 +30,122 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
 class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"foo\" == null", "null == \"foo\"", "1 == 2", "3 == 4",
+      "!(1 == 2)", "(1 == 2) || (3 == 4)", "!false", "\"foo\".equals(\"bar\")"})
+    void preserveAssertDiagnosticInput(String condition) {
+        rewriteRun(
+          groovy(
+            """
+              class Conditions {
+                  void check() {
+                      assert %1$s
+                      assert %1$s : "diagnostic message"
+                  }
+              }
+              """.formatted(condition)
+          )
+        );
+    }
+
+    @Test
+    void preserveNestedNegationPrecedence() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                  boolean same(String left, String right) {
+                      return !!(left == right)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveNonBooleanDuplicateOperands() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                  def nullOr() { return null || null }
+                  def nullAnd() { return null && null }
+                  def stringOr(String value) { return value || value }
+                  def stringAnd(String value) { return value && value }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralEqualsAsStatement() {
+        rewriteRun(groovy("class A{void f(){\"foo\".equals(\"bar\");}}"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"foo\".equals(\"bar\")", "\"\".isEmpty()", "value.equals(value)"})
+    void preserveStringCallsInStatementPositions(String invocation) {
+        rewriteRun(groovy(
+          """
+            class A {
+                void f(String value, boolean flag, String[] values) {
+                    %1$s;
+                    if (flag) %1$s; else %1$s;
+                    while (flag) %1$s;
+                    do %1$s while (flag);
+                    for (; flag;) %1$s;
+                    for (String item : values) %1$s;
+                    for (%1$s; flag; %1$s) {}
+                    label: %1$s;
+                    switch (value) { case "foo": %1$s; break; }
+                }
+            }
+            """.formatted(invocation)
+        ));
+    }
+
+    @Test
+    void foldStringExpressionsInsideStatementArguments() {
+        rewriteRun(groovy(
+          """
+            class A {
+                void accept(boolean a, boolean b) {}
+                boolean f() {
+                    accept("foo".equals("bar"), "".isEmpty())
+                    return "foo".equals("bar")
+                }
+            }
+            """,
+          """
+            class A {
+                void accept(boolean a, boolean b) {}
+                boolean f() {
+                    accept(false, true)
+                    return false
+                }
+            }
+            """
+        ));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"next().equals(next())"})
+    void preserveStringSelfEqualsEvaluation(String expression) {
+        rewriteRun(groovy(
+          """
+            class A {
+                String value;
+                String next() { return value; }
+                boolean f(String value, A holder, String[] values, int index) {
+                    return %s;
+                }
+            }
+            """.formatted(expression)
+        ));
+    }
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -125,6 +242,45 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void preserveSpockDoubleNotOptOut() {
+        rewriteRun(
+          groovy(
+            """
+              class Conditions {
+                  void check(String foo, String bar, Boolean boxed) {
+                      assert !!(foo == bar)
+                      assert !!(foo != bar)
+                      assert !!(foo.length() > bar.length())
+                      assert !!boxed
+                      assert !!true
+                      assert !!(foo == bar) : "foobar"
+                      assert !!(foo.isEmpty() || bar.isEmpty())
+                      assert !!(foo.length() == bar.length())
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveDoubleNotByLanguageRatherThanFileExtension() {
+        rewriteRun(
+          groovy(
+            """
+              assert !!(1 == 2)
+              boolean simplified = !false
+              """,
+            """
+              assert !!(1 == 2)
+              boolean simplified = true
+              """,
+            spec -> spec.path("conditions.java")
+          )
+        );
+    }
+
+    @Test
     void doubleNegationWithParentheses() {
         rewriteRun(
           groovy(
@@ -133,14 +289,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   def m() {
                       boolean a = !!(!(!true))
                       boolean b = !(!a)
-                  }
-              }
-              """,
-            """
-              class A {
-                  def m() {
-                      boolean a = true
-                      boolean b = a
                   }
               }
               """

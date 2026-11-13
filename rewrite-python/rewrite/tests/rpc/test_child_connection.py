@@ -136,7 +136,7 @@ def test_engine_roots_collapse_to_one_entry_when_deps_sit_beside_the_engine(monk
             return _FakeDist(requires=["parso>=0.7.1,<0.8", "more_itertools>=10.0.0"])
         return _FakeDist(location=ENGINE_ROOT)
 
-    monkeypatch.setattr(child_connection.metadata, "distribution", dist)
+    monkeypatch.setattr(child_connection, "_distribution", lambda name, path: dist(name))
     assert _engine_roots() == [ENGINE_ROOT]
 
 
@@ -149,8 +149,20 @@ def test_engine_roots_skip_optional_extras(monkeypatch):
             ])
         return _FakeDist(location={"parso": "/deps"}.get(name, "/extras"))
 
-    monkeypatch.setattr(child_connection.metadata, "distribution", dist)
+    monkeypatch.setattr(child_connection, "_distribution", lambda name, path: dist(name))
     assert _engine_roots() == [ENGINE_ROOT, "/deps"]
+
+
+def test_engine_roots_ignore_engine_metadata_in_a_bundle_venv_on_the_path(monkeypatch, tmp_path):
+    venvs = tmp_path / "venvs"
+    joined = venvs / "pkga" / "lib" / "python3.12" / "site-packages"
+    for name, requires in (("openrewrite", "Requires-Dist: shared_dep\n"), ("shared_dep", "")):
+        dist_info = joined / f"{name}-1.0.dist-info"
+        dist_info.mkdir(parents=True)
+        (dist_info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n{requires}")
+    monkeypatch.setattr(sys, "path", [str(tmp_path / "src"), str(joined)])  # a source run, then a hosted venv
+
+    assert _engine_roots(exclude_paths=(str(venvs),)) == [ENGINE_ROOT]
 
 
 def test_child_env_puts_the_engine_first_on_pythonpath(monkeypatch):

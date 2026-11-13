@@ -149,6 +149,12 @@ final class PreferredVersions {
             for (String version : uniqueNameVersions.get(name)) {
                 Map<String, Selector> selectors = preferredVersions.computeIfAbsent(name, n -> new LinkedHashMap<>());
                 Selector existingSelector = selectors.get(version);
+                if (!release.weightsLockedPreferredVersions()) {
+                    if (existingSelector == null) {
+                        selectors.put(version, Selector.of("version"));
+                    }
+                    continue;
+                }
                 if (existingSelector == null) {
                     selectors.put(version, Selector.of("version", EXISTING_VERSION_SELECTOR_WEIGHT));
                     continue;

@@ -41,6 +41,7 @@ declare module "./tree" {
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
             readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
             readonly Computed: "org.openrewrite.javascript.marker.Computed";
+            readonly ResolvedNames: "org.openrewrite.javascript.marker.ResolvedNames";
         };
     }
 }
@@ -53,6 +54,7 @@ declare module "./tree" {
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
     FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
     Computed: "org.openrewrite.javascript.marker.Computed",
+    ResolvedNames: "org.openrewrite.javascript.marker.ResolvedNames",
 } as const;
 
 /**
@@ -98,6 +100,32 @@ export interface Computed extends Marker {
 }
 
 /**
+ * What the type checker resolves each name of a compilation unit to, as a canonical name that a
+ * reference and its declaration share.
+ */
+export interface ResolvedNames extends Marker {
+    readonly kind: typeof JS.Markers.ResolvedNames;
+    /**
+     * Each canonical name once.
+     */
+    readonly names: string[];
+    /**
+     * Parallel to {@link names}: the npm package that declares each, or null for the repository's
+     * own and for the default library.
+     */
+    readonly packages: (string | null)[];
+    /**
+     * Each symbol kind used once.
+     */
+    readonly kinds: string[];
+    /**
+     * Four numbers per row: its start and end offset into the text as it prints, in UTF-16 code
+     * units, an index into {@link names} and an index into {@link kinds}.
+     */
+    readonly spans: number[];
+}
+
+/**
  * Registers an RPC codec for any marker that has a `prefix: J.Space` field.
  */
 function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
@@ -135,6 +163,28 @@ RpcCodecs.registerCodec(JS.Markers.Computed, {
     rpcSend(after: Computed, q: RpcSendQueue): void {
         q.getAndSend(after, a => a.id);
         q.getAndSend(after, a => spaceRef(a.suffix));
+    }
+});
+
+// Each list travels as one value: a file has thousands of names, and a list sent element by element
+// costs a message for every number.
+RpcCodecs.registerCodec(JS.Markers.ResolvedNames, {
+    rpcReceive(before: ResolvedNames, q: RpcReceiveQueue): ResolvedNames {
+        return updateIfChanged(before, {
+            id: q.receive(before.id),
+            names: q.receive(before.names),
+            packages: q.receive(before.packages),
+            kinds: q.receive(before.kinds),
+            spans: q.receive(before.spans),
+        });
+    },
+
+    rpcSend(after: ResolvedNames, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.names);
+        q.getAndSend(after, a => a.packages);
+        q.getAndSend(after, a => a.kinds);
+        q.getAndSend(after, a => a.spans);
     }
 });
 

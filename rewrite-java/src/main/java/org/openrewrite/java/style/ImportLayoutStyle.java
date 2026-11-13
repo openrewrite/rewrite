@@ -44,6 +44,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -237,11 +238,6 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        List<JRightPadded<J.Import>> checkConflicts = new ArrayList<>(originalImports);
-        checkConflicts.add(paddedToAdd);
-        boolean isFoldable = new ImportLayoutConflictDetection(classpath, checkConflicts, classpathDirty)
-                .isPackageFoldable(packageOrOuterClassName(paddedToAdd));
-
         // Walk both directions from the insertion point, looking for imports that are in the same block and have the
         // same package/outerclassname.
         AtomicInteger starFoldFrom = new AtomicInteger(insertPosition);
@@ -271,8 +267,10 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        if (isFoldable && (((paddedToAdd.getElement().isStatic() && getNameCountToUseStarImport() <= sameCount) ||
-                (!paddedToAdd.getElement().isStatic() && getClassCountToUseStarImport() <= sameCount)) || isPackageAlwaysFolded(getPackagesToFold(), paddedToAdd.getElement()))) {
+        if (((paddedToAdd.getElement().isStatic() && getNameCountToUseStarImport() <= sameCount) ||
+             (!paddedToAdd.getElement().isStatic() && getClassCountToUseStarImport() <= sameCount) ||
+             isPackageAlwaysFolded(getPackagesToFold(), paddedToAdd.getElement())) &&
+            isPackageFoldable(originalImports, paddedToAdd, classpath, classpathDirty)) {
             starFold.set(true);
             if (insertPosition != starFoldFrom.get()) {
                 // if we're adding to the middle of a group of imports that are getting star folded,
@@ -346,6 +344,14 @@ public class ImportLayoutStyle implements JavaStyle {
      * @param originalImports A list of potentially unordered imports.
      * @return A list of imports that are grouped and ordered.
      */
+    private static boolean isPackageFoldable(List<JRightPadded<J.Import>> originalImports, JRightPadded<J.Import> toAdd,
+                                             Collection<JavaType.FullyQualified> classpath, boolean classpathDirty) {
+        List<JRightPadded<J.Import>> withAdded = new ArrayList<>(originalImports);
+        withAdded.add(toAdd);
+        return new ImportLayoutConflictDetection(classpath, withAdded, classpathDirty)
+                .isPackageFoldable(packageOrOuterClassName(toAdd));
+    }
+
     public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath) {
         return orderImports(originalImports, classpath, false);
     }
@@ -583,6 +589,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         /**
          * Checks if folding the package will create a namespace conflict with any other classes that have already been imported.
+         * It reads the classpath on a list's first use, so callers test the cheap conditions first.
          *
          * @param packageName package that qualifies for folding into a '*'.
          * @return folding the package will not create any namespace conflicts.
@@ -595,11 +602,18 @@ public class ImportLayoutStyle implements JavaStyle {
             }
             if (containsClassNameConflict == null) {
                 containsClassNameConflict = new HashSet<>();
-                setJVMClassNames();
+                ClasspathIndex index = ClasspathIndex.of(classpath);
+                Set<String> javaLangClassNames;
+                if (index == null) {
+                    setJVMClassNames();
+                    javaLangClassNames = jvmClasspathNames;
+                } else {
+                    javaLangClassNames = index.javaLangClassNames;
+                }
 
-                Map<String, Set<String>> nameToPackages = mapNamesInPackageToPackages();
+                Map<String, Set<String>> nameToPackages = mapNamesInPackageToPackages(index);
                 for (String className : nameToPackages.keySet()) {
-                    if (nameToPackages.get(className).size() > 1 || jvmClasspathNames.contains(className)) {
+                    if (nameToPackages.get(className).size() > 1 || javaLangClassNames.contains(className)) {
                         containsClassNameConflict.addAll(nameToPackages.get(className));
                     }
                 }
@@ -616,7 +630,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        private Map<String, Set<String>> mapNamesInPackageToPackages() {
+        private Map<String, Set<String>> mapNamesInPackageToPackages(@Nullable ClasspathIndex index) {
             Map<String, Set<String>> nameToPackages = new HashMap<>();
             Set<String> checkPackageForClasses = new HashSet<>();
 
@@ -626,27 +640,163 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .add(anImport.getElement().getPackageName());
             }
 
+            if (index != null) {
+                for (String packageOrType : checkPackageForClasses) {
+                    for (String className : index.classNamesByPackage.getOrDefault(packageOrType, emptyList())) {
+                        nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3)).add(packageOrType);
+                    }
+                    for (int position : index.positionsByName.getOrDefault(packageOrType, ClasspathIndex.NONE)) {
+                        JavaType.FullyQualified type = ((List<JavaType.FullyQualified>) classpath).get(position);
+                        // A type whose package is imported contributes its class name above, not its static members
+                        if (!checkPackageForClasses.contains(type.getPackageName())) {
+                            addStaticMemberNames(type, packageOrType, nameToPackages);
+                        }
+                    }
+                }
+                return nameToPackages;
+            }
+
             for (JavaType.FullyQualified classGraphFqn : classpath) {
                 String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
                     String className = classGraphFqn.getClassName();
                     nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3)).add(packageName);
                 } else if (checkPackageForClasses.contains(classGraphFqn.getFullyQualifiedName())) {
-                    packageName = classGraphFqn.getFullyQualifiedName();
-                    for (JavaType.Variable member : classGraphFqn.getMembers()) {
-                        if (member.hasFlags(Flag.Static)) {
-                            nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(packageName);
-                        }
-                    }
-
-                    for (JavaType.Method method : classGraphFqn.getMethods()) {
-                        if (method.hasFlags(Flag.Static)) {
-                            nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(packageName);
-                        }
-                    }
+                    addStaticMemberNames(classGraphFqn, classGraphFqn.getFullyQualifiedName(), nameToPackages);
                 }
             }
             return nameToPackages;
+        }
+
+        private static void addStaticMemberNames(JavaType.FullyQualified type, String typeName,
+                                                 Map<String, Set<String>> nameToPackages) {
+            for (JavaType.Variable member : type.getMembers()) {
+                if (member.hasFlags(Flag.Static)) {
+                    nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(typeName);
+                }
+            }
+            for (JavaType.Method method : type.getMethods()) {
+                if (method.hasFlags(Flag.Static)) {
+                    nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(typeName);
+                }
+            }
+        }
+    }
+
+    /**
+     * The class names of each package and the positions of each fully qualified name in one classpath list, so that
+     * the conflict check for a file looks up its imported packages. It holds names and positions, so it keeps no
+     * type alive.
+     */
+    private static final class ClasspathIndex {
+        private static final int[] NONE = new int[0];
+
+        // Classpath lists seen recently, by identity
+        private static final Seen[] seen = new Seen[8];
+        private static int next;
+
+        final Map<String, List<String>> classNamesByPackage = new HashMap<>();
+        final Map<String, int[]> positionsByName = new HashMap<>();
+        final Set<String> javaLangClassNames = new HashSet<>();
+
+        private ClasspathIndex(List<JavaType.FullyQualified> classpath) {
+            for (int i = 0; i < classpath.size(); i++) {
+                JavaType.FullyQualified type = classpath.get(i);
+                String packageName = type.getPackageName();
+                classNamesByPackage.computeIfAbsent(packageName, p -> new ArrayList<>()).add(type.getClassName());
+                positionsByName.merge(type.getFullyQualifiedName(), new int[]{i}, ClasspathIndex::concat);
+                if ("java.lang".equals(packageName)) {
+                    javaLangClassNames.add(type.getClassName());
+                }
+            }
+        }
+
+        private static int[] concat(int[] a, int[] b) {
+            int[] both = Arrays.copyOf(a, a.length + b.length);
+            System.arraycopy(b, 0, both, a.length, b.length);
+            return both;
+        }
+
+        /**
+         * The index of this classpath, or null the first time a list is seen, when one scan is cheaper than an
+         * index that might never be used again. Only a random-access list gets one, since the index refers to its
+         * elements by position.
+         */
+        static @Nullable ClasspathIndex of(Collection<JavaType.FullyQualified> classpath) {
+            if (!(classpath instanceof List) || !(classpath instanceof RandomAccess) || classpath.isEmpty()) {
+                return null;
+            }
+            List<JavaType.FullyQualified> list = (List<JavaType.FullyQualified>) classpath;
+            Seen entry;
+            synchronized (seen) {
+                entry = find(list);
+                if (entry == null) {
+                    remember(new Seen(list));
+                    return null;
+                }
+                if (entry.index != null || entry.building) {
+                    // While another thread builds the index, this one scans
+                    return entry.index;
+                }
+                entry.building = true;
+            }
+            ClasspathIndex index = null;
+            try {
+                index = new ClasspathIndex(list);
+                return index;
+            } finally {
+                synchronized (seen) {
+                    entry.index = index;
+                    entry.building = false;
+                }
+            }
+        }
+
+        // Drops every entry whose list is gone, or has changed size since it was seen
+        private static @Nullable Seen find(List<JavaType.FullyQualified> list) {
+            Seen found = null;
+            for (int i = 0; i < seen.length; i++) {
+                Seen entry = seen[i];
+                if (entry == null) {
+                    continue;
+                }
+                List<JavaType.FullyQualified> seenList = entry.classpath.get();
+                if (seenList == null || seenList == list && seenList.size() != entry.size) {
+                    seen[i] = null;
+                } else if (seenList == list) {
+                    found = entry;
+                }
+            }
+            return found;
+        }
+
+        private static void remember(Seen entry) {
+            for (int i = 0; i < seen.length; i++) {
+                if (seen[i] == null) {
+                    seen[i] = entry;
+                    return;
+                }
+            }
+            seen[next] = entry;
+            next = (next + 1) % seen.length;
+        }
+
+        /**
+         * A classpath list seen recently, with its size then and, from its second use on, its index.
+         */
+        private static final class Seen {
+            final WeakReference<List<JavaType.FullyQualified>> classpath;
+            final int size;
+
+            @Nullable
+            ClasspathIndex index;
+
+            boolean building;
+
+            Seen(List<JavaType.FullyQualified> classpath) {
+                this.classpath = new WeakReference<>(classpath);
+                this.size = classpath.size();
+            }
         }
     }
 
@@ -760,8 +910,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     boolean starImportExists = importGroup.stream()
                             .anyMatch(it -> "*".equals(it.getElement().getQualid().getSimpleName()));
 
-                    if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
-                            (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
+                    if ((isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) &&
+                            importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar))) {
 
                         J.FieldAccess qualid = toStar.getElement().getQualid();
                         J.Identifier name = qualid.getName();
@@ -864,7 +1014,11 @@ public class ImportLayoutStyle implements JavaStyle {
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
         String typeName = anImport.getElement().getTypeName();
         if (anImport.getElement().isStatic()) {
-            return typeName;
+            // Group by the owner of the imported member, not the imported type itself.
+            // Modifier.Keyword and Modifier.Keyword.* import from different owners.
+            Expression owner = anImport.getElement().getQualid().getTarget();
+            JavaType.FullyQualified ownerType = TypeUtils.asFullyQualified(owner.getType());
+            return ownerType == null ? owner.printTrimmed(new JavaPrinter<>()) : ownerType.getFullyQualifiedName();
         } else {
             if (typeName.contains("$")) {
                 return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');

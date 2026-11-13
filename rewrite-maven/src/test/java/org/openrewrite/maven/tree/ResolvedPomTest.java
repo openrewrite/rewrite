@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.maven.MavenSettingsAutoLoadingExtension.withMavenCentralMirror;
+import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
 
 class ResolvedPomTest implements RewriteTest {
 

@@ -109,7 +109,7 @@ public class DeleteMethodArgument extends Recipe {
 
                 // Update the method types
                 JavaType.Method methodType = m.getMethodType();
-                if (methodType != null) {
+                if (methodType != null && declaresOwnParameter(methodType)) {
                     List<String> parameterNames = new ArrayList<>(methodType.getParameterNames());
                     parameterNames.remove(argumentIndex);
                     List<JavaType> parameterTypes = new ArrayList<>(methodType.getParameterTypes());
@@ -124,6 +124,15 @@ public class DeleteMethodArgument extends Recipe {
                 }
             }
             return m;
+        }
+
+        /**
+         * Arguments beyond the declared parameters, or passed to a varargs parameter, leave the signature as it is.
+         */
+        private boolean declaresOwnParameter(JavaType.Method methodType) {
+            int parameters = Math.min(methodType.getParameterNames().size(), methodType.getParameterTypes().size());
+            int lastOwn = methodType.hasFlags(Flag.Varargs) ? parameters - 1 : parameters;
+            return argumentIndex < lastOwn;
         }
     }
 }

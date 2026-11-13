@@ -17,6 +17,7 @@
 import builtins
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
@@ -32,8 +33,10 @@ from rewrite.python.format.line_breaks import line_break
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, module_binding_name, pad_right,
                                          referenced_names)
-from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
+from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport, Shebang
 from rewrite.python.visitor import PythonVisitor
+from rewrite.tree import PrintOutputCapture
+from rewrite.visitor import Cursor
 
 
 def _is_module_docstring(padded_stmts: list) -> bool:
@@ -274,9 +277,12 @@ class AddImport(PythonVisitor):
         new_import = create_import_statement(self.module, self.name, self.alias)
         newline = line_break(cu)
 
-        # Insert after the module docstring (which must stay first) and any existing imports.
+        # The shebang and the module docstring must stay first.
         padded_stmts = list(cu.padding.statements)
-        header = 1 if _is_module_docstring(padded_stmts) else 0
+        shebang = padded_stmts[0] if padded_stmts and isinstance(padded_stmts[0].element, Shebang) else None
+        header = 1 if shebang else 0
+        if _is_module_docstring(padded_stmts[header:]):
+            header += 1
         first_import = None
         insert_idx = header
         for i in range(header, len(padded_stmts)):
@@ -317,28 +323,50 @@ class AddImport(PythonVisitor):
         else:
             placement = None
             if first_import is not None:
-                placement = self._place_in_sections(cu, padded_stmts[first_import:insert_idx], first_import)
+                placement = self._place_in_sections(cu, padded_stmts, first_import, insert_idx)
+            # A future import must precede every statement but the header, where isort adds a file's first
+            # import too. An existing `from __future__ import` takes the new name instead.
+            if (first_import is None or self.module == '__future__') and header < len(padded_stmts) \
+                    and (placement is None or placement.index != header):
+                placement = _Placement(header, after=False, new_group=False)
             if placement is None:
                 placement = _Placement(insert_idx - 1, after=True, new_group=False)
-            cu, padded_stmts = _insert(cu, padded_stmts, new_import, newline, placement)
+            # A shebang holds the line break that ends it. The statement after it borrows the break meanwhile,
+            # so that its prefix reads as any other statement's.
+            lent = shebang.after.whitespace if shebang is not None else ''
+            if lent:
+                padded_stmts[0] = shebang.replace(_after=Space.EMPTY)
+                cu = _respace(cu, padded_stmts, 1, lambda whitespace: lent + whitespace)
+            cu, padded_stmts = _insert(cu, padded_stmts, new_import, newline, placement, first_import)
+            if lent:
+                padded_stmts[0] = shebang
+                cu = _respace(cu, padded_stmts, 1, lambda whitespace: whitespace.removeprefix(lent))
 
         return cu.padding.replace(_statements=padded_stmts)
 
-    def _place_in_sections(self, cu: CompilationUnit, block: list, offset: int) -> Optional['_Placement']:
-        """Where the new import goes when `block` is laid out in isort's sections: future, standard
-        library, third party and local, each a run of imports separated from the next by a blank line,
-        in that order. None where the imports are laid out otherwise, or are one run that shows no layout."""
-        local_roots = set(Path(str(cu.source_path)).parts[:-1])
-        groups: list[list[int]] = []
-        for i, padded in enumerate(block):
-            if not groups or _BLANK_LINE.search(_text_of(padded.element.prefix)):
-                groups.append([])
-            groups[-1].append(offset + i)
-        if len(groups) < 2:
+    def _place_in_sections(self, cu: CompilationUnit, padded_stmts: list, start: int,
+                           end: int) -> Optional['_Placement']:
+        """Where the new import goes when the imports `padded_stmts[start:end]` are laid out in isort's sections:
+        future, standard library, third party and local, each a run of imports separated from the next by a blank
+        line, in that order. None where they are laid out otherwise, or are one run that shows no layout."""
+        if not any(_BLANK_LINE.search(_text_of(padded_stmts[i].element.prefix)) for i in range(start + 1, end)):
             return None
+        # isort never moves an import across the end of a block, and the imports after it may rely on that order.
+        block = _last_isort_block(cu, padded_stmts, start, end)
+        if not block:
+            return None
+        # First-party packages sit in the project root or its `src` directory, isort's default `src_paths`.
+        directories = Path(str(cu.source_path)).parts[:-1]
+        local_roots = {directories[0]} if directories else set()
+        local_roots.update(directories[i + 1] for i, directory in enumerate(directories[:-1]) if directory == 'src')
+        groups: list[list[int]] = []
+        for i in block:
+            if not groups or _BLANK_LINE.search(_text_of(padded_stmts[i].element.prefix)):
+                groups.append([])
+            groups[-1].append(i)
         sections = []
         for group in groups:
-            in_group = {_section(_module_of(block[i - offset].element), local_roots) for i in group}
+            in_group = {_section(_module_of(padded_stmts[i].element), local_roots) for i in group}
             if len(in_group) != 1:
                 return None
             sections.append(in_group.pop())
@@ -347,12 +375,18 @@ class AddImport(PythonVisitor):
 
         section = _section(self.module, local_roots)
         key = (self.name is not None, self.module.lower())
-        for group, group_section in zip(groups, sections):
-            if group_section == section:
-                for i in group:
-                    if key < _isort_key(block[i - offset].element):
-                        return _Placement(i, after=False, new_group=False)
-                return _Placement(group[-1], after=True, new_group=False)
+        own = [group for group, group_section in zip(groups, sections) if group_section == section]
+        if own:
+            # A section can hold its `import m` and `from m import n` statements in separate runs, and either
+            # kind in several.
+            runs = [group for group in own
+                    if all(_isort_key(padded_stmts[i].element)[0] == key[0] for i in group)]
+            group = next((run for run in reversed(runs) if _isort_key(padded_stmts[run[0]].element) <= key),
+                         runs[0] if runs else own[0])
+            for i in group:
+                if key < _isort_key(padded_stmts[i].element):
+                    return _Placement(i, after=False, new_group=False)
+            return _Placement(group[-1], after=True, new_group=False)
         earlier = [group for group, group_section in zip(groups, sections) if group_section < section]
         if earlier:
             return _Placement(earlier[-1][-1], after=True, new_group=True)
@@ -360,6 +394,43 @@ class AddImport(PythonVisitor):
 
 
 _BLANK_LINE = re.compile(r'\n[ \t\r\f]*\n')
+_SKIP = re.compile(r'isort: ?skip')
+_SKIP_FILE = re.compile(r'isort: ?skip_file')
+
+
+def _last_isort_block(cu: CompilationUnit, padded_stmts: list, start: int, end: int) -> list[int]:
+    """The last of the blocks isort sorts apart among the imports `padded_stmts[start:end]`. A block ends at a
+    `# isort: split` comment and at an import isort leaves in place."""
+    if _SKIP_FILE.search(cu.print_all()):
+        return []
+    cursor = Cursor(Cursor(None, Cursor.ROOT_VALUE), cu)
+    block: list[int] = []
+    off = False
+    for i in range(start, end):
+        for comment in padded_stmts[i].element.prefix.comments:
+            action = comment.text.strip()
+            if action == 'isort: off':
+                off = True
+            elif action == 'isort: on':
+                off = False
+            elif action == 'isort: split':
+                block = []
+        following = padded_stmts[i + 1].element.prefix if i + 1 < len(padded_stmts) else cu.eof
+        if off or _is_skipped(padded_stmts[i].element, following, cursor):
+            block = []
+        else:
+            block.append(i)
+    return block
+
+
+def _is_skipped(statement: J, following: Space, cursor: Cursor) -> bool:
+    """Whether `# isort: skip` ends the first line of `statement`, the line isort and ruff both read it on.
+    The comment ending a one-line statement opens `following`, the space after the statement."""
+    text = statement.replace(prefix=Space.EMPTY).print(cursor, PrintOutputCapture(0))
+    first_line = re.split(r'[\r\n]', text, maxsplit=1)[0]
+    if first_line == text and following.comments and not re.search(r'[\r\n]', following.whitespace):
+        first_line += '#' + following.comments[0].text
+    return bool(_SKIP.search(first_line))
 
 
 class _Section(IntEnum):
@@ -412,13 +483,22 @@ class _Placement(NamedTuple):
 
 
 def _insert(cu: CompilationUnit, padded_stmts: list, new_import: J, newline: str,
-            placement: _Placement) -> tuple[CompilationUnit, list]:
+            placement: _Placement, first_import: Optional[int]) -> tuple[CompilationUnit, list]:
     separator = newline * 2 if placement.new_group else newline
     if not placement.after:
-        # The new import takes over the separation, and any comment, ahead of the statement it precedes.
+        # The new import takes over the separation ahead of the statement it precedes. The comments
+        # above the file's first import head the file and stay above both.
         anchor = padded_stmts[placement.index]
-        padded_stmts[placement.index] = anchor.replace(_element=anchor.element.replace(prefix=Space([], separator)))
-        padded_stmts.insert(placement.index, JRightPadded(new_import.replace(prefix=anchor.element.prefix),
+        heads_imports = first_import is None or placement.index <= first_import
+        prefix, attached = (anchor.element.prefix, []) if heads_imports \
+            else _split_attached_comments(anchor.element.prefix)
+        # Code keeps its distance from the imports above it.
+        whitespace = anchor.element.prefix.whitespace
+        if isinstance(anchor.element, (Import, MultiImport)) or not ('\n' in whitespace or '\r' in whitespace):
+            whitespace = separator
+        padded_stmts[placement.index] = anchor.replace(
+            _element=anchor.element.replace(prefix=Space(attached, whitespace)))
+        padded_stmts.insert(placement.index, JRightPadded(new_import.replace(prefix=prefix),
                                                           Space.EMPTY, Markers.EMPTY))
         return cu, padded_stmts
 
@@ -432,6 +512,33 @@ def _insert(cu: CompilationUnit, padded_stmts: list, new_import: J, newline: str
         cu = cu.replace(eof=following)
     padded_stmts.insert(at, JRightPadded(new_import.replace(prefix=prefix), Space.EMPTY, Markers.EMPTY))
     return cu, padded_stmts
+
+
+def _respace(cu: CompilationUnit, padded_stmts: list, at: int, change: Callable[[str], str]) -> CompilationUnit:
+    """Apply `change` to the whitespace that opens the statement at `at`, or the end of the file past the last.
+    A statement is replaced in `padded_stmts` itself."""
+    if at == len(padded_stmts):
+        return cu.replace(eof=cu.eof.replace(whitespace=change(cu.eof.whitespace)))
+    padded = padded_stmts[at]
+    prefix = padded.element.prefix
+    padded_stmts[at] = padded.replace(
+        _element=padded.element.replace(prefix=prefix.replace(whitespace=change(prefix.whitespace))))
+    return cu
+
+
+def _split_attached_comments(space: Space) -> tuple[Space, list]:
+    """`space` up to the comment lines directly above the statement it precedes, and those comments.
+    As in isort, such a comment moves with the statement. An isort action comment stays where it is."""
+    comments = space.comments
+    attached = len(comments)
+    while attached > 0:
+        before = comments[attached - 2].suffix if attached > 1 else space.whitespace
+        on_own_line = '\n' in before or '\r' in before
+        is_action = comments[attached - 1].text.strip().startswith('isort:')
+        if _BLANK_LINE.search(comments[attached - 1].suffix) or not on_own_line or is_action:
+            break
+        attached -= 1
+    return Space(comments[:attached], space.whitespace), comments[attached:]
 
 
 def _split_trailing_comment(space: Space, separator: str, newline: str) -> tuple[Space, Space]:

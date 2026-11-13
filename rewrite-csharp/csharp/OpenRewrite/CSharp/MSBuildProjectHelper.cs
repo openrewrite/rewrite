@@ -31,7 +31,8 @@ namespace OpenRewrite.CSharp;
 ///     metadata (target frameworks, package references, resolved packages,
 ///     project references) comes from the in-memory NuGet <see cref="LockFile" />
 ///     produced by <see cref="NuGetResolver" /> (in-process PackageSpec/RestoreRunner
-///     restore — no <c>dotnet restore</c> child process, no <c>project.assets.json</c> read).
+///     restore — no <c>dotnet restore</c> child process, no <c>project.assets.json</c> read),
+///     except the identity and version properties, which come from an MSBuild evaluation of the project.
 ///     Legacy <c>packages.config</c> projects get the same full attestation via a
 ///     PackageSpec synthesized from their packages.config entries.
 ///     After a recipe modifies a .csproj file, this helper regenerates the
@@ -46,7 +47,7 @@ public static class MSBuildProjectHelper
     // therefore stale until the next restore. Mutating visitors add to
     // this set; RegenerateMarkerVisitor consumes from it so files no one touched
     // skip the (expensive) restore.
-    private const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
+    internal const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
 
     /// <summary>
     /// Marks the given .csproj source path as having pending changes whose
@@ -98,7 +99,8 @@ public static class MSBuildProjectHelper
 
     /// <summary>
     ///     Creates an MSBuildProject marker. Only the Sdk attribute is read from the XML document.
-    ///     All dependency and framework metadata comes from an in-process NuGet restore of the
+    ///     Identity and version properties come from an MSBuild evaluation of the project on disk, and all
+    ///     dependency and framework metadata from an in-process NuGet restore of the
     ///     project on disk under <paramref name="rootDir"/> (PackageReference projects via
     ///     restore-graph generation; packages.config projects via a synthesized PackageSpec).
     /// </summary>
@@ -125,7 +127,8 @@ public static class MSBuildProjectHelper
 
             var projectDir = Path.GetDirectoryName(projectPath)!;
             return CreateFromLockFile(sdk, lockFile, projectDir,
-                includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir));
+                includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir),
+                properties: ReadProjectProperties(projectPath, Path.GetFullPath(rootDir)));
         }
         catch (Exception ex)
         {
@@ -141,8 +144,66 @@ public static class MSBuildProjectHelper
     public static MSBuildProject CreateMarker(Document doc, LockFile lockFile, string projectDir)
     {
         var sdk = doc.Root.GetAttributeValue("Sdk");
+        var projectPath = Path.GetFullPath(Path.Combine(projectDir, Path.GetFileName(doc.SourcePath)));
         return CreateFromLockFile(sdk, lockFile, projectDir,
-            includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir));
+            includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir),
+            properties: ReadProjectProperties(projectPath, RootDirOf(projectPath, doc.SourcePath)));
+    }
+
+    private static readonly string[] VersionProperties = ["Version", "VersionPrefix", "VersionSuffix", "PackageVersion"];
+    private static readonly string[] IdentityProperties = ["PackageId", "AssemblyName"];
+
+    /// <summary>
+    ///     The project's identity and version properties, as MSBuild evaluates them. A property counts only when a
+    ///     file under <paramref name="rootDir"/> sets it, so SDK defaults (the implicit <c>1.0.0</c>) are left out.
+    ///     <c>Version</c> and <c>PackageVersion</c> derive from <c>VersionPrefix</c>/<c>VersionSuffix</c> and from
+    ///     each other in the SDK, so once the repository sets any version property their evaluated values are
+    ///     recorded too, without a <see cref="PropertyValue.DefinedIn"/> when the SDK did the derivation.
+    /// </summary>
+    private static Dictionary<string, PropertyValue> ReadProjectProperties(string projectPath, string? rootDir)
+    {
+        var properties = new Dictionary<string, PropertyValue>(StringComparer.OrdinalIgnoreCase);
+        if (rootDir == null)
+            return properties;
+        var evaluated = NuGetResolver.EvaluateProperties(projectPath, VersionProperties.Concat(IdentityProperties));
+        foreach (var (name, property) in evaluated)
+        {
+            var definedIn = RelativeToRoot(property.DefinedIn, rootDir);
+            if (definedIn != null)
+                properties[name] = new PropertyValue(property.Value, definedIn);
+        }
+        if (!VersionProperties.Any(properties.ContainsKey))
+            return properties;
+        foreach (var name in new[] { "Version", "PackageVersion" })
+        {
+            if (!properties.ContainsKey(name) && evaluated.TryGetValue(name, out var derived))
+                properties[name] = new PropertyValue(derived.Value);
+        }
+        return properties;
+    }
+
+    private static string? RelativeToRoot(string? path, string rootDir)
+    {
+        if (path == null)
+            return null;
+        var relative = Path.GetRelativePath(rootDir, path);
+        return relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar) || Path.IsPathRooted(relative)
+            ? null
+            : relative.Replace('\\', '/');
+    }
+
+    /// <summary>The directory <paramref name="sourcePath"/> is relative to, or null when the paths disagree.</summary>
+    private static string? RootDirOf(string projectPath, string sourcePath)
+    {
+        var root = Path.GetDirectoryName(projectPath);
+        var segments = sourcePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = segments.Length - 2; i >= 0 && root != null; i--)
+        {
+            if (!string.Equals(Path.GetFileName(root), segments[i], StringComparison.Ordinal))
+                return null;
+            root = Path.GetDirectoryName(root);
+        }
+        return root;
     }
 
     /// <summary>
@@ -172,7 +233,7 @@ public static class MSBuildProjectHelper
     ///     through a project reference is still reported at its true distance from the project.
     /// </summary>
     public static MSBuildProject CreateFromLockFile(string? sdk, LockFile lockFile, string projectDir,
-        bool includeDeclaredPackageReferences = true)
+        bool includeDeclaredPackageReferences = true, IDictionary<string, PropertyValue>? properties = null)
     {
         var spec = lockFile.PackageSpec;
 
@@ -377,7 +438,7 @@ public static class MSBuildProjectHelper
         return new MSBuildProject(
             Tree.RandomId(),
             sdk,
-            new Dictionary<string, PropertyValue>(),
+            properties ?? new Dictionary<string, PropertyValue>(),
             packageSources,
             tfmList);
     }

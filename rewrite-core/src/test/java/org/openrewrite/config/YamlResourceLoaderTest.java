@@ -44,9 +44,8 @@ class YamlResourceLoaderTest implements RewriteTest {
         }
     }
 
-    @DocumentExample
     @Test
-    void recipeExamples() {
+    void exampleDocumentsAreIgnored() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
             //language=yml
@@ -57,104 +56,23 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+              ---
               type: specs.openrewrite.org/v1beta/example
               recipeName: test.ChangeTextToHello
               examples:
-                - description: "Change World to Hello in a text file"
+                - description: "Change World to Hello"
                   sources:
                     - before: "World"
                       after: "Hello!"
-                      path: "1.txt"
                       language: "text"
-                    - before: "World 2"
-                      after: "Hello 2!"
-                      path: "2.txt"
-                      language: "text"
-                - description: "Change World to Hello in a java file"
-                  parameters:
-                    - arg0
-                    - 1
-                  sources:
-                    - before: |
-                        public class A {
-                            void method() {
-                                System.out.println("World");
-                            }
-                        }
-                      after: |
-                        public class A {
-                            void method() {
-                                System.out.println("Hello!");
-                            }
-                        }
-                      language: java
               """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          ), URI.create("rewrite.yml"), new Properties()))
           .build();
 
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).singleElement().satisfies(r -> {
-            assertThat(r.getExamples()).hasSize(2);
-            assertThat(r.getExamples()).first().satisfies(e -> {
-                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
-                assertThat(e.getSources()).hasSize(2);
-                assertThat(e.getSources()).first().satisfies(s -> {
-                      assertThat(s.getBefore()).isEqualTo("World");
-                      assertThat(s.getAfter()).isEqualTo("Hello!");
-                      assertThat(s.getPath()).isEqualTo("1.txt");
-                      assertThat(s.getLanguage()).isEqualTo("text");
-                  }
-                );
-
-                assertThat(e.getSources().get(1)).satisfies(s -> {
-                      assertThat(s.getBefore()).isEqualTo("World 2");
-                      assertThat(s.getAfter()).isEqualTo("Hello 2!");
-                      assertThat(s.getPath()).isEqualTo("2.txt");
-                      assertThat(s.getLanguage()).isEqualTo("text");
-                  }
-                );
-            });
-            assertThat(r.getExamples().get(1)).satisfies(e -> {
-                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
-
-                assertThat(e.getParameters()).hasSize(2);
-                assertThat(e.getParameters().getFirst()).isEqualTo("arg0");
-                assertThat(e.getParameters().get(1)).isEqualTo("1");
-
-                assertThat(e.getSources()).hasSize(1);
-                assertThat(e.getSources()).first().satisfies(s -> {
-                    //language=java
-                    assertThat(s.getBefore()).isEqualTo("""
-                      public class A {
-                          void method() {
-                              System.out.println("World");
-                          }
-                      }
-                      """);
-                    //language=java
-                    assertThat(s.getAfter()).isEqualTo("""
-                      public class A {
-                          void method() {
-                              System.out.println("Hello!");
-                          }
-                      }
-                      """);
-                    assertThat(s.getPath()).isNull();
-                    assertThat(s.getLanguage()).isEqualTo("java");
-                });
-            });
-        });
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).singleElement().satisfies(descriptor -> {
-            List<RecipeExample> descriptorExamples = descriptor.getExamples();
-            assertThat(descriptorExamples).containsExactlyElementsOf(recipes.iterator().next().getExamples());
-        });
+        assertThat(env.listRecipes()).singleElement()
+          .satisfies(recipe -> assertThat(recipe.getExamples()).isEmpty());
+        assertThat(env.listRecipeDescriptors()).singleElement()
+          .satisfies(descriptor -> assertThat(descriptor.getExamples()).isEmpty());
     }
 
     @Test
@@ -259,40 +177,6 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(env.activateRecipes("test.FieldOption").validateAll())
           .flatMap(Validated::failures)
           .isEmpty();
-    }
-
-    @Test
-    void maintainers() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              maintainers:
-                  - maintainer: Sam
-                    logo: https://sam.com/logo.svg
-                  - maintainer: Jon
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
-        assertThat(descriptor.getDataTables()).isNotEmpty();
-        assertThat(descriptor.getMaintainers()).hasSize(2);
-        Maintainer sam = descriptor.getMaintainers().getFirst();
-        assertThat(sam.getMaintainer()).isEqualTo("Sam");
-        assertThat(sam.getLogo()).isNotNull();
-        assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
-        Maintainer jon = descriptor.getMaintainers().get(1);
-        assertThat(jon.getMaintainer()).isEqualTo("Jon");
-        assertThat(jon.getLogo()).isNull();
     }
 
     @Test
