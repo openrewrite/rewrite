@@ -27,9 +27,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      *               - 'default': Removes the default import from the module if unused,
      *                 regardless of its local name
      *               - '*': Removes the namespace import if unused
-     *               Both also remove an unused `import X = require` or whole `require`, which bind the whole module,
-     *               while any other member removes only that member's bindings, keeping `import * as fs from "fs"`
-     *               for `"readFile"`.
+     *               Any member also removes the unused module objects it is read through: a namespace import,
+     *               `import X = require` and whole `require`, so `"readFile"` removes an unused
+     *               `import * as fs from "fs"`. A default import goes only for `'default'` or no member.
      */
     constructor(readonly module: string,
                 readonly member?: string) {
@@ -285,7 +285,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const alias = namedBindings as JS.Alias;
                 const aliasName = (alias.alias as J.Identifier).simpleName;
 
-                // `'*'` or no member asks for it
+                // Every request asks for it, as any member is read through it
                 if (this.asksFor(bindingsOf(jsImport).find(b => b.form === "namespace")) && !usedNames.has(aliasName)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
@@ -348,7 +348,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         const importedName = (importClause.name.element as J.Identifier).simpleName;
 
-        // It binds the whole module, which `'*'`, `'default'` or no member asks for
+        // It binds the whole module, which every request asks for, as any member is read through it
         if (this.asksFor(bindingsOf(jsImport)[0]) && !usedNames.has(importedName)) {
             return undefined;
         }
@@ -357,12 +357,14 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Whether this removal asks for `binding`, as the binding table reads a request: every binding of the module
-     * when no member is given, else the one {@link bindsMember} reads for the member. `'default'` asks for `D` of
-     * `import D from "m"`, while `"D"` does not.
+     * Whether this removal asks for `binding`: every binding of the module when no member is given, else the one
+     * {@link bindsMember} reads for the member, and the module objects any member is read through, as `exportOf`
+     * reads `fs.readFile`: a namespace import, `import X = require` and whole `require`. `'default'` asks for `D` of
+     * `import D from "m"`, while `"D"` and `"readFile"` do not.
      */
     private asksFor(binding: ModuleBinding | undefined): boolean {
-        return binding !== undefined && (this.member === undefined || bindsMember(binding, memberName(this.member)));
+        return binding !== undefined && (this.member === undefined || bindsMember(binding, memberName(this.member)) ||
+            binding.form === "namespace" || binding.form === "import-equals" || binding.form === "require");
     }
 
     private async processNamedImports(
@@ -451,7 +453,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return varDecls;
         }
 
-        // Handle: const fs = require('fs'), the whole module, which `'*'`, `'default'` or no member asks for
+        // Handle: const fs = require('fs'), the whole module, which every request asks for
         if (isIdentifier(pattern) && this.asksFor(bindingsOf(varDecls)[0]) && !usedNames.has(pattern.simpleName)) {
             return undefined; // Remove the entire require statement
         }

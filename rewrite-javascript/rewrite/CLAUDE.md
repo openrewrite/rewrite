@@ -265,9 +265,16 @@ const {...rest} = require("m") // require-pattern: no one member, as `{a: {b}}` 
 const X = await import("m")    // dynamic-import: the namespace object
 ```
 
-`RemoveImport` removes the unused rows a request asks for as `bindsMember` reads it: with no member every row of
-the module, with `'default'` or `'*'` the default or namespace import or a whole-module `require`, and with a name
-only that member's, so `RemoveImport("fs", "readFile")` keeps an unused `import * as fs from "fs"`.
+`RemoveImport` removes the unused rows a request asks for. A member also asks for the module objects `exportOf`
+reads it through, so a recipe that has rewritten the file's last `fs.readFile` asks for `"readFile"`, and an unused
+`import * as fs from "fs"` goes too. A default import is not one of them. What a request removes, when unused:
+
+| binding | no member | `'default'` | `'*'` | another member |
+|---|---|---|---|---|
+| `import D from "m"` | removed | removed | kept | kept |
+| `import * as NS from "m"` | removed | removed | removed | removed |
+| `import X = require("m")` | removed | removed | removed | removed |
+| `const X = require("m")` | removed | removed | removed | removed |
 
 ### Which name a rebind binds
 

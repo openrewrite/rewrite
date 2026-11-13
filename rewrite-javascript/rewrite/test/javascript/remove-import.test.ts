@@ -130,9 +130,7 @@ describe('RemoveImport visitor', () => {
     describe('methods with same names from different types', () => {
         test('util.isArray coming from namespace import but uses Array.isArray', async () => {
             const spec = new RecipeSpec();
-            // A request for `isArray` alone keeps a namespace import, so this asks for the whole module.
-            // Before: new RemoveImport("util", "isArray"), which removed an unused namespace import too
-            spec.recipe = fromVisitor(new RemoveImport("util"));
+            spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
 
             //language=typescript
             await withDir(async (repo) => {
@@ -548,10 +546,9 @@ describe('RemoveImport visitor', () => {
             );
         });
 
-        test('should remove unused namespace import when removing the namespace', async () => {
+        test('should remove unused namespace import when removing a specific member', async () => {
             const spec = new RecipeSpec();
-            // Before: new RemoveImport("react", "SFC") removed it too, while a request for one member now keeps it
-            spec.recipe = fromVisitor(new RemoveImport("react", "*"));
+            spec.recipe = fromVisitor(new RemoveImport("react", "SFC"));
 
             //language=typescript
             await spec.rewriteRun(
@@ -579,6 +576,71 @@ describe('RemoveImport visitor', () => {
                         import * as React from 'react';
 
                         const el: React.ReactNode = null;
+                    `
+                )
+            );
+        });
+
+        // A recipe that has rewritten the file's last `ReactDOM.render` asks for `render`, and nothing reads the
+        // namespace it was read through any more
+        test('removing a member removes the unused namespace import it was read through', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react-dom", "render"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as ReactDOM from 'react-dom';
+                        import {createRoot} from 'react-dom/client';
+
+                        const root = createRoot(document.getElementById('root'));
+                        root.render(<App/>);
+                    `,
+                    `
+                        import {createRoot} from 'react-dom/client';
+
+                        const root = createRoot(document.getElementById('root'));
+                        root.render(<App/>);
+                    `
+                )
+            );
+        });
+
+        test('removing a member keeps the namespace import it was read through while another member is read', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react-dom", "render"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as ReactDOM from 'react-dom';
+                        import {createRoot} from 'react-dom/client';
+
+                        const root = createRoot(document.getElementById('root'));
+                        root.render(<App/>);
+                        ReactDOM.unmountComponentAtNode(document.getElementById('legacy'));
+                    `
+                )
+            );
+        });
+
+        // `React.default` reads the default through the namespace, so a request for the default asks for it too
+        test('removing the default removes an unused namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as React from 'react';
+
+                        export const x = 1;
+                    `,
+                    `
+                        export const x = 1;
                     `
                 )
             );
@@ -1010,11 +1072,10 @@ describe('RemoveImport visitor', () => {
             );
         });
 
-        test('should keep unused import-equals-require when removing a specific member', async () => {
+        test('should remove unused import-equals-require with member specified', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
 
-            // Before: removed, leaving `console.log("no util usage");` and an `export {};`
             //language=typescript
             await spec.rewriteRun(
                 typescript(
@@ -1022,6 +1083,11 @@ describe('RemoveImport visitor', () => {
                         import util = require("util");
 
                         console.log("no util usage");
+                    `,
+                    `
+                        console.log("no util usage");
+
+                        export {};
                     `
                 )
             );
@@ -2141,17 +2207,19 @@ describe('RemoveImport visitor', () => {
             );
         });
 
-        test('a member-scoped removal keeps a namespace import that JSX does not read', async () => {
+        test('a member-scoped removal removes a namespace import that JSX does not read', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("lodash", "map"));
 
-            // Before: removed, leaving `export const A = () => <div/>;`
             //language=tsx
             await spec.rewriteRun(
                 tsx(
                     `
                         import * as _ from 'lodash';
 
+                        export const A = () => <div/>;
+                    `,
+                    `
                         export const A = () => <div/>;
                     `
                 )
@@ -2296,23 +2364,6 @@ describe("RemoveImport reading the binding table", () => {
                 const logger = container.require("logger");
 
                 container.start();
-            `)
-        );
-    });
-
-    // A request for one member removes only the bindings of that member, as the table reads a request
-    test("a request for one member keeps an unused namespace import", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
-        // Before: `import * as fs from "fs";` was removed, as an unused namespace import, `import X = require` or whole
-        // `require` was for any member, since once a recipe has rewritten the file's last `fs.readFile` nothing reads it
-        await spec.rewriteRun(
-            //language=typescript
-            typescript(`
-                import * as fs from "fs";
-                import {join} from "path";
-
-                export const configPath = join("config", "app.json");
             `)
         );
     });
