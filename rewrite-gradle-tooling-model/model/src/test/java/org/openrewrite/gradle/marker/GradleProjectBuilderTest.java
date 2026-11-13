@@ -24,7 +24,7 @@ import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.util.*;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GradleProjectBuilderTest {

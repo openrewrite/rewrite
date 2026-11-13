@@ -57,7 +57,7 @@ public class PipfileFile implements PythonDependencyFile {
                 }
                 return updateKeyValueVersion(kv, newVersion);
             }
-        }.visitNonNull(doc, upgrades, cursor);
+        }.visitNonNull(doc, upgrades, cursor.getParentOrThrow());
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
             result = result.withMarkers(result.getMarkers().setByType(updatedMarker));
@@ -110,7 +110,7 @@ public class PipfileFile implements PythonDependencyFile {
                 });
                 return t.withValues(newValues);
             }
-        }.visitNonNull(doc, normalizedNames, cursor);
+        }.visitNonNull(doc, normalizedNames, cursor.getParentOrThrow());
         if (result != doc) {
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -141,7 +141,7 @@ public class PipfileFile implements PythonDependencyFile {
                 }
                 return kv;
             }
-        }.visitNonNull(doc, 0, cursor);
+        }.visitNonNull(doc, 0, cursor.getParentOrThrow());
         if (result != doc) {
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -174,7 +174,7 @@ public class PipfileFile implements PythonDependencyFile {
                 }
                 return kv;
             }
-        }.visitNonNull(doc, packageMessages, cursor);
+        }.visitNonNull(doc, packageMessages, cursor.getParentOrThrow());
         if (result != doc) {
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }

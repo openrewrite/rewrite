@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -54,7 +55,9 @@ class ReplaceConstantTest implements RewriteTest {
     @Test
     void replaceStaticallyImportedConstant() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
+          // the recipe doesn't retype the call whose argument it replaces, which then calls println(String)
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
           java(
             """
               import static com.google.common.base.Charsets.UTF_8;
@@ -70,6 +73,40 @@ class ReplaceConstantTest implements RewriteTest {
                   Object o = "UTF_8";
                   void foo() {
                       System.out.println("UTF_8");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstantInLambda() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
+          java(
+            """
+              import java.util.function.Supplier;
+              import static com.google.common.base.Charsets.UTF_8;
+
+              class Test {
+                  void run(Supplier<Object> supplier) {
+                  }
+
+                  void method() {
+                      run(() -> UTF_8);
+                  }
+              }
+              """,
+            """
+              import java.util.function.Supplier;
+
+              class Test {
+                  void run(Supplier<Object> supplier) {
+                  }
+
+                  void method() {
+                      run(() -> "UTF_8");
                   }
               }
               """

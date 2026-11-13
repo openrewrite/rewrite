@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RPC request to parse an entire Go project.
@@ -36,17 +37,17 @@ class ParseProject implements RpcRequest {
     @Nullable
     Path relativeTo;
 
-    ParseProject(Path projectPath) {
-        this(projectPath, null, null);
-    }
+    /**
+     * Parser options, as on {@link GoParseRequest#getOptions()}.
+     */
+    @Nullable
+    Map<String, String> options;
 
-    ParseProject(Path projectPath, @Nullable List<String> exclusions) {
-        this(projectPath, exclusions, null);
-    }
-
-    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo,
+                 @Nullable Map<String, String> options) {
         this.projectPath = projectPath;
         this.exclusions = exclusions;
         this.relativeTo = relativeTo;
+        this.options = options;
     }
 }

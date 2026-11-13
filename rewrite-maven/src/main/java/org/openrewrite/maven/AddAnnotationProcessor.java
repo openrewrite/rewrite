@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * The behavior differs based on project structure:
  * <ul>
  *   <li><b>Single module:</b> Adds to build/plugins</li>
- *   <li><b>Multi-module with parent in reactor:</b> Adds to parent's build/pluginManagement/plugins</li>
+ *   <li><b>Multi-module with parent in reactor:</b> Adds to the nearest parent's build/pluginManagement/plugins</li>
  *   <li><b>Orphan module (no parent in reactor):</b> Adds to build/plugins</li>
  * </ul>
  */
@@ -113,10 +113,12 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
             for (Map.Entry<Path, Path> e : tentativeChildToParent.entrySet()) {
                 Path child = e.getKey();
                 Path parent = e.getValue();
-                if (reactorLinked.contains(child)) {
-                    parentPomPaths.add(parent);
-                } else {
+                if (!reactorLinked.contains(child)) {
                     orphans.add(child);
+                } else if (!packagingPomPaths.contains(child)) {
+                    // A `pom` module compiles nothing, so it does not claim its own parent.
+                    // Otherwise every ancestor of a module gets configured, not just the nearest.
+                    parentPomPaths.add(parent);
                 }
             }
 
@@ -273,24 +275,21 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                     return tree;
                 }
 
-                // GAV-coincident orphan: AddPluginVisitor.isAcceptable would
-                // otherwise short-circuit via its parentPomIsProjectPom()
-                // check and refuse to add the plugin. Targeting the visitor
-                // at this exact source path bypasses that guard.
-                boolean isGavCoincidentOrphan = !isParent && mrr.parentPomIsProjectPom();
-                String pluginFilePattern = isGavCoincidentOrphan ? PathUtils.separatorsToUnix(sourcePath.toString()) : null;
+                // The reactor analysis above already picked this exact POM, so target the
+                // visitor at it rather than let AddPluginVisitor's blanket
+                // parentPomIsProjectPom() guard veto any POM with an in-reactor parent.
                 tree = new AddPluginVisitor(isParent,
                         MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID, null,
                         "<configuration><annotationProcessorPaths/></configuration>", null, null,
-                        pluginFilePattern
+                        PathUtils.separatorsToUnix(sourcePath.toString())
                 ).visit(tree, ctx);
 
                 // Then, configure the annotation processor path
                 return new MavenIsoVisitor<ExecutionContext>() {
                     @Override
                     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                        Xml.Tag plugins = super.visitTag(tag, ctx);
-                        plugins = (Xml.Tag) new MavenPlugin.Matcher(isParent, MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
+                        Xml.Tag visited = super.visitTag(tag, ctx);
+                        Xml.Tag plugins = (Xml.Tag) new MavenPlugin.Matcher(isParent, MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID).asVisitor(plugin -> {
                             MavenResolutionResult currentMrr = getResolutionResult();
                             AtomicReference<TreeVisitor<?, ExecutionContext>> maybePropertyUpdate = new AtomicReference<>();
 
@@ -369,9 +368,10 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                             }
 
                             return modifiedPlugin;
-                        }).visitNonNull(plugins, 0);
+                        }).visitNonNull(visited, 0);
 
-                        if (plugins != tag) {
+                        // Format where the path was added, not again at each enclosing tag up to <project>
+                        if (plugins != visited) {
                             plugins = autoFormat(plugins, ctx);
                         }
                         return plugins;

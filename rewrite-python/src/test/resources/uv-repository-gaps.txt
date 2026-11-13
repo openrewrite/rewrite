@@ -1,0 +1,7 @@
+# Corpus scenarios under lock/repository/uv/ the engine does not reproduce yet, with what it does instead.
+apache__gravitino__mcp-server__upgrade	refuses: RESOLUTION_REQUIRED
+apache__polaris-tools__mcp-server__upgrade	refuses: RESOLUTION_REQUIRED
+huggingface__carbon__upgrade	refuses: DYNAMIC_SDIST_METADATA
+langchain-ai__langgraph-cua-py__upgrade	refuses: RESOLUTION_REQUIRED
+pydantic__talks__2026-02-monty__removal	refuses: RESOLUTION_REQUIRED
+pydantic__talks__2026-02-monty__upgrade	refuses: RESOLUTION_REQUIRED

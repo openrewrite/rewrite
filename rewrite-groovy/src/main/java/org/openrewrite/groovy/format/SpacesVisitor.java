@@ -18,6 +18,8 @@ package org.openrewrite.groovy.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.groovy.marker.AsStyleTypeCast;
+import org.openrewrite.groovy.marker.LambdaStyle;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
@@ -51,6 +53,20 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
             return typeCast;
         }
         return super.visitTypeCast(typeCast, p);
+    }
+
+    @Override
+    public J.Lambda visitLambda(J.Lambda lambda, P p) {
+        J.Lambda l = super.visitLambda(lambda, p);
+        List<J> parameters = lambda.getParameters().getParameters();
+        if (parameters.isEmpty() || lambda.getParameters().isParenthesized() ||
+            lambda.getMarkers().findFirst(LambdaStyle.class).map(LambdaStyle::isJavaStyle).orElse(false)) {
+            return l;
+        }
+        // A closure's parameters follow `{`, so Java's rule of no padding after `(` must not eat the space there
+        Space beforeFirst = parameters.get(0).getPrefix();
+        return l.withParameters(l.getParameters().withParameters(ListUtils.mapFirst(l.getParameters().getParameters(),
+                param -> param.withPrefix(beforeFirst))));
     }
 
     @Override

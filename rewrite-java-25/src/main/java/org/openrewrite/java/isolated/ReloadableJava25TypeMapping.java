@@ -183,12 +183,20 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
 
     private JavaType generic(Type.TypeVar type, String signature) {
         String name;
-        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+        if (type instanceof Type.CapturedType) {
+            // A captured wildcard is javac's internal representation of the wildcard it was captured
+            // from; represent it as "?" (as the signature builder already does) rather than leaking
+            // javac's invalid-Java name "<captured wildcard>".
             name = "?";
         } else {
             name = type.tsym.name.toString();
         }
         return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
+            if (type instanceof Type.CapturedType && !((Type.CapturedType) type).lower.hasTag(TypeTag.BOT)) {
+                // a capture of `? super String` is denoted by its lower bound, not by the declared bound it has above
+                gtv.unsafeSet(gtv.getName(), CONTRAVARIANT, singletonList(type(((Type.CapturedType) type).lower)));
+                return;
+            }
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
@@ -217,6 +225,11 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
+        // Taken before the initializer may complete the symbol, matching the signature built from the same state.
+        // A generic class arrives through its own symbol type only once javac has completed it, since javac
+        // completes an owner before its nested classes and a class before any of its members.
+        boolean parameterized = classType.typarams_field != null && classType.typarams_field.length() > 0;
+        // flags_field is empty until javac completes the symbol, so the initializer sets flags and kind again.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), stub -> {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
@@ -278,10 +291,11 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
                     typeParameters.add(type(tParam));
                 }
             }
-            stub.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            stub.unsafeSet(sym.flags_field, getKind(sym), fqn, typeParameters, supertype, owner, listAnnotations(sym),
+                    interfaces, fields, methods);
         });
 
-        if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
+        if (parameterized) {
             JavaType.Class finalClazz = clazz;
             return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
@@ -295,18 +309,17 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.FullyQualified.Kind getKind(Symbol.ClassSymbol sym) {
-        switch (sym.getKind()) {
-            case ENUM:
-                return JavaType.FullyQualified.Kind.Enum;
-            case ANNOTATION_TYPE:
-                return JavaType.FullyQualified.Kind.Annotation;
-            case INTERFACE:
-                return JavaType.FullyQualified.Kind.Interface;
-            case RECORD:
-                return JavaType.FullyQualified.Kind.Record;
-            default:
-                return JavaType.FullyQualified.Kind.Class;
+        long flags = sym.flags_field;
+        if ((flags & Flags.ANNOTATION) != 0) {
+            return JavaType.FullyQualified.Kind.Annotation;
+        } else if ((flags & Flags.INTERFACE) != 0) {
+            return JavaType.FullyQualified.Kind.Interface;
+        } else if ((flags & Flags.ENUM) != 0) {
+            return JavaType.FullyQualified.Kind.Enum;
+        } else if ((flags & Flags.RECORD) != 0) {
+            return JavaType.FullyQualified.Kind.Record;
         }
+        return JavaType.FullyQualified.Kind.Class;
     }
 
     @Override
@@ -425,6 +438,15 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
                 }
             } catch (Exception e) {
                 // ignore
+            }
+
+            // An unresolvable argument leaves the select as a plain ErrorType even though the callee
+            // resolved; recover the invocation type javac computed (kept in the error's original
+            // type), falling back to the symbol's declared type, to keep the JavaType.Method.
+            if (symbol instanceof Symbol.MethodSymbol && symbol.kind != Kinds.Kind.ERR &&
+                symbol.type != null && !(symbol.type instanceof Type.ErrorType)) {
+                Type originalType = selectType.getOriginalType();
+                return methodInvocationType(originalType instanceof Type.MethodType ? originalType : symbol.type, symbol);
             }
         }
 

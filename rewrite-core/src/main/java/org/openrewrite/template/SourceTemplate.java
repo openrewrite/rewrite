@@ -18,6 +18,9 @@ package org.openrewrite.template;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 
+import javax.annotation.CheckReturnValue;
+
 public interface SourceTemplate<T extends Tree, C extends Coordinates> {
+    @CheckReturnValue
     <T2 extends T> T2 apply(Cursor scope, C coordinates, Object... parameters);
 }

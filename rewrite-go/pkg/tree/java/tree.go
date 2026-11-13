@@ -18,8 +18,11 @@ package java
 
 import "github.com/google/uuid"
 
-// Tree is the root interface for all LST nodes.
-type Tree interface{ IsTree() }
+type Tree interface {
+	IsTree()
+	// IsHeavyweight makes every tree a recipe.Heavyweight.
+	IsHeavyweight()
+}
 
 // J is the interface for all Java-like AST nodes that carry a prefix
 // space. Mirrors org.openrewrite.java.tree.J — `getId`, `getPrefix`,
@@ -50,19 +53,16 @@ type J interface {
 	GetMarkers() Markers
 }
 
-// Expression is a J node that evaluates to a value.
 type Expression interface {
 	J
 	IsExpression()
 }
 
-// Statement is a J node that can appear at statement level.
 type Statement interface {
 	J
 	IsStatement()
 }
 
-// SourceFile is a J node representing an entire source file.
 type SourceFile interface {
 	J
 	IsSourceFile()

@@ -237,14 +237,16 @@ public class RecipeMarketplaceReader {
 
         if (name == null) {
             throw new IllegalArgumentException("CSV file must contain a column named 'name' and each row must have a value for it");
-        } else if (packageName == null) {
-            throw new IllegalArgumentException("CSV file must contain a column named 'packageName' and each row must have a value for it");
-        } else if (ecosystem == null) {
-            throw new IllegalArgumentException("CSV file must contain a column named 'ecosystem' and each row must have a value for it");
         }
 
-        // Create bundle if ecosystem information is present
-        RecipeBundle bundle = new RecipeBundle(ecosystem.toLowerCase(), packageName, requestedVersion, version, team);
+        if ((ecosystem == null) != (packageName == null)) {
+            throw new IllegalArgumentException("A recipe row must have both 'ecosystem' and 'packageName' or neither, but '" +
+                                               name + "' has only '" + (ecosystem == null ? "packageName" : "ecosystem") + "'");
+        }
+
+        RecipeBundle bundle = new RecipeBundle(
+                ecosystem == null ? null : ecosystem.toLowerCase(Locale.ROOT),
+                packageName, requestedVersion, version, team);
 
         RecipeListing listing = new RecipeListing(
                 marketplace,

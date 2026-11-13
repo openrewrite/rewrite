@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.openrewrite.jgit.dircache.DirCache;
 import org.openrewrite.jgit.dircache.DirCacheIterator;
 import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.jgit.lib.Repository;
@@ -51,6 +52,28 @@ public final class GitIgnore {
      * @return {@code true} if the path should be treated as ignored
      */
     public static boolean isIgnoredAndUntracked(Repository repository, String repoRelativePath) {
+        try {
+            return isIgnoredAndUntracked(repository, repository.readDirCache(), repoRelativePath);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Returns {@code true} if the given path is matched by a {@code .gitignore}
+     * rule and is <b>not</b> tracked in the given git index.
+     * <p>
+     * This overload accepts a pre-read {@link DirCache} so callers that check many
+     * paths against the same index can read it once (via {@link Repository#readDirCache()})
+     * and reuse it, rather than re-parsing {@code .git/index} on every invocation.
+     *
+     * @param repository       the JGit repository
+     * @param dirCache         the git index, typically obtained from {@link Repository#readDirCache()}
+     * @param repoRelativePath path relative to the repository root, using forward slashes
+     *                         (e.g. {@code "src/main/java/Foo.java"})
+     * @return {@code true} if the path should be treated as ignored
+     */
+    public static boolean isIgnoredAndUntracked(Repository repository, DirCache dirCache, String repoRelativePath) {
         if (repoRelativePath.isEmpty()) {
             return false;
         }
@@ -64,7 +87,7 @@ public final class GitIgnore {
 
         try (TreeWalk walk = new TreeWalk(repository)) {
             walk.addTree(new FileTreeIterator(repository));
-            walk.addTree(new DirCacheIterator(repository.readDirCache()));
+            walk.addTree(new DirCacheIterator(dirCache));
             walk.setFilter(PathFilterGroup.createFromStrings(repoRelativePath));
             while (walk.next()) {
                 WorkingTreeIterator workingTreeIterator = walk.getTree(0, WorkingTreeIterator.class);
@@ -103,5 +126,19 @@ public final class GitIgnore {
      */
     public static boolean isIgnoredAndUntracked(Repository repository, java.nio.file.Path platformPath) {
         return isIgnoredAndUntracked(repository, separatorsToUnix(platformPath.toString()));
+    }
+
+    /**
+     * Convenience overload that normalizes a platform path to a
+     * forward-slash-separated, repository-relative path, using a pre-read index.
+     *
+     * @param repository the JGit repository
+     * @param dirCache the git index, typically obtained from {@link Repository#readDirCache()}
+     * @param platformPath path that may use platform separators
+     * @return {@code true} if the path should be treated as ignored
+     * @see #isIgnoredAndUntracked(Repository, DirCache, String)
+     */
+    public static boolean isIgnoredAndUntracked(Repository repository, DirCache dirCache, java.nio.file.Path platformPath) {
+        return isIgnoredAndUntracked(repository, dirCache, separatorsToUnix(platformPath.toString()));
     }
 }

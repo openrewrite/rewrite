@@ -35,7 +35,6 @@ class JavaVisitorTest implements RewriteTest {
     void javaVisitorHandlesPaddedWithNullElem() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipes(
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
@@ -51,7 +50,7 @@ class JavaVisitorTest implements RewriteTest {
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
                   public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                      if ("allTheThings".equals(method.getSimpleName())) {
+                      if ("allTheThings".equals(method.getSimpleName()) && method.getThrows() == null) {
                           return JavaTemplate.builder("Exception").contextSensitive().build()
                             .apply(getCursor(), method.getCoordinates().replaceThrows());
                       }
@@ -139,12 +138,11 @@ class JavaVisitorTest implements RewriteTest {
     void javaVisitorHandlesErroneousNodes() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipes(
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
                   public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                      if ("test".equals(method.getSimpleName())) {
+                      if ("test".equals(method.getSimpleName()) && method.getThrows() == null) {
                           return JavaTemplate.builder("Exception").contextSensitive().build()
                             .apply(getCursor(), method.getCoordinates().replaceThrows());
                       }

@@ -1,0 +1,957 @@
+# node-semver 5.5.0 test/*.js, the calls of the functions yarn 1.22.22 makes: fn, args..., =>, result (JSON; {"undefined":true} is undefined, {"threw":msg} a throw)
+gt	"0.0.0"	"0.0.0-foo"	{"undefined":true}	=>	true
+lt	"0.0.0-foo"	"0.0.0"	{"undefined":true}	=>	true
+gt	"0.0.0-foo"	"0.0.0"	{"undefined":true}	=>	false
+lt	"0.0.0"	"0.0.0-foo"	{"undefined":true}	=>	false
+eq	"0.0.0"	"0.0.0"	{"undefined":true}	=>	true
+eq	"0.0.0-foo"	"0.0.0-foo"	{"undefined":true}	=>	true
+neq	"0.0.0"	"0.0.0-foo"	{"undefined":true}	=>	true
+cmp	"0.0.0-foo"	"=="	"0.0.0-foo"	{"undefined":true}	=>	true
+cmp	"0.0.0"	">="	"0.0.0-foo"	{"undefined":true}	=>	true
+cmp	"0.0.0-foo"	"<="	"0.0.0"	{"undefined":true}	=>	true
+cmp	"0.0.0"	"!="	"0.0.0-foo"	{"undefined":true}	=>	true
+gt	"0.0.1"	"0.0.0"	{"undefined":true}	=>	true
+lt	"0.0.0"	"0.0.1"	{"undefined":true}	=>	true
+gt	"0.0.0"	"0.0.1"	{"undefined":true}	=>	false
+lt	"0.0.1"	"0.0.0"	{"undefined":true}	=>	false
+eq	"0.0.1"	"0.0.1"	{"undefined":true}	=>	true
+neq	"0.0.1"	"0.0.0"	{"undefined":true}	=>	true
+cmp	"0.0.0"	"=="	"0.0.0"	{"undefined":true}	=>	true
+cmp	"0.0.1"	">="	"0.0.0"	{"undefined":true}	=>	true
+cmp	"0.0.0"	"<="	"0.0.1"	{"undefined":true}	=>	true
+cmp	"0.0.1"	"!="	"0.0.0"	{"undefined":true}	=>	true
+gt	"1.0.0"	"0.9.9"	{"undefined":true}	=>	true
+lt	"0.9.9"	"1.0.0"	{"undefined":true}	=>	true
+gt	"0.9.9"	"1.0.0"	{"undefined":true}	=>	false
+lt	"1.0.0"	"0.9.9"	{"undefined":true}	=>	false
+eq	"1.0.0"	"1.0.0"	{"undefined":true}	=>	true
+eq	"0.9.9"	"0.9.9"	{"undefined":true}	=>	true
+neq	"1.0.0"	"0.9.9"	{"undefined":true}	=>	true
+cmp	"0.9.9"	"=="	"0.9.9"	{"undefined":true}	=>	true
+cmp	"1.0.0"	">="	"0.9.9"	{"undefined":true}	=>	true
+cmp	"0.9.9"	"<="	"1.0.0"	{"undefined":true}	=>	true
+cmp	"1.0.0"	"!="	"0.9.9"	{"undefined":true}	=>	true
+gt	"0.10.0"	"0.9.0"	{"undefined":true}	=>	true
+lt	"0.9.0"	"0.10.0"	{"undefined":true}	=>	true
+gt	"0.9.0"	"0.10.0"	{"undefined":true}	=>	false
+lt	"0.10.0"	"0.9.0"	{"undefined":true}	=>	false
+eq	"0.10.0"	"0.10.0"	{"undefined":true}	=>	true
+eq	"0.9.0"	"0.9.0"	{"undefined":true}	=>	true
+neq	"0.10.0"	"0.9.0"	{"undefined":true}	=>	true
+cmp	"0.9.0"	"=="	"0.9.0"	{"undefined":true}	=>	true
+cmp	"0.10.0"	">="	"0.9.0"	{"undefined":true}	=>	true
+cmp	"0.9.0"	"<="	"0.10.0"	{"undefined":true}	=>	true
+cmp	"0.10.0"	"!="	"0.9.0"	{"undefined":true}	=>	true
+gt	"0.99.0"	"0.10.0"	{"undefined":true}	=>	true
+lt	"0.10.0"	"0.99.0"	{"undefined":true}	=>	true
+gt	"0.10.0"	"0.99.0"	{"undefined":true}	=>	false
+lt	"0.99.0"	"0.10.0"	{"undefined":true}	=>	false
+eq	"0.99.0"	"0.99.0"	{"undefined":true}	=>	true
+neq	"0.99.0"	"0.10.0"	{"undefined":true}	=>	true
+cmp	"0.10.0"	"=="	"0.10.0"	{"undefined":true}	=>	true
+cmp	"0.99.0"	">="	"0.10.0"	{"undefined":true}	=>	true
+cmp	"0.10.0"	"<="	"0.99.0"	{"undefined":true}	=>	true
+cmp	"0.99.0"	"!="	"0.10.0"	{"undefined":true}	=>	true
+gt	"2.0.0"	"1.2.3"	{"undefined":true}	=>	true
+lt	"1.2.3"	"2.0.0"	{"undefined":true}	=>	true
+gt	"1.2.3"	"2.0.0"	{"undefined":true}	=>	false
+lt	"2.0.0"	"1.2.3"	{"undefined":true}	=>	false
+eq	"2.0.0"	"2.0.0"	{"undefined":true}	=>	true
+eq	"1.2.3"	"1.2.3"	{"undefined":true}	=>	true
+neq	"2.0.0"	"1.2.3"	{"undefined":true}	=>	true
+cmp	"1.2.3"	"=="	"1.2.3"	{"undefined":true}	=>	true
+cmp	"2.0.0"	">="	"1.2.3"	{"undefined":true}	=>	true
+cmp	"1.2.3"	"<="	"2.0.0"	{"undefined":true}	=>	true
+cmp	"2.0.0"	"!="	"1.2.3"	{"undefined":true}	=>	true
+gt	"v0.0.0"	"0.0.0-foo"	true	=>	true
+lt	"0.0.0-foo"	"v0.0.0"	true	=>	true
+gt	"0.0.0-foo"	"v0.0.0"	true	=>	false
+lt	"v0.0.0"	"0.0.0-foo"	true	=>	false
+eq	"v0.0.0"	"v0.0.0"	true	=>	true
+eq	"0.0.0-foo"	"0.0.0-foo"	true	=>	true
+neq	"v0.0.0"	"0.0.0-foo"	true	=>	true
+cmp	"0.0.0-foo"	"=="	"0.0.0-foo"	true	=>	true
+cmp	"v0.0.0"	">="	"0.0.0-foo"	true	=>	true
+cmp	"0.0.0-foo"	"<="	"v0.0.0"	true	=>	true
+cmp	"v0.0.0"	"!="	"0.0.0-foo"	true	=>	true
+gt	"v0.0.1"	"0.0.0"	true	=>	true
+lt	"0.0.0"	"v0.0.1"	true	=>	true
+gt	"0.0.0"	"v0.0.1"	true	=>	false
+lt	"v0.0.1"	"0.0.0"	true	=>	false
+eq	"v0.0.1"	"v0.0.1"	true	=>	true
+eq	"0.0.0"	"0.0.0"	true	=>	true
+neq	"v0.0.1"	"0.0.0"	true	=>	true
+cmp	"0.0.0"	"=="	"0.0.0"	true	=>	true
+cmp	"v0.0.1"	">="	"0.0.0"	true	=>	true
+cmp	"0.0.0"	"<="	"v0.0.1"	true	=>	true
+cmp	"v0.0.1"	"!="	"0.0.0"	true	=>	true
+gt	"v1.0.0"	"0.9.9"	true	=>	true
+lt	"0.9.9"	"v1.0.0"	true	=>	true
+gt	"0.9.9"	"v1.0.0"	true	=>	false
+lt	"v1.0.0"	"0.9.9"	true	=>	false
+eq	"v1.0.0"	"v1.0.0"	true	=>	true
+eq	"0.9.9"	"0.9.9"	true	=>	true
+neq	"v1.0.0"	"0.9.9"	true	=>	true
+cmp	"0.9.9"	"=="	"0.9.9"	true	=>	true
+cmp	"v1.0.0"	">="	"0.9.9"	true	=>	true
+cmp	"0.9.9"	"<="	"v1.0.0"	true	=>	true
+cmp	"v1.0.0"	"!="	"0.9.9"	true	=>	true
+gt	"v0.10.0"	"0.9.0"	true	=>	true
+lt	"0.9.0"	"v0.10.0"	true	=>	true
+gt	"0.9.0"	"v0.10.0"	true	=>	false
+lt	"v0.10.0"	"0.9.0"	true	=>	false
+eq	"v0.10.0"	"v0.10.0"	true	=>	true
+eq	"0.9.0"	"0.9.0"	true	=>	true
+neq	"v0.10.0"	"0.9.0"	true	=>	true
+cmp	"0.9.0"	"=="	"0.9.0"	true	=>	true
+cmp	"v0.10.0"	">="	"0.9.0"	true	=>	true
+cmp	"0.9.0"	"<="	"v0.10.0"	true	=>	true
+cmp	"v0.10.0"	"!="	"0.9.0"	true	=>	true
+gt	"v0.99.0"	"0.10.0"	true	=>	true
+lt	"0.10.0"	"v0.99.0"	true	=>	true
+gt	"0.10.0"	"v0.99.0"	true	=>	false
+lt	"v0.99.0"	"0.10.0"	true	=>	false
+eq	"v0.99.0"	"v0.99.0"	true	=>	true
+eq	"0.10.0"	"0.10.0"	true	=>	true
+neq	"v0.99.0"	"0.10.0"	true	=>	true
+cmp	"0.10.0"	"=="	"0.10.0"	true	=>	true
+cmp	"v0.99.0"	">="	"0.10.0"	true	=>	true
+cmp	"0.10.0"	"<="	"v0.99.0"	true	=>	true
+cmp	"v0.99.0"	"!="	"0.10.0"	true	=>	true
+gt	"v2.0.0"	"1.2.3"	true	=>	true
+lt	"1.2.3"	"v2.0.0"	true	=>	true
+gt	"1.2.3"	"v2.0.0"	true	=>	false
+lt	"v2.0.0"	"1.2.3"	true	=>	false
+eq	"v2.0.0"	"v2.0.0"	true	=>	true
+eq	"1.2.3"	"1.2.3"	true	=>	true
+neq	"v2.0.0"	"1.2.3"	true	=>	true
+cmp	"1.2.3"	"=="	"1.2.3"	true	=>	true
+cmp	"v2.0.0"	">="	"1.2.3"	true	=>	true
+cmp	"1.2.3"	"<="	"v2.0.0"	true	=>	true
+cmp	"v2.0.0"	"!="	"1.2.3"	true	=>	true
+gt	"0.0.0"	"v0.0.0-foo"	true	=>	true
+lt	"v0.0.0-foo"	"0.0.0"	true	=>	true
+gt	"v0.0.0-foo"	"0.0.0"	true	=>	false
+lt	"0.0.0"	"v0.0.0-foo"	true	=>	false
+eq	"v0.0.0-foo"	"v0.0.0-foo"	true	=>	true
+neq	"0.0.0"	"v0.0.0-foo"	true	=>	true
+cmp	"v0.0.0-foo"	"=="	"v0.0.0-foo"	true	=>	true
+cmp	"0.0.0"	">="	"v0.0.0-foo"	true	=>	true
+cmp	"v0.0.0-foo"	"<="	"0.0.0"	true	=>	true
+cmp	"0.0.0"	"!="	"v0.0.0-foo"	true	=>	true
+gt	"0.0.1"	"v0.0.0"	true	=>	true
+lt	"v0.0.0"	"0.0.1"	true	=>	true
+gt	"v0.0.0"	"0.0.1"	true	=>	false
+lt	"0.0.1"	"v0.0.0"	true	=>	false
+eq	"0.0.1"	"0.0.1"	true	=>	true
+neq	"0.0.1"	"v0.0.0"	true	=>	true
+cmp	"v0.0.0"	"=="	"v0.0.0"	true	=>	true
+cmp	"0.0.1"	">="	"v0.0.0"	true	=>	true
+cmp	"v0.0.0"	"<="	"0.0.1"	true	=>	true
+cmp	"0.0.1"	"!="	"v0.0.0"	true	=>	true
+gt	"1.0.0"	"v0.9.9"	true	=>	true
+lt	"v0.9.9"	"1.0.0"	true	=>	true
+gt	"v0.9.9"	"1.0.0"	true	=>	false
+lt	"1.0.0"	"v0.9.9"	true	=>	false
+eq	"1.0.0"	"1.0.0"	true	=>	true
+eq	"v0.9.9"	"v0.9.9"	true	=>	true
+neq	"1.0.0"	"v0.9.9"	true	=>	true
+cmp	"v0.9.9"	"=="	"v0.9.9"	true	=>	true
+cmp	"1.0.0"	">="	"v0.9.9"	true	=>	true
+cmp	"v0.9.9"	"<="	"1.0.0"	true	=>	true
+cmp	"1.0.0"	"!="	"v0.9.9"	true	=>	true
+gt	"0.10.0"	"v0.9.0"	true	=>	true
+lt	"v0.9.0"	"0.10.0"	true	=>	true
+gt	"v0.9.0"	"0.10.0"	true	=>	false
+lt	"0.10.0"	"v0.9.0"	true	=>	false
+eq	"v0.9.0"	"v0.9.0"	true	=>	true
+neq	"0.10.0"	"v0.9.0"	true	=>	true
+cmp	"v0.9.0"	"=="	"v0.9.0"	true	=>	true
+cmp	"0.10.0"	">="	"v0.9.0"	true	=>	true
+cmp	"v0.9.0"	"<="	"0.10.0"	true	=>	true
+cmp	"0.10.0"	"!="	"v0.9.0"	true	=>	true
+gt	"0.99.0"	"v0.10.0"	true	=>	true
+lt	"v0.10.0"	"0.99.0"	true	=>	true
+gt	"v0.10.0"	"0.99.0"	true	=>	false
+lt	"0.99.0"	"v0.10.0"	true	=>	false
+eq	"0.99.0"	"0.99.0"	true	=>	true
+neq	"0.99.0"	"v0.10.0"	true	=>	true
+cmp	"v0.10.0"	"=="	"v0.10.0"	true	=>	true
+cmp	"0.99.0"	">="	"v0.10.0"	true	=>	true
+cmp	"v0.10.0"	"<="	"0.99.0"	true	=>	true
+cmp	"0.99.0"	"!="	"v0.10.0"	true	=>	true
+gt	"2.0.0"	"v1.2.3"	true	=>	true
+lt	"v1.2.3"	"2.0.0"	true	=>	true
+gt	"v1.2.3"	"2.0.0"	true	=>	false
+lt	"2.0.0"	"v1.2.3"	true	=>	false
+eq	"2.0.0"	"2.0.0"	true	=>	true
+eq	"v1.2.3"	"v1.2.3"	true	=>	true
+neq	"2.0.0"	"v1.2.3"	true	=>	true
+cmp	"v1.2.3"	"=="	"v1.2.3"	true	=>	true
+cmp	"2.0.0"	">="	"v1.2.3"	true	=>	true
+cmp	"v1.2.3"	"<="	"2.0.0"	true	=>	true
+cmp	"2.0.0"	"!="	"v1.2.3"	true	=>	true
+gt	"1.2.3"	"1.2.3-asdf"	{"undefined":true}	=>	true
+lt	"1.2.3-asdf"	"1.2.3"	{"undefined":true}	=>	true
+gt	"1.2.3-asdf"	"1.2.3"	{"undefined":true}	=>	false
+lt	"1.2.3"	"1.2.3-asdf"	{"undefined":true}	=>	false
+eq	"1.2.3-asdf"	"1.2.3-asdf"	{"undefined":true}	=>	true
+neq	"1.2.3"	"1.2.3-asdf"	{"undefined":true}	=>	true
+cmp	"1.2.3-asdf"	"=="	"1.2.3-asdf"	{"undefined":true}	=>	true
+cmp	"1.2.3"	">="	"1.2.3-asdf"	{"undefined":true}	=>	true
+cmp	"1.2.3-asdf"	"<="	"1.2.3"	{"undefined":true}	=>	true
+cmp	"1.2.3"	"!="	"1.2.3-asdf"	{"undefined":true}	=>	true
+gt	"1.2.3"	"1.2.3-4"	{"undefined":true}	=>	true
+lt	"1.2.3-4"	"1.2.3"	{"undefined":true}	=>	true
+gt	"1.2.3-4"	"1.2.3"	{"undefined":true}	=>	false
+lt	"1.2.3"	"1.2.3-4"	{"undefined":true}	=>	false
+eq	"1.2.3-4"	"1.2.3-4"	{"undefined":true}	=>	true
+neq	"1.2.3"	"1.2.3-4"	{"undefined":true}	=>	true
+cmp	"1.2.3-4"	"=="	"1.2.3-4"	{"undefined":true}	=>	true
+cmp	"1.2.3"	">="	"1.2.3-4"	{"undefined":true}	=>	true
+cmp	"1.2.3-4"	"<="	"1.2.3"	{"undefined":true}	=>	true
+cmp	"1.2.3"	"!="	"1.2.3-4"	{"undefined":true}	=>	true
+gt	"1.2.3"	"1.2.3-4-foo"	{"undefined":true}	=>	true
+lt	"1.2.3-4-foo"	"1.2.3"	{"undefined":true}	=>	true
+gt	"1.2.3-4-foo"	"1.2.3"	{"undefined":true}	=>	false
+lt	"1.2.3"	"1.2.3-4-foo"	{"undefined":true}	=>	false
+eq	"1.2.3-4-foo"	"1.2.3-4-foo"	{"undefined":true}	=>	true
+neq	"1.2.3"	"1.2.3-4-foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-4-foo"	"=="	"1.2.3-4-foo"	{"undefined":true}	=>	true
+cmp	"1.2.3"	">="	"1.2.3-4-foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-4-foo"	"<="	"1.2.3"	{"undefined":true}	=>	true
+cmp	"1.2.3"	"!="	"1.2.3-4-foo"	{"undefined":true}	=>	true
+gt	"1.2.3-5-foo"	"1.2.3-5"	{"undefined":true}	=>	true
+lt	"1.2.3-5"	"1.2.3-5-foo"	{"undefined":true}	=>	true
+gt	"1.2.3-5"	"1.2.3-5-foo"	{"undefined":true}	=>	false
+lt	"1.2.3-5-foo"	"1.2.3-5"	{"undefined":true}	=>	false
+eq	"1.2.3-5-foo"	"1.2.3-5-foo"	{"undefined":true}	=>	true
+eq	"1.2.3-5"	"1.2.3-5"	{"undefined":true}	=>	true
+neq	"1.2.3-5-foo"	"1.2.3-5"	{"undefined":true}	=>	true
+cmp	"1.2.3-5"	"=="	"1.2.3-5"	{"undefined":true}	=>	true
+cmp	"1.2.3-5-foo"	">="	"1.2.3-5"	{"undefined":true}	=>	true
+cmp	"1.2.3-5"	"<="	"1.2.3-5-foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-5-foo"	"!="	"1.2.3-5"	{"undefined":true}	=>	true
+gt	"1.2.3-5"	"1.2.3-4"	{"undefined":true}	=>	true
+lt	"1.2.3-4"	"1.2.3-5"	{"undefined":true}	=>	true
+gt	"1.2.3-4"	"1.2.3-5"	{"undefined":true}	=>	false
+lt	"1.2.3-5"	"1.2.3-4"	{"undefined":true}	=>	false
+neq	"1.2.3-5"	"1.2.3-4"	{"undefined":true}	=>	true
+cmp	"1.2.3-5"	">="	"1.2.3-4"	{"undefined":true}	=>	true
+cmp	"1.2.3-4"	"<="	"1.2.3-5"	{"undefined":true}	=>	true
+cmp	"1.2.3-5"	"!="	"1.2.3-4"	{"undefined":true}	=>	true
+gt	"1.2.3-5-foo"	"1.2.3-5-Foo"	{"undefined":true}	=>	true
+lt	"1.2.3-5-Foo"	"1.2.3-5-foo"	{"undefined":true}	=>	true
+gt	"1.2.3-5-Foo"	"1.2.3-5-foo"	{"undefined":true}	=>	false
+lt	"1.2.3-5-foo"	"1.2.3-5-Foo"	{"undefined":true}	=>	false
+eq	"1.2.3-5-Foo"	"1.2.3-5-Foo"	{"undefined":true}	=>	true
+neq	"1.2.3-5-foo"	"1.2.3-5-Foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-5-Foo"	"=="	"1.2.3-5-Foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-5-foo"	">="	"1.2.3-5-Foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-5-Foo"	"<="	"1.2.3-5-foo"	{"undefined":true}	=>	true
+cmp	"1.2.3-5-foo"	"!="	"1.2.3-5-Foo"	{"undefined":true}	=>	true
+gt	"3.0.0"	"2.7.2+asdf"	{"undefined":true}	=>	true
+lt	"2.7.2+asdf"	"3.0.0"	{"undefined":true}	=>	true
+gt	"2.7.2+asdf"	"3.0.0"	{"undefined":true}	=>	false
+lt	"3.0.0"	"2.7.2+asdf"	{"undefined":true}	=>	false
+eq	"3.0.0"	"3.0.0"	{"undefined":true}	=>	true
+eq	"2.7.2+asdf"	"2.7.2+asdf"	{"undefined":true}	=>	true
+neq	"3.0.0"	"2.7.2+asdf"	{"undefined":true}	=>	true
+cmp	"2.7.2+asdf"	"=="	"2.7.2+asdf"	{"undefined":true}	=>	true
+cmp	"3.0.0"	">="	"2.7.2+asdf"	{"undefined":true}	=>	true
+cmp	"2.7.2+asdf"	"<="	"3.0.0"	{"undefined":true}	=>	true
+cmp	"3.0.0"	"!="	"2.7.2+asdf"	{"undefined":true}	=>	true
+gt	"1.2.3-a.10"	"1.2.3-a.5"	{"undefined":true}	=>	true
+lt	"1.2.3-a.5"	"1.2.3-a.10"	{"undefined":true}	=>	true
+gt	"1.2.3-a.5"	"1.2.3-a.10"	{"undefined":true}	=>	false
+lt	"1.2.3-a.10"	"1.2.3-a.5"	{"undefined":true}	=>	false
+eq	"1.2.3-a.10"	"1.2.3-a.10"	{"undefined":true}	=>	true
+eq	"1.2.3-a.5"	"1.2.3-a.5"	{"undefined":true}	=>	true
+neq	"1.2.3-a.10"	"1.2.3-a.5"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.5"	"=="	"1.2.3-a.5"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.10"	">="	"1.2.3-a.5"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.5"	"<="	"1.2.3-a.10"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.10"	"!="	"1.2.3-a.5"	{"undefined":true}	=>	true
+gt	"1.2.3-a.b"	"1.2.3-a.5"	{"undefined":true}	=>	true
+lt	"1.2.3-a.5"	"1.2.3-a.b"	{"undefined":true}	=>	true
+gt	"1.2.3-a.5"	"1.2.3-a.b"	{"undefined":true}	=>	false
+lt	"1.2.3-a.b"	"1.2.3-a.5"	{"undefined":true}	=>	false
+eq	"1.2.3-a.b"	"1.2.3-a.b"	{"undefined":true}	=>	true
+neq	"1.2.3-a.b"	"1.2.3-a.5"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b"	">="	"1.2.3-a.5"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.5"	"<="	"1.2.3-a.b"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b"	"!="	"1.2.3-a.5"	{"undefined":true}	=>	true
+gt	"1.2.3-a.b"	"1.2.3-a"	{"undefined":true}	=>	true
+lt	"1.2.3-a"	"1.2.3-a.b"	{"undefined":true}	=>	true
+gt	"1.2.3-a"	"1.2.3-a.b"	{"undefined":true}	=>	false
+lt	"1.2.3-a.b"	"1.2.3-a"	{"undefined":true}	=>	false
+eq	"1.2.3-a"	"1.2.3-a"	{"undefined":true}	=>	true
+neq	"1.2.3-a.b"	"1.2.3-a"	{"undefined":true}	=>	true
+cmp	"1.2.3-a"	"=="	"1.2.3-a"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b"	">="	"1.2.3-a"	{"undefined":true}	=>	true
+cmp	"1.2.3-a"	"<="	"1.2.3-a.b"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b"	"!="	"1.2.3-a"	{"undefined":true}	=>	true
+gt	"1.2.3-a.b.c.10.d.5"	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	true
+lt	"1.2.3-a.b.c.5.d.100"	"1.2.3-a.b.c.10.d.5"	{"undefined":true}	=>	true
+gt	"1.2.3-a.b.c.5.d.100"	"1.2.3-a.b.c.10.d.5"	{"undefined":true}	=>	false
+lt	"1.2.3-a.b.c.10.d.5"	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	false
+eq	"1.2.3-a.b.c.10.d.5"	"1.2.3-a.b.c.10.d.5"	{"undefined":true}	=>	true
+eq	"1.2.3-a.b.c.5.d.100"	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	true
+neq	"1.2.3-a.b.c.10.d.5"	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b.c.5.d.100"	"=="	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b.c.10.d.5"	">="	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b.c.5.d.100"	"<="	"1.2.3-a.b.c.10.d.5"	{"undefined":true}	=>	true
+cmp	"1.2.3-a.b.c.10.d.5"	"!="	"1.2.3-a.b.c.5.d.100"	{"undefined":true}	=>	true
+gt	"1.2.3-r2"	"1.2.3-r100"	{"undefined":true}	=>	true
+lt	"1.2.3-r100"	"1.2.3-r2"	{"undefined":true}	=>	true
+gt	"1.2.3-r100"	"1.2.3-r2"	{"undefined":true}	=>	false
+lt	"1.2.3-r2"	"1.2.3-r100"	{"undefined":true}	=>	false
+eq	"1.2.3-r2"	"1.2.3-r2"	{"undefined":true}	=>	true
+eq	"1.2.3-r100"	"1.2.3-r100"	{"undefined":true}	=>	true
+neq	"1.2.3-r2"	"1.2.3-r100"	{"undefined":true}	=>	true
+cmp	"1.2.3-r100"	"=="	"1.2.3-r100"	{"undefined":true}	=>	true
+cmp	"1.2.3-r2"	">="	"1.2.3-r100"	{"undefined":true}	=>	true
+cmp	"1.2.3-r100"	"<="	"1.2.3-r2"	{"undefined":true}	=>	true
+cmp	"1.2.3-r2"	"!="	"1.2.3-r100"	{"undefined":true}	=>	true
+gt	"1.2.3-r100"	"1.2.3-R2"	{"undefined":true}	=>	true
+lt	"1.2.3-R2"	"1.2.3-r100"	{"undefined":true}	=>	true
+gt	"1.2.3-R2"	"1.2.3-r100"	{"undefined":true}	=>	false
+lt	"1.2.3-r100"	"1.2.3-R2"	{"undefined":true}	=>	false
+eq	"1.2.3-R2"	"1.2.3-R2"	{"undefined":true}	=>	true
+neq	"1.2.3-r100"	"1.2.3-R2"	{"undefined":true}	=>	true
+cmp	"1.2.3-R2"	"=="	"1.2.3-R2"	{"undefined":true}	=>	true
+cmp	"1.2.3-r100"	">="	"1.2.3-R2"	{"undefined":true}	=>	true
+cmp	"1.2.3-R2"	"<="	"1.2.3-r100"	{"undefined":true}	=>	true
+cmp	"1.2.3-r100"	"!="	"1.2.3-R2"	{"undefined":true}	=>	true
+eq	"1.2.3"	"v1.2.3"	true	=>	true
+neq	"1.2.3"	"v1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	"v1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	"v1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	"v1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	"v1.2.3"	true	=>	true
+gt	"1.2.3"	"v1.2.3"	true	=>	false
+gte	"1.2.3"	"v1.2.3"	true	=>	true
+lt	"1.2.3"	"v1.2.3"	true	=>	false
+lte	"1.2.3"	"v1.2.3"	true	=>	true
+eq	"1.2.3"	"=1.2.3"	true	=>	true
+neq	"1.2.3"	"=1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	"=1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	"=1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	"=1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	"=1.2.3"	true	=>	true
+gt	"1.2.3"	"=1.2.3"	true	=>	false
+gte	"1.2.3"	"=1.2.3"	true	=>	true
+lt	"1.2.3"	"=1.2.3"	true	=>	false
+lte	"1.2.3"	"=1.2.3"	true	=>	true
+eq	"1.2.3"	"v 1.2.3"	true	=>	true
+neq	"1.2.3"	"v 1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	"v 1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	"v 1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	"v 1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	"v 1.2.3"	true	=>	true
+gt	"1.2.3"	"v 1.2.3"	true	=>	false
+gte	"1.2.3"	"v 1.2.3"	true	=>	true
+lt	"1.2.3"	"v 1.2.3"	true	=>	false
+lte	"1.2.3"	"v 1.2.3"	true	=>	true
+eq	"1.2.3"	"= 1.2.3"	true	=>	true
+neq	"1.2.3"	"= 1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	"= 1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	"= 1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	"= 1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	"= 1.2.3"	true	=>	true
+gt	"1.2.3"	"= 1.2.3"	true	=>	false
+gte	"1.2.3"	"= 1.2.3"	true	=>	true
+lt	"1.2.3"	"= 1.2.3"	true	=>	false
+lte	"1.2.3"	"= 1.2.3"	true	=>	true
+eq	"1.2.3"	" v1.2.3"	true	=>	true
+neq	"1.2.3"	" v1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	" v1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	" v1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	" v1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	" v1.2.3"	true	=>	true
+gt	"1.2.3"	" v1.2.3"	true	=>	false
+gte	"1.2.3"	" v1.2.3"	true	=>	true
+lt	"1.2.3"	" v1.2.3"	true	=>	false
+lte	"1.2.3"	" v1.2.3"	true	=>	true
+eq	"1.2.3"	" =1.2.3"	true	=>	true
+neq	"1.2.3"	" =1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	" =1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	" =1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	" =1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	" =1.2.3"	true	=>	true
+gt	"1.2.3"	" =1.2.3"	true	=>	false
+gte	"1.2.3"	" =1.2.3"	true	=>	true
+lt	"1.2.3"	" =1.2.3"	true	=>	false
+lte	"1.2.3"	" =1.2.3"	true	=>	true
+eq	"1.2.3"	" v 1.2.3"	true	=>	true
+neq	"1.2.3"	" v 1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	" v 1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	" v 1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	" v 1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	" v 1.2.3"	true	=>	true
+gt	"1.2.3"	" v 1.2.3"	true	=>	false
+gte	"1.2.3"	" v 1.2.3"	true	=>	true
+lt	"1.2.3"	" v 1.2.3"	true	=>	false
+lte	"1.2.3"	" v 1.2.3"	true	=>	true
+eq	"1.2.3"	" = 1.2.3"	true	=>	true
+neq	"1.2.3"	" = 1.2.3"	true	=>	false
+cmp	"1.2.3"	"=="	" = 1.2.3"	true	=>	true
+cmp	"1.2.3"	"!="	" = 1.2.3"	true	=>	false
+cmp	"1.2.3"	"==="	" = 1.2.3"	true	=>	false
+cmp	"1.2.3"	"!=="	" = 1.2.3"	true	=>	true
+gt	"1.2.3"	" = 1.2.3"	true	=>	false
+gte	"1.2.3"	" = 1.2.3"	true	=>	true
+lt	"1.2.3"	" = 1.2.3"	true	=>	false
+lte	"1.2.3"	" = 1.2.3"	true	=>	true
+eq	"1.2.3-0"	"v1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	"v1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	"v1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	"v1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	"v1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	"v1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	"v1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	"v1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	"v1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	"v1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	"=1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	"=1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	"=1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	"=1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	"=1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	"=1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	"=1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	"=1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	"=1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	"=1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	"v 1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	"v 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	"v 1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	"v 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	"v 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	"v 1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	"v 1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	"v 1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	"v 1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	"v 1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	"= 1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	"= 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	"= 1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	"= 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	"= 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	"= 1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	"= 1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	"= 1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	"= 1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	"= 1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	" v1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	" v1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	" v1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	" v1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	" v1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	" v1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	" v1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	" v1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	" v1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	" v1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	" =1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	" =1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	" =1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	" =1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	" =1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	" =1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	" =1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	" =1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	" =1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	" =1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	" v 1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	" v 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	" v 1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	" v 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	" v 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	" v 1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	" v 1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	" v 1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	" v 1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	" v 1.2.3-0"	true	=>	true
+eq	"1.2.3-0"	" = 1.2.3-0"	true	=>	true
+neq	"1.2.3-0"	" = 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"=="	" = 1.2.3-0"	true	=>	true
+cmp	"1.2.3-0"	"!="	" = 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"==="	" = 1.2.3-0"	true	=>	false
+cmp	"1.2.3-0"	"!=="	" = 1.2.3-0"	true	=>	true
+gt	"1.2.3-0"	" = 1.2.3-0"	true	=>	false
+gte	"1.2.3-0"	" = 1.2.3-0"	true	=>	true
+lt	"1.2.3-0"	" = 1.2.3-0"	true	=>	false
+lte	"1.2.3-0"	" = 1.2.3-0"	true	=>	true
+eq	"1.2.3-1"	"v1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	"v1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	"v1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	"v1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	"v1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	"v1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	"v1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	"v1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	"v1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	"v1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	"=1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	"=1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	"=1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	"=1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	"=1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	"=1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	"=1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	"=1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	"=1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	"=1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	"v 1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	"v 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	"v 1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	"v 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	"v 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	"v 1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	"v 1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	"v 1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	"v 1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	"v 1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	"= 1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	"= 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	"= 1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	"= 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	"= 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	"= 1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	"= 1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	"= 1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	"= 1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	"= 1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	" v1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	" v1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	" v1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	" v1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	" v1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	" v1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	" v1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	" v1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	" v1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	" v1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	" =1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	" =1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	" =1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	" =1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	" =1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	" =1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	" =1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	" =1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	" =1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	" =1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	" v 1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	" v 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	" v 1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	" v 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	" v 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	" v 1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	" v 1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	" v 1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	" v 1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	" v 1.2.3-1"	true	=>	true
+eq	"1.2.3-1"	" = 1.2.3-1"	true	=>	true
+neq	"1.2.3-1"	" = 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"=="	" = 1.2.3-1"	true	=>	true
+cmp	"1.2.3-1"	"!="	" = 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"==="	" = 1.2.3-1"	true	=>	false
+cmp	"1.2.3-1"	"!=="	" = 1.2.3-1"	true	=>	true
+gt	"1.2.3-1"	" = 1.2.3-1"	true	=>	false
+gte	"1.2.3-1"	" = 1.2.3-1"	true	=>	true
+lt	"1.2.3-1"	" = 1.2.3-1"	true	=>	false
+lte	"1.2.3-1"	" = 1.2.3-1"	true	=>	true
+eq	"1.2.3-beta"	"v1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	"v1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	"v1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	"v1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	"v1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	"v1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	"v1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	"v1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	"v1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	"v1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	"=1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	"=1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	"=1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	"=1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	"=1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	"=1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	"=1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	"=1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	"=1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	"=1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	"v 1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	"v 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	"v 1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	"v 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	"v 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	"v 1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	"v 1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	"v 1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	"v 1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	"v 1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	"= 1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	"= 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	"= 1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	"= 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	"= 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	"= 1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	"= 1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	"= 1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	"= 1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	"= 1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	" v1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	" v1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	" v1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	" v1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	" v1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	" v1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	" v1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	" v1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	" v1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	" v1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	" =1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	" =1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	" =1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	" =1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	" =1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	" =1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	" =1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	" =1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	" =1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	" =1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	" v 1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	" v 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	" v 1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	" v 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	" v 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	" v 1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	" v 1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	" v 1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	" v 1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	" v 1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta"	" = 1.2.3-beta"	true	=>	true
+neq	"1.2.3-beta"	" = 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"=="	" = 1.2.3-beta"	true	=>	true
+cmp	"1.2.3-beta"	"!="	" = 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"==="	" = 1.2.3-beta"	true	=>	false
+cmp	"1.2.3-beta"	"!=="	" = 1.2.3-beta"	true	=>	true
+gt	"1.2.3-beta"	" = 1.2.3-beta"	true	=>	false
+gte	"1.2.3-beta"	" = 1.2.3-beta"	true	=>	true
+lt	"1.2.3-beta"	" = 1.2.3-beta"	true	=>	false
+lte	"1.2.3-beta"	" = 1.2.3-beta"	true	=>	true
+eq	"1.2.3-beta+build"	" = 1.2.3-beta+otherbuild"	true	=>	true
+neq	"1.2.3-beta+build"	" = 1.2.3-beta+otherbuild"	true	=>	false
+cmp	"1.2.3-beta+build"	"=="	" = 1.2.3-beta+otherbuild"	true	=>	true
+cmp	"1.2.3-beta+build"	"!="	" = 1.2.3-beta+otherbuild"	true	=>	false
+cmp	"1.2.3-beta+build"	"==="	" = 1.2.3-beta+otherbuild"	true	=>	false
+cmp	"1.2.3-beta+build"	"!=="	" = 1.2.3-beta+otherbuild"	true	=>	true
+gt	"1.2.3-beta+build"	" = 1.2.3-beta+otherbuild"	true	=>	false
+gte	"1.2.3-beta+build"	" = 1.2.3-beta+otherbuild"	true	=>	true
+lt	"1.2.3-beta+build"	" = 1.2.3-beta+otherbuild"	true	=>	false
+lte	"1.2.3-beta+build"	" = 1.2.3-beta+otherbuild"	true	=>	true
+eq	"1.2.3+build"	" = 1.2.3+otherbuild"	true	=>	true
+neq	"1.2.3+build"	" = 1.2.3+otherbuild"	true	=>	false
+cmp	"1.2.3+build"	"=="	" = 1.2.3+otherbuild"	true	=>	true
+cmp	"1.2.3+build"	"!="	" = 1.2.3+otherbuild"	true	=>	false
+cmp	"1.2.3+build"	"==="	" = 1.2.3+otherbuild"	true	=>	false
+cmp	"1.2.3+build"	"!=="	" = 1.2.3+otherbuild"	true	=>	true
+gt	"1.2.3+build"	" = 1.2.3+otherbuild"	true	=>	false
+gte	"1.2.3+build"	" = 1.2.3+otherbuild"	true	=>	true
+lt	"1.2.3+build"	" = 1.2.3+otherbuild"	true	=>	false
+lte	"1.2.3+build"	" = 1.2.3+otherbuild"	true	=>	true
+eq	"1.2.3-beta+build"	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	true
+neq	"1.2.3-beta+build"	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	false
+cmp	"1.2.3-beta+build"	"=="	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	true
+cmp	"1.2.3-beta+build"	"!="	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	false
+cmp	"1.2.3-beta+build"	"==="	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	false
+cmp	"1.2.3-beta+build"	"!=="	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	true
+gt	"1.2.3-beta+build"	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	false
+gte	"1.2.3-beta+build"	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	true
+lt	"1.2.3-beta+build"	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	false
+lte	"1.2.3-beta+build"	"1.2.3-beta+otherbuild"	{"undefined":true}	=>	true
+eq	"1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+neq	"1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+cmp	"1.2.3+build"	"=="	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+cmp	"1.2.3+build"	"!="	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+cmp	"1.2.3+build"	"==="	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+cmp	"1.2.3+build"	"!=="	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+gt	"1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+gte	"1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+lt	"1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+lte	"1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+eq	"  v1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+neq	"  v1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+cmp	"  v1.2.3+build"	"=="	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+cmp	"  v1.2.3+build"	"!="	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+cmp	"  v1.2.3+build"	"==="	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+cmp	"  v1.2.3+build"	"!=="	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+gt	"  v1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+gte	"  v1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+lt	"  v1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	false
+lte	"  v1.2.3+build"	"1.2.3+otherbuild"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.0.0 - 2.0.0"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"^1.2.3+build"	{"undefined":true}	=>	true
+satisfies	"1.3.0"	"^1.2.3+build"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.3-pre+asdf - 2.4.3-pre+asdf"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.3pre+asdf - 2.4.3-pre+asdf"	true	=>	true
+satisfies	"1.2.3"	"1.2.3-pre+asdf - 2.4.3pre+asdf"	true	=>	true
+satisfies	"1.2.3"	"1.2.3pre+asdf - 2.4.3pre+asdf"	true	=>	true
+satisfies	"1.2.3-pre.2"	"1.2.3-pre+asdf - 2.4.3-pre+asdf"	{"undefined":true}	=>	true
+satisfies	"2.4.3-alpha"	"1.2.3-pre+asdf - 2.4.3-pre+asdf"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.3+asdf - 2.4.3+asdf"	{"undefined":true}	=>	true
+satisfies	"1.0.0"	"1.0.0"	{"undefined":true}	=>	true
+satisfies	"0.2.4"	">=*"	{"undefined":true}	=>	true
+satisfies	"1.0.0"	""	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"*"	{"undefined":true}	=>	true
+satisfies	"v1.2.3"	"*"	true	=>	true
+satisfies	"1.0.0"	">=1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.0.1"	">=1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.1.0"	">=1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.0.1"	">1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.1.0"	">1.0.0"	{"undefined":true}	=>	true
+satisfies	"2.0.0"	"<=2.0.0"	{"undefined":true}	=>	true
+satisfies	"1.9999.9999"	"<=2.0.0"	{"undefined":true}	=>	true
+satisfies	"0.2.9"	"<=2.0.0"	{"undefined":true}	=>	true
+satisfies	"1.9999.9999"	"<2.0.0"	{"undefined":true}	=>	true
+satisfies	"0.2.9"	"<2.0.0"	{"undefined":true}	=>	true
+satisfies	"1.0.0"	">= 1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.0.1"	">=  1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.1.0"	">=   1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.0.1"	"> 1.0.0"	{"undefined":true}	=>	true
+satisfies	"1.1.0"	">  1.0.0"	{"undefined":true}	=>	true
+satisfies	"2.0.0"	"<=   2.0.0"	{"undefined":true}	=>	true
+satisfies	"1.9999.9999"	"<= 2.0.0"	{"undefined":true}	=>	true
+satisfies	"0.2.9"	"<=  2.0.0"	{"undefined":true}	=>	true
+satisfies	"1.9999.9999"	"<    2.0.0"	{"undefined":true}	=>	true
+satisfies	"0.2.9"	"<\t2.0.0"	{"undefined":true}	=>	true
+satisfies	"v0.1.97"	">=0.1.97"	true	=>	true
+satisfies	"0.1.97"	">=0.1.97"	{"undefined":true}	=>	true
+satisfies	"1.2.4"	"0.1.20 || 1.2.4"	{"undefined":true}	=>	true
+satisfies	"0.0.0"	">=0.2.3 || <0.0.1"	{"undefined":true}	=>	true
+satisfies	"0.2.3"	">=0.2.3 || <0.0.1"	{"undefined":true}	=>	true
+satisfies	"0.2.4"	">=0.2.3 || <0.0.1"	{"undefined":true}	=>	true
+satisfies	"1.3.4"	"||"	{"undefined":true}	=>	true
+satisfies	"2.1.3"	"2.x.x"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.x"	{"undefined":true}	=>	true
+satisfies	"2.1.3"	"1.2.x || 2.x"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.x || 2.x"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"x"	{"undefined":true}	=>	true
+satisfies	"2.1.3"	"2.*.*"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.*"	{"undefined":true}	=>	true
+satisfies	"2.1.3"	"1.2.* || 2.*"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.* || 2.*"	{"undefined":true}	=>	true
+satisfies	"2.1.2"	"2"	{"undefined":true}	=>	true
+satisfies	"2.3.1"	"2.3"	{"undefined":true}	=>	true
+satisfies	"0.0.9"	"~x"	{"undefined":true}	=>	true
+satisfies	"2.0.9"	"~2"	{"undefined":true}	=>	true
+satisfies	"2.4.0"	"~2.4"	{"undefined":true}	=>	true
+satisfies	"2.4.5"	"~2.4"	{"undefined":true}	=>	true
+satisfies	"3.2.2"	"~>3.2.1"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~1"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~>1"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~> 1"	{"undefined":true}	=>	true
+satisfies	"1.0.2"	"~1.0"	{"undefined":true}	=>	true
+satisfies	"1.0.2"	"~ 1.0"	{"undefined":true}	=>	true
+satisfies	"1.0.12"	"~ 1.0.3"	{"undefined":true}	=>	true
+satisfies	"1.0.0"	">=1"	{"undefined":true}	=>	true
+satisfies	"1.0.0"	">= 1"	{"undefined":true}	=>	true
+satisfies	"1.1.1"	"<1.2"	{"undefined":true}	=>	true
+satisfies	"1.1.1"	"< 1.2"	{"undefined":true}	=>	true
+satisfies	"0.5.5"	"~v0.5.4-pre"	{"undefined":true}	=>	true
+satisfies	"0.5.4"	"~v0.5.4-pre"	{"undefined":true}	=>	true
+satisfies	"0.7.2"	"=0.7.x"	{"undefined":true}	=>	true
+satisfies	"0.7.2"	"<=0.7.x"	{"undefined":true}	=>	true
+satisfies	"0.7.2"	">=0.7.x"	{"undefined":true}	=>	true
+satisfies	"0.6.2"	"<=0.7.x"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~1.2.1 >=1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~1.2.1 =1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~1.2.1 1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~1.2.1 >=1.2.3 1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"~1.2.1 1.2.3 >=1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	">=1.2.1 1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"1.2.3 >=1.2.1"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	">=1.2.3 >=1.2.1"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	">=1.2.1 >=1.2.3"	{"undefined":true}	=>	true
+satisfies	"1.2.8"	">=1.2"	{"undefined":true}	=>	true
+satisfies	"1.8.1"	"^1.2.3"	{"undefined":true}	=>	true
+satisfies	"0.1.2"	"^0.1.2"	{"undefined":true}	=>	true
+satisfies	"0.1.2"	"^0.1"	{"undefined":true}	=>	true
+satisfies	"0.0.1"	"^0.0.1"	{"undefined":true}	=>	true
+satisfies	"1.4.2"	"^1.2"	{"undefined":true}	=>	true
+satisfies	"1.4.2"	"^1.2 ^1"	{"undefined":true}	=>	true
+satisfies	"1.2.3-pre"	"^1.2.3-alpha"	{"undefined":true}	=>	true
+satisfies	"1.2.0-pre"	"^1.2.0-alpha"	{"undefined":true}	=>	true
+satisfies	"0.0.1-beta"	"^0.0.1-alpha"	{"undefined":true}	=>	true
+satisfies	"0.1.1-beta"	"^0.1.1-alpha"	{"undefined":true}	=>	true
+satisfies	"1.2.3"	"^x"	{"undefined":true}	=>	true
+satisfies	"0.9.7"	"x - 1.0.0"	{"undefined":true}	=>	true
+satisfies	"0.9.7"	"x - 1.x"	{"undefined":true}	=>	true
+satisfies	"1.9.7"	"1.0.0 - x"	{"undefined":true}	=>	true
+satisfies	"1.9.7"	"1.x - x"	{"undefined":true}	=>	true
+satisfies	"7.9.9"	"<=7.x"	{"undefined":true}	=>	true
+satisfies	"2.2.3"	"1.0.0 - 2.0.0"	{"undefined":true}	=>	false
+satisfies	"1.2.3-pre.2"	"1.2.3+asdf - 2.4.3+asdf"	{"undefined":true}	=>	false
+satisfies	"2.4.3-alpha"	"1.2.3+asdf - 2.4.3+asdf"	{"undefined":true}	=>	false
+satisfies	"2.0.0"	"^1.2.3+build"	{"undefined":true}	=>	false
+satisfies	"1.2.0"	"^1.2.3+build"	{"undefined":true}	=>	false
+satisfies	"1.2.3-pre"	"^1.2.3"	{"undefined":true}	=>	false
+satisfies	"1.2.0-pre"	"^1.2"	{"undefined":true}	=>	false
+satisfies	"1.3.0-beta"	">1.2"	{"undefined":true}	=>	false
+satisfies	"1.2.3-beta"	"<=1.2.3"	{"undefined":true}	=>	false
+satisfies	"1.2.3-beta"	"^1.2.3"	{"undefined":true}	=>	false
+satisfies	"0.7.0-asdf"	"=0.7.x"	{"undefined":true}	=>	false
+satisfies	"0.7.0-asdf"	">=0.7.x"	{"undefined":true}	=>	false
+satisfies	"1.0.0beta"	"1"	true	=>	false
+satisfies	"1.0.0beta"	"<1"	true	=>	false
+satisfies	"1.0.0beta"	"< 1"	true	=>	false
+satisfies	"1.0.1"	"1.0.0"	{"undefined":true}	=>	false
+satisfies	"0.0.0"	">=1.0.0"	{"undefined":true}	=>	false
+satisfies	"0.0.1"	">=1.0.0"	{"undefined":true}	=>	false
+satisfies	"0.1.0"	">=1.0.0"	{"undefined":true}	=>	false
+satisfies	"0.0.1"	">1.0.0"	{"undefined":true}	=>	false
+satisfies	"0.1.0"	">1.0.0"	{"undefined":true}	=>	false
+satisfies	"3.0.0"	"<=2.0.0"	{"undefined":true}	=>	false
+satisfies	"2.9999.9999"	"<=2.0.0"	{"undefined":true}	=>	false
+satisfies	"2.2.9"	"<=2.0.0"	{"undefined":true}	=>	false
+satisfies	"2.9999.9999"	"<2.0.0"	{"undefined":true}	=>	false
+satisfies	"2.2.9"	"<2.0.0"	{"undefined":true}	=>	false
+satisfies	"v0.1.93"	">=0.1.97"	true	=>	false
+satisfies	"0.1.93"	">=0.1.97"	{"undefined":true}	=>	false
+satisfies	"1.2.3"	"0.1.20 || 1.2.4"	{"undefined":true}	=>	false
+satisfies	"0.0.3"	">=0.2.3 || <0.0.1"	{"undefined":true}	=>	false
+satisfies	"0.2.2"	">=0.2.3 || <0.0.1"	{"undefined":true}	=>	false
+satisfies	"1.1.3"	"2.x.x"	{"undefined":true}	=>	false
+satisfies	"3.1.3"	"2.x.x"	{"undefined":true}	=>	false
+satisfies	"1.3.3"	"1.2.x"	{"undefined":true}	=>	false
+satisfies	"3.1.3"	"1.2.x || 2.x"	{"undefined":true}	=>	false
+satisfies	"1.1.3"	"1.2.x || 2.x"	{"undefined":true}	=>	false
+satisfies	"1.1.3"	"2.*.*"	{"undefined":true}	=>	false
+satisfies	"3.1.3"	"2.*.*"	{"undefined":true}	=>	false
+satisfies	"1.3.3"	"1.2.*"	{"undefined":true}	=>	false
+satisfies	"3.1.3"	"1.2.* || 2.*"	{"undefined":true}	=>	false
+satisfies	"1.1.3"	"1.2.* || 2.*"	{"undefined":true}	=>	false
+satisfies	"1.1.2"	"2"	{"undefined":true}	=>	false
+satisfies	"2.4.1"	"2.3"	{"undefined":true}	=>	false
+satisfies	"2.5.0"	"~2.4"	{"undefined":true}	=>	false
+satisfies	"2.3.9"	"~2.4"	{"undefined":true}	=>	false
+satisfies	"3.3.2"	"~>3.2.1"	{"undefined":true}	=>	false
+satisfies	"3.2.0"	"~>3.2.1"	{"undefined":true}	=>	false
+satisfies	"0.2.3"	"~1"	{"undefined":true}	=>	false
+satisfies	"2.2.3"	"~>1"	{"undefined":true}	=>	false
+satisfies	"1.1.0"	"~1.0"	{"undefined":true}	=>	false
+satisfies	"1.0.0"	"<1"	{"undefined":true}	=>	false
+satisfies	"1.1.1"	">=1.2"	{"undefined":true}	=>	false
+satisfies	"2.0.0beta"	"1"	true	=>	false
+satisfies	"0.5.4-alpha"	"~v0.5.4-beta"	{"undefined":true}	=>	false
+satisfies	"0.8.2"	"=0.7.x"	{"undefined":true}	=>	false
+satisfies	"0.6.2"	">=0.7.x"	{"undefined":true}	=>	false
+satisfies	"0.7.2"	"<0.7.x"	{"undefined":true}	=>	false
+satisfies	"1.2.3-beta"	"<1.2.3"	{"undefined":true}	=>	false
+satisfies	"1.2.3-beta"	"=1.2.3"	{"undefined":true}	=>	false
+satisfies	"1.2.8"	">1.2"	{"undefined":true}	=>	false
+satisfies	"0.0.2"	"^0.0.1"	{"undefined":true}	=>	false
+satisfies	"2.0.0-alpha"	"^1.2.3"	{"undefined":true}	=>	false
+satisfies	"1.2.2"	"^1.2.3"	{"undefined":true}	=>	false
+satisfies	"1.1.9"	"^1.2"	{"undefined":true}	=>	false
+satisfies	"v1.2.3-foo"	"*"	true	=>	false
+satisfies	"1.2.3"	"blerg"	{"undefined":true}	=>	false
+satisfies	"123.0.0"	"git+https://user:password0123@github.com/foo"	true	=>	false
+satisfies	"2.0.0-pre"	"^1.2.3"	{"undefined":true}	=>	false
+satisfies	false	"^1.2.3"	{"undefined":true}	=>	false
+validRange	"1.0.0 - 2.0.0"	{"undefined":true}	=>	">=1.0.0 <=2.0.0"
+validRange	"1.0.0"	{"undefined":true}	=>	"1.0.0"
+validRange	">=*"	{"undefined":true}	=>	"*"
+validRange	""	{"undefined":true}	=>	"*"
+validRange	"*"	{"undefined":true}	=>	"*"
+validRange	">=1.0.0"	{"undefined":true}	=>	">=1.0.0"
+validRange	">1.0.0"	{"undefined":true}	=>	">1.0.0"
+validRange	"<=2.0.0"	{"undefined":true}	=>	"<=2.0.0"
+validRange	"1"	{"undefined":true}	=>	">=1.0.0 <2.0.0"
+validRange	"<2.0.0"	{"undefined":true}	=>	"<2.0.0"
+validRange	">= 1.0.0"	{"undefined":true}	=>	">=1.0.0"
+validRange	">=  1.0.0"	{"undefined":true}	=>	">=1.0.0"
+validRange	">=   1.0.0"	{"undefined":true}	=>	">=1.0.0"
+validRange	"> 1.0.0"	{"undefined":true}	=>	">1.0.0"
+validRange	">  1.0.0"	{"undefined":true}	=>	">1.0.0"
+validRange	"<=   2.0.0"	{"undefined":true}	=>	"<=2.0.0"
+validRange	"<= 2.0.0"	{"undefined":true}	=>	"<=2.0.0"
+validRange	"<=  2.0.0"	{"undefined":true}	=>	"<=2.0.0"
+validRange	"<    2.0.0"	{"undefined":true}	=>	"<2.0.0"
+validRange	"<\t2.0.0"	{"undefined":true}	=>	"<2.0.0"
+validRange	">=0.1.97"	{"undefined":true}	=>	">=0.1.97"
+validRange	"0.1.20 || 1.2.4"	{"undefined":true}	=>	"0.1.20||1.2.4"
+validRange	">=0.2.3 || <0.0.1"	{"undefined":true}	=>	">=0.2.3||<0.0.1"
+validRange	"||"	{"undefined":true}	=>	"||"
+validRange	"2.x.x"	{"undefined":true}	=>	">=2.0.0 <3.0.0"
+validRange	"1.2.x"	{"undefined":true}	=>	">=1.2.0 <1.3.0"
+validRange	"1.2.x || 2.x"	{"undefined":true}	=>	">=1.2.0 <1.3.0||>=2.0.0 <3.0.0"
+validRange	"x"	{"undefined":true}	=>	"*"
+validRange	"2.*.*"	{"undefined":true}	=>	">=2.0.0 <3.0.0"
+validRange	"1.2.*"	{"undefined":true}	=>	">=1.2.0 <1.3.0"
+validRange	"1.2.* || 2.*"	{"undefined":true}	=>	">=1.2.0 <1.3.0||>=2.0.0 <3.0.0"
+validRange	"2"	{"undefined":true}	=>	">=2.0.0 <3.0.0"
+validRange	"2.3"	{"undefined":true}	=>	">=2.3.0 <2.4.0"
+validRange	"~2.4"	{"undefined":true}	=>	">=2.4.0 <2.5.0"
+validRange	"~>3.2.1"	{"undefined":true}	=>	">=3.2.1 <3.3.0"
+validRange	"~1"	{"undefined":true}	=>	">=1.0.0 <2.0.0"
+validRange	"~>1"	{"undefined":true}	=>	">=1.0.0 <2.0.0"
+validRange	"~> 1"	{"undefined":true}	=>	">=1.0.0 <2.0.0"
+validRange	"~1.0"	{"undefined":true}	=>	">=1.0.0 <1.1.0"
+validRange	"~ 1.0"	{"undefined":true}	=>	">=1.0.0 <1.1.0"
+validRange	"^0"	{"undefined":true}	=>	">=0.0.0 <1.0.0"
+validRange	"^ 1"	{"undefined":true}	=>	">=1.0.0 <2.0.0"
+validRange	"^0.1"	{"undefined":true}	=>	">=0.1.0 <0.2.0"
+validRange	"^1.0"	{"undefined":true}	=>	">=1.0.0 <2.0.0"
+validRange	"^1.2"	{"undefined":true}	=>	">=1.2.0 <2.0.0"
+validRange	"^0.0.1"	{"undefined":true}	=>	">=0.0.1 <0.0.2"
+validRange	"^0.0.1-beta"	{"undefined":true}	=>	">=0.0.1-beta <0.0.2"
+validRange	"^0.1.2"	{"undefined":true}	=>	">=0.1.2 <0.2.0"
+validRange	"^1.2.3"	{"undefined":true}	=>	">=1.2.3 <2.0.0"
+validRange	"^1.2.3-beta.4"	{"undefined":true}	=>	">=1.2.3-beta.4 <2.0.0"
+validRange	"<1"	{"undefined":true}	=>	"<1.0.0"
+validRange	"< 1"	{"undefined":true}	=>	"<1.0.0"
+validRange	">=1"	{"undefined":true}	=>	">=1.0.0"
+validRange	">= 1"	{"undefined":true}	=>	">=1.0.0"
+validRange	"<1.2"	{"undefined":true}	=>	"<1.2.0"
+validRange	"< 1.2"	{"undefined":true}	=>	"<1.2.0"
+validRange	">01.02.03"	true	=>	">1.2.3"
+validRange	">01.02.03"	{"undefined":true}	=>	null
+validRange	"~1.2.3beta"	true	=>	">=1.2.3-beta <1.3.0"
+validRange	"~1.2.3beta"	{"undefined":true}	=>	null
+validRange	"^ 1.2 ^ 1"	{"undefined":true}	=>	">=1.2.0 <2.0.0 >=1.0.0 <2.0.0"
+eq	"=1.2.3"	"1.2.3"	true	=>	true
+eq	"=1.2.3"	"1.2.3"	=>	{"threw":"Invalid Version: =1.2.3"}
+eq	"01.02.03"	"1.2.3"	true	=>	true
+eq	"01.02.03"	"1.2.3"	=>	{"threw":"Invalid Version: 01.02.03"}
+eq	"1.2.3-beta.01"	"1.2.3-beta.1"	true	=>	true
+eq	"1.2.3-beta.01"	"1.2.3-beta.1"	=>	{"threw":"Invalid Version: 1.2.3-beta.01"}
+eq	"   =1.2.3"	"1.2.3"	true	=>	true
+eq	"   =1.2.3"	"1.2.3"	=>	{"threw":"Invalid Version:    =1.2.3"}
+eq	"1.2.3foo"	"1.2.3-foo"	true	=>	true
+eq	"1.2.3foo"	"1.2.3-foo"	=>	{"threw":"Invalid Version: 1.2.3foo"}
+maxSatisfying	["1.2.3","1.2.4"]	"1.2"	{"undefined":true}	=>	"1.2.4"
+maxSatisfying	["1.2.4","1.2.3"]	"1.2"	{"undefined":true}	=>	"1.2.4"
+maxSatisfying	["1.2.3","1.2.4","1.2.5","1.2.6"]	"~1.2.3"	{"undefined":true}	=>	"1.2.6"
+maxSatisfying	["1.1.0","1.2.0","1.2.1","1.3.0","2.0.0b1","2.0.0b2","2.0.0b3","2.0.0","2.1.0"]	"~2.0.0"	true	=>	"2.0.0"
+cmp	"1.2.3"	"a frog"	"4.5.6"	=>	{"threw":"Invalid operator: a frog"}
+maxSatisfying	[]	"some frogs and sneks-v2.5.6"	=>	null
+clean	"1.2.3"	=>	"1.2.3"
+clean	" 1.2.3 "	=>	"1.2.3"
+clean	" 1.2.3-4 "	=>	"1.2.3-4"
+clean	" 1.2.3-pre "	=>	"1.2.3-pre"
+clean	"  =v1.2.3   "	=>	"1.2.3"
+clean	"v1.2.3"	=>	"1.2.3"
+clean	" v1.2.3 "	=>	"1.2.3"
+clean	"\t1.2.3"	=>	"1.2.3"
+clean	">1.2.3"	=>	null
+clean	"~1.2.3"	=>	null
+clean	"<=1.2.3"	=>	null
+clean	"1.2.x"	=>	null
+valid	"1.2.111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"	false	=>	null
+valid	"1.2.111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"	true	=>	null
+valid	"1.2.111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"	false	=>	null
+valid	"1.2.111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"	true	=>	null

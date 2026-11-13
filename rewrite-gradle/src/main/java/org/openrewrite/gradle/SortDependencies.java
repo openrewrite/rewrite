@@ -37,6 +37,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+import static java.util.Collections.singletonList;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class SortDependencies extends Recipe {
@@ -113,7 +115,7 @@ public class SortDependencies extends Recipe {
 
                 body = body.withStatements(sorted);
                 lambda = lambda.withBody(body);
-                return m.withArguments(java.util.Collections.singletonList(lambda));
+                return m.withArguments(singletonList(lambda));
             }
         });
     }

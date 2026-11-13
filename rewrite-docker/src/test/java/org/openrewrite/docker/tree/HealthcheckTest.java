@@ -134,7 +134,7 @@ class HealthcheckTest implements RewriteTest {
     void healthcheckWithLineContinuationInCommand() {
         // Line continuation in the command itself (after CMD)
         rewriteRun(
-          spec -> spec.typeValidationOptions(all().allowNonWhitespaceInWhitespace(true)),
+          spec -> spec.typeValidationOptions(all()),
           docker(
             """
               FROM ubuntu:20.04
@@ -162,7 +162,7 @@ class HealthcheckTest implements RewriteTest {
     @Test
     void healthcheckWithLineContinuationCRLF() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(all().allowNonWhitespaceInWhitespace(true)),
+          spec -> spec.typeValidationOptions(all()),
           docker(
             "FROM ubuntu:20.04\r\n" +
             "HEALTHCHECK --interval=30s \\\r\n" +

@@ -24,13 +24,17 @@ var logFile = args.FirstOrDefault(a => a.StartsWith("--log-file="))
 var recipeInstallDir = args.FirstOrDefault(a => a.StartsWith("--recipe-install-dir="))
     ?.Substring("--recipe-install-dir=".Length);
 
+var metricsCsv = args.FirstOrDefault(a => a.StartsWith("--metrics-csv="))
+    ?.Substring("--metrics-csv=".Length);
+
 var loggerConfig = new LoggerConfiguration();
 if (logFile != null)
 {
     loggerConfig.MinimumLevel.Debug()
         .WriteTo.File(logFile,
             outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-            flushToDiskInterval: TimeSpan.FromSeconds(1));
+            flushToDiskInterval: TimeSpan.FromSeconds(1),
+            shared: true);
 }
 
 Log.Logger = loggerConfig.CreateLogger();
@@ -46,5 +50,5 @@ sw.Stop();
 Log.Debug("<< Parser warmup ({Elapsed})", sw.Elapsed);
 
 Log.Information("Starting RPC server");
-await RewriteRpcServer.RunAsync(recipeInstallDir: recipeInstallDir);
+await RewriteRpcServer.RunAsync(recipeInstallDir: recipeInstallDir, metricsCsv: metricsCsv);
 Log.Information("RPC server exited");

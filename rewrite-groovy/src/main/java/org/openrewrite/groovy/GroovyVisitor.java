@@ -171,8 +171,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         }
         r = r.withFrom(visitAndCast(r.getFrom(), p));
         r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, p));
-        r = r.withTo(visitAndCast(r.getTo(), p));
-        return r.withType(visitType(r.getType(), p));
+        return r.withTo(visitAndCast(r.getTo(), p));
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {

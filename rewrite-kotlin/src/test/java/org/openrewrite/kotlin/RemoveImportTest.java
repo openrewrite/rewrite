@@ -51,6 +51,40 @@ class RemoveImportTest implements RewriteTest {
         });
     }
 
+    @Test
+    void commentInTypeImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              import java.util./*type*/ArrayList
+
+              class A
+              """,
+            """
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentInFunctionImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeMemberImportRecipe("kotlin.collections", "emptyList")),
+          kotlin(
+            """
+              import kotlin.collections./*extension*/emptyList
+
+              class A
+              """,
+            """
+              class A
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
     @Test
     void preservesKtlintSuppressionCommentOnLineBeforeRemovedImport() {
@@ -209,7 +243,7 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void keepImportAlias() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(removeMemberImportRecipe("java.util.regex.Pattern", "COMMENTS")),
           kotlin(
             """
@@ -228,8 +262,8 @@ class RemoveImportTest implements RewriteTest {
     void removeImportAlias() {
         // TODO check if this is really what we want to happen
         rewriteRun(
-          // Type validation is disabled until https://github.com/openrewrite/rewrite-kotlin/issues/545 is implemented.
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          // Identifiers are not validated until https://github.com/openrewrite/rewrite-kotlin/issues/545 is implemented.
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(removeMemberImportRecipe("java.util.regex.Pattern", "COMMENTS")),
           kotlin(
             """
@@ -246,6 +280,42 @@ class RemoveImportTest implements RewriteTest {
               class A {
                   val f = arrayOf(i)
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTypeImportAlias() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              import java.util.ArrayList as AL
+
+              class A {
+                  val list = AL<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepImportOfConstructorReference() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("a.b.Original")),
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+
+              val f = ::Original
               """
           )
         );

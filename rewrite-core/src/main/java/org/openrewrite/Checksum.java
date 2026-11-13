@@ -116,8 +116,9 @@ public class Checksum implements RpcCodec<Checksum> {
             }
 
             try (DigestInputStream dis = new DigestInputStream(is, md)) {
+                byte[] buffer = new byte[8192];
                 //noinspection StatementWithEmptyBody
-                while (dis.read() != -1) {
+                while (dis.read(buffer) != -1) {
                     // read stream to EOF
                 }
                 return sourceFile.withChecksum(new Checksum(algorithm, md.digest()));

@@ -1,0 +1,174 @@
+"""Facade request handling: route RPC operations across per-bundle children.
+
+In facade mode (``--recipe-install-dir`` set, not a child) each bundle gets its own venv. A lone
+bundle runs in the facade process, where the server's own handlers serve its recipes. Each later
+bundle gets a child, and recipe execution routes to the owning child, or to this process for the
+hosted bundle.
+
+``Print``/``GetObject`` are not routed: the working source file is owned outside the children, so
+a child's edit has to be pulled back into it (``hub_pull``) or it is never seen. That store and the
+per-child ref tables it needs live in ``rewrite.rpc.server`` as the ``_hub_*`` functions.
+"""
+from pathlib import Path
+
+from rewrite.discovery import distribution_name_from_source
+
+
+_LOCAL = object()  # stands in for a bundle when the facade runs a visitor itself
+
+
+class Facade:
+    def __init__(self, children, hub_pull=None, local_visit=None, is_local_visitor=None, hub_drop=None,
+                 local_prepare=None, local_generate=None):
+        self._children = children
+        self._hub_pull = hub_pull
+        self._hub_drop = hub_drop
+        # Built-in visitors (auto-format, add-import) and the hosted bundle's recipes run in this
+        # process, against the working tree the facade holds.
+        self._local_visit = local_visit
+        self._is_local_visitor = is_local_visitor or (lambda name: False)
+        self._local_prepare = local_prepare
+        self._local_generate = local_generate
+        self._bundle_by_visitor = {}    # visitor name (edit:/scan:) -> bundle
+        self._bundle_by_recipe_id = {}  # prepared recipe id -> bundle
+
+    def routes_to_children(self):
+        """False when the only bundle runs in this process and the server's own handlers serve it."""
+        return not self._children.hosts_every_bundle()
+
+    def _owner(self, visitor_name):
+        """The bundle that owns ``visitor_name``, or ``_LOCAL`` when the facade runs it itself."""
+        bundle = self._bundle_by_visitor.get(visitor_name)
+        if bundle is not None:
+            return bundle
+        if self._local_visit is not None and self._is_local_visitor(visitor_name):
+            return _LOCAL
+        raise ValueError(f"No child owns visitor '{visitor_name}'")
+
+    def install_recipes(self, params: dict) -> dict:
+        recipes = params.get("recipes")
+        if isinstance(recipes, str):
+            return self._install_local(recipes, params.get("venv"))
+        if isinstance(recipes, dict):
+            package = recipes.get("packageName")
+            version = recipes.get("version")
+            if not package:
+                raise ValueError("Package name is required")
+            if version:
+                spec = f"{package}{version}" if version[0] in "=<>!~" else f"{package}=={version}"
+            else:
+                spec = package
+            rows = self._children.install(package, spec)
+            return {"recipesInstalled": len(rows), "version": self._children.resolved_version(package)}
+        raise ValueError(f"Invalid recipes parameter: {recipes!r}")
+
+    def _install_local(self, local_path: str, venv=None) -> dict:
+        dist = distribution_name_from_source(Path(local_path))
+        if not dist:
+            raise ValueError(f"Could not determine the distribution name for local path '{local_path}'")
+        if venv:
+            rows = self._children.attach(dist, venv, attribution_name=local_path)
+            return {"recipesInstalled": len(rows), "version": self._children.resolved_version(venv)}
+        rows = self._children.install(dist, local_path, force=True, attribution_name=local_path)
+        return {"recipesInstalled": len(rows), "version": self._children.resolved_version(dist)}
+
+    def get_marketplace(self, params: dict):
+        return self._children.marketplace()
+
+    def prepare_recipe(self, params: dict) -> dict:
+        recipe_name = params.get("id")
+        bundle = self._children.owner(recipe_name)
+        # A hosted composite's sub-recipes are in no bundle's rows, and this process prepares them.
+        hosted = self._children.hosts(bundle) if bundle is not None else self._children.hosting()
+        if hosted and self._local_prepare is not None:
+            return self._local_prepare(params)
+        if bundle is None:
+            raise ValueError(f"No bundle owns recipe '{recipe_name}'")
+        response = self._children.request(bundle, "PrepareRecipe", params)
+        self._register(response, bundle)
+        return response
+
+    def _register(self, response: dict, bundle) -> None:
+        rid = response.get("id")
+        if rid is not None:
+            self._bundle_by_recipe_id[rid] = bundle
+        for key in ("editVisitor", "scanVisitor"):
+            visitor = response.get(key)
+            if visitor:
+                self._bundle_by_visitor[visitor] = bundle
+        for key in ("editPreconditions", "scanPreconditions"):
+            for precondition in (response.get(key) or []):
+                visitor = precondition.get("visitorName")
+                if visitor:
+                    self._bundle_by_visitor[visitor] = bundle
+        for child in (response.get("recipeList") or []):
+            self._register(child, bundle)  # same bundle: in-boundary composition
+
+    def visit(self, params: dict) -> dict:
+        visitor = params.get("visitor")
+        bundle = self._owner(visitor)
+        if bundle is _LOCAL:
+            item = {"visitor": visitor, "visitorOptions": params.get("visitorOptions")}
+            return {"modified": self._local_visit([item], params)[0]["modified"]}
+        result = self._children.request(bundle, "Visit", params)
+        tree_id = params.get("treeId")
+        if self._hub_pull is not None and tree_id is not None and result.get("modified"):
+            # A single Visit reports only "modified", so a deletion is only visible on the pull.
+            self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"), may_delete=True)
+        return result
+
+    def batch_visit(self, params: dict) -> dict:
+        """Route a BatchVisit's visitors to their owning children, preserving sequence.
+
+        The host batches a tree's visitors across every recipe in a run cycle, so one BatchVisit can
+        span bundles. Each same-owner run is served the facade's current tree over that child's ref
+        table, and its edit is pulled back before the next run starts — so the second bundle sees the
+        first one's result rather than the original."""
+        groups = []  # [(owner, [visitor, ...]), ...]
+        for visitor in params.get("visitors", []):
+            owner = self._owner(visitor.get("visitor"))
+            if groups and groups[-1][0] == owner:
+                groups[-1][1].append(visitor)
+            else:
+                groups.append((owner, [visitor]))
+
+        tree_id = params.get("treeId")
+        source_file_type = params.get("sourceFileType")
+        results = []
+        for owner, sub_visitors in groups:
+            if owner is _LOCAL:
+                sub_results = self._local_visit(sub_visitors, params)
+            else:
+                sub_results = self._children.request(
+                    owner, "BatchVisit", {**params, "visitors": sub_visitors}).get("results", [])
+            results.extend(sub_results)
+            if any(r.get("deleted") for r in sub_results):
+                # The result already says so; pulling would get DELETE, which a lost tree also answers.
+                if self._hub_drop is not None and tree_id is not None:
+                    self._hub_drop(tree_id)
+                break
+            if (owner is not _LOCAL and self._hub_pull is not None and tree_id is not None and
+                    any(r.get("modified") for r in sub_results)):
+                self._hub_pull(self._children, owner, tree_id, source_file_type)
+        return {"results": results}
+
+    def evict(self, params: dict) -> bool:
+        self._children.broadcast_evict(params)
+        return True
+
+    def reset(self, params: dict) -> bool:
+        self._children.broadcast_reset(params)
+        return True
+
+    def set_data_table_store(self, params: dict) -> bool:
+        self._children.set_data_table_store(params)
+        return True
+
+    def generate(self, params: dict) -> dict:
+        recipe_id = params.get("id")
+        bundle = self._bundle_by_recipe_id.get(recipe_id)
+        if bundle is None:
+            if self._local_generate is not None:
+                return self._local_generate(params)  # prepared in this process, or nowhere
+            raise ValueError(f"No child owns prepared recipe '{recipe_id}'")
+        return self._children.request(bundle, "Generate", params)

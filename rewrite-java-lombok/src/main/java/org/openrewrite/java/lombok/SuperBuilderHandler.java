@@ -22,7 +22,7 @@ import lombok.core.AnnotationValues;
 import lombok.core.HandlerPriority;
 import lombok.core.LombokImmutableList;
 import lombok.core.LombokNode;
-import lombok.experimental.SuperBuilder;
+import lombok.SuperBuilder;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
 import lombok.javac.handlers.HandleConstructor;

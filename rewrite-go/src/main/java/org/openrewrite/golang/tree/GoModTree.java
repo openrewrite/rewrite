@@ -27,7 +27,7 @@ import org.openrewrite.golang.GoModVisitor;
  * extending {@link Tree} gives every node {@code Tree}'s {@code @c} polymorphic type
  * id so the elements survive {@code .lst} (de)serialization, and the {@code accept}
  * dispatch routes traversal to a {@link GoModVisitor} just as {@code Hcl} routes to
- * {@code HclVisitor}. Printing remains delegated to the Go RPC server.
+ * {@code HclVisitor}.
  */
 public interface GoModTree extends Tree {
 

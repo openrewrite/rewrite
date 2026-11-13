@@ -21,7 +21,7 @@ import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
-import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces, PackageSemicolon}
+import org.openrewrite.scala.marker.{IndentedSyntax, PackageSemicolon}
 import org.openrewrite.scala.tree.S
 
 import java.util
@@ -35,12 +35,12 @@ import java.util.{Collections, List as JList}
  */
 class CompilationUnitResult(
                              val packageDecl: J.Package,
-                             val statements: JList[Statement],
+                             val statements: JList[JRightPadded[Statement]],
                              val lastCursorPosition: Int
                            ) {
   def getPackageDecl: J.Package = packageDecl
 
-  def getStatements: JList[Statement] = statements
+  def getStatements: JList[JRightPadded[Statement]] = statements
 
   def getLastCursorPosition: Int = lastCursorPosition
 }
@@ -54,7 +54,7 @@ class ScalaASTConverter {
    * Converts a Scala parse result to compilation unit components.
    */
   def convertToCompilationUnit(parseResult: ScalaParseResult, source: String, typeFactory: JavaTypeFactory = null): CompilationUnitResult = {
-    val statements = new util.ArrayList[Statement]()
+    val statements = new util.ArrayList[JRightPadded[Statement]]()
     var packageDecl: J.Package = null
 
     // Use the context from the parse result (carries type info from batch compilation)
@@ -70,12 +70,12 @@ class ScalaASTConverter {
 
     // Build type mapping from typed tree if available
     val mapping: Option[ScalaTypeMapping] = if (typeFactory != null) {
-      parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeFactory, tpd))
+      parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeFactory, tpd, parseResult.typedNodes))
     } else None
 
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment, mapping)
     // Traverse the untyped tree for source-faithful structure.
-    // Types are extracted via ScalaTypeMapping's span-based lookup into the typed tree.
+    // Types are extracted via ScalaTypeMapping, which knows the typed tree of each of its nodes.
     val tree: Trees.Tree[?] = parseResult.tree
 
     // Check if tree is empty (parse error case)
@@ -86,6 +86,10 @@ class ScalaASTConverter {
 
     // Handle different types of top-level trees
     tree match {
+      case pkgDef: Trees.PackageDef[?] if isBracedPackage(pkgDef, visitor) =>
+        // A single top-level braced package is a scope that owns its body, so it
+        // becomes a statement rather than the compilation unit's package header.
+        statements.add(JRightPadded.build(buildBracedPackage(pkgDef, visitor)))
       case pkgDef: Trees.PackageDef[?] =>
         // Extract package declaration and create J.Package using the visitor
         // This ensures the cursor is properly updated
@@ -111,72 +115,121 @@ class ScalaASTConverter {
             }.getOrElse(pkgDef.stats)
           } else pkgDef.stats
 
-        // Process the statements within the package.
-        // Sort by source position to ensure source order is preserved —
-        // the Dotty parser may reorder brace imports internally.
-        val sortedStats = rawStats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-        sortedStats.foreach {
-          case _: Trees.PackageDef[?] =>
-          case imp: Trees.Import[?] =>
-            val converted = visitor.visitTree(imp)
-            converted match {
-              case stmt: Statement =>
-                statements.add(stmt)
-              case null =>
-              case _ =>
-            }
-          case stat =>
-            val converted = visitor.visitTree(stat)
-            converted match {
-              case null =>
-              case _: J.Empty =>
-              case stmt: Statement =>
-                statements.add(stmt)
-              case other =>
-            }
-        }
-
-        // For braced package syntax, consume the closing `}` so it doesn't leak into
-        // EOF whitespace, and record the space before it on the marker for re-emission.
-        if (packageDecl != null) {
-          val bracesMarker = packageDecl.getMarkers.findFirst(classOf[PackageBraces])
-          if (bracesMarker.isPresent) {
-            val srcText = visitor.getSourceText
-            val srcOffset = visitor.getOffsetAdjustment
-            val startIdx = visitor.getCursor - srcOffset
-            var i = startIdx
-            while (i < srcText.length && srcText.charAt(i) != '}') {
-              i += 1
-            }
-            if (i < srcText.length && srcText.charAt(i) == '}') {
-              val afterBody = srcText.substring(startIdx, i)
-              val updated = bracesMarker.get.copy(afterBody = afterBody)
-              packageDecl = packageDecl.withMarkers(packageDecl.getMarkers.computeByType(updated, (_: PackageBraces, n: PackageBraces) => n))
-              visitor.updateCursor(i + 1 + srcOffset)
-            }
-          }
-        }
-      case imp: Trees.Import[?] =>
-        // Top-level import (no enclosing package).
-        val converted = visitor.visitTree(imp)
-        converted match {
-          case stmt: Statement => statements.add(stmt)
-          case null => // Skip null returns
-          case _ => // Skip non-statements
-        }
+        statements.addAll(convertBody(rawStats, visitor))
       case _ =>
-        // Single statement
-        System.out.println(s"Processing single statement: ${tree.getClass.getSimpleName}")
-        val converted = visitor.visitTree(tree)
-        converted match {
-          case null => // Skip null returns
-          case _: J.Empty => // Skip empty nodes
-          case stmt: Statement => statements.add(stmt)
-          case _ => // Skip non-statements
-        }
+        statements.addAll(convertBody(Seq(tree), visitor))
     }
 
     new CompilationUnitResult(packageDecl, statements, visitor.getCursor)
+  }
+
+  /**
+   * Converts the body statements of a package (or the compilation unit) into a flat
+   * list, visiting in source order so the visitor's cursor advances monotonically.
+   * Braced packages nested among the statements become [[S.PackageDeclaration]] so
+   * they keep their own scope; non-braced nested packages are not yet modeled.
+   */
+  private def convertBody(rawStats: Seq[Trees.Tree[?]], visitor: ScalaTreeVisitor): util.ArrayList[JRightPadded[Statement]] = {
+    val out = new util.ArrayList[JRightPadded[Statement]]()
+    val sourceLength = visitor.getSourceText.length
+    val srcOffset = visitor.getOffsetAdjustment
+    // Sort by source position to ensure source order is preserved —
+    // the Dotty parser may reorder brace imports internally.
+    val sortedStats = rawStats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
+    visitor.consumeEmptyStatements(sourceLength, out)
+    for (idx <- sortedStats.indices) {
+      val stat = sortedStats(idx)
+      val converted: Statement = stat match {
+        case pkg: Trees.PackageDef[?] if isBracedPackage(pkg, visitor) => buildBracedPackage(pkg, visitor)
+        case _: Trees.PackageDef[?] => null // Non-braced nested package — not yet modeled, skip.
+        case _ =>
+          visitor.visitTree(stat) match {
+            case _: J.Empty => null
+            case stmt: Statement => stmt
+            case _ => null
+          }
+      }
+      if (converted != null) {
+        val statEnd = if (stat.span.exists) Math.max(0, stat.span.end - srcOffset) else visitor.getCursor
+        val nextStart = sortedStats.drop(idx + 1)
+          .find(_.span.exists)
+          .map(s => Math.max(0, s.span.start - srcOffset))
+          .getOrElse(sourceLength)
+        visitor.addStatement(out, converted, statEnd, nextStart)
+      }
+    }
+    out
+  }
+
+  /**
+   * A `PackageDef` is braced when a `{` immediately follows its package name
+   * (`package a { ... }`), as opposed to the file-header (`package a.b.c`),
+   * indented (`package a:`) or synthetic empty-package forms.
+   */
+  private def isBracedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): Boolean = {
+    if (!pkgDef.pid.span.exists) return false
+    val packageName = extractPackageName(pkgDef)
+    if (packageName.isEmpty || packageName == "<empty>") return false
+    val srcText = visitor.getSourceText
+    val scanStart = pkgDef.pid.span.end - visitor.getOffsetAdjustment
+    if (scanStart < 0 || scanStart > srcText.length) return false
+    var i = scanStart
+    while (i < srcText.length && Character.isWhitespace(srcText.charAt(i))) {
+      i += 1
+    }
+    i < srcText.length && srcText.charAt(i) == '{'
+  }
+
+  /**
+   * Builds an [[S.PackageDeclaration]] for a braced package, recursing into its body
+   * (so nested/sibling braced packages are handled uniformly). The `{`/`}` are owned
+   * by the body [[J.Block]]; the [[J.Package]] head carries only `package <name>`.
+   */
+  private def buildBracedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): S.PackageDeclaration = {
+    val prefix = visitor.extractPrefix(pkgDef.span)
+
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
+    val namePkg = new J.Package(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
+      Collections.emptyList()
+    )
+
+    val srcText = visitor.getSourceText
+    val srcOffset = visitor.getOffsetAdjustment
+
+    // Consume the space before `{` (becomes the block prefix) and the `{` itself.
+    val scanStart = pkgDef.pid.span.end - srcOffset
+    var braceIdx = scanStart
+    while (braceIdx < srcText.length && srcText.charAt(braceIdx) != '{') {
+      braceIdx += 1
+    }
+    val beforeBrace = srcText.substring(scanStart, braceIdx)
+    visitor.updateCursor(braceIdx + 1 + srcOffset)
+
+    val rpStmts = convertBody(pkgDef.stats, visitor)
+
+    // Consume the space before `}` (becomes the block end) and the `}` itself.
+    val afterStart = visitor.getCursor - srcOffset
+    var closeIdx = afterStart
+    while (closeIdx < srcText.length && srcText.charAt(closeIdx) != '}') {
+      closeIdx += 1
+    }
+    val afterBody = srcText.substring(afterStart, closeIdx)
+    visitor.updateCursor(closeIdx + 1 + srcOffset)
+
+    val block = new J.Block(
+      Tree.randomId(),
+      ScalaSpace.format(beforeBrace),
+      Markers.EMPTY,
+      JRightPadded.build(false),
+      rpStmts,
+      ScalaSpace.format(afterBody)
+    )
+
+    new S.PackageDeclaration(Tree.randomId(), prefix, Markers.EMPTY, namePkg, block)
   }
 
   /**
@@ -186,16 +239,13 @@ class ScalaASTConverter {
     // Extract the prefix (whitespace before 'package' keyword)
     val prefix = visitor.extractPrefix(pkgDef.span)
 
-    // Extract the package name
-    val packageName = extractPackageName(pkgDef)
-
     // Find the end of the package declaration in the source
     // This includes "package" keyword + package name
     val packageEndPos = pkgDef.pid.span.end
 
     // Detect Scala 3 indented package syntax: `package foo.bar:` followed by an indented region,
-    // or braced package syntax: `package foo.bar { ... }`. In each case consume the delimiter
-    // and tag the J.Package with the appropriate marker so the printer re-emits it.
+    // and consume the delimiter so the printer re-emits it. Braced packages
+    // (`package foo.bar { ... }`) are handled separately as S.PackageDeclaration.
     val srcText = visitor.getSourceText
     val srcOffset = visitor.getOffsetAdjustment
     val scanStart = packageEndPos - srcOffset
@@ -205,10 +255,9 @@ class ScalaASTConverter {
     }
     val nextChar = if (scanIdx < srcText.length) srcText.charAt(scanIdx) else 0.toChar
     val hasIndentedColon = nextChar == ':'
-    val hasBraces = nextChar == '{'
     val hasSemicolon = nextChar == ';'
     val cursorAfter =
-      if (hasIndentedColon || hasBraces || hasSemicolon) scanIdx + 1 + srcOffset
+      if (hasIndentedColon || hasSemicolon) scanIdx + 1 + srcOffset
       else packageEndPos
 
     // Update the visitor's cursor to after the package declaration
@@ -217,14 +266,11 @@ class ScalaASTConverter {
     visitor.updateCursor(cursorAfter)
 
     // Create package expression
-    val packageExpr: Expression = TypeTree.build(packageName)
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
 
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
     if (hasIndentedColon) {
       markerList.add(new IndentedSyntax(Tree.randomId()))
-    } else if (hasBraces) {
-      val beforeBrace = srcText.substring(scanStart, scanIdx)
-      markerList.add(PackageBraces(Tree.randomId(), beforeBrace, ""))
     }
     if (hasSemicolon) {
       markerList.add(PackageSemicolon(Tree.randomId()))
@@ -252,6 +298,27 @@ class ScalaASTConverter {
   }
 
   /**
+   * The package name as written in source (the `pid` span), so backtick-quoted
+   * segments like `` `trait` `` retain their quoting — the compiler's name strings
+   * strip it. `TypeTree.build` with the backtick escape turns each quoted segment
+   * into an identifier with a bare simple name and a [[org.openrewrite.java.marker.Quoted]]
+   * marker, which the printer renders back with backticks. Falls back to
+   * [[extractPackageName]] when the span is unusable.
+   */
+  private def packageNameFromSource(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): String = {
+    if (pkgDef.pid.span.exists) {
+      val srcText = visitor.getSourceText
+      val srcOffset = visitor.getOffsetAdjustment
+      val start = pkgDef.pid.span.start - srcOffset
+      val end = pkgDef.pid.span.end - srcOffset
+      if (start >= 0 && start < end && end <= srcText.length) {
+        return srcText.substring(start, end)
+      }
+    }
+    extractPackageName(pkgDef)
+  }
+
+  /**
    * Extracts the package name from a PackageDef.
    */
   private def extractPackageName(pkg: Trees.PackageDef[?]): String = {
@@ -266,7 +333,7 @@ class ScalaASTConverter {
    * Converts a Scala parse result to a list of statements (backward compatibility).
    */
   def convertToStatements(parseResult: ScalaParseResult, source: String): JList[Statement] = {
-    convertToCompilationUnit(parseResult, source, null).statements
+    JRightPadded.getElements(convertToCompilationUnit(parseResult, source, null).statements)
   }
 
   /**
@@ -274,17 +341,7 @@ class ScalaASTConverter {
    * This should return the source text after the last parsed element.
    */
   def getRemainingSource(parseResult: ScalaParseResult, source: String, lastCursorPosition: Int): String = {
-    // If tree is empty (parse error), don't return any remaining source
-    // The Unknown node will handle the entire source
-    if (parseResult.tree.isEmpty) {
-      return ""
-    }
-
-    // Return any remaining source after the last cursor position
-    if (lastCursorPosition < source.length) {
-      source.substring(lastCursorPosition)
-    } else {
-      ""
-    }
+    val start = Math.max(lastCursorPosition, 0)
+    if (start < source.length) source.substring(start) else ""
   }
 }

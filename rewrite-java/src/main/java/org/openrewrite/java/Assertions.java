@@ -18,10 +18,12 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -34,6 +36,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,7 +52,13 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
+@CheckReturnValue
 public class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+        JdkClassSharingTypeFactory.useForParsers();
+    }
+
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
     private static final Map<String, JavaSourceSet> javaSourceSets = new ConcurrentHashMap<>();
@@ -60,6 +69,9 @@ public class Assertions {
     static void customizeExecutionContext(ExecutionContext ctx) {
         if (ctx.getMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
             ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+        if (ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX) == null) {
+            ctx.putMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX, true);
         }
     }
 
@@ -85,14 +97,17 @@ public class Assertions {
                 List<J.Unknown> allUnknown = new JavaIsoVisitor<List<J.Unknown>>() {
                     @Override
                     public J.Unknown visitUnknown(J.Unknown unknown, List<J.Unknown> list) {
-                        J.Unknown err = super.visitUnknown(unknown, list);
-                        list.add(err);
-                        return err;
+                        J.Unknown u = super.visitUnknown(unknown, list);
+                        list.add(u);
+                        return u;
                     }
                 }.reduce(source, new ArrayList<>());
                 if (!allUnknown.isEmpty()) {
-                    throw new IllegalStateException("LST contains erroneous nodes\n" + allUnknown.stream()
-                            .map(unknown -> unknown.getSource().getText())
+                    throw new IllegalStateException("LST contains unknown elements\n" + allUnknown.stream()
+                            .map(unknown -> unknown.getSource().getMarkers()
+                                    .findFirst(ParseExceptionResult.class)
+                                    .map(per -> per.getMessage() + "\n")
+                                    .orElse("") + unknown.getSource().getText())
                             .collect(joining("\n\n")));
                 }
             }
@@ -179,7 +194,7 @@ public class Assertions {
     }
 
     public static SourceSpecs mavenProject(String project, SourceSpecs... sources) {
-        return mavenProject(project, spec -> project(spec, project), sources);
+        return mavenProject(project, spec -> spec.markers(javaProject(project)), sources);
     }
 
     public static SourceSpecs srcMainJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -187,7 +202,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainJava(SourceSpecs... javaSources) {
-        return srcMainJava(spec -> sourceSet(spec, "main"), javaSources);
+        return srcMainJava(spec -> spec.markers(javaSourceSet("main")), javaSources);
     }
 
     public static SourceSpecs srcMainResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -195,7 +210,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainResources(SourceSpecs... resources) {
-        return srcMainResources(spec -> sourceSet(spec, "main"), resources);
+        return srcMainResources(spec -> spec.markers(javaSourceSet("main")), resources);
     }
 
     public static SourceSpecs srcTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -203,7 +218,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestJava(SourceSpecs... javaSources) {
-        return srcTestJava(spec -> sourceSet(spec, "test"), javaSources);
+        return srcTestJava(spec -> spec.markers(javaSourceSet("test")), javaSources);
     }
 
     public static SourceSpecs srcTestResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -211,7 +226,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestResources(SourceSpecs... resources) {
-        return srcTestResources(spec -> sourceSet(spec, "test"), resources);
+        return srcTestResources(spec -> spec.markers(javaSourceSet("test")), resources);
     }
 
     public static SourceSpecs srcSmokeTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -219,7 +234,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcSmokeTestJava(SourceSpecs... javaSources) {
-        return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
+        return srcSmokeTestJava(spec -> spec.markers(javaSourceSet("smokeTest")), javaSources);
     }
 
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {
@@ -229,6 +244,21 @@ public class Assertions {
     public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
         for (SourceSpec<?> spec : sourceSpec) {
             spec.markers(javaVersion(version));
+        }
+        return sourceSpec;
+    }
+
+    /**
+     * Attach a {@link JavaVersion} where the compiling JDK ({@code createdBy}) may differ from the
+     * {@code -source}/{@code --release} bytecode level, e.g. JDK 23 producing Java 8 bytecode.
+     */
+    public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        return sourceSpec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
+    }
+
+    public static SourceSpecs version(SourceSpecs sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        for (SourceSpec<?> spec : sourceSpec) {
+            spec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
         }
         return sourceSpec;
     }
@@ -244,7 +274,7 @@ public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
         return sourceFiles -> {
-            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, new JavaTypeCache(), false);
+            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath);
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
@@ -316,8 +346,18 @@ public class Assertions {
 
     public static JavaVersion javaVersion(int version) {
         return javaVersions.computeIfAbsent(version, v ->
-                new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
+                new JavaVersion(Tree.randomId(), v + ".0.1", "adoptopenjdk",
                         Integer.toString(v), Integer.toString(v)));
+    }
+
+    /**
+     * @param createdByMajor       the major version of the compiling JDK ({@code createdBy})
+     * @param sourceCompatibility  the {@code -source} level
+     * @param targetCompatibility  the {@code --release}/target bytecode level
+     */
+    public static JavaVersion javaVersion(int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        return new JavaVersion(Tree.randomId(), createdByMajor + ".0.1", "adoptopenjdk",
+                Integer.toString(sourceCompatibility), Integer.toString(targetCompatibility));
     }
 
     private static JavaProject javaProject(String projectName) {

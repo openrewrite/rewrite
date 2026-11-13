@@ -61,7 +61,7 @@ public class GolangParser implements Parser {
                     Go.CompilationUnit.class.getName(), ctx, module, goModContent);
         }
         return rpc.parse(sources, relativeTo, this,
-                Go.CompilationUnit.class.getName(), ctx);
+                Go.CompilationUnit.class.getName(), ctx, GoRewriteRpc.parseOptions(ctx));
     }
 
     @Override

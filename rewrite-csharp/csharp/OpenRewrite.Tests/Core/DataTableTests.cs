@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp.Rpc;
 
 namespace OpenRewrite.Tests.Core;
 
@@ -119,7 +122,8 @@ public class CsvDataTableStoreTests
             Assert.StartsWith("# @name", lines[0]);
             Assert.StartsWith("# @instanceName", lines[1]);
             Assert.StartsWith("# @group", lines[2]);
-            Assert.Equal("Source Path,Line Number,Match", lines[3]);
+            // Header uses field names (matches the Java writer for shared files).
+            Assert.Equal("SourcePath,LineNumber,Match", lines[3]);
             Assert.Equal("Foo.cs,42,hello", lines[4]);
             Assert.Equal("Bar.cs,7,world", lines[5]);
         }
@@ -207,6 +211,131 @@ public class CsvDataTableStoreTests
             if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
         }
     }
+
+    [Fact]
+    public void WritesPrefixAndSuffixColumns()
+    {
+        var outputDir = Path.Combine(Path.GetTempPath(), "datatable-test-" + Guid.NewGuid());
+        try
+        {
+            var store = new CsvDataTableStore(outputDir,
+                new Dictionary<string, string> { ["repositoryOrigin"] = "github.com/acme/widgets" },
+                new Dictionary<string, string> { ["organization"] = "Acme" });
+            var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
+                "Matches found by a text search.");
+            var ctx = new OpenRewrite.Core.ExecutionContext();
+
+            store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 42, Match = "hello" });
+
+            var fileKey = CsvDataTableStore.FileKey(table);
+            var lines = File.ReadAllLines(Path.Combine(outputDir, fileKey + ".csv"));
+            Assert.Equal("repositoryOrigin,SourcePath,LineNumber,Match,organization", lines[3]);
+            Assert.Equal("github.com/acme/widgets,Foo.cs,42,hello,Acme", lines[4]);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+        }
+    }
+
+    [Fact]
+    public void DecidesHeaderByFileExistenceAcrossStores()
+    {
+        var outputDir = Path.Combine(Path.GetTempPath(), "datatable-test-" + Guid.NewGuid());
+        try
+        {
+            var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
+                "Matches found by a text search.");
+            var ctx = new OpenRewrite.Core.ExecutionContext();
+
+            // Two store instances on one dir simulate the Java host + an RPC runtime sharing one file.
+            new CsvDataTableStore(outputDir)
+                .InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
+            new CsvDataTableStore(outputDir)
+                .InsertRow(table, ctx, new TextMatch { SourcePath = "B.cs", LineNumber = 2, Match = "b" });
+
+            var fileKey = CsvDataTableStore.FileKey(table);
+            var lines = File.ReadAllLines(Path.Combine(outputDir, fileKey + ".csv"));
+            // 3 comment lines + 1 header + 2 data rows
+            Assert.Equal(6, lines.Length);
+            Assert.Equal("SourcePath,LineNumber,Match", lines[3]);
+            Assert.Equal("A.cs,1,a", lines[4]);
+            Assert.Equal("B.cs,2,b", lines[5]);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+        }
+    }
+}
+
+public class SetDataTableStoreTests
+{
+    [Fact]
+    public void CsvReconstructsRawCsvStoreAtOutputDir()
+    {
+        var outputDir = Path.Combine(Path.GetTempPath(), "datatable-test-" + Guid.NewGuid());
+        try
+        {
+            var store = new SetDataTableStoreRequest.Csv
+            {
+                OutputDir = outputDir,
+                PrefixColumns = new Dictionary<string, string> { ["repositoryOrigin"] = "acme" },
+                SuffixColumns = new Dictionary<string, string> { ["organization"] = "Acme" }
+            }.ToDataTableStore();
+
+            var csv = Assert.IsType<CsvDataTableStore>(store);
+            Assert.Equal("acme", csv.PrefixColumns["repositoryOrigin"]);
+            Assert.Equal("Acme", csv.SuffixColumns["organization"]);
+
+            var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
+                "Matches found by a text search.");
+            csv.InsertRow(table, new OpenRewrite.Core.ExecutionContext(),
+                new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
+
+            var fileKey = CsvDataTableStore.FileKey(table);
+            var lines = File.ReadAllLines(Path.Combine(outputDir, fileKey + ".csv"));
+            Assert.Equal("repositoryOrigin,SourcePath,LineNumber,Match,organization", lines[3]);
+            Assert.Equal("acme,Foo.cs,1,x,Acme", lines[4]);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+        }
+    }
+
+    [Fact]
+    public void NoopKeepsRowsInMemory()
+    {
+        var store = new SetDataTableStoreRequest.NoOp().ToDataTableStore();
+        Assert.IsType<InMemoryDataTableStore>(store);
+    }
+
+    [Fact]
+    public void UnderSpecifiedCsvFallsBackToInMemory()
+    {
+        var store = new SetDataTableStoreRequest.Csv().ToDataTableStore();
+        Assert.IsType<InMemoryDataTableStore>(store);
+    }
+
+    [Fact]
+    public void DeserializesCsvWireFormByKindDiscriminator()
+    {
+        const string json =
+            """{"kind":"CSV","outputDir":"/tmp/dt","prefixColumns":{"repositoryOrigin":"acme"},"suffixColumns":{}}""";
+        var request = JsonSerializer.Deserialize<SetDataTableStoreRequest>(json, RpcJson.Options);
+        var csv = Assert.IsType<SetDataTableStoreRequest.Csv>(request);
+        Assert.Equal("/tmp/dt", csv.OutputDir);
+        Assert.Equal("acme", csv.PrefixColumns!["repositoryOrigin"]);
+    }
+
+    [Fact]
+    public void DeserializesNoOpWireForm()
+    {
+        var request = JsonSerializer.Deserialize<SetDataTableStoreRequest>(
+            """{"kind":"NOOP"}""", RpcJson.Options);
+        Assert.IsType<SetDataTableStoreRequest.NoOp>(request);
+    }
 }
 
 public class DataTableTests
@@ -271,5 +400,42 @@ public class DataTableTests
         Assert.Equal("SourcePath", descriptor.Columns[0].Name);
         Assert.Equal("Source Path", descriptor.Columns[0].DisplayName);
         Assert.Equal("The path of the source file", descriptor.Columns[0].Description);
+    }
+}
+
+public class FileKeyMatchesJavaTests
+{
+    // fileKey must match the Java host's exactly (incl. the sha256[..4] suffix), or a shared table resolves to two files.
+
+    [Fact]
+    public void DefaultTableUsesBareFullyQualifiedName()
+    {
+        var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text matches",
+            "Lines matching a text search.");
+        Assert.Equal("org.openrewrite.table.TextMatches", CsvDataTableStore.FileKey(table));
+    }
+
+    [Fact]
+    public void CustomInstanceNameAppendsSanitizedSuffix()
+    {
+        var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text matches",
+            "Lines matching a text search.") { InstanceName = "Custom run" };
+        Assert.Equal("org.openrewrite.table.TextMatches--custom-run-6251", CsvDataTableStore.FileKey(table));
+    }
+
+    [Fact]
+    public void GroupTakesPrecedenceAndIsSanitized()
+    {
+        var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text matches",
+            "Lines matching a text search.") { InstanceName = "Custom run", Group = "team-alpha" };
+        Assert.Equal("org.openrewrite.table.TextMatches--team-alpha-29c4", CsvDataTableStore.FileKey(table));
+    }
+
+    [Fact]
+    public void GroupEqualToNameUsesBareName()
+    {
+        var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text matches",
+            "Lines matching a text search.") { Group = "org.openrewrite.table.TextMatches" };
+        Assert.Equal("org.openrewrite.table.TextMatches", CsvDataTableStore.FileKey(table));
     }
 }

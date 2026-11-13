@@ -25,6 +25,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -38,10 +42,12 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceClassAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                      if (annotation.toString().contains("2.0")) {
+                          return annotation;
+                      }
                       return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
                         getCursor(), annotation.getCoordinates().replace(), "2.0");
                   }
@@ -65,10 +71,12 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceNestedClassAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                      if (annotation.toString().contains("2.0")) {
+                          return annotation;
+                      }
                       return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
                         getCursor(), annotation.getCoordinates().replace(), "2.0");
                   }
@@ -94,31 +102,95 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     }
 
     @Test
-    void replaceAnnotation2() {
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        // javac recovers from unbalanced braces in the parse stub, so additionally assert the
+        // stub is well-formed; stricter parsers (Kotlin, Groovy, Scala) reject unbalanced stubs
+        List<String> stubs = new ArrayList<>();
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-                  @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                      return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
-                        getCursor(), annotation.getCoordinates().replace(), "2.0");
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("SuppressWarnings".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("all"))) {
+                      return JavaTemplate.builder("\"all\"")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
                   }
+                  return annotation;
               }
-            ))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
-              @Deprecated(since = "1.0", forRemoval = true)
               class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("unchecked")
+                  void method() {}
               }
               """,
             """
-              @Deprecated(since = "2.0", forRemoval = true)
               class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("all")
+                  void method() {}
               }
               """
           )
         );
+        assertThat(stubs)
+          .isNotEmpty()
+          .allSatisfy(stub -> assertThat(stub.chars().filter(c -> c == '{').count())
+            .as("balanced braces in template stub:%n%s", stub)
+            .isEqualTo(stub.chars().filter(c -> c == '}').count()));
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
+    @Test
+    void replaceAnnotationArgumentsWithAssignmentShapedSubstitution() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Retry".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && !annotation.getArguments().isEmpty() &&
+                      annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
+                      assignment.getVariable() instanceof J.Identifier attribute &&
+                      "include".equals(attribute.getSimpleName())) {
+                      return JavaTemplate.builder("includes = #{any()}")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          assignment.getAssignment());
+                  }
+                  return annotation;
+              }
+          })),
+          java(
+            """
+              @interface Retry {
+                  Class<? extends Throwable>[] include() default {};
+                  Class<? extends Throwable>[] includes() default {};
+              }
+              """
+          ),
+          java(
+            """
+              class MyService {
+                  @Retry(include = {IllegalStateException.class})
+                  void doWork() {}
+              }
+              """,
+            """
+              class MyService {
+                  @Retry(includes = {IllegalStateException.class})
+                  void doWork() {}
+              }
+              """
+          ));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4634")

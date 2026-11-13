@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {createTwoFilesPatch} from "diff";
 import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
+import {TreePrinters} from "./print";
 import fs, {readFileSync} from "node:fs";
 import {isAbsolute, relative} from "path";
 import {ParseError, ParseErrorKind} from "./parse-error";
@@ -28,7 +30,25 @@ export function parserInputRead(input: ParserInput): string {
     if (typeof input === "object") {
         return input.text;
     }
-    return fs.readFileSync(input).toString()
+    return decodeSourceBytes(fs.readFileSync(input));
+}
+
+/**
+ * Decodes the bytes of a source file to text. UTF-16 (little or big endian) is recognized by its byte order
+ * mark, since such a file is otherwise indistinguishable from binary content; anything else is read as UTF-8.
+ * A byte order mark is kept as a leading U+FEFF so that parsers can record it and printing restores it.
+ */
+export function decodeSourceBytes(bytes: Buffer): string {
+    if (bytes.length >= 2) {
+        if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+            return bytes.toString("utf16le");
+        } else if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+            // Buffer has no utf16be decoder, so swap the byte pairs of an even-length copy.
+            const even = Buffer.from(bytes.subarray(0, bytes.length - (bytes.length % 2)));
+            return even.swap16().toString("utf16le");
+        }
+    }
+    return bytes.toString();
 }
 
 export function parserInputFile(input: ParserInput): string {
@@ -79,6 +99,27 @@ export abstract class Parser {
         return isAbsolute(path) && this.relativeTo ? relative(this.relativeTo, path) : path;
     }
 
+    /**
+     * A parse result that does not print back to its input has silently lost source, so it is reported as
+     * a `ParseError` carrying the tree that lost it. Mirrors `org.openrewrite.Parser`, down to the message.
+     * A parser whose LST cannot hold some byte of its input passes the form it can hold as `source`.
+     */
+    protected async requirePrintEqualsInput(sourceFile: SourceFile, input: ParserInput,
+                                            source: string = parserInputRead(input)): Promise<SourceFile> {
+        if (!this.ctx.getBoolean(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)) {
+            return sourceFile;
+        }
+        const printed = await TreePrinters.print(sourceFile);
+        if (printed === source) {
+            return sourceFile;
+        }
+        const path = this.relativePath(input);
+        const diff = createTwoFilesPatch(path, path, source, printed, "", "", {context: 3});
+        const error = this.error(input, new Error(`${sourceFile.sourcePath} is not print idempotent. \n${diff}`));
+        const withErroneous: ParseError = {...error, erroneous: sourceFile};
+        return withErroneous;
+    }
+
     protected error(input: ParserInput, e: Error): ParseError {
         return {
             kind: ParseErrorKind,
@@ -88,7 +129,7 @@ export abstract class Parser {
                 id: randomId(),
                 parserType: this.constructor.name,
                 exceptionType: e.name,
-                message: e.message + ':\n' + e.stack,
+                message: e.stack ?? e.message,
             } satisfies ParseExceptionResult as ParseExceptionResult),
             text: parserInputRead(input),
             sourcePath: this.relativePath(input),
@@ -148,7 +189,7 @@ export function readSourceSync(sourcePath: ParserInput) {
 
 type ParserConstructor<T extends Parser> = new (options?: ParserOptions) => T;
 
-export type ParserType = "javascript" | "packageJson" | "json" | "yaml" | "plainText";
+export type ParserType = "javascript" | "packageJson" | "json" | "yaml" | "xml" | "plainText";
 
 export class Parsers {
     private static registry = new Map<ParserType, ParserConstructor<Parser>>();

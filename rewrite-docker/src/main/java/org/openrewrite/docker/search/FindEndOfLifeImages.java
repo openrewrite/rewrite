@@ -70,8 +70,8 @@ public class FindEndOfLifeImages extends Recipe {
         return new DockerFrom.Matcher()
                 .excludeScratch()
                 .asVisitor((image, ctx) -> {
-                    String imageName = image.getImageName();
-                    String tag = image.getTag();
+                    String imageName = image.getImageName().orElse(null);
+                    String tag = image.getTag().orElse(null);
                     Docker.From from = image.getTree();
 
                     if (imageName == null || tag == null) {

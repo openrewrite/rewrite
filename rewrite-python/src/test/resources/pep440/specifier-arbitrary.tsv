@@ -1,0 +1,18 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_specifiers.py (test_arbitrary_equality_normalization; Version-typed rows only, matching containment of an already-parsed version)
+# Retrieved: 2026-07-16
+# specifier<TAB>version<TAB>expected.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+===1.1	1.01	true
+===1.1	1.1	true
+===1.01	1.01	false
+===1.01	1.1	false
+===1.a1	1.a1	false
+===1a1	1.a1	true
+===0!1.0	1.0	false
+===1.0	0!1.0	true
+===01.0	1.0	false
+===1.0	01.0	true
+===1.0-1	1.0.post1	false
+===1.0.post1	1.0-1	true
+===1.0.dev01	1.0.dev1	false
+===1.0.dev1	1.0.dev01	true

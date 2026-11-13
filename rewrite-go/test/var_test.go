@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -136,20 +140,12 @@ func TestParseVarPointerType(t *testing.T) {
 				fn := cu.Statements[0].Element.(*java.MethodDeclaration)
 				varDecl := fn.Body.Statements[0].Element.(*java.VariableDeclarations)
 
-				if varDecl.TypeExpr == nil {
-					t.Fatal("expected TypeExpr to be set for 'var x *int'")
-				}
+				require.NotNil(t, varDecl.TypeExpr, "expected TypeExpr to be set for 'var x *int'")
 				pt, ok := varDecl.TypeExpr.(*golang.PointerType)
-				if !ok {
-					t.Fatalf("expected TypeExpr to be *golang.PointerType, got %T", varDecl.TypeExpr)
-				}
+				require.Truef(t, ok, "expected TypeExpr to be *golang.PointerType, got %T", varDecl.TypeExpr)
 				ident, ok := pt.Elem.(*java.Identifier)
-				if !ok {
-					t.Fatalf("expected PointerType.Elem to be *java.Identifier, got %T", pt.Elem)
-				}
-				if ident.Name != "int" {
-					t.Errorf("expected PointerType.Elem name to be 'int', got %q", ident.Name)
-				}
+				require.Truef(t, ok, "expected PointerType.Elem to be *java.Identifier, got %T", pt.Elem)
+				assert.Equal(t, "int", ident.Name, "expected PointerType.Elem name to be 'int")
 			},
 		})
 }

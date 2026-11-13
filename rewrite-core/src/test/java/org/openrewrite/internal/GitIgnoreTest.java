@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.jgit.api.Git;
+import org.openrewrite.jgit.dircache.DirCache;
 import org.openrewrite.jgit.lib.Repository;
 
 import java.nio.charset.StandardCharsets;
@@ -163,6 +164,43 @@ class GitIgnoreTest {
 
             assertThat(GitIgnore.isIgnoredAndUntracked(repo, "")).isFalse();
             assertThat(GitIgnore.isIgnoredAndUntracked(repo, "/")).isFalse();
+        }
+    }
+
+    @Test
+    void dirCacheOverloadMatchesTwoArgOverload(@TempDir Path tempDir) throws Exception {
+        try (Git git = Git.init().setDirectory(tempDir.toFile()).call()) {
+            Repository repo = git.getRepository();
+
+            writeFile(tempDir.resolve("generated.txt"), "untracked content");
+
+            writeFile(tempDir.resolve("tracked-ignored.txt"), "content");
+            git.add().addFilepattern("tracked-ignored.txt").call();
+
+            writeFile(tempDir.resolve("normal.txt"), "content");
+            git.add().addFilepattern("normal.txt").call();
+            git.commit().setMessage("initial").call();
+
+            writeFile(tempDir.resolve(".gitignore"), "generated.txt\ntracked-ignored.txt\n");
+            git.add().addFilepattern(".gitignore").call();
+            git.commit().setMessage("add gitignore").call();
+
+            DirCache dirCache = repo.readDirCache();
+
+            assertThat(GitIgnore.isIgnoredAndUntracked(repo, dirCache, "generated.txt"))
+                    .as("ignored + untracked file should be ignored via DirCache overload")
+                    .isTrue()
+                    .isEqualTo(GitIgnore.isIgnoredAndUntracked(repo, "generated.txt"));
+
+            assertThat(GitIgnore.isIgnoredAndUntracked(repo, dirCache, "tracked-ignored.txt"))
+                    .as("ignored but tracked file should NOT be ignored via DirCache overload")
+                    .isFalse()
+                    .isEqualTo(GitIgnore.isIgnoredAndUntracked(repo, "tracked-ignored.txt"));
+
+            assertThat(GitIgnore.isIgnoredAndUntracked(repo, dirCache, "normal.txt"))
+                    .as("non-ignored file should NOT be ignored via DirCache overload")
+                    .isFalse()
+                    .isEqualTo(GitIgnore.isIgnoredAndUntracked(repo, "normal.txt"));
         }
     }
 

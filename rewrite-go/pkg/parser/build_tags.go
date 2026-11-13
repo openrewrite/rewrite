@@ -29,7 +29,9 @@ import (
 // have file content in-memory rather than on disk.
 //
 // The constraint evaluator recognizes:
-//   - GOOS/GOARCH name tags (matches when ctx.GOOS == tag etc.)
+//   - GOOS/GOARCH name tags (matches when ctx.GOOS == tag etc.), plus the
+//     aliases android→linux, ios→darwin and illumos→solaris
+//   - the compiler name in buildCtx.Compiler ("gc" or "gccgo")
 //   - "cgo" if buildCtx.CgoEnabled is true
 //   - language version tags (e.g. "go1.21") if at or below the configured
 //     release; falls back to true to avoid spurious exclusions
@@ -67,15 +69,32 @@ func MatchBuildContext(buildCtx build.Context, name, content string) bool {
 // `_test.go` is intentionally NOT excluded here (callers handle that
 // upstream).
 func matchOSArchFilename(buildCtx build.Context, name string) bool {
+	// Suffixes resolve through matchTag, so the GOOS aliases reach filenames
+	// too: foo_linux.go builds for android.
+	goos, goarch := osArchFromFilename(name)
+	if goos != "" && !matchTag(buildCtx, goos) {
+		return false
+	}
+	if goarch != "" && !matchTag(buildCtx, goarch) {
+		return false
+	}
+	return true
+}
+
+// osArchFromFilename returns the GOOS and/or GOARCH a file's name pins it to
+// via the `*_GOOS.go`, `*_GOARCH.go`, `*_GOOS_GOARCH.go` suffix rules. A
+// value is empty when the name implies none; unrelated underscore-separated
+// stems (`server_handler.go`) yield two empty strings.
+func osArchFromFilename(name string) (goos, goarch string) {
 	if !strings.HasSuffix(name, ".go") {
-		return true
+		return "", ""
 	}
 	stem := strings.TrimSuffix(name, ".go")
 	stem = strings.TrimSuffix(stem, "_test")
 	parts := strings.Split(stem, "_")
 	n := len(parts)
 	if n < 2 {
-		return true
+		return "", ""
 	}
 
 	last := parts[n-1]
@@ -85,15 +104,42 @@ func matchOSArchFilename(buildCtx build.Context, name string) bool {
 	}
 
 	if knownOS(prev) && knownArch(last) {
-		return prev == buildCtx.GOOS && last == buildCtx.GOARCH
+		return prev, last
 	}
 	if knownOS(last) {
-		return last == buildCtx.GOOS
+		return last, ""
 	}
 	if knownArch(last) {
-		return last == buildCtx.GOARCH
+		return "", last
 	}
-	return true
+	return "", ""
+}
+
+// BuildConstraintData describes the build constraints a file declares: the
+// combined `//go:build` / `// +build` expression and the GOOS/GOARCH its
+// filename suffix implies. A field is empty when the file states none.
+type BuildConstraintData struct {
+	Constraint string
+	GOOS       string
+	GOARCH     string
+}
+
+// IsEmpty reports whether the file declares no build constraint at all.
+func (d BuildConstraintData) IsEmpty() bool {
+	return d.Constraint == "" && d.GOOS == "" && d.GOARCH == ""
+}
+
+// FileBuildConstraints reports the build constraints (name, content) declares,
+// regardless of any build context: the filename-suffix GOOS/GOARCH and the
+// joined constraint expression. Unlike MatchBuildContext it does not evaluate
+// them — it records what a file asks for so a marker can carry it.
+func FileBuildConstraints(name, content string) BuildConstraintData {
+	goos, goarch := osArchFromFilename(name)
+	return BuildConstraintData{
+		Constraint: strings.Join(buildConstraintLines(content), "\n"),
+		GOOS:       goos,
+		GOARCH:     goarch,
+	}
 }
 
 // buildConstraintLines extracts each `//go:build` or `// +build` line
@@ -134,10 +180,21 @@ func matchTag(buildCtx build.Context, tag string) bool {
 		return true
 	case buildCtx.GOARCH:
 		return true
+	case buildCtx.Compiler:
+		return true
+	case "linux":
+		return buildCtx.GOOS == "android"
+	case "darwin":
+		return buildCtx.GOOS == "ios"
+	case "solaris":
+		return buildCtx.GOOS == "illumos"
 	case "cgo":
 		return buildCtx.CgoEnabled
 	case "unix":
 		return knownUnixOS(buildCtx.GOOS)
+	case "boringcrypto":
+		// Legacy spelling of the goexperiment tag.
+		tag = "goexperiment.boringcrypto"
 	}
 	for _, t := range buildCtx.BuildTags {
 		if t == tag {

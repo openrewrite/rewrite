@@ -1,7 +1,9 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
+import com.hierynomus.gradle.license.tasks.LicenseCheck
+import com.hierynomus.gradle.license.tasks.LicenseFormat
+import nl.javadude.gradle.plugins.license.License
+import java.util.Calendar
 
 plugins {
     id("org.openrewrite.build.language-library")
@@ -16,13 +18,13 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
 
     compileOnly(project(":rewrite-test"))
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -31,9 +33,12 @@ tasks.withType<Javadoc>().configureEach {
 }
 
 // Test fixtures for the GoMod conformance corpus are .gomod / .gosum / .json
-// files; none of these formats accept a leading license header. Go sources and
-// vendored third-party code are likewise excluded from the license header check
-// (.go files carry their own header management; vendor/ is third-party).
+// files; none of these formats accept a leading license header. The default
+// license task excludes all .go files (the vendored Go staged into main
+// resources must never be stamped); first-party Go sources are instead managed
+// by the dedicated licenseGo / licenseFormatGo tasks below, which scope precisely
+// to our own code. vendor/ (third-party) and testdata/ (sample user programs)
+// are never stamped.
 configure<nl.javadude.gradle.plugins.license.LicenseExtension> {
     excludePatterns.addAll(listOf(
         "**/*.gomod",
@@ -44,7 +49,54 @@ configure<nl.javadude.gradle.plugins.license.LicenseExtension> {
         "**/go.sum",
         "**/vendor/**",
     ))
+
+    // A /* */ header style for Go that tolerates leading build-constraint lines.
+    // Go requires `//go:build` (and legacy `// +build`) to precede the package
+    // clause and allows only line comments and blank lines before them, so a
+    // block-comment license header must come *after* the constraint. skipLinePattern
+    // keeps that leading line in place and applies/detects the header below it; for
+    // files without a constraint it behaves exactly like SLASHSTAR_STYLE.
+    headerDefinitions.create("go_slashstar_style") {
+        withFirstLine("/*")
+        withBeforeEachLine(" * ")
+        withEndLine(" */")
+        withSkipLinePattern("^//\\s*(go:build|\\+build).*\$")
+        withFirstLineDetectionDetectionPattern("(\\s|\\t)*/\\*.*\$")
+        withLastLineDetectionDetectionPattern(".*\\*/(\\s|\\t)*\$")
+        multiline()
+        withNoBlankLines()
+    }
 }
+
+// First-party Go sources use a blank-line header variant (not the <p> form used
+// by .java/.cs/.ts), so they get their own header template. The shared
+// LicenseExtension excludes **/*.go globally; that exclude is applied to every
+// License task via conventionMapping, i.e. only when the task does not set its
+// own excludes. These tasks therefore set excludes explicitly to override it and
+// actually scan our Go — while still skipping vendor/ and testdata/.
+val goLicenseHeader = file("${rootProject.projectDir}/gradle/msalLicenseHeaderGo.txt")
+val goLicenseExcludes = listOf("**/vendor/**", "**/testdata/**")
+fun License.configureForFirstPartyGo() {
+    group = "license"
+    source = fileTree(projectDir) { include("cmd/**/*.go", "pkg/**/*.go", "test/**/*.go", "*.go") }
+    setExcludes(goLicenseExcludes)
+    header = goLicenseHeader
+    mapping("go", "go_slashstar_style")
+    ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
+}
+
+val licenseGo = tasks.register<LicenseCheck>("licenseGo") {
+    description = "Check license headers on first-party Go files"
+    configureForFirstPartyGo()
+}
+
+val licenseFormatGo = tasks.register<LicenseFormat>("licenseFormatGo") {
+    description = "Apply license headers to first-party Go files"
+    configureForFirstPartyGo()
+}
+
+tasks.named("licenseMain") { dependsOn(licenseGo) }
+tasks.named("licenseFormatMain") { dependsOn(licenseFormatGo) }
 
 // ============================================
 // Go RPC Source Packaging
@@ -91,8 +143,12 @@ val prepareGoRpcSources = tasks.register<Sync>("prepareGoRpcSources") {
         include("vendor/**")
         exclude("**/*_test.go")
         exclude("**/testdata/**")
+        exclude("cmd/rpc/test_recipes.go")
     }
-    from(rootProject.file("LICENSE"))
+    // rewrite-go is published under the Moderne Source Available License, so the
+    // packaged RPC source ships the module's MSAL LICENSE.md (not the repo-root
+    // Apache LICENSE).
+    from(file("LICENSE.md"))
 }
 
 sourceSets.named("main") {
@@ -108,7 +164,7 @@ listOf("processResources", "sourcesJar", "licenseMain", "assemble").forEach {
 val goBuild = tasks.register<Exec>("goBuild") {
     workingDir = projectDir
     // Use relative path to avoid absolute paths in cache key (Exec args are cache inputs)
-    commandLine("go", "build", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
+    commandLine("go", "build", "-tags", "rpctest", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
 
     inputs.files(fileTree(projectDir) {
         include("**/*.go")
@@ -138,7 +194,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
             }
@@ -150,39 +206,6 @@ testing {
 // Go Test Support Tasks
 // ============================================
 
-// Configuration to collect classpath for the Java RPC server
-val javaRpcClasspath by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    extendsFrom(configurations.getByName("runtimeClasspath"))
-}
-
-dependencies {
-    javaRpcClasspath(project(":rewrite-maven"))
-}
-
-// Task to generate classpath file for Java RPC server testing from Go
-val generateTestClasspath by tasks.registering {
-    group = "golang"
-    description = "Generate classpath file for Java RPC server (used by Go tests)"
-
-    val outputFile = file("test-classpath.txt")
-    outputs.file(outputFile)
-
-    dependsOn(tasks.named("compileJava"))
-
-    doLast {
-        val classpath = (
-            javaRpcClasspath.files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
-    }
-}
-
 val junitXmlFile = file("build/test-results/gotest/junit.xml")
 
 val goTest = tasks.register<Exec>("goTest") {
@@ -190,12 +213,12 @@ val goTest = tasks.register<Exec>("goTest") {
     description = "Run Go tests"
 
     workingDir = projectDir
+    // -PverboseTests restores the per-test `standard-verbose` output
+    val gotestFormat = if (project.hasProperty("verboseTests")) "standard-verbose" else "pkgname"
     commandLine("go", "run", "gotest.tools/gotestsum@latest",
         "--junitfile", junitXmlFile.relativeTo(projectDir).path,
-        "--format", "standard-verbose",
-        "--", "-count=1", "./test/...")
-
-    dependsOn(generateTestClasspath)
+        "--format", gotestFormat,
+        "--", "-count=1", "./...")
 
     inputs.files(fileTree(projectDir) {
         include("**/*.go")
@@ -204,12 +227,18 @@ val goTest = tasks.register<Exec>("goTest") {
         exclude("build/**")
         exclude("vendor/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file(file("test-classpath.txt"))
+    inputs.files(fileTree(projectDir) {
+        include("**/testdata/**")
+        include("src/test/resources/**")
+        exclude("build/**")
+        exclude("vendor/**")
+    }).withPropertyName("goTestData").withPathSensitivity(PathSensitivity.RELATIVE)
+    // marker_guard_test.go and quote_test.go read these Java sources directly
+    inputs.files(listOf("rewrite-go", "rewrite-core", "rewrite-java").map { rootProject.file("$it/src/main/java") })
+        .withPropertyName("javaSources").withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
 }
-
-ImportJUnitXmlReports.register(tasks, goTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(goTest)

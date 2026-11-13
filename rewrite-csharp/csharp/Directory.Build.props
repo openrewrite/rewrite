@@ -11,4 +11,7 @@
     Keep this file empty so it does not impose any properties on the SDK
     projects; its sole purpose is to act as a stop marker.
   -->
+
+  <Import Project="$(MSBuildThisFileDirectory)../../.local/RealPath.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)../../.local/RealPath.props')" />
 </Project>

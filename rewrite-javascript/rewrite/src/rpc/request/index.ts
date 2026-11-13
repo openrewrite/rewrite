@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+export * from "./dependency-types";
 export * from "./generate";
 export * from "./get-object";
 export * from "./get-marketplace";
@@ -23,3 +24,4 @@ export * from "./print";
 export * from "./visit";
 export * from "./batch-visit";
 export * from "./trace-get-object";
+export * from "./set-data-table-store";

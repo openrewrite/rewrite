@@ -17,8 +17,18 @@ package org.openrewrite.gradle.toolingapi;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+
 public interface OpenRewriteModelProxy {
     byte[] getGradleProjectBytes();
+
+    /**
+     * The serialized {@link org.openrewrite.gradle.marker.GradleProject} for every project in the build, keyed by
+     * its Gradle path (e.g. {@code ":"}, {@code ":sub"}). Allows consumers to attach the correct project model to a
+     * subproject build file now that Gradle 9 no longer supports targeting an individual build file.
+     * May be {@code null} when produced by an older version of the tooling plugin.
+     */
+    @Nullable Map<String, byte[]> getGradleProjectsByPathBytes();
 
     byte @Nullable [] getGradleSettingsBytes();
 }

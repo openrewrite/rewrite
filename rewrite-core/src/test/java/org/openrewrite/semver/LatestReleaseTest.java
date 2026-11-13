@@ -17,6 +17,10 @@ package org.openrewrite.semver;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.semver.LatestRelease.normalizeVersion;
@@ -239,6 +243,33 @@ class LatestReleaseTest {
     }
 
     @Test
+    void backpatchIsAsMuchAReleaseAsTheVersionItPatches() {
+        assertThat(latestRelease.isValid(null, "2.14.1.1-osera-00001")).isTrue();
+        assertThat(latestRelease.isValid(null, "2.14.1.1-backpatch-00001")).isTrue();
+        assertThat(latestRelease.isValid(null, "5.2.19.RELEASE-osera-00001")).isTrue();
+        assertThat(latestRelease.isValid(null, "3.2.9.Final-backpatch-00001")).isTrue();
+
+        assertThat(latestRelease.isValid(null, "3.5.0-RC1-osera-00001")).isFalse();
+        assertThat(latestRelease.isValid(null, "29.0-jre-osera-00001")).isFalse();
+        assertThat(new LatestRelease("-jre").isValid(null, "29.0-jre-osera-00001")).isTrue();
+        assertThat(new LatestRelease("-osera-\\d+").isValid(null, "2.14.1.1-backpatch-00001")).isFalse();
+
+        assertThat(latestRelease.isValid(null, "2.14.1.1-acme-00001")).isFalse();
+    }
+
+    @Test
+    void backpatchSortsAboveTheVersionItPatchesAndBelowTheNextRelease() {
+        assertThat(latestRelease.compare(null, "2.14.1.1-osera-00001", "2.14.1")).isPositive();
+        assertThat(latestRelease.compare(null, "2.14.1.1-osera-00001", "2.14.2")).isNegative();
+        assertThat(latestRelease.compare(null, "2.14.1.1-osera-00001", "2.14.1.1-osera-00002")).isNegative();
+
+        assertThat(latestRelease.compare(null, "5.2.19.RELEASE-osera-00001", "5.2.19.RELEASE")).isPositive();
+        assertThat(latestRelease.compare(null, "5.2.19.RELEASE-osera-00001", "5.2.20.RELEASE")).isNegative();
+        assertThat(latestRelease.compare(null, "5.2.19.RELEASE-osera-00001", "5.2.19.RELEASE-osera-00002")).isNegative();
+        assertThat(latestRelease.compare(null, "4.1.Final-backpatch-00001", "4.1.Final-backpatch-00002")).isNegative();
+    }
+
+    @Test
     void preReleaseVersionsShouldBeLessThanReleaseVersions() {
         assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0")).isLessThan(0);
         assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);
@@ -247,5 +278,58 @@ class LatestReleaseTest {
         // "RC" is a known qualifier and "beta" is not
         assertThat(latestRelease.compare(null, "3.5.0-beta", "3.5.0-RC1")).isLessThan(0);
         assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-beta")).isGreaterThan(0);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "9.0-milestone-2, 9.0-milestone-10",
+      "8.14-rc-2, 8.14-rc-10",
+      "1.0-M2, 1.0-M10",
+      "1.0.0-RC2, 1.0.0-RC10",
+      "1.0.0-beta.2, 1.0.0-beta.10",
+      "1.0.0-alpha.9, 1.0.0-alpha.10",
+      "1.0.0-rc.1, 1.0.0-rc.1.1",
+      "1.0.0-beta.99, 1.0.0-beta.x",
+      "1.0.0-rc2, 1.0.0-RC10"
+    })
+    void preReleaseCountersCompareNumerically(String lower, String higher) {
+        assertThat(latestRelease.compare(null, lower, higher)).isNegative();
+        assertThat(latestRelease.compare(null, higher, lower)).isPositive();
+    }
+
+    private static final List<String> MIXED_VERSIONS = List.of(
+      "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-alpha.beta",
+      "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11",
+      "1.0-M1", "1.0-M2", "1.0-M10", "1.0.0-milestone-3", "1.0.0-milestone-12",
+      "1.0.0-RC1", "1.0.0-RC2", "1.0.0-rc-3", "1.0.0-RC10", "1.0.0-cr.11",
+      "1.0.0-SNAPSHOT", "1.0.0", "1.0.0-jre", "1.0.0-android", "1.0.0-custom10", "1.0.0-custom9",
+      "1.0.0-2", "1.0.0-10", "1.0.0.sp1", "1.0.0.sp10", "1.0.0-20211102.000501-28",
+      "1.0.0-20211102.012229-29"
+    );
+
+    @Test
+    void preReleaseOrderIsTransitive() {
+        for (String a : MIXED_VERSIONS) {
+            for (String b : MIXED_VERSIONS) {
+                int ab = latestRelease.compare(null, a, b);
+                assertThat(Integer.signum(ab))
+                  .as("%s vs %s", a, b)
+                  .isEqualTo(-Integer.signum(latestRelease.compare(null, b, a)));
+                for (String c : MIXED_VERSIONS) {
+                    if (ab <= 0 && latestRelease.compare(null, b, c) <= 0) {
+                        assertThat(latestRelease.compare(null, a, c)).as("%s <= %s <= %s", a, b, c).isNotPositive();
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void preReleaseVersionsSortInExpectedOrder() {
+        assertThat(MIXED_VERSIONS.stream().sorted(latestRelease::compare)).containsSubsequence(
+          "1.0.0-alpha.10", "1.0.0-alpha.beta", "1.0.0-beta.2", "1.0.0-beta.11",
+          "1.0.0-milestone-3", "1.0.0-milestone-12", "1.0.0-cr.11", "1.0.0-rc-3",
+          "1.0.0-SNAPSHOT", "1.0.0", "1.0.0.sp1", "1.0.0.sp10", "1.0.0-custom9", "1.0.0-custom10"
+        );
     }
 }

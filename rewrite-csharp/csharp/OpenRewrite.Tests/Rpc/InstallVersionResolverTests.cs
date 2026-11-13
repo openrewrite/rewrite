@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using NuGet.ProjectModel;
 using OpenRewrite.CSharp;
 
 namespace OpenRewrite.Tests.Rpc;
@@ -20,7 +21,9 @@ namespace OpenRewrite.Tests.Rpc;
 /// <summary>
 /// Regression coverage for the InstallRecipes RPC, which used to echo wildcard versions
 /// (e.g. "*", "*-*") back to the caller because it read the version off the csproj's
-/// PackageReference Version attribute instead of the resolved value in project.assets.json.
+/// PackageReference Version attribute instead of the version NuGet actually resolved.
+/// The resolved version now comes from the in-memory <see cref="LockFile"/> of the
+/// in-process restore.
 /// </summary>
 public class InstallVersionResolverTests
 {
@@ -31,93 +34,74 @@ public class InstallVersionResolverTests
     [InlineData("*-*", "8.82.0-snapshot.20260514132053")]
     public void WildcardRequestResolvesToConcreteVersion(string requested, string resolved)
     {
-        WithAssetsJson(requested, resolved, projectDir =>
-            Assert.Equal(resolved,
-                MSBuildProjectHelper.GetResolvedPackageVersion(projectDir, Pkg)));
+        var lockFile = LockFileFor(requested, resolved);
+        Assert.Equal(resolved, MSBuildProjectHelper.GetResolvedPackageVersion(lockFile, Pkg));
     }
 
     [Fact]
     public void PackageNameMatchIsCaseInsensitive()
     {
-        // Caller-supplied package name may differ in casing from the ID recorded in
-        // project.assets.json; resolution must still succeed.
-        WithAssetsJson("*", "8.81.17", projectDir =>
-            Assert.Equal("8.81.17",
-                MSBuildProjectHelper.GetResolvedPackageVersion(projectDir, Pkg.ToLowerInvariant())));
+        // Caller-supplied package name may differ in casing from the resolved ID;
+        // resolution must still succeed.
+        var lockFile = LockFileFor("*", "8.81.17");
+        Assert.Equal("8.81.17",
+            MSBuildProjectHelper.GetResolvedPackageVersion(lockFile, Pkg.ToLowerInvariant()));
     }
 
     [Fact]
     public void UnknownPackageThrows()
     {
-        WithAssetsJson("*", "8.81.17", projectDir =>
-        {
-            var ex = Assert.Throws<InvalidOperationException>(() =>
-                MSBuildProjectHelper.GetResolvedPackageVersion(projectDir, "Does.Not.Exist"));
-            Assert.Contains("not a direct dependency", ex.Message);
-        });
+        var lockFile = LockFileFor("*", "8.81.17");
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            MSBuildProjectHelper.GetResolvedPackageVersion(lockFile, "Does.Not.Exist"));
+        Assert.Contains("not a direct dependency", ex.Message);
     }
 
     [Fact]
-    public void MissingAssetsJsonThrows()
-    {
-        WithTempDir(projectDir =>
-        {
-            var ex = Assert.Throws<InvalidOperationException>(() =>
-                MSBuildProjectHelper.GetResolvedPackageVersion(projectDir, Pkg));
-            Assert.Contains("project.assets.json not found", ex.Message);
-        });
-    }
-
-    private static void WithAssetsJson(
-        string requestedVersion,
-        string resolvedVersion,
-        Action<string> assert)
-    {
-        WithTempDir(projectDir =>
-        {
-            var objDir = Path.Combine(projectDir, "obj");
-            Directory.CreateDirectory(objDir);
-            File.WriteAllText(Path.Combine(objDir, "project.assets.json"), $$"""
-                {
-                  "version": 3,
-                  "targets": {
-                    "net10.0": {
-                      "{{Pkg}}/{{resolvedVersion}}": { "type": "package" }
-                    }
-                  },
-                  "libraries": {
-                    "{{Pkg}}/{{resolvedVersion}}": { "type": "package" }
-                  },
-                  "project": {
-                    "frameworks": {
-                      "net10.0": {
-                        "dependencies": {
-                          "{{Pkg}}": {
-                            "target": "Package",
-                            "version": "[{{requestedVersion}}, )"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-                """);
-            assert(projectDir);
-        });
-    }
-
-    private static void WithTempDir(Action<string> assert)
+    public void ProjectWithoutCsprojThrows()
     {
         var projectDir = Path.Combine(Path.GetTempPath(),
             "openrewrite-installrecipes-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(projectDir);
         try
         {
-            assert(projectDir);
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                MSBuildProjectHelper.GetResolvedPackageVersion(projectDir, Pkg));
+            Assert.Contains("No .csproj found", ex.Message);
         }
         finally
         {
             try { Directory.Delete(projectDir, recursive: true); } catch { /* best-effort */ }
         }
+    }
+
+    private static LockFile LockFileFor(string requestedVersion, string resolvedVersion)
+    {
+        // Same JSON shape the restore produces; parsed straight into the LockFile object model.
+        return new LockFileFormat().Parse($$"""
+            {
+              "version": 3,
+              "targets": {
+                "net10.0": {
+                  "{{Pkg}}/{{resolvedVersion}}": { "type": "package" }
+                }
+              },
+              "libraries": {
+                "{{Pkg}}/{{resolvedVersion}}": { "type": "package" }
+              },
+              "project": {
+                "frameworks": {
+                  "net10.0": {
+                    "dependencies": {
+                      "{{Pkg}}": {
+                        "target": "Package",
+                        "version": "[{{requestedVersion}}, )"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """, "in-memory");
     }
 }

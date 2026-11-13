@@ -19,11 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -32,8 +31,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -75,6 +72,10 @@ public class RemoveDependency extends Recipe {
                     .configuration(configuration)
                     .groupId(groupId)
                     .artifactId(artifactId);
+            final GradleMultiDependency.Matcher gradleMultiDependencyMatcher = GradleMultiDependency.matcher()
+                    .configuration(configuration)
+                    .groupId(groupId)
+                    .artifactId(artifactId);
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
             GradleProject gradleProject;
@@ -97,7 +98,7 @@ public class RemoveDependency extends Recipe {
 
                     sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
                     if (sourceFile != tree) {
-                        sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
+                        sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject, ctx)));
                         JavaSourceSet.markDirty(ctx, sourceFile);
                     }
                     return sourceFile;
@@ -119,44 +120,26 @@ public class RemoveDependency extends Recipe {
             @Override
             public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                    return null;
-                }
-
-                return m;
+                Optional<GradleMultiDependency> multiDependency = gradleMultiDependencyMatcher.get(getCursor());
+                return multiDependency.isPresent() ? multiDependency.get().map(dependency -> null) : m;
             }
 
-            private GradleProject updateGradleModel(GradleProject gp) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    if (!StringUtils.isBlank(configuration) && configuration.equals(gdc.getName())) {
-                        newNameToConfiguration.put(gdc.getName(), gdc);
-                        continue;
+            private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
+                if (!StringUtils.isBlank(configuration)) {
+                    if (gp.getConfiguration(configuration) == null) {
+                        return gp;
                     }
-
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            return null;
-                        }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            return null;
-                        }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
+                    return gp.mapConfiguration(configuration,
+                            conf -> conf.mapDependencies(
+                                    requested -> depMatcher.matches(requested.getGroupId(), requested.getArtifactId()) ? null : requested,
+                                    gp.getMavenRepositories(), ctx),
+                            ctx);
                 }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+                return gp.mapConfigurations(
+                        conf -> conf.mapDependencies(
+                                requested -> depMatcher.matches(requested.getGroupId(), requested.getArtifactId()) ? null : requested,
+                                gp.getMavenRepositories(), ctx),
+                        ctx);
             }
         });
 

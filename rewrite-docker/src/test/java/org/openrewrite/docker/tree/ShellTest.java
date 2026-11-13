@@ -90,4 +90,16 @@ class ShellTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shellWithSpaceBeforeComma() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              SHELL ["/bin/bash" , "-c"]
+              """
+          )
+        );
+    }
 }

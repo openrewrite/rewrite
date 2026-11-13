@@ -38,18 +38,49 @@ public class ProfileActivation {
 
     public static boolean isActive(@Nullable String id, Iterable<String> activeProfiles,
                                    @Nullable ProfileActivation activation) {
-        if (id != null) {
-            for (String activeProfile : activeProfiles) {
-                if (activeProfile.trim().equals(id)) {
-                    return true;
-                }
+        if (isDeactivated(id, activeProfiles)) {
+            return false;
+        }
+        boolean anyExplicitlyActivated = false;
+        for (String activeProfile : activeProfiles) {
+            String profile = activeProfile.trim();
+            if (isDeactivation(profile)) {
+                continue;
+            }
+            anyExplicitlyActivated = true;
+            if (profile.equals(id)) {
+                return true;
             }
         }
         return activation != null &&
                (activation.isActive() ||
                 // Active by default is *only* enabled when no other profile is marked active by any other mechanism
                 // So even this check for any other explicit activation is overly broad
-                (Boolean.TRUE.equals(activation.getActiveByDefault()) && !activeProfiles.iterator().hasNext()));
+                (Boolean.TRUE.equals(activation.getActiveByDefault()) && !anyExplicitlyActivated));
+    }
+
+    /**
+     * Maven's {@code -P !id} (equivalently {@code -P -id}) suppresses a profile regardless of how it would
+     * otherwise have activated, including one activated by {@code -P} in the same invocation.
+     *
+     * @param id             The id of the profile being considered.
+     * @param activeProfiles Profiles named on the command line, deactivations included with their prefix intact.
+     */
+    public static boolean isDeactivated(@Nullable String id, Iterable<String> activeProfiles) {
+        if (id == null) {
+            return false;
+        }
+        for (String activeProfile : activeProfiles) {
+            String profile = activeProfile.trim();
+            if (isDeactivation(profile) && profile.substring(1).trim().equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isDeactivation(String profile) {
+        return !profile.isEmpty() && (profile.charAt(0) == '!' || profile.charAt(0) == '-');
     }
 
     public boolean isActive() {

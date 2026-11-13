@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -57,7 +58,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -167,18 +168,18 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                                 J.MethodInvocation beforeDependency = (J.MethodInvocation) (dependencyComparator.getBeforeDependency() instanceof J.Return ?
                                         requireNonNull(((J.Return) dependencyComparator.getBeforeDependency()).getExpression()) :
                                         dependencyComparator.getBeforeDependency());
+                                Space currentPrefix = currentStatement.getPrefix();
                                 if (i == 0) {
                                     if (!addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                        statements.set(i, currentStatement.withPrefix(Space.format("\n\n" + currentStatement.getPrefix().getIndent())));
+                                        statements.set(i, currentStatement.withPrefix(currentPrefix.withWhitespace("\n\n" + currentPrefix.getIndent())));
                                     }
                                 } else {
                                     Space originalPrefix = addDependencyInvocation.getPrefix();
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
+                                    addDependencyInvocation = addDependencyInvocation.withPrefix(Space.format(currentPrefix.getWhitespace()));
 
-                                    if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                        if (!currentStatement.getPrefix().equals(originalPrefix)) {
-                                            statements.set(i, currentStatement.withPrefix(originalPrefix));
-                                        }
+                                    if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName()) &&
+                                            !currentPrefix.getWhitespace().equals(originalPrefix.getWhitespace())) {
+                                        statements.set(i, currentStatement.withPrefix(currentPrefix.withWhitespace(originalPrefix.getWhitespace())));
                                     }
                                 }
                             }
@@ -347,14 +348,12 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 J.MethodInvocation dependencies;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 if (isKotlinDsl) {
-                    dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
-                            .findFirst()
+                    dependencies = (J.MethodInvocation) ((J.Block) parseTemplate(template, ctx)
                             .map(requireParsed(K.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0)).getStatements().get(0);
                 } else {
-                    dependencies = (J.MethodInvocation) GRADLE_PARSER.parse(ctx, template)
-                            .findFirst()
+                    dependencies = (J.MethodInvocation) parseTemplate(template, ctx)
                             .map(requireParsed(G.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
@@ -374,14 +373,12 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 J.MethodInvocation dependency;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 if (isKotlinDsl) {
-                    dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
-                            .findFirst()
+                    dependency = (J.MethodInvocation) ((J.Block) parseTemplate(template, ctx)
                             .map(requireParsed(K.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0)).getStatements().get(0);
                 } else {
-                    dependency = (J.MethodInvocation) GRADLE_PARSER.parse(ctx, template)
-                            .findFirst()
+                    dependency = (J.MethodInvocation) parseTemplate(template, ctx)
                             .map(requireParsed(G.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
@@ -391,6 +388,18 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
             }
         }).get(0), ctx, cursor);
+    }
+
+    private Optional<SourceFile> parseTemplate(String template, ExecutionContext ctx) {
+        // Source files may be visited on several threads at once, and the shared parser's type cache isn't thread-safe
+        synchronized (GRADLE_PARSER) {
+            if (isKotlinDsl) {
+                GradleParser.Input input = new GradleParser.Input(Paths.get("build.gradle.kts"),
+                        () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)));
+                return GRADLE_PARSER.parseInputs(singletonList(input), null, ctx).findFirst();
+            }
+            return GRADLE_PARSER.parse(ctx, template).findFirst();
+        }
     }
 
     private String templateDependencies() {

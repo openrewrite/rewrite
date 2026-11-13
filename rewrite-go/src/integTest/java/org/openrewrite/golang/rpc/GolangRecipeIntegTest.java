@@ -69,7 +69,6 @@ class GolangRecipeIntegTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
         spec.typeValidationOptions(TypeValidation.builder()
-          .allowNonWhitespaceInWhitespace(true)
           .identifiers(false)
           .methodInvocations(false)
           .build());
@@ -91,7 +90,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -107,6 +106,51 @@ class GolangRecipeIntegTest implements RewriteTest {
               func f() {
               \tvar flag = true
               \t_ = flag
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * A {@code JavaVisitor} walking {@code J.Switch#getCases()} may cast each
+     * statement to {@code J.Case} — the contract every parser but Go honours
+     * (this is exactly what {@code MinimumSwitchCases} does). Go's {@code select}
+     * is not a Java {@code switch}: it maps to {@code Go.Select}, whose clauses
+     * are {@code Go.CommClause}. Before {@code Go.Select} existed, {@code select}
+     * was a {@code J.Switch} full of {@code Go.CommClause}, so this recipe threw
+     * {@code ClassCastException: Go$CommClause cannot be cast to J$Case}. The
+     * regular {@code switch} in the same file must still be visited and yield
+     * {@code J.Case} unharmed.
+     */
+    @Test
+    void switchVisitorNeverSeesSelectClauses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Switch visitSwitch(J.Switch switch_, org.openrewrite.ExecutionContext ctx) {
+                  for (org.openrewrite.java.tree.Statement s : switch_.getCases().getStatements()) {
+                      J.Case c = (J.Case) s;
+                      c.getCaseLabels();
+                  }
+                  return super.visitSwitch(switch_, ctx);
+              }
+          })),
+          go(
+            """
+              package main
+
+              func f(c chan int, d chan int, x int) {
+              \tselect {
+              \tcase v := <-c:
+              \t\t_ = v
+              \tcase d <- 1:
+              \tdefault:
+              \t}
+              \tswitch x {
+              \tcase 1:
+              \tdefault:
+              \t}
               }
               """
           )
@@ -131,7 +175,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -148,6 +192,39 @@ class GolangRecipeIntegTest implements RewriteTest {
               \tflag = 1
               \ty = 2
               )
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameInsideMultiAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })),
+          go(
+            """
+              package main
+
+              func f() {
+              \tvar x, y int
+              \tx, y = y, x
+              }
+              """,
+            """
+              package main
+
+              func f() {
+              \tvar flag, y int
+              \tflag, y = y, flag
+              }
               """
           )
         );
@@ -317,6 +394,48 @@ class GolangRecipeIntegTest implements RewriteTest {
         );
     }
 
+    /**
+     * Reproduces the reported EmptyBlock/Go corruption root cause: a Java recipe
+     * that mutates a {@code J.Binary} operator ({@code ==} -> {@code !=}) must
+     * round-trip through the Go RPC print path. If the operator change is dropped,
+     * the source prints unchanged (== stays ==).
+     */
+    @Test
+    void flipBinaryOperatorRoundTrips() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Binary visitBinary(J.Binary binary, org.openrewrite.ExecutionContext ctx) {
+                  J.Binary b = super.visitBinary(binary, ctx);
+                  if (b.getOperator() == J.Binary.Type.Equal) {
+                      return b.withOperator(J.Binary.Type.NotEqual);
+                  }
+                  return b;
+              }
+          })),
+          go(
+            """
+              package main
+
+              func test() {
+              \tif err == nil {
+              \t\thandle(err)
+              \t}
+              }
+              """,
+            """
+              package main
+
+              func test() {
+              \tif err != nil {
+              \t\thandle(err)
+              \t}
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void renameIdentifier() {
         rewriteRun(
@@ -328,7 +447,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -361,7 +480,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return m;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -475,7 +594,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -486,9 +605,7 @@ class GolangRecipeIntegTest implements RewriteTest {
             """
               package main
 
-              import (
-              \t"net/http"
-              )
+              import "net/http"
 
               func world() {
               }

@@ -23,6 +23,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 
+@CheckReturnValue
 public final class Assertions {
     private Assertions() {
     }
@@ -155,6 +157,42 @@ public final class Assertions {
                 }
         );
         toml.path("uv.lock");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs poetryLock(@Language("toml") @Nullable String before) {
+        return poetryLock(before, s -> {
+        });
+    }
+
+    public static SourceSpecs poetryLock(@Language("toml") @Nullable String before,
+                                         Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, org.openrewrite.toml.TomlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("poetry.lock");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs pdmLock(@Language("toml") @Nullable String before) {
+        return pdmLock(before, s -> {
+        });
+    }
+
+    public static SourceSpecs pdmLock(@Language("toml") @Nullable String before,
+                                      Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, org.openrewrite.toml.TomlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("pdm.lock");
         spec.accept(toml);
         return toml;
     }

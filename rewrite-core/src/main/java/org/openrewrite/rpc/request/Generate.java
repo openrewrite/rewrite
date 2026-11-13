@@ -21,12 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
-import org.openrewrite.scheduling.RecipeRunCycle;
-import org.openrewrite.scheduling.WatchableExecutionContext;
-import org.openrewrite.table.RecipeRunStats;
-import org.openrewrite.table.SearchResults;
-import org.openrewrite.table.SourcesFileErrors;
-import org.openrewrite.table.SourcesFileResults;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,7 +28,6 @@ import java.util.Map;
 import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.ExecutionContext.CURRENT_RECIPE;
 
 @Value
 public class Generate implements RpcRequest {
@@ -55,22 +48,15 @@ public class Generate implements RpcRequest {
         protected Object handle(Generate request) throws Exception {
             Recipe recipe = preparedRecipes.getInstantiated().get(request.getId());
 
-            ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP(), null);
-            if (ctx.getMessage(CURRENT_RECIPE) == null) {
-                WatchableExecutionContext wctx = new WatchableExecutionContext(ctx);
-                wctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), wctx,
-                        new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
-                        new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
-                        LargeSourceSet::edit));
-                ctx.putCurrentRecipe(recipe);
-            }
+            ExecutionContext ctx = Visit.recipeContext((ExecutionContext) getObject.apply(request.getP(), null),
+                    recipe, Visit.Phase.GENERATE, preparedRecipes);
 
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                 Object acc = scanningRecipe.getAccumulator(preparedRecipes.getRecipeCursors().computeIfAbsent(recipe,
                         r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
-                Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, ctx);
+                Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, emptyList(), ctx);
 
                 GenerateResponse response = new GenerateResponse(
                         new ArrayList<>(generated.size()),

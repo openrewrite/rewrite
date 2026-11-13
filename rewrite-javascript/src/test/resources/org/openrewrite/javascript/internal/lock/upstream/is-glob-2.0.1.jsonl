@@ -1,0 +1,55 @@
+{"header":"is-glob 2.0.1: every call its own tests (test.js) make, with its answer; generate/upstream-calls.js generate/upstream/is-glob.js <checkout> 2.0.1"}
+{"test":"test.js > isGlob > glob patterns > should return `true` if it is a glob pattern:","fn":"isGlob","args":["*.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should return `true` if it is a glob pattern:","fn":"isGlob","args":["!*.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should return `true` if it is a glob pattern:","fn":"isGlob","args":["!foo"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should return `true` if it is a glob pattern:","fn":"isGlob","args":["!foo.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should return `true` if it is a glob pattern:","fn":"isGlob","args":["**/abc.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should return `true` if it is a glob pattern:","fn":"isGlob","args":["abc/*.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a string:","fn":"isGlob","args":[],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a string:","fn":"isGlob","args":[null],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a string:","fn":"isGlob","args":[["**/*.js"]],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a string:","fn":"isGlob","args":[["foo.js"]],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a glob pattern:","fn":"isGlob","args":["."],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a glob pattern:","fn":"isGlob","args":["aa"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a glob pattern:","fn":"isGlob","args":["abc.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should return `false` if it is not a glob pattern:","fn":"isGlob","args":["abc/def/ghi.js"],"out":false}
+{"test":"test.js > isGlob > brace patterns > should return `true` if the path has brace characters:","fn":"isGlob","args":["abc/{a,b}.js"],"out":true}
+{"test":"test.js > isGlob > brace patterns > should return `true` if the path has brace characters:","fn":"isGlob","args":["abc/{a..z}.js"],"out":true}
+{"test":"test.js > isGlob > brace patterns > should return `true` if the path has brace characters:","fn":"isGlob","args":["abc/{a..z..2}.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["abc/(aaa|bbb).js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["abc/?.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["?.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["[abc].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["[^abc].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["a/b/c/[a-z].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should return `true` if the path has regex characters:","fn":"isGlob","args":["[a-j]*[^c]b/c"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has an extglob:","fn":"isGlob","args":["abc/@(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has an extglob:","fn":"isGlob","args":["abc/!(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has an extglob:","fn":"isGlob","args":["abc/+(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has an extglob:","fn":"isGlob","args":["abc/*(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has an extglob:","fn":"isGlob","args":["abc/?(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has extglob characters and is not valid path:","fn":"isGlob","args":["abc/!.js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has extglob characters and is not valid path:","fn":"isGlob","args":["abc/*.js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `true` if it has extglob characters and is not valid path:","fn":"isGlob","args":["abc/?.js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should return `false` if it has extglob characters but is a valid path:","fn":"isGlob","args":["abc/@.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should return `false` if it has extglob characters but is a valid path:","fn":"isGlob","args":["abc/+.js"],"out":false}
+{"test":"differences","fn":"isGlob","args":[""],"out":false}
+{"test":"differences","fn":"isGlob","args":["!"],"out":true}
+{"test":"differences","fn":"isGlob","args":["\\*"],"out":true}
+{"test":"differences","fn":"isGlob","args":["\\{a,b}"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a{b"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a(b"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a|b"],"out":true}
+{"test":"differences","fn":"isGlob","args":["[]"],"out":true}
+{"test":"differences","fn":"isGlob","args":["{}"],"out":true}
+{"test":"differences","fn":"isGlob","args":["()"],"out":true}
+{"test":"differences","fn":"isGlob","args":["\\!a"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a/(b|c)"],"out":true}
+{"test":"differences","fn":"isGlob","args":["@(a"],"out":true}
+{"test":"differences","fn":"isGlob","args":["\\@(a)"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a[b\\]c]"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a.?"],"out":true}
+{"test":"differences","fn":"isGlob","args":["(?:a)"],"out":true}
+{"test":"differences","fn":"isGlob","args":["(?!a"],"out":true}
+{"test":"differences","fn":"isGlob","args":["a)"],"out":true}
+{"test":"differences","fn":"isGlob","args":["\\[a]!"],"out":true}

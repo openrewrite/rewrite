@@ -20,6 +20,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -28,6 +29,7 @@ import java.util.function.Function;
  * after the recipe run. Originally this applied only to validating the well-formedness of type metadata in Java LSTs
  * (hence the name TypeValidation), but has since expanded to include concepts relevant to other types of sources.
  * "InvariantValidation" would be a more accurate name, but "TypeValidation" is kept for backwards compatibility.
+ * Checks of how a recipe behaves are in {@link RecipeQualityValidation}.
  */
 @Data
 @NoArgsConstructor
@@ -82,11 +84,9 @@ public class TypeValidation {
     private boolean dependencyModel = true;
 
     /**
-     * Controls whether the recipe's usage of cursoring is validated to be acyclic.
-     * The cursor indicates a position within a tree which has no cycles. So if a cursor ever shows that an element is
-     * its own parent the recipe author has made a mistake. In some circumstances this mistake causes problems, in others
-     * it is benign.
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
      */
+    @Deprecated
     @Builder.Default
     private boolean cursorAcyclic = true;
 
@@ -113,7 +113,10 @@ public class TypeValidation {
      * Adding messages to execution context is a side effect which makes the recipe run itself stateful.
      * Potentially allows recipes to interfere with each other in surprising and hard to debug ways.
      * Problematic for all the same reasons mutable global variables or singletons are.
+     *
+     * @deprecated Use {@link RecipeQualityValidation#executionContextUnchanged}.
      */
+    @Deprecated
     @Builder.Default
     private boolean immutableExecutionContext = true;
 
@@ -123,7 +126,10 @@ public class TypeValidation {
      * scanning and editing phases of the recipe lifecycle.
      * This validation raises an error if a scanner attempts an edit. You can disable this validation if your recipe
      * deliberately attempts an edit during scanning, and you don't care that this edit is ultimately ignored.
+     *
+     * @deprecated Use {@link RecipeQualityValidation#noEditsInScanningPhase}.
      */
+    @Deprecated
     @Builder.Default
     private boolean immutableScanning = true;
 
@@ -149,8 +155,24 @@ public class TypeValidation {
     /**
      * Skip all invariant validation checks.
      */
+    @SuppressWarnings("deprecation")
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false, false);
+        return builder()
+                .classDeclarations(false)
+                .identifiers(false)
+                .methodDeclarations(false)
+                .variableDeclarations(false)
+                .methodInvocations(false)
+                .constructorInvocations(false)
+                .dependencyModel(false)
+                .cursorAcyclic(false)
+                .erroneous(false)
+                .unknown(false)
+                .immutableExecutionContext(false)
+                .immutableScanning(false)
+                .allowNonWhitespaceInWhitespace(true)
+                .parseAndPrintEquality(false)
+                .build();
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
@@ -160,9 +182,32 @@ public class TypeValidation {
     }
 
     static TypeValidation after(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
-        TypeValidation typeValidation = testMethodSpec.getAfterTypeValidation() != null ?
-                testMethodSpec.getAfterTypeValidation() : testClassSpec.getAfterTypeValidation();
+        TypeValidation typeValidation = afterOf(testMethodSpec);
+        if (typeValidation == null) {
+            typeValidation = afterOf(testClassSpec);
+        }
         // after type validation defaults to before type validation; possibly this will become stricter in the future
         return typeValidation != null ? typeValidation : before(testMethodSpec, testClassSpec);
+    }
+
+    /**
+     * Whether the test validates the type attribution of the recipe's input and output, which checks that compare
+     * the types of code need.
+     */
+    static boolean validatesTypes(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        return validatesTypes(before(testMethodSpec, testClassSpec)) &&
+               validatesTypes(after(testMethodSpec, testClassSpec));
+    }
+
+    private static boolean validatesTypes(TypeValidation validation) {
+        return validation.classDeclarations() && validation.identifiers() && validation.methodDeclarations() &&
+               validation.variableDeclarations() && validation.methodInvocations() &&
+               validation.constructorInvocations();
+    }
+
+    @SuppressWarnings("deprecation")
+    private static @Nullable TypeValidation afterOf(RecipeSpec spec) {
+        RecipeQualityValidation quality = spec.getRecipeQualityValidation();
+        return quality != null && quality.types() != null ? quality.types() : spec.getAfterTypeValidation();
     }
 }

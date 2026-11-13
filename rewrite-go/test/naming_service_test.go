@@ -19,15 +19,17 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 )
 
 func TestNamingService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.NamingService](nil)
-	if svc == nil {
-		t.Fatal("recipe.Service returned nil for *golang.NamingService")
-	}
+	require.NotNil(t, svc, "recipe.Service returned nil for *golang.NamingService")
 }
 
 func TestNamingService_ToPascalCase(t *testing.T) {
@@ -107,13 +109,9 @@ func TestNamingService_IsValidIdentifier(t *testing.T) {
 func TestNamingService_IsPredeclared(t *testing.T) {
 	svc := &recipes.NamingService{}
 	for _, name := range []string{"int", "string", "true", "false", "nil", "iota", "len", "make", "new", "any", "comparable", "min", "max", "clear", "error"} {
-		if !svc.IsPredeclared(name) {
-			t.Errorf("IsPredeclared(%q) = false, want true", name)
-		}
+		assert.Truef(t, svc.IsPredeclared(name), "IsPredeclared(%q) = false, want true", name)
 	}
 	for _, name := range []string{"Foo", "foo", "MyType", "Println", "func", "if"} {
-		if svc.IsPredeclared(name) {
-			t.Errorf("IsPredeclared(%q) = true, want false", name)
-		}
+		assert.Falsef(t, svc.IsPredeclared(name), "IsPredeclared(%q) = true, want false", name)
 	}
 }

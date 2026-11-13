@@ -132,7 +132,7 @@ These modules use their own package managers (`uv`/`pip` for Python, `npm` for N
 ### Language Parsers
 - **`rewrite-java`**: Main Java language support with comprehensive AST model
 - **`rewrite-java-8/11/17/21/25`**: Java version-specific features and compatibility
-- **`rewrite-groovy/kotlin/javascript/csharp`**: Other languages extending the `J` model from `rewrite-java`
+- **`rewrite-groovy/kotlin/javascript/csharp/ruby/scala`**: Other languages extending the `J` model from `rewrite-java`
 - **`rewrite-docker`**: Dockerfile parsing and manipulation
 
 ### Format Parsers
@@ -226,8 +226,8 @@ The build enforces license headers on all source files and runs OWASP dependency
 
 For detailed guidance on working with specific language implementations, consult the module-specific CLAUDE.md files:
 
-- **Python (`rewrite-python/rewrite/CLAUDE.md`)**: Development setup, testing with RPC, recipe patterns, padding/whitespace conventions specific to the Python module.
-- **TypeScript/JavaScript (`rewrite-javascript/rewrite/CLAUDE.md`)**: Node.js setup, async visitor patterns, test patterns, RPC sender/receiver architecture, module organization.
+- **Python (`rewrite-python/rewrite/CLAUDE.md`)**: Development setup, testing with RPC, recipe patterns, padding/whitespace conventions specific to the Python module, inspecting type attribution (`REWRITE_PYTHON_DUMP_TYPES`, `rewrite-python-types`).
+- **TypeScript/JavaScript (`rewrite-javascript/rewrite/CLAUDE.md`)**: Node.js setup, async visitor patterns, test patterns, RPC sender/receiver architecture, module organization, inspecting type attribution (`REWRITE_JAVASCRIPT_DUMP_TYPES`, `rewrite-javascript-types`).
 
 These files contain implementation-specific patterns, conventions, and debugging tips that supersede general guidance in this document.
 

@@ -15,8 +15,11 @@
  */
 package org.openrewrite.javascript;
 
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
@@ -24,12 +27,21 @@ import java.nio.file.Path;
 import static org.openrewrite.javascript.Assertions.npm;
 import static org.openrewrite.javascript.Assertions.packageJson;
 
+/**
+ * PM-gated parity cross-check: exercises the recipe against a real {@code npm} workspace and skips
+ * when npm is not on the PATH.
+ */
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
+
+    @BeforeEach
+    void requirePackageManager() {
+        Assumptions.assumeTrue(PackageManagerExecutor.NPM.find() != null, "npm not installed");
+    }
 
     @Test
     void addsNpmOverrideForTransitive(@TempDir Path tempDir) {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("lodash", "^4.17.21", null)),
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("ms", "^2.1.3", null)),
                 npm(tempDir,
                         packageJson(
                                 "{\n" +
@@ -44,7 +56,21 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                                 "    \"express\": \"^4.18.0\"\n" +
                                 "  },\n" +
                                 "  \"overrides\": {\n" +
-                                "    \"lodash\": \"^4.17.21\"\n" +
+                                "    \"ms\": \"^2.1.3\"\n" +
+                                "  }\n" +
+                                "}\n")));
+    }
+
+    @Test
+    void addsNoOverrideForAPackageNotInTheTree(@TempDir Path tempDir) {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("lodash", "^4.17.21", null)),
+                npm(tempDir,
+                        packageJson(
+                                "{\n" +
+                                "  \"name\": \"x\",\n" +
+                                "  \"dependencies\": {\n" +
+                                "    \"express\": \"^4.18.0\"\n" +
                                 "  }\n" +
                                 "}\n")));
     }

@@ -408,6 +408,98 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddImportIfOnlyReferencedByStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", null, true))),
+          java(
+            """
+              import java.util.List;
+
+              import static java.util.Collections.*;
+
+              class A {
+                  List<String> list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddImportIfOnlyReferencedThroughVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.Node", null, true))),
+          java(
+            """
+              package a;
+
+              public class Node {
+                  public Node next;
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Base {
+                  protected Node node;
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              class B extends a.Base {
+                  Object next() {
+                      return node.next;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddImportIfOnlyReferencedByVar() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.Node", null, true))),
+          java(
+            """
+              package a;
+
+              public class Node {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Base {
+                  public Node node() {
+                      return new Node();
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              class B {
+                  Object node(a.Base base) {
+                      var node = base.node();
+                      return node;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addImportInsertsNewMiddleBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
@@ -1091,7 +1183,7 @@ class AddImportTest implements RewriteTest {
     @Test
     void doNotFoldNormalImportWithNamespaceConflict() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Iterator", null, false)))
             .beforeRecipe(addTypesToSourceSet("main")),
           srcMainJava(
             java(
@@ -1111,7 +1203,7 @@ class AddImportTest implements RewriteTest {
                 import java.awt.*; // contains a List class
                 import java.util.Collection;
                 import java.util.Collections;
-                import java.util.List;
+                import java.util.Iterator;
                 import java.util.Map;
                 import java.util.Set;
 
@@ -1597,6 +1689,44 @@ class AddImportTest implements RewriteTest {
                   void method() {
                       sort(new ArrayList<String>());
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingStaticImportOfNestedTypeMatchesDottedName() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeAddImport("b", "New.Typing", "STATIC", null, true);
+                  maybeAddImport("b.New.Typing", "dynamic");
+                  return cu;
+              }
+          })).parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package b;
+
+              public class New {
+                  public enum Typing {
+                      STATIC;
+                      public static Typing dynamic() {
+                          return STATIC;
+                      }
+                  }
+              }
+              """
+          )),
+          java(
+            """
+              import static b.New.Typing.STATIC;
+              import static b.New.Typing.dynamic;
+
+              class Test {
+                  Object s = STATIC;
+                  Object d = dynamic();
               }
               """
           )

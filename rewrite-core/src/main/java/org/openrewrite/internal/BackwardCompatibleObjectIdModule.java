@@ -17,6 +17,7 @@ package org.openrewrite.internal;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.util.JsonParserSequence;
 import com.fasterxml.jackson.databind.BeanDescription;
 import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -97,31 +98,36 @@ public class BackwardCompatibleObjectIdModule extends SimpleModule {
         @Override
         public Object deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
             if (p.currentToken() == JsonToken.START_OBJECT) {
-                // Buffer the object so we can peek for the id property, then replay it into the appropriate delegate.
-                TokenBuffer buffer = new TokenBuffer(p, ctxt);
-                buffer.copyCurrentStructure(p);
-                boolean hasId = containsField(buffer, p, idPropertyName);
-                JsonParser replay = buffer.asParser(p);
+                // Scan only the field-name prefix for the id property, buffering as little as possible. In the common
+                // new-format case the writer emits the id first, so we stop immediately and stream the (potentially
+                // large) remainder straight from the live parser rather than copying the whole subtree.
+                TokenBuffer prefix = new TokenBuffer(p, ctxt);
+                prefix.writeStartObject();
+                while (p.nextToken() == JsonToken.FIELD_NAME) {
+                    String name = p.currentName();
+                    prefix.writeFieldName(name);
+                    if (idPropertyName.equals(name)) {
+                        // New format: id present. Buffer its value, then concatenate the prefix ahead of the live
+                        // parser (left at the id value, so the sequence resumes with the following token) and let the
+                        // id-aware delegate read the full object without a second pass over the subtree.
+                        p.nextToken();
+                        prefix.copyCurrentStructure(p);
+                        JsonParser merged = JsonParserSequence.createFlattened(false, prefix.asParser(p), p);
+                        merged.nextToken();
+                        return _delegatee.deserialize(merged, ctxt);
+                    }
+                    p.nextToken();
+                    prefix.copyCurrentStructure(p);
+                }
+                // END_OBJECT reached with no id property: an older/un-deduplicated payload. The whole (rare) object is
+                // now buffered; replay it into the id-free delegate, which tolerates the missing id.
+                prefix.writeEndObject();
+                JsonParser replay = prefix.asParser(p);
                 replay.nextToken();
-                return hasId ? _delegatee.deserialize(replay, ctxt) : withoutId().deserialize(replay, ctxt);
+                return withoutId().deserialize(replay, ctxt);
             }
             // A bare integer back-reference (or null): the id-aware delegate resolves it as it always has.
             return _delegatee.deserialize(p, ctxt);
-        }
-
-        private static boolean containsField(TokenBuffer buffer, JsonParser src, String field) throws IOException {
-            try (JsonParser scan = buffer.asParser(src)) {
-                scan.nextToken(); // position at START_OBJECT
-                while (scan.nextToken() == JsonToken.FIELD_NAME) {
-                    boolean match = field.equals(scan.currentName());
-                    scan.nextToken();
-                    if (match) {
-                        return true;
-                    }
-                    scan.skipChildren();
-                }
-                return false;
-            }
         }
 
         private JsonDeserializer<Object> withoutId() {

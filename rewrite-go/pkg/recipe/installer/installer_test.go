@@ -21,6 +21,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsProxyFetchError(t *testing.T) {
@@ -55,18 +58,14 @@ func TestIsProxyFetchError(t *testing.T) {
 		got := isProxyFetchError(tc.err)
 
 		// then
-		if got != tc.want {
-			t.Errorf("isProxyFetchError(%q) = %v, want %v", tc.err, got, tc.want)
-		}
+		assert.Equal(t, tc.want, got, "isProxyFetchError")
 	}
 }
 
 func writeGoMod(t *testing.T, contents string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(contents), 0o644); err != nil {
-		t.Fatalf("write go.mod: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(contents), 0o644), "write go.mod")
 	return dir
 }
 
@@ -91,16 +90,14 @@ go 1.25
 require (
 	github.com/foo/bar v1.2.3
 )
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3, got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got, "expected v")
 }
 
 func TestReadResolvedVersion_IndirectRequireInBlock(t *testing.T) {
@@ -112,16 +109,14 @@ go 1.25
 require (
 	github.com/foo/bar v1.2.3 // indirect
 )
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3, got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got, "expected v")
 }
 
 func TestReadResolvedVersion_SingleLineRequire(t *testing.T) {
@@ -131,16 +126,14 @@ func TestReadResolvedVersion_SingleLineRequire(t *testing.T) {
 go 1.25
 
 require github.com/foo/bar v1.2.3
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3, got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got, "expected v")
 }
 
 func TestReadResolvedVersion_PrefixCollision(t *testing.T) {
@@ -153,14 +146,12 @@ require (
 	github.com/foo/barbaz v0.9.9
 	github.com/foo/bar v1.2.3
 )
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3 (the exact match, not the prefix-collision sibling), got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got, "expected v1.2.3 (the exact match, not the prefix-collision sibling")
 }

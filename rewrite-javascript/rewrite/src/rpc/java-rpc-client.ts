@@ -18,6 +18,7 @@ import * as path from "node:path";
 import * as readline from "node:readline";
 import {ChildProcessWithoutNullStreams, spawn} from "node:child_process";
 import * as rpc from "vscode-jsonrpc/node";
+import {chunkedJsonDecoder} from "./message-decoder";
 import {RewriteRpc} from "./rewrite-rpc";
 import {RecipeMarketplace} from "../marketplace";
 
@@ -37,6 +38,8 @@ export interface JavaRpcOptions {
      * only. Does NOT configure the Java side — for that, use {@link marketplaceCsv}.
      */
     marketplace?: RecipeMarketplace;
+    /** How many messages the TS-side {@link RewriteRpc} sends per page of an object. */
+    batchSize?: number;
 }
 
 /**
@@ -104,7 +107,9 @@ export class JavaRpcTestServer {
         });
 
         const connection = rpc.createMessageConnection(
-            new rpc.StreamMessageReader(child.stdout),
+            // Trees and recipe descriptors cross this connection too, so it needs the same headroom
+            // as the server's: the default decoder caps an inbound message at V8's ~512 MB string limit.
+            new rpc.StreamMessageReader(child.stdout, {contentTypeDecoder: chunkedJsonDecoder}),
             new rpc.StreamMessageWriter(child.stdin),
             opts.logger,
         );
@@ -113,6 +118,7 @@ export class JavaRpcTestServer {
         const rewriteRpc = new RewriteRpc(connection, {
             marketplace: opts.marketplace,
             logger: opts.logger,
+            batchSize: opts.batchSize,
         });
 
         // Hand back control once we know either (a) the JVM is up and the connection is
@@ -141,8 +147,8 @@ export class JavaRpcTestServer {
     }
 
     /**
-     * End the JSON-RPC connection and wait for the Java process to exit. Falls back
-     * to SIGKILL after a short grace period to ensure no orphan JVMs are left behind.
+     * End the JSON-RPC connection and stop the Java process. Falls back to SIGKILL
+     * after a short grace period to ensure no orphan JVMs are left behind.
      */
     async dispose(): Promise<void> {
         // Attach the exit listener BEFORE signalling shutdown so we never miss the
@@ -157,12 +163,13 @@ export class JavaRpcTestServer {
             return;
         }
 
-        // End the connection before killing the process: this triggers an EOF on the
-        // Java side's stdin reader, which lets it shut down cleanly. Killing first
-        // can race with in-flight requests and leak the connection-close handler.
+        // End the connection before killing the process: killing first can race with
+        // in-flight requests and leak the connection-close handler. The JVM does not exit
+        // when its stdin closes, so waiting for it to would only run out the grace period.
         try {
             this.rpc.end();
         } catch { /* ignore — already closed */ }
+        this.child.kill();
 
         const grace = setTimeout(() => {
             this.child.kill("SIGKILL");

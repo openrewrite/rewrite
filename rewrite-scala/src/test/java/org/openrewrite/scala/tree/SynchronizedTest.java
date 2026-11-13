@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.scala.Assertions.scala;
 
 class SynchronizedTest implements RewriteTest {
-    
+
     @Test
     void synchronizedBlock() {
         rewriteRun(
@@ -38,7 +38,7 @@ class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void synchronizedWithExplicitMonitor() {
         rewriteRun(
@@ -56,7 +56,7 @@ class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void synchronizedMethod() {
         rewriteRun(
@@ -71,7 +71,7 @@ class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void nestedSynchronized() {
         rewriteRun(
@@ -92,7 +92,7 @@ class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void synchronizedWithReturn() {
         rewriteRun(

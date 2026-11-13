@@ -20,7 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypedTree;
 import org.openrewrite.marker.Marker;
 
 import java.io.IOException;
@@ -28,6 +31,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
+import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.reverse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -228,7 +233,7 @@ class ModerneWebsiteExampleTest {
 
         void buildTypeGraph() {
             // full reachable closure (counts only)
-            Set<JavaType> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<JavaType> seen = newSetFromMap(new IdentityHashMap<>());
             Deque<JavaType> q = new ArrayDeque<>(typeEntries.keySet());
             int edges = 0;
             while (!q.isEmpty()) {
@@ -271,7 +276,7 @@ class ModerneWebsiteExampleTest {
         void buildDense() {
             final int MAX_NODES = 1900, MAX_EDGES = 5200;
             IdentityHashMap<JavaType, Integer> depth = new IdentityHashMap<>();
-            Set<JavaType> recorded = Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<JavaType> recorded = newSetFromMap(new IdentityHashMap<>());
             Deque<JavaType> q = new ArrayDeque<>();
             for (JavaType e : typeEntries.keySet()) { depth.put(e, 0); q.add(e); }
             List<JavaType> order = new ArrayList<>();
@@ -323,7 +328,7 @@ class ModerneWebsiteExampleTest {
         // shortest path up extends + implements from `from` to the type whose FQN == targetFqn
         List<JavaType.FullyQualified> pathTo(JavaType.FullyQualified from, String targetFqn) {
             IdentityHashMap<JavaType.FullyQualified, JavaType.FullyQualified> parent = new IdentityHashMap<>();
-            Set<JavaType.FullyQualified> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<JavaType.FullyQualified> seen = newSetFromMap(new IdentityHashMap<>());
             Deque<JavaType.FullyQualified> q = new ArrayDeque<>();
             q.add(from); seen.add(from);
             JavaType.FullyQualified target = null;
@@ -339,7 +344,7 @@ class ModerneWebsiteExampleTest {
             if (target == null) return null;
             List<JavaType.FullyQualified> path = new ArrayList<>();
             for (JavaType.FullyQualified t = target; t != null; t = parent.get(t)) path.add(t);
-            Collections.reverse(path);
+            reverse(path);
             return path;
         }
 

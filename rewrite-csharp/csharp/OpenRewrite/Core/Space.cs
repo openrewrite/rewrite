@@ -39,16 +39,20 @@ public sealed class Space(string whitespace, IList<Comment> comments)
         Flyweights["\n"] = Newline;
     }
 
-    private static Space Build(string whitespace, IList<Comment> comments)
+    private static Space Build(string whitespace, IList<Comment> comments) =>
+        (comments.Count == 0 ? Shared(whitespace) : null) ?? new Space(whitespace, comments);
+
+    /// <summary>
+    /// The one comment-free Space shared for <paramref name="whitespace"/>, or null when it is too
+    /// long to share.
+    /// </summary>
+    public static Space? Shared(string? whitespace)
     {
-        if (comments.Count == 0)
-        {
-            if (string.IsNullOrEmpty(whitespace))
-                return Empty;
-            if (whitespace.Length <= MaxFlyweightLength)
-                return Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []));
-        }
-        return new Space(whitespace, comments);
+        if (string.IsNullOrEmpty(whitespace))
+            return Empty;
+        return whitespace.Length <= MaxFlyweightLength
+            ? Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []))
+            : null;
     }
 
     public static Space Format(string whitespace) =>
@@ -185,43 +189,9 @@ public sealed class Space(string whitespace, IList<Comment> comments)
             }
         }
 
-        // Group consecutive /// doc comments into a single XmlDocComment.
-        // After rotation, doc comment lines are TextComment with text starting with "/".
-        if (comments.Count > 0)
-        {
-            var grouped = new List<Comment>();
-            int j = 0;
-            while (j < comments.Count)
-            {
-                var cmt = comments[j];
-                if (cmt is TextComment tc && !tc.Multiline && tc.Text.StartsWith("/"))
-                {
-                    // Start of a doc comment block — group consecutive /// lines.
-                    var sb = new System.Text.StringBuilder();
-                    sb.Append(tc.Text);
-                    string lastSuffix = tc.Suffix;
-                    j++;
-                    while (j < comments.Count &&
-                           comments[j] is TextComment next && !next.Multiline &&
-                           next.Text.StartsWith("/"))
-                    {
-                        sb.Append(lastSuffix);
-                        sb.Append("//");
-                        sb.Append(next.Text);
-                        lastSuffix = next.Suffix;
-                        j++;
-                    }
-                    grouped.Add(new XmlDocComment(sb.ToString(), lastSuffix, true));
-                }
-                else
-                {
-                    grouped.Add(cmt);
-                    j++;
-                }
-            }
-            comments = grouped;
-        }
-
+        // Doc comments (///) are left as individual single-line TextComments here; the C#
+        // parser layer (CsDocCommentParser) groups and structures them from Roslyn's own XML
+        // documentation-comment parse. See CSharpParserVisitor.CachedFormat.
         return comments.Count > 0 ? new Space(ws, comments) : Build(formatting, []);
     }
 
@@ -247,13 +217,8 @@ public abstract class Comment(string text, string suffix, bool multiline)
 /// <summary>
 /// A single-line or multi-line text comment.
 /// </summary>
-public sealed class TextComment(string text, string suffix, bool multiline)
-    : Comment(text, suffix, multiline);
-
-/// <summary>
-/// An XML documentation comment (///) block.
-/// The Text property contains the raw content after the initial "//",
-/// including continuation "///" prefixes on subsequent lines.
-/// </summary>
-public sealed class XmlDocComment(string text, string suffix, bool multiline)
-    : Comment(text, suffix, multiline);
+public sealed class TextComment(string text, string suffix, bool multiline, Markers? markers = null)
+    : Comment(text, suffix, multiline)
+{
+    public Markers Markers { get; } = markers ?? Markers.Empty;
+}

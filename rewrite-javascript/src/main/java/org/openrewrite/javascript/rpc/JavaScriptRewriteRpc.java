@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
@@ -28,27 +30,36 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.internal.EngineInstall;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import java.util.stream.StreamSupport;
 
@@ -59,6 +70,12 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
     /**
+     * An {@link ExecutionContext} message. When {@code true}, the parser attaches a
+     * {@link org.openrewrite.javascript.marker.ResolvedNames} to each compilation unit.
+     */
+    public static final String RESOLVE_NAMES = "org.openrewrite.javascript.resolveNames";
+
+    /**
      * The command used to start the RPC process. Useful for logging and diagnostics.
      */
     private final String command;
@@ -67,6 +84,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     JavaScriptRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
         super(process.getRpcClient(), marketplace, resolvers);
+        // Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
+        batchSize(5000);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
@@ -84,6 +103,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.setFactory(builder);
     }
 
+    public static void resetFactory() {
+        MANAGER.resetFactory();
+    }
+
     @Override
     public void shutdown() {
         super.shutdown();
@@ -98,6 +121,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.reset();
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
@@ -106,10 +133,18 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         );
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(String packageName) {
         return installRecipes(packageName, null);
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
         return send(
                 "InstallRecipes",
@@ -117,6 +152,20 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         new InstallRecipesByPackage.Package(packageName, version)),
                 InstallRecipesResponse.class
         );
+    }
+
+    /**
+     * Parser options forwarded to the Node server with every parse request, carrying this context's
+     * {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} and {@link #RESOLVE_NAMES} settings.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        Map<String, String> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+        if (ctx.getMessage(RESOLVE_NAMES, false)) {
+            options.put("resolveNames", "true");
+        }
+        return options;
     }
 
     /**
@@ -157,6 +206,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        // The server relativizes only against this, so without it source paths land on the LST absolute.
+        Path base = relativeTo == null ? projectPath : relativeTo;
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
 
@@ -168,7 +219,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -178,6 +229,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
+
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the TypeScript side declined to parse; build the Quark
+                    // locally from its path (plus file attributes) — no content on the wire.
+                    Path sourcePath = Paths.get(item.getSourcePath());
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(base.resolve(sourcePath))));
+                    return true;
+                }
 
                 SourceFile sourceFile;
                 try {
@@ -195,12 +255,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     // a usable ParseError rather than crashing the whole stream with an NPE.
                     String relativePath = item.getSourcePath() != null ? item.getSourcePath() : item.getId();
                     Path sourcePath = Paths.get(relativePath);
-                    Path absoluteSourcePath = projectPath.resolve(sourcePath);
+                    // The server relativized the path against `base`, which is not `projectPath`
+                    // when the caller named a `relativeTo`. Resolved against anything else, the
+                    // error carries no text, or the text of whatever file happens to be there.
+                    Path absoluteSourcePath = base.resolve(sourcePath);
                     try {
                         sourceFile = ParseError.build(
                                 JavaScriptParser.builder().build(),
                                 Parser.Input.fromFile(absoluteSourcePath),
-                                projectPath,
+                                base,
                                 ctx,
                                 e);
                     } catch (Exception readFailure) {
@@ -243,6 +306,25 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }, false);
     }
 
+    /**
+     * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
+     * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -250,7 +332,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         private final Set<String> unsetEnvNames = new LinkedHashSet<>();
         private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
@@ -265,6 +347,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path inspectBrkRewriteSourcePath;
 
         private @Nullable Path workingDirectory;
+
+        private @Nullable DataTableStore dataTableStore;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -394,6 +478,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Where recipes in the JavaScript runtime write data table rows, conveyed via the
+         * {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Path npxPath = npxPathSupplier.get();
@@ -404,6 +497,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
 
             Stream<@Nullable String> cmd;
+            // The published engine npx installs into its cache, when the RPC runs from one.
+            String packagedVersion = null;
 
             if (inspectBrk != null) {
                 Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
@@ -423,6 +518,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 );
             } else {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
+                packagedVersion = version.endsWith("-SNAPSHOT") ? null : version;
                 cmd = Stream.of(
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
@@ -436,23 +532,24 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             }
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            // Set working directory if specified
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.unsetEnv(unsetEnvNames);
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
             // caller-provided options, if any, are taking precedence over the options baked above
-            process.environment().merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);
+            env.merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);
             if (npxPath.getParent() != null) {
                 // `npx` is typically a shebang script alongside the `node` executable
-                process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
+                env.put("PATH", npxPath.getParent() + File.pathSeparator +
                         System.getenv("PATH"));
             }
+            if (packagedVersion != null) {
+                installEngine(npxPath, packagedVersion, env);
+            }
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("javascript")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .unsetEnv(unsetEnvNames)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {
@@ -460,10 +557,95 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+                        .dataTableStore(dataTableStore)
+                        .log(log == null ? null : new PrintStream(openLog(log)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        /**
+         * Installs {@code @openrewrite/rewrite@<version>} into npx's cache before the RPC's own npx runs it, once,
+         * however many threads and processes start an RPC at the same time. npx installs a package it does not have on
+         * first use, into a directory every npx sharing the cache uses, and several installing it at once, as the test
+         * forks of a build do the first time it needs a version, leave it half-written: the RPC then shuts down early.
+         * So the first start of a version runs npx on its own, asking the RPC for no more than its help, which loads the
+         * package, while the others wait on a lock ({@link EngineInstall}); once it has passed, a record in npm's cache
+         * ({@code _openrewrite/javascript/<version>}) marks the version installed, and every RPC starts from a cache
+         * that holds it. npx owns the install itself: one it left half-written before this was here is npx's to notice.
+         * (The npx of a recent npm 11 locks its own installs; npm 10's, which Node 22 ships, does not.)
+         */
+        void installEngine(Path npxPath, String version, Map<String, String> env) {
+            // The environment npx runs with: this process's, less what the RPC unsets, with the RPC's own on top.
+            Map<String, String> npxEnvironment = new LinkedHashMap<>(System.getenv());
+            unsetEnvNames.forEach(npxEnvironment::remove);
+            npxEnvironment.putAll(env);
+            Path installed = npmCache(npxEnvironment).resolve("_openrewrite").resolve("javascript").resolve(version);
+            EngineInstall.ensureInstalled(installed, version, record -> npxInstall(npxPath, version, env, record));
+        }
+
+        /**
+         * Runs npx as the RPC's command does, for the RPC's help alone, so that npx installs the engine and exits; what
+         * it prints goes to {@code npx.log} in {@code record}.
+         */
+        private void npxInstall(Path npxPath, String version, Map<String, String> env, Path record)
+                throws IOException, InterruptedException {
+            String spec = "@openrewrite/rewrite@" + version;
+            Path output = record.resolve("npx.log");
+            ProcessBuilder pb = new ProcessBuilder(npxPath.toString(), "--yes", "--package=" + spec, "rewrite-rpc",
+                    "--help")
+                    .redirectErrorStream(true)
+                    .redirectOutput(output.toFile());
+            // The environment the RPC itself gets, so npx reads the same registry, credentials and cache.
+            unsetEnvNames.forEach(pb.environment()::remove);
+            pb.environment().putAll(env);
+            if (workingDirectory != null) {
+                pb.directory(workingDirectory.toFile());
+            }
+            Process process = pb.start();
+            process.getOutputStream().close();
+            if (!process.waitFor(10, TimeUnit.MINUTES)) {
+                process.destroyForcibly();
+                throw new IllegalStateException("Timed out installing " + spec + " with " + npxPath);
+            }
+            if (process.exitValue() != 0) {
+                throw new IllegalStateException("Could not install " + spec + " with " + npxPath + " (exit code " +
+                                                process.exitValue() + "):\n" +
+                                                new String(Files.readAllBytes(output), StandardCharsets.UTF_8).trim());
+            }
+        }
+
+        /**
+         * npm's cache directory, which npx installs packages beneath ({@code _npx}), for npx running with
+         * {@code environment}: npm's {@code cache} setting when the environment sets it, in either case, as npm reads
+         * it, or npm's default.
+         */
+        static Path npmCache(Map<String, String> environment) {
+            String configured = null;
+            for (Map.Entry<String, String> variable : environment.entrySet()) {
+                if ("npm_config_cache".equalsIgnoreCase(variable.getKey()) && !StringUtils.isBlank(variable.getValue())) {
+                    configured = variable.getValue();
+                }
+            }
+            if (configured != null) {
+                return Paths.get(configured);
+            }
+            String localAppData = environment.get("LOCALAPPDATA");
+            if (System.getProperty("os.name").toLowerCase().contains("windows") && !StringUtils.isBlank(localAppData)) {
+                return Paths.get(localAppData, "npm-cache");
+            }
+            return Paths.get(System.getProperty("user.home"), ".npm");
+        }
+
+        private static OutputStream openLog(Path log) throws IOException {
+            // The parent directory may not exist yet (e.g. a previously configured
+            // temp directory that has since been deleted), so create it defensively
+            // rather than failing the (re)start of the RPC process.
+            Path parent = log.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            return Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE);
         }
     }
 }

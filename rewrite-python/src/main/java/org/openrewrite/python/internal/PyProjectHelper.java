@@ -29,11 +29,12 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Shared utilities for Python dependency recipes operating on pyproject.toml files.
@@ -113,7 +114,7 @@ public class PyProjectHelper {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
         List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
+        parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
         if (!parsed.isEmpty() && parsed.get(0) instanceof Json.Document) {
             Json.Document newDoc = (Json.Document) parsed.get(0);
@@ -128,17 +129,21 @@ public class PyProjectHelper {
      * identity (id) and markers.
      */
     public static Toml.Document reparseToml(Toml.Document original, String newContent) {
-        TomlParser parser = new TomlParser();
-        Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
-        List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
-        if (!parsed.isEmpty() && parsed.get(0) instanceof Toml.Document) {
-            Toml.Document newDoc = (Toml.Document) parsed.get(0);
+        Toml.Document newDoc = parseToml(original.getSourcePath(), newContent);
+        if (newDoc != null) {
             return newDoc.withId(original.getId())
                     .withMarkers(original.getMarkers());
         }
         return original;
+    }
+
+    private static Toml.@Nullable Document parseToml(Path sourcePath, String content) {
+        TomlParser parser = new TomlParser();
+        Parser.Input input = Parser.Input.fromString(sourcePath, content);
+        List<SourceFile> parsed = new ArrayList<>();
+        parser.parseInputs(singletonList(input), null,
+                new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
+        return !parsed.isEmpty() && parsed.get(0) instanceof Toml.Document ? (Toml.Document) parsed.get(0) : null;
     }
 
     /**
@@ -156,22 +161,27 @@ public class PyProjectHelper {
         if (existing == null) {
             return depsFile;
         }
+        PythonResolutionResult newMarker = createMarker(depsFile);
+        if (newMarker != null) {
+            return depsFile.withMarkers(depsFile.getMarkers().setByType(newMarker.withId(existing.getId())));
+        }
+        return depsFile;
+    }
+
+    /**
+     * Derive a pyproject.toml or Pipfile marker from the document's content alone, or {@code null} for other files.
+     */
+    private static @Nullable PythonResolutionResult createMarker(SourceFile depsFile) {
         if (depsFile instanceof Toml.Document) {
             Toml.Document doc = (Toml.Document) depsFile;
             Path sourcePath = doc.getSourcePath();
             if (sourcePath.endsWith("pyproject.toml")) {
-                PythonResolutionResult newMarker = PythonDependencyParser.createMarker(doc, null);
-                if (newMarker != null) {
-                    return doc.withMarkers(doc.getMarkers().setByType(newMarker.withId(existing.getId())));
-                }
+                return PythonDependencyParser.createMarker(doc, null);
             } else if (sourcePath.endsWith("Pipfile")) {
-                PythonResolutionResult newMarker = PipfileParser.createMarker(doc);
-                if (newMarker != null) {
-                    return doc.withMarkers(doc.getMarkers().setByType(newMarker.withId(existing.getId())));
-                }
+                return PipfileParser.createMarker(doc);
             }
         }
-        return depsFile;
+        return null;
     }
 
     /**
@@ -196,7 +206,24 @@ public class PyProjectHelper {
                 if (resolved.isEmpty()) {
                     return depsFile;
                 }
-                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved);
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Uv);
+                break;
+            case Poetry:
+                resolved = PoetryLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Poetry);
+                break;
+            case Pdm:
+                resolved = PdmLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Pdm);
                 break;
             case Pipenv:
                 resolved = PipfileLockParser.parse(regeneratedLockContent);
@@ -212,43 +239,67 @@ public class PyProjectHelper {
     }
 
     /**
-     * ExecutionContext key for the {@code Map<Path, SourceFile>} that holds the
-     * latest chain-modified deps tree for each project path. Recipes write to this
+     * ExecutionContext key for the {@code Map<Path, LiveDeps>} that holds the
+     * latest chain-modified deps file for each project path. Recipes write to this
      * after applying their edit so that subsequent recipes (or the same recipe's
      * lock-file visit when lock is visited before deps) can read the up-to-date
-     * deps tree.
+     * deps file.
      */
-    private static final String LIVE_DEPS_TREES = "org.openrewrite.python.liveDepsTrees";
+    private static final String LIVE_DEPS = "org.openrewrite.python.liveDeps";
 
     /**
-     * Read the latest known chain-modified deps tree for a given path from the
-     * shared {@link ExecutionContext} side channel, or {@code null} if no recipe
-     * has written one yet.
+     * A chain-modified deps file kept as its text and the lock regenerated with it, from which its tree is rebuilt.
      */
-    @SuppressWarnings("unchecked")
-    public static @Nullable SourceFile getLiveDepsTree(ExecutionContext ctx, Path depsPath) {
-        Map<Path, SourceFile> map = (Map<Path, SourceFile>) ctx.getMessage(LIVE_DEPS_TREES);
-        return map == null ? null : map.get(depsPath);
+    @lombok.Value
+    private static class LiveDeps {
+        String content;
+        @Nullable String lockContent;
     }
 
     /**
-     * Publish the current chain-modified deps tree for a given path to the shared
+     * Rebuild the latest known chain-modified deps tree for a given pyproject.toml
+     * or Pipfile from the shared {@link ExecutionContext} side channel, or return
+     * {@code null} if no recipe has written one yet.
+     */
+    @SuppressWarnings("unchecked")
+    public static @Nullable SourceFile getLiveDepsTree(ExecutionContext ctx, Path depsPath) {
+        Map<Path, LiveDeps> map = (Map<Path, LiveDeps>) ctx.getMessage(LIVE_DEPS);
+        LiveDeps live = map == null ? null : map.get(depsPath);
+        if (live == null) {
+            return null;
+        }
+        Toml.Document doc = parseToml(depsPath, live.getContent());
+        if (doc == null) {
+            return null;
+        }
+        PythonResolutionResult marker = createMarker(doc);
+        if (marker == null) {
+            return null;
+        }
+        SourceFile depsTree = doc.withMarkers(doc.getMarkers().add(marker));
+        return live.getLockContent() == null ? depsTree : applyResolvedDependencies(depsTree, live.getLockContent());
+    }
+
+    /**
+     * Publish the current chain-modified deps file for a given path to the shared
      * {@link ExecutionContext} side channel. Subsequent recipes — and lock-file
      * visits within the same recipe pass that arrive after this one — read this
      * to apply their edit on top of prior recipes' modifications.
+     *
+     * @param depsContent the edited deps file's text, without any markup added to report a failure
+     * @param regen       the lock regeneration that went with the edit, or {@code null}
      */
-    public static void putLiveDepsTree(ExecutionContext ctx, Path depsPath, SourceFile depsTree) {
-        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_DEPS_TREES, k -> new HashMap<>());
-        map.put(depsPath, depsTree);
+    public static void putLiveDeps(ExecutionContext ctx, Path depsPath, String depsContent,
+                                   LockFileRegeneration.@Nullable Result regen) {
+        Map<Path, LiveDeps> map = ctx.computeMessageIfAbsent(LIVE_DEPS, k -> new HashMap<>());
+        map.put(depsPath, new LiveDeps(depsContent,
+                regen != null && regen.isSuccess() ? regen.getLockFileContent() : null));
     }
 
     /**
      * Apply a recipe-specific trait edit to a deps tree, refresh its marker, and
-     * regenerate the lock file. Used both by deps-file visits (which obtain the
-     * trait from the framework's live cursor) and by lock-file lazy-compute visits
-     * (which obtain the trait via a synthetic cursor over a tree pulled from the
-     * accumulator or the {@link #getLiveDepsTree(ExecutionContext, Path) ctx side
-     * channel}).
+     * regenerate the lock file. Used by deps-file visits, which obtain the trait
+     * from the framework's live cursor, when the lock file has not been visited yet.
      *
      * @param trait               the trait wrapping the deps tree to edit
      * @param editFn              applies the recipe-specific edit (e.g.
@@ -261,17 +312,87 @@ public class PyProjectHelper {
             PythonDependencyFile trait,
             Function<PythonDependencyFile, PythonDependencyFile> editFn,
             @Nullable String capturedLockContent) {
-        PythonDependencyFile updated = editFn.apply(trait);
-        if (updated.getTree() == trait.getTree()) {
+        return editAndRegenerate(trait, editFn, capturedLockContent, new InMemoryExecutionContext());
+    }
+
+    public static EditAndRegenerateResult editAndRegenerate(
+            PythonDependencyFile trait,
+            Function<PythonDependencyFile, PythonDependencyFile> editFn,
+            @Nullable String capturedLockContent,
+            ExecutionContext ctx) {
+        SourceFile modified = applyEdit(trait, editFn);
+        if (modified == null) {
             return EditAndRegenerateResult.unchanged();
         }
-        SourceFile modified = refreshMarker((SourceFile) updated.getTree());
+        String originalDepsContent = ((SourceFile) trait.getTree()).printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(modified, capturedLockContent);
+                : regenerateLockContent(modified, originalDepsContent, capturedLockContent, ctx);
+        return EditAndRegenerateResult.changed(applyRegeneratedLock(modified, regen), regen);
+    }
+
+    /**
+     * Apply a recipe-specific trait edit to a deps tree whose lock file was visited
+     * and regenerated first, refresh its marker and overlay that regeneration.
+     *
+     * @return the edited deps tree, or {@code null} when the edit changes nothing
+     */
+    public static @Nullable SourceFile edit(PythonDependencyFile trait,
+                                            Function<PythonDependencyFile, PythonDependencyFile> editFn,
+                                            LockFileRegeneration.@Nullable Result regen) {
+        SourceFile modified = applyEdit(trait, editFn);
+        return modified == null ? null : applyRegeneratedLock(modified, regen);
+    }
+
+    private static @Nullable SourceFile applyEdit(PythonDependencyFile trait,
+                                                  Function<PythonDependencyFile, PythonDependencyFile> editFn) {
+        PythonDependencyFile updated = editFn.apply(trait);
+        return updated.getTree() == trait.getTree() ? null : refreshMarker((SourceFile) updated.getTree());
+    }
+
+    private static SourceFile applyRegeneratedLock(SourceFile modified, LockFileRegeneration.@Nullable Result regen) {
         if (regen != null && regen.isSuccess() && regen.getLockFileContent() != null) {
-            modified = applyResolvedDependencies(modified, regen.getLockFileContent());
+            return applyResolvedDependencies(modified, regen.getLockFileContent());
         }
-        return EditAndRegenerateResult.changed(modified, regen);
+        return modified;
+    }
+
+    /**
+     * A recipe's edit of a deps file as text, which is what regenerating its lock file
+     * needs when the lock file is visited before the deps file.
+     */
+    @lombok.Value
+    public static class DepsEdit {
+        String originalContent;
+        String modifiedContent;
+        PythonResolutionResult.@Nullable PackageManager packageManager;
+
+        /**
+         * Apply a recipe-specific trait edit to a deps tree, or return {@code null} when it changes nothing.
+         */
+        public static @Nullable DepsEdit of(PythonDependencyFile trait,
+                                            Function<PythonDependencyFile, PythonDependencyFile> editFn) {
+            SourceFile modified = applyEdit(trait, editFn);
+            if (modified == null) {
+                return null;
+            }
+            PythonResolutionResult marker = modified.getMarkers()
+                    .findFirst(PythonResolutionResult.class).orElse(null);
+            return new DepsEdit(((SourceFile) trait.getTree()).printAll(), modified.printAll(),
+                    marker == null ? null : marker.getPackageManager());
+        }
+
+        /**
+         * Regenerate the lock file for this edit, or return {@code null} when there is no
+         * lock content or no regeneration adapter for the package manager.
+         */
+        public LockFileRegeneration.@Nullable Result regenerate(@Nullable String capturedLockContent,
+                                                                ExecutionContext ctx) {
+            LockFileRegeneration regen = LockFileRegeneration.forPackageManager(packageManager);
+            if (regen == null || capturedLockContent == null) {
+                return null;
+            }
+            return regen.regenerate(modifiedContent, originalContent, capturedLockContent, ctx);
+        }
     }
 
     @lombok.Value
@@ -301,6 +422,22 @@ public class PyProjectHelper {
      */
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile depsFile, @Nullable String capturedLockContent) {
+        return regenerateLockContent(depsFile, capturedLockContent, new InMemoryExecutionContext());
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile depsFile, @Nullable String capturedLockContent, ExecutionContext ctx) {
+        return regenerateLockContent(depsFile, null, capturedLockContent, ctx);
+    }
+
+    /**
+     * @param originalDepsContent the pre-edit dependencies-file content, or {@code null}; lets the
+     *                            engine reconcile only the packages the edit changed (see
+     *                            {@link LockFileRegeneration#regenerate}).
+     */
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile depsFile, @Nullable String originalDepsContent,
+            @Nullable String capturedLockContent, ExecutionContext ctx) {
         PythonResolutionResult marker = depsFile.getMarkers()
                 .findFirst(PythonResolutionResult.class).orElse(null);
         if (marker == null) {
@@ -310,7 +447,7 @@ public class PyProjectHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(depsFile.printAll(), capturedLockContent);
+        return regen.regenerate(depsFile.printAll(), originalDepsContent, capturedLockContent, ctx);
     }
 
     /**
@@ -422,7 +559,10 @@ public class PyProjectHelper {
             String packageName,
             @Nullable String scope,
             @Nullable String groupName) {
-        if (scope == null || "project.dependencies".equals(scope)) {
+        if (scope == null) {
+            // default: all scopes, matching the null-scope edit paths (Pipfile dev-packages, pyproject groups)
+            return marker.findDependencyInAnyScope(packageName);
+        } else if ("project.dependencies".equals(scope)) {
             return marker.findDependency(packageName);
         } else if ("build-system.requires".equals(scope)) {
             return findInList(marker.getBuildRequires(), packageName);

@@ -27,7 +27,6 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
@@ -643,15 +642,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(enum_, Space.Location.ENUM_VALUE_PREFIX, p);
         visit(enum_.getAnnotations(), p);
         visit(enum_.getName(), p);
-        NewClass initializer = enum_.getInitializer();
-        if (enum_.getInitializer() != null) {
-            visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
-            visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
-            if (!initializer.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
-                visitContainer("(", initializer.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
-            }
-            visit(initializer.getBody(), p);
-        }
+        visit(enum_.getInitializer(), p);
         afterSyntax(enum_, p);
         return enum_;
     }
@@ -930,7 +921,10 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
         visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
-        p.append("new");
+        // An enum constant's initializer is written as just its arguments and body
+        if (!(getCursor().getParentTreeCursor().getValue() instanceof EnumValue)) {
+            p.append("new");
+        }
         visit(newClass.getClazz(), p);
         if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);

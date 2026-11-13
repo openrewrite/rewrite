@@ -63,6 +63,16 @@ public interface Protobuf2ParserListener extends ParseTreeListener {
 	 */
 	void exitSyntax(Protobuf2Parser.SyntaxContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link Protobuf2Parser#edition}.
+	 * @param ctx the parse tree
+	 */
+	void enterEdition(Protobuf2Parser.EditionContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link Protobuf2Parser#edition}.
+	 * @param ctx the parse tree
+	 */
+	void exitEdition(Protobuf2Parser.EditionContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link Protobuf2Parser#importStatement}.
 	 * @param ctx the parse tree
 	 */
@@ -282,6 +292,16 @@ public interface Protobuf2ParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitReserved(Protobuf2Parser.ReservedContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link Protobuf2Parser#extensions}.
+	 * @param ctx the parse tree
+	 */
+	void enterExtensions(Protobuf2Parser.ExtensionsContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link Protobuf2Parser#extensions}.
+	 * @param ctx the parse tree
+	 */
+	void exitExtensions(Protobuf2Parser.ExtensionsContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link Protobuf2Parser#ranges}.
 	 * @param ctx the parse tree

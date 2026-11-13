@@ -20,6 +20,11 @@ export interface Style {
     readonly kind: string
 }
 
+/** Style markers carry their own kind (e.g. Autodetect, PrettierStyle), so `styles` is what identifies one. */
+export function isNamedStyles(marker: Marker): marker is NamedStyles<string> {
+    return Array.isArray((marker as Partial<NamedStyles<string>>).styles);
+}
+
 export interface NamedStyles<K extends string = typeof MarkersKind.NamedStyles> extends Marker {
     readonly kind: K
     readonly name: string;

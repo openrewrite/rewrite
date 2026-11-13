@@ -38,7 +38,11 @@ class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JavaParser.fromJavaVersion()
-          .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core"));
+          .classpath(
+            "junit-jupiter-api",
+            "guava",
+            "jackson-databind",
+            "jackson-core"));
     }
 
     @Language("java")
@@ -946,6 +950,44 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void upgradeExistingDependencyThatIsTheOnlyMemberOfItsFamily() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("org.apache.commons", "commons-lang3", "3.12.0",
+            null, null, false, null, null, null, null, "org.apache.commons*", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.10</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.12.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
@@ -2415,6 +2457,37 @@ class AddDependencyTest implements RewriteTest {
                           <artifactId>jakarta.ws.rs-api</artifactId>
                       </dependency>
                   </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/8211")
+    void latestPatchWithManagedDependencyDoesNotUpgradeToLatestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.springframework.boot:spring-boot-starter-actuator:latest.patch", null, null, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.12</version>
+                  <relativePath/>
+                </parent>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-actuator</artifactId>
+                    <version>3.2.12</version>
+                  </dependency>
+                </dependencies>
               </project>
               """
           )

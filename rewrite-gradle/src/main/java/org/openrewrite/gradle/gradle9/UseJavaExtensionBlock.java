@@ -18,6 +18,7 @@ package org.openrewrite.gradle.gradle9;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -25,22 +26,25 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -48,108 +52,166 @@ public class UseJavaExtensionBlock extends Recipe {
 
     private static final String SOURCE = "sourceCompatibility";
     private static final String TARGET = "targetCompatibility";
-    private static final String VERSIONS_KEY = "USE_JAVA_EXTENSION_BLOCK_VERSIONS";
 
-    @Override
-    public String getDisplayName() {
-        return "Move `sourceCompatibility` and `targetCompatibility` into the `java { }` extension block";
-    }
+    final String displayName = "Move `sourceCompatibility` and `targetCompatibility` into the `java { }` extension block";
 
-    @Override
-    public String getDescription() {
-        return "Gradle 9 removed the `JavaPluginConvention` (deprecated in 8.2). Top-level `sourceCompatibility` and " +
-                "`targetCompatibility` assignments in a Groovy build script previously delegated to that convention object " +
-                "and stop working in Gradle 9. Move them into the `java { }` extension block, normalizing values to " +
-                "`JavaVersion.VERSION_<n>` and adding the missing counterpart so both properties are set explicitly. " +
-                "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
-    }
+    final String description = "Gradle 9 removed the `JavaPluginConvention` (deprecated in 8.2). Top-level `sourceCompatibility` and " +
+            "`targetCompatibility` assignments in a Groovy build script previously delegated to that convention object " +
+            "and stop working in Gradle 9. Move them into the `java { }` extension block, normalizing values to " +
+            "`JavaVersion.VERSION_<n>` and adding the missing counterpart so both properties are set explicitly. " +
+            "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 J visited = super.visit(tree, ctx);
-                Map<String, Expression> versionsToMove = getCursor().pollMessage(VERSIONS_KEY);
-                if (!(visited instanceof G.CompilationUnit) || versionsToMove == null || versionsToMove.isEmpty()) {
+                if (!(visited instanceof G.CompilationUnit)) {
                     return visited;
                 }
+                // Top-level `sourceCompatibility` / `targetCompatibility` assignments delegate to the removed
+                // `JavaPluginConvention`; move them into a `java { }` block at the root of the build script.
                 G.CompilationUnit cu = (G.CompilationUnit) visited;
-
-                Expression srcVal = versionsToMove.get(SOURCE);
-                Expression tgtVal = versionsToMove.get(TARGET);
-                if (srcVal != null && tgtVal == null) {
-                    versionsToMove.put(TARGET, srcVal);
-                } else if (tgtVal != null && srcVal == null) {
-                    versionsToMove.put(SOURCE, tgtVal);
-                }
-
-                J.MethodInvocation incomingBlock = (J.MethodInvocation) buildJavaBlock(versionsToMove, ctx);
-
-                List<Statement> originalStatements = cu.getStatements();
-                List<Statement> mapped = ListUtils.map(originalStatements, s ->
-                        isJavaBlock(s) ? mergeIntoExistingJavaBlock((J.MethodInvocation) s, incomingBlock) : s);
-                if (mapped == originalStatements) {
-                    mapped = ListUtils.concat(originalStatements, incomingBlock.withPrefix(Space.format("\n\n")));
-                }
-                return cu.withStatements(mapped);
+                return cu.withStatements(moveCompatibility(cu.getStatements(), new Cursor(getCursor(), cu), ctx));
             }
 
             @Override
-            public @Nullable J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-                if (!(getCursor().getParentTreeCursor().getValue() instanceof G.CompilationUnit)) {
-                    return assignment;
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                // Spread the same fix into `subprojects { }` / `allprojects { }` configuration blocks, where the
+                // assignments delegate to each project's convention object just like at the top level.
+                if (!isProjectConfigurationBlock(m) ||
+                        !(getCursor().firstEnclosing(JavaSourceFile.class) instanceof G.CompilationUnit)) {
+                    return m;
                 }
-                String name = compatibilityName(assignment);
-                if (name == null) {
-                    return assignment;
+                J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
+                J.Block body = (J.Block) lambda.getBody();
+                List<Statement> statements = body.getStatements();
+                List<Statement> mapped = moveCompatibility(statements, getCursor(), ctx);
+                if (mapped == statements) {
+                    return m;
                 }
-                getCursor().getRoot().<Map<String, Expression>>computeMessageIfAbsent(
-                        VERSIONS_KEY, k -> new LinkedHashMap<>()
-                ).put(name, assignment.getAssignment());
-                return null;
+                return autoFormat(m.withArguments(singletonList(lambda.withBody(body.withStatements(mapped)))),
+                        ctx, getCursor().getParentOrThrow());
             }
         });
     }
 
-    private static boolean isJavaBlock(Statement s) {
-        if (!(s instanceof J.MethodInvocation)) {
+    private static boolean isProjectConfigurationBlock(J.MethodInvocation m) {
+        if (m.getSelect() != null || m.getArguments().size() != 1) {
             return false;
         }
-        J.MethodInvocation m = (J.MethodInvocation) s;
-        return "java".equals(m.getSimpleName()) &&
-                m.getArguments().size() == 1 &&
-                m.getArguments().get(0) instanceof J.Lambda;
+        if (!"subprojects".equals(m.getSimpleName()) && !"allprojects".equals(m.getSimpleName())) {
+            return false;
+        }
+        Expression arg = m.getArguments().get(0);
+        return arg instanceof J.Lambda && ((J.Lambda) arg).getBody() instanceof J.Block;
     }
 
-    private static J.MethodInvocation mergeIntoExistingJavaBlock(J.MethodInvocation existing, J.MethodInvocation incoming) {
-        J.Lambda existingLambda = (J.Lambda) existing.getArguments().get(0);
-        if (!(existingLambda.getBody() instanceof J.Block)) {
-            return existing;
-        }
-        J.Block existingBody = (J.Block) existingLambda.getBody();
-
-        Set<String> existingNames = new HashSet<>();
-        for (Statement bs : existingBody.getStatements()) {
-            String n = compatibilityName(bs);
-            if (n != null) {
-                existingNames.add(n);
+    private static List<Statement> moveCompatibility(List<Statement> statements, Cursor scope, ExecutionContext ctx) {
+        Map<String, Expression> versionsToMove = new LinkedHashMap<>();
+        for (Statement s : statements) {
+            String name = compatibilityName(s);
+            if (name != null) {
+                versionsToMove.put(name, asAssignment(s).getAssignment());
             }
         }
-
-        J.Lambda incomingLambda = (J.Lambda) incoming.getArguments().get(0);
-        List<Statement> incomingStatements = ((J.Block) incomingLambda.getBody()).getStatements();
-        List<Statement> incomingToAdd = ListUtils.map(incomingStatements, s -> {
-            String n = compatibilityName(s);
-            return n != null && existingNames.contains(n) ? null : s;
-        });
-        if (incomingToAdd.isEmpty()) {
-            return existing;
+        if (versionsToMove.isEmpty()) {
+            return statements;
         }
-        List<Statement> merged = ListUtils.concatAll(existingBody.getStatements(), incomingToAdd);
-        return existing.withArguments(Collections.singletonList(
-                existingLambda.withBody(existingBody.withStatements(merged))));
+
+        Expression srcVal = versionsToMove.get(SOURCE);
+        Expression tgtVal = versionsToMove.get(TARGET);
+        if (srcVal != null && tgtVal == null) {
+            versionsToMove.put(TARGET, srcVal);
+        } else if (tgtVal != null && srcVal == null) {
+            versionsToMove.put(SOURCE, tgtVal);
+        }
+
+        boolean[] merged = {false};
+        List<Statement> mapped = ListUtils.map(statements, s -> {
+            if (compatibilityName(s) != null) {
+                return null;
+            }
+            // The closure body of a configuration block returns its last statement, so unwrap `J.Return`
+            // when looking for an existing `java { }` block to merge into.
+            J.MethodInvocation javaBlock = asJavaBlock(s);
+            if (javaBlock == null) {
+                return s;
+            }
+            merged[0] = true;
+            J.MethodInvocation withEntries = addMissingEntries(javaBlock, versionsToMove, scope);
+            return s instanceof J.Return ? ((J.Return) s).withExpression(withEntries) : withEntries;
+        });
+        if (!merged[0]) {
+            // A blank line separates the new block from preceding statements, but not when it stands alone
+            // as the first statement of its (sub)project block.
+            Space prefix = Space.format(mapped.isEmpty() ? "\n" : "\n\n");
+            mapped = ListUtils.concat(mapped, ((J.MethodInvocation) buildJavaBlock(versionsToMove, ctx)).withPrefix(prefix));
+        }
+        return mapped;
+    }
+
+    /**
+     * Adds only what the existing block is missing, so there is nothing to build and then dedupe against.
+     */
+    private static J.MethodInvocation addMissingEntries(J.MethodInvocation javaBlock, Map<String, Expression> entries, Cursor scope) {
+        J.Lambda lambda = (J.Lambda) javaBlock.getArguments().get(0);
+        if (!(lambda.getBody() instanceof J.Block)) {
+            return javaBlock;
+        }
+        J.Block body = (J.Block) lambda.getBody();
+        Map<String, Expression> missing = new LinkedHashMap<>(entries);
+        for (Statement statement : body.getStatements()) {
+            missing.remove(compatibilityName(statement));
+        }
+        if (missing.isEmpty()) {
+            return javaBlock;
+        }
+
+        StringBuilder assignments = new StringBuilder();
+        List<Object> values = new ArrayList<>();
+        for (Map.Entry<String, Expression> entry : missing.entrySet()) {
+            if (assignments.length() > 0) {
+                assignments.append('\n');
+            }
+            assignments.append(entry.getKey()).append(" = ");
+            Integer version = extractVersion(entry.getValue());
+            if (version == null) {
+                // A value the recipe cannot normalise travels as a parameter rather than as text
+                assignments.append("#{any()}");
+                values.add(entry.getValue().withPrefix(Space.EMPTY));
+            } else {
+                assignments.append(enumForm(version));
+            }
+        }
+        return GroovyTemplate.builder(assignments.toString())
+                .build()
+                .apply(new Cursor(scope, javaBlock), body.getCoordinates().lastStatement(), values.toArray());
+    }
+
+    private static J.@Nullable MethodInvocation asJavaBlock(Statement s) {
+        J.MethodInvocation m = asInvocation(s);
+        if (m != null && "java".equals(m.getSimpleName()) &&
+                m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+            return m;
+        }
+        return null;
+    }
+
+    private static J.@Nullable MethodInvocation asInvocation(Statement s) {
+        if (s instanceof J.MethodInvocation) {
+            return (J.MethodInvocation) s;
+        }
+        if (s instanceof J.Return) {
+            Expression e = ((J.Return) s).getExpression();
+            if (e instanceof J.MethodInvocation) {
+                return (J.MethodInvocation) e;
+            }
+        }
+        return null;
     }
 
     private static Statement buildJavaBlock(Map<String, Expression> entries, ExecutionContext ctx) {

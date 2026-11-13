@@ -12,25 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pin the :class:`LegacyNotEqual` marker → printer wiring.
+"""The Py2 spelling ``<>`` of "not equal" is kept through a :class:`LegacyNotEqual` marker.
 
-The Py2 spelling ``<>`` for "not equal" is not actually reachable through
-the current parso 0.7 pipeline (parso pre-rewrites ``<>`` to ``!=`` before
-the visitor sees it), so the :class:`LegacyNotEqual` marker is dormant in
-practice. The fold logic in :mod:`_py2_parser_visitor` and the printer
-branch in :mod:`printer` are nonetheless wired up so a future parso
-upgrade — or source pre-processing that injects a ``<>`` operator leaf —
-will Just Work.
-
-This test pins that wiring by constructing the LST node directly. If a
-future change breaks the marker → ``<>`` rendering path, this test fails
-loudly instead of silently letting the bug ship the day the parser
-upstream gains ``<>`` support.
+parso has no ``<>`` token, so the parser hands it ``!=`` in its place and puts the
+marker on every comparison the source spelled ``<>``.
 """
+
+import pytest
 
 from rewrite import random_id, Markers
 from rewrite.java import Space, JLeftPadded
 from rewrite.java import tree as j
+from rewrite.python._py2_parser_visitor import Py2ParserVisitor
 from rewrite.python.markers import LegacyNotEqual
 from rewrite.python.printer import PythonPrinter
 
@@ -67,3 +60,34 @@ def test_no_marker_emits_bang_equals():
     """Without the marker, ``NotEqual`` prints as the Py3-style ``!=``."""
     binary = _binary_ne("a", "b", legacy=False)
     assert PythonPrinter().print(binary) == "a != b"
+
+
+@pytest.mark.parametrize("source, legacy", [
+    ("x = a <> b\n", 1),
+    ("if a <> b and c<>d:\n    print \"<>\"  # <>\n", 2),
+    ("x = a < b <> c != d\n", 1),
+    ("x = a <> b\r\ny = 1 <>2\r\n", 2),
+    ("x = a != b\n", 0),
+])
+def test_parser_keeps_the_spelling(source, legacy):
+    cu = Py2ParserVisitor(source, "<test>", "2.7").parse()
+
+    assert PythonPrinter().print(cu) == source
+    assert _count_legacy(cu) == legacy
+
+
+def _count_legacy(tree) -> int:
+    from dataclasses import fields, is_dataclass
+    count, seen, stack = 0, set(), [tree]
+    while stack:
+        o = stack.pop()
+        if id(o) in seen:
+            continue
+        seen.add(id(o))
+        if isinstance(o, j.Binary) and o.markers.find_first(LegacyNotEqual) is not None:
+            count += 1
+        if is_dataclass(o):
+            stack.extend(getattr(o, f.name, None) for f in fields(o))
+        elif isinstance(o, (list, tuple)):
+            stack.extend(o)
+    return count

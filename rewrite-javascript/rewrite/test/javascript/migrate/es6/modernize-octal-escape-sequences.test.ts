@@ -17,187 +17,32 @@
  */
 import {RecipeSpec} from "../../../../src/test";
 import {ModernizeOctalEscapeSequences} from "../../../../src/javascript/migrate/es6/modernize-octal-escape-sequences";
-import {javascript} from "../../../../src/javascript";
+import {javascript, tsx} from "../../../../src/javascript";
 
 describe("modernize-octal-escape-sequences", () => {
     const spec = new RecipeSpec()
-    spec.recipe = new ModernizeOctalEscapeSequences();
+    spec.recipe = new ModernizeOctalEscapeSequences()
 
-    test("convert null character", () => {
+    test("converts one, two and three digit octal escapes, and the surrounding text is untouched", () => {
         return spec.rewriteRun(
             //language=javascript
             javascript(
-                `const nullChar = "\\0";`,
-                `const nullChar = "\\x00";`
+                `const chars = "Hello\\1\\7\\12\\77\\123\\377World";`,
+                `const chars = "Hello\\x01\\x07\\x0a\\x3f\\x53\\xffWorld";`
             )
         )
     })
 
-    test("convert single digit octal escapes", () => {
+    test("leaves alone every escape that is not octal", () => {
         return spec.rewriteRun(
             //language=javascript
             javascript(
-                `const chars = "\\1\\2\\3\\7";`,
-                `const chars = "\\x01\\x02\\x03\\x07";`
+                `const escapes = "Hello World\\n\\t\\r\\\\\\u0000\\u00FF\\x00\\xFF";`
             )
         )
     })
 
-    test("convert two digit octal escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const chars = "\\12\\77";`,
-                `const chars = "\\x0a\\x3f";`
-            )
-        )
-    })
-
-    test("convert three digit octal escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const chars = "\\123\\377";`,
-                `const chars = "\\x53\\xff";`
-            )
-        )
-    })
-
-    test("convert mixed octal escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const mixed = "\\0\\12\\123";`,
-                `const mixed = "\\x00\\x0a\\x53";`
-            )
-        )
-    })
-
-    test("convert octal escapes with regular text", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const message = "Hello\\0World";`,
-                `const message = "Hello\\x00World";`
-            )
-        )
-    })
-
-    test("convert multiple strings with octal escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `
-                const a = "\\0";
-                const b = "\\123";
-                const c = "test\\7end";
-                `,
-                `
-                const a = "\\x00";
-                const b = "\\x53";
-                const c = "test\\x07end";
-                `
-            )
-        )
-    })
-
-    test("do not convert strings without octal escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const normal = "Hello World";`
-            )
-        )
-    })
-
-    test("do not convert other escape sequences", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const escapes = "\\n\\t\\r\\\\";`
-            )
-        )
-    })
-
-    test("do not convert unicode escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const unicode = "\\u0000\\u00FF";`
-            )
-        )
-    })
-
-    test("do not convert hex escapes", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const hex = "\\x00\\xFF";`
-            )
-        )
-    })
-
-    test("convert octal in template literal", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                "const template = `test\\0end`;",
-                "const template = `test\\x00end`;"
-            )
-        )
-    })
-
-    test("convert octal in object property", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const obj = { separator: "\\0" };`,
-                `const obj = { separator: "\\x00" };`
-            )
-        )
-    })
-
-    test("convert octal in array", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const delimiters = ["\\0", "\\1", "\\2"];`,
-                `const delimiters = ["\\x00", "\\x01", "\\x02"];`
-            )
-        )
-    })
-
-    test("convert octal in function call", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `split("\\0");`,
-                `split("\\x00");`
-            )
-        )
-    })
-
-    test("convert bell character", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const bell = "\\7";`,
-                `const bell = "\\x07";`
-            )
-        )
-    })
-
-    test("convert backspace character", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const backspace = "\\10";`,
-                `const backspace = "\\x08";`
-            )
-        )
-    })
-
-    test("do not convert numeric literals", () => {
+    test("a numeric literal is not a string, so its digits stay put", () => {
         return spec.rewriteRun(
             //language=javascript
             javascript(
@@ -205,68 +50,113 @@ describe("modernize-octal-escape-sequences", () => {
             )
         )
     })
+
+    test("leaves template literals alone, where \\0 is valid and other octal escapes are an error", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                "const template = `test\\0end`;"
+            )
+        )
+    })
+
+    test("leaves regex backreferences alone", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const re = /(a)\\1/;`
+            )
+        )
+    })
+
+    test("an escaped backslash followed by digits is not an octal escape", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\\\123";`
+            )
+        )
+    })
+
+    test("an escape starting with 4-7 takes at most two digits", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\400\\777";`,
+                `const s = "\\x200\\x3f7";`
+            )
+        )
+    })
+
+    test("leaves the NUL escape alone when no digit follows", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "a\\0b";`
+            )
+        )
+    })
+
+    test("converts \\0 followed by 8 or 9, which is still a legacy octal escape", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\08\\09";`,
+                `const s = "\\x008\\x009";`
+            )
+        )
+    })
+
+    test("leaves JSX attribute strings alone, as JSX does not process escapes", () => {
+        return spec.rewriteRun(
+            //language=tsx
+            tsx(
+                `const a = <a title="\\101"/>;`
+            )
+        )
+    })
+
+    test("keeps surrogate escapes in place when the text before them changes length", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\1\\ud83d\\ude80\\12";`,
+                `const s = "\\x01\\ud83d\\ude80\\x0a";`
+            )
+        )
+    })
+
+    test("an octal escape stops at a surrogate escape", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\1\\ud83d23";`,
+                `const s = "\\x01\\ud83d23";`
+            )
+        )
+    })
+
+    test("converts single-quoted strings", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = 'a\\101';`,
+                `const s = 'a\\x41';`
+            )
+        )
+    })
 });
 
 describe("modernize-octal-escape-sequences with useUnicodeEscapes option", () => {
     const spec = new RecipeSpec()
-    spec.recipe = new ModernizeOctalEscapeSequences({useUnicodeEscapes: true});
+    spec.recipe = new ModernizeOctalEscapeSequences({useUnicodeEscapes: true})
 
-    test("convert null character to Unicode", () => {
+    test("the option chooses \\u over \\x for the same escapes", () => {
         return spec.rewriteRun(
             //language=javascript
             javascript(
-                `const nullChar = "\\0";`,
-                `const nullChar = "\\u0000";`
-            )
-        )
-    })
-
-    test("convert single digit octal escapes to Unicode", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const chars = "\\1\\2\\3\\7";`,
-                `const chars = "\\u0001\\u0002\\u0003\\u0007";`
-            )
-        )
-    })
-
-    test("convert two digit octal escapes to Unicode", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const chars = "\\12\\77";`,
-                `const chars = "\\u000a\\u003f";`
-            )
-        )
-    })
-
-    test("convert three digit octal escapes to Unicode", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const chars = "\\123\\377";`,
-                `const chars = "\\u0053\\u00ff";`
-            )
-        )
-    })
-
-    test("convert mixed octal escapes to Unicode", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const mixed = "\\0\\12\\123";`,
-                `const mixed = "\\u0000\\u000a\\u0053";`
-            )
-        )
-    })
-
-    test("convert octal escapes with regular text to Unicode", () => {
-        return spec.rewriteRun(
-            //language=javascript
-            javascript(
-                `const message = "Hello\\0World";`,
-                `const message = "Hello\\u0000World";`
+                `const mixed = "\\01\\12\\123";`,
+                `const mixed = "\\u0001\\u000a\\u0053";`
             )
         )
     })

@@ -28,10 +28,12 @@
  */
 
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
+import {BlankLinesStyle, IntelliJ, JavaScriptParser, JavaScriptVisitor, JS, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
 import {create as produce, Draft} from "mutative";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
+import {J} from "../../../src/java";
+import {ExecutionContext} from "../../../src/execution";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
@@ -76,9 +78,14 @@ describe('SpacesVisitor', () => {
                 import{delta,gamma,zeta}from'delta.js';
                 import{b}from'qux.js';
                 import*as foo from'foo.js';
+                import defer   *as deferred from'deferred.js';
                 import a from'baz.js';
                 import'module-without-export.js';
                 import type{Models} from'../models';
+                import c,{d} from 'cd.js';
+                import e, {f} from 'ef.js';
+                import g,
+                    {h} from 'gh.js';
                 `,
                 `
                 export {MyPreciousClass} from './my-precious-class';
@@ -86,9 +93,59 @@ describe('SpacesVisitor', () => {
                 import {delta, gamma, zeta} from 'delta.js';
                 import {b} from 'qux.js';
                 import * as foo from 'foo.js';
+                import defer * as deferred from 'deferred.js';
                 import a from 'baz.js';
                 import 'module-without-export.js';
                 import type {Models} from '../models';
+                import c, {d} from 'cd.js';
+                import e, {f} from 'ef.js';
+                import g,
+                    {h} from 'gh.js';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('an inline type specifier in an export keeps one space before the name it qualifies', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export {type  A, type	B as C, d} from 'm';
+                `,
+                `
+                export {type A, type B as C, d} from 'm';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('a cleared inline type marker leaves no space behind', () => {
+        spec.recipe = fromVisitor(new ClearInlineTypeThenSpaces());
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export {type A, type B as C, d} from 'm';
+                `,
+                `
+                export {A, B as C, d} from 'm';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('an inline type specifier in an import keeps one space before the name it qualifies', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                import {type  A, type	B as C, d} from 'm';
+                `,
+                `
+                import {type A, type B as C, d} from 'm';
                 `
                 // @formatter:on
             ));
@@ -362,4 +419,27 @@ const d = {x, y, z};`
             )
         )
     });
+
+    test('type parameter bounds space around equals and before the closing bracket or comma', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(`type A<T extends X > = T;`, `type A<T extends X> = T;`),
+            typescript(`type B<T  =  X> = T;`, `type B<T = X> = T;`),
+            typescript(`type C<T extends X=  Y> = T;`, `type C<T extends X = Y> = T;`),
+            typescript(`function f<T extends X , U>() {}`, `function f<T extends X, U>() {}`)
+        )
+    });
 });
+
+class ClearInlineTypeThenSpaces extends JavaScriptVisitor<ExecutionContext> {
+    protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+        const edited = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
+        return new SpacesVisitor<ExecutionContext>(spaces()).visit(edited, ctx);
+    }
+
+    protected override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, ctx: ExecutionContext): Promise<J | undefined> {
+        return produce(exportSpecifier, draft => {
+            draft.typeOnly.element = false;
+        });
+    }
+}

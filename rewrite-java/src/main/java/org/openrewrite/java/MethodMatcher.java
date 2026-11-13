@@ -35,14 +35,17 @@ import static java.util.stream.Collectors.toList;
  * #declaring class# #method name#(#argument list#)
  * </B><P>
  * <li>The declaring class must be fully qualified.</li>
- * <li>A wildcard character, "*", may be used in either the declaring class or method name.</li>
+ * <li>A wildcard character, "*", may be used in either the declaring class or method name. In the declaring class it
+ * does not match across a "." separator.</li>
+ * <li>".." can be used in the declaring class to match any number of package segments, e.g. "java.util..*".</li>
  * <li>The argument list is expressed as a comma-separated list of the argument types</li>
  * <li>".." can be used in the argument list to match zero or more arguments of any type.</li>
  * <P><PRE>
  * EXAMPLES:
  * <p>
  * *..* *(..)                              - All method invocations
- * java.util.* *(..)                       - All method invocations to classes belonging to java.util (including sub-packages)
+ * java.util.* *(..)                       - All method invocations to classes belonging to java.util (excluding sub-packages)
+ * java.util..* *(..)                      - All method invocations to classes belonging to java.util (including sub-packages)
  * java.util.Collections *(..)             - All method invocations on java.util.Collections class
  * java.util.Collections unmodifiable*(..) - All method invocations starting with "unmodifiable" on java.util.Collections
  * java.util.Collections min(..)           - All method invocations for all overloads of "min"
@@ -82,6 +85,7 @@ public class MethodMatcher {
     private MethodNameMatcher methodNameMatcher;
     private List<ArgumentMatcher> argumentMatchers;
     private int varArgsPosition = -1;
+    private @Nullable String declaringTypeMatchPrefix;
 
     /**
      * Whether to match overridden forms of the method on subclasses of {@link #typeMatcher}.
@@ -137,6 +141,50 @@ public class MethodMatcher {
         this.methodNameMatcher = parser.methodNameMatcher;
         this.argumentMatchers = parser.argumentMatchers;
         this.varArgsPosition = parser.varArgsPosition;
+        this.declaringTypeMatchPrefix = parser.declaringTypeMatchPrefix;
+    }
+
+    /**
+     * The literal prefix that the declaring-type pattern requires of any matching type's fully qualified name:
+     * everything in the type pattern up to the first wildcard metacharacter ({@code *} or {@code ..}), with
+     * {@code $} canonicalized to {@code .}. A {@code ..} subpackage wildcard keeps the package separator that
+     * precedes it, since every type it matches has that separator in its FQN ({@code java.util..*} yields
+     * {@code java.util.}). Returns {@code null} when the pattern starts with a wildcard, i.e. no prefix can be
+     * required.
+     * <p>
+     * Because the type portion of a method pattern is matched verbatim against the declaring type's name (ignoring
+     * {@code matchOverrides}), this prefix is a <em>necessary</em> prefix of any non-override match. Callers holding
+     * a collection of methods sorted by canonical declaring-type FQN can therefore binary-search to this prefix and
+     * scan only the {@code startsWith(prefix)} window, confirming each candidate with {@link #matches(JavaType.Method)}.
+     */
+    public @Nullable String getDeclaringTypeMatchPrefix() {
+        return declaringTypeMatchPrefix;
+    }
+
+    /**
+     * The literal prefix of a declaring-type pattern: characters preceding the first {@code *} or {@code ..}, with
+     * {@code $} canonicalized to {@code .}. The package separator before a {@code ..} wildcard is retained
+     * ({@code java.util..*} -> {@code java.util.}) because every match has it; a separator before {@code *} is
+     * naturally retained too ({@code com.*.Bar} -> {@code com.}). {@code null} when empty.
+     */
+    private static @Nullable String literalTypePrefix(String typePattern) {
+        int end = typePattern.length();
+        for (int i = 0; i < typePattern.length(); i++) {
+            char c = typePattern.charAt(i);
+            if (c == '.' && i + 1 < typePattern.length() && typePattern.charAt(i + 1) == '.') {
+                end = i == 0 ? 0 : i + 1;
+                break;
+            }
+            if (c == '*') {
+                end = i;
+                break;
+            }
+        }
+        if (end == 0) {
+            return null;
+        }
+        String prefix = typePattern.substring(0, end);
+        return prefix.indexOf('$') < 0 ? prefix : prefix.replace('$', '.');
     }
 
     public static Validated<String> validate(@Nullable String signature) {
@@ -393,10 +441,28 @@ public class MethodMatcher {
             if (!typeMatcher.matchesSimpleName(select.getSimpleName())) {
                 return false;
             }
+        } else if (method.getSelect() instanceof J.FieldAccess) {
+            J.FieldAccess select = (J.FieldAccess) method.getSelect();
+            // A fully qualified type name, as in `java.util.Collections.emptyList()`, is checked like a simple one
+            if (select.getType() instanceof JavaType.Class &&
+                ((JavaType.Class) select.getType()).getFullyQualifiedName().replace('$', '.').equals(dottedName(select)) &&
+                !typeMatcher.matchesSimpleName(select.getSimpleName())) {
+                return false;
+            }
         }
 
         // For unknown types, we need to be more lenient with argument matching
         return matchesArgumentsAllowingUnknownTypes(method);
+    }
+
+    private static @Nullable String dottedName(Expression expression) {
+        if (expression instanceof J.Identifier) {
+            return ((J.Identifier) expression).getSimpleName();
+        } else if (expression instanceof J.FieldAccess) {
+            String target = dottedName(((J.FieldAccess) expression).getTarget());
+            return target == null ? null : target + "." + ((J.FieldAccess) expression).getSimpleName();
+        }
+        return null;
     }
 
     private boolean matchesArgumentsAllowingUnknownTypes(J.MethodInvocation method) {
@@ -759,6 +825,9 @@ public class MethodMatcher {
 
         @Override
         public boolean matches(JavaType type) {
+            if (type instanceof JavaType.MultiCatch) {
+                return everyMemberButNull((JavaType.MultiCatch) type);
+            }
             type = unwrapArrays(type, arrayDimensions, false);
             if (type == null) {
                 return false;
@@ -773,6 +842,23 @@ public class MethodMatcher {
                 return true;
             }
             return matches(type);
+        }
+
+        /**
+         * A union parameter type, like Python's {@code str | None}, comes as a {@link JavaType.MultiCatch}.
+         * Patterns have no union syntax, so {@code String} names a parameter that may also be null.
+         */
+        private boolean everyMemberButNull(JavaType.MultiCatch union) {
+            boolean any = false;
+            for (JavaType member : union.getThrowableTypes()) {
+                if (member != JavaType.Primitive.Null) {
+                    if (!matches(member)) {
+                        return false;
+                    }
+                    any = true;
+                }
+            }
+            return any;
         }
 
         @Override
@@ -867,6 +953,7 @@ public class MethodMatcher {
         private MethodMatcher.MethodNameMatcher methodNameMatcher;
         private List<MethodMatcher.ArgumentMatcher> argumentMatchers;
         private int varArgsPosition = -1;
+        private @Nullable String declaringTypeMatchPrefix;
         private boolean hasWildcardVarArgs = false;  // Track if we've seen .. wildcard
 
         void parse() {
@@ -895,6 +982,7 @@ public class MethodMatcher {
                 throw new IllegalArgumentException("Invalid method pattern - empty type pattern: " + pattern);
             }
             typeMatcher = parseTypeMatcher(typePattern);
+            declaringTypeMatchPrefix = literalTypePrefix(typePattern);
 
             // Parse method name pattern
             String methodName = pattern.substring(separator + 1, openParen).trim();

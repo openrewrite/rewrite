@@ -242,6 +242,11 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         return super.visitAttribute(a, p);
     }
 
+    @Override
+    public Hcl.HeredocTemplate visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, P p) {
+        return heredocTemplate.withPrefix(visitSpace(heredocTemplate.getPrefix(), Space.Location.HEREDOC, p));
+    }
+
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
         if (!space.getLastWhitespace().contains("\n")) {
             return space;
@@ -260,9 +265,9 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                  (Comment.Style.INLINE != space.getComments().get(0).getStyle() &&
                   (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
                 if (style.getUseTabCharacter()) {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
+                    space = space.withWhitespace(space.getWhitespace().replace(" ", ""));
                 } else {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
+                    space = space.withWhitespace(space.getWhitespace().replace("\t", ""));
                 }
             }
 

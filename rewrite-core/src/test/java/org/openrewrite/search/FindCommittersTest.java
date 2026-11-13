@@ -48,11 +48,10 @@ class FindCommittersTest implements RewriteTest {
         );
 
         rewriteRun(
-          spec -> spec.dataTable(DistinctCommitters.Row.class, rows -> {
+          spec -> spec.dataTable(DistinctCommitters.Row.class, rows ->
               assertThat(rows).satisfiesExactly(
                 r -> assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com")
-              );
-          }),
+              )),
           text(
             "hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
@@ -77,11 +76,10 @@ class FindCommittersTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec.recipe(new FindCommitters("2023-01-10"))
-            .dataTable(DistinctCommitters.Row.class, rows -> {
+            .dataTable(DistinctCommitters.Row.class, rows ->
                 assertThat(rows).satisfiesExactly(
                   r -> assertThat(r.getEmail()).isEqualTo("p.streef@gmail.com")
-                );
-            }),
+                )),
           text(
             "hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
@@ -106,12 +104,11 @@ class FindCommittersTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec.recipe(new FindCommitters(""))
-            .dataTable(DistinctCommitters.Row.class, rows -> {
+            .dataTable(DistinctCommitters.Row.class, rows ->
                 assertThat(rows).satisfiesExactly(
                   r -> assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com"),
                   r -> assertThat(r.getEmail()).isEqualTo("p.streef@gmail.com")
-                );
-            }),
+                )),
           text(
             "hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
@@ -129,15 +126,14 @@ class FindCommittersTest implements RewriteTest {
         );
 
         rewriteRun(
-          spec -> spec.dataTable(DistinctCommitters.Row.class, rows -> {
+          spec -> spec.dataTable(DistinctCommitters.Row.class, rows ->
               assertThat(rows).satisfiesExactly(
                 r -> {
                     assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com");
                     assertThat(r.getLastCommit()).isNull();
                     assertThat(r.getCommits()).isZero();
                 }
-              );
-          }),
+              )),
           text(
             "hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
@@ -156,11 +152,10 @@ class FindCommittersTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec.recipe(new FindCommitters("2023-01-01"))
-            .dataTable(DistinctCommitters.Row.class, rows -> {
+            .dataTable(DistinctCommitters.Row.class, rows ->
                 assertThat(rows).satisfiesExactly(
                   r -> assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com")
-                );
-            }),
+                )),
           text(
             "hi",
             spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))

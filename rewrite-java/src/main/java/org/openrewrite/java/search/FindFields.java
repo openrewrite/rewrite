@@ -131,8 +131,6 @@ public class FindFields extends Recipe {
             }
         };
 
-        Set<J> vs = new HashSet<>();
-        findVisitor.visit(j, vs);
-        return vs;
+        return findVisitor.reduce(j, new HashSet<>());
     }
 }

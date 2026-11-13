@@ -26,7 +26,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
-// ParseGoMod parses go.mod content into a golang.GoResolutionResult.
 // Mirrors org.openrewrite.golang.GoModParser on the Java side.
 func ParseGoMod(path, content string) (*golang.GoResolutionResult, error) {
 	f, err := modfile.Parse(path, []byte(content), nil)

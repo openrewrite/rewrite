@@ -1,11 +1,11 @@
 /*
  * Copyright 2026 the original author or authors.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,9 +29,10 @@
 //
 // The framework introspects the wrapper at PrepareRecipe time and emits
 // the gate's identity in the editPreconditions slot of the
-// PrepareRecipeResponse. The Java host then evaluates the precondition
-// against the local source file *before* dispatching the visit RPC,
-// skipping the entire RPC round trip when the precondition does not match.
+// PrepareRecipeResponse, or in scanPreconditions for a scanner. The Java
+// host then evaluates the precondition against the local source file
+// *before* dispatching the visit RPC, skipping the entire RPC round trip
+// when the precondition does not match.
 package preconditions
 
 import (
@@ -81,7 +82,7 @@ type Composite struct {
 // are designed to evaluate at the root and may assume the root layout.
 //
 // The framework also introspects this wrapper at PrepareRecipe time and
-// promotes Check to the editPreconditions wire slot so that the Java
+// promotes Check to the edit or scan preconditions wire slot so that the Java
 // host can evaluate the precondition locally and skip the visit RPC
 // entirely. In that case the wrapped V is what runs Go-side, so the
 // Visit method below is the fallback for in-process callers and for
@@ -90,6 +91,8 @@ type CheckVisitor struct {
 	Check CheckArg
 	V     recipe.TreeVisitor
 }
+
+func (*CheckVisitor) IsHeavyweight() {}
 
 // Visit runs the gate, then defers to the wrapped visitor when the gate
 // matches. RecipeRef operands are treated as "always matches" in-process
@@ -167,14 +170,13 @@ func runVisitor(v recipe.TreeVisitor, t java.Tree, p any) bool {
 	return result != t
 }
 
-// Check wraps an editor with a precondition gate.
-//
 // Argument shapes accepted as the gate (CheckArg):
 //   - recipe.TreeVisitor — runs in-process as the gate
-//   - recipe.Recipe — its Editor() is used as the gate
+//   - recipe.Recipe — its Editor() is used as the gate. The host runs a
+//     recipe.DelegatesTo as the Java recipe it names instead.
 //   - *RecipeRef — placeholder for a Java search recipe; the framework
-//     emits the recipe identity in the editPreconditions wire slot at
-//     PrepareRecipe time so the host evaluates it locally without a Go RPC
+//     emits the recipe identity in the edit or scan preconditions wire slot
+//     at PrepareRecipe time so the host evaluates it locally without a Go RPC
 //   - *Composite — combination via Or / And / Not
 func Check(check CheckArg, v recipe.TreeVisitor) recipe.TreeVisitor {
 	return &CheckVisitor{Check: check, V: v}

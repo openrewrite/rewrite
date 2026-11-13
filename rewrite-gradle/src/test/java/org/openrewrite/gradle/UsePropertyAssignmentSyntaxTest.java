@@ -260,12 +260,182 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
     }
 
     @Test
+    void versionCatalogBuilderCallsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version("junit", "6.1.2")
+                          library("bom", "org.junit", "junit-bom").versionRef("junit")
+                          library("assertj", "org.assertj", "assertj-core").version("3.27.7")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodCallUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          buildGradle(
+            """
+              someBuilder().version('1.0')
+              """
+          )
+        );
+    }
+
+    @Test
+    void regularMethodWithSameNameUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("group")),
+          buildGradle(
+            """
+              def m = java.util.regex.Pattern.compile("(\\\\d+)\\\\..*").matcher("1.2")
+              def major = ""
+              if (m.find()) {
+                  major = m.group(1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noArgMethodCallUnchanged() {
         rewriteRun(
           buildGradle(
             """
               tasks.register('runLogic', JavaExec) {
                   description()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryUrlConvertedInBuildGradle() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("url")),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      maven {
+                          url 'https://repo.example.com/plugins'
+                      }
+                  }
+              }
+              repositories {
+                  maven {
+                      url "https://repo.example.com/releases"
+                  }
+                  maven { url uri('https://repo.example.com/snapshots') }
+                  ivy {
+                      url 'https://repo.example.com/ivy'
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      maven {
+                          url = 'https://repo.example.com/plugins'
+                      }
+                  }
+              }
+              repositories {
+                  maven {
+                      url = "https://repo.example.com/releases"
+                  }
+                  maven { url = uri('https://repo.example.com/snapshots') }
+                  ivy {
+                      url = 'https://repo.example.com/ivy'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryUrlConvertedInSettingsGradle() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("url")),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url 'https://repo.example.com/plugins'
+                      }
+                  }
+              }
+              dependencyResolutionManagement {
+                  repositories {
+                      maven {
+                          url 'https://repo.example.com/releases'
+                      }
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = 'https://repo.example.com/plugins'
+                      }
+                  }
+              }
+              dependencyResolutionManagement {
+                  repositories {
+                      maven {
+                          url = 'https://repo.example.com/releases'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryUrlAssignmentAndSetterUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("url")),
+          buildGradle(
+            """
+              repositories {
+                  maven {
+                      url = 'https://repo.example.com/releases'
+                  }
+                  maven {
+                      setUrl('https://repo.example.com/snapshots')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declaredUrlMethodInClosureUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("url")),
+          buildGradle(
+            """
+              class Site {
+                  void url(String url) {}
+              }
+              new Site().with {
+                  url 'https://example.com'
               }
               """
           )

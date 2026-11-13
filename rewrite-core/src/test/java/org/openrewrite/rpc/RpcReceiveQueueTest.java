@@ -17,16 +17,32 @@ package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import io.moderne.jsonrpc.JsonRpcSuccess;
+import io.moderne.jsonrpc.RawJson;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Checksum;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.text.PlainText;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.time.ZonedDateTime;
 import java.util.*;
 
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -111,6 +127,19 @@ class RpcReceiveQueueTest {
     }
 
     @Test
+    void changedMarkerWithSameIdRoundTrips() {
+        BuildTool buildTool = new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.0");
+        Markers before = Markers.build(List.of(buildTool));
+        Markers after = before.withMarkers(List.of(buildTool.withVersion("8.0")));
+
+        sq.send(after, before, null);
+        Markers received = rq.receive(before);
+
+        assertThat(received.findFirst(BuildTool.class)).hasValueSatisfying(bt ->
+          assertThat(bt.getVersion()).isEqualTo("8.0"));
+    }
+
+    @Test
     void plainMapRoundTripsWithoutLeakingRefMetadata() throws Exception {
         // A Map<String, String> (e.g. NodeResolutionResult.Npmrc#properties) must survive
         // the round trip without gaining "@c"/"@ref" entries. Those keys are only meaningful
@@ -137,6 +166,46 @@ class RpcReceiveQueueTest {
     }
 
     @Test
+    void fileAttributeTimestampsTravelAsStrings() {
+        ZonedDateTime created = ZonedDateTime.parse("2026-08-16T10:15:30.123456789+02:00[Europe/Berlin]");
+        FileAttributes before = new FileAttributes(created, created.plusHours(1), created.plusHours(2),
+          true, true, false, 100);
+
+        sq.send(before, null, null);
+
+        // A raw ZonedDateTime is written as a bare epoch number and arrives as a Double -- a CCE
+        // in rpcReceive, and even coerced it would have lost the zone and the nanos below.
+        List<RpcObjectData> timestamps = batches.stream().flatMap(List::stream).collect(toList()).subList(1, 4);
+        assertThat(timestamps).allSatisfy(data -> {
+            assertThat(data.getValueType()).isNull();
+            assertThat((Object) data.getValue()).isInstanceOf(String.class);
+        });
+
+        FileAttributes after = rq.receive(null);
+        assertThat(after).isEqualTo(before);
+        assertThat(after.getCreationTime()).isEqualTo(created);
+        assertThat(requireNonNull(after.getCreationTime()).getZone()).isEqualTo(created.getZone());
+        assertThat(after.getCreationTime().getNano()).isEqualTo(123456789);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {0, 42, Integer.MAX_VALUE, Integer.MAX_VALUE + 1L})
+    @Issue("https://github.com/openrewrite/rewrite/issues/9417")
+    void fileAttributeSizeRoundTripsThroughJson(long size) throws IOException {
+        FileAttributes before = new FileAttributes(null, null, null, true, true, false, 100);
+        FileAttributes after = before.withSize(size);
+
+        // A different baseline forces the size through the CHANGE path rather than NO_CHANGE.
+        sq.send(after, before, null);
+        replaceBatchesWithTheirJsonDecoding();
+        assertThat(rq.receive(before)).isEqualTo(after);
+
+        sq.send(after, null, null);
+        replaceBatchesWithTheirJsonDecoding();
+        assertThat(rq.<FileAttributes>receive(null)).isEqualTo(after);
+    }
+
+    @Test
     void detectsMissingCodecOnReceiverSide() {
         // given
         batches.addLast(List.of(
@@ -147,6 +216,40 @@ class RpcReceiveQueueTest {
         assertThatThrownBy(() -> rq.receive(null))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("No RPC codec registered on the Java side for 'java.lang.StringBuilder'");
+    }
+
+    @Test
+    void rejectsAnAddThatCarriesNothing() {
+        batches.addLast(List.of(new RpcObjectData(RpcObjectData.State.ADD, null, null, null, false)));
+
+        assertThatThrownBy(() -> rq.receive(null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("no value type, value or ref");
+    }
+
+    @Test
+    void nullMarkerStaysWhereItIsWhenAnotherChanges() {
+        BuildTool buildTool = new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.0");
+        Markers before = Markers.build(Arrays.asList(null, buildTool));
+        Markers after = before.withMarkers(Arrays.asList(null, buildTool.withVersion("8.0")));
+
+        sq.send(after, before, null);
+        Markers received = rq.receive(before);
+
+        assertThat(received.getMarkers()).hasSize(2);
+        assertThat(received.getMarkers().get(0)).isNull();
+        assertThat(received.findFirst(BuildTool.class)).hasValueSatisfying(bt ->
+          assertThat(bt.getVersion()).isEqualTo("8.0"));
+    }
+
+    private void replaceBatchesWithTheirJsonDecoding() throws IOException {
+        JsonMessageFormatter formatter = new JsonMessageFormatter(new ParameterNamesModule());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        formatter.serialize(new JsonRpcSuccess(1, RawJson.of(
+          batches.stream().flatMap(List::stream).collect(toList()))), out);
+        batches.clear();
+        batches.addLast(((JsonRpcSuccess) formatter.deserialize(new ByteArrayInputStream(out.toByteArray())))
+          .getResult(GetObjectResponse.class));
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {

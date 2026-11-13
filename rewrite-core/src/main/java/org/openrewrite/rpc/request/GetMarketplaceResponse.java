@@ -16,6 +16,7 @@
 package org.openrewrite.rpc.request;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.marketplace.RecipeBundle;
@@ -35,11 +36,27 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
     public static class Row {
         RecipeDescriptor descriptor;
         List<List<CategoryDescriptor>> categoryPaths;
+
+        /**
+         * The package this recipe was contributed by, as reported by the RPC server. Lets the host
+         * attribute each row to its true bundle instead of force-tagging every row with the one
+         * requested bundle. Null when the server does not report origin (e.g. ecosystems not yet
+         * emitting it, or built-in recipes) — such rows fall back to the requested bundle.
+         */
+        @Nullable String packageName;
     }
 
     public RecipeMarketplace toMarketplace(RecipeBundle bundle) {
         RecipeMarketplace marketplace = new RecipeMarketplace();
         for (Row recipe : this) {
+            // A row carrying a different package's origin belongs to that bundle's own reader, not this
+            // one — skip it so each reader contributes only its own recipes (and a later install of one
+            // bundle can't resurrect another the host has uninstalled). A null origin (ecosystems not yet
+            // emitting it, or built-in recipes) falls back to the requested bundle.
+            if (recipe.getPackageName() != null &&
+                    !recipe.getPackageName().equals(bundle.getPackageName())) {
+                continue;
+            }
             for (List<CategoryDescriptor> categoryPath : recipe.getCategoryPaths()) {
                 marketplace.install(RecipeListing.fromDescriptor(recipe.getDescriptor(), bundle), categoryPath);
             }
@@ -66,7 +83,8 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
                 category.getDescription(), emptySet(), false, 0, false));
         for (RecipeListing recipe : category.getRecipes()) {
             rowByRecipeId.computeIfAbsent(recipe.getName(), recipeId ->
-                    new Row(recipe.describe(resolvers), new ArrayList<>())).categoryPaths.add(categoryPath);
+                    new Row(recipe.describe(resolvers), new ArrayList<>(),
+                            recipe.getBundle().getPackageName())).categoryPaths.add(categoryPath);
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
             fromCategory(resolvers, rowByRecipeId, child, categoryPath);

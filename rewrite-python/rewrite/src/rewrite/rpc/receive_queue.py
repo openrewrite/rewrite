@@ -23,30 +23,62 @@ This processes the same JSON format that Python sends:
 ]
 """
 from collections import deque
-from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, TypeVar, cast
+from typing import Any, Callable, Deque, Dict, List, Optional, Set, TypeVar, cast
 
 from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
+from rewrite.utils import assign_fields, replace_if_changed
 
 T = TypeVar('T')
 
-# Hot-path lookup: every received envelope hits this. `Enum.__call__` does a
-# metaclass-driven O(n) value scan in stdlib `enum`; a plain dict is ~5-10×
-# faster, and at ~70M calls per medium-set sequential run that matters.
+# `Enum.__call__` scans the members for a value, where a dict lookup does not.
 _STATE_BY_VALUE: Dict[str, RpcObjectState] = {s.value: s for s in RpcObjectState}
 
+# A str-valued enum member equals its value, so these match a state decoded off the wire and an
+# RpcObjectState put on an in-process queue alike.
+_NO_CHANGE, _DELETE, _ADD, _CHANGE = 'NO_CHANGE', 'DELETE', 'ADD', 'CHANGE'
+_UNSET: Any = object()
 
-class RpcObjectData(NamedTuple):
-    """Data structure for RPC object messages.
 
-    Tuple-backed (no __dict__) for cheap instantiation: ~70M of these are
-    created per medium-set sequential run and they're never mutated.
+class _FrozenList(list):
+    """A shared immutable empty ``list`` to deduplicate the many empty child
+    collections in a received LST (memory optimization). Subclassing ``list``
+    keeps ``isinstance(x, list)`` true; the mutators raise so a stray in-place
+    write fails loudly instead of corrupting every node that shares it."""
+
+    __slots__ = ()
+
+    def _immutable(self, *_args: Any, **_kwargs: Any) -> Any:
+        raise TypeError("empty received list is immutable and shared")
+
+    __setitem__ = __delitem__ = __iadd__ = __imul__ = _immutable  # type: ignore[assignment]
+    append = extend = insert = remove = pop = clear = sort = reverse = _immutable  # type: ignore[assignment]
+
+
+_EMPTY_LIST: List[Any] = _FrozenList()
+
+
+class RpcObjectData:
+    """An RPC object message as ``RpcReceiveQueue.take`` returns it.
+
+    ``receive`` and ``receive_list`` read the decoded message dict directly.
     """
-    state: RpcObjectState
-    value_type: Optional[str] = None
-    value: Any = None
-    ref: Optional[int] = None
-    trace: Optional[str] = None
+
+    __slots__ = ('state', 'value_type', 'value', 'ref', 'trace')
+
+    def __init__(self, state: RpcObjectState, value_type: Optional[str] = None,
+                 value: Any = None, ref: Optional[int] = None, trace: Optional[str] = None):
+        self.state = state
+        self.value_type = value_type
+        self.value = value
+        self.ref = ref
+        self.trace = trace
+
+    # receive_list reports a desynchronized queue by formatting the message it got, which a
+    # default object repr would reduce to an address.
+    def __repr__(self) -> str:
+        return (f"RpcObjectData(state={self.state}, value_type={self.value_type!r}, "
+                f"value={self.value!r}, ref={self.ref!r}, trace={self.trace!r})")
 
 
 class RpcReceiveQueue:
@@ -79,23 +111,33 @@ class RpcReceiveQueue:
         self._source_file_type = source_file_type
         self._pull = pull
         self._trace = trace
+        # Ids of the objects this queue built and has not published yet. A child
+        # is added and dropped inside its own frame, so this holds one entry per
+        # level of the tree being received rather than one per node.
+        self._fresh: Set[int] = set()
+        # Refs this queue recorded, for roll_back_refs.
+        self._received_refs: List[int] = []
+        # Registry lookups, resolved once per class or valueType for the life of this queue.
+        self._codecs: Dict[type, Any] = {}
+        self._factories: Dict[str, Any] = {}
 
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
+        return self._parse_message(self._take_raw())
+
+    def _take_raw(self) -> Dict[str, Any]:
+        """The next message as decoded off the wire, which ``receive`` and ``receive_list`` read in place."""
         if not self._batch:
             self._batch = deque(self._pull())
 
         if not self._batch:
             raise RuntimeError("RPC receive queue is empty and pull returned no data")
 
-        raw = self._batch.popleft()
-        return self._parse_message(raw)
+        return self._batch.popleft()
 
     def _parse_message(self, raw: Dict[str, Any]) -> RpcObjectData:
         """Parse a raw message dict into RpcObjectData."""
         state_raw = raw.get('state', 'NO_CHANGE')
-        # type(x) is str sidesteps the ABC dispatch path that isinstance() takes
-        # — saves a hot per-call ~200 ns × ~70M calls.
         state = _STATE_BY_VALUE[state_raw] if type(state_raw) is str else state_raw
 
         return RpcObjectData(
@@ -143,18 +185,20 @@ class RpcReceiveQueue:
         Returns:
             The deserialized object, or None if deleted
         """
-        message = self.take()
-        ref: Optional[int] = None
+        message = self._take_raw()
+        state = message.get('state', _NO_CHANGE)
 
-        if message.state == RpcObjectState.NO_CHANGE:
+        if state == _NO_CHANGE:
             return before
 
-        elif message.state == RpcObjectState.DELETE:
+        elif state == _DELETE:
             return None
 
-        elif message.state == RpcObjectState.ADD:
-            ref = message.ref
-            if ref is not None and message.value_type is None and message.value is None:
+        elif state == _ADD:
+            ref = message.get('ref')
+            value_type = message.get('valueType')
+            value = message.get('value')
+            if ref is not None and value_type is None and value is None:
                 # Pure reference to existing object
                 if ref in self._refs:
                     return self._refs[ref]
@@ -162,29 +206,58 @@ class RpcReceiveQueue:
                     raise RuntimeError(f"Received reference to unknown object: {ref}")
             else:
                 # New object or forward declaration with ref
-                if message.value_type is None:
-                    before = message.value
+                if value_type is None:
+                    before = value
+                    fresh = False
                 else:
-                    before = self._new_obj(message.value_type)
+                    before = self._new_obj(value_type)
+                    fresh = True
 
                 if ref is not None:
                     # Store for future references (handles cyclic graphs)
                     self._refs[ref] = before
+                    self._received_refs.append(ref)
 
             # Fall through to CHANGE for field-by-field deserialization
-            return self._do_change(before, on_change, message, ref)
+            if not fresh:
+                return self._do_change(before, on_change, state, value_type, value, ref)
+            self._fresh.add(id(before))
+            try:
+                return self._do_change(before, on_change, state, value_type, value, ref)
+            finally:
+                self._fresh.discard(id(before))
 
-        elif message.state == RpcObjectState.CHANGE:
-            return self._do_change(before, on_change, message, message.ref)
+        elif state == _CHANGE:
+            return self._do_change(before, on_change, state, message.get('valueType'),
+                                   message.get('value'), message.get('ref'))
 
         else:
-            raise RuntimeError(f"Unknown state type: {message.state}")
+            raise RuntimeError(f"Unknown state type: {state}")
+
+    def roll_back_refs(self) -> None:
+        """Drop the refs received through this queue, for when what it was receiving did not
+        arrive whole. The sender of a failed transfer forgets the refs it assigned in it as well."""
+        for ref in self._received_refs:
+            self._refs.pop(ref, None)
+        self._received_refs.clear()
+
+    def apply(self, obj: T, **kwargs) -> T:
+        """Give a node the fields just read off the wire.
+
+        A node this queue is still building is filled in place; one the caller
+        already holds is copied, because a visitor may be sharing it.
+        """
+        if id(obj) in self._fresh:
+            return assign_fields(obj, **kwargs)
+        return replace_if_changed(obj, **kwargs)
 
     def _do_change(
         self,
         before: Optional[T],
         on_change: Optional[Callable[[Optional[T]], T]],
-        message: RpcObjectData,
+        state: str,
+        value_type: Optional[str],
+        value: Any,
         ref: Optional[int]
     ) -> Optional[T]:
         """Handle CHANGE state for an object."""
@@ -196,14 +269,17 @@ class RpcReceiveQueue:
             codec = self._get_codec(before)
             if codec is not None:
                 after = codec(before, self)
-            elif message.value is not None:
-                if message.value_type:
-                    after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
+            elif value is not None:
+                reader = _value_readers.get(value_type) if value_type else None
+                if reader is not None:
+                    after = reader(value)
+                elif value_type:
+                    after = {'kind': value_type, **value} if isinstance(value, dict) else value
                 else:
-                    after = message.value
-            elif message.state == RpcObjectState.ADD and message.value_type:
+                    after = value
+            elif state == _ADD and value_type:
                 raise RuntimeError(
-                    f"No RPC codec registered on the Python side for '{message.value_type}'. "
+                    f"No RPC codec registered on the Python side for '{value_type}'. "
                     "The remote side has a codec and sent property messages that will not be consumed, "
                     "causing RPC queue desynchronization."
                 )
@@ -252,24 +328,24 @@ class RpcReceiveQueue:
         Returns:
             The deserialized list, or None if deleted
         """
-        message = self.take()
+        state = self._take_raw().get('state', _NO_CHANGE)
 
-        if message.state == RpcObjectState.NO_CHANGE:
+        if state == _NO_CHANGE:
             return before
 
-        elif message.state == RpcObjectState.DELETE:
+        elif state == _DELETE:
             return None
 
-        elif message.state == RpcObjectState.ADD:
+        elif state == _ADD:
             before = []
             # Fall through to CHANGE
 
-        elif message.state != RpcObjectState.CHANGE:
-            raise RuntimeError(f"{message.state} is not supported for lists")
+        elif state != _CHANGE:
+            raise RuntimeError(f"{state} is not supported for lists")
 
         # Next message should be CHANGE with positions array
-        positions_msg = self.take()
-        positions = positions_msg.value
+        positions_msg = self._take_raw()
+        positions = positions_msg.get('value')
 
         if not isinstance(positions, list):
             raise RuntimeError(f"Expected positions array but got: {positions_msg}")
@@ -284,7 +360,7 @@ class RpcReceiveQueue:
             item = self.receive(b, on_change)
             after.append(item)
 
-        return after
+        return after if after else _EMPTY_LIST
 
     def receive_markers(self, markers: Optional['Markers'] = None) -> 'Markers':
         """Receive and deserialize Markers.
@@ -307,7 +383,7 @@ class RpcReceiveQueue:
             new_id = self.receive_defined(m.id)
             new_markers_list = self.receive_list(list(m.markers) if m.markers else None)
 
-            return Markers(new_id, new_markers_list or [])
+            return Markers.build(new_id, new_markers_list or [])
 
         return self.receive(markers, on_change) or Markers.EMPTY
 
@@ -316,7 +392,9 @@ class RpcReceiveQueue:
 
         All types should be registered via codec registration at module load time.
         """
-        factory = _get_codec_factory(value_type, self._source_file_type)
+        factory = self._factories.get(value_type, _UNSET)
+        if factory is _UNSET:
+            factory = self._factories[value_type] = _get_codec_factory(value_type, self._source_file_type)
         if factory is not None:
             return factory()
 
@@ -333,8 +411,11 @@ class RpcReceiveQueue:
             return None
 
         # Look up by Python class name - no isinstance checks needed
-        obj_type = type(obj).__qualname__
-        return _get_receive_codec(obj_type, self._source_file_type)
+        obj_type = type(obj)
+        codec = self._codecs.get(obj_type, _UNSET)
+        if codec is _UNSET:
+            codec = self._codecs[obj_type] = _get_receive_codec(obj_type.__qualname__, self._source_file_type)
+        return codec
 
 
 # Codec registry
@@ -344,6 +425,9 @@ _codec_factories: Dict[str, Dict[str, Callable[[], Any]]] = {}
 _send_codecs: Dict[type, Callable[[Any, Any], None]] = {}
 # Reverse mapping: Python class -> Java type name (used by sender)
 _python_to_java_type: Dict[type, str] = {}
+# Types the host has no codec for, which cross whole as the value of one message
+_value_readers: Dict[str, Callable[[Any], Any]] = {}
+_value_writers: Dict[type, Callable[[Any], Any]] = {}
 
 
 def register_receive_codec(
@@ -413,6 +497,30 @@ def register_send_codec(
     _send_codecs[python_class] = codec
 
 
+def register_value_codec(
+    java_type: str,
+    python_class: type,
+    reader: Callable[[Any], Any],
+    writer: Callable[[Any], Any]
+) -> None:
+    """Register a type that travels as one inline value, in the JSON form the host gives it.
+
+    Args:
+        java_type: Java type name
+        python_class: The Python class
+        reader: Function to build the object from its value: (value) -> obj
+        writer: Function to produce that value: (obj) -> value
+    """
+    _value_readers[java_type] = reader
+    _value_writers[python_class] = writer
+    _python_to_java_type[python_class] = java_type
+
+
+def get_value_writer(obj: Any) -> Optional[Callable[[Any], Any]]:
+    """Get the function that turns an object into its inline value, or None if it has none."""
+    return _value_writers.get(type(obj))
+
+
 def get_send_codec(obj: Any) -> Optional[Callable[[Any, Any], None]]:
     """Get the send codec for an object.
 
@@ -432,7 +540,7 @@ def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
     new_id = q.receive_defined(markers.id)
     new_markers_list = q.receive_list(list(markers.markers) if markers.markers else None)
 
-    return Markers(new_id, new_markers_list or [])
+    return Markers.build(new_id, new_markers_list or [])
 
 
 # ============================================================================

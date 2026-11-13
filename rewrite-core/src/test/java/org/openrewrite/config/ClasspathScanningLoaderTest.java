@@ -17,16 +17,28 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.AbstractRecipe;
 import org.openrewrite.Recipe;
+import org.openrewrite.style.NamedStyles;
 
+import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ClasspathScanningLoaderTest {
@@ -200,5 +212,95 @@ class ClasspathScanningLoaderTest {
         // Exactly one loader was drained — the short-circuit stopped iterating once
         // the recipe turned up in the shared map.
         assertThat(loader.yamlLoadersDrained()).isEqualTo(1);
+    }
+
+    @Test
+    void activateRecipeOnManyThreadsAtOnce() throws Exception {
+        // Tests that share one environment and run in parallel use it for the first time all at once.
+        Environment env = Environment.builder().scanRuntimeClasspath().build();
+
+        List<String> activated = onThreadsAtOnce(16, thread -> env.activateRecipes("test.declarative.sample.a").getName());
+
+        assertThat(activated).containsOnly("test.declarative.sample.a");
+    }
+
+    @Test
+    void useRuntimeClasspathOnManyThreadsAtOnce() throws Exception {
+        assertManyThreadsSeeWhatOneSees(() -> Environment.builder().scanRuntimeClasspath().build(), "test.declarative.sample.a");
+    }
+
+    @Test
+    void useJarOnManyThreadsAtOnce(@TempDir Path jar) throws Exception {
+        // The loaders scanJar builds share one superclass map, and describing the jar's
+        // recipe lists the recipes of every dependency.
+        Files.createDirectories(jar.resolve("META-INF/rewrite"));
+        Files.writeString(jar.resolve("META-INF/rewrite/recipe.yml"),
+                """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: com.example.UsesSampleA
+                displayName: Uses sample A
+                description: Uses a recipe from a dependency.
+                recipeList:
+                  - test.declarative.sample.a
+                """);
+        List<Path> dependencies = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+                .map(Path::of)
+                .toList();
+
+        assertManyThreadsSeeWhatOneSees(
+                () -> Environment.builder().scanJar(jar, dependencies, getClass().getClassLoader()).build(),
+                "com.example.UsesSampleA");
+    }
+
+    /**
+     * Uses one fresh environment from many threads at once, each doing one of several things,
+     * and checks that each sees what a single thread sees in another fresh environment.
+     */
+    private static void assertManyThreadsSeeWhatOneSees(Supplier<Environment> environment, String recipe) throws Exception {
+        List<Function<Environment, List<String>>> uses = List.of(
+                env -> names(env.listRecipes(), Recipe::getName),
+                env -> names(env.listRecipeDescriptors(), RecipeDescriptor::getName),
+                env -> names(env.listCategoryDescriptors(), CategoryDescriptor::getPackageName),
+                env -> names(env.listStyles(), NamedStyles::getName),
+                env -> List.of(env.activateRecipes(recipe).getName()));
+        Environment reference = environment.get();
+        List<List<String>> expected = uses.stream().map(use -> use.apply(reference)).toList();
+
+        Environment env = environment.get();
+        List<List<String>> actual = onThreadsAtOnce(4 * uses.size(), thread -> uses.get(thread % uses.size()).apply(env));
+
+        for (int thread = 0; thread < actual.size(); thread++) {
+            assertThat(actual.get(thread)).isEqualTo(expected.get(thread % uses.size()));
+        }
+    }
+
+    private static <T> List<String> names(Collection<T> items, Function<T, String> name) {
+        return items.stream().map(name).sorted().toList();
+    }
+
+    private static <T> List<T> onThreadsAtOnce(int threads, IntFunction<T> task) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try {
+            CountDownLatch ready = new CountDownLatch(threads);
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<T>> futures = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                int thread = i;
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return task.apply(thread);
+                }));
+            }
+            ready.await();
+            start.countDown();
+            List<T> results = new ArrayList<>();
+            for (Future<T> future : futures) {
+                results.add(future.get(1, MINUTES));
+            }
+            return results;
+        } finally {
+            executor.shutdownNow();
+        }
     }
 }

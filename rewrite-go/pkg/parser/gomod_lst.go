@@ -23,7 +23,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// ParseGoModFile parses go.mod content into a lossless golang.GoMod LST.
 // Mirrors org.openrewrite.golang.GoModParser on the Java side (the LST
 // path, not the legacy PlainText+marker path).
 //
@@ -41,7 +40,7 @@ func ParseGoModFile(path, content string) (*golang.GoMod, error) {
 
 	gm := &golang.GoMod{
 		Ident:      uuid.New(),
-		Markers:    java.Markers{ID: uuid.New()},
+		Markers:    java.EmptyMarkers,
 		SourcePath: path,
 		Charset:    "UTF-8",
 	}
@@ -56,7 +55,7 @@ func ParseGoModFile(path, content string) (*golang.GoMod, error) {
 			dir := &golang.GoModDirective{
 				Ident:   uuid.New(),
 				Prefix:  prefix,
-				Markers: java.Markers{ID: uuid.New()},
+				Markers: java.EmptyMarkers,
 			}
 			if len(vals) > 0 {
 				dir.Keyword = vals[0].Text
@@ -77,7 +76,7 @@ func ParseGoModFile(path, content string) (*golang.GoMod, error) {
 				entry := &golang.GoModDirective{
 					Ident:   uuid.New(),
 					Prefix:  entryPrefix,
-					Markers: java.Markers{ID: uuid.New()},
+					Markers: java.EmptyMarkers,
 					Values:  splitGoModTokens(content[ln.Start.Byte:ln.End.Byte]),
 				}
 				after, next := consumeGoModAfter(content, ln.End.Byte)
@@ -91,7 +90,7 @@ func ParseGoModFile(path, content string) (*golang.GoMod, error) {
 			block := &golang.GoModBlock{
 				Ident:        uuid.New(),
 				Prefix:       prefix,
-				Markers:      java.Markers{ID: uuid.New()},
+				Markers:      java.EmptyMarkers,
 				Keyword:      keyword,
 				BeforeLParen: beforeLParen,
 				Entries:      entries,
@@ -118,7 +117,7 @@ func rightPadStatement(s golang.GoModStatement, after java.Space) java.RightPadd
 	return java.RightPadded[golang.GoModStatement]{
 		Element: s,
 		After:   after,
-		Markers: java.Markers{ID: uuid.New()},
+		Markers: java.EmptyMarkers,
 	}
 }
 
@@ -145,7 +144,7 @@ func splitGoModTokens(raw string) []*golang.GoModValue {
 		vals = append(vals, &golang.GoModValue{
 			Ident:   uuid.New(),
 			Prefix:  java.ParseSpace(prefix),
-			Markers: java.Markers{ID: uuid.New()},
+			Markers: java.EmptyMarkers,
 			Text:    raw[start:i],
 		})
 	}

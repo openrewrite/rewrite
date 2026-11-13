@@ -15,13 +15,21 @@
  */
 package org.openrewrite.java.style;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
@@ -320,6 +328,28 @@ class AutodetectTest implements RewriteTest {
             	public void method() {
             		int value = 0;
             	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void tabsDeeperThanBlockDepth() {
+        var cus = jp().parse(
+          """
+            public class Test {
+            \tpublic int method(boolean b) {
+            \t\tif (b)
+            \t\t\t    return 1;
+            \t\treturn 0;
+            \t}
             }
             """
         );
@@ -642,6 +672,46 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
+        var cus = jp().parse(
+          """
+            package org.openrewrite.test;
+
+            public class Outer {
+                public enum Measure {
+                    One, Two, Three, Four, Five, Six;
+
+                    public int label;
+                }
+            }
+            """,
+          """
+            package org.openrewrite.test;
+
+            import java.util.List;
+
+            import static org.openrewrite.test.Outer.Measure.*;
+
+            class OuterTest {
+                List<Object> used() {
+                    return List.of(One, Two, Three, Four, Five);
+                }
+
+                int parameterized(Outer.Measure measure) {
+                    return measure.label;
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+
+        assertThat(importLayout.getNameCountToUseStarImport()).isEqualTo(5);
+    }
+
+    @Test
     void detectMethodArgs() {
         var cus = jp().parse(
           """
@@ -709,6 +779,22 @@ class AutodetectTest implements RewriteTest {
                 {
                     String s = (String) getString();
                 }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterTypeCast()).isTrue();
+    }
+
+    @Test
+    void afterTypeCastDefaultsToSpaceWithoutCasts() {
+        var cus = jp().parse(
+          """
+            class T {
             }
             """
         );
@@ -1569,4 +1655,157 @@ class AutodetectTest implements RewriteTest {
 
     }
 
+    @Nested
+    class Merge {
+        // Each file disagrees with the others somewhere, so the merged result has to reproduce the vote
+        private final List<SourceFile> sources = jp().parse(
+          """
+            import com.fasterxml.jackson.annotation.JsonCreator;
+
+            import org.openrewrite.internal.StringUtils;
+            import org.openrewrite.internal.ListUtils;
+
+            import javax.net.ssl.SSLContext;
+            import java.util.List;
+            import java.util.Map;
+
+            import static java.util.Collections.emptyList;
+
+            class A {
+            	List<String> a(Object o) {
+            		if(o == null) {
+            			return emptyList();
+            		}
+            		return (List<String>) o;
+            	}
+            }
+            """,
+          """
+            import static java.util.Collections.emptyMap;
+
+            import javax.net.ssl.SSLContext;
+            import java.io.File;
+            import java.util.Map;
+
+            class B {
+                Map<String, String> b(int n) {
+                    if (n > 0) {
+                        return emptyMap();
+                    }
+                    for(int i = 0;i < n;i++) {
+                        foo (i);
+                    }
+                    return null;
+                }
+            }
+            """,
+          """
+            import java.io.File;
+            import java.util.List;
+            import java.util.Set;
+
+            class C {
+              @Deprecated
+              void c(String s) {
+                if(s == null) {
+                  s = (String)s;
+                }
+                else {
+                  bar(s , s);
+                }
+              }
+            }
+            """,
+          "class D {\r\n    void d() {\r\n        try {\r\n        } catch(Exception e) {\r\n        }\r\n    }\r\n}\r\n",
+          """
+            class E {
+                @Deprecated int e;
+            }
+            """
+        ).toList();
+
+        @Test
+        void mergedDetectorsMatchOneDetectorThatSampledEverything() {
+            var all = detector(sources);
+            var first = detector(sources.subList(0, 2));
+            var second = detector(sources.subList(2, 3));
+            var third = detector(sources.subList(3, 5));
+
+            assertSameStyles(Autodetect.detector().merge(first).merge(second).merge(third), all);
+            assertSameStyles(detector(sources.subList(3, 5)).merge(detector(sources.subList(2, 3))).merge(detector(sources.subList(0, 2))), all);
+        }
+
+        @Test
+        void importLayoutDoesNotDependOnSampleOrder() {
+            // Block sequences of the same length, so neither file is the obvious choice
+            var tied = jp().parse(
+              """
+                import java.util.List;
+
+                import org.openrewrite.internal.StringUtils;
+
+                class X {
+                }
+                """,
+              """
+                import org.openrewrite.internal.StringUtils;
+
+                import java.util.List;
+
+                class Y {
+                }
+                """
+            ).toList();
+            var reversed = new ArrayList<>(tied);
+            Collections.reverse(reversed);
+
+            assertThat(detector(reversed).build().getStyle(ImportLayoutStyle.class))
+              .usingRecursiveComparison()
+              .withEqualsForType(Merge::samePattern, Pattern.class)
+              .isEqualTo(detector(tied).build().getStyle(ImportLayoutStyle.class));
+        }
+
+        @Test
+        void buildIsRepeatable() {
+            var detector = detector(sources);
+            assertThat(detector.build().getStyles())
+              .usingRecursiveComparison()
+              .withEqualsForType(Merge::samePattern, Pattern.class)
+              .isEqualTo(detector.build().getStyles());
+        }
+
+        @Test
+        void serializedDetectorsRoundTrip() throws Exception {
+            var all = detector(sources);
+            for (ObjectMapper mapper : List.of(new ObjectMapper().findAndRegisterModules(), ObjectMappers.propertyBasedMapper(null))) {
+                var first = mapper.readValue(mapper.writeValueAsBytes(detector(sources.subList(0, 3))), Autodetect.Detector.class);
+                var second = mapper.readValue(mapper.writeValueAsBytes(detector(sources.subList(3, 5))), Autodetect.Detector.class);
+                assertSameStyles(first.merge(second), all);
+            }
+        }
+
+        @Test
+        void packageNamesAreSerializedOncePerDetector() throws Exception {
+            // java.util is imported by three of the files
+            var json = new ObjectMapper().findAndRegisterModules().writeValueAsString(detector(sources));
+            assertThat(json.split("\"java\\.util\"", -1)).hasSize(2);
+        }
+
+        private Autodetect.Detector detector(List<SourceFile> sources) {
+            var detector = Autodetect.detector();
+            sources.forEach(detector::sample);
+            return detector;
+        }
+
+        private void assertSameStyles(Autodetect.Detector actual, Autodetect.Detector expected) {
+            assertThat(actual.build().getStyles())
+              .usingRecursiveComparison()
+              .withEqualsForType(Merge::samePattern, Pattern.class)
+              .isEqualTo(expected.build().getStyles());
+        }
+
+        private static boolean samePattern(Pattern a, Pattern b) {
+            return a.pattern().equals(b.pattern());
+        }
+    }
 }

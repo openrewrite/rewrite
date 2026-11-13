@@ -1,0 +1,6 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_requirements.py (test_normalized_requirements)
+# Retrieved: 2026-07-16
+# input requirement<TAB>requirement whose marker normalizes identically.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+mariadb>=1.0.1; extra == "mariadb_connector"	mariadb>=1.0.1; extra == "mariadb-connector"
+mariadb>=1.0.1; python_version >= "3" and extra == "mariadb_connector"	mariadb>=1.0.1; python_version >= "3" and extra == "mariadb-connector"

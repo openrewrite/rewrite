@@ -17,6 +17,7 @@ package org.openrewrite.json.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.style.Autodetect;
@@ -79,6 +80,9 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
     public @Nullable Json visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Json) tree;
+        }
+        if (tree instanceof Json.Document) {
+            FormattingListener.beforeFormat(tree, stopAfter, getCursor());
         }
         return super.visit(tree, p);
     }

@@ -49,6 +49,23 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithMultiLineChainedArgument() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val fmt = new CollectionInputFormat[Row](
+                values.asJava,
+                fromDataTypeToTypeInfo(getProducedDataType)
+                  .createSerializer(new SerializerConfigImpl)
+                  .asInstanceOf[TypeSerializer[Row]])
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassWithoutParentheses() {
         rewriteRun(
           scala(
@@ -345,6 +362,33 @@ class NewClassTest implements RewriteTest {
             }
             """
           )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedAnonymousClassMembers() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  val x = new Object { val a = 1; val b = 2 }
+                  val r = new Runnable { def run() = (); val y = 1 }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInAnonymousClass() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  val x = new Object { ; val a = 1;; val b = 2; }
+                }
+                """
+            )
         );
     }
 }

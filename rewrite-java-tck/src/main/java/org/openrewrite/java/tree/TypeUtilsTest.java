@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -45,6 +46,86 @@ class TypeUtilsTest implements RewriteTest {
             var fooMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
             assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isPresent();
         });
+    }
+
+    @Test
+    void assignabilityWithRecursiveIntersectionBounds() {
+        rewriteRun(
+          java(
+            """
+              interface Type<T extends Type<T>> {}
+              interface NumericType<T extends NumericType<T>> extends Type<T> {}
+              interface RealType<T extends RealType<T>> extends NumericType<T> {}
+              interface NativeType<T extends NativeType<T>> extends Type<T> {}
+              class UnsignedShortType implements RealType<UnsignedShortType>, NativeType<UnsignedShortType> {}
+              class Test {
+                  static <T> T type(T value) { return value; }
+                  <T extends RealType<T> & NativeType<T>> boolean test(T value) {
+                      return UnsignedShortType.class.isInstance(type(value));
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                    if ("isInstance".equals(m.getSimpleName())) {
+                        var target = ((J.FieldAccess) m.getSelect()).getTarget().getType();
+                        var operand = (JavaType.GenericTypeVariable) m.getArguments().get(0).getType();
+                        for (var bound : operand.getBounds()) {
+                            assertThat(TypeUtils.isAssignableTo(target, bound)).isFalse();
+                            assertThat(TypeUtils.isAssignableTo(bound, target)).isFalse();
+                        }
+                    }
+                    return m;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void comparisonContextUsesIdentityForRecursiveTypeGraphs() {
+        var first = recursiveTypeVariable();
+        var second = recursiveTypeVariable();
+        var context = BOUND.enterComparison(first, first);
+
+        assertThat(context.isComparing(first, first)).isTrue();
+        assertThat(context.isComparing(second, second)).isFalse();
+        assertThat(context.enterComparison(second, second).isComparing(first, first)).isTrue();
+        assertThat(context.enterComparison(second, second).isComparing(second, second)).isTrue();
+        assertThat(TypeUtils.isOfType(first, second)).isTrue();
+        assertThat(first).isEqualTo(second);
+        assertThat(second).isEqualTo(first);
+        assertThat(first).isNotEqualTo(recursiveTypeVariable("NativeType"));
+        assertThat(first).isNotEqualTo(second.withName("U"));
+        assertThat(first).isNotEqualTo(second.withVariance(JavaType.GenericTypeVariable.Variance.INVARIANT));
+    }
+
+    @Test
+    void inferenceContextRecognizesRebuiltRecursiveGraphs() {
+        var first = recursiveTypeVariable();
+        var second = recursiveTypeVariable();
+        var rebuiltFirst = recursiveTypeVariable();
+        var rebuiltSecond = recursiveTypeVariable();
+        var context = TypeUtils.ComparisonContext.INFER.enterComparison(first, second);
+
+        assertThat(context.isComparing(rebuiltFirst, rebuiltSecond)).isTrue();
+        assertThat(context.flipInference().isComparing(rebuiltFirst, rebuiltSecond)).isTrue();
+        assertThat(context.isComparing(rebuiltFirst, recursiveTypeVariable("NativeType"))).isFalse();
+        assertThat(context.isComparing(rebuiltFirst.withName("U"), rebuiltSecond)).isFalse();
+        assertThat(context.isComparing(rebuiltFirst.withVariance(JavaType.GenericTypeVariable.Variance.INVARIANT), rebuiltSecond)).isFalse();
+    }
+
+    private static JavaType.GenericTypeVariable recursiveTypeVariable() {
+        return recursiveTypeVariable("RealType");
+    }
+
+    private static JavaType.GenericTypeVariable recursiveTypeVariable(String boundName) {
+        var variable = new JavaType.GenericTypeVariable(null, "T",
+          JavaType.GenericTypeVariable.Variance.COVARIANT, emptyList());
+        var bound = new JavaType.Parameterized(null, JavaType.ShallowClass.build(boundName), singletonList(variable));
+        return variable.unsafeSet("T", JavaType.GenericTypeVariable.Variance.COVARIANT, singletonList(bound));
     }
 
     @Test
@@ -111,6 +192,47 @@ class TypeUtilsTest implements RewriteTest {
             s -> s.afterRecipe(cu -> {
                 var fooMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
                 assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void isOverrideProtectedInDifferentPackage() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              public class Superclass {
+                  protected void foo() { }
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              import foo.Superclass;
+              class Clazz extends Superclass {
+                  @Override protected void foo() { }
+              }
+              """,
+            typeIsPresent()
+          )
+        );
+    }
+
+    @Test
+    void isNotOverrideOfProtectedObjectMethodFromInterface() {
+        rewriteRun(
+          java(
+            """
+              interface Reproducer extends Cloneable {
+                  Reproducer clone();
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var cloneMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                assertThat(TypeUtils.findOverriddenMethod(cloneMethodType)).isEmpty();
             })
           )
         );
@@ -406,6 +528,32 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void annotationArrayElementValuesWithoutValuesAreOfSameType() {
+        // Hand-built because the parser routes through `ArrayElementValue.from`, which sets
+        // exactly one of the two arrays; an RPC peer builds the type directly and can set neither.
+        JavaType.Method element = new JavaType.Method(null, 0L, JavaType.ShallowClass.build("com.example.Foo"),
+          "value", JavaType.Primitive.String, emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList());
+        JavaType.Annotation neither = annotationWithArray(element, null, null);
+        JavaType.Annotation empty = annotationWithArray(element, new Object[0], null);
+        JavaType.Annotation constants = annotationWithArray(element, new Object[]{"a"}, null);
+        JavaType.Annotation references = annotationWithArray(element, null,
+          new JavaType[]{JavaType.ShallowClass.build("java.lang.String")});
+
+        assertTrue(TypeUtils.isOfType(neither, annotationWithArray(element, null, null)));
+        assertTrue(TypeUtils.isOfType(neither, empty));
+        assertTrue(TypeUtils.isOfType(empty, neither));
+
+        assertFalse(TypeUtils.isOfType(neither, constants));
+        assertFalse(TypeUtils.isOfType(neither, references));
+    }
+
+    private static JavaType.Annotation annotationWithArray(JavaType.Method element, Object @Nullable [] constantValues,
+                                                           JavaType @Nullable [] referenceValues) {
+        return new JavaType.Annotation(JavaType.ShallowClass.build("com.example.Foo"),
+          singletonList(new JavaType.Annotation.ArrayElementValue(element, constantValues, referenceValues)));
+    }
+
+    @Test
     void isParameterizedTypeOfType() {
         rewriteRun(
           java(
@@ -632,7 +780,7 @@ class TypeUtilsTest implements RewriteTest {
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Long));
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Int));
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Short));
-        assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Char));
+        assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Char));
         assertTrue(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Byte));
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Double));
         assertFalse(TypeUtils.isAssignableTo(JavaType.Primitive.Short, JavaType.Primitive.Float));

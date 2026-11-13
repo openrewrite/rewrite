@@ -20,6 +20,7 @@ public interface RecipeBundleResolver extends AutoCloseable {
 
     RecipeBundleReader resolve(RecipeBundle bundle);
 
+    @Override
     default void close() throws Exception {
         // no-op
     }

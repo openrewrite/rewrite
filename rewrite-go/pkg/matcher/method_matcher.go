@@ -23,8 +23,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// MethodMatcher matches method invocations against an AspectJ-style pattern.
-//
 // Pattern format: "DeclaringType MethodName(ArgType1, ArgType2, ..)"
 //
 // Examples:
@@ -45,32 +43,30 @@ type MethodMatcher struct {
 	matchesAnyArgs       bool // true when pattern is (..)
 }
 
-// argMatcher matches a single argument type.
 type argMatcher interface {
 	matches(t java.JavaType) bool
 }
 
-// typeArgMatcher matches a specific type by FQN pattern.
 type typeArgMatcher struct {
 	pattern *regexp.Regexp
 	raw     string
 }
 
+// An argument that is a literal answers to every Go type its keyword stands
+// for, so the pattern matching any of them matches the argument.
 func (m *typeArgMatcher) matches(t java.JavaType) bool {
-	fqn := GetFullyQualifiedName(t)
-	if fqn == "" {
-		// If type info is not available, match by raw name against common Go types.
-		return false
+	for _, name := range GoTypeNames(t) {
+		if name != "" && m.pattern.MatchString(canonicalGoType(name)) {
+			return true
+		}
 	}
-	return m.pattern.MatchString(fqn)
+	return false
 }
 
-// wildcardArgMatcher matches any type (the ".." wildcard).
 type wildcardArgMatcher struct{}
 
 func (m *wildcardArgMatcher) matches(t java.JavaType) bool { return true }
 
-// NewMethodMatcher creates a MethodMatcher from the given pattern string.
 // Pattern format: "DeclaringType MethodName(ArgTypes)"
 func NewMethodMatcher(pattern string) *MethodMatcher {
 	pattern = strings.TrimSpace(pattern)
@@ -117,7 +113,7 @@ func NewMethodMatcher(pattern string) *MethodMatcher {
 				break
 			}
 			mm.argPatterns = append(mm.argPatterns, &typeArgMatcher{
-				pattern: globToRegexp(resolveGoType(part)),
+				pattern: globToRegexp(canonicalGoType(part)),
 				raw:     part,
 			})
 		}
@@ -126,7 +122,6 @@ func NewMethodMatcher(pattern string) *MethodMatcher {
 	return mm
 }
 
-// Matches checks if the given MethodInvocation matches this pattern.
 func (m *MethodMatcher) Matches(mi *java.MethodInvocation) bool {
 	// Match method name
 	if m.methodNamePattern != nil && !m.methodNamePattern.MatchString(mi.Name.Name) {
@@ -172,7 +167,6 @@ func (m *MethodMatcher) Matches(mi *java.MethodInvocation) bool {
 	return true
 }
 
-// MatchesMethod checks if a JavaTypeMethod matches this pattern.
 func (m *MethodMatcher) MatchesMethod(mt *java.JavaTypeMethod) bool {
 	if mt == nil {
 		return false
@@ -185,10 +179,7 @@ func (m *MethodMatcher) MatchesMethod(mt *java.JavaTypeMethod) bool {
 
 	// Match declaring type
 	if m.declaringTypePattern != nil {
-		declFQN := ""
-		if mt.DeclaringType != nil {
-			declFQN = mt.DeclaringType.GetFullyQualifiedName()
-		}
+		declFQN := java.FQNOf(mt.DeclaringType)
 		if !m.declaringTypePattern.MatchString(declFQN) {
 			return false
 		}
@@ -272,32 +263,4 @@ func globToRegexp(pattern string) *regexp.Regexp {
 
 func isRegexpMeta(ch byte) bool {
 	return strings.ContainsRune(`\.+?{}[]()^$|`, rune(ch))
-}
-
-// resolveGoType maps common Go type names to their FQN equivalents
-// used by the type mapper. This allows patterns like "string" to match
-// both the primitive keyword and the FQN.
-func resolveGoType(name string) string {
-	// The type mapper maps Go primitives to JavaTypePrimitive keywords.
-	// Most Go types are already their own FQN.
-	switch name {
-	case "string":
-		return "String" // JavaTypePrimitive keyword for Go strings
-	case "bool":
-		return "boolean"
-	case "int", "int8", "int16", "int32", "int64":
-		return name
-	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
-		return name
-	case "float32", "float64":
-		return name
-	case "byte":
-		return "byte"
-	case "rune":
-		return "char"
-	case "error":
-		return "error"
-	default:
-		return name
-	}
 }

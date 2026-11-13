@@ -67,6 +67,41 @@ class OneDependencyDeclarationPerStatementTest implements RewriteTest {
     }
 
     @Test
+    void splitsParenthesizedCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('com.google.guava:guava:30.0-jre', 'org.apache.commons:commons-lang3:3.12.0')
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('com.google.guava:guava:30.0-jre')
+                  implementation('org.apache.commons:commons-lang3:3.12.0')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void splitsWhenSecondCoordinateUsesVersionVariable() {
         rewriteRun(
           buildGradle(
@@ -145,6 +180,24 @@ class OneDependencyDeclarationPerStatementTest implements RewriteTest {
 
               dependencies {
                   implementation 'com.google.guava', 'guava', '30.0-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leavesDependencyHandlerAddAlone() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                 plugins.withId('java') {
+                     dependencies {
+                         add('testImplementation', platform("org.junit:junit-bom:6.1.2"))
+                         add('testImplementation', platform("org.mockito:mockito-bom:5.23.0"))
+                     }
+                  }
               }
               """
           )

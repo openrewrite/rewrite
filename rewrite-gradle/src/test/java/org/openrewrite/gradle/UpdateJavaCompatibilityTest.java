@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,11 @@ import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 @SuppressWarnings("GroovyUnusedAssignment")
 class UpdateJavaCompatibilityTest implements RewriteTest {
+
+    private static GradleParser.Builder withAndroidGradlePlugin() {
+        return GradleParser.builder().buildscriptClasspathFromResources(new InMemoryExecutionContext(),
+          "gradle-base-services", "gradle-core-api", "gradle-api");
+    }
 
     @DocumentExample
     @Test
@@ -481,6 +487,206 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
+    @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    @Test
+    void releasePropertyGetsUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              tasks.withType(JavaCompile) {
+                  options.release.set(8)
+              }
+
+              compileJava {
+                  options.release.set(8)
+              }
+
+              compileJava.options.release.set(8)
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              tasks.withType(JavaCompile) {
+                  options.release.set(11)
+              }
+
+              compileJava {
+                  options.release.set(11)
+              }
+
+              compileJava.options.release.set(11)
+              """
+          )
+        );
+    }
+
+    @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    @Test
+    void releasePropertyGetsUpdatedInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              tasks.withType(JavaCompile::class) {
+                  if (JavaVersion.current().isJava9Compatible) {
+                      options.release.set(8)
+                  } else {
+                      sourceCompatibility = "1.8"
+                      targetCompatibility = "1.8"
+                  }
+              }
+
+              tasks.named<JavaCompile>("compileJava") {
+                  options.release.set(8)
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+
+              tasks.withType(JavaCompile::class) {
+                  if (JavaVersion.current().isJava9Compatible) {
+                      options.release.set(11)
+                  } else {
+                      sourceCompatibility = "11"
+                      targetCompatibility = "11"
+                  }
+              }
+
+              tasks.named<JavaCompile>("compileJava") {
+                  options.release.set(11)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              ext.versions = [java: JavaVersion.VERSION_17]
+
+              java {
+                  sourceCompatibility = versions.java
+                  targetCompatibility = project.ext.versions.java
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(versions.java.majorVersion)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAloneInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              object Versions {
+                  val java = JavaVersion.VERSION_17
+              }
+
+              java {
+                  sourceCompatibility = Versions.java
+                  targetCompatibility = Versions.java
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compatibilityFromLocalVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  def javaVersion = JavaVersion.VERSION_1_8
+                  sourceCompatibility = javaVersion
+                  targetCompatibility = javaVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  def javaVersion = JavaVersion.VERSION_11
+                  sourceCompatibility = javaVersion
+                  targetCompatibility = javaVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyUpdateVariablesFeedingCompatibility() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              def someOtherVersion = JavaVersion.VERSION_1_8
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_1_8
+                  targetCompatibility = JavaVersion.VERSION_1_8
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              def someOtherVersion = JavaVersion.VERSION_1_8
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_11
+                  targetCompatibility = JavaVersion.VERSION_11
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void updateExisitingSourceCompatibilityInKotlinDSL() {
         rewriteRun(
@@ -688,6 +894,126 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               java {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17.majorVersion))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCall() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)).parser(withAndroidGradlePlugin()),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
+                      targetCompatibility JavaVersion.VERSION_1_8
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_17
+                      targetCompatibility JavaVersion.VERSION_17
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCallSourceOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, UpdateJavaCompatibility.CompatibilityType.source, null, null, null))
+            .parser(withAndroidGradlePlugin()),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
+                      targetCompatibility JavaVersion.VERSION_1_8
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_17
+                      targetCompatibility JavaVersion.VERSION_1_8
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  id("com.android.application")
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility = JavaVersion.VERSION_1_8
+                      targetCompatibility = JavaVersion.VERSION_1_8
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id("com.android.application")
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility = JavaVersion.VERSION_17
+                      targetCompatibility = JavaVersion.VERSION_17
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCallWithoutAndroidGradlePluginOnClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
                   }
               }
               """

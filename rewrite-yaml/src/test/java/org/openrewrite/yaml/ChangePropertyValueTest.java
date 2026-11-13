@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -36,6 +37,21 @@ class ChangePropertyValueTest implements RewriteTest {
                 """
             my.prop: bar
             """
+          )
+        );
+    }
+
+    @Test
+    void quotedNewValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("management.endpoints.web.exposure.include", "\"*\"", null, null, null, null)),
+          yaml(
+            """
+              management.endpoints.web.exposure.include: info,health
+              """,
+            """
+              management.endpoints.web.exposure.include: "*"
+              """
           )
         );
     }
@@ -234,7 +250,454 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void preservesFoldedClipBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: >
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesFoldedStripBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesFoldedKeepBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: >+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: >+
+                replaced
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralClipBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: |
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralStripBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: |-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: |-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralKeepBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: |+
+                replaced
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineNewValueReindentsAcrossBlockBody() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "first\nsecond", null, null, null, null)),
+          yaml(
+            """
+              key: |
+                old line
+              after: tail
+              """,
+            """
+              key: |
+                first
+                second
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexReplacementOnBlockScalarOperatesOnBodyOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "B", "A", true, null, null)),
+          yaml(
+            """
+              key: |-
+                line A one
+                line A two
+              after: tail
+              """,
+            """
+              key: |-
+                line B one
+                line B two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCrlfLiteralBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  replaced\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
+    void multilineReplacementOnCrlfBlockScalarKeepsCrlf() {
+        // The new value introduces its own interior line break (a bare '\n' from the recipe
+        // argument). On a CRLF file that break must be emitted as CRLF, not glued in as a lone
+        // LF that would leave the block with mixed line endings.
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "new one\nnew two", null, null, null, null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  new one\r\n" +
+            "  new two\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
         assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null, null).validate().isInvalid());
+    }
+
+    @Nested
+    class AnchoredValuesTest implements RewriteTest {
+        @Test
+        void updatesAnchorReferencedOnlyFromMatchingKeys() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("**.SERVICE_API", "29-stable", "28-stable", null, null, null)),
+              yaml(
+                """
+                  .service-version: &service-version
+                    28-stable
+
+                  deploy-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  test-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  """,
+                """
+                  .service-version: &service-version
+                    29-stable
+
+                  deploy-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  test-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacesAliasWhenAnchorIsSharedWithOtherKeys() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("app.version", "2.0", "1.0", null, null, null)),
+              yaml(
+                """
+                  defaults: &v 1.0
+                  app:
+                    version: *v
+                  lib:
+                    version: *v
+                  """,
+                """
+                  defaults: &v 1.0
+                  app:
+                    version: 2.0
+                  lib:
+                    version: *v
+                  """
+              )
+            );
+        }
+
+        @Test
+        void leavesAliasAloneWhenAnchoredValueDoesNotMatch() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("app.version", "2.0", "1.0", null, null, null)),
+              yaml(
+                """
+                  defaults: &v 1.5
+                  app:
+                    version: *v
+                  """
+              )
+            );
+        }
+
+        @Test
+        void anchorDefinedUnderMatchingKeyIsChangedOnce() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("*.version", "1.1", "1.0", null, null, null)),
+              yaml(
+                """
+                  app:
+                    version: &v 1.0
+                  lib:
+                    version: *v
+                  """,
+                """
+                  app:
+                    version: &v 1.1
+                  lib:
+                    version: *v
+                  """
+              )
+            );
+        }
+
+        @Test
+        void updatesAnchorAliasedFromSequence() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("versions", "2.0", "1.0", null, null, null)),
+              yaml(
+                """
+                  base: &v 1.0
+                  versions:
+                    - *v
+                    - 3.0
+                  """,
+                """
+                  base: &v 2.0
+                  versions:
+                    - *v
+                    - 3.0
+                  """
+              )
+            );
+        }
+
+        @Test
+        void updatesAnchorAliasedFromNestedSequence() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("versions", "2.0", "1.0", null, null, null)),
+              yaml(
+                """
+                  base: &v 1.0
+                  versions: [[*v, 3.0]]
+                  """,
+                """
+                  base: &v 2.0
+                  versions: [[*v, 3.0]]
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doesNotRenameAnchoredKey() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("app.version", "2.0", null, null, null, null)),
+              yaml(
+                """
+                  &k version: x
+                  app:
+                    version: *k
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doesNotInlineMultilineAnchoredValue() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePropertyValue("app.version", "X", "one", true, null, null)),
+              yaml(
+                """
+                  defaults: &v one
+                    two
+                  app:
+                    version: *v
+                  lib: *v
+                  """
+              )
+            );
+        }
+
+        @Test
+        void chainedRecipesUpdateAnchorSuccessively() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangePropertyValue("**.SERVICE_API", "29-stable", "28-stable", null, null, null),
+                new ChangePropertyValue("**.SERVICE_API", "30-stable", "29-stable", null, null, null)
+              ),
+              yaml(
+                """
+                  .service-version: &service-version
+                    28-stable
+
+                  deploy-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  test-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  """,
+                """
+                  .service-version: &service-version
+                    30-stable
+
+                  deploy-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  test-job:
+                    variables:
+                      SERVICE_API: *service-version
+                  """
+              )
+            );
+        }
+
+        @Test
+        void chainedRecipesUpdateInlinedAliasSuccessively() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangePropertyValue("app.version", "2.0", "1.0", null, null, null),
+                new ChangePropertyValue("app.version", "3.0", "2.0", null, null, null)
+              ),
+              yaml(
+                """
+                  defaults: &v 1.0
+                  app:
+                    version: *v
+                  lib:
+                    version: *v
+                  """,
+                """
+                  defaults: &v 1.0
+                  app:
+                    version: 3.0
+                  lib:
+                    version: *v
+                  """
+              )
+            );
+        }
+
+        @Test
+        void chainedRecipesOnKeysSharingAnAnchor() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangePropertyValue("app.version", "2.0", "1.0", null, null, null),
+                new ChangePropertyValue("lib.version", "2.0", "1.0", null, null, null)
+              ),
+              yaml(
+                """
+                  defaults: &v 1.0
+                  app:
+                    version: *v
+                  lib:
+                    version: *v
+                  """,
+                """
+                  defaults: &v 2.0
+                  app:
+                    version: 2.0
+                  lib:
+                    version: *v
+                  """
+              )
+            );
+        }
     }
 }

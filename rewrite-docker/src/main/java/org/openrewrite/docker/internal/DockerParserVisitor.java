@@ -24,6 +24,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.docker.internal.grammar.DockerLexer;
 import org.openrewrite.docker.internal.grammar.DockerParser;
 import org.openrewrite.docker.internal.grammar.DockerParserBaseVisitor;
+import org.openrewrite.docker.tree.CommaPrefix;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -176,107 +177,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         // Parse the text and split out environment variables
         List<Docker.ArgumentContent> contents = parseText(ctx.text());
 
-        // Advance cursor to end of text
         advanceCursor(ctx.text().getStop().getStopIndex() + 1);
-
-        // If the entire image is a single quoted string, don't split it
-        if (contents.size() == 1 && contents.get(0) instanceof Docker.Literal && ((Docker.Literal) contents.get(0)).isQuoted()) {
-            // Single quoted string - keep it as-is
-            Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
-            return new Docker.@Nullable Argument[]{imageName, null, null};
-        }
-
-        // Split contents into imageName, tag, and digest components
-        List<Docker.ArgumentContent> imageNameContents = new ArrayList<>();
-        List<Docker.ArgumentContent> tagContents = new ArrayList<>();
-        List<Docker.ArgumentContent> digestContents = new ArrayList<>();
-
-        boolean foundColon = false;
-        boolean foundAt = false;
-
-        for (Docker.ArgumentContent content : contents) {
-            if (content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
-                String text = ((Docker.Literal) content).getText();
-
-                // Look for @ first (digest takes precedence over tag)
-                int atIndex = text.indexOf('@');
-                int colonIndex = text.indexOf(':');
-
-                if (atIndex >= 0 && !foundAt) {
-                    // Split at @
-                    foundAt = true;
-                    String beforeAt = text.substring(0, atIndex);
-                    String digestPart = text.substring(atIndex + 1);
-
-                    // Check for : in the part before @ (handles image:tag@digest)
-                    int colonInBeforeAt = beforeAt.indexOf(':');
-                    if (colonInBeforeAt >= 0 && !foundColon) {
-                        // We have image:tag@digest
-                        foundColon = true;
-                        String imagePart = beforeAt.substring(0, colonInBeforeAt);
-                        String tagPart = beforeAt.substring(colonInBeforeAt + 1);
-
-                        if (!imagePart.isEmpty()) {
-                            imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
-                        }
-                        if (!tagPart.isEmpty()) {
-                            tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
-                        }
-                    } else {
-                        // Just image@digest (no tag)
-                        if (!beforeAt.isEmpty()) {
-                            if (foundColon) {
-                                // Content before @ goes to tag (we already found : earlier)
-                                tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
-                            } else {
-                                imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
-                            }
-                        }
-                    }
-                    if (!digestPart.isEmpty()) {
-                        digestContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, digestPart, null));
-                    }
-                } else if (colonIndex >= 0 && !foundColon && !foundAt) {
-                    // Split at :
-                    foundColon = true;
-                    String imagePart = text.substring(0, colonIndex);
-                    String tagPart = text.substring(colonIndex + 1);
-
-                    if (!imagePart.isEmpty()) {
-                        imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
-                    }
-                    if (!tagPart.isEmpty()) {
-                        tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
-                    }
-                } else {
-                    // Add to appropriate list
-                    if (foundAt) {
-                        digestContents.add(content);
-                    } else if (foundColon) {
-                        tagContents.add(content);
-                    } else {
-                        imageNameContents.add(content);
-                    }
-                }
-            } else {
-                // Environment variables or quoted strings
-                if (foundAt) {
-                    digestContents.add(content);
-                } else if (foundColon) {
-                    tagContents.add(content);
-                } else {
-                    imageNameContents.add(content);
-                }
-            }
-        }
-
-        Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, imageNameContents);
-        Docker.Argument tag = tagContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
-        Docker.Argument digest = digestContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
-
-        return new Docker.@Nullable Argument[]{imageName, tag, digest};
+        return ImageReferences.split(contents, prefix);
     }
 
     private List<Docker.ArgumentContent> parseText(DockerParser.@Nullable TextContext textCtx) {
@@ -442,16 +344,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.jsonArray() != null) {
             form = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
-            // Parse sources and destination into CopyShellForm
-            List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
-            Docker.Argument destination = parseDestinationPath(ctx.destination());
-            // The prefix for shellForm comes from the first source
-            Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
-            if (!sources.isEmpty()) {
-                // Remove prefix from first source since it's now on the shellForm
-                sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
-            }
-            form = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+            form = parseCopyShellForm(ctx.sourceList(), ctx.destination());
         } else {
             throw new IllegalStateException("ADD must have either sourceList or jsonArray or heredoc");
         }
@@ -483,16 +376,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         } else if (ctx.jsonArray() != null) {
             form = visitJsonArrayAsExecForm(ctx.jsonArray());
         } else if (ctx.sourceList() != null) {
-            // Parse sources and destination into CopyShellForm
-            List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
-            Docker.Argument destination = parseDestinationPath(ctx.destination());
-            // The prefix for shellForm comes from the first source
-            Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
-            if (!sources.isEmpty()) {
-                // Remove prefix from first source since it's now on the shellForm
-                sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
-            }
-            form = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+            form = parseCopyShellForm(ctx.sourceList(), ctx.destination());
         } else {
             throw new IllegalStateException("COPY must have either sourceList or jsonArray or heredoc");
         }
@@ -506,50 +390,72 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     /**
-     * Parse source paths from the grammar's sourceList context.
-     * With lexer modes for flag values, the grammar's token allocation is now correct.
+     * Parse the sources and destination of a COPY/ADD into a {@link Docker.CopyShellForm}.
+     * <p>
+     * The grammar cannot tell where one path ends and the next begins when they are split by an
+     * {@code =} (the lexer emits it as a separate token), so the tokens of the source list and the
+     * destination are regrouped here: tokens that touch an {@code =} without whitespace in between
+     * belong to the same argument, e.g. {@code https://host/r?file=a/b.jar}.
      */
-    private List<Docker.Argument> parseSourcePaths(DockerParser.SourceListContext ctx) {
-        List<Docker.Argument> sources = new ArrayList<>();
-        for (DockerParser.SourcePathContext pathCtx : ctx.sourcePath()) {
-            sources.add(parsePathToken(pathCtx));
+    private Docker.CopyShellForm parseCopyShellForm(DockerParser.SourceListContext sourceList,
+                                                    DockerParser.DestinationContext destinationCtx) {
+        List<Token> tokens = new ArrayList<>();
+        for (DockerParser.SourcePathContext pathCtx : sourceList.sourcePath()) {
+            tokens.add(pathCtx.getStart());
         }
-        return sources;
+        tokens.add(destinationCtx.destinationPath().getStart());
+
+        List<Docker.Argument> arguments = new ArrayList<>();
+        Token previous = null;
+        Space argPrefix = Space.EMPTY;
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        for (Token token : tokens) {
+            boolean glued = previous != null &&
+                            previous.getStopIndex() + 1 == token.getStartIndex() &&
+                            (previous.getType() == DockerLexer.EQUALS || token.getType() == DockerLexer.EQUALS);
+            if (!glued) {
+                if (previous != null) {
+                    arguments.add(new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents));
+                }
+                argPrefix = prefix(token);
+                contents = new ArrayList<>();
+            }
+            contents.add(parsePathContent(token));
+            previous = token;
+        }
+        arguments.add(new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents));
+
+        Docker.Argument destination = arguments.remove(arguments.size() - 1);
+        List<Docker.Argument> sources = arguments;
+        // The prefix for shellForm comes from the first source
+        Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
+        if (!sources.isEmpty()) {
+            // Remove prefix from first source since it's now on the shellForm
+            sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
+        }
+        return new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
     }
 
     /**
-     * Parse destination path from the grammar's destination context.
+     * Convert a single path token (source or destination piece) into argument content and consume it.
      */
-    private Docker.Argument parseDestinationPath(DockerParser.DestinationContext ctx) {
-        return parsePathToken(ctx.destinationPath());
-    }
-
-    /**
-     * Parse a single path token (source or destination) into an Argument.
-     */
-    private Docker.Argument parsePathToken(ParserRuleContext pathCtx) {
-        Space argPrefix = prefix(pathCtx.getStart());
-        Token token = pathCtx.getStart();
+    private Docker.ArgumentContent parsePathContent(Token token) {
         String tokenText = token.getText();
         skip(token);
 
-        Docker.ArgumentContent content;
         if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
             String value = tokenText.substring(1, tokenText.length() - 1);
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
+            return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
         } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
             String value = tokenText.substring(1, tokenText.length() - 1);
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
+            return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
         } else if (token.getType() == DockerLexer.ENV_VAR) {
             boolean braced = tokenText.startsWith("${");
             String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
-            content = new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, braced);
-        } else {
-            // UNQUOTED_TEXT - store as plain literal (includes complex paths like ${VAR}/path)
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tokenText, null);
+            return new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, braced);
         }
-
-        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, singletonList(content));
+        // UNQUOTED_TEXT and EQUALS - store as plain literal (includes complex paths like ${VAR}/path)
+        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tokenText, null);
     }
 
     @Override
@@ -957,6 +863,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                             if (terminal.getSymbol().getType() == DockerLexer.COMMA &&
                                     terminal.getSymbol().getStartIndex() > jsonStrings.get(i).getStop().getStopIndex() &&
                                     terminal.getSymbol().getStartIndex() < jsonStrings.get(i + 1).getStart().getStartIndex()) {
+                                arguments.set(i, withCommaPrefix(arg, prefix(terminal.getSymbol())));
                                 skip(terminal.getSymbol());
                                 break;
                             }
@@ -971,6 +878,18 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.RBRACKET().getSymbol());
 
         return new JsonArrayParseResult(arguments, closingBracketPrefix);
+    }
+
+    /**
+     * Record the whitespace preceding a JSON array comma on the element that comes before it,
+     * so that e.g. {@code ["a" , "b"]} prints back unchanged.
+     */
+    private static Docker.Argument withCommaPrefix(Docker.Argument arg, Space commaPrefix) {
+        return commaPrefix.isEmpty() ? arg : arg.withMarkers(arg.getMarkers().add(new CommaPrefix(randomId(), commaPrefix)));
+    }
+
+    private static Docker.Literal withCommaPrefix(Docker.Literal literal, Space commaPrefix) {
+        return commaPrefix.isEmpty() ? literal : literal.withMarkers(literal.getMarkers().add(new CommaPrefix(randomId(), commaPrefix)));
     }
 
     private Docker.Argument convertJsonString(DockerParser.JsonStringContext ctx) {
@@ -1042,6 +961,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                             if (terminal.getSymbol().getType() == DockerLexer.COMMA &&
                                     terminal.getSymbol().getStartIndex() > jsonStrings.get(i).getStop().getStopIndex() &&
                                     terminal.getSymbol().getStartIndex() < jsonStrings.get(i + 1).getStart().getStartIndex()) {
+                                arguments.set(i, withCommaPrefix(arg, prefix(terminal.getSymbol())));
                                 skip(terminal.getSymbol());
                                 break;
                             }
@@ -1486,6 +1406,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
                 // Skip the comma after this element (if not the last element)
                 if (i < commas.size()) {
+                    args.set(i, withCommaPrefix(args.get(i), prefix(commas.get(i).getSymbol())));
                     skip(commas.get(i).getSymbol());
                 }
             }
@@ -1541,6 +1462,11 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             // Handle comma - skip it and capture only whitespace after it
             if (text.charAt(i) == ',') {
+                // Whitespace before the comma belongs to the preceding element
+                if (!args.isEmpty() && i > prefixStart) {
+                    int last = args.size() - 1;
+                    args.set(last, withCommaPrefix(args.get(last), Space.format(text.substring(prefixStart, i))));
+                }
                 i++; // skip comma
                 prefixStart = i; // start prefix after comma
                 // Skip whitespace after comma

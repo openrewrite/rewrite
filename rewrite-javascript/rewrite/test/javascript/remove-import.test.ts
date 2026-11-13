@@ -48,6 +48,27 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('should remove named import with string literal module export name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("./styles.module.css", "link-a"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {"link-a" as linkA, "link-b" as linkB} from './styles.module.css';
+
+                        console.log(linkB);
+                    `,
+                    `
+                        import {"link-b" as linkB} from './styles.module.css';
+
+                        console.log(linkB);
+                    `
+                )
+            );
+        });
+
         test('should remove entire import when only one named import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
@@ -58,12 +79,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -89,6 +110,21 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+        test('should not remove aliased import when its alias is used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {foo as bar} from 'm';
+
+                        bar();
+                    `
+                )
+            );
+        });
     });
 
     describe('methods with same names from different types', () => {
@@ -110,6 +146,8 @@ describe('RemoveImport visitor', () => {
                             //@formatter:off
                             `
                                 Array.isArray([]);
+
+                                export {};
                             `
                             //@formatter:on
                         ),
@@ -148,6 +186,8 @@ describe('RemoveImport visitor', () => {
                             //@formatter:off
                             `
                                 Array.isArray([]);
+
+                                export {};
                             `
                             //@formatter:on
                         ),
@@ -186,6 +226,8 @@ describe('RemoveImport visitor', () => {
                             //@formatter:off
                             `
                                 Array.isArray([]);
+
+                                export {};
                             `
                             //@formatter:on
                         ),
@@ -218,12 +260,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import fs from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -259,12 +301,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import fs from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -303,12 +345,12 @@ describe('RemoveImport visitor', () => {
                             `
                                 import React from 'react';
 
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `,
                             `
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `
@@ -408,6 +450,45 @@ describe('RemoveImport visitor', () => {
                 );
             }, { unsafeCleanup: true });
         });
+        test('should remove default and named imports when none is used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React, {useState} from 'react';
+
+                        export const x = 1;
+                    `,
+                    `
+                        export const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('should remove default import and unused named imports while keeping used ones', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React, {useState, useMemo} from 'react';
+
+                        useMemo();
+                    `,
+                    `
+                        import {useMemo} from 'react';
+
+                        useMemo();
+                    `
+                )
+            );
+        });
     });
 
     describe('namespace imports', () => {
@@ -421,12 +502,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import * as fs from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -451,9 +532,94 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+        test('should not remove side-effect import when removing the namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "*"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import 'm';
+                    `
+                )
+            );
+        });
+
+        test('should remove unused namespace import when removing a specific member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "SFC"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as React from 'react';
+
+                        export const x = 1;
+                    `,
+                    `
+                        export const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('should keep used namespace import when removing a specific member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "SFC"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as React from 'react';
+
+                        const el: React.ReactNode = null;
+                    `
+                )
+            );
+        });
     });
 
     describe('type imports', () => {
+        test('a value of the same name does not keep a type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {type ReactText} from 'react';
+
+                        declare const ReactText: number;
+                        export const x = ReactText;
+                    `,
+                    `
+                        declare const ReactText: number;
+                        export const x = ReactText;
+                    `
+                )
+            );
+        });
+
+        test('a typeof query keeps a type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("./store", "store"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {store} from './store';
+
+                        export type State = ReturnType<typeof store.getState>;
+                    `
+                )
+            );
+        });
+
         test('should remove type import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs", "Stats"));
@@ -464,12 +630,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import type {Stats} from 'fs';
 
-                        function example() {
+                        export function example() {
                             return null;
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             return null;
                         }
                     `
@@ -580,6 +746,75 @@ describe('RemoveImport visitor', () => {
                         function example() {
                             return null;
                         }
+                    `
+                )
+            );
+        });
+
+        test('should remove a destructured require member bound under another name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile: rf, writeFile} = require('fs');
+
+                        function example() {
+                            writeFile('test.txt', 'content', () => {
+                            });
+                        }
+                    `,
+                    `
+                        const {writeFile} = require('fs');
+
+                        function example() {
+                            writeFile('test.txt', 'content', () => {
+                            });
+                        }
+                    `
+                ),
+                // `readFile` here reads a property of `a`, not a member of the module, so nothing
+                // the module exports is bound and there is nothing to remove even though it is unused.
+                typescript(
+                    `
+                        const {a: {readFile}} = require('fs');
+                    `
+                )
+            );
+        });
+
+        test('a member-scoped removal leaves a destructured require of another module alone', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile} = require('fs-extra');
+                    `
+                )
+            );
+        });
+
+        test('a module-wide removal drops the unused members of a destructured require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile, writeFile} = require('fs');
+
+                        writeFile('test.txt', 'content');
+                    `,
+                    `
+                        const {writeFile} = require('fs');
+
+                        writeFile('test.txt', 'content');
                     `
                 )
             );
@@ -749,6 +984,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         console.log("no util usage");
+
+                        export {};
                     `
                 )
             );
@@ -784,6 +1021,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         console.log("no util usage");
+
+                        export {};
                     `
                 )
             );
@@ -991,7 +1230,7 @@ describe('RemoveImport visitor', () => {
                         import fs from 'fs';
 
                         // This comment belongs to the class below
-                        class MyClass {
+                        export class MyClass {
                             doSomething() {
                                 return 'test';
                             }
@@ -999,7 +1238,7 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         // This comment belongs to the class below
-                        class MyClass {
+                        export class MyClass {
                             doSomething() {
                                 return 'test';
                             }
@@ -1023,7 +1262,7 @@ describe('RemoveImport visitor', () => {
                          * Documentation for the function
                          * @returns {string} A test value
                          */
-                        function example() {
+                        export function example() {
                             return 'test';
                         }
                     `,
@@ -1032,7 +1271,7 @@ describe('RemoveImport visitor', () => {
                          * Documentation for the function
                          * @returns {string} A test value
                          */
-                        function example() {
+                        export function example() {
                             return 'test';
                         }
                     `
@@ -1051,13 +1290,13 @@ describe('RemoveImport visitor', () => {
                         import fs from 'fs'; // This import is unused
 
                         // Main application code starts here
-                        function main() {
+                        export function main() {
                             console.log('application');
                         }
                     `,
                     `
                         // Main application code starts here
-                        function main() {
+                        export function main() {
                             console.log('application');
                         }
                     `
@@ -1113,6 +1352,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         console.log('test');
+
+                        export {};
                     `
                 )
             );
@@ -1156,6 +1397,8 @@ describe('RemoveImport visitor', () => {
                     `
                         // File comment
                         console.log('test');
+
+                        export {};
                     `
                 )
             );
@@ -1171,11 +1414,11 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from "fs";
 
-                        const foo = 1;
+                        export const foo = 1;
                         console.log(foo);
                     `,
                     `
-                        const foo = 1;
+                        export const foo = 1;
                         console.log(foo);
                         `
                 )
@@ -1192,12 +1435,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from "fs";
 
-                        function foo() {
+                        export function foo() {
                             return 42;
                         }
                     `,
                     `
-                        function foo() {
+                        export function foo() {
                             return 42;
                         }
                     `
@@ -1263,7 +1506,7 @@ describe('RemoveImport visitor', () => {
                                     children: string;
                                 };
 
-                                function App({ children }: Props) {
+                                export function App({ children }: Props) {
                                     return <div>{children}</div>;
                                 }
                             `,
@@ -1272,7 +1515,7 @@ describe('RemoveImport visitor', () => {
                                     children: string;
                                 };
 
-                                function App({ children }: Props) {
+                                export function App({ children }: Props) {
                                     return <div>{children}</div>;
                                 }
                             `
@@ -1344,12 +1587,12 @@ describe('RemoveImport visitor', () => {
                             `
                                 import {vi} from 'vitest';
 
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `,
                             `
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `
@@ -1561,4 +1804,464 @@ describe('RemoveImport visitor', () => {
             }, {unsafeCleanup: true});
         });
     });
+
+    describe('reference positions', () => {
+        test('an identifier read anywhere in an expression keeps the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        const handlers = {read: readFile};
+                        const first = [readFile][0] ?? readFile;
+                    `
+                )
+            );
+        });
+
+        test('a shorthand property is a use of the binding it names', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export const handlers = {readFile};
+                    `
+                )
+            );
+        });
+
+        test('a reference inside a require call keeps the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        const contents = require(readFile);
+                    `
+                )
+            );
+        });
+
+        test('a re-export keeps the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export {readFile};
+                    `
+                )
+            );
+        });
+    });
+
+    describe('shadowed names', () => {
+        test('a name an inner scope rebinds is not a use of the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export function f() {
+                            const readFile = 1;
+                            return readFile;
+                        }
+                    `,
+                    `
+                        export function f() {
+                            const readFile = 1;
+                            return readFile;
+                        }
+                    `
+                )
+            );
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export function g(readFile: number) {
+                            return readFile;
+                        }
+                    `,
+                    `
+                        export function g(readFile: number) {
+                            return readFile;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a type parameter of the import\'s name is not a use of it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "T"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {T} from 'm';
+
+                        export function f<T>(x: T): T {
+                            return x;
+                        }
+                    `,
+                    `
+                        export function f<T>(x: T): T {
+                            return x;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a value and a type of one name hide only the uses that read their own kind', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "X"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        function f() {
+                            interface X {}
+                            return X.go();
+                        }
+                    `
+                )
+            );
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        function f() {
+                            const X = 1;
+                            let y: X;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a qualified type name reads a namespace, which an interface does not bind', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "NS"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as NS from 'm';
+
+                        namespace Outer {
+                            interface NS {}
+                            let x: NS.Foo;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a namespace binds a value only once it is instantiated', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "X"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        namespace Outer {
+                            namespace X { export type T = 1 }
+                            X.go();
+                        }
+                    `
+                )
+            );
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        export namespace Outer {
+                            namespace X { export const go = () => 1 }
+                            X.go();
+                        }
+                    `,
+                    `
+                        export namespace Outer {
+                            namespace X { export const go = () => 1 }
+                            X.go();
+                        }
+                    `
+                )
+            );
+        });
+    });
+
+    describe('multiline import layout', () => {
+        test('should preserve trailing comma when removing the last specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "C"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {
+                            A,
+                            B,
+                            C,
+                        } from 'm';
+
+                        A();
+                        B();
+                    `,
+                    `
+                        import {
+                            A,
+                            B,
+                        } from 'm';
+
+                        A();
+                        B();
+                    `
+                )
+            );
+        });
+
+        test('should preserve layout when removing a middle specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "B"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {
+                            A,
+                            B,
+                            C,
+                        } from 'm';
+
+                        A();
+                        C();
+                    `,
+                    `
+                        import {
+                            A,
+                            C,
+                        } from 'm';
+
+                        A();
+                        C();
+                    `
+                )
+            );
+        });
+    });
+
+    describe('classic JSX', () => {
+        test('a member-scoped removal keeps a namespace import, which JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as React from 'react';
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a member-scoped removal keeps an import-equals-require, which JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React = require('react');
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a member-scoped removal keeps a require, which JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        const React = require('react');
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a member-scoped removal removes a namespace import that JSX does not read', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("lodash", "map"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as _ from 'lodash';
+
+                        export const A = () => <div/>;
+                    `,
+                    `
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a @jsx pragma names the binding JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("preact", "render"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        /** @jsx preact.h */
+                        import * as preact from 'preact';
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('removing the namespace by name still removes it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "*"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as React from 'react';
+
+                        export const A = () => <div/>;
+                    `,
+                    `
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+    });
+
+    describe('module marker', () => {
+        test('a file with JSX gets no marker', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "forwardRef"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        const A = () => <div/>;
+                    `,
+                    `
+                        const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('an .mts file is a module without one', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                {
+                    ...typescript(
+                        `
+                            import {readFile} from 'fs';
+
+                            const a = 1;
+                        `,
+                        `
+                            const a = 1;
+                        `
+                    ),
+                    ext: 'mts'
+                }
+            );
+        });
+
+        test('the marker goes after a trailing comment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        const a = 1;
+                        // trailing
+                    `,
+                    `
+                        const a = 1;
+                        // trailing
+
+                        export {};
+                    `
+                )
+            );
+        });
+    });
+
 });

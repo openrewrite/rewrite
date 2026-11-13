@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -132,6 +133,129 @@ class ScalaTemplateTest implements RewriteTest {
             """
               class Test {
                   println("static")
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceSplatExpression() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitSplatExpression(S.SplatExpression splat, ExecutionContext ctx) {
+                  if (splat.getExpression().toString().contains("ys")) {
+                      return super.visitSplatExpression(splat, ctx);
+                  }
+                  return ScalaTemplate.apply("ys: _*", getCursor(), splat.getCoordinates().replace());
+              }
+          })),
+          scala(
+            """
+              object Test {
+                  def f(xs: Int*): Unit = {}
+                  val ys = Seq(1, 2, 3)
+                  val xs = Seq(4, 5, 6)
+                  f(xs: _*)
+              }
+              """,
+            """
+              object Test {
+                  def f(xs: Int*): Unit = {}
+                  val ys = Seq(1, 2, 3)
+                  val xs = Seq(4, 5, 6)
+                  f(ys: _*)
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("deprecated".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
+                      return ScalaTemplate.builder("\"new\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          scala(
+            """
+              class Test {
+                  class Sibling {
+                  }
+
+                  @deprecated("old")
+                  def foo(): Unit = {}
+              }
+              """,
+            """
+              class Test {
+                  class Sibling {
+                  }
+
+                  @deprecated("new")
+                  def foo(): Unit = {}
+              }
+              """
+          ));
+    }
+
+    @Test
+    void parenthesizeWithScalaPrecedence() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "both" -> "#{any(boolean)} & #{any(boolean)}";
+                      case "either" -> "#{any(boolean)} | #{any(boolean)}";
+                      case "differ" -> "#{any(boolean)} ^ #{any(boolean)}";
+                      case "shl" -> "#{any(int)} << #{any(int)}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return ScalaTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+              }
+          })),
+          scala(
+            """
+              object T {
+                def both(a: Boolean, b: Boolean): Boolean = a & b
+                def either(a: Boolean, b: Boolean): Boolean = a | b
+                def differ(a: Boolean, b: Boolean): Boolean = a ^ b
+                def shl(a: Int, b: Int): Int = a << b
+                def f(p: Boolean, x: Boolean, y: Boolean, a: Int, b: Int, c: Int): Unit = {
+                  val strict = p && both(x, y)
+                  val loose = either(x, y) && p
+                  val odd = p && differ(x, y)
+                  val shifted = a < shl(b, c)
+                }
+              }
+              """,
+            """
+              object T {
+                def both(a: Boolean, b: Boolean): Boolean = a & b
+                def either(a: Boolean, b: Boolean): Boolean = a | b
+                def differ(a: Boolean, b: Boolean): Boolean = a ^ b
+                def shl(a: Int, b: Int): Int = a << b
+                def f(p: Boolean, x: Boolean, y: Boolean, a: Int, b: Int, c: Int): Unit = {
+                  val strict = p && (x & y)
+                  val loose = (x | y) && p
+                  val odd = p && (x ^ y)
+                  val shifted = a < (b << c)
+                }
               }
               """
           ));

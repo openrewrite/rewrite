@@ -50,7 +50,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer o) {
-                String type = method.printTrimmed(getCursor());
+                String type = method.printTrimmed(getCursor().getParentOrThrow());
                 types.computeIfAbsent(type, k -> new ArrayList<>(2))
                   .add(Objects.requireNonNull(method.getMethodType()));
                 return super.visitMethodInvocation(method, o);

@@ -327,4 +327,27 @@ class FindRepositoryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void bothGStringFormsAgreeOnAnEscapedUrl() {
+        rewriteRun(
+          spec -> spec.recipe(new FindRepository(null, "https://repo.example.com\\u002F$name", null)),
+          buildGradle(
+            """
+              def name = 'releases'
+              repositories {
+                  maven { url = "https://repo.example.com\\u002F$name" }
+                  maven { url "https://repo.example.com\\u002F$name" }
+              }
+              """,
+            """
+              def name = 'releases'
+              repositories {
+                  /*~~>*/maven { url = "https://repo.example.com\\u002F$name" }
+                  /*~~>*/maven { url "https://repo.example.com\\u002F$name" }
+              }
+              """
+          )
+        );
+    }
 }

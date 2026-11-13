@@ -17,8 +17,12 @@ package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.marker.MethodBodyEqualsPrefix;
+import org.openrewrite.scala.marker.OmitBraces;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class MethodDeclarationTest implements RewriteTest {
@@ -180,6 +184,19 @@ class MethodDeclarationTest implements RewriteTest {
                 }
                 object C {
                   def foo(args: Array[String]*): Int = 0
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodWithSpaceBeforeVarargsStar() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def replace(indexVectorTuples: (Int, ColumnVector) *): Unit = ()
                 }
                 """
             )
@@ -466,6 +483,42 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void implicitParamListAfterEmptyParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def run()(implicit t: Int): Int = t
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.MethodDeclaration run = (J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().getFirst()).getBody().getStatements().getFirst();
+                    assertThat(run.getParameters()).isEmpty();
+                    assertThat(((J.Identifier) run.getReturnTypeExpression()).getSimpleName()).isEqualTo("Int");
+                    J.Lambda curried = (J.Lambda) run.getBody().getStatements().getFirst();
+                    J.VariableDeclarations t = (J.VariableDeclarations) curried.getParameters().getParameters().getFirst();
+                    assertThat(t.getVariables().getFirst().getSimpleName()).isEqualTo("t");
+                })
+            )
+        );
+    }
+
+    @Test
+    void emptyCurriedParamLists() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(): Int = a
+                  def g()(): Int = 1
+                  def h()(using s: String)(): String = s
+                }
+                """
+            )
+        );
+    }
+
     @Nested
     class Using implements RewriteTest {
 
@@ -633,6 +686,23 @@ class MethodDeclarationTest implements RewriteTest {
         }
 
         @Test
+        void consecutiveBracelessExtensionsWithMethodCallBody() {
+            // Two consecutive braceless extensions where the first's method body is a
+            // method invocation must each print once, not duplicate the first on print.
+            rewriteRun(
+                scala(
+                    """
+                    extension (pk: Int)
+                      def a: Int = foo()
+
+                    extension (v: Int)
+                      def c: Int = v
+                    """
+                )
+            );
+        }
+
+        @Test
         void bracelessExtensionWithBraceBlockMethodBody() {
             // A `{` inside a method body must not be mistaken for the extension's
             // opening brace, which would make the parser treat this braceless
@@ -740,6 +810,66 @@ class MethodDeclarationTest implements RewriteTest {
                 }
                 """
             )
+        );
+    }
+
+    @Test
+    void auxiliaryConstructorWithExpressionBody() {
+        rewriteRun(
+          scala(
+            """
+              class A(a: Int) {
+                def this() = this(0)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration a = (J.ClassDeclaration) cu.getStatements().get(0);
+                J.MethodDeclaration constructor = (J.MethodDeclaration) a.getBody().getStatements().get(0);
+                assertThat(constructor.getSimpleName()).isEqualTo("this");
+                assertThat(constructor.getMarkers().findFirst(MethodBodyEqualsPrefix.class))
+                  .get().extracting(m -> m.getPrefix().getWhitespace()).isEqualTo(" ");
+
+                J.Block body = constructor.getBody();
+                assertThat(body).isNotNull();
+                assertThat(body.getMarkers().findFirst(OmitBraces.class)).isPresent();
+                assertThat(body.getPrefix().getWhitespace()).isEqualTo(" ");
+                // Dotty closes the body with a `()` literal the source does not contain
+                assertThat(body.getStatements()).singleElement()
+                  .isInstanceOfSatisfying(J.MethodInvocation.class, selfInvocation -> {
+                      assertThat(selfInvocation.getSimpleName()).isEqualTo("this");
+                      assertThat(selfInvocation.getArguments()).singleElement()
+                        .isInstanceOfSatisfying(J.Literal.class, arg -> assertThat(arg.getValue()).isEqualTo(0));
+                  });
+            })
+          )
+        );
+    }
+
+    @Test
+    void auxiliaryConstructorWithBlockBody() {
+        rewriteRun(
+          scala(
+            """
+              class A(a: Int) {
+                def this() = {
+                  this(0)
+                  println("init")
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration a = (J.ClassDeclaration) cu.getStatements().get(0);
+                J.MethodDeclaration constructor = (J.MethodDeclaration) a.getBody().getStatements().get(0);
+
+                J.Block body = constructor.getBody();
+                assertThat(body).isNotNull();
+                assertThat(body.getMarkers().findFirst(OmitBraces.class)).isEmpty();
+                assertThat(body.getEnd().getWhitespace()).isEqualTo("\n  ");
+                assertThat(body.getStatements()).hasSize(2);
+                assertThat(((J.MethodInvocation) body.getStatements().get(0)).getSimpleName()).isEqualTo("this");
+                assertThat(body.getStatements().get(1)).isInstanceOf(J.MethodInvocation.class);
+            })
+          )
         );
     }
 
@@ -935,6 +1065,117 @@ class MethodDeclarationTest implements RewriteTest {
             }
             """
           )
+        );
+    }
+
+    @Test
+    void parameterWithInfixType() {
+        rewriteRun(
+          scala(
+            """
+            class AsyncDb
+            class InsightDb
+            type @@[A, B] = A
+            def f(x: AsyncDb @@ InsightDb) = x
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInParameters() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(
+                x: Int,
+                y: Int,
+              ): Int = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInParametersSingleLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Int,): Int = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInTypeParameters() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo[
+                A,
+                B,
+              ](x: A): A = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInTypeParametersSingleLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo[A,](x: A): A = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedBracedExtensionMethods() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  extension (x: Int) { def a = 1; def b = 2 }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInBracedExtension() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  extension (x: Int) { ; def a = 1;; def b = 2; }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void auxiliaryConstructorWithTrailingSemicolons() {
+        rewriteRun(
+            scala(
+                """
+                class A(x: Int) {
+                  def this() = { this(1);; }
+                }
+                """
+            )
         );
     }
 }

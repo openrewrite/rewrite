@@ -22,6 +22,7 @@ import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
 /**
@@ -40,19 +41,22 @@ class ChangeTypeIntegTest implements RewriteTest {
 
     @Test
     void changeBuiltinType() {
-        // str -> String (demonstrates pattern matching on built-in types)
+        // a str value has the String primitive for its type, so the class is left as the owner of its methods
         rewriteRun(
           spec -> spec
             .typeValidationOptions(TypeValidation.none())
-            .recipe(new ChangeType("str", "String", false)),
+            .recipe(new ChangeType("str", "text.Text", false)),
           python(
             """
               result = "hello".upper()
               """,
             """
               result = "hello".upper()
-              """
+              """,
             // No visible change - type attribution is internal
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getTypesInUse().getUsedMethods())
+              .extracting(method -> method.getDeclaringType().getFullyQualifiedName())
+              .containsExactly("text.Text"))
           )
         );
     }

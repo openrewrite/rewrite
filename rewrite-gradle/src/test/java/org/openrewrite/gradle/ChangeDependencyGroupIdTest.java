@@ -24,6 +24,8 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
@@ -112,6 +114,69 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
                 .map(conf -> conf.findRequestedDependency("org.dewrite", "rewrite-core"))
                 .as("Requested dependency model should have been updated to have groupId org.dewrite")
                 .isPresent())
+          )
+        );
+    }
+
+    @Test
+    void changesGroupIdOnlyInMarkerForSpecifiedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.openrewrite", "rewrite-core", "org.dewrite", "api")),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              configurations {
+                  create("isolated")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  api 'org.openrewrite:rewrite-core:latest.release'
+                  add("isolated", "org.openrewrite:rewrite-core:latest.release")
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              configurations {
+                  create("isolated")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  api 'org.dewrite:rewrite-core:latest.release'
+                  add("isolated", "org.openrewrite:rewrite-core:latest.release")
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                  Optional<GradleProject> gradleProject = cu.getMarkers().findFirst(GradleProject.class);
+                  assertThat(gradleProject
+                    .map(gp -> gp.getConfiguration("api"))
+                    .map(conf -> conf.findRequestedDependency("org.dewrite", "rewrite-core")))
+                    .as("api marker should be updated to org.dewrite")
+                    .isPresent();
+                  assertThat(gradleProject
+                    .map(gp -> gp.getConfiguration("isolated"))
+                    .map(conf -> conf.findRequestedDependency("org.dewrite", "rewrite-core")))
+                    .as("isolated marker should NOT be updated (different config)")
+                    .isEmpty();
+                  assertThat(gradleProject
+                    .map(gp -> gp.getConfiguration("isolated"))
+                    .map(conf -> conf.findRequestedDependency("org.openrewrite", "rewrite-core")))
+                  .as("isolated marker should retain the original group")
+                  .isPresent();
+            })
           )
         );
     }

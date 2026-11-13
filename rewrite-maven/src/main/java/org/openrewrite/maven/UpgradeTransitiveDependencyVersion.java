@@ -21,20 +21,26 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toCollection;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManagedDependency.Scanned> {
+public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTransitiveDependencyVersion.Accumulator> {
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -43,6 +49,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
 
     String description = "Upgrades the version of a transitive dependency in a Maven pom file. " +
                "Leaves direct dependencies unmodified. " +
+               "When the transitive dependency's version is already governed by a plain `<dependencyManagement>` " +
+               "entry in the project, that entry is upgraded in place rather than adding a duplicate; otherwise " +
+               "(including a version supplied by an imported BOM) a new managed dependency is added. " +
                "Can be paired with the regular Upgrade Dependency Version recipe to upgrade a dependency everywhere, " +
                "regardless of whether it is direct or transitive.";
 
@@ -162,32 +171,96 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
         return super.validate().and(Semver.validate(version, versionPattern));
     }
 
-    @Override
-    public AddManagedDependency.Scanned getInitialValue(ExecutionContext ctx) {
-        return addManagedDependency().getInitialValue(ctx);
+    /**
+     * The sub-recipe accumulators plus scan-time governance: {@code governingPoms} (poms with a plain managed entry
+     * to update in place) and {@code locallyManagedByPom} (per pom, the matched coordinates it governs, so the
+     * visitor skips pinning them without recomputing governance). Keyed per-pom by group:artifact:version - a
+     * coordinate managed in one module must still be pinned in a sibling where it is unmanaged.
+     */
+    public static class Accumulator {
+        final AddManagedDependency.Scanned addScanned;
+        final UpgradeDependencyVersion.Accumulator upgradeAccumulator;
+        final Set<GroupArtifactVersion> governingPoms = new HashSet<>();
+        final Map<GroupArtifactVersion, Set<GroupArtifact>> locallyManagedByPom = new HashMap<>();
+
+        Accumulator(AddManagedDependency.Scanned addScanned, UpgradeDependencyVersion.Accumulator upgradeAccumulator) {
+            this.addScanned = addScanned;
+            this.upgradeAccumulator = upgradeAccumulator;
+        }
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(AddManagedDependency.Scanned acc) {
-        return addManagedDependency().getScanner(acc);
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator(
+                addManagedDependency().getInitialValue(ctx),
+                upgradeDependencyVersion().getInitialValue(ctx));
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(AddManagedDependency.Scanned acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        TreeVisitor<?, ExecutionContext> addScanner = addManagedDependency().getScanner(acc.addScanned);
+        TreeVisitor<?, ExecutionContext> upgradeScanner = upgradeDependencyVersion().getScanner(acc.upgradeAccumulator);
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Set<ResolvedDependency> matchingDependencies = getResolutionResult().findDependencies(groupId, artifactId, null)
+                if (addScanner.isAcceptable(document, ctx)) {
+                    addScanner.visit(document, ctx);
+                }
+                if (upgradeScanner.isAcceptable(document, ctx)) {
+                    upgradeScanner.visit(document, ctx);
+                }
+
+                MavenResolutionResult mrr = getResolutionResult();
+                for (ResolvedDependency dep : mrr.findDependencies(groupId, artifactId, null)) {
+                    if (!dep.isTransitive()) {
+                        continue;
+                    }
+                    GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
+                    // Record the pom declaring a plain managed entry so the update path targets it. A BOM-imported
+                    // version is left to the pin path instead: overriding the member with a managed entry always
+                    // reaches the target, whereas raising a (often framework-coupled) BOM may not; callers wanting
+                    // the BOM raised use UpgradeDependencyVersion directly.
+                    VersionGovernance governance = VersionGovernance.of(mrr, ga);
+                    if (isLocalManaged(governance)) {
+                        acc.governingPoms.add(governance.getGoverningPom().asGroupArtifactVersion());
+                        acc.locallyManagedByPom.computeIfAbsent(mrr.getPom().getGav().asGroupArtifactVersion(), k -> new HashSet<>()).add(ga);
+                    }
+                }
+                return document;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                Xml.Document d = document;
+
+                // Where this pom declares the governing entry, upgrade it in place. A dead entry in a different pom
+                // is never in scope here, so it is left untouched.
+                if (acc.governingPoms.contains(mrr.getPom().getGav().asGroupArtifactVersion())) {
+                    d = (Xml.Document) upgradeDependencyVersion().getVisitor(acc.upgradeAccumulator).visitNonNull(d, ctx);
+                }
+
+                // Pin the remaining transitive dependencies, skipping any governed by a plain managed entry in THIS
+                // pom's resolution (handled by the update path above). The skip is per-pom: the same coordinate may
+                // be unmanaged in a sibling and must still be pinned there.
+                Set<GroupArtifact> managedHere = acc.locallyManagedByPom.getOrDefault(mrr.getPom().getGav().asGroupArtifactVersion(), emptySet());
+                Set<ResolvedDependency> matchingDependencies = mrr.findDependencies(groupId, artifactId, null)
                         .stream()
                         .filter(ResolvedDependency::isTransitive)
+                        .filter(dep -> !managedHere.contains(new GroupArtifact(dep.getGroupId(), dep.getArtifactId())))
                         .collect(toCollection(LinkedHashSet::new));
                 if (matchingDependencies.isEmpty()) {
-                    return document;
+                    return d;
                 }
 
                 // Skip transitive dependencies that a project parent also has,
                 // since the parent will get the managed dependency and children will inherit it
-                MavenResolutionResult current = getResolutionResult();
+                MavenResolutionResult current = mrr;
                 while (current.parentPomIsProjectPom()) {
                     MavenResolutionResult parentResult = current.getParent();
                     List<ResolvedDependency> parentTransitiveDeps = parentResult.findDependencies(groupId, artifactId, null);
@@ -200,13 +273,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                 }
 
                 if (matchingDependencies.isEmpty()) {
-                    return document;
+                    return d;
                 }
 
-                Xml.Document d = document;
                 for (ResolvedDependency matchingDependency : matchingDependencies) {
                     d = (Xml.Document) addManagedDependency(matchingDependency.getGroupId(), matchingDependency.getArtifactId())
-                            .getVisitor(acc)
+                            .getVisitor(acc.addScanned)
                             .visitNonNull(d, ctx);
                 }
                 return d;
@@ -220,5 +292,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
 
     private AddManagedDependency addManagedDependency(String groupId, String artifactId) {
         return new AddManagedDependency(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, because);
+    }
+
+    private UpgradeDependencyVersion upgradeDependencyVersion() {
+        return new UpgradeDependencyVersion(groupId, artifactId, version, versionPattern, true, null);
+    }
+
+    private static boolean isLocalManaged(@Nullable VersionGovernance governance) {
+        return governance != null && governance.getKind() == VersionGovernance.Kind.LOCAL_MANAGED;
     }
 }

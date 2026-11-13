@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "test-package",
+      "dependencies": {
+        "dummy-package": "file:./bar-0.0.2.tgz",
+      },
+    },
+  },
+  "packages": {
+    "dummy-package": ["bar@./bar-0.0.2.tgz", {}, "sha512-DXWxn8qZ4n87XMJjwZUdYPnsrl8Ntz66PudFoxDVkaPEkZBBzENAKsJPgbBacD782W8RwD/v4mjwVyqlPpQ59w=="],
+  }
+}

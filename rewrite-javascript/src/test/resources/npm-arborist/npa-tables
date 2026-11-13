@@ -1,0 +1,1228 @@
+[
+ {
+  "file": "basic.js",
+  "arg": "foo@1.2",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "range",
+   "saveSpec": null,
+   "fetchSpec": "1.2",
+   "raw": "foo@1.2",
+   "rawSpec": "1.2"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@~1.2",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "range",
+   "saveSpec": null,
+   "fetchSpec": "~1.2",
+   "raw": "foo@~1.2",
+   "rawSpec": "~1.2"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "@foo/bar",
+  "where": "/test/a/b",
+  "expected": {
+   "raw": "@foo/bar",
+   "name": "@foo/bar",
+   "escapedName": "@foo%2fbar",
+   "scope": "@foo",
+   "rawSpec": "*",
+   "saveSpec": null,
+   "fetchSpec": "*",
+   "type": "range"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "@foo/bar@",
+  "where": "/test/a/b",
+  "expected": {
+   "raw": "@foo/bar@",
+   "name": "@foo/bar",
+   "escapedName": "@foo%2fbar",
+   "scope": "@foo",
+   "rawSpec": "*",
+   "saveSpec": null,
+   "fetchSpec": "*",
+   "type": "range"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "@foo/bar@baz",
+  "where": "/test/a/b",
+  "expected": {
+   "raw": "@foo/bar@baz",
+   "name": "@foo/bar",
+   "escapedName": "@foo%2fbar",
+   "scope": "@foo",
+   "rawSpec": "baz",
+   "saveSpec": null,
+   "fetchSpec": "baz",
+   "type": "tag"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "@f fo o al/ a d s ;f",
+  "where": "/test/a/b",
+  "expected": {
+   "raw": "@f fo o al/ a d s ;f",
+   "name": null,
+   "escapedName": null,
+   "rawSpec": "@f fo o al/ a d s ;f",
+   "saveSpec": "file:@f fo o al/ a d s ;f",
+   "fetchSpec": "/test/a/b/@f fo o al/ a d s ;f",
+   "type": "directory"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "version",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "raw": "foo@1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@=v1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "version",
+   "saveSpec": null,
+   "fetchSpec": "=v1.2.3",
+   "raw": "foo@=v1.2.3",
+   "rawSpec": "=v1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@npm:bar",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "alias",
+   "saveSpec": null,
+   "fetchSpec": null,
+   "raw": "foo@npm:bar",
+   "rawSpec": "npm:bar",
+   "subSpec": {
+    "registry": true,
+    "name": "bar",
+    "escapedName": "bar",
+    "type": "range",
+    "raw": "bar",
+    "rawSpec": "*",
+    "saveSpec": null,
+    "fetchSpec": "*"
+   }
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@notgithub.com/user/foo#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@notgithub.com/user/foo#1.2.3",
+   "fetchSpec": "ssh://git@notgithub.com/user/foo",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://git@notgithub.com/user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@notgithub.com/user/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@notgithub.com/user/foo",
+   "fetchSpec": "ssh://git@notgithub.com/user/foo",
+   "gitCommittish": null,
+   "raw": "git+ssh://git@notgithub.com/user/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@notgithub.com:user/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@notgithub.com:user/foo",
+   "fetchSpec": "git@notgithub.com:user/foo",
+   "gitCommittish": null,
+   "raw": "git+ssh://git@notgithub.com:user/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://mydomain.com:foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://mydomain.com:foo",
+   "fetchSpec": "mydomain.com:foo",
+   "gitCommittish": null,
+   "raw": "git+ssh://mydomain.com:foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@notgithub.com:user/foo#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@notgithub.com:user/foo#1.2.3",
+   "fetchSpec": "git@notgithub.com:user/foo",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://git@notgithub.com:user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://mydomain.com:foo#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://mydomain.com:foo#1.2.3",
+   "fetchSpec": "mydomain.com:foo",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://mydomain.com:foo#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://mydomain.com:foo/bar#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://mydomain.com:foo/bar#1.2.3",
+   "fetchSpec": "mydomain.com:foo/bar",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://mydomain.com:foo/bar#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://mydomain.com:1234#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://mydomain.com:1234#1.2.3",
+   "fetchSpec": "ssh://mydomain.com:1234",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://mydomain.com:1234#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://mydomain.com:1234/hey#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://mydomain.com:1234/hey#1.2.3",
+   "fetchSpec": "ssh://mydomain.com:1234/hey",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://mydomain.com:1234/hey#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://mydomain.com:1234/hey",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://mydomain.com:1234/hey",
+   "fetchSpec": "ssh://mydomain.com:1234/hey",
+   "gitCommittish": null,
+   "raw": "git+ssh://mydomain.com:1234/hey"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://username:password@mydomain.com:1234/hey#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://username:password@mydomain.com:1234/hey#1.2.3",
+   "fetchSpec": "ssh://username:password@mydomain.com:1234/hey",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://username:password@mydomain.com:1234/hey#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@github.com/user/foo#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com/user/foo.git#1.2.3",
+   "fetchSpec": "ssh://git@github.com/user/foo.git",
+   "gitCommittish": "1.2.3",
+   "raw": "git+ssh://git@github.com/user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@notgithub.com/user/foo#semver:^1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "hosted": null,
+   "saveSpec": "git+ssh://git@notgithub.com/user/foo#semver:^1.2.3",
+   "fetchSpec": "ssh://git@notgithub.com/user/foo",
+   "gitCommittish": null,
+   "gitRange": "^1.2.3",
+   "raw": "git+ssh://git@notgithub.com/user/foo#semver:^1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@notgithub.com:user/foo#semver:^1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "hosted": null,
+   "saveSpec": "git+ssh://git@notgithub.com:user/foo#semver:^1.2.3",
+   "fetchSpec": "git@notgithub.com:user/foo",
+   "gitCommittish": null,
+   "gitRange": "^1.2.3",
+   "raw": "git+ssh://git@notgithub.com:user/foo#semver:^1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@github.com/user/foo#semver:^1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com/user/foo.git#semver:^1.2.3",
+   "fetchSpec": "ssh://git@github.com/user/foo.git",
+   "gitCommittish": null,
+   "gitRange": "^1.2.3",
+   "raw": "git+ssh://git@github.com/user/foo#semver:^1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+ssh://git@github.com:user/foo#semver:^1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com/user/foo.git#semver:^1.2.3",
+   "fetchSpec": "ssh://git@github.com/user/foo.git",
+   "gitCommittish": null,
+   "gitRange": "^1.2.3",
+   "raw": "git+ssh://git@github.com:user/foo#semver:^1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "user/foo#semver:^1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "github:user/foo#semver:^1.2.3",
+   "fetchSpec": null,
+   "gitCommittish": null,
+   "gitRange": "^1.2.3",
+   "raw": "user/foo#semver:^1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "user/foo#path:dist",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "github:user/foo#path:dist",
+   "fetchSpec": null,
+   "gitCommittish": null,
+   "gitSubdir": "/dist",
+   "raw": "user/foo#path:dist"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "user/foo#1234::path:dist",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "github:user/foo#1234::path:dist",
+   "fetchSpec": null,
+   "gitCommittish": "1234",
+   "gitRange": null,
+   "gitSubdir": "/dist",
+   "raw": "user/foo#1234::path:dist"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "user/foo#notimplemented:value",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "github:user/foo#notimplemented:value",
+   "fetchSpec": null,
+   "gitCommittish": null,
+   "gitRange": null,
+   "gitSubdir": null,
+   "raw": "user/foo#notimplemented:value"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git+file://path/to/repo#1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git+file://path/to/repo#1.2.3",
+   "fetchSpec": "file://path/to/repo",
+   "gitCommittish": "1.2.3",
+   "raw": "git+file://path/to/repo#1.2.3"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git://notgithub.com/user/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "git",
+   "saveSpec": "git://notgithub.com/user/foo",
+   "fetchSpec": "git://notgithub.com/user/foo",
+   "raw": "git://notgithub.com/user/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "@foo/bar@git+ssh://notgithub.com/user/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "@foo/bar",
+   "escapedName": "@foo%2fbar",
+   "scope": "@foo",
+   "saveSpec": "git+ssh://notgithub.com/user/foo",
+   "fetchSpec": "ssh://notgithub.com/user/foo",
+   "rawSpec": "git+ssh://notgithub.com/user/foo",
+   "raw": "@foo/bar@git+ssh://notgithub.com/user/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "git@npm:not-git",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "git",
+   "type": "alias",
+   "subSpec": {
+    "type": "range",
+    "registry": true,
+    "name": "not-git",
+    "fetchSpec": "*"
+   },
+   "raw": "git@npm:not-git"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "not-git@hostname.com:some/repo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://not-git@hostname.com:some/repo",
+   "fetchSpec": "not-git@hostname.com:some/repo",
+   "raw": "not-git@hostname.com:some/repo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "/path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/path/to/foo",
+   "fetchSpec": "/path/to/foo",
+   "raw": "/path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "/path/to/foo.tar",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "file",
+   "saveSpec": "file:/path/to/foo.tar",
+   "fetchSpec": "/path/to/foo.tar",
+   "raw": "/path/to/foo.tar"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "/path/to/foo.tgz",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "file",
+   "saveSpec": "file:/path/to/foo.tgz",
+   "fetchSpec": "/path/to/foo.tgz",
+   "raw": "/path/to/foo.tgz"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:path/to/foo",
+   "fetchSpec": "/test/a/b/path/to/foo",
+   "raw": "file:path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:path/to/foo.tar.gz",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "file",
+   "saveSpec": "file:path/to/foo",
+   "fetchSpec": "/test/a/b/path/to/foo.tar.gz",
+   "raw": "file:path/to/foo.tar.gz"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:~/path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:~/path/to/foo",
+   "fetchSpec": "{HOME}/path/to/foo",
+   "raw": "file:~/path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:/~/path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:~/path/to/foo",
+   "fetchSpec": "{HOME}/path/to/foo",
+   "raw": "file:/~/path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:/~path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/~path/to/foo",
+   "fetchSpec": "/~path/to/foo",
+   "raw": "file:/~path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:/.path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/.path/to/foo",
+   "fetchSpec": "/.path/to/foo",
+   "raw": "file:/.path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:./path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:path/to/foo",
+   "fetchSpec": "/test/a/b/path/to/foo",
+   "raw": "file:./path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:/./path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:path/to/foo",
+   "fetchSpec": "/test/a/b/path/to/foo",
+   "raw": "file:/./path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file://./path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:path/to/foo",
+   "fetchSpec": "/test/a/b/path/to/foo",
+   "raw": "file://./path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:../path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:../path/to/foo",
+   "fetchSpec": "/test/a/path/to/foo",
+   "raw": "file:../path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:/../path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:../path/to/foo",
+   "fetchSpec": "/test/a/path/to/foo",
+   "raw": "file:/../path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file://../path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:../path/to/foo",
+   "fetchSpec": "/test/a/path/to/foo",
+   "raw": "file://../path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:///path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/path/to/foo",
+   "fetchSpec": "/path/to/foo",
+   "raw": "file:///path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:/path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/path/to/foo",
+   "fetchSpec": "/path/to/foo",
+   "raw": "file:/path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file://path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/path/to/foo",
+   "fetchSpec": "/path/to/foo",
+   "raw": "file://path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file:////path/to/foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:/path/to/foo",
+   "fetchSpec": "/path/to/foo",
+   "raw": "file:////path/to/foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "file://.",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "directory",
+   "saveSpec": "file:",
+   "fetchSpec": "/test/a/b",
+   "raw": "file://."
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "http://insecure.com/foo.tgz",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "remote",
+   "saveSpec": "http://insecure.com/foo.tgz",
+   "fetchSpec": "http://insecure.com/foo.tgz",
+   "raw": "http://insecure.com/foo.tgz"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "https://server.com/foo.tgz",
+  "where": "/test/a/b",
+  "expected": {
+   "name": null,
+   "escapedName": null,
+   "type": "remote",
+   "saveSpec": "https://server.com/foo.tgz",
+   "fetchSpec": "https://server.com/foo.tgz",
+   "raw": "https://server.com/foo.tgz"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@latest",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "tag",
+   "saveSpec": null,
+   "fetchSpec": "latest",
+   "raw": "foo@latest"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "range",
+   "saveSpec": null,
+   "fetchSpec": "*",
+   "raw": "foo"
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@ 1.2 ",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "range",
+   "saveSpec": null,
+   "fetchSpec": "1.2",
+   "raw": "foo@ 1.2 ",
+   "rawSpec": " 1.2 "
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@ 1.2.3 ",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "version",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "raw": "foo@ 1.2.3 ",
+   "rawSpec": " 1.2.3 "
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@1.2.3 ",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "version",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "raw": "foo@1.2.3 ",
+   "rawSpec": "1.2.3 "
+  }
+ },
+ {
+  "file": "basic.js",
+  "arg": "foo@ 1.2.3",
+  "where": "/test/a/b",
+  "expected": {
+   "name": "foo",
+   "escapedName": "foo",
+   "type": "version",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "raw": "foo@ 1.2.3",
+   "rawSpec": " 1.2.3"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "user/foo-js",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "github:user/foo-js",
+   "raw": "user/foo-js"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "user/foo-js#bar/baz",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "github:user/foo-js#bar/baz",
+   "raw": "user/foo-js#bar/baz"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "user..blerg--/..foo-js# . . . . . some . tags / / /",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "github:user..blerg--/..foo-js# . . . . . some . tags / / /",
+   "raw": "user..blerg--/..foo-js# . . . . . some . tags / / /"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "user/foo-js#bar/baz/bin",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "raw": "user/foo-js#bar/baz/bin"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "foo@user/foo-js",
+  "where": null,
+  "expected": {
+   "name": "foo",
+   "type": "git",
+   "saveSpec": "github:user/foo-js",
+   "raw": "foo@user/foo-js"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "github:user/foo-js",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "github:user/foo-js",
+   "raw": "github:user/foo-js"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git+ssh://git@github.com/user/foo#1.2.3",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com/user/foo.git#1.2.3",
+   "raw": "git+ssh://git@github.com/user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git+ssh://git@github.com:user/foo#1.2.3",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com/user/foo.git#1.2.3",
+   "raw": "git+ssh://git@github.com:user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git://github.com/user/foo",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git://github.com/user/foo.git",
+   "raw": "git://github.com/user/foo"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "https://github.com/user/foo.git",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+https://github.com/user/foo.git",
+   "raw": "https://github.com/user/foo.git"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "@foo/bar@git+ssh://github.com/user/foo",
+  "where": null,
+  "expected": {
+   "name": "@foo/bar",
+   "scope": "@foo",
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com/user/foo.git",
+   "rawSpec": "git+ssh://github.com/user/foo",
+   "raw": "@foo/bar@git+ssh://github.com/user/foo"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "foo@bar/foo",
+  "where": null,
+  "expected": {
+   "name": "foo",
+   "type": "git",
+   "saveSpec": "github:bar/foo",
+   "raw": "foo@bar/foo"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git@github.com:12345",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com:12345",
+   "fetchSpec": "ssh://git@github.com:12345",
+   "raw": "git@github.com:12345"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git@github.com:12345/",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com:12345/",
+   "fetchSpec": "ssh://git@github.com:12345/",
+   "raw": "git@github.com:12345/"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git@github.com:12345/foo",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com:12345/foo",
+   "fetchSpec": "ssh://git@github.com:12345/foo",
+   "raw": "git@github.com:12345/foo"
+  }
+ },
+ {
+  "file": "github.js",
+  "arg": "git@github.com:12345foo",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@github.com:12345foo",
+   "fetchSpec": "git@github.com:12345foo",
+   "raw": "git@github.com:12345foo"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "gitlab:user/foo-js",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "raw": "gitlab:user/foo-js"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "gitlab:user/foo-js#bar/baz",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "raw": "gitlab:user/foo-js#bar/baz"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "gitlab:user..blerg--/..foo-js# . . . . . some . tags / / /",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "gitlab:user..blerg--/..foo-js# . . . . . some . tags / / /",
+   "raw": "gitlab:user..blerg--/..foo-js# . . . . . some . tags / / /"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "gitlab:user/foo-js#bar/baz/bin",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "gitlab:user/foo-js#bar/baz/bin",
+   "raw": "gitlab:user/foo-js#bar/baz/bin"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "foo@gitlab:user/foo-js",
+  "where": null,
+  "expected": {
+   "name": "foo",
+   "type": "git",
+   "saveSpec": "gitlab:user/foo-js",
+   "raw": "foo@gitlab:user/foo-js"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "git+ssh://git@gitlab.com/user/foo#1.2.3",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@gitlab.com/user/foo.git#1.2.3",
+   "raw": "git+ssh://git@gitlab.com/user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "https://gitlab.com/user/foo.git",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+https://gitlab.com/user/foo.git",
+   "raw": "https://gitlab.com/user/foo.git"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "arg": "@foo/bar@git+ssh://gitlab.com/user/foo",
+  "where": null,
+  "expected": {
+   "name": "@foo/bar",
+   "scope": "@foo",
+   "type": "git",
+   "saveSpec": "git+ssh://git@gitlab.com/user/foo.git",
+   "rawSpec": "git+ssh://gitlab.com/user/foo",
+   "raw": "@foo/bar@git+ssh://gitlab.com/user/foo"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "bitbucket:user/foo-js",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "bitbucket:user/foo-js",
+   "raw": "bitbucket:user/foo-js"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "bitbucket:user/foo-js#bar/baz",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "bitbucket:user/foo-js#bar/baz",
+   "raw": "bitbucket:user/foo-js#bar/baz"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "bitbucket:user..blerg--/..foo-js# . . . . . some . tags / / /",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "bitbucket:user..blerg--/..foo-js# . . . . . some . tags / / /",
+   "raw": "bitbucket:user..blerg--/..foo-js# . . . . . some . tags / / /"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "bitbucket:user/foo-js#bar/baz/bin",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "bitbucket:user/foo-js#bar/baz/bin",
+   "raw": "bitbucket:user/foo-js#bar/baz/bin"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "foo@bitbucket:user/foo-js",
+  "where": null,
+  "expected": {
+   "name": "foo",
+   "type": "git",
+   "saveSpec": "bitbucket:user/foo-js",
+   "raw": "foo@bitbucket:user/foo-js"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "git+ssh://git@bitbucket.org/user/foo#1.2.3",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+ssh://git@bitbucket.org/user/foo.git#1.2.3",
+   "raw": "git+ssh://git@bitbucket.org/user/foo#1.2.3"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "https://bitbucket.org/user/foo.git",
+  "where": null,
+  "expected": {
+   "name": null,
+   "type": "git",
+   "saveSpec": "git+https://bitbucket.org/user/foo.git",
+   "raw": "https://bitbucket.org/user/foo.git"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "arg": "@foo/bar@git+ssh://bitbucket.org/user/foo",
+  "where": null,
+  "expected": {
+   "name": "@foo/bar",
+   "scope": "@foo",
+   "type": "git",
+   "saveSpec": "git+ssh://git@bitbucket.org/user/foo.git",
+   "rawSpec": "git+ssh://bitbucket.org/user/foo",
+   "raw": "@foo/bar@git+ssh://bitbucket.org/user/foo"
+  }
+ }
+]

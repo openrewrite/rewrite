@@ -15,15 +15,19 @@
  */
 package org.openrewrite.config;
 
+import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -40,9 +44,8 @@ class YamlResourceLoaderTest implements RewriteTest {
         }
     }
 
-    @DocumentExample
     @Test
-    void recipeExamples() {
+    void exampleDocumentsAreIgnored() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
             //language=yml
@@ -53,104 +56,23 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+              ---
               type: specs.openrewrite.org/v1beta/example
               recipeName: test.ChangeTextToHello
               examples:
-                - description: "Change World to Hello in a text file"
+                - description: "Change World to Hello"
                   sources:
                     - before: "World"
                       after: "Hello!"
-                      path: "1.txt"
                       language: "text"
-                    - before: "World 2"
-                      after: "Hello 2!"
-                      path: "2.txt"
-                      language: "text"
-                - description: "Change World to Hello in a java file"
-                  parameters:
-                    - arg0
-                    - 1
-                  sources:
-                    - before: |
-                        public class A {
-                            void method() {
-                                System.out.println("World");
-                            }
-                        }
-                      after: |
-                        public class A {
-                            void method() {
-                                System.out.println("Hello!");
-                            }
-                        }
-                      language: java
               """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          ), URI.create("rewrite.yml"), new Properties()))
           .build();
 
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).singleElement().satisfies(r -> {
-            assertThat(r.getExamples()).hasSize(2);
-            assertThat(r.getExamples()).first().satisfies(e -> {
-                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
-                assertThat(e.getSources()).hasSize(2);
-                assertThat(e.getSources()).first().satisfies(s -> {
-                      assertThat(s.getBefore()).isEqualTo("World");
-                      assertThat(s.getAfter()).isEqualTo("Hello!");
-                      assertThat(s.getPath()).isEqualTo("1.txt");
-                      assertThat(s.getLanguage()).isEqualTo("text");
-                  }
-                );
-
-                assertThat(e.getSources().get(1)).satisfies(s -> {
-                      assertThat(s.getBefore()).isEqualTo("World 2");
-                      assertThat(s.getAfter()).isEqualTo("Hello 2!");
-                      assertThat(s.getPath()).isEqualTo("2.txt");
-                      assertThat(s.getLanguage()).isEqualTo("text");
-                  }
-                );
-            });
-            assertThat(r.getExamples().get(1)).satisfies(e -> {
-                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
-
-                assertThat(e.getParameters()).hasSize(2);
-                assertThat(e.getParameters().getFirst()).isEqualTo("arg0");
-                assertThat(e.getParameters().get(1)).isEqualTo("1");
-
-                assertThat(e.getSources()).hasSize(1);
-                assertThat(e.getSources()).first().satisfies(s -> {
-                    //language=java
-                    assertThat(s.getBefore()).isEqualTo("""
-                      public class A {
-                          void method() {
-                              System.out.println("World");
-                          }
-                      }
-                      """);
-                    //language=java
-                    assertThat(s.getAfter()).isEqualTo("""
-                      public class A {
-                          void method() {
-                              System.out.println("Hello!");
-                          }
-                      }
-                      """);
-                    assertThat(s.getPath()).isNull();
-                    assertThat(s.getLanguage()).isEqualTo("java");
-                });
-            });
-        });
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).singleElement().satisfies(descriptor -> {
-            List<RecipeExample> descriptorExamples = descriptor.getExamples();
-            assertThat(descriptorExamples).containsExactlyElementsOf(recipes.iterator().next().getExamples());
-        });
+        assertThat(env.listRecipes()).singleElement()
+          .satisfies(recipe -> assertThat(recipe.getExamples()).isEmpty());
+        assertThat(env.listRecipeDescriptors()).singleElement()
+          .satisfies(descriptor -> assertThat(descriptor.getExamples()).isEmpty());
     }
 
     @Test
@@ -175,7 +97,41 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
-    void maintainers() {
+    void nonStringTagsAreReportedAsValidationErrorsInsteadOfThrowing() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              tags:
+                - fine
+                - not_string_tag: boom
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Recipe recipe = env.listRecipes().iterator().next();
+
+        // Only valid String tags are retained, so iterating getTags() does not throw a ClassCastException
+        assertThat(recipe.getTags()).containsExactly("fine");
+        recipe.getTags().forEach(tag -> assertThat(tag).isInstanceOf(String.class));
+
+        // The non-string tag surfaces as a validation error rather than crashing at runtime
+        assertThat(recipe.validate().isValid()).isFalse();
+        assertThat(recipe.validate().failures())
+          .anySatisfy(failure -> {
+              assertThat(failure.getProperty()).isEqualTo("test.ChangeTextToHello.tags");
+              assertThat(failure.getMessage()).contains("tags must be a list of strings");
+          });
+    }
+
+    @Test
+    void unknownOptionIsReportedAsValidationError() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
             //language=yml
@@ -186,26 +142,41 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
-              maintainers:
-                  - maintainer: Sam
-                    logo: https://sam.com/logo.svg
-                  - maintainer: Jon
+                      toTxt: Hello?
               """.getBytes()
           ), URI.create("rewrite.yml"), new Properties()))
           .build();
 
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
-        assertThat(descriptor.getDataTables()).isNotEmpty();
-        assertThat(descriptor.getMaintainers()).hasSize(2);
-        Maintainer sam = descriptor.getMaintainers().getFirst();
-        assertThat(sam.getMaintainer()).isEqualTo("Sam");
-        assertThat(sam.getLogo()).isNotNull();
-        assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
-        Maintainer jon = descriptor.getMaintainers().get(1);
-        assertThat(jon.getMaintainer()).isEqualTo("Jon");
-        assertThat(jon.getLogo()).isNull();
+        Recipe recipe = env.activateRecipes("test.ChangeTextToHello");
+
+        assertThat(recipe.validateAll())
+          .flatMap(Validated::failures)
+          .singleElement()
+          .satisfies(failure -> {
+              assertThat(failure.getProperty()).isEqualTo("org.openrewrite.text.ChangeText.toTxt");
+              assertThat(failure.getMessage()).isEqualTo("is not an option of this recipe; valid options are: toText");
+          });
+    }
+
+    @Test
+    void optionFieldThatJacksonCannotSetIsNotReportedAsUnknown() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.FieldOption
+              displayName: Field option
+              recipeList:
+                  - org.openrewrite.config.YamlResourceLoaderTest$RecipeWithFieldOption:
+                      fieldOption: value
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        assertThat(env.activateRecipes("test.FieldOption").validateAll())
+          .flatMap(Validated::failures)
+          .isEmpty();
     }
 
     @Test
@@ -245,6 +216,28 @@ class YamlResourceLoaderTest implements RewriteTest {
           Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()));
     }
 
+    @Test
+    void loadRecipeWhoseStaticInitializerHasNotYetFailed() {
+        // Unlike RecipeWithBadStaticInitializer, this class is never pre-loaded, so the first
+        // load throws ExceptionInInitializerError rather than NoClassDefFoundError.
+        final List<Validated<Object>> invalidRecipes = new ArrayList<>();
+
+        createYamlResourceLoader().loadRecipe(
+          "org.company.CustomRecipe",
+          0,
+          RecipeFailingOnFirstLoad.class.getName(),
+          recipe -> {
+          },
+          recipe -> {
+          },
+          invalidRecipes::add);
+
+        assertEquals(1, invalidRecipes.size());
+        Validated.Invalid<Object> invalid = (Validated.Invalid<Object>) invalidRecipes.get(0);
+        assertThat(invalid.getException()).isInstanceOf(ExceptionInInitializerError.class);
+        assertThat(invalid.getMessage()).contains("ExceptionInInitializerError");
+    }
+
     private void assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(Object recipeData) {
         final List<Validated<Object>> invalidRecipes = new ArrayList<>();
         YamlResourceLoader resourceLoader = createYamlResourceLoader();
@@ -260,6 +253,13 @@ class YamlResourceLoaderTest implements RewriteTest {
           invalidRecipes::add);
 
         assertEquals(1, invalidRecipes.size());
+        Validated.Invalid<Object> invalid = (Validated.Invalid<Object>) invalidRecipes.get(0);
+        assertThat(invalid.getMessage())
+          .as("must report why the class could not be loaded, not merely that it could not be")
+          .contains("Could not initialize class");
+        assertThat(invalid.getException())
+          .as("the originating error must be retained for callers that can surface it")
+          .isInstanceOf(NoClassDefFoundError.class);
     }
 
     private YamlResourceLoader createYamlResourceLoader() {
@@ -299,6 +299,130 @@ class YamlResourceLoaderTest implements RewriteTest {
             .build().listRecipes().iterator().next()),
           text("hello", "/bin/java")
         );
+    }
+
+    @Test
+    void loadRecipeReturnsNullWhenMarketplaceDoesNotListTheRecipe() {
+        YamlResourceLoader userYaml = marketplaceBackedLoader(
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: user.BestPractices
+            displayName: User best practices
+            description: Test.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: Hello!
+            """);
+
+        assertThat(userYaml.loadRecipe("user.BestPractices"))
+          .as("a recipe this loader defines is returned")
+          .isNotNull();
+        assertThat(userYaml.loadRecipe("org.example.NotInThisYaml"))
+          .as("a recipe neither defined here nor listed in the marketplace is reported as absent")
+          .isNull();
+    }
+
+    @Test
+    void marketplaceBackedLoaderDoesNotAbortResolutionOfATransitiveRecipe() {
+        // Loader order is load bearing: the marketplace-backed loader, which can supply neither
+        // recipe, must be consulted between the loader defining Outer and the one defining Inner.
+        Environment env = Environment.builder()
+          .load(declarativeLoader("org.example.Outer", "org.example.Inner", "outer.yml"))
+          .load(marketplaceBackedLoader(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: user.Unrelated
+              displayName: Unrelated
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                    toText: Hello!
+              """))
+          .load(declarativeLoader("org.example.Inner", "org.openrewrite.text.ChangeText:\n        toText: Hello!", "inner.yml"))
+          .build();
+
+        Recipe outer = env.activateRecipes("org.example.Outer");
+
+        assertThat(outer.getRecipeList()).singleElement()
+          .extracting(Recipe::getName).isEqualTo("org.example.Inner");
+        assertThat(outer.validate().isValid()).isTrue();
+    }
+
+    @Test
+    void unresolvableTransitiveRecipeIsReportedAsValidationErrorRatherThanThrowing() {
+        Environment env = Environment.builder()
+          .load(declarativeLoader("org.example.Outer", "org.example.Missing", "outer.yml"))
+          .load(marketplaceBackedLoader(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: user.Unrelated
+              displayName: Unrelated
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                    toText: Hello!
+              """))
+          .build();
+
+        Recipe outer = env.activateRecipes("org.example.Outer");
+
+        assertThat(outer.validate().failures())
+          .anySatisfy(f -> {
+              assertThat(f.getProperty()).startsWith("org.example.Outer.recipeList[0]");
+              assertThat(f.getInvalidValue()).isEqualTo("org.example.Missing");
+              assertThat(f.getMessage()).isEqualTo("refers to a recipe that doesn't exist.");
+          });
+    }
+
+    private static YamlResourceLoader declarativeLoader(String name, @Language("yml") String subRecipe, String source) {
+        return new YamlResourceLoader(new ByteArrayInputStream((
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: %s
+            displayName: %s
+            description: Test.
+            recipeList:
+              - %s
+            """.formatted(name, name, subRecipe)).getBytes()), URI.create(source), new Properties());
+    }
+
+    private static YamlResourceLoader marketplaceBackedLoader(@Language("yml") String yaml) {
+        return new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+          URI.create("file:///user.yaml"), new Properties(), new RecipeMarketplace(), emptyList());
+    }
+
+    public static class RecipeWithFieldOption extends Recipe {
+        @Option(displayName = "Field option", description = "Has no constructor parameter or setter.")
+        @Nullable
+        String fieldOption;
+
+        @Override
+        public String getDisplayName() {
+            return "Recipe with field option";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Recipe with field option.";
+        }
+    }
+
+    private static class RecipeFailingOnFirstLoad extends Recipe {
+        static final int val = 1 / 0;
+
+        @Override
+        public String getDisplayName() {
+            return "";
+        }
+
+        @Override
+        public String getDescription() {
+            return "";
+        }
     }
 
     private static class RecipeWithBadStaticInitializer extends Recipe {

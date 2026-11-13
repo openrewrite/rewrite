@@ -27,8 +27,6 @@ import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Objects;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -395,7 +393,7 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void unresolvedNameFirSource() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().variableDeclarations(false)),
           kotlin(
             //language=none, disabled due to invalid code
             """
@@ -822,6 +820,19 @@ class VariableDeclarationTest implements RewriteTest {
             """
               fun method () /*C3*/ :  Int {
                  return 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dynamicType() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(x: dynamic, y:  dynamic) {
+                  val z: dynamic = x
               }
               """
           )

@@ -51,7 +51,7 @@ options { tokenVocab=XPathLexer; }
 
 // [14] Expr ::= OrExpr
 xpathExpression
-    : expr
+    : expr EOF
     ;
 
 // Top-level expression - any expression type
@@ -196,7 +196,7 @@ abbreviatedStep
 
 // [13] AbbreviatedAxisSpecifier ::= '@'?
 attributeStep
-    : AT (QNAME | NCNAME | WILDCARD)
+    : AT (QNAME | NCNAME | WILDCARD | TEXT | COMMENT | NODE | PROCESSING_INSTRUCTION | AND | OR)
     ;
 
 //==============================================================================
@@ -214,6 +214,12 @@ nameTest
     : WILDCARD
     | QNAME
     | NCNAME
+    | TEXT
+    | COMMENT
+    | NODE
+    | PROCESSING_INSTRUCTION
+    | AND
+    | OR
     ;
 
 // [38] NodeType ::= 'comment' | 'text' | 'processing-instruction' | 'node'

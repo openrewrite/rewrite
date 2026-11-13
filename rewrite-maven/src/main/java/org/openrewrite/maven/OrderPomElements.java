@@ -120,9 +120,9 @@ public class OrderPomElements extends Recipe {
                     }
 
                     if (foundChange) {
+                        // Each moved element took the prefix of the slot it moved into, so nothing needs reformatting
                         root = root.withContent(updatedOrder);
                         mvn = mvn.withRoot(root);
-                        mvn = autoFormat(mvn, ctx);
                     }
                 }
                 return mvn;

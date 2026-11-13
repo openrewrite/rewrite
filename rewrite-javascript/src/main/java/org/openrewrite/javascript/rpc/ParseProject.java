@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RPC request to parse an entire JavaScript/TypeScript project.
@@ -48,17 +49,25 @@ class ParseProject implements RpcRequest {
     @Nullable
     Path relativeTo;
 
+    /**
+     * Parser options, as on {@link org.openrewrite.rpc.request.Parse#getOptions()}.
+     */
+    @Nullable
+    Map<String, String> options;
+
     ParseProject(Path projectPath) {
-        this(projectPath, null, null);
+        this(projectPath, null, null, null);
     }
 
     ParseProject(Path projectPath, @Nullable List<String> exclusions) {
-        this(projectPath, exclusions, null);
+        this(projectPath, exclusions, null, null);
     }
 
-    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo,
+                 @Nullable Map<String, String> options) {
         this.projectPath = projectPath;
         this.exclusions = exclusions;
         this.relativeTo = relativeTo;
+        this.options = options;
     }
 }

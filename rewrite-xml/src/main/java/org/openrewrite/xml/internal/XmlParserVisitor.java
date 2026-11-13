@@ -17,10 +17,12 @@ package org.openrewrite.xml.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
@@ -50,6 +52,12 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
+    private final boolean htmlMode;
+
+    /// The first unbalanced tag found, thrown only once the whole document has been visited: it may be an artifact
+    /// of ANTLR recovering from a later malformed attribute, whose own error then pinpoints the cause instead.
+    private @Nullable IllegalStateException unbalancedTag;
+    private boolean unclosedElement;
 
     /**
      * Track position within the file by character
@@ -61,16 +69,22 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private int codePointCursor = 0;
 
     public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
+        this(path, fileAttributes, source, charset, charsetBomMarked, false);
+    }
+
+    public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset,
+                            boolean charsetBomMarked, boolean htmlMode) {
         this.path = path;
         this.fileAttributes = fileAttributes;
         this.source = source;
         this.charset = charset;
         this.charsetBomMarked = charsetBomMarked;
+        this.htmlMode = htmlMode;
     }
 
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
-        return convert(ctx, (c, prefix) -> new Xml.Document(
+        Xml.Document document = convert(ctx, (c, prefix) -> new Xml.Document(
                 randomId(),
                 path,
                 prefix,
@@ -83,6 +97,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 visitElement(ctx.element()),
                 source.substring(cursor))
         );
+        if (unbalancedTag != null && (unclosedElement || !htmlMode)) {
+            throw unbalancedTag;
+        }
+        return document;
     }
 
     @Override
@@ -199,13 +217,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
                             .collect(toList());
+                    String beforeTagDelimiterPrefix = prefix(ctx.getStop());
+                    requireWellFormedAttribute(isXmlWhitespace(beforeTagDelimiterPrefix), c);
+
                     return new Xml.XmlDecl(
                             randomId(),
                             prefix,
                             Markers.EMPTY,
                             name,
                             attributes,
-                            prefix(ctx.getStop())
+                            beforeTagDelimiterPrefix
                     );
                 }
         );
@@ -219,11 +240,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Xml.CharData> piTexts = c.PI_TEXT().stream()
                             .map(piText -> convert(piText, (cdata, p) -> charData(cdata.getText(), false, p)))
                             .collect(toList());
-                    Xml.CharData piText = piTexts.get(0);
-                    if (piTexts.size() > 1) {
-                        StringBuilder sb = new StringBuilder();
-                        piTexts.forEach(it -> sb.append(it.getText()));
-                        piText = piText.withText(sb.toString());
+                    // The XML specification makes the data optional, so `<?target?>` has no PI_TEXT at all
+                    Xml.CharData piText = null;
+                    if (!piTexts.isEmpty()) {
+                        piText = piTexts.get(0);
+                        if (piTexts.size() > 1) {
+                            StringBuilder sb = new StringBuilder();
+                            piTexts.forEach(it -> sb.append(it.getText()));
+                            piText = piText.withText(sb.toString());
+                        }
                     }
 
                     return new Xml.ProcessingInstruction(
@@ -245,6 +270,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             String beforeType = prefix(ctx.Name());
             String type = convert(ctx.Name(), (n, p) -> n.getText());
             List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
+            String beforeDirectiveClose = prefix(ctx.DIRECTIVE_CLOSE());
+            requireWellFormedAttribute(isXmlWhitespace(beforeDirectiveClose), c);
 
             return new Xml.JspDirective(
                     randomId(),
@@ -253,7 +280,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     beforeType,
                     type,
                     attributes,
-                    prefix(ctx.DIRECTIVE_CLOSE())
+                    beforeDirectiveClose
             );
         });
     }
@@ -356,6 +383,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                                 .map(Content.class::cast)
                                 .collect(toList());
 
+                        recordUnbalancedTag(name, c);
+
                         // ANTLR may synthesize missing closing-tag tokens during error recovery
                         // on malformed input; tolerate any combination of null OPEN/Name/CLOSE.
                         if (ctx.OPEN(1) != null || ctx.Name(1) != null || ctx.CLOSE(1) != null) {
@@ -377,15 +406,50 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         }
                     }
 
+                    requireWellFormedAttribute(isXmlWhitespace(beforeTagDelimiterPrefix), c);
+
                     return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
         );
     }
 
+    /// Note an element whose closing tag is missing or names another element. The grammar does not compare the
+    /// two names, so `<a><b></a>` would otherwise close `<b>` with `</a>` and shift every enclosing close tag by
+    /// one level, leaving ANTLR to recover at end of input by discarding the outermost element's content.
+    ///
+    /// HTML and JSP tolerate a mismatch as long as every element still gets a closing tag, since misnested inline
+    /// markup like `<b><i>x</b></i>` and scriptlet-conditional tags round-trip exactly; only once an element is left
+    /// unclosed is the first mismatch reported, as the likely cause of the shift.
+    private void recordUnbalancedTag(String name, XMLParser.ElementContext ctx) {
+        Token open = ctx.getStart();
+        if (!isSourceToken(ctx.OPEN(1)) || !isSourceToken(ctx.SLASH()) ||
+            !isSourceToken(ctx.Name(1)) || !isSourceToken(ctx.CLOSE(1))) {
+            unclosedElement = true;
+            if (unbalancedTag != null) {
+                return;
+            }
+            unbalancedTag = new IllegalStateException(String.format(
+                    "Unclosed element <%s> in %s opened at line %d, column %d.",
+                    name, path, open.getLine(), open.getCharPositionInLine() + 1));
+            return;
+        }
+        String closeName = ctx.Name(1).getText();
+        if (unbalancedTag == null && (htmlMode ? !closeName.equalsIgnoreCase(name) : !closeName.equals(name))) {
+            Token close = ctx.OPEN(1).getSymbol();
+            unbalancedTag = new IllegalStateException(String.format(
+                    "Mismatched closing tag </%s> at line %d, column %d for <%s> opened at line %d, column %d in %s.",
+                    closeName, close.getLine(), close.getCharPositionInLine() + 1,
+                    name, open.getLine(), open.getCharPositionInLine() + 1, path));
+        }
+    }
+
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
+            requireWellFormedAttribute(isXmlWhitespace(prefix) && isSourceToken(c.Name()) &&
+                                       isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()), c);
+
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
@@ -399,8 +463,36 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     )
             );
 
+            requireWellFormedAttribute(isXmlWhitespace(beforeEquals) && isXmlWhitespace(value.getPrefix()), c);
+
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
+    }
+
+    /// Whether text is XML `S`, the only thing that may separate a tag's name, attributes and delimiter.
+    /// Stricter than `StringUtils.isBlank`, which accepts characters the `INSIDE`-mode lexer never skips.
+    private boolean isXmlWhitespace(String text) {
+        return StringUtils.indexOfNonWhitespace(text) == -1;
+    }
+
+    /// Whether a node is a token from the source, rather than one ANTLR error recovery
+    /// synthesized (an [ErrorNode]) or left out altogether.
+    private boolean isSourceToken(@Nullable TerminalNode node) {
+        return node != null && !(node instanceof ErrorNode);
+    }
+
+    /// Reject an attribute ANTLR only produced by recovering from malformed markup. Such a tree can still
+    /// reprint byte-for-byte — the dropped source survives in a prefix — so `requirePrintEqualsInput` misses it.
+    private void requireWellFormedAttribute(boolean wellFormed, ParserRuleContext ctx) {
+        if (!wellFormed) {
+            Token start = ctx.getStart();
+            throw new IllegalStateException(String.format(
+                    "Malformed attribute in %s at line %d, column %d. The markup here is not a well-formed " +
+                    "name=\"value\" attribute; common causes are a literal '\"' inside a double-quoted value, which " +
+                    "XML 1.0 section 2.3 does not permit (write it as &quot; or delimit the value with single " +
+                    "quotes), an unquoted value, or an HTML-style attribute written without a value.",
+                    path, start.getLine(), start.getCharPositionInLine() + 1));
+        }
     }
 
     @Override

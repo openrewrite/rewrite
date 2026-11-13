@@ -51,10 +51,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -325,7 +325,7 @@ public abstract class Recipe implements Cloneable {
         if (type.isEnum()) {
             return Arrays.stream(type.getEnumConstants())
                     .map(e -> ((Enum<?>) e).name())
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return null;
     }
@@ -424,7 +424,8 @@ public abstract class Recipe implements Cloneable {
      * a further cycle is needed to update method invocations of that declaration that were visited prior to the declaration change. But other
      * visitors never need to cause another cycle, such as those that format whitespace or add search markers. Note that even when this is false,
      * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
-     * another cycle (or if there are no changes made in a cycle), then another will not run.
+     * another cycle (or if there are no changes made in a cycle), then another will not run. A change made by any
+     * recipe nested in this recipe's recipe list counts as a change made by this recipe.
      */
     public boolean causesAnotherCycle() {
         return false;

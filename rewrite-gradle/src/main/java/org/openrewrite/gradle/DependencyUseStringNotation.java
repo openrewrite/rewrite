@@ -171,6 +171,11 @@ public class DependencyUseStringNotation extends Recipe {
             private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
                 // Name is the only required key in a dependency map.
                 if (mapNotation.containsKey("name")) {
+                    for (Expression component : mapNotation.values()) {
+                        if (!isSpellableVerbatim(component)) {
+                            return null;
+                        }
+                    }
                     String group = coerceToStringNotation(mapNotation.get("group"));
                     String name = coerceToStringNotation(mapNotation.get("name"));
                     String version = coerceToStringNotation(mapNotation.get("version"));
@@ -201,6 +206,27 @@ public class DependencyUseStringNotation extends Recipe {
                 }
                 String first = (String) ((J.Literal) arguments.get(0)).getValue();
                 return first != null && !first.contains(":");
+            }
+
+            /**
+             * Whether every literal under {@code expression} holds a value that a fresh double quoted literal
+             * spells verbatim. A quote, backslash or dollar has to be escaped, which the rebuilt notation cannot do.
+             */
+            private boolean isSpellableVerbatim(Expression expression) {
+                if (expression instanceof J.Literal) {
+                    Object value = ((J.Literal) expression).getValue();
+                    return !(value instanceof String) ||
+                            ((String) value).chars().noneMatch(c -> c == '"' || c == '\\' || c == '$');
+                }
+                if (expression instanceof G.GString) {
+                    for (J part : ((G.GString) expression).getStrings()) {
+                        J tree = part instanceof G.GString.Value ? ((G.GString.Value) part).getTree() : part;
+                        if (tree instanceof Expression && !isSpellableVerbatim((Expression) tree)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
             }
 
             private @Nullable String coerceToStringNotation(Expression expression) {

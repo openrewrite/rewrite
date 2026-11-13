@@ -55,6 +55,11 @@ public class ProtoIsoVisitor<P> extends ProtoVisitor<P> {
     }
 
     @Override
+    public Proto.Extensions visitExtensions(Proto.Extensions extensions, P p) {
+        return (Proto.Extensions) super.visitExtensions(extensions, p);
+    }
+
+    @Override
     public Proto.Field visitField(Proto.Field field, P p) {
         return (Proto.Field) super.visitField(field, p);
     }

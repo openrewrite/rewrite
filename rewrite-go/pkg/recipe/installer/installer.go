@@ -31,7 +31,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
-// RecipeModuleInfo holds information about an installed recipe module.
 type RecipeModuleInfo struct {
 	ImportPath string
 	// ActivatePkg is the full Go import path of the package that contains
@@ -50,7 +49,6 @@ type Installer struct {
 	Logger       func(string, ...any) // optional logger
 }
 
-// NewInstaller creates an Installer rooted at the given workspace directory.
 // The caller is responsible for choosing (and, where appropriate, cleaning
 // up) the directory; the installer does not impose a default location.
 func NewInstaller(workspaceDir string) *Installer {
@@ -59,7 +57,6 @@ func NewInstaller(workspaceDir string) *Installer {
 	}
 }
 
-// ensureWorkspace creates the workspace directory and initializes go.mod if needed.
 func (inst *Installer) ensureWorkspace() error {
 	if err := os.MkdirAll(inst.WorkspaceDir, 0755); err != nil {
 		return fmt.Errorf("create workspace: %w", err)
@@ -345,7 +342,6 @@ func generateHelper(path string, modulePath string) error {
 	})
 }
 
-// goCmd runs a go command in the workspace directory.
 func (inst *Installer) goCmd(args ...string) error {
 	return inst.goCmdEnv(nil, args...)
 }
@@ -388,12 +384,10 @@ func isProxyFetchError(err error) bool {
 		strings.Contains(msg, "Not Found")
 }
 
-// addReplace adds a replace directive to the workspace go.mod.
 func (inst *Installer) addReplace(modulePath, localPath string) error {
 	return inst.goCmd("mod", "edit", "-replace="+modulePath+"="+localPath)
 }
 
-// addRequire adds a require directive to the workspace go.mod.
 func (inst *Installer) addRequire(modulePath, version string) error {
 	return inst.goCmd("mod", "edit", "-require="+modulePath+"@"+version)
 }
@@ -435,7 +429,6 @@ func findActivatePackage(moduleDir, modulePath string) (string, error) {
 	return activatePkg, nil
 }
 
-// readModulePath reads the module path from a go.mod file in the given directory.
 func readModulePath(dir string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
 	if err != nil {
@@ -512,7 +505,6 @@ func (inst *Installer) propagateReplaces(moduleDir string) error {
 	return nil
 }
 
-// readResolvedVersion reads the resolved version of a module from the workspace go.mod.
 func (inst *Installer) readResolvedVersion(modulePath string) string {
 	data, err := os.ReadFile(filepath.Join(inst.WorkspaceDir, "go.mod"))
 	if err != nil {

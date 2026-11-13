@@ -101,6 +101,12 @@ export interface DiscoveredFiles {
     };
     /** JavaScript/TypeScript files (includes .prettierrc.js, prettier.config.js) */
     jsFiles: string[];
+    /**
+     * JS/TS files that won't be parsed into an AST and are instead recorded as
+     * Quarks (path only, no content). Currently only files over
+     * {@link MAX_PARSEABLE_SIZE_BYTES}; other unparseable cases may join later.
+     */
+    unparseableFiles: string[];
     /** JSON files (tsconfig.json, .prettierrc.json, other .json) */
     jsonFiles: string[];
     /** YAML files (.prettierrc.yaml, other .yaml/.yml) */
@@ -123,11 +129,43 @@ export const DEFAULT_EXCLUSIONS = [
 ];
 
 /**
+ * Exclusions that apply even to files git reports. Dependency trees and minified
+ * bundles are sometimes committed but are never a project's own source, whereas the
+ * remaining entries in {@link DEFAULT_EXCLUSIONS} are what a .gitignore already says.
+ */
+export const DEFAULT_TRACKED_EXCLUSIONS = [
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.bundle.js"
+];
+
+/** Lets `**` cross dot directories such as pnpm's `node_modules/.pnpm`, as .gitignore patterns do. */
+function exclusionMatcher(exclusions: string[]): picomatch.Matcher {
+    return picomatch(exclusions, {dot: true});
+}
+
+/**
+ * Git lists a symlink or submodule as a file even where it is a directory, and lists
+ * deleted files while they are still tracked.
+ */
+function isRegularFile(filePath: string): boolean {
+    return fs.statSync(filePath, {throwIfNoEntry: false})?.isFile() ?? false;
+}
+
+/**
  * Source file extensions for JavaScript/TypeScript.
  */
 const SOURCE_EXTENSIONS = new Set([
     ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"
 ]);
+
+/**
+ * JS/TS files larger than this are recorded as Quarks rather than parsed into a
+ * full AST. Matches the 1 MB default in the JVM {@code JavaScriptParser}, which
+ * likewise diverts oversize files off the parse path. A ~20 MB JSON-like `.js`
+ * otherwise balloons the TypeScript parser to multi-GB / OOM.
+ */
+const MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024;
 
 /**
  * All lock file names for quick lookup.
@@ -163,6 +201,7 @@ export class ProjectParser {
     private readonly projectPath: string;
     private readonly relativeTo: string;
     private readonly exclusions: string[];
+    private readonly gitExclusions: string[];
     private readonly ctx: ExecutionContext;
     private readonly useGit: boolean;
     private readonly onProgress?: ProjectParserOptions["onProgress"];
@@ -173,6 +212,7 @@ export class ProjectParser {
         this.projectPath = path.resolve(projectPath);
         this.relativeTo = options.relativeTo ? path.resolve(options.relativeTo) : this.projectPath;
         this.exclusions = options.exclusions ?? DEFAULT_EXCLUSIONS;
+        this.gitExclusions = options.exclusions ?? DEFAULT_TRACKED_EXCLUSIONS;
         this.ctx = options.ctx ?? new ExecutionContext();
         this.useGit = options.useGit ?? this.isGitRepository();
         this.onProgress = options.onProgress;
@@ -299,57 +339,24 @@ export class ProjectParser {
                 relativeTo: this.relativeTo
             });
 
-            // Check if Prettier is available
-            const detection = await prettierLoader.detectPrettier();
-
-            if (detection.available) {
-                // Prettier is available: add per-file PrettierStyle markers
-                for await (const sf of parser.parse(...discovered.jsFiles)) {
-                    current++;
-                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
-
-                    const prettierMarker = await prettierLoader.getConfigMarker(
-                        path.join(this.relativeTo, sf.sourcePath)
-                    );
-                    if (prettierMarker) {
-                        yield produce(sf, draft => {
-                            draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
-                        });
-                    } else {
-                        yield sf;
-                    }
+            const fallbackFiles: SourceFile[] = [];
+            for await (const sf of parser.parse(...discovered.jsFiles)) {
+                current++;
+                this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
+                const prettierMarker = await prettierLoader.getConfigMarker(
+                    path.join(this.relativeTo, sf.sourcePath)
+                );
+                if (prettierMarker) {
+                    yield produce(sf, draft => {
+                        draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
+                    });
+                } else {
+                    fallbackFiles.push(sf);
                 }
-            } else {
-                // Prettier is NOT available: auto-detect styles from parsed files
-                this.log("Prettier not found, auto-detecting styles...");
-
-                // Dynamic import to break circular dependency at module load time
-                // (see buildAutodetectMarker for explanation)
-                const {Autodetect} = await import("./autodetect.js");
-                const {JS} = await import("./tree.js");
-
-                const parsedFiles: SourceFile[] = [];
-
-                // Parse all JS files and collect them for sampling
-                for await (const sf of parser.parse(...discovered.jsFiles)) {
-                    current++;
-                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
-                    if (sf.kind === JS.Kind.CompilationUnit) {
-                        parsedFiles.push(sf);
-                    }
-                }
-
-                // Sample all parsed files and build Autodetect marker
-                const detector = Autodetect.detector();
-                for (const sf of parsedFiles) {
-                    await detector.sample(sf);
-                }
-                const autodetectMarker = detector.build();
-                this.log(`Auto-detected styles: indent=${detector.getTabsAndIndentsStyle().indentSize}, ` +
-                    `useTabs=${detector.getTabsAndIndentsStyle().useTabCharacter}`);
-
-                // Yield all files with the Autodetect marker
-                for (const sf of parsedFiles) {
+            }
+            if (fallbackFiles.length > 0) {
+                const autodetectMarker = await this.buildAutodetectMarker(fallbackFiles);
+                for (const sf of fallbackFiles) {
                     yield produce(sf, draft => {
                         draft.markers = replaceMarkerByKind(draft.markers, autodetectMarker);
                     });
@@ -412,6 +419,7 @@ export class ProjectParser {
                 text: []
             },
             jsFiles: [],
+            unparseableFiles: [],
             jsonFiles: [],
             yamlFiles: [],
             textFiles: []
@@ -434,7 +442,7 @@ export class ProjectParser {
             if (basename === "package.json") {
                 discovered.packageJsonFiles.push(file);
             } else if (SOURCE_EXTENSIONS.has(ext)) {
-                discovered.jsFiles.push(file);
+                (this.isOversize(file) ? discovered.unparseableFiles : discovered.jsFiles).push(file);
             } else if ((JSON_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
                 discovered.lockFiles.json.push(file);
             } else if (basename === "yarn.lock") {
@@ -489,8 +497,7 @@ export class ProjectParser {
                 const trimmed = line.trim();
                 if (trimmed) {
                     const fullPath = path.join(this.projectPath, trimmed);
-                    // git ls-files can return deleted files that are still tracked
-                    if (fs.existsSync(fullPath)) {
+                    if (isRegularFile(fullPath)) {
                         files.push(fullPath);
                     }
                 }
@@ -508,17 +515,22 @@ export class ProjectParser {
             for (const line of untracked.stdout.split("\n")) {
                 const trimmed = line.trim();
                 if (trimmed) {
-                    // Untracked files should exist, but check anyway for robustness
                     const fullPath = path.join(this.projectPath, trimmed);
-                    if (fs.existsSync(fullPath)) {
+                    if (isRegularFile(fullPath)) {
                         files.push(fullPath);
                     }
                 }
             }
         }
 
+        // A project inside an ignored directory is invisible to git; the walk is what
+        // discovers it.
+        if (files.length === 0) {
+            return this.discoverFilesWithWalk();
+        }
+
         // Filter by our exclusion patterns and accepted file types
-        return files.filter(file => this.isAcceptedFile(file));
+        return files.filter(file => this.isAcceptedFile(file, this.gitExclusions));
     }
 
     /**
@@ -526,7 +538,7 @@ export class ProjectParser {
      */
     private async discoverFilesWithWalk(): Promise<string[]> {
         const files: string[] = [];
-        const isExcluded = picomatch(this.exclusions);
+        const isExcluded = exclusionMatcher(this.exclusions);
 
         const walk = async (dir: string, relativePath: string = "") => {
             let entries: fs.Dirent[];
@@ -565,13 +577,13 @@ export class ProjectParser {
     /**
      * Checks if a file should be accepted for parsing.
      */
-    private isAcceptedFile(filePath: string): boolean {
+    private isAcceptedFile(filePath: string, exclusions: string[] = this.exclusions): boolean {
         const basename = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
 
         // Check exclusion patterns with relative path
         const relativePath = path.relative(this.projectPath, filePath);
-        const isExcluded = picomatch(this.exclusions);
+        const isExcluded = exclusionMatcher(exclusions);
         if (isExcluded(relativePath)) {
             return false;
         }
@@ -605,6 +617,19 @@ export class ProjectParser {
     }
 
     /**
+     * Whether a source file exceeds {@link MAX_PARSEABLE_SIZE_BYTES}. A stat
+     * failure returns false so the file follows the normal parse path (which
+     * surfaces a real read error as a ParseError) rather than being quarked.
+     */
+    private isOversize(filePath: string): boolean {
+        try {
+            return fs.statSync(filePath).size > MAX_PARSEABLE_SIZE_BYTES;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Classifies a yarn.lock file as YAML (Berry) or text (Classic).
      */
     private async classifyYarnLockFile(filePath: string): Promise<"yaml" | "text"> {
@@ -617,10 +642,20 @@ export class ProjectParser {
     }
 
     /**
-     * Checks if the project is a git repository.
+     * Checks whether a git work tree encloses the project, which for a project below the
+     * repository root is an ancestor directory. A linked work tree or submodule has `.git`
+     * as a file, so presence rather than kind is what counts.
      */
     private isGitRepository(): boolean {
-        return fs.existsSync(path.join(this.projectPath, ".git"));
+        let dir = this.projectPath;
+        while (!fs.existsSync(path.join(dir, ".git"))) {
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                return false;
+            }
+            dir = parent;
+        }
+        return true;
     }
 
     /**
@@ -633,6 +668,7 @@ export class ProjectParser {
             discovered.lockFiles.yaml.length +
             discovered.lockFiles.text.length +
             discovered.jsFiles.length +
+            discovered.unparseableFiles.length +
             discovered.jsonFiles.length +
             discovered.yamlFiles.length +
             discovered.textFiles.length
@@ -652,6 +688,7 @@ export class ProjectParser {
                 text: discovered.lockFiles.text.filter(filter)
             },
             jsFiles: discovered.jsFiles.filter(filter),
+            unparseableFiles: discovered.unparseableFiles.filter(filter),
             jsonFiles: discovered.jsonFiles.filter(filter),
             yamlFiles: discovered.yamlFiles.filter(filter),
             textFiles: discovered.textFiles.filter(filter)

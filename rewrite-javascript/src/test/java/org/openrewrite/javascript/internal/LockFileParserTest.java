@@ -123,9 +123,85 @@ class LockFileParserTest {
                 .extracting(NodeResolutionResult.Dependency::getName).containsExactly("react");
         assertThat(express.getOptionalDependencies())
                 .extracting(NodeResolutionResult.Dependency::getName).containsExactly("fsevents");
-        // resolved is null at parse time; the relinking pass populates it.
+        // None of these deps have their own entry in this lock, so they stay unresolved.
         assertThat(express.getDependencies()).allSatisfy(d ->
                 assertThat(d.getResolved()).isNull());
+    }
+
+    @Test
+    void linksTransitiveDependencies() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/a\": { \"version\": \"1.0.0\", \"dependencies\": { \"b\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/b\": { \"version\": \"1.0.0\", \"dependencies\": { \"c\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/c\": { \"version\": \"1.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        ResolvedDependency a = result.getTopLevel().get("a");
+        NodeResolutionResult.Dependency bRequest = a.getDependencies().get(0);
+        assertThat(bRequest.getResolved()).isSameAs(result.getTopLevel().get("b"));
+        NodeResolutionResult.Dependency cRequest = bRequest.getResolved().getDependencies().get(0);
+        assertThat(cRequest.getResolved()).isSameAs(result.getTopLevel().get("c"));
+    }
+
+    @Test
+    void resolvesNestedShadowedVersion() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/a\": { \"version\": \"1.0.0\", \"dependencies\": { \"b\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/b\": { \"version\": \"2.0.0\" },\n" +
+                "    \"node_modules/a/node_modules/b\": { \"version\": \"1.5.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        // Top-level b is 2.0.0, but a's nested node_modules shadow it with 1.5.0.
+        assertThat(result.getTopLevel().get("b").getVersion()).isEqualTo("2.0.0");
+        ResolvedDependency a = result.getTopLevel().get("a");
+        NodeResolutionResult.Dependency bRequest = a.getDependencies().get(0);
+        assertThat(bRequest.getResolved()).isNotNull();
+        assertThat(bRequest.getResolved().getVersion()).isEqualTo("1.5.0");
+    }
+
+    @Test
+    void fallsBackToSemverMatchForPathsOutsideTheWalk() {
+        // b exists only under a synthetic path (the shape the yarn/pnpm adapters
+        // emit for duplicate versions) that no node_modules walk-up can reach.
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/a\": { \"version\": \"1.0.0\", \"dependencies\": { \"b\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/.pnpm/0/node_modules/b\": { \"version\": \"1.5.0\" },\n" +
+                "    \"node_modules/.pnpm/1/node_modules/b\": { \"version\": \"2.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        ResolvedDependency a = result.getTopLevel().get("a");
+        NodeResolutionResult.Dependency bRequest = a.getDependencies().get(0);
+        assertThat(bRequest.getResolved()).isNotNull();
+        assertThat(bRequest.getResolved().getVersion()).isEqualTo("1.5.0");
+    }
+
+    @Test
+    void linksCyclicDependencies() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/a\": { \"version\": \"1.0.0\", \"dependencies\": { \"b\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/b\": { \"version\": \"1.0.0\", \"dependencies\": { \"a\": \"^1.0.0\" } }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        ResolvedDependency a = result.getTopLevel().get("a");
+        ResolvedDependency b = result.getTopLevel().get("b");
+        assertThat(a.getDependencies().get(0).getResolved()).isSameAs(b);
+        assertThat(b.getDependencies().get(0).getResolved()).isSameAs(a);
     }
 
     @Test
@@ -193,5 +269,69 @@ class LockFileParserTest {
         assertThatThrownBy(() -> LockFileParser.parse("{ \"lockfileVersion\": 3 }"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("packages");
+    }
+
+    @Test
+    void resolveSkipsPathHitThatViolatesConstraint() {
+        // given
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/lodash": { "version": "3.10.1" },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.21" }
+                  }
+                }
+                """;
+
+        // when
+        ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^4.17.0");
+
+        // then
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void resolveFallbackPicksHighestSatisfyingVersion() {
+        // given
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.0" },
+                    "node_modules/__dup_1__/node_modules/lodash": { "version": "4.17.21" },
+                    "node_modules/__dup_2__/node_modules/lodash": { "version": "3.10.1" }
+                  }
+                }
+                """;
+
+        // when
+        ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^4.17.0");
+
+        // then
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void resolveKeepsPathHitWhenNoVersionSatisfiesConstraint() {
+        // given
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/lodash": { "version": "3.10.1" },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.21" }
+                  }
+                }
+                """;
+
+        // when
+        ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^5.0.0");
+
+        // then
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getVersion()).isEqualTo("3.10.1");
     }
 }

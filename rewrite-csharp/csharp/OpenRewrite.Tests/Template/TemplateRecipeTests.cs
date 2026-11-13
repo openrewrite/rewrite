@@ -24,6 +24,37 @@ namespace OpenRewrite.Tests.Template;
 
 public class TemplateRecipeTests : RewriteTest
 {
+    [Fact]
+    public void CreatePrimaryConstructorFromClassMemberTemplate()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new PrimaryConstructorTemplateRecipe()),
+            CSharp("class C { }", "class C(int value) { }")
+        );
+    }
+
+    [Theory]
+    [InlineData("class")]
+    [InlineData("struct")]
+    public void CreatePrimaryConstructorPreservesDeclaration(string kind)
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new PrimaryConstructorTemplateRecipe()),
+            CSharp(
+                $"public partial {kind} Existing<T> {{ private int count = 1; }}",
+                $"public partial {kind} Existing<T>(int value) {{ private int count = 1; }}")
+        );
+    }
+
+    [Fact]
+    public void PreserveExistingPrimaryConstructor()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new PrimaryConstructorTemplateRecipe()),
+            CSharp("class C(string name) { }")
+        );
+    }
+
     // ===============================================================
     // Template replacement (apply)
     // ===============================================================
@@ -371,6 +402,27 @@ class FindThrowExceptionRecipe : OpenRewrite.Core.Recipe
         {
             @throw = (Throw)base.VisitThrow(@throw, ctx);
             return pat.Find(@throw, Cursor);
+        }
+    }
+}
+
+class PrimaryConstructorTemplateRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Create a primary constructor from a template";
+    public override string Description => "Verifies the template produces the parser's primary constructor shape.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration declaration, ExecutionContext ctx)
+        {
+            if (declaration.Body.Statements.Any(s => s.Element.Markers.FindFirst<PrimaryConstructor>() != null))
+                return declaration;
+            var template = CSharpTemplate.ClassMember("class C(int value) { }");
+            var scaffold = (ClassDeclaration)template.Apply(Cursor)!;
+            return declaration.WithBody(declaration.Body.WithStatements(
+                [scaffold.Body.Statements[0], .. declaration.Body.Statements]));
         }
     }
 }

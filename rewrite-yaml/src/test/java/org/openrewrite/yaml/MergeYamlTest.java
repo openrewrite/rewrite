@@ -15,22 +15,79 @@
  */
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
+import java.util.stream.Stream;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.Last;
 
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
+
+    @Test
+    void identicalMappingDoesNotChangeTree() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "spring:\n  http:\n    client:\n      factory: jdk", false, null, null, null, null, null)),
+          yaml(
+            """
+              spring:
+                http:
+                  client:
+                    factory: jdk # Keep the configured factory
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveNestedTrailingCommentBeforeMultipleRootSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$.a.tracing", "export:\n  endpoint: url", false, null, null, null, null, null)),
+          yaml(
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+              z: x # unrelated comment
+              last: y
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  export:
+                    endpoint: url
+              z: x # unrelated comment
+              last: y
+              """
+          )
+        );
+    }
 
     @DocumentExample
     @Test
@@ -274,7 +331,6 @@ class MergeYamlTest implements RewriteTest {
     void insertYaml() {
         rewriteRun(
           spec -> spec
-            .cycles(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
@@ -1643,6 +1699,64 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void addSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name",
+              null,
+              null,
+              null,
+              null
+            )),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          ),
+          yaml(
+            "",
+            """
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          )
+        );
+    }
+
+    @Test
+    void addFlowSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups", "[a, b]", false, null, null, null, null, null)),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups: [a, b]
+              """
+          )
+        );
+    }
+
+    @Test
     // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
@@ -1662,7 +1776,7 @@ class MergeYamlTest implements RewriteTest {
                 null
               ),
               new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null))
-            .expectedCyclesThatMakeChanges(2),
+            .expectedCyclesThatMakeChanges(2).cycles(2), // MergeYaml blanks `initially` again each cycle and CopyValue refills it
           yaml(
             """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -1717,6 +1831,77 @@ class MergeYamlTest implements RewriteTest {
               new-property: value
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertPropertyOptions")
+    void doesNotCopyTrailingCommentOfPrecedingEntryToInsertedEntry(MergeYaml.@Nullable InsertMode insertMode,
+                                                                   @Nullable String insertProperty,
+                                                                   String after) {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.config",
+              //language=yaml
+              """
+                new-property: value
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+          yaml(
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+              other: x
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertPropertyOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          arguments(Last, null,
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          // Inserted after the commented last entry — also becomes the last entry
+          arguments(After, "activate-mep",
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          // Inserted before the commented last entry — comment must remain on `activate-mep`
+          arguments(Before, "activate-mep",
+            """
+              config:
+                activate-auto: true
+                new-property: value
+                activate-mep: true # Some comment
+              other: x
+              """)
         );
     }
 
@@ -2363,6 +2548,164 @@ class MergeYamlTest implements RewriteTest {
               first: value
               second: value
               """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeFirstElementKeepsFileHeaderOnTop() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first",
+            null
+          )),
+          yaml(
+            """
+              # yaml-language-server: $schema=https://example.com/schema.json
+
+              # Comment about first
+              first: value
+              """,
+            """
+              # yaml-language-server: $schema=https://example.com/schema.json
+
+              A: a
+              # Comment about first
+              first: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeFirstElementOfExplicitDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first",
+            null
+          )),
+          yaml(
+            """
+              ---
+              first: value
+              """,
+            """
+              ---
+              A: a
+              first: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeMappingIntoSequenceWithScalarEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: a@1
+              """,
+            null,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - local.yml
+                - local: other.yml
+              """,
+            """
+              include:
+                - local.yml
+                - local: other.yml
+                - component: a@1
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeSequenceWithScalarAndMappingEntriesDoesNotDuplicateScalars() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - local.yml
+                - extra.yml
+                - component: a@1
+              """,
+            null,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - local.yml
+                - local: other.yml
+              """,
+            """
+              include:
+                - local.yml
+                - local: other.yml
+                - extra.yml
+                - component: a@1
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeFirstElementKeepsCommentWithEntryInCrlfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first",
+            null
+          )),
+          yaml(
+            "# Comment about first\r\nfirst: value\r\n",
+            "A: a\r\n# Comment about first\r\nfirst: value\r\n",
+            spec -> spec.mapBeforeRecipe(docs -> docs.withMarkers(docs.getMarkers().add(
+              new NamedStyles(randomId(), "crlf", "CRLF", null, emptySet(), singletonList(new GeneralFormatStyle(true))))))
           )
         );
     }
@@ -3061,6 +3404,154 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @MethodSource("insertNextToLastSiblingFollowedByBlankLinesOptions")
+    void insertNewKeyDirectlyNextToLastSiblingWhenFollowedByBlankLines(MergeYaml.@Nullable InsertMode insertMode,
+                                                                       @Nullable String insertProperty,
+                                                                       String after) {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.service_config",
+              // language=yaml
+              """
+                enabled: true
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              service_config:
+                name: 'hello'
+
+
+
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertNextToLastSiblingFollowedByBlankLinesOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(Last, null,
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(After, "name",
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(Before, "name",
+            """
+              service_config:
+                enabled: true
+                name: 'hello'
+
+
+
+              """)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertNextToLastSiblingPrecededByBlankLinesOptions")
+    void insertNewKeyDirectlyNextToLastSiblingWhenPrecededByBlankLines(MergeYaml.@Nullable InsertMode insertMode,
+                                                                       @Nullable String insertProperty,
+                                                                       String after) {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.service_config",
+              // language=yaml
+              """
+                enabled: true
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              service_config:
+
+
+
+                name: 'hello'
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertNextToLastSiblingPrecededByBlankLinesOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(Last, null,
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(After, "name",
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(Before, "name",
+            """
+              service_config:
+
+
+
+                enabled: true
+                name: 'hello'
+              """)
+        );
+    }
+
     @Test
     void invalidYaml() {
         var recipe = new MergeYaml(
@@ -3512,7 +4003,7 @@ class MergeYamlTest implements RewriteTest {
     void deleteKeyFollowedByMergeYamlCompletesInTwoCycles() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
+            .expectedCyclesThatMakeChanges(2).cycles(2) // DeleteKey removes what MergeYaml added in the previous cycle
             .recipe(
               new CompositeRecipe(
                 List.of(
@@ -3612,6 +4103,39 @@ class MergeYamlTest implements RewriteTest {
                     beta: fixedValue
                   bar:
                     alpha: randomValue2
+                    beta: fixedValue
+              """
+          )
+        );
+    }
+
+    @Test
+    void wildcardMatchesEachSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.list.services.*",
+            //language=yaml
+            "beta: fixedValue",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              list:
+                services:
+                  - alpha: randomValue1
+                  - alpha: randomValue2
+              """,
+            """
+              list:
+                services:
+                  - alpha: randomValue1
+                    beta: fixedValue
+                  - alpha: randomValue2
                     beta: fixedValue
               """
           )
@@ -3752,4 +4276,791 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void newEntryMatchesSiblingIndentWhenGreaterThanDetected() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  # Tool will only check for accesses, only within the last N days
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    keep: 'none'
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  # Tool will only check for accesses, only within the last N days
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    keep: 'none'
+                  retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenDeeplyNested() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.parent.child",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              parent:
+                child:
+                        access_days_threshold: 30
+                        ignore_dependencies: false
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              parent:
+                child:
+                        access_days_threshold: 30
+                        ignore_dependencies: false
+                        retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newNestedEntryMatchesSiblingIndentAndKeepsRelativeChildIndent() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            """
+              vms_options:
+                cleanup: true
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    cleanup: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenLessThanDetected() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                  foo: 1
+                  bar: 2
+                  nested:
+                      baz: 3
+              settings:
+                access_days_threshold: 30
+                ignore_dependencies: false
+              """,
+            """
+              common:
+                  foo: 1
+                  bar: 2
+                  nested:
+                      baz: 3
+              settings:
+                access_days_threshold: 30
+                ignore_dependencies: false
+                retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwritePlainOverBlockFoldedAdoptsPlainFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwritePlainOverBlockLiteralAdoptsPlainFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverPlainAdoptsIncomingBlockFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |\n  line one\n  line two\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockStripOverPlainNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |-\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockClipOverPlainNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverPlainAsLastEntryNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "last: |-\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              before: head
+              last: value
+              """,
+            """
+              before: head
+              last: |-
+                line one
+                line two
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverBlockSameStyleKeepsExistingEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: >-\n  replaced\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void doesNotCopyInlineCommentOfLastLineToInsertedEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.config",
+            //language=yaml
+            """
+              newblock:
+                child:
+                  enabled: false
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+              """,
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+                newblock:
+                  child:
+                    enabled: false
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void keepsCommentOnItsOwnLineAtTheEndOfTheDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.config",
+            //language=yaml
+            """
+              newblock: value
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing: true # inline comment here
+              # standalone comment
+              """,
+            """
+              config:
+                existing: true # inline comment here
+                newblock: value
+              # standalone comment
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void doesNotCopyInlineCommentOfLastLineWhenCreatingANewKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.newkey",
+            //language=yaml
+            """
+              sub: value
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing: true # inline comment here
+              """,
+            """
+              config:
+                existing: true # inline comment here
+              newkey:
+                sub: value
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void mergeYamlVisitorAppliedToWholeDocument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlVisitor<>() {
+              @Override
+              public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                  Yaml.Mapping root = (Yaml.Mapping) documents.getDocuments().get(0).getBlock();
+                  Yaml.Block config = root.getEntries().get(0).getValue();
+                  //language=yaml
+                  Yaml incoming = MergeYaml.parse("""
+                    newblock:
+                      child:
+                        enabled: false
+                    """);
+                  return new MergeYamlVisitor<ExecutionContext>(config, incoming, false, null, null, null)
+                    .visitNonNull(documents, ctx);
+              }
+          })),
+          yaml(
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+              """,
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+                newblock:
+                  child:
+                    enabled: false
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfMappings() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: awesome-component@1.0
+                  inputs:
+                    input1: 2
+              """,
+            false,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+              """,
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+                - component: awesome-component@1.0
+                  inputs:
+                    input1: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfMappingsFollowedByKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: awesome-component@1.0
+              """,
+            false,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+              stages:
+                - build
+              """,
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+                - component: awesome-component@1.0
+              stages:
+                - build
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfScalars() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              stages:
+                - test
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              stages:
+                - build # An awesome comment about this!
+              """,
+            """
+              stages:
+                - build # An awesome comment about this!
+                - test
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertIntoCommentedSequenceOptions")
+    void keepInlineCommentWhenInsertingIntoSequence(MergeYaml.InsertMode insertMode, String insertProperty) {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              stages:
+                - test
+              """,
+            false,
+            null,
+            null,
+            insertMode,
+            insertProperty,
+            null
+          )),
+          yaml(
+            """
+              stages:
+                - build # An awesome comment about this!
+                - deploy
+              """,
+            """
+              stages:
+                - build # An awesome comment about this!
+                - test
+                - deploy
+              """
+          )
+        );
+    }
+
+    static Stream<Arguments> insertIntoCommentedSequenceOptions() {
+        return Stream.of(
+          arguments(After, "build"),
+          arguments(Before, "deploy")
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingSeveralEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              a:
+                y: 2
+                z: 3
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              a:
+                x: 1 # An awesome comment about this!
+              b: 2
+              """,
+            """
+              a:
+                x: 1 # An awesome comment about this!
+                y: 2
+                z: 3
+              b: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenMergingIntoLastSequenceEntryAndAppending() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - name: a
+                  y: 2
+                - name: b
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+                  y: 2
+                - name: b
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenMergingIntoLastSequenceEntryAndAppendingFollowedByKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - name: a
+                  y: 2
+                - name: b
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+              stages:
+                - build
+              """,
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+                  y: 2
+                - name: b
+              stages:
+                - build
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentOfFollowingSequenceEntryWhenAppendingToSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.include[*].tags",
+            //language=yaml
+            """
+              - y
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  tags:
+                    - x
+                - name: b # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  tags:
+                    - x
+                    - y
+                - name: b # An awesome comment about this!
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentOfFollowingSequenceEntryWhenAppendingToMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.include[*].cfg",
+            //language=yaml
+            """
+              y: 2
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  cfg:
+                    x: 1
+                - name: b # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  cfg:
+                    x: 1
+                    y: 2
+                - name: b # An awesome comment about this!
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$.job", "c: 3", false, null, null, null, null, null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+                c: 3
+              """
+          )
+        );
+    }
 }

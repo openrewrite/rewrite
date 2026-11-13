@@ -23,7 +23,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.NameCaseConvention;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
@@ -75,9 +74,7 @@ public class FindProperties extends Recipe {
             }
         };
 
-        Set<Properties.Entry> ps = new HashSet<>();
-        findVisitor.visit(p, ps);
-        return ps;
+        return findVisitor.reduce(p, new HashSet<>());
     }
 
     @Override

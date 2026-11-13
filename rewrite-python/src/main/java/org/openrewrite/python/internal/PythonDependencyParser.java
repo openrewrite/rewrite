@@ -22,10 +22,15 @@ import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -92,10 +97,43 @@ public class PythonDependencyParser {
                 dependencyGroups,
                 constraintDependencies,
                 overrideDependencies,
-                Collections.emptyList(),
+                emptyList(),
                 packageManager,
-                null
+                getUvIndexes(doc)
         );
+    }
+
+    /**
+     * The {@code [[tool.uv.index]]} entries uv searches for any package. An {@code explicit} index serves
+     * only the packages {@code [tool.uv.sources]} pins to it, so it is left out.
+     */
+    private static @Nullable List<PythonResolutionResult.SourceIndex> getUvIndexes(Toml.Document doc) {
+        List<PythonResolutionResult.SourceIndex> indexes = new ArrayList<>();
+        for (TomlValue value : doc.getValues()) {
+            if (!(value instanceof Toml.Table) || ((Toml.Table) value).getName() == null ||
+                !"tool.uv.index".equals(((Toml.Table) value).getName().getName())) {
+                continue;
+            }
+            Toml.Table table = (Toml.Table) value;
+            String url = getStringValue(table, "url");
+            if (url != null && !getBooleanValue(table, "explicit")) {
+                String name = getStringValue(table, "name");
+                indexes.add(new PythonResolutionResult.SourceIndex(name == null ? url : name, url,
+                        getBooleanValue(table, "default")));
+            }
+        }
+        return indexes.isEmpty() ? null : indexes;
+    }
+
+    private static boolean getBooleanValue(Toml.Table table, String key) {
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getKey() instanceof Toml.Identifier &&
+                key.equals(((Toml.Identifier) ((Toml.KeyValue) value).getKey()).getName()) &&
+                ((Toml.KeyValue) value).getValue() instanceof Toml.Literal) {
+                return Boolean.TRUE.equals(((Toml.Literal) ((Toml.KeyValue) value).getValue()).getValue());
+            }
+        }
+        return false;
     }
 
     private static Map<String, Toml.Table> indexTables(Toml.Document doc) {
@@ -133,7 +171,7 @@ public class PythonDependencyParser {
 
     static List<Dependency> getDependencyList(Toml.@Nullable Table table, String key) {
         if (table == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue) {
@@ -146,7 +184,7 @@ public class PythonDependencyParser {
                 }
             }
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     private static List<Dependency> parseDependencyArray(Toml.Array array) {
@@ -188,7 +226,7 @@ public class PythonDependencyParser {
             }
         }
 
-        return Collections.emptyMap();
+        return emptyMap();
     }
 
     /**
@@ -230,7 +268,7 @@ public class PythonDependencyParser {
     private static Map<String, List<Dependency>> getDependencyGroups(Map<String, Toml.Table> tables) {
         Toml.Table groupsTable = tables.get("dependency-groups");
         if (groupsTable == null) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, List<Dependency>> result = new LinkedHashMap<>();
         for (Toml value : groupsTable.getValues()) {
@@ -289,7 +327,7 @@ public class PythonDependencyParser {
     private static List<Dependency> getPdmOverrides(Map<String, Toml.Table> tables) {
         Toml.Table pdmOverridesTable = tables.get("tool.pdm.overrides");
         if (pdmOverridesTable == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<Dependency> result = new ArrayList<>();
         for (Toml value : pdmOverridesTable.getValues()) {

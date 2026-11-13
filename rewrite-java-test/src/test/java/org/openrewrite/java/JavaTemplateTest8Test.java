@@ -22,9 +22,17 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -337,7 +345,6 @@ class JavaTemplateTest8Test implements RewriteTest {
         rewriteRun(
           spec -> spec
             .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
-            .typeValidationOptions(org.openrewrite.test.TypeValidation.builder().methodInvocations(false).build())
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -503,8 +510,9 @@ class JavaTemplateTest8Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
+                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
+                  if (template.matches(cursor)) {
                       return SearchResult.found(nameTree);
                   }
                   return super.visitTypeName(nameTree, ctx);
@@ -597,8 +605,9 @@ class JavaTemplateTest8Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
+                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
+                  if (template.matches(cursor)) {
                       return SearchResult.found(nameTree);
                   }
                   return super.visitTypeName(nameTree, ctx);
@@ -638,7 +647,9 @@ class JavaTemplateTest8Test implements RewriteTest {
     @Test
     void replaceContextSensitiveMethodInvocationInAssignmentWithLocalClassType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template writes a local or anonymous class as its supertype, so it infers that type
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
@@ -690,6 +701,376 @@ class JavaTemplateTest8Test implements RewriteTest {
                       }
                       var entity = new Entity();
                       entity.map = Map.of("collection", Collections.singletonList(Map.of("dest", new Inner())));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8327")
+    @Test
+    void unreachableCoordinatesFailLoudly() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void test() {
+                      int n = 1;
+                      System.out.println(hashCode());
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        // The coordinate names a statement that is not inside `scope`, so nothing can ever match it
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("println".equals(method.getSimpleName())) {
+                    J.MethodDeclaration enclosing = getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class);
+                    Statement sibling = requireNonNull(enclosing.getBody()).getStatements().getFirst();
+                    return JavaTemplate.apply("0", getCursor(), sibling.getCoordinates().replace());
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("JavaTemplate coordinates were never matched")
+          .hasMessageContaining(J.VariableDeclarations.class.getName());
+    }
+
+    @Test
+    void coordinatesNestedInArgumentsAreReachable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("println".equals(method.getSimpleName()) && method.getArguments().getFirst() instanceof J.MethodInvocation) {
+                      return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test() {
+                      System.out.println(hashCode());
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      System.out.println(0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchToAnIfThatHasNone() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  if (iff.getElsePart() != null) {
+                      return iff;
+                  }
+                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else if (true) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchExtendsAnExistingChain() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  // Only the head of the chain, and only while it still falls through to a plain else
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.If.Else ||
+                      iff.getElsePart() == null || !(iff.getElsePart().getBody() instanceof J.Block)) {
+                      return super.visitIf(iff, ctx);
+                  }
+                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                          System.out.println(n);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else if (true) {
+                      } else {
+                          System.out.println(n);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchWithABlockMakesAPlainElse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  if (iff.getElsePart() != null) {
+                      return iff;
+                  }
+                  return JavaTemplate.apply("{\n    System.out.println(\"fallthrough\");\n}", getCursor(),
+                    iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                          System.out.println("fallthrough");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchRejectsANonIfWhenAnElseAlreadyExists() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                      }
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.If visitIf(J.If iff, Integer p) {
+                return JavaTemplate.apply("{\n}", getCursor(), iff.getCoordinates().addElseBranch());
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("requires a template that produces an `if`");
+    }
+
+    @Test
+    void contextSensitiveTemplateGivesArrayVariablesTheirDeclaredDimensions() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("clear")) {
+                      return JavaTemplate.builder("reset(a, b, c, d)")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  private int[] a, b[];
+                  private int c[];
+                  void reset(int[] a, int[][] b, int[] c, int[][] d) {}
+                  void clear() {}
+                  void test() {
+                      int[][] d = new int[2][3];
+                      clear();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private int[] a, b[];
+                  private int c[];
+                  void reset(int[] a, int[][] b, int[] c, int[][] d) {}
+                  void clear() {}
+                  void test() {
+                      int[][] d = new int[2][3];
+                      reset(a, b, c, d);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateStubDeclaresVarargsParameterAsArray() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  if ("unused".equals(literal.getValue())) {
+                      return JavaTemplate.builder("\"all\"")
+                        .contextSensitive()
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), literal.getCoordinates().replace());
+                  }
+                  return literal;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(@SuppressWarnings("unused") String... args) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(@SuppressWarnings("all") String... args) {
+                  }
+              }
+              """
+          )
+        );
+        // an annotation argument cannot refer to the parameter, so only the stub shows the type it is declared with
+        assertThat(stubs)
+          .isNotEmpty()
+          .allSatisfy(stub -> assertThat(stub).contains("String[] args"));
+    }
+
+    @Test
+    void contextSensitiveTemplateInitializingOneOfSeveralVariablesTakesThatVariablesType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("make")) {
+                      return JavaTemplate.builder("java.util.Collections.emptyList()")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<String> make() { return null; }
+                  void test() {
+                      List<String> a = make(), b[] = null;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<String> make() { return null; }
+                  void test() {
+                      List<String> a = java.util.Collections.emptyList(), b[] = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextSensitiveTemplateSeesVarLocalsWithTheirInferredTypes() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("clear")) {
+                      return JavaTemplate.builder("take(arr, n)")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void take(int[] a, int n) {}
+                  void take(int[] a, long n) {}
+                  void clear() {}
+                  void test() {
+                      var arr = new int[3];
+                      var n = 1L;
+                      clear();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void take(int[] a, int n) {}
+                  void take(int[] a, long n) {}
+                  void clear() {}
+                  void test() {
+                      var arr = new int[3];
+                      var n = 1L;
+                      take(arr, n);
                   }
               }
               """

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.python.internal;
 
-import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -23,33 +22,32 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Locates and runs a Python package manager CLI. Pre-configured instances are
- * provided for {@code uv} ({@link #UV}) and {@code pipenv} ({@link #PIPENV});
- * each caches the resolved executable path on first {@link #find()}.
+ * Locates and runs a Python package manager CLI for {@link org.openrewrite.python.DependencyWorkspace}.
+ * A pre-configured instance is provided for {@code uv} ({@link #UV}); it caches the
+ * resolved executable path on first {@link #find()}.
  * <p>
  * Callers that just need the executable path can call {@link #find()} and skip
- * lock regeneration when it returns {@code null}. Callers that already have the
+ * workspace creation when it returns {@code null}. Callers that already have the
  * path can run subcommands via {@link #run(Path, String, Map, String...)}.
  */
 public final class PackageManagerExecutor {
 
     public static final PackageManagerExecutor UV = new PackageManagerExecutor(
-            "uv", 120, PackageManagerExecutor::uvExtraLocations, Collections.emptyMap());
-
-    public static final PackageManagerExecutor PIPENV = new PackageManagerExecutor(
-            "pipenv", 300, Collections::emptyList, pipenvEnvDefaults());
+            "uv", 120, PackageManagerExecutor::uvExtraLocations);
 
     @Value
     public static class RunResult {
@@ -59,36 +57,44 @@ public final class PackageManagerExecutor {
         String stderr;
     }
 
-    @Getter
     private final String name;
-
     private final long timeoutSeconds;
     private final Supplier<List<String>> extraLocations;
 
-    /**
-     * Environment variables that should be merged into every invocation of this
-     * tool (caller-supplied values win on key collision).
-     */
-    @Getter
-    private final Map<String, String> envDefaults;
-
     private @Nullable String cachedPath;
 
-    private PackageManagerExecutor(String name, long timeoutSeconds,
-                                   Supplier<List<String>> extraLocations, Map<String, String> envDefaults) {
+    private PackageManagerExecutor(String name, long timeoutSeconds, Supplier<List<String>> extraLocations) {
         this.name = name;
         this.timeoutSeconds = timeoutSeconds;
         this.extraLocations = extraLocations;
-        this.envDefaults = envDefaults;
     }
 
     /**
      * Run the package manager in the given directory with additional environment variables.
      */
     public RunResult run(Path workDir, String executablePath, Map<String, String> environment, String... args) throws IOException, InterruptedException {
+        return run(workDir, executablePath, environment, null, null, args);
+    }
+
+    /**
+     * Run the package manager until {@code deadline}, or for this manager's default timeout when there
+     * is none, appending the command and its output to {@code log}. The environment is not logged, so
+     * credentials belong there rather than in {@code args}.
+     */
+    public RunResult run(Path workDir, String executablePath, Map<String, String> environment,
+                         @Nullable Instant deadline, @Nullable Path log, String... args)
+            throws IOException, InterruptedException {
         String[] command = new String[args.length + 1];
         command[0] = executablePath;
         System.arraycopy(args, 0, command, 1, args.length);
+
+        long timeoutMillis = deadline == null ? TimeUnit.SECONDS.toMillis(timeoutSeconds) :
+                Duration.between(Instant.now(), deadline).toMillis();
+        if (timeoutMillis <= 0) {
+            RunResult result = new RunResult(false, -1, "", "The deadline passed before " + name + " could start");
+            appendToLog(log, command, result);
+            return result;
+        }
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(workDir.toFile());
@@ -105,17 +111,37 @@ public final class PackageManagerExecutor {
         stdoutReader.start();
         stderrReader.start();
 
-        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
+        RunResult result;
         if (!finished) {
             process.destroyForcibly();
-            return new RunResult(false, -1, stdout.toString(), "Process timed out after " + timeoutSeconds + "s");
+            result = new RunResult(false, -1, stdout.toString(), "Process timed out after " +
+                                                                 TimeUnit.MILLISECONDS.toSeconds(timeoutMillis) + "s");
+        } else {
+            stdoutReader.join(5000);
+            stderrReader.join(5000);
+            int exitCode = process.exitValue();
+            result = new RunResult(exitCode == 0, exitCode, stdout.toString(), stderr.toString());
         }
+        appendToLog(log, command, result);
+        return result;
+    }
 
-        stdoutReader.join(5000);
-        stderrReader.join(5000);
+    private static void appendToLog(@Nullable Path log, String[] command, RunResult result) {
+        appendToLog(log, "$ " + String.join(" ", command) + "\n" + result.getStdout() + result.getStderr() +
+                         (result.isSuccess() ? "" : "(exit code " + result.getExitCode() + ")\n"));
+    }
 
-        int exitCode = process.exitValue();
-        return new RunResult(exitCode == 0, exitCode, stdout.toString(), stderr.toString());
+    public static void appendToLog(@Nullable Path log, String text) {
+        if (log == null) {
+            return;
+        }
+        try {
+            Files.write(log, text.getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException ignored) {
+            // An unwritable log loses the text, not the command's result
+        }
     }
 
     /**
@@ -174,16 +200,6 @@ public final class PackageManagerExecutor {
         } catch (IOException e) {
             // Ignore
         }
-    }
-
-    private static Map<String, String> pipenvEnvDefaults() {
-        // PIPENV_VENV_IN_PROJECT keeps the virtualenv inside the temp dir so it's
-        // torn down with the rest of the work area; NOSPIN/QUIET keep stderr clean.
-        Map<String, String> defaults = new LinkedHashMap<>();
-        defaults.put("PIPENV_VENV_IN_PROJECT", "1");
-        defaults.put("PIPENV_NOSPIN", "1");
-        defaults.put("PIPENV_QUIET", "1");
-        return Collections.unmodifiableMap(defaults);
     }
 
     private static List<String> uvExtraLocations() {

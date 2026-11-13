@@ -24,11 +24,13 @@ import {
     PackageManager,
     readNpmrcConfigs
 } from "./node-resolution-result";
+import {createNodeRuntimeMarker, NodeRuntime} from "./node-runtime";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
-import {getLockFileDetectionConfig, runList} from "./package-manager";
+import {getLockFileDetectionConfig, getLockFileName, PackageManagerSelectionError, runList, runVersion, selectPackageManager} from "./package-manager";
+import {markupWarn} from "../markers";
 import picomatch from "picomatch";
 import {DEFAULT_DIR_EXCLUSIONS, walkDirs} from "../path-utils";
 
@@ -75,6 +77,12 @@ export interface PackageJsonParserOptions extends ParserOptions {
 export class PackageJsonParser extends Parser {
     private readonly jsonParser: JsonParser;
     private readonly skipDependencyResolution: boolean;
+
+    /** The NodeRuntime of each project root, by package manager and root directory, for the parser's lifetime */
+    private readonly runtimes = new Map<string, NodeRuntime>();
+
+    private readonly selectedRoots = new Map<string, string>();
+    private readonly selectionFailures = new Map<string, string>();
 
     /** Fields to copy from package.json that contain dependency maps */
     private static readonly DEPENDENCY_FIELDS = [
@@ -166,18 +174,53 @@ export class PackageJsonParser extends Parser {
                 markersByDir.set(dir, await this.createMarker(input, dir));
             }
             const marker = markersByDir.get(dir)!;
+            const runtime = this.nodeRuntime(dir, marker?.packageManager);
 
-            // Attach the marker to the JSON document
-            if (marker) {
-                yield {
-                    ...jsonDoc,
-                    markers: {
-                        ...jsonDoc.markers,
-                        markers: [...jsonDoc.markers.markers, marker]
-                    }
-                };
-            } else {
-                yield jsonDoc;
+            // Attach the markers to the JSON document: every one gets the NodeRuntime of its project
+            const out: Json.Document = {
+                ...jsonDoc,
+                markers: {
+                    ...jsonDoc.markers,
+                    markers: [...jsonDoc.markers.markers, ...(marker ? [marker] : []), runtime]
+                }
+            };
+            const failure = this.selectionFailures.get(dir);
+            yield failure === undefined ? out : markupWarn(out, failure);
+        }
+    }
+
+    /**
+     * The NodeRuntime of the project whose package.json is in `dir`, one instance per project root: the directory of
+     * the lock the parser found `packageManager` by, else `dir`. That package manager's `--version` is asked there,
+     * once per package manager and root directory; without one, as when dependency resolution is skipped, none is.
+     */
+    private nodeRuntime(dir: string, packageManager?: PackageManager): NodeRuntime {
+        const absoluteDir = path.resolve(this.relativeTo ?? '', dir);
+        const root = packageManager === undefined ? absoluteDir :
+            this.selectedRoots.get(absoluteDir) ?? this.projectRoot(absoluteDir, packageManager);
+        const key = `${packageManager ?? ''}:${root}`;
+        let runtime = this.runtimes.get(key);
+        if (!runtime) {
+            runtime = createNodeRuntimeMarker(packageManager,
+                packageManager === undefined ? undefined : runVersion(packageManager, root));
+            this.runtimes.set(key, runtime);
+        }
+        return runtime;
+    }
+
+    /**
+     * The nearest directory from `dir` up to relativeTo that holds `packageManager`'s lock, as the lock file walk
+     * finds it; `dir` where none does.
+     */
+    private projectRoot(dir: string, packageManager: PackageManager): string {
+        const lockFile = getLockFileName(packageManager);
+        const stop = this.relativeTo ? path.resolve(this.relativeTo) : undefined;
+        for (let current = dir; ; current = path.dirname(current)) {
+            if (fs.existsSync(path.join(current, lockFile))) {
+                return current;
+            }
+            if (current === stop || path.dirname(current) === current) {
+                return dir;
             }
         }
     }
@@ -186,6 +229,8 @@ export class PackageJsonParser extends Parser {
      * Creates a NodeResolutionResult marker from the package.json content and optional lock file.
      */
     private async createMarker(input: ParserInput, dir: string): Promise<NodeResolutionResult | null> {
+        this.selectionFailures.delete(dir);
+        this.selectedRoots.delete(path.resolve(this.relativeTo ?? "", dir));
         try {
             const content = parserInputRead(input);
             const packageJson = JSON.parse(content);
@@ -205,7 +250,7 @@ export class PackageJsonParser extends Parser {
                 const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
                     ? path.resolve(this.relativeTo, dir)
                     : dir;
-                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo);
+                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo, packageJson);
                 lockContent = lockResult?.content;
                 packageManager = lockResult?.packageManager;
             }
@@ -246,9 +291,12 @@ export class PackageJsonParser extends Parser {
                 lockContent,
                 workspacePackagePaths,
                 packageManager,
-                npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+                npmrcConfigs.length > 0 ? npmrcConfigs : undefined,
+                path.relative(this.selectedRoots.get(path.resolve(absoluteDir)) ?? absoluteDir, absoluteDir)
+                    .split(path.sep).join("/")
             );
         } catch (error) {
+            if (error instanceof PackageManagerSelectionError) this.selectionFailures.set(dir, error.message);
             console.warn(`Failed to create NodeResolutionResult marker: ${error}`);
             return null;
         }
@@ -343,6 +391,9 @@ export class PackageJsonParser extends Parser {
                     continue;
                 }
 
+                // a pattern without wildcards names the directory itself
+                candidates.push(absoluteBaseDir);
+
                 // Use walkDirs with appropriate depth limit
                 const dirs = await walkDirs(absoluteBaseDir, {
                     maxDepth: hasRecursive ? undefined : 0,
@@ -353,7 +404,7 @@ export class PackageJsonParser extends Parser {
             }
         }
 
-        return candidates;
+        return [...new Set(candidates)];
     }
 
     /**
@@ -425,31 +476,42 @@ export class PackageJsonParser extends Parser {
      */
     private async tryReadLockFileWithWalkUp(
         startDir: string,
-        rootDir?: string
+        rootDir?: string,
+        manifest?: unknown
     ): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
+        const selected = selectPackageManager(startDir, rootDir, manifest);
+        if (selected) {
+            this.selectedRoots.set(path.resolve(startDir), selected.root);
+            if (selected.lockFile) return this.tryReadLockFile(selected.root, selected.packageManager);
+            const installed = await this.walkNodeModules(selected.root);
+            return {content: installed ?? {lockfileVersion: 0, packages: {}}, packageManager: selected.packageManager};
+        }
         // Normalize paths for comparison
         const normalizedRoot = rootDir ? path.resolve(rootDir) : undefined;
+
+        // Each directory from startDir up, stopping at rootDir (or the filesystem root)
+        const dirs: string[] = [];
         let currentDir = path.resolve(startDir);
-
-        // Walk up the directory tree looking for a lock file
         while (true) {
-            const result = await this.tryReadLockFile(currentDir);
-            if (result) {
-                return result;
-            }
-
-            // If we've reached rootDir, stop walking (don't go above it)
+            dirs.push(currentDir);
             if (normalizedRoot && currentDir === normalizedRoot) {
                 break;
             }
-
-            // Check if we've reached the filesystem root
             const parentDir = path.dirname(currentDir);
             if (parentDir === currentDir) {
                 break;
             }
-
             currentDir = parentDir;
+        }
+
+        // Fallback: node_modules without a lock file anywhere above (e.g., symlinked from another
+        // workspace). Walk them for resolved dependency information, and assume npm.
+        for (const dir of dirs) {
+            const parsed = await this.walkNodeModules(dir);
+            if (parsed) {
+                this.selectedRoots.set(path.resolve(startDir), dir);
+                return { content: parsed, packageManager: PackageManager.Npm };
+            }
         }
 
         return undefined;
@@ -461,9 +523,10 @@ export class PackageJsonParser extends Parser {
      *
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
-    private async tryReadLockFile(dir: string): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
+    private async tryReadLockFile(dir: string, selected?: PackageManager): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
         // Use shared lock file detection config (first match wins based on priority)
         for (const config of getLockFileDetectionConfig()) {
+            if (selected !== undefined && config.filename !== getLockFileName(selected)) continue;
             const lockPath = path.join(dir, config.filename);
             if (!fs.existsSync(lockPath)) {
                 continue;
@@ -502,14 +565,6 @@ export class PackageJsonParser extends Parser {
                     : config.packageManager;
                 return { content: { lockfileVersion: 0, packages: {} }, packageManager };
             }
-        }
-
-        // Fallback: if node_modules exists but no lock file was found (e.g., symlinked from another workspace),
-        // walk node_modules to get resolved dependency information
-        const parsed = await this.walkNodeModules(dir);
-        if (parsed) {
-            // Assume npm as the default package manager when only node_modules exists
-            return { content: parsed, packageManager: PackageManager.Npm };
         }
 
         return undefined;
@@ -728,6 +783,19 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
+     * The packages a bun.lock key nests, outermost first. A scope and the name after it are one
+     * package: "@babel/core" names one, "is-even/is-odd" and "@babel/core/@babel/types" two.
+     */
+    private static bunKeyPackages(key: string): string[] {
+        const parts = key.split('/');
+        const packages: string[] = [];
+        for (let i = 0; i < parts.length; i++) {
+            packages.push(parts[i].startsWith('@') && i + 1 < parts.length ? `${parts[i]}/${parts[++i]}` : parts[i]);
+        }
+        return packages;
+    }
+
+    /**
      * Converts bun.lock format to npm package-lock.json format for unified processing.
      *
      * bun.lock format (v1):
@@ -771,14 +839,11 @@ export class PackageJsonParser extends Parser {
 
             // Convert bun's path format to npm's node_modules format
             // bun uses "parent/child" for nested deps, npm uses "node_modules/parent/node_modules/child"
-            let pkgPath: string;
-            if (key.includes('/')) {
+            const nesting = PackageJsonParser.bunKeyPackages(key);
+            const pkgPath = nesting.length > 1
                 // Nested dependency - convert "is-even/is-odd" to "node_modules/is-even/node_modules/is-odd"
-                const parts = key.split('/');
-                pkgPath = parts.map(p => `node_modules/${p}`).join('/');
-            } else {
-                pkgPath = `node_modules/${name}`;
-            }
+                ? nesting.map(p => `node_modules/${p}`).join('/')
+                : `node_modules/${name}`;
 
             packages[pkgPath] = pkgEntry;
         }

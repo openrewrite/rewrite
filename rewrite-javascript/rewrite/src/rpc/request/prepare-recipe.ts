@@ -19,13 +19,17 @@ import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {Check, CheckArg, CompositePrecondition, RecipeRef} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
+import {DelegatingRecipe} from "../java-recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
 
 export class PrepareRecipe {
-    constructor(private readonly id: string, private readonly options?: any) {
+    constructor(private readonly id: string,
+                private readonly options?: any,
+                // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
+                private readonly acceptsCausesAnotherCycle?: boolean) {
     }
 
     static handle(connection: MessageConnection,
@@ -40,103 +44,113 @@ export class PrepareRecipe {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.id;
-                    const id = snowflake.generate();
+                    const accepts = request.acceptsCausesAnotherCycle === true;
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
-                        // The host re-prepares every sub-recipe of a composite by id while
-                        // building RpcRecipe.getRecipeList(). A sub-recipe that delegates to a
-                        // Java recipe (e.g. org.openrewrite.javascript.UpgradeDependencyVersion,
-                        // produced by upgradeDependencyVersion() -> prepareJavaRecipe) is an
-                        // RpcRecipe that installSubRecipes deliberately did not register here: it
-                        // has no no-arg constructor and is hosted on the peer. A miss therefore
-                        // means the host owns this recipe, so tell it to resolve the id locally
-                        // (the Java recipe is on the host's classpath) via delegatesTo, rather
-                        // than failing with "Could not find recipe with id ...".
-                        return {
-                            id: id,
-                            descriptor: PrepareRecipe.delegateDescriptor(request.id),
-                            editVisitor: `edit:${id}`,
-                            editPreconditions: [],
-                            scanPreconditions: [],
-                            delegatesTo: {
-                                recipeName: request.id,
-                                options: request.options ?? {}
-                            }
-                        };
+                        // A miss means the host owns this recipe (e.g. a Java-delegate child a host
+                        // re-prepares by name), so answer with a delegatesTo stand-in for it to resolve.
+                        return await PrepareRecipe.prepareInstance(new DelegatingRecipe(request.id, request.options ?? {}),
+                            snowflake, preparedRecipes, marketplace, accepts);
                     }
                     if (!recipeCtor[1]) {
                         throw new Error(`Recipe ${request.id} was installed without a constructor`);
                     }
-                    let recipe = new recipeCtor[1](request.options);
-
-                    const editPreconditions: Precondition[] = [];
-                    recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
-
-                    const scanPreconditions: Precondition[] = [];
-                    recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
-
-                    preparedRecipes.set(id, recipe);
-
-                    await this.installSubRecipes(recipe, marketplace);
-
-                    const result: PrepareRecipeResponse = {
-                        id: id,
-                        descriptor: await recipe.descriptor(),
-                        editVisitor: `edit:${id}`,
-                        editPreconditions: editPreconditions,
-                        scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                        scanPreconditions: scanPreconditions
-                    };
-
-                    if ('javaRecipeName' in recipe) {
-                        result.delegatesTo = {
-                            recipeName: (recipe as any).javaRecipeName,
-                            options: (recipe as any).delegatesToOptions ?? {}
-                        };
-                    }
-
-                    return result;
+                    return await PrepareRecipe.prepareInstance(new recipeCtor[1](request.options),
+                        snowflake, preparedRecipes, marketplace, accepts);
                 }
             )
         );
     }
 
     /**
-     * Minimal stand-in descriptor for a recipe the host will resolve locally via
-     * {@link PrepareRecipeResponse.delegatesTo}. The host reads only `delegatesTo` for
-     * delegated recipes and ignores this descriptor, but the response type requires one.
+     * Prepares a recipe and, recursively, its whole child tree, registering every node in
+     * {@code preparedRecipes}; the response carries {@code recipeList} so the host builds the tree
+     * without a PrepareRecipe round-trip per child (mirrors the C# server's PrepareInstance).
+     * Required options are validated per node. A stand-in for a host recipe (see {@link #delegatesTo})
+     * carries only {@code delegatesTo} and leaves validation to the host.
      */
-    private static delegateDescriptor(name: string): RecipeDescriptor {
-        return {
-            name: name,
-            displayName: name,
-            instanceName: name,
-            description: "",
-            tags: [],
-            estimatedEffortPerOccurrence: 5,
-            options: [],
-            preconditions: [],
-            recipeList: [],
-            dataTables: [],
-            maintainers: [],
-            contributors: [],
-            examples: []
-        };
-    }
+    private static async prepareInstance(recipe: Recipe,
+                                         snowflake: ReturnType<typeof SnowflakeId>,
+                                         preparedRecipes: Map<String, Recipe>,
+                                         marketplace: RecipeMarketplace,
+                                         acceptsCausesAnotherCycle: boolean): Promise<PrepareRecipeResponse> {
+        const id = snowflake.generate();
+        const delegatesTo = PrepareRecipe.delegatesTo(recipe);
+        if (delegatesTo) {
+            // Registered so a peer that visits `edit:<id>` instead of honouring delegatesTo reaches it.
+            preparedRecipes.set(id, recipe);
+            return {
+                id: id,
+                descriptor: await recipe.descriptor(),
+                editVisitor: `edit:${id}`,
+                editPreconditions: [],
+                scanPreconditions: [],
+                delegatesTo
+            };
+        }
 
-    private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
-        for (const subRecipe of await recipe.recipeList()) {
-            // An RpcRecipe is a proxy for a recipe already prepared on a remote
-            // peer; it has no no-arg constructor to install and its sub-recipes
-            // live remotely, so there is nothing to register locally.
-            if (subRecipe instanceof RpcRecipe) {
-                continue;
-            }
-            if (!marketplace.findRecipe(subRecipe.name)) {
-                await marketplace.install(subRecipe.constructor as any, []);
-                await this.installSubRecipes(subRecipe, marketplace);
+        const editPreconditions: Precondition[] = [];
+        recipe = await PrepareRecipe.optimizePreconditions(recipe, "edit", editPreconditions);
+        const scanPreconditions: Precondition[] = [];
+        recipe = await PrepareRecipe.optimizePreconditions(recipe, "scan", scanPreconditions);
+
+        preparedRecipes.set(id, recipe);
+
+        const descriptor = await recipe.descriptor();
+        for (const option of descriptor.options) {
+            if ((option.required ?? true) && option.value == null) {
+                throw new Error(`Missing required option \`${option.name}\` for recipe \`${descriptor.name}\`.`);
             }
         }
+
+        const response: PrepareRecipeResponse = {
+            id: id,
+            descriptor: descriptor,
+            editVisitor: `edit:${id}`,
+            editPreconditions: editPreconditions,
+            scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
+            scanPreconditions: scanPreconditions
+        };
+        if (acceptsCausesAnotherCycle && recipe.causesAnotherCycle === true) {
+            response.causesAnotherCycle = true;
+        }
+
+        const childResponses: PrepareRecipeResponse[] = [];
+        for (const child of await recipe.recipeList()) {
+            if (child instanceof RpcRecipe) {
+                // Already prepared on the host: hand it back by name with the options its parent set.
+                const options: Record<string, any> = {};
+                for (const option of (await child.descriptor()).options) {
+                    if (option.value != null) {
+                        options[option.name] = option.value;
+                    }
+                }
+                childResponses.push(await PrepareRecipe.prepareInstance(new DelegatingRecipe(child.name, options),
+                    snowflake, preparedRecipes, marketplace, acceptsCausesAnotherCycle));
+                continue;
+            }
+            // Register a child that was instantiated in recipeList() but never installed, so a peer
+            // that re-prepares children by name (rather than consuming recipeList) can still find it.
+            if (!PrepareRecipe.delegatesTo(child) && !marketplace.findRecipe(child.name)) {
+                await marketplace.install(child.constructor as any, []);
+            }
+            childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace,
+                acceptsCausesAnotherCycle));
+        }
+        response.recipeList = childResponses;
+
+        return response;
+    }
+
+    /**
+     * The Java recipe {@code recipe} stands in for, or {@code undefined} for a recipe this process
+     * runs itself. Duck-typed on the fields {@link DelegatingRecipe} declares, so a recipe package
+     * that loaded its own copy of this module is recognised too.
+     */
+    private static delegatesTo(recipe: any): {recipeName: string, options: Record<string, any>} | undefined {
+        return recipe != null && typeof recipe.javaRecipeName === "string" ?
+            {recipeName: recipe.javaRecipeName, options: {...(recipe.delegatesToOptions ?? {})}} :
+            undefined;
     }
 
     /**
@@ -146,42 +160,50 @@ export class PrepareRecipe {
      */
     private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
         let visitor: TreeVisitor<any, ExecutionContext>;
-        if (phase === "edit") {
-            visitor = await recipe.editor();
-        } else if (phase === "scan") {
-            if (recipe instanceof ScanningRecipe) {
-                visitor = await recipe.scanner(undefined);
+        try {
+            if (phase === "edit") {
+                visitor = await recipe.editor();
+            } else if (recipe instanceof ScanningRecipe) {
+                visitor = await recipe.scanner(recipe.initialValue(new ExecutionContext()));
             } else {
                 return recipe;
             }
+        } catch {
+            // A visitor that can only be built during a run keeps its preconditions, which it then checks itself.
+            return recipe;
         }
 
         if (visitor! instanceof Check) {
-            const wireEntry = this.conditionWireEntry(visitor.check, phase);
+            const wireEntry = this.conditionWireEntry(visitor.check);
             if (wireEntry) {
                 preconditions.push(wireEntry);
-                recipe = Object.assign(
-                    Object.create(Object.getPrototypeOf(recipe)),
-                    recipe,
-                    phase === "edit" ?
-                        {
-                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                                return visitor.v;
-                            }
-                        } :
-                        {
-                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
-                                const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
-                                return (checkVisitor as Check<any>).v;
-                            }
+                if (phase === "edit") {
+                    const editor = recipe.editor;
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async editor(this: Recipe): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const editVisitor = await editor.call(this);
+                            return editVisitor instanceof Check ? editVisitor.v : editVisitor;
                         }
-                )
+                    });
+                } else {
+                    const scanner = (recipe as ScanningRecipe<any>).scanner;
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async scanner(this: ScanningRecipe<any>, acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const scanVisitor = await scanner.call(this, acc);
+                            return scanVisitor instanceof Check ? scanVisitor.v : scanVisitor;
+                        }
+                    });
+                }
             }
             await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
             await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
+    }
+
+    private static withOverrides(recipe: Recipe, overrides: object): Recipe {
+        return Object.assign(Object.create(Object.getPrototypeOf(recipe)), recipe, overrides);
     }
 
     /**
@@ -194,11 +216,11 @@ export class PrepareRecipe {
      * condition can't be serialized — the caller leaves the wrapper
      * intact so the gate runs in-process as a fallback.
      */
-    private static conditionWireEntry(condition: CheckArg, phase: "edit" | "scan"): Precondition | undefined {
+    private static conditionWireEntry(condition: CheckArg): Precondition | undefined {
         if (condition instanceof CompositePrecondition) {
             const operands: Precondition[] = [];
             for (const operand of condition.operands) {
-                const entry = this.conditionWireEntry(operand, phase);
+                const entry = this.conditionWireEntry(operand);
                 if (entry === undefined) {
                     return undefined;
                 }
@@ -206,16 +228,17 @@ export class PrepareRecipe {
             }
             return {op: condition.op, operands};
         }
-        // Common case: helpers like usesMethod / usesType return a lightweight
-        // RecipeRef so the recipe author can declare a precondition without
-        // firing an RPC at editor() time. The Java host's
-        // PreparedRecipeCache.instantiateVisitor constructs the named recipe
-        // via Jackson and uses its visitor.
-        if (condition instanceof RecipeRef) {
-            return {visitorName: condition.recipeName, visitorOptions: {...condition.options}};
+        // Common case: usesMethod / usesType return a lightweight RecipeRef, and
+        // prepareJavaRecipe a DelegatingRecipe, so a precondition is declared without
+        // firing an RPC at editor() time. The Java host's PreparedRecipeCache
+        // .instantiateVisitor constructs the named recipe via Jackson and uses its visitor.
+        const ref = condition instanceof RecipeRef ? condition : PrepareRecipe.delegatesTo(condition);
+        if (ref) {
+            return {visitorName: ref.recipeName, visitorOptions: {...ref.options}};
         }
         if (condition instanceof RpcRecipe) {
-            return {visitorName: phase === "edit" ? condition.editVisitor : condition.scanVisitor!};
+            // A recipe gates with its editor in either phase, as Check evaluates it in-process.
+            return {visitorName: condition.editVisitor};
         }
         return undefined;
     }
@@ -266,6 +289,12 @@ export interface PrepareRecipeResponse {
     scanVisitor?: string
     scanPreconditions: Precondition[]
     delegatesTo?: DelegatesTo
+    /**
+     * The prepared child recipes of a composite. When present, the host builds the recipe tree
+     * locally from these instead of re-preparing each child by name (the whole-tree optimization).
+     */
+    recipeList?: PrepareRecipeResponse[]
+    causesAnotherCycle?: boolean
 }
 
 /**

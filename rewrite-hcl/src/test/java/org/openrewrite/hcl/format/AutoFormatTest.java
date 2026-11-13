@@ -168,4 +168,92 @@ class AutoFormatTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void heredocContentIsNotIndented() {
+        rewriteRun(
+          hcl(
+            """
+              resource "aws_instance" "web" {
+              user_data = <<EOT
+              echo hello
+                echo nested
+              EOT
+              }
+              """,
+            """
+              resource "aws_instance" "web" {
+                user_data = <<EOT
+              echo hello
+                echo nested
+              EOT
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void indentedHeredocContentIsPreserved() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                  script = <<-EOT
+                    echo ${var.name}
+
+                      ${upper(var.greeting)}
+                  EOT
+                  other = "x"
+              }
+              """,
+            """
+              locals {
+                script = <<-EOT
+                    echo ${var.name}
+
+                      ${upper(var.greeting)}
+                  EOT
+                other = "x"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void heredocInsideObjectAndTuple() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                object = {
+                     a = <<EOT
+              one
+              EOT
+                }
+                list = [
+                       <<EOT
+              two
+              EOT
+                ]
+              }
+              """,
+            """
+              locals {
+                object = {
+                  a = <<EOT
+              one
+              EOT
+                }
+                list = [
+                  <<EOT
+              two
+              EOT
+                ]
+              }
+              """
+          )
+        );
+    }
 }

@@ -17,7 +17,6 @@ package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.ChangeType;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.test.RewriteTest;
 

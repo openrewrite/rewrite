@@ -26,22 +26,25 @@ import static java.util.Objects.requireNonNull;
  */
 @Getter
 public class Reference {
-    @SuppressWarnings("AccessStaticViaInstance")
-    private static final ThreadLocal<Reference> flyweight = new ThreadLocal<>()
-            .withInitial(Reference::new);
-
     @Nullable
-    private Object value;
+    private final Object value;
+
+    protected Reference() {
+        this.value = null;
+    }
+
+    private Reference(@Nullable Object value) {
+        this.value = value;
+    }
 
     /**
      * @param t Any instance.
      * @return A reference wrapper, which assists the sender to know when to pass by reference
-     * rather than by value.
+     * rather than by value. Each call returns a distinct instance: a diffing sender holds the
+     * before and after references at the same time, so they must not share state.
      */
     public static Reference asRef(@Nullable Object t) {
-        Reference ref = flyweight.get();
-        ref.value = t;
-        return ref;
+        return new Reference(t);
     }
 
     /**

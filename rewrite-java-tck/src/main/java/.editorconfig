@@ -1,5 +1,5 @@
-root = true
-
+# The tck ships its tests from src/main so every Java parser module can run them.
 [*.java]
 indent_size = 4
 ij_continuation_indent_size = 2
+trim_trailing_whitespace = false

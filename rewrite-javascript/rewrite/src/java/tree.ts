@@ -40,6 +40,21 @@ export interface Expression extends J {
     readonly type?: Type;
 }
 
+export namespace Expression {
+    /**
+     * Returns the first expression inside any number of nested parentheses, or the expression itself
+     * when it is not parenthesized.
+     */
+    export function unwrap(expr: Expression): Expression;
+    export function unwrap(expr: Expression | undefined): Expression | undefined;
+    export function unwrap(expr: Expression | undefined): Expression | undefined {
+        while (expr?.kind === J.Kind.Parentheses) {
+            expr = (expr as J.Parentheses<Expression>).tree.element;
+        }
+        return expr;
+    }
+}
+
 export interface MethodCall extends Expression {
     readonly methodType?: Type.Method;
 }
@@ -252,7 +267,7 @@ export namespace J {
         }
     }
 
-    export interface Block extends J {
+    export interface Block extends J, Statement {
         readonly kind: typeof Kind.Block;
         readonly static: RightPadded<boolean>;
         readonly statements: RightPadded<Statement>[];
@@ -411,7 +426,7 @@ export namespace J {
         }
     }
 
-    export interface Import extends J {
+    export interface Import extends J, Statement {
         readonly kind: typeof Kind.Import;
         readonly static: LeftPadded<boolean>;
         readonly qualid: FieldAccess;
@@ -427,7 +442,7 @@ export namespace J {
         readonly modifier?: Modifier;
     }
 
-    export interface DeconstructionPattern extends J, TypedTree {
+    export interface DeconstructionPattern extends J, Expression, TypedTree {
         readonly kind: typeof Kind.DeconstructionPattern;
         readonly deconstructor: Expression;
         readonly nested: Container<J>;
@@ -475,7 +490,7 @@ export namespace J {
         readonly codePoint: string;
     }
 
-    export interface MemberReference extends J, MethodCall {
+    export interface MemberReference extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.MemberReference;
         readonly containing: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
@@ -484,7 +499,7 @@ export namespace J {
         readonly variableType?: Type.Variable;
     }
 
-    export interface MethodDeclaration extends J, TypedTree {
+    export interface MethodDeclaration extends J, Statement, TypedTree {
         readonly kind: typeof Kind.MethodDeclaration;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
@@ -500,7 +515,7 @@ export namespace J {
         readonly methodType?: Type.Method;
     }
 
-    export interface MethodInvocation extends J, TypedTree, MethodCall {
+    export interface MethodInvocation extends J, Statement, TypedTree, MethodCall {
         readonly kind: typeof Kind.MethodInvocation;
         readonly select?: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
@@ -552,7 +567,7 @@ export namespace J {
         readonly type?: Type;
     }
 
-    export interface NewClass extends J, TypedTree, MethodCall {
+    export interface NewClass extends J, Statement, TypedTree, MethodCall {
         readonly kind: typeof Kind.NewClass;
         readonly enclosing?: RightPadded<Expression>;
         readonly new: Space;
@@ -568,13 +583,13 @@ export namespace J {
         readonly typeTree: RightPadded<TypeTree>;
     }
 
-    export interface Package extends J {
+    export interface Package extends J, Statement {
         readonly kind: typeof Kind.Package;
         readonly expression: Expression;
         readonly annotations?: Annotation[];
     }
 
-    export interface ParameterizedType extends J, TypeTree {
+    export interface ParameterizedType extends J, TypeTree, Expression {
         readonly kind: typeof Kind.ParameterizedType;
         readonly class: NameTree;
         readonly typeParameters?: Container<Expression>;
@@ -696,7 +711,7 @@ export namespace J {
         }
     }
 
-    export interface VariableDeclarations extends J, TypedTree {
+    export interface VariableDeclarations extends J, Statement, TypedTree {
         readonly kind: typeof Kind.VariableDeclarations;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
@@ -706,7 +721,7 @@ export namespace J {
     }
 
     export namespace VariableDeclarations {
-        export interface NamedVariable extends J {
+        export interface NamedVariable extends J, NameTree {
             readonly kind: typeof Kind.NamedVariable;
             readonly name: VariableDeclarator;
             readonly dimensionsAfterName: LeftPadded<Space>[];
@@ -737,7 +752,8 @@ export namespace J {
     export interface Yield extends J, Statement {
         readonly kind: typeof Kind.Yield;
         readonly implicit: boolean;
-        readonly value: Expression;
+        /** Absent from a bare `yield`. */
+        readonly value?: Expression;
     }
 
     export interface Unknown extends J, Statement, Expression, TypeTree {
@@ -789,14 +805,6 @@ export function isSpace(tree: any): tree is J.Space {
         tree.kind === J.Kind.Space;
 }
 
-export function space(whitespace: string): J.Space {
-    return {
-        kind: J.Kind.Space,
-        comments: [],
-        whitespace: whitespace,
-    };
-}
-
 export const emptySpace: J.Space = {
     kind: J.Kind.Space,
     comments: [],
@@ -808,6 +816,33 @@ export const singleSpace: J.Space = {
     comments: [],
     whitespace: " ",
 };
+
+// Short whitespace repeats throughout a run, so as with Java's Space.shared one instance serves every use.
+const sharedSpaces = new Map<string, J.Space>([["", emptySpace], [" ", singleSpace]]);
+
+/**
+ * A comment-free Space, shared with every other use of short whitespace, so it must never be mutated.
+ * Assigning one over an existing prefix silently drops the comments that prefix carried; spread the
+ * prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
+ */
+export function space(whitespace: string): J.Space {
+    return sharedSpace(whitespace) ?? {kind: J.Kind.Space, comments: [], whitespace};
+}
+
+/**
+ * The one comment-free Space shared for `whitespace`, or undefined when `whitespace` is too long to share.
+ */
+export function sharedSpace(whitespace: string): J.Space | undefined {
+    if (whitespace.length > 50) {
+        return undefined;
+    }
+    let s = sharedSpaces.get(whitespace);
+    if (s === undefined) {
+        s = {kind: J.Kind.Space, comments: [], whitespace};
+        sharedSpaces.set(whitespace, s);
+    }
+    return s;
+}
 
 export function emptyContainer<T extends J>(): J.Container<T> {
     return {
@@ -845,6 +880,8 @@ export const isIf = (tree: any): tree is J.If => tree["kind"] === J.Kind.If;
 export const isImport = (tree: any): tree is J.Import => tree["kind"] === J.Kind.Import;
 export const isLambda = (tree: any): tree is J.Lambda => tree["kind"] === J.Kind.Lambda;
 export const isLiteral = (tree: any): tree is J.Literal => tree["kind"] === J.Kind.Literal;
+export const isStringLiteral = (tree: any): tree is J.Literal & {value: string} =>
+    tree?.kind === J.Kind.Literal && typeof tree.value === "string";
 export const isMethodDeclaration = (n: any): n is J.MethodDeclaration => n.kind === J.Kind.MethodDeclaration;
 export const isMethodInvocation = (n: any): n is J.MethodInvocation => n.kind === J.Kind.MethodInvocation;
 export const isNamedVariable = (n: any): n is J.VariableDeclarations.NamedVariable => n.kind === J.Kind.NamedVariable;

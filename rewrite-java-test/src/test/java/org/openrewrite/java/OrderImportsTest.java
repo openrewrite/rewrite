@@ -39,6 +39,57 @@ class OrderImportsTest implements RewriteTest {
         spec.recipe(new OrderImports(false, null));
     }
 
+    @Test
+    void preserveNestedEnumStaticWildcard() {
+        rewriteRun(
+          java(
+            """
+              package p;
+              public class Modifier {
+                  public enum Keyword { PUBLIC, PRIVATE }
+              }
+              """
+          ),
+          java(
+            """
+              import static p.Modifier.Keyword;
+              import static p.Modifier.Keyword.*;
+
+              class Example {
+                  Keyword first = PUBLIC;
+                  Keyword second = PRIVATE;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotCountNestedTypeAlongsideItsStaticMembers() {
+        rewriteRun(
+          java(
+            """
+              package p;
+              public class Modifier {
+                  public enum Keyword { PUBLIC, PRIVATE }
+              }
+              """
+          ),
+          java(
+            """
+              import static p.Modifier.Keyword;
+              import static p.Modifier.Keyword.PRIVATE;
+              import static p.Modifier.Keyword.PUBLIC;
+
+              class Example {
+                  Keyword first = PUBLIC;
+                  Keyword second = PRIVATE;
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void foldIntoStar() {
@@ -720,7 +771,7 @@ class OrderImportsTest implements RewriteTest {
                   JRightPadded<JavaType> myRightPadded = null;
                   JContainer<JavaType> myContainer = null;
                   Space mySpace = null;
-                  JavaType.Variable myVariable = null;
+                  JavaType.Variable myQualifiedVariable = null;
               }
               """,
             """
@@ -733,7 +784,7 @@ class OrderImportsTest implements RewriteTest {
                   JRightPadded<JavaType> myRightPadded = null;
                   JContainer<JavaType> myContainer = null;
                   Space mySpace = null;
-                  JavaType.Variable myVariable = null;
+                  JavaType.Variable myQualifiedVariable = null;
               }
               """
           )

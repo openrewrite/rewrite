@@ -74,4 +74,76 @@ class FindMethodsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void companionMethodThroughQualifier() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("WithCompanion.Companion create()", false)),
+          kotlin(
+            """
+              typealias A = WithCompanion
+
+              class WithCompanion {
+                  companion object {
+                      fun create() = 1
+                  }
+              }
+
+              val a = WithCompanion.create()
+              val b = A.create()
+              val c = WithCompanion.Companion.create()
+              """,
+            """
+              typealias A = WithCompanion
+
+              class WithCompanion {
+                  companion object {
+                      fun /*~~>*/create() = 1
+                  }
+              }
+
+              val a = /*~~>*/WithCompanion.create()
+              val b = /*~~>*/A.create()
+              val c = /*~~>*/WithCompanion.Companion.create()
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedCompanionMethodThroughQualifier() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("Outer.Nested.Companion create()", false)),
+          kotlin(
+            """
+              typealias N = Outer.Nested
+
+              class Outer {
+                  class Nested {
+                      companion object {
+                          fun create() = 1
+                      }
+                  }
+              }
+
+              val a = Outer.Nested.create()
+              val b = N.create()
+              """,
+            """
+              typealias N = Outer.Nested
+
+              class Outer {
+                  class Nested {
+                      companion object {
+                          fun /*~~>*/create() = 1
+                      }
+                  }
+              }
+
+              val a = /*~~>*/Outer.Nested.create()
+              val b = /*~~>*/N.create()
+              """
+          )
+        );
+    }
 }

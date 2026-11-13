@@ -18,7 +18,6 @@ package golang
 
 import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
-// FindMethods finds all method invocations matching a pattern.
 // Delegates to the Java FindMethods recipe via RPC.
 type FindMethods struct {
 	recipe.Base

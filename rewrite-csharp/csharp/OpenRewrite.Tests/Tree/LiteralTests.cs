@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
 
@@ -122,5 +123,27 @@ public class LiteralTests : RewriteTest
         Assert.NotNull(lit.Type);
         Assert.IsType<JavaType.Primitive>(lit.Type);
         Assert.Equal(expectedKind, ((JavaType.Primitive)lit.Type).Kind);
+    }
+
+    [Theory]
+    [InlineData("234.7m", JavaType.PrimitiveKind.Double, 234.7d)]
+    [InlineData("42u", JavaType.PrimitiveKind.Long, 42L)]
+    [InlineData("42UL", JavaType.PrimitiveKind.Long, 42L)]
+    [InlineData("18446744073709551615UL", JavaType.PrimitiveKind.Long, -1L)] // ulong bits reinterpreted as signed
+    [InlineData("4.5f", JavaType.PrimitiveKind.Float, 4.5f)]
+    [InlineData("5L", JavaType.PrimitiveKind.Long, 5L)]
+    [InlineData("1_000_000", JavaType.PrimitiveKind.Int, 1_000_000)]
+    public void NumericLiteralValueMatchesDeclaredType(string literal, JavaType.PrimitiveKind expectedKind, object expectedValue)
+    {
+        var cu = Parse($"{literal};");
+        var lit = FindFirst<Literal>(cu);
+        Assert.NotNull(lit);
+        var primitive = Assert.IsType<JavaType.Primitive>(lit.Type);
+        Assert.Equal(expectedKind, primitive.Kind);
+        Assert.NotNull(lit.Value);
+        Assert.Equal(expectedValue.GetType(), lit.Value!.GetType());
+        Assert.Equal(expectedValue, lit.Value);
+        Assert.Equal(literal, lit.ValueSource);
+        Assert.Equal($"{literal};", new CSharpPrinter<object>().Print(cu));
     }
 }

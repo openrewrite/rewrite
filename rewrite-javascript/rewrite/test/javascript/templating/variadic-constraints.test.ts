@@ -13,15 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, pattern} from "../../../src/javascript";
+import {capture, JavaScriptParser, pattern, sourceFileCache} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('Variadic Capture Constraints', () => {
-    let parser: JavaScriptParser;
-
-    beforeEach(() => {
-        parser = new JavaScriptParser();
-    });
+    const parser = new JavaScriptParser({sourceFileCache});
 
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});

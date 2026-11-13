@@ -120,7 +120,7 @@ public class AddNullMethodArgument extends Recipe {
                     args.remove(0);
                 }
 
-                Expression nullLiteral = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, "null", "null", null, JavaType.Primitive.Null);
+                Expression nullLiteral = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, null, "null", null, JavaType.Primitive.Null);
                 if (explicitCast == Boolean.TRUE) {
                     nullLiteral = new J.TypeCast(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,

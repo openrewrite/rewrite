@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
@@ -34,6 +35,51 @@ import java.util.Optional;
 @Value
 public class Annotated implements Trait<J.Annotation> {
     Cursor cursor;
+
+    /**
+     * @param attribute The name of the annotation attribute.
+     * @return The attribute's value, or empty when the attribute is not explicitly
+     * present in the source. Defaults declared on the annotation type are not resolved.
+     */
+    @Incubating(since = "8.87.0")
+    public Optional<AttributeValue> getAttributeValue(String attribute) {
+        if (getTree().getArguments() == null) {
+            return Optional.empty();
+        }
+        for (Expression argument : getTree().getArguments()) {
+            if (argument instanceof J.Assignment) {
+                J.Assignment assignment = (J.Assignment) argument;
+                if (!(assignment.getVariable() instanceof J.Identifier) ||
+                        !((J.Identifier) assignment.getVariable()).getSimpleName().equals(attribute)) {
+                    continue;
+                }
+
+                return new AttributeValue.Matcher().get(
+                        assignment.getAssignment(),
+                        new Cursor(cursor, argument)
+                );
+            } else if ("value".equals(attribute)) {
+                return new AttributeValue.Matcher().get(argument, cursor);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * @param defaultAlias The name of the annotation attribute that is aliased to
+     *                     "value", if any.
+     * @return The attribute value in any syntactic shape.
+     */
+    @Incubating(since = "8.87.0")
+    public Optional<AttributeValue> getDefaultAttributeValue(@Nullable String defaultAlias) {
+        Optional<AttributeValue> valueAttr = getAttributeValue("value");
+        if (valueAttr.isPresent()) {
+            return valueAttr;
+        }
+        return defaultAlias != null ?
+                getAttributeValue(defaultAlias) :
+                Optional.empty();
+    }
 
     /**
      * @param defaultAlias The name of the annotation attribute that is aliased to

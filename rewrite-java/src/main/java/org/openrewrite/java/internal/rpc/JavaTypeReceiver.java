@@ -144,10 +144,11 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
 
     @Override
     public JavaType visitVariable(JavaType.Variable variable, RpcReceiveQueue q) {
+        long flags = q.receive((Number) variable.getFlagsBitMap()).longValue();
         String name = q.receive(variable.getName());
         JavaType owner = q.receive(variable.getOwner(), v -> visit(v, q));
         JavaType type = q.receive(variable.getType(), v -> visit(v, q));
         List<JavaType.FullyQualified> annotations = q.receiveList(variable.getAnnotations(), v -> (JavaType.FullyQualified) visit(v, q));
-        return variable.unsafeSet(name, owner, type, arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY));
+        return variable.unsafeSet(name, flags, owner, type, arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY));
     }
 }

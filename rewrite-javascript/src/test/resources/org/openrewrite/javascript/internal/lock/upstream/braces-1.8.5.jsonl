@@ -1,0 +1,297 @@
+{"header":"braces 1.8.5: every call its own tests (test/bash.js, test/test.js) make, with its answer; generate/upstream-calls.js generate/upstream/braces.js <checkout> 1.8.5"}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["ff{c,b,a}"],"out":["ffc","ffb","ffa"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["f{d,e,f}g"],"out":["fdg","feg","ffg"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{l,n,m}xyz"],"out":["lxyz","nxyz","mxyz"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{abc\\,def}"],"out":["{abc,def}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{abc}",{"bash":true}],"out":["{abc}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["\\{a,b,c,d,e}"],"out":["{a,b,c,d,e}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{x,y,\\{a,b,c}}"],"out":["x}","y}","{a}","b}","c}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{x\\,y,\\{abc\\},trie}"],"out":["x,y","{abc}","trie"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["/usr/{ucb/{ex,edit},lib/{ex,how_ex}}"],"out":["/usr/ucb/ex","/usr/lib/ex","/usr/ucb/edit","/usr/lib/how_ex"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{}"],"out":["{}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{ }"],"out":["{","}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["}"],"out":["}"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["{"],"out":["{"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["abcd{efgh"],"out":["abcd{efgh"]}
+{"test":"test/bash.js > braces > braces","fn":"braces","args":["foo {1,2} bar"],"out":["foo","1","2","bar"]}
+{"test":"test/bash.js > braces > new sequence brace operators","fn":"braces","args":["{1..10}"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/bash.js > braces > new sequence brace operators","fn":"braces","args":["{0..10,braces}"],"out":["0..10","braces"]}
+{"test":"test/bash.js > braces > new sequence brace operators","fn":"braces","args":["{braces,{0..10}}"],"out":["braces","0","1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/bash.js > braces > new sequence brace operators","fn":"braces","args":["{{0..10},braces}"],"out":["0","braces","1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/bash.js > braces > new sequence brace operators","fn":"braces","args":["x{{0..10},braces}y"],"out":["x0y","xbracesy","x1y","x2y","x3y","x4y","x5y","x6y","x7y","x8y","x9y","x10y"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{3..3}"],"out":["3"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["x{3..3}y"],"out":["x3y"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{10..1}"],"out":["10","9","8","7","6","5","4","3","2","1"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{10..1}y"],"out":["10y","9y","8y","7y","6y","5y","4y","3y","2y","1y"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["x{10..1}y"],"out":["x10y","x9y","x8y","x7y","x6y","x5y","x4y","x3y","x2y","x1y"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{a..f}"],"out":["a","b","c","d","e","f"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{f..a}"],"out":["f","e","d","c","b","a"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{a..A}"],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{A..a}"],"out":["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","`","a"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["{f..f}"],"out":["f"]}
+{"test":"test/bash.js > braces > ranges","fn":"braces","args":["0{1..9} {10..20}"],"out":["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20"]}
+{"test":"test/bash.js > braces > mixes are incorrectly-formed brace expansions","fn":"braces","args":["{1..f}"],"out":["{1..f}"]}
+{"test":"test/bash.js > braces > mixes are incorrectly-formed brace expansions","fn":"braces","args":["{f..1}"],"out":["{f..1}"]}
+{"test":"test/bash.js > braces > do negative numbers work?","fn":"braces","args":["{-1..-10}"],"out":["-1","-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/bash.js > braces > do negative numbers work?","fn":"braces","args":["{-20..0}"],"out":["-20","-19","-18","-17","-16","-15","-14","-13","-12","-11","-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"]}
+{"test":"test/bash.js > braces > weirdly-formed brace expansions -- fixed in post-bash-3.1","fn":"braces","args":["{-1..-10}"],"out":["-1","-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/bash.js > braces > weirdly-formed brace expansions -- fixed in post-bash-3.1","fn":"braces","args":["{-20..0}"],"out":["-20","-19","-18","-17","-16","-15","-14","-13","-12","-11","-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"]}
+{"test":"test/bash.js > braces > weirdly-formed brace expansions -- fixed in post-bash-3.1","fn":"braces","args":["a-{b{d,e}}-c",{"bash":true}],"out":["a-{bd}-c","a-{be}-c"]}
+{"test":"test/bash.js > braces > weirdly-formed brace expansions -- fixed in post-bash-3.1","fn":"braces","args":["a-{bdef-{g,i}-c"],"out":["a-{bdef-g-c","a-{bdef-i-c"]}
+{"test":"test/bash.js > braces > weirdly-formed brace expansions -- fixed in post-bash-3.1","fn":"braces","args":["{\"klklkl\"}{1,2,3}"],"out":["{klklkl}1","{klklkl}2","{klklkl}3"]}
+{"test":"test/bash.js > braces > weirdly-formed brace expansions -- fixed in post-bash-3.1","fn":"braces","args":["{\"x,x\"}"],"out":["{x,x}"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{1..10..2}"],"out":["1","3","5","7","9"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{-1..-10..2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{-1..-10..-2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{10..1..-2}"],"out":["10","8","6","4","2"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{10..1..2}"],"out":["10","8","6","4","2"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{1..20..2}"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{1..20..20}"],"out":["1"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{100..0..5}"],"out":["100","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5","0"]}
+{"test":"test/bash.js > braces > numerical ranges with steps","fn":"braces","args":["{100..0..-5}"],"out":["100","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5","0"]}
+{"test":"test/bash.js > braces > alpha ranges with steps","fn":"braces","args":["{a..z}"],"out":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]}
+{"test":"test/bash.js > braces > alpha ranges with steps","fn":"braces","args":["{a..z..2}"],"out":["a","c","e","g","i","k","m","o","q","s","u","w","y"]}
+{"test":"test/bash.js > braces > alpha ranges with steps","fn":"braces","args":["{z..a..-2}"],"out":["z","x","v","t","r","p","n","l","j","h","f","d","b"]}
+{"test":"test/bash.js > braces > make sure brace expansion handles ints > 2**31 - 1 using intmax_t","fn":"braces","args":["{2147483645..2147483649}"],"out":["2147483645","2147483646","2147483647","2147483648","2147483649"]}
+{"test":"test/bash.js > braces > unwanted zero-padding -- fixed post-bash-4.0","fn":"braces","args":["{10..0..2}"],"out":["10","8","6","4","2","0"]}
+{"test":"test/bash.js > braces > unwanted zero-padding -- fixed post-bash-4.0","fn":"braces","args":["{10..0..-2}"],"out":["10","8","6","4","2","0"]}
+{"test":"test/bash.js > braces > unwanted zero-padding -- fixed post-bash-4.0","fn":"braces","args":["{-50..-0..5}"],"out":["-50","-45","-40","-35","-30","-25","-20","-15","-10","-5","0"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..10.f}"],"out":["{1..10.f}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..ff}"],"out":["{1..ff}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..10..ff}"],"out":["{1..10..ff}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1.20..2}"],"out":["{1.20..2}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..20..f2}"],"out":["{1..20..f2}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..20..2f}"],"out":["{1..20..2f}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..2f..2}"],"out":["{1..2f..2}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..ff..2}"],"out":["{1..ff..2}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..ff}"],"out":["{1..ff}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..f}"],"out":["{1..f}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..0f}"],"out":["{1..0f}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..10f}"],"out":["{1..10f}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..10.f}"],"out":["{1..10.f}"]}
+{"test":"test/bash.js > braces > bad","fn":"braces","args":["{1..10.f}"],"out":["{1..10.f}"]}
+{"test":"test/test.js > braces > brace expansion > should return an empty array when no braces are found","fn":"braces","args":[""],"out":[]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["a{,}"],"out":["a"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["{,}b"],"out":["b"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["a{,}b"],"out":["ab"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["a{,}",{"nodupes":false}],"out":["a","a"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["a{,}{,}",{"nodupes":false}],"out":["a","a","a","a"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["a{,}{,}{,}",{"nodupes":false}],"out":["a","a","a","a","a","a","a","a"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["{a,b{,}{,}{,}}",{"nodupes":false}],"out":["a","b","b","b","b","b","b","b","b"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["a{,}/{c,d}/e",{"nodupes":false}],"out":["a/c/e","a/c/e","a/d/e","a/d/e"]}
+{"test":"test/test.js > braces > brace expansion > should expand bash exponential notation","fn":"braces","args":["{a,b{,}{,}{,},c}d",{"nodupes":false}],"out":["ad","bd","bd","bd","bd","bd","bd","bd","bd","cd"]}
+{"test":"test/test.js > braces > brace expansion > should eliminate dupes in repeated strings when `nodupes` is true","fn":"braces","args":["a{,}",{"nodupes":true}],"out":["a"]}
+{"test":"test/test.js > braces > brace expansion > should eliminate dupes in repeated strings when `nodupes` is true","fn":"braces","args":["a{,}{,}",{"nodupes":true}],"out":["a"]}
+{"test":"test/test.js > braces > brace expansion > should eliminate dupes in repeated strings when `nodupes` is true","fn":"braces","args":["a{,}{,}{,}",{"nodupes":true}],"out":["a"]}
+{"test":"test/test.js > braces > brace expansion > should eliminate dupes in repeated strings when `nodupes` is true","fn":"braces","args":["{a,b{,}{,}{,}}",{"nodupes":true}],"out":["a","b"]}
+{"test":"test/test.js > braces > brace expansion > should eliminate dupes in repeated strings when `nodupes` is true","fn":"braces","args":["{a,b{,}{,}{,},c}d",{"nodupes":true}],"out":["ad","bd","cd"]}
+{"test":"test/test.js > braces > brace expansion > should eliminate dupes in repeated strings when `nodupes` is true","fn":"braces","args":["{a,b{,}{,}{,},c}d",{"nodupes":true}],"out":["ad","bd","cd"]}
+{"test":"test/test.js > braces > brace expansion > should work with no braces","fn":"braces","args":["abc"],"out":["abc"]}
+{"test":"test/test.js > braces > brace expansion > should work with no commas","fn":"braces","args":["a{b}c"],"out":["abc"]}
+{"test":"test/test.js > braces > brace expansion > should work with no commas in `bash` mode","fn":"braces","args":["a{b}c",{"bash":true}],"out":["a{b}c"]}
+{"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["0{1..9} {10..20}"],"out":["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20"]}
+{"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["a{ ,c{d, },h}x"],"out":["a{",",c{d,","},h}x"]}
+{"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["a{ ,c{d, },h} "],"out":["a{",",c{d,","},h}"]}
+{"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["/srv/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.{html,ejs}"],"out":["/srv/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.html","/srv/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.ejs"]}
+{"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["{ }"],"out":["{","}"]}
+{"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["{}"],"out":["{}"]}
+{"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["}"],"out":["}"]}
+{"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["{"],"out":["{"]}
+{"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["{,}"],"out":[]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["a-{bdef-{g,i}-c"],"out":["a-{bdef-g-c","a-{bdef-i-c"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["abc{"],"out":["abc{"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["{abc{"],"out":["{abc{"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["{abc"],"out":["{abc"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["}abc"],"out":["}abc"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["ab{c"],"out":["ab{c"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["ab{c"],"out":["ab{c"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["{{a,b}"],"out":["{a","{b"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["{a,b}}"],"out":["a}","b}"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["abcd{efgh"],"out":["abcd{efgh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["a{b{c{d,e}f}g}h"],"out":["abcdfgh","abcefgh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["f{x,y{{g,z}}h}"],"out":["fx","fygh","fyzh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["z{a,b},c}d"],"out":["za,c}d","zb,c}d"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["a{b{c{d,e}f{x,y{{g}h"],"out":["a{b{cdf{x,y{gh","a{b{cef{x,y{gh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["f{x,y{{g}h"],"out":["f{x,y{gh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["f{x,y{{g}}h"],"out":["f{x,ygh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["a{b{c{d,e}f{x,y{}g}h"],"out":["a{b{cdfxh","a{b{cefxh","a{b{cdfy{}gh","a{b{cefy{}gh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["f{x,y{}g}h"],"out":["fxh","fy{}gh"]}
+{"test":"test/test.js > braces > brace expansion > should handle imbalanced braces","fn":"braces","args":["z{a,b{,c}d"],"out":["z{a,bd","z{a,bcd"]}
+{"test":"test/test.js > braces > brace expansion > should handle invalid braces in `bash mode`:","fn":"braces","args":["a{b{c{d,e}f}g}h",{"bash":true}],"out":["a{b{cdf}g}h","a{b{cef}g}h"]}
+{"test":"test/test.js > braces > brace expansion > should handle invalid braces in `bash mode`:","fn":"braces","args":["f{x,y{{g,z}}h}",{"bash":true}],"out":["fx","fy{g}h","fy{z}h"]}
+{"test":"test/test.js > braces > brace expansion > should handle invalid braces in `bash mode`:","fn":"braces","args":["z{a,b},c}d",{"bash":true}],"out":["za,c}d","zb,c}d"]}
+{"test":"test/test.js > braces > brace expansion > should handle invalid braces in `bash mode`:","fn":"braces","args":["a{b{c{d,e}f{x,y{{g}h",{"bash":true}],"out":["a{b{cdf{x,y{{g}h","a{b{cef{x,y{{g}h"]}
+{"test":"test/test.js > braces > brace expansion > should handle invalid braces in `bash mode`:","fn":"braces","args":["f{x,y{{g}h",{"bash":true}],"out":["f{x,y{{g}h"]}
+{"test":"test/test.js > braces > brace expansion > should handle invalid braces in `bash mode`:","fn":"braces","args":["f{x,y{{g}}h",{"bash":true}],"out":["f{x,y{{g}}h"]}
+{"test":"test/test.js > braces > brace expansion > should return invalid braces:","fn":"braces","args":["{0..10,braces}"],"out":["0..10","braces"]}
+{"test":"test/test.js > braces > brace expansion > should not expand quoted strings.","fn":"braces","args":["{\"x,x\"}"],"out":["{x,x}"]}
+{"test":"test/test.js > braces > brace expansion > should not expand quoted strings.","fn":"braces","args":["{\"klklkl\"}{1,2,3}"],"out":["{klklkl}1","{klklkl}2","{klklkl}3"]}
+{"test":"test/test.js > braces > brace expansion > should work with one value","fn":"braces","args":["a{b}c"],"out":["abc"]}
+{"test":"test/test.js > braces > brace expansion > should work with one value","fn":"braces","args":["a/b/c{d}e"],"out":["a/b/cde"]}
+{"test":"test/test.js > braces > brace expansion > should work with one value in `bash` mode","fn":"braces","args":["a{b}c",{"bash":true}],"out":["a{b}c"]}
+{"test":"test/test.js > braces > brace expansion > should work with one value in `bash` mode","fn":"braces","args":["a/b/c{d}e",{"bash":true}],"out":["a/b/c{d}e"]}
+{"test":"test/test.js > braces > brace expansion > should work with nested non-sets","fn":"braces","args":["foo {1,2} bar"],"out":["foo","1","2","bar"]}
+{"test":"test/test.js > braces > brace expansion > should work with nested non-sets","fn":"braces","args":["{a-{b,c,d}}"],"out":["a-b","a-c","a-d"]}
+{"test":"test/test.js > braces > brace expansion > should work with nested non-sets","fn":"braces","args":["{a,{a-{b,c,d}}}"],"out":["a","a-b","a-c","a-d"]}
+{"test":"test/test.js > braces > brace expansion > should work with nested non-sets in `bash` mode","fn":"braces","args":["{a-{b,c,d}}",{"bash":true}],"out":["{a-b}","{a-c}","{a-d}"]}
+{"test":"test/test.js > braces > brace expansion > should work with nested non-sets in `bash` mode","fn":"braces","args":["{a,{a-{b,c,d}}}",{"bash":true}],"out":["a","{a-b}","{a-c}","{a-d}"]}
+{"test":"test/test.js > braces > brace expansion > should not expand dots with leading slashes (escaped or paths).","fn":"braces","args":["a{b,c/*/../d}e"],"out":["abe","ac/*/../de"]}
+{"test":"test/test.js > braces > brace expansion > should not expand dots with leading slashes (escaped or paths).","fn":"braces","args":["a{b,b,c/../b}d"],"out":["abd","ac/../bd"]}
+{"test":"test/test.js > braces > brace expansion > should work with commas.","fn":"braces","args":["a{b,}c"],"out":["abc","ac"]}
+{"test":"test/test.js > braces > brace expansion > should work with commas.","fn":"braces","args":["a{,b}c"],"out":["ac","abc"]}
+{"test":"test/test.js > braces > brace expansion > should expand sets","fn":"braces","args":["a/{x,y}/cde"],"out":["a/x/cde","a/y/cde"]}
+{"test":"test/test.js > braces > brace expansion > should expand sets","fn":"braces","args":["a/b/c/{x,y}"],"out":["a/b/c/x","a/b/c/y"]}
+{"test":"test/test.js > braces > brace expansion > should expand sets","fn":"braces","args":["ff{c,b,a}"],"out":["ffc","ffb","ffa"]}
+{"test":"test/test.js > braces > brace expansion > should expand sets","fn":"braces","args":["f{d,e,f}g"],"out":["fdg","feg","ffg"]}
+{"test":"test/test.js > braces > brace expansion > should expand sets","fn":"braces","args":["{l,n,m}xyz"],"out":["lxyz","nxyz","mxyz"]}
+{"test":"test/test.js > braces > brace expansion > should expand sets","fn":"braces","args":["{x,y,{abc},trie}"],"out":["x","y","abc","trie"]}
+{"test":"test/test.js > braces > brace expansion > should use `bash` mode to expand sets","fn":"braces","args":["{x,y,{abc},trie}",{"bash":true}],"out":["x","y","{abc}","trie"]}
+{"test":"test/test.js > braces > brace expansion > should expand multiple sets","fn":"braces","args":["a/{a,b}/{c,d}/e"],"out":["a/a/c/e","a/b/c/e","a/a/d/e","a/b/d/e"]}
+{"test":"test/test.js > braces > brace expansion > should expand multiple sets","fn":"braces","args":["a{b,c}d{e,f}g"],"out":["abdeg","acdeg","abdfg","acdfg"]}
+{"test":"test/test.js > braces > brace expansion > should expand multiple sets","fn":"braces","args":["a/{x,y}/c{d,e}f.{md,txt}"],"out":["a/x/cdf.md","a/y/cdf.md","a/x/cef.md","a/y/cef.md","a/x/cdf.txt","a/y/cdf.txt","a/x/cef.txt","a/y/cef.txt"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["{a,b}{{a,b},a,b}"],"out":["aa","ab","ba","bb"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["/usr/{ucb/{ex,edit},lib/{ex,how_ex}}"],"out":["/usr/ucb/ex","/usr/lib/ex","/usr/ucb/edit","/usr/lib/how_ex"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["a{b,c{d,e}f}g"],"out":["abg","acdfg","acefg"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["a{{x,y},z}b"],"out":["axb","azb","ayb"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["f{x,y{g,z}}h"],"out":["fxh","fygh","fyzh"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["a{b,c{d,e},h}x/z"],"out":["abx/z","acdx/z","ahx/z","acex/z"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["a{b,c{d,e},h}x{y,z}"],"out":["abxy","acdxy","ahxy","acexy","abxz","acdxz","ahxz","acexz"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["a{b,c{d,e},{f,g}h}x{y,z}"],"out":["abxy","acdxy","afhxy","acexy","aghxy","abxz","acdxz","afhxz","acexz","aghxz"]}
+{"test":"test/test.js > braces > brace expansion > should expand nested sets","fn":"braces","args":["a-{b{d,e}}-c"],"out":["a-bd-c","a-be-c"]}
+{"test":"test/test.js > braces > brace expansion > should use `bash` mode to expand nested sets.","fn":"braces","args":["a-{b{d,e}}-c",{"bash":true}],"out":["a-{bd}-c","a-{be}-c"]}
+{"test":"test/test.js > braces > brace expansion > should expand with globs.","fn":"braces","args":["a/b/{d,e}/*.js"],"out":["a/b/d/*.js","a/b/e/*.js"]}
+{"test":"test/test.js > braces > brace expansion > should expand with globs.","fn":"braces","args":["a/**/c/{d,e}/f*.js"],"out":["a/**/c/d/f*.js","a/**/c/e/f*.js"]}
+{"test":"test/test.js > braces > brace expansion > should expand with globs.","fn":"braces","args":["a/**/c/{d,e}/f*.{md,txt}"],"out":["a/**/c/d/f*.md","a/**/c/e/f*.md","a/**/c/d/f*.txt","a/**/c/e/f*.txt"]}
+{"test":"test/test.js > braces > brace expansion > should expand with extglobs.","fn":"braces","args":["a/b/{d,e,[1-5]}/*.js"],"out":["a/b/d/*.js","a/b/e/*.js","a/b/[1-5]/*.js"]}
+{"test":"test/test.js > braces > escaping: > should not expand strings with es6/bash-like variables.","fn":"braces","args":["abc/${ddd}/xyz"],"out":["abc/${ddd}/xyz"]}
+{"test":"test/test.js > braces > escaping: > should not expand strings with es6/bash-like variables.","fn":"braces","args":["a${b}c"],"out":["a${b}c"]}
+{"test":"test/test.js > braces > escaping: > should not expand strings with es6/bash-like variables.","fn":"braces","args":["a/{${b},c}/d"],"out":["a/${b}/d","a/c/d"]}
+{"test":"test/test.js > braces > escaping: > should not expand strings with es6/bash-like variables.","fn":"braces","args":["a${b,d}/{foo,bar}c"],"out":["a${b,d}/fooc","a${b,d}/barc"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped commas.","fn":"braces","args":["a{b\\,c}d"],"out":["a{b,c}d"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped commas.","fn":"braces","args":["a{b\\,c\\,d}e"],"out":["a{b,c,d}e"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped commas.","fn":"braces","args":["{abc\\,def}"],"out":["{abc,def}"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped commas.","fn":"braces","args":["{abc\\,def,ghi}"],"out":["abc,def","ghi"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped commas.","fn":"braces","args":["a/{b,c}/{x\\,y}/d/e"],"out":["a/b/x,y/d/e","a/c/x,y/d/e"]}
+{"test":"test/test.js > braces > escaping: > should return sets with escaped commas in `bash` mode.","fn":"braces","args":["a/{b,c}/{x\\,y}/d/e",{"bash":true}],"out":["a/b/{x,y}/d/e","a/c/{x,y}/d/e"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces.","fn":"braces","args":["{a,b\\}c,d}"],"out":["{a,b}c,d}"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces.","fn":"braces","args":["\\{a,b,c,d,e}"],"out":["{a,b,c,d,e}"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces.","fn":"braces","args":["a/{b,\\{a,b,c,d,e}/d"],"out":["a/b/d","a/{a/d","a/c/d","a/d/d","a/e/d"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces.","fn":"braces","args":["a/{b,\\{a,b,c,d,e}/d",{"nodupes":false}],"out":["a/b/d","a/{a/d","a/b/d","a/c/d","a/d/d","a/e/d"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces.","fn":"braces","args":["a/\\{b,c}/{d,e}/f"],"out":["a/{b,c}/d/f","a/{b,c}/e/f"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces.","fn":"braces","args":["./\\{x,y}/{a..z..3}/",{"makeRe":true}],"out":["./{x,y}/(a|d|g|j|m|p|s|v|y)/"]}
+{"test":"test/test.js > braces > escaping: > should not expand escaped braces or commas.","fn":"braces","args":["{x\\,y,\\{abc\\},trie}"],"out":["x,y","{abc}","trie"]}
+{"test":"test/test.js > braces > options > should remove empty values and `\\` when `options.strict` is true.","fn":"braces","args":["{a..A}",{"strict":true}],"out":["a","`","_","^","]","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A"]}
+{"test":"test/test.js > braces > custom functions > should expose the current value as the first param.","fn":"braces","args":["{1..5}",{"$":"function","name":""}],"out":["1","2","3","4","5"]}
+{"test":"test/test.js > braces > custom functions > should expose the `isNumber` boolean as the second param.","fn":"braces","args":["{a..e}",{"$":"function","name":""}],"out":["a","b","c","d","e"]}
+{"test":"test/test.js > braces > custom functions > should expose the index as the third param.","fn":"braces","args":["{a..e}",{"$":"function","name":""}],"out":["a0","b1","c2","d3","e4"]}
+{"test":"test/test.js > braces > complex > should expand a complex combination of ranges and sets:","fn":"braces","args":["a/{x,y}/{1..5}c{d,e}f.{md,txt}"],"out":["a/x/1cdf.md","a/y/1cdf.md","a/x/2cdf.md","a/y/2cdf.md","a/x/3cdf.md","a/y/3cdf.md","a/x/4cdf.md","a/y/4cdf.md","a/x/5cdf.md","a/y/5cdf.md","a/x/1cef.md","a/y/1cef.md","a/x/2cef.md","a/y/2cef.md","a/x/3cef.md","a/y/3cef.md","a/x/4cef.md","a/y/4cef.md","a/x/5cef.md","a/y/5cef.md","a/x/1cdf.txt","a/y/1cdf.txt","a/x/2cdf.txt","a/y/2cdf.txt","a/x/3cdf.txt","a/y/3cdf.txt","a/x/4cdf.txt","a/y/4cdf.txt","a/x/5cdf.txt","a/y/5cdf.txt","a/x/1cef.txt","a/y/1cef.txt","a/x/2cef.txt","a/y/2cef.txt","a/x/3cef.txt","a/y/3cef.txt","a/x/4cef.txt","a/y/4cef.txt","a/x/5cef.txt","a/y/5cef.txt"]}
+{"test":"test/test.js > braces > complex > should expand complex sets and ranges in `bash` mode:","fn":"braces","args":["a/{x,{1..5},y}/c{d}e",{"bash":true}],"out":["a/x/c{d}e","a/1/c{d}e","a/y/c{d}e","a/2/c{d}e","a/3/c{d}e","a/4/c{d}e","a/5/c{d}e"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["a{0..3}d"],"out":["a0d","a1d","a2d","a3d"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["x{10..1}y"],"out":["x10y","x9y","x8y","x7y","x6y","x5y","x4y","x3y","x2y","x1y"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["x{3..3}y"],"out":["x3y"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{-1..-10}"],"out":["-1","-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{-20..0}"],"out":["-20","-19","-18","-17","-16","-15","-14","-13","-12","-11","-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{1..10}"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{1..3}"],"out":["1","2","3"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{1..9}"],"out":["1","2","3","4","5","6","7","8","9"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{3..3}"],"out":["3"]}
+{"test":"test/test.js > range expansion > should expand numerical ranges","fn":"braces","args":["{5..8}"],"out":["5","6","7","8"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["0{a..d}0"],"out":["0a0","0b0","0c0","0d0"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["0{a..d}0"],"out":["0a0","0b0","0c0","0d0"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["a/{b..d}/e"],"out":["a/b/e","a/c/e","a/d/e"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{a..A}"],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{A..a}"],"out":["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","`","a"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{a..e}"],"out":["a","b","c","d","e"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{A..E}"],"out":["A","B","C","D","E"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{a..f}"],"out":["a","b","c","d","e","f"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{a..z}"],"out":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{E..A}"],"out":["E","D","C","B","A"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{f..a}"],"out":["f","e","d","c","b","a"]}
+{"test":"test/test.js > range expansion > should expand alphabetical ranges","fn":"braces","args":["{f..f}"],"out":["f"]}
+{"test":"test/test.js > range expansion > should use steps with alphabetical ranges","fn":"braces","args":["{a..e..2}"],"out":["a","c","e"]}
+{"test":"test/test.js > range expansion > should use steps with alphabetical ranges","fn":"braces","args":["{E..A..2}"],"out":["E","C","A"]}
+{"test":"test/test.js > range expansion > should not try to expand ranges with decimals","fn":"braces","args":["{1.1..2.1}"],"out":["{1.1..2.1}"]}
+{"test":"test/test.js > range expansion > should not try to expand ranges with decimals","fn":"braces","args":["{1.1..2.1}",{"makeRe":true}],"out":["{1.1..2.1}"]}
+{"test":"test/test.js > range expansion > should not try to expand ranges with decimals","fn":"braces","args":["{1.1..~2.1}",{"makeRe":true}],"out":["{1.1..~2.1}"]}
+{"test":"test/test.js > range expansion > should expand negative ranges","fn":"braces","args":["{z..a..-2}"],"out":["z","x","v","t","r","p","n","l","j","h","f","d","b"]}
+{"test":"test/test.js > range expansion > should expand negative ranges","fn":"braces","args":["{-10..-1}"],"out":["-10","-9","-8","-7","-6","-5","-4","-3","-2","-1"]}
+{"test":"test/test.js > range expansion > should expand negative ranges","fn":"braces","args":["{0..-5}"],"out":["0","-1","-2","-3","-4","-5"]}
+{"test":"test/test.js > range expansion > should expand negative ranges","fn":"braces","args":["{9..-4}"],"out":["9","8","7","6","5","4","3","2","1","0","-1","-2","-3","-4"]}
+{"test":"test/test.js > range expansion > should expand multiple ranges:","fn":"braces","args":["a/{b..d}/e/{f..h}"],"out":["a/b/e/f","a/c/e/f","a/d/e/f","a/b/e/g","a/c/e/g","a/d/e/g","a/b/e/h","a/c/e/h","a/d/e/h"]}
+{"test":"test/test.js > range expansion > should work with dots in file paths","fn":"braces","args":["../{1..3}/../foo"],"out":["../1/../foo","../2/../foo","../3/../foo"]}
+{"test":"test/test.js > range expansion > should make a regex-string when `options.makeRe` is defined:","fn":"braces","args":["../{1..3}/../foo",{"makeRe":true}],"out":["../[1-3]/../foo"]}
+{"test":"test/test.js > range expansion > should make a regex-string when `options.makeRe` is defined:","fn":"braces","args":["../{2..10..2}/../foo",{"makeRe":true}],"out":["../(2|4|6|8|10)/../foo"]}
+{"test":"test/test.js > range expansion > should make a regex-string when `options.makeRe` is defined:","fn":"braces","args":["../{1..3}/../{a,b,c}/foo",{"makeRe":true}],"out":["../[1-3]/../(a|b|c)/foo"]}
+{"test":"test/test.js > range expansion > should make a regex-string when `options.makeRe` is defined:","fn":"braces","args":["./{a..z..3}/",{"makeRe":true}],"out":["./(a|d|g|j|m|p|s|v|y)/"]}
+{"test":"test/test.js > range expansion > should make a regex-string when `options.makeRe` is defined:","fn":"braces","args":["./{\"x,y\"}/{a..z..3}/",{"makeRe":true}],"out":["./{x,y}/(a|d|g|j|m|p|s|v|y)/"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{-1..-10..-2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{-1..-10..2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{-50..-0..5}"],"out":["-50","-45","-40","-35","-30","-25","-20","-15","-10","-5","0"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..10..2}"],"out":["1","3","5","7","9"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..20..20}"],"out":["1"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..20..2}"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..0..-2}"],"out":["10","8","6","4","2","0"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..0..2}"],"out":["10","8","6","4","2","0"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..1..-2}"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..1..2}"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..1}"],"out":["10","9","8","7","6","5","4","3","2","1"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..1}y"],"out":["10y","9y","8y","7y","6y","5y","4y","3y","2y","1y"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{100..0..-5}"],"out":["100","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5","0"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{100..0..5}"],"out":["100","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5","0"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{a..z..2}"],"out":["a","c","e","g","i","k","m","o","q","s","u","w","y"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..10..1}"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..10..2}"],"out":["1","3","5","7","9"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..20..20}"],"out":["1"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{1..20..2}"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..1..-2}"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{10..1..2}"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{2..10..1}"],"out":["2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{2..10..2}"],"out":["2","4","6","8","10"]}
+{"test":"test/test.js > range expansion > should expand ranges using steps:","fn":"braces","args":["{2..10..3}"],"out":["2","5","8"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-1..-10..-2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-1..-10..2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-10..-2..2}"],"out":["-10","-8","-6","-4","-2"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-2..-10..1}"],"out":["-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-2..-10..2}"],"out":["-2","-4","-6","-8","-10"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-2..-10..3}"],"out":["-2","-5","-8"]}
+{"test":"test/test.js > range expansion > should expand negative ranges using steps:","fn":"braces","args":["{-9..9..3}"],"out":["-9","-6","-3","0","3","6","9"]}
+{"test":"test/test.js > range expansion > should expand mixed ranges and sets:","fn":"braces","args":["x{{0..10},braces}y"],"out":["x0y","xbracesy","x1y","x2y","x3y","x4y","x5y","x6y","x7y","x8y","x9y","x10y"]}
+{"test":"test/test.js > range expansion > should expand mixed ranges and sets:","fn":"braces","args":["{{0..10},braces}"],"out":["0","braces","1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > range expansion > should expand mixed ranges and sets:","fn":"braces","args":["{2147483645..2147483649}"],"out":["2147483645","2147483646","2147483647","2147483648","2147483649"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1.20..2}"],"out":["{1.20..2}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..0f}"],"out":["{1..0f}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..10..ff}"],"out":["{1..10..ff}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..10.f}"],"out":["{1..10.f}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..10f}"],"out":["{1..10f}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..20..2f}"],"out":["{1..20..2f}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..20..f2}"],"out":["{1..20..f2}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..2f..2}"],"out":["{1..2f..2}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..ff..2}"],"out":["{1..ff..2}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..ff}"],"out":["{1..ff}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{1..f}"],"out":["{1..f}"]}
+{"test":"test/test.js > range expansion > should return invalid ranges:","fn":"braces","args":["{f..1}"],"out":["{f..1}"]}
+{"test":"differences","fn":"braces","args":["a{b,c}d",{"makeRe":true}],"out":["a(b|c)d"]}
+{"test":"differences","fn":"braces","args":["{a,b}{c,d}",{"makeRe":true}],"out":["(a|b)(c|d)"]}
+{"test":"differences","fn":"braces","args":["a\\{b,c}",{"makeRe":true}],"out":["a{b,c}"]}
+{"test":"differences","fn":"braces","args":["{1..3}",{"makeRe":true}],"out":["[1-3]"]}
+{"test":"differences","fn":"braces","args":["{a..c}",{"makeRe":true}],"out":["[a-c]"]}
+{"test":"differences","fn":"braces","args":["{01..03}",{"makeRe":true}],"out":["[01-02-03]"]}
+{"test":"differences","fn":"braces","args":["{1..10..3}",{"makeRe":true}],"out":["(1|4|7|10)"]}
+{"test":"differences","fn":"braces","args":["a/{b,c}/d",{"makeRe":true}],"out":["a/(b|c)/d"]}
+{"test":"differences","fn":"braces","args":["{,a}",{"makeRe":true}],"out":["(|a)"]}
+{"test":"differences","fn":"braces","args":["{a,}",{"makeRe":true}],"out":["(a|)"]}
+{"test":"differences","fn":"braces","args":["${a,b}",{"makeRe":true}],"out":["${a,b}"]}
+{"test":"differences","fn":"braces","args":["{a,b",{"makeRe":true}],"out":["{a,b"]}
+{"test":"differences","fn":"braces","args":["{\"a,b\"}",{"makeRe":true}],"out":["{a,b}"]}
+{"test":"differences","fn":"braces","args":["{a..e..x}",{"makeRe":true}],"out":["[a-e]"]}
+{"test":"differences","fn":"braces","args":["{a,b}/{c,d}/{e,f}",{"makeRe":true}],"out":["(a|b)/(c|d)/(e|f)"]}
+{"test":"differences","fn":"braces","args":["a{1..3}b",{"makeRe":true}],"out":["a[1-3]b"]}
+{"test":"differences","fn":"braces","args":["{-1..2}",{"makeRe":true}],"out":["-1","0","1","2"]}
+{"test":"differences","fn":"braces","args":["{a..A}",{"makeRe":true}],"out":["(a|_|Z|Y|X|W|V|U|T|S|R|Q|P|O|N|M|L|K|J|I|H|G|F|E|D|C|B|A)"]}
+{"test":"differences","fn":"braces","args":["{1..2}{a,b}",{"makeRe":true}],"out":["[1-2](a|b)"]}
+{"test":"differences","fn":"braces","args":["a/**/{b,c}.js",{"makeRe":true}],"out":["a/**/(b|c).js"]}
+{"test":"differences","fn":"braces","args":["{[a],b}",{"makeRe":true}],"out":["([a]|b)"]}
+{"test":"differences","fn":"braces","args":["{(a|b),c}",{"makeRe":true}],"out":["((a|b)|c)"]}
+{"test":"differences","fn":"braces","args":["{a,b}c{d,e}",{"makeRe":true}],"out":["(a|b)c(d|e)"]}
+{"test":"differences","fn":"braces","args":["{a,{b,c}}",{"makeRe":true}],"out":["(a|(b|c))"]}
+{"test":"differences","fn":"braces","args":["{3..1}",{"makeRe":true}],"out":["(3|2|1)"]}

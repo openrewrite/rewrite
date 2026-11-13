@@ -16,12 +16,17 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.xml.Assertions.xml;
 
 class UsesTypeTest implements RewriteTest {
 
@@ -447,6 +452,259 @@ class UsesTypeTest implements RewriteTest {
               import java.util.ArrayList;
               class Test {
                   ArrayList<String> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeInDottedForm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Outer.Inner", false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeInBinaryForm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Outer$Inner", false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Mid.Inner", "a.b.Outer$Mid$Inner", "a.b.Outer.Mid$Inner"})
+    void doublyNestedType(String type) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Mid {
+                      public static class Inner {}
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Mid.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Mid.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void topLevelTypeMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Other", false))),
+          java(
+            """
+              package a.b;
+              public class Thing {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Thing;
+              class Test {
+                  Thing t;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageSegmentStartingUppercase() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.B.Thing", false))),
+          java(
+            """
+              package a.B;
+              public class Thing {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.B.Thing;
+              class Test {
+                  Thing t;
+              }
+              """,
+            """
+              /*~~>*/import a.B.Thing;
+              class Test {
+                  Thing t;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedTypeReference(String type) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
+          xml(
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                  <bean id="abc" class="a.b.Outer$Inner"/>
+              </beans>
+              """,
+            """
+              <!--~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                  <bean id="abc" class="a.b.Outer$Inner"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedImportCountsAsUse() {
+        // Spring Boot 4's migration removed spring-boot-starter-aop when AspectJ types did not resolve
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.ProceedingJoinPoint", false)))
+            .typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)), // no AspectJ
+          java(
+            """
+              import org.aspectj.lang.ProceedingJoinPoint;
+              import org.aspectj.lang.annotation.Around;
+
+              class LoggingAspect {
+                  @Around("execution(* *(..))")
+                  Object log(ProceedingJoinPoint pjp) throws Throwable {
+                      return pjp.proceed();
+                  }
+              }
+              """,
+            """
+              /*~~>*/import org.aspectj.lang.ProceedingJoinPoint;
+              import org.aspectj.lang.annotation.Around;
+
+              class LoggingAspect {
+                  @Around("execution(* *(..))")
+                  Object log(ProceedingJoinPoint pjp) throws Throwable {
+                      return pjp.proceed();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"org.aspectj..*", "org.aspectj.lang.annotation.*", "org.aspectj.lang.annotation.A*"})
+    void unresolvedImportMatchesPatterns(String pattern) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(pattern, false)))
+            .typeValidationOptions(TypeValidation.all().identifiers(false)), // no AspectJ
+          java(
+            """
+              import org.aspectj.lang.annotation.Aspect;
+
+              @Aspect
+              class LoggingAspect {
+              }
+              """,
+            """
+              /*~~>*/import org.aspectj.lang.annotation.Aspect;
+
+              @Aspect
+              class LoggingAspect {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedImportOfAnotherTypeOrAPackageIsNotAUse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.annotation.Aspect", false))),
+          java(
+            """
+              import org.aspectj.lang.annotation.*;
+              import org.aspectj.lang.ProceedingJoinPoint;
+
+              class NotQuiteAnAspect {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void resolvedImportIsMatchedByTypeAsBefore() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collections", false))),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
               }
               """
           )

@@ -24,9 +24,12 @@ import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
+import org.openrewrite.groovy.service.GroovySourceFileStatementService;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.SourceFileStatementService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -156,6 +159,8 @@ public interface G extends J {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyAutoFormatService.class.getName());
                 } else if (WhitespaceValidationService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyWhitespaceValidationService.class.getName());
+                } else if (SourceFileStatementService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovySourceFileStatementService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
@@ -320,15 +325,33 @@ public interface G extends J {
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
+                // Groovy permits statements before imports, for example Jenkins' @Library declaration.
+                // Keep those statements (and their leading license comments) before the import block.
+                int insertionIdx = 0;
+                for (JRightPadded<Statement> statement : t.statements) {
+                    if (statement.getElement() instanceof J.Import) {
+                        break;
+                    }
+                    insertionIdx++;
+                }
+                if (insertionIdx == t.statements.size()) {
+                    insertionIdx = 0;
+                }
+                List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
+                if (insertionIdx > 0 && !imports.isEmpty()) {
+                    // Java import layout assumes imports start the file and may clear this space.
+                    String beforeImports = originalImports.get(0).getElement().getPrefix().getWhitespace();
+                    imports = ListUtils.mapFirst(imports, i -> i.map(imp ->
+                            imp.withPrefix(imp.getPrefix().withWhitespace(beforeImports))));
+                }
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.Import))
                         .collect(toList());
                 //noinspection unchecked
-                statements.addAll(0, imports.stream()
+                statements.addAll(insertionIdx, imports.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(toList()));
 
-                List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
                 if (originalImports.size() != imports.size()) {
                     return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
                 } else {
@@ -370,6 +393,7 @@ public interface G extends J {
     final class ExpressionStatement implements G, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -682,6 +706,7 @@ public interface G extends J {
     @Data
     @With
     final class GString implements G, Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
@@ -707,6 +732,7 @@ public interface G extends J {
         @Data
         @With
         public static final class Value implements G {
+            @EqualsAndHashCode.Include
             UUID id;
             Markers markers;
             J tree;

@@ -1,0 +1,173 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * Licensed under the Moderne Source Available License (the "License");
+ * See https://docs.moderne.io/licensing/moderne-source-available-license
+ */
+using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.Rpc;
+using OpenRewrite.Java;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
+
+namespace OpenRewrite.Tests.Rpc;
+
+public class PrepareRecipeTreeTest
+{
+    private sealed class ChildRecipe : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Child";
+        public override string Description => "Child recipe.";
+        public override JavaVisitor<ExecutionContext> GetVisitor() => new CSharpVisitor<ExecutionContext>();
+    }
+
+    private sealed class ParentRecipe : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Parent";
+        public override string Description => "Parent composite recipe.";
+        public override List<global::OpenRewrite.Core.Recipe> GetRecipeList() => [new ChildRecipe()];
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_ReturnsConfiguredChildTree()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new ParentRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var parent = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(ParentRecipe).FullName!
+        });
+
+        Assert.Single(parent.RecipeList);
+        var child = parent.RecipeList[0];
+        Assert.Equal(typeof(ChildRecipe).FullName, child.Descriptor.Name);
+        Assert.NotEqual(parent.Id, child.Id);
+        Assert.False(string.IsNullOrEmpty(child.EditVisitor));
+    }
+
+    private sealed class ChildWithRequiredOption : global::OpenRewrite.Core.Recipe
+    {
+        [global::OpenRewrite.Core.Option(DisplayName = "Required thing", Description = "A required option.")]
+        public string? RequiredThing { get; set; }
+
+        public override string DisplayName => "Child with required option";
+        public override string Description => "Child recipe with a required option.";
+        public override JavaVisitor<ExecutionContext> GetVisitor() => new CSharpVisitor<ExecutionContext>();
+    }
+
+    private sealed class ParentMissingChildOption : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Parent missing child option";
+        public override string Description => "Composite whose child is missing a required option.";
+        public override List<global::OpenRewrite.Core.Recipe> GetRecipeList() => [new ChildWithRequiredOption()];
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_ThrowsWhenAChildIsMissingARequiredOption()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new ParentMissingChildOption(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(ParentMissingChildOption).FullName! }));
+
+        Assert.Contains("RequiredThing", ex.Message);
+        Assert.Contains("Missing required option", ex.Message);
+    }
+
+    private sealed class SetsText : global::OpenRewrite.Core.Recipe
+    {
+        [global::OpenRewrite.Core.Option(DisplayName = "Text", Description = "Text value.")]
+        public string? Text { get; set; }
+
+        public override string DisplayName => "Sets text";
+        public override string Description => "A recipe with a text option.";
+        public override JavaVisitor<ExecutionContext> GetVisitor() => new CSharpVisitor<ExecutionContext>();
+    }
+
+    private sealed class CompositeSameType : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Composite with same-type children";
+        public override string Description => "A composite with distinct-option children of one type.";
+        public override List<global::OpenRewrite.Core.Recipe> GetRecipeList() =>
+            [new SetsText { Text = "a" }, new SetsText { Text = "b" }, new SetsText { Text = "c" }];
+    }
+
+    /// <summary>
+    /// A composite whose GetRecipeList() yields multiple instances of the same recipe class with
+    /// different option values must keep each prepared child a distinct instance with its own
+    /// options, rather than collapsing them.
+    /// </summary>
+    [Fact]
+    public async Task PrepareRecipe_SameTypeChildrenPreserveDistinctOptions()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new CompositeSameType(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var parent = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(CompositeSameType).FullName!
+        });
+
+        Assert.Equal(3, parent.RecipeList.Count);
+        Assert.Equal(3, parent.RecipeList.Select(c => c.Id).Distinct().Count());
+        Assert.All(parent.RecipeList, c => Assert.Equal(typeof(SetsText).FullName, c.Descriptor.Name));
+        var texts = parent.RecipeList
+            .Select(c => c.Descriptor.Options.Single(o => o.Name == "Text").Value)
+            .ToList();
+        Assert.Equal(new object?[] { "a", "b", "c" }, texts);
+    }
+
+    private sealed class EitherOptionRecipe : global::OpenRewrite.Core.Recipe
+    {
+        [global::OpenRewrite.Core.Option(DisplayName = "First", Description = "First alternative.",
+            Required = false)]
+        public string? First { get; set; }
+
+        [global::OpenRewrite.Core.Option(DisplayName = "Second", Description = "Second alternative.",
+            Required = false)]
+        public string? Second { get; set; }
+
+        public override string DisplayName => "Either option";
+        public override string Description => "A recipe needing at least one of two optional options.";
+
+        public override IEnumerable<string> Validate()
+        {
+            if (string.IsNullOrEmpty(First) && string.IsNullOrEmpty(Second))
+                yield return "At least one of `First` or `Second` must be set.";
+        }
+
+        public override JavaVisitor<ExecutionContext> GetVisitor() => new CSharpVisitor<ExecutionContext>();
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_ThrowsWhenRecipeValidateReportsAProblem()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new EitherOptionRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(EitherOptionRecipe).FullName! }));
+
+        Assert.Contains("At least one of `First` or `Second` must be set.", ex.Message);
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_SucceedsWhenRecipeValidatePasses()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new EitherOptionRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var prepared = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(EitherOptionRecipe).FullName!,
+            Options = new Dictionary<string, object?> { ["First"] = "value" }
+        });
+
+        Assert.Equal(typeof(EitherOptionRecipe).FullName, prepared.Descriptor.Name);
+    }
+}

@@ -28,6 +28,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -72,11 +73,12 @@ public class NormalizeDockerHubImageName extends Recipe {
         return new DockerFrom.Matcher()
                 .excludeScratch()
                 .asVisitor(image -> {
-                    if (image.getImageName() == null) {
+                    Optional<String> imageName = image.getImageName();
+                    if (!imageName.isPresent()) {
                         return image.getTree();
                     }
 
-                    Matcher matcher = DOCKER_HUB_PATTERN.matcher(image.getImageName());
+                    Matcher matcher = DOCKER_HUB_PATTERN.matcher(imageName.get());
                     if (!matcher.matches()) {
                         return image.getTree();
                     }

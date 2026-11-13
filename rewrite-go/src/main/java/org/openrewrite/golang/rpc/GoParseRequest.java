@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.Parse;
 import org.openrewrite.rpc.request.RpcRequest;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Go-specific Parse RPC payload. Mirrors the rewrite-core {@code Parse}
@@ -52,4 +53,12 @@ public class GoParseRequest implements RpcRequest {
      */
     @Nullable
     String goModContent;
+
+    /**
+     * Parser options the Go server interprets, keyed as in {@link org.openrewrite.ExecutionContext}.
+     * The only key today is {@code REQUIRE_PRINT_EQUALS_INPUT}, which the server treats
+     * as enabled when absent.
+     */
+    @Nullable
+    Map<String, String> options;
 }

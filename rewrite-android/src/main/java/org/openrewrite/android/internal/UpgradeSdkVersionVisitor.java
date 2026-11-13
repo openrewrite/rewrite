@@ -30,10 +30,12 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.IntPredicate;
+
+import static java.util.Collections.singletonList;
+import static java.util.Collections.unmodifiableList;
 
 /**
  * Visitor scaffolding shared by {@code UpgradeCompileSdkVersion},
@@ -85,7 +87,7 @@ public class UpgradeSdkVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     public List<Finding> getFindings() {
-        return Collections.unmodifiableList(findings);
+        return unmodifiableList(findings);
     }
 
     public static boolean isBuildGradle(@Nullable SourceFile sf) {
@@ -127,7 +129,7 @@ public class UpgradeSdkVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
                     J.Literal newLit = ((J.Literal) arg)
                             .withValue(newValue)
                             .withValueSource(String.valueOf(newValue));
-                    return method.withArguments(Collections.singletonList(newLit));
+                    return method.withArguments(singletonList(newLit));
                 }
                 if (mutate && finding != null && finding.source.getKind() == SdkVersionValueSource.Kind.LITERAL_STRING) {
                     J.Literal lit = (J.Literal) arg;
@@ -136,7 +138,7 @@ public class UpgradeSdkVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
                     String src = lit.getValueSource();
                     String quote = src == null || src.isEmpty() ? "\"" : src.substring(0, 1);
                     J.Literal newLit = lit.withValue(newStr).withValueSource(quote + newStr + quote);
-                    return method.withArguments(Collections.singletonList(newLit));
+                    return method.withArguments(singletonList(newLit));
                 }
                 if (mutate && finding != null && finding.source.getKind() == SdkVersionValueSource.Kind.UNRESOLVED) {
                     return Markup.warn(method, new IllegalStateException(

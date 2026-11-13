@@ -28,6 +28,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.Input
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.Opcodes
+import org.objectweb.asm.TypeReference
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodNode
 import java.io.File
@@ -153,7 +154,16 @@ abstract class GenerateLanguageScopesTask @Inject constructor() : DefaultTask() 
             descriptor = m.desc,
             nodeInternalName = nodeInternal,
             returnInternalName = retInternal,
+            nullableReturn = m.returnsNullable(),
         )
+    }
+
+    /** Whether the return type carries a `@Nullable`, as a type-use annotation or on the method itself. */
+    private fun MethodNode.returnsNullable(): Boolean {
+        val returnTypeAnnotations = (visibleTypeAnnotations.orEmpty() + invisibleTypeAnnotations.orEmpty())
+            .filter { TypeReference(it.typeRef).sort == TypeReference.METHOD_RETURN && it.typePath == null }
+        val methodAnnotations = visibleAnnotations.orEmpty() + invisibleAnnotations.orEmpty()
+        return (returnTypeAnnotations + methodAnnotations).any { it.desc.endsWith("/Nullable;") }
     }
 
     private fun splitDescriptor(desc: String): Pair<List<String>, String>? {
@@ -236,9 +246,10 @@ public class ${lang.scopeName} internal constructor() : LanguageScope() {""")
             val nodeFqn = m.nodeInternalName.replace('/', '.').replace('$', '.')
             val retFqn = m.returnInternalName.replace('/', '.').replace('$', '.')
             val key = (m.methodName + ":" + m.descriptor).replace("$", "\\$")
-            // The return type of the underlying visitor may be a wider J (e.g.
-            // JavaVisitor.visitMethodInvocation returns J, action returns
-            // J.MethodInvocation). Cast accordingly.
+            // The override returns the visitor method's own return type, which
+            // may be a wider J (e.g. JavaVisitor.visitMethodInvocation returns J,
+            // action returns J.MethodInvocation). Only a @Nullable return needs a
+            // cast, to the non-null type the override declares.
             //
             // Action shape is a receiver-style function type
             // `<Visitor>.(Node) -> Node`, which on the JVM compiles to
@@ -248,7 +259,8 @@ public class ${lang.scopeName} internal constructor() : LanguageScope() {""")
             sb.appendLine("        override fun ${m.methodName}(node: $nodeFqn, ctx: ExecutionContext): $retFqn {")
             sb.appendLine("            val action = actions[\"$key\"] as? ((Any, Any) -> Any)")
             sb.appendLine("            val transformed = if (action != null) action(this, node) as $nodeFqn else node")
-            sb.appendLine("            return super.${m.methodName}(transformed, ctx) as $retFqn")
+            val cast = if (m.nullableReturn) " as $retFqn" else ""
+            sb.appendLine("            return super.${m.methodName}(transformed, ctx)$cast")
             sb.appendLine("        }")
             sb.appendLine()
         }
@@ -345,4 +357,5 @@ private data class VisitMethod(
     val descriptor: String,
     val nodeInternalName: String,
     val returnInternalName: String,
+    val nullableReturn: Boolean,
 )

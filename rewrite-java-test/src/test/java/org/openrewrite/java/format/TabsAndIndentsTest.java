@@ -16,14 +16,19 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
@@ -56,6 +61,75 @@ class TabsAndIndentsTest implements RewriteTest {
               )
             )
           )));
+    }
+
+    @Test
+    void formatChangedControlWithOriginalLoopCursor() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop.Control visitForControl(J.ForLoop.Control control, ExecutionContext ctx) {
+                  J.VariableDeclarations declaration = (J.VariableDeclarations) control.getInit().getFirst();
+                  J.VariableDeclarations.NamedVariable variable = declaration.getVariables().getFirst();
+                  J.Literal initializer = (J.Literal) variable.getInitializer();
+                  if (Integer.valueOf(0).equals(initializer.getValue())) {
+                      declaration = declaration.withVariables(List.of(variable.withInitializer(
+                        initializer.withValue(1).withValueSource("1"))));
+                      control = control.withInit(List.of(declaration));
+                  }
+                  return (J.ForLoop.Control) new AutoFormatVisitor<ExecutionContext>()
+                    .visitNonNull(control, ctx, getCursor().getParentTreeCursor());
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 0;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 1;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void formatMultilineForSubtree() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                  return autoFormat(forLoop, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j=handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j = handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """
+          )
+        );
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
@@ -696,7 +770,7 @@ class TabsAndIndentsTest implements RewriteTest {
               label2:
               for (int i = 0; i < 5; i++) doSomething(i);
               }
-              switch (a) {
+              switch (x) {
               case 0:
               doCase0();
               break;
@@ -749,7 +823,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                   label2:
                                   for (int i = 0; i < 5; i++) doSomething(i);
                               }
-                              switch (a) {
+                              switch (x) {
                                   case 0:
                                       doCase0();
                                       break;
@@ -932,6 +1006,137 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void forEachLoop() {
+        rewriteRun(
+          autoFormat(style -> style.withContinuationIndent(2)),
+          java(
+            """
+              import java.util.List;
+              public class Test {
+                  public void test(List<String> list) {
+                  for (
+                   String s
+                   :
+                   list
+                  ) {
+                  }
+                  for (String s :
+                   list) {
+                  }
+                  for (String s
+                   : list) {
+                  }
+                  labeled: for (String s :
+                   list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              public class Test {
+                  public void test(List<String> list) {
+                      for (
+                        String s
+                        :
+                        list
+                      ) {
+                      }
+                      for (String s :
+                        list) {
+                      }
+                      for (String s
+                        : list) {
+                      }
+                      labeled: for (String s :
+                        list) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoopWithLambdaInIterable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.function.Supplier;
+
+              public class Test {
+                  public void test(Supplier<List<String>> supplier) {
+                  for (String s : get(() -> {
+                  return List.of("a");
+                  })) {
+                  }
+                  }
+                  List<String> get(Supplier<List<String>> supplier) {
+                      return supplier.get();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.function.Supplier;
+
+              public class Test {
+                  public void test(Supplier<List<String>> supplier) {
+                      for (String s : get(() -> {
+                          return List.of("a");
+                      })) {
+                      }
+                  }
+                  List<String> get(Supplier<List<String>> supplier) {
+                      return supplier.get();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoopVariableWithModifierOrAnnotationOnOwnLine() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                  for (final
+                   String s : list) {
+                  }
+                  for (@SuppressWarnings("unused")
+                   String s
+                   : list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                      for (final
+                              String s : list) {
+                      }
+                      for (@SuppressWarnings("unused")
+                              String s
+                              : list) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodDeclaration() {
         rewriteRun(
           autoFormat(style -> style.withContinuationIndent(2)),
@@ -1069,7 +1274,6 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -1609,8 +1813,7 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
-              import java.lang.annotation.Retention;
-              @Retention
+              @SuppressWarnings
               (value = "1.0")
               public
               class
@@ -1641,9 +1844,8 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
-              import java.lang.annotation.Retention;
               
-              @Retention
+              @SuppressWarnings
                       (value = "1.0")
               public
               class
@@ -1814,7 +2016,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void failure1() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all()
+            .identifiers(false).methodDeclarations(false).methodInvocations(false).constructorInvocations(false)),
           java(
             """
               public class Test {
@@ -2446,7 +2649,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               public record RenameRequest(
@@ -2740,6 +2943,36 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void textBlockBlankLinesAreNotIndented() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+
+                    AND YES
+                    ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                          YES
+
+                          AND YES
+                          ""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void textBlocksNotAlignedTabs() {
         rewriteRun(
           autoFormat(
@@ -2767,6 +3000,61 @@ class TabsAndIndentsTest implements RewriteTest {
               \t\t\t""\"
               \t\t\t\t\tNO
               \t\t\t\t\t""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8096")
+    @Test
+    void ternaryAsLambdaBodyArgument() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+
+              class A {
+                  Optional<String> repository(String in) {
+                      return Optional.of(in);
+                  }
+
+                  public String convert(String in) {
+                      var optionalConverter = repository(in);
+                      return optionalConverter.map(arg -> arg.isEmpty()
+                              ? in.toLowerCase()
+                              : in
+                      ).orElse(in);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void nonPositiveTabSize(int tabSize) {
+        rewriteRun(
+          // Autodetect derives the indent size from the tab size, so both are non-positive together, leaving no width to indent by
+          autoFormat(style -> style.withUseTabCharacter(true).withTabSize(tabSize).withIndentSize(tabSize)),
+          java(
+            """
+              class Test {
+              \tvoid m() {
+              \t\tif (true) {
+              int n = 0;
+              \t\t}
+              \t}
+              }
+              """,
+            """
+              class Test {
+              void m() {
+              if (true) {
+              int n = 0;
+              }
+              }
               }
               """
           )

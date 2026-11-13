@@ -38,6 +38,21 @@ public interface VersionComparator extends Comparator<String> {
 
     int compare(@Nullable String currentVersion, String v1, String v2);
 
+    /**
+     * The highest of {@code availableVersions} this selector admits, in its original spelling,
+     * first-seen candidate winning ties. Unlike {@link #upgrade}, not constrained to exceed a
+     * current version.
+     */
+    default Optional<String> maxSatisfying(Collection<String> availableVersions) {
+        String best = null;
+        for (String candidate : availableVersions) {
+            if (isValid(null, candidate) && (best == null || compare(null, candidate, best) > 0)) {
+                best = candidate;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
     default Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
         boolean seen = false;
         String best = null;
@@ -67,19 +82,23 @@ public interface VersionComparator extends Comparator<String> {
         boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
         String versionMeta = parsed.qualifier();
         if (requireMeta) {
-            return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
+            if (versionMeta != null && versionMeta.matches(metadataPattern)) {
+                return true;
+            }
+        } else if (versionMeta == null || !requireRelease) {
             return true;
-        } else if (requireRelease) {
+        } else {
             String lowercaseVersionMeta = versionMeta.toLowerCase();
             for (String suffix : RELEASE_SUFFIXES) {
                 if (suffix.equals(lowercaseVersionMeta)) {
                     return true;
                 }
             }
-            return false;
         }
-        return true;
+
+        // A backpatch is admitted wherever the version it patches is.
+        String patchedVersion = parsed.patchedVersion();
+        return patchedVersion != null && checkVersion(patchedVersion, metadataPattern, requireRelease);
     }
 
 }

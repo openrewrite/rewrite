@@ -36,7 +36,7 @@ public abstract class GradleTraitMatcher<U extends Trait<?>> extends SimpleTrait
         return maybeGp.orElse(null);
     }
 
-    protected boolean withinBlock(Cursor cursor, String name) {
+    protected static boolean withinBlock(Cursor cursor, String name) {
         Cursor parentCursor = cursor.getParent();
         while (parentCursor != null) {
             if (parentCursor.getValue() instanceof J.MethodInvocation) {

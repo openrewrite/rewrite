@@ -21,6 +21,9 @@ import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 // ScanningRecipe extends Recipe with a two-phase scan-then-edit pattern.
 // The first phase collects data across all source files into an accumulator,
 // and the second phase uses that accumulated data to make transformations.
+// The accumulator stays in memory until the cycle ends, so it should hold
+// values such as coordinates, paths and ids, not trees or other
+// recipe.Heavyweight objects.
 //
 // Implementations use `any` for the accumulator type and cast internally:
 //
@@ -56,7 +59,6 @@ type ScanningRecipe interface {
 	Generate(acc any, ctx *ExecutionContext) []java.Tree
 }
 
-// ScanningBase provides default implementations for optional ScanningRecipe methods.
 // Embed it in your scanning recipe struct.
 type ScanningBase struct {
 	Base

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
 using OpenRewrite.Core;
@@ -87,7 +86,7 @@ public class PluginLoadContextTest : IDisposable
             """);
 
         _publishDir = Path.Combine(_pluginDir, "publish");
-        RunDotnet($"publish \"{Path.Combine(_pluginDir, "TestPlugin.csproj")}\" -c Release -o \"{_publishDir}\"");
+        DotnetCli.Run($"publish \"{Path.Combine(_pluginDir, "TestPlugin.csproj")}\" -c Release -o \"{_publishDir}\"");
     }
 
     public void Dispose()
@@ -182,29 +181,5 @@ public class PluginLoadContextTest : IDisposable
         Assert.Single(recipes);
         Assert.Equal("TestPlugin.TestRecipe", recipes[0].Name);
         Assert.Equal("Test recipe from plugin", recipes[0].DisplayName);
-    }
-
-    private static void RunDotnet(string arguments)
-    {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
-
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
-        }
     }
 }

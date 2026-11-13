@@ -38,7 +38,7 @@ namespace OpenRewrite.CSharp;
 /// </summary>
 public class DotNetBuildContext
 {
-    private const string ContextKey = "org.openrewrite.csharp.DotNetBuildContext";
+    internal const string ContextKey = "org.openrewrite.csharp.DotNetBuildContext";
 
     /// <summary>
     /// File extensions and names that are needed for a correct dotnet restore.
@@ -52,7 +52,9 @@ public class DotNetBuildContext
 
     private static readonly HashSet<string> BuildFileNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "nuget.config"
+        "nuget.config",
+        // Needed so legacy projects can be reattested (synthesized restore graph) after edits.
+        "packages.config"
     };
 
     /// <summary>
@@ -151,11 +153,9 @@ public class DotNetBuildContext
                 try
                 {
                     var content = File.ReadAllText(file);
-                    // Normalize to forward slashes for consistency with SourcePath
-                    var normalizedPath = relativePath.Replace(Path.DirectorySeparatorChar, '/');
                     lock (_lock)
                     {
-                        _diskFiles.TryAdd(normalizedPath, content);
+                        _diskFiles.TryAdd(relativePath, content);
                     }
                 }
                 catch (Exception ex)
@@ -183,6 +183,11 @@ public class DotNetBuildContext
     /// <summary>
     /// Writes all captured files to the given root directory, preserving
     /// their relative path structure. LST documents are printed at this point.
+    /// Entries excluded or superseded by LSTs are not validated or written. All remaining
+    /// paths are validated before any directories or files are created. Paths must be
+    /// relative paths without drive prefixes or parent segments. Native Windows separators
+    /// are accepted on Windows; backslashes on other hosts are rejected conservatively.
+    /// This provides lexical containment, not symlink or filesystem race protection.
     /// </summary>
     /// <param name="rootDir">The directory to write files into.</param>
     /// <param name="exclude">Optional path to exclude (e.g., the .csproj already written by the caller).</param>
@@ -199,7 +204,11 @@ public class DotNetBuildContext
         // Collect all paths that have LST versions (they take precedence)
         var lstPaths = new HashSet<string>(lstFiles.Keys, StringComparer.OrdinalIgnoreCase);
 
-        // Write disk-captured files first (skipping any that have LST versions)
+        var root = Path.GetFullPath(rootDir);
+        var pending = new List<(string Destination, string? Content, Document? Document)>();
+
+        // Select and validate the complete snapshot before performing any writes.
+        // Preserve disk/LST precedence and exclusion using the original path keys.
         foreach (var (relativePath, content) in diskFiles)
         {
             if (exclude != null && string.Equals(relativePath, exclude, StringComparison.OrdinalIgnoreCase))
@@ -207,23 +216,43 @@ public class DotNetBuildContext
             if (lstPaths.Contains(relativePath))
                 continue;
 
-            WriteFile(rootDir, relativePath, content);
+            pending.Add((ResolveDestination(root, relativePath), content, null));
         }
 
-        // Write LST-captured files (printed at materialization time)
+        // Select LST-captured files (printed at materialization time)
         foreach (var (relativePath, doc) in lstFiles)
         {
             if (exclude != null && string.Equals(relativePath, exclude, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var content = XmlParser.Print(doc);
-            WriteFile(rootDir, relativePath, content);
+            pending.Add((ResolveDestination(root, relativePath), null, doc));
+        }
+
+        foreach (var (destination, content, document) in pending)
+        {
+            WriteFile(destination, document == null ? content! : XmlParser.Print(document));
         }
     }
 
-    private static void WriteFile(string rootDir, string relativePath, string content)
+    internal static string ResolveDestination(string root, string relativePath)
     {
-        var fullPath = Path.Combine(rootDir, relativePath);
+        // Check Windows syntax on every host as well as the host's own rooted syntax.
+        if (string.IsNullOrWhiteSpace(relativePath) || relativePath.Contains('\0') ||
+            (!OperatingSystem.IsWindows() && relativePath.Contains('\\')) || relativePath.Contains(':') ||
+            relativePath.Replace('\\', '/').StartsWith('/') || Path.IsPathRooted(relativePath) ||
+            relativePath.Replace('\\', '/').Split('/').Contains(".."))
+            throw new ArgumentException("Captured build file path must be a supported relative path without parent segments.", nameof(relativePath));
+
+        var destination = Path.GetFullPath(Path.Combine(root, relativePath));
+        var prefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!destination.StartsWith(prefix, comparison) || destination.Equals(root, comparison))
+            throw new ArgumentException("Captured build file path must resolve beneath the materialization root.", nameof(relativePath));
+        return destination;
+    }
+
+    private static void WriteFile(string fullPath, string content)
+    {
         var dir = Path.GetDirectoryName(fullPath);
         if (dir != null)
             Directory.CreateDirectory(dir);

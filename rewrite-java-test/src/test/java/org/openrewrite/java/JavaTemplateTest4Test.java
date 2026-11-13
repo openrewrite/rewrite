@@ -314,6 +314,49 @@ class JavaTemplateTest4Test implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("UnusedAssignment")
+    @Test
+    void replaceStatementInBlockPreservesLeadingBlankLine() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  var statement = method.getBody().getStatements().get(1);
+                  if (statement instanceof J.Unary) {
+                      return JavaTemplate.builder("n = 2;\nn = 3;")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), statement.getCoordinates().replace());
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  int n;
+                  void test() {
+                      n = 1;
+
+                      n++;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int n;
+                  void test() {
+                      n = 1;
+
+                      n = 2;
+                      n = 3;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void beforeStatementInBlock() {
         rewriteRun(

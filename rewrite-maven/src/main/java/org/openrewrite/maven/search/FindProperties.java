@@ -81,9 +81,12 @@ public class FindProperties extends Recipe {
 
                 Optional<String> value = t.getValue();
                 if (value.isPresent() && propertyUsageMatcher.matcher(value.get()).matches()) {
-                    //noinspection unchecked
-                    t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
-                            SearchResult.found(v, getResolutionResult().getPom().getValue(value.get()))));
+                    String resolvedValue = getResolutionResult().getPom().getValue(value.get());
+                    if (valueMatcher == null || (resolvedValue != null && valueMatcher.matcher(resolvedValue).matches())) {
+                        //noinspection unchecked
+                        t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
+                                SearchResult.found(v, resolvedValue)));
+                    }
                 }
                 return t;
             }
@@ -97,8 +100,7 @@ public class FindProperties extends Recipe {
      */
     public static Set<Xml.Tag> find(Xml.Document xml, String propertyPattern) {
         Pattern propertyMatcher = Pattern.compile(propertyPattern);
-        Set<Xml.Tag> found = new HashSet<>();
-        new MavenVisitor<Set<Xml.Tag>>() {
+        return new MavenVisitor<Set<Xml.Tag>>() {
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> tags) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, tags);
@@ -107,7 +109,6 @@ public class FindProperties extends Recipe {
                 }
                 return t;
             }
-        }.visit(xml, found);
-        return found;
+        }.reduce(xml, new HashSet<>());
     }
 }

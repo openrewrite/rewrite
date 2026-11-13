@@ -23,6 +23,7 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
 
+import static java.util.Collections.singletonMap;
 import static org.openrewrite.internal.ListUtils.concat;
 
 @Value
@@ -58,7 +59,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 }
                 return literal;
             }
-        }.visitNonNull(doc, upgrades, cursor);
+        }.visitNonNull(doc, upgrades, cursor.getParentOrThrow());
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
             result = result.withMarkers(result.getMarkers().setByType(updatedMarker));
@@ -139,7 +140,7 @@ public class PyProjectFile implements PythonDependencyFile {
 
                 return a.getPadding().withValues(newPadded);
             }
-        }.visitNonNull(doc, normalizedNames, cursor);
+        }.visitNonNull(doc, normalizedNames, cursor.getParentOrThrow());
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -172,7 +173,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 String newSpec = buildChangedSpec(spec, depName, newPackageName, newVersion);
                 return literal.withSource("\"" + newSpec + "\"").withValue(newSpec);
             }
-        }.visitNonNull(doc, 0, cursor);
+        }.visitNonNull(doc, 0, cursor.getParentOrThrow());
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -236,10 +237,10 @@ public class PyProjectFile implements PythonDependencyFile {
                     current.marker, entry.getKey(), scope, null);
             if (existing == null) {
                 current = current.withAddedDependencies(
-                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+                        singletonMap(entry.getKey(), entry.getValue()), scope, null);
             } else {
                 current = current.withUpgradedVersions(
-                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+                        singletonMap(entry.getKey(), entry.getValue()), scope, null);
             }
         }
         return current;
@@ -403,7 +404,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 }
                 return literal;
             }
-        }.visitNonNull(doc, packageMessages, cursor);
+        }.visitNonNull(doc, packageMessages, cursor.getParentOrThrow());
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }

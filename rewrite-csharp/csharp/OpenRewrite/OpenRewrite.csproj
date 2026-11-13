@@ -14,6 +14,7 @@
     <PackageProjectUrl>https://docs.openrewrite.org</PackageProjectUrl>
     <RepositoryUrl>https://github.com/openrewrite/rewrite</RepositoryUrl>
     <PackageTags>openrewrite;refactoring;csharp;dotnet</PackageTags>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
     <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
@@ -22,28 +23,54 @@
     <!-- CS3021: need a CLSCompliant attribute because the assembly does not have a CLSCompliant attribute -->
     <!-- CA2255: ModuleInitializer used in library code is intentional for RPC type-name registration. -->
     <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114;CS8602;CS8603;CS8604;CS3021;CA2255</NoWarn>
+
+    <!-- Always emit a ref assembly. Consumers reference us as a ProjectReference (via symlink) -->
+    <!-- and MSBuild's reduced target set during cross-project compile expects obj/.../ref/OpenRewrite.dll. -->
+<!--    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>-->
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="NuGet.Frameworks" Version="6.12.4" />
-    <PackageReference Include="NuGet.Versioning" Version="6.12.4" />
+    <PackageReference Include="NuGet.Frameworks" Version="7.9.0" />
+    <PackageReference Include="NuGet.Versioning" Version="7.9.0" />
+    <!-- In-process NuGet restore (PackageSpec/DependencyGraphSpec -> RestoreRunner -> LockFile).
+         Commands transitively supplies ProjectModel, Protocol, Packaging, Configuration, Common. -->
+    <PackageReference Include="NuGet.Commands" Version="7.9.0" />
+    <!-- In-process MSBuild: .sln parsing (SolutionFile.Parse) and restore-graph evaluation
+         (NuGetResolver). Tasks.Core/Utilities.Core carry the task assemblies the SDK targets
+         load; without them evaluation fails with MSB4062. MSBuildLocator.Register* is not
+         needed with these versions - see MSBuildEnvironment in NuGetResolver.cs. -->
+    <PackageReference Include="Microsoft.Build" Version="18.9.6" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.9.6" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.9.6" />
+    <!-- Overrides the 10.0.10 that Microsoft.Build.Tasks.Core pulls in, for CVE-2026-96958,
+         CVE-2026-96959, CVE-2026-96960, CVE-2026-84008 and CVE-2026-70162. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.3.0" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.3.0" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.6.0" PrivateAssets="none" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-    <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
+    <PackageReference Include="StreamJsonRpc" Version="2.25.29" />
+    <!-- Overrides the 2.5.302 that StreamJsonRpc pulls in, for CVE-2026-92707. -->
+    <PackageReference Include="MessagePack" Version="2.5.307" />
+    <!-- Overrides the 1.2.4 that StreamJsonRpc pulls in, for GHSA-grf3-jgmf-2g5j. -->
+    <PackageReference Include="Nerdbank.MessagePack" Version="1.3.88" />
     <!-- xunit (assertion/fixture API only) is consumed by the public Test/ helpers (RewriteTest, RpcFixture, ...). -->
     <!-- The runner packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio) live in the sibling OpenRewrite.Tests project. -->
     <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.3" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.4" PrivateAssets="none" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Moderne Source Available License, shipped at the nupkg root (see PackageLicenseFile). -->
+  <ItemGroup>
+    <None Include="../../LICENSE.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>

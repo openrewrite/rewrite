@@ -23,6 +23,7 @@ import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.OmitBraces;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeAscriptionColonPrefix;
+import org.openrewrite.scala.marker.UnicodeArrow;
 import org.openrewrite.scala.tree.S;
 
 import java.util.ArrayList;
@@ -141,7 +142,7 @@ public final class ScalaTryBuilder {
                         Tree.randomId(), Space.EMPTY, Markers.EMPTY, nameId, Collections.emptyList(), null, null);
                 J.VariableDeclarations varDecl = new J.VariableDeclarations(Tree.randomId(), c.getPrefix(), Markers.EMPTY,
                         Collections.emptyList(), Collections.emptyList(), typeTree, beforeColon,
-                        Collections.emptyList(), Collections.singletonList(JRightPadded.build(namedVar)));
+                        Collections.singletonList(JRightPadded.build(namedVar)));
                 // For the first catch the J.Try printer emits the catch keyword then the brace, so its
                 // parameter prefix carries the space before `{`; subsequent catches don't reprint it.
                 Space controlPrefix = i == 0 ? blockPrefix : Space.EMPTY;
@@ -149,7 +150,10 @@ public final class ScalaTryBuilder {
                         Tree.randomId(), controlPrefix, Markers.EMPTY,
                         JRightPadded.build(varDecl).withAfter(labelRp.getAfter()));
                 Space catchPrefix = i == 0 ? beforeCatch : c.getPrefix();
-                catchList.add(new J.Try.Catch(Tree.randomId(), catchPrefix, Markers.EMPTY, controlParens, caseBody));
+                Markers catchMarkers = c.getMarkers().findFirst(UnicodeArrow.class)
+                        .map(Markers.EMPTY::add)
+                        .orElse(Markers.EMPTY);
+                catchList.add(new J.Try.Catch(Tree.randomId(), catchPrefix, catchMarkers, controlParens, caseBody));
             }
             // The space before the closing `}` lives on the cases-block end; in J.Try it belongs to
             // the last catch body's end space.

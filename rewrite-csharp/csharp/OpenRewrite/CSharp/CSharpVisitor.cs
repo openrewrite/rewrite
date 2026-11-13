@@ -47,6 +47,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             IsPattern ip => VisitIsPattern(ip, p),
             StatementExpression se => VisitStatementExpression(se, p),
             SizeOf sof => VisitSizeOf(sof, p),
+            TypeOf tof => VisitTypeOf(tof, p),
             UnsafeStatement us => VisitUnsafeStatement(us, p),
             FixedStatement fs => VisitFixedStatement(fs, p),
             PointerType pt => VisitPointerType(pt, p),
@@ -144,6 +145,38 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         };
     }
 
+    /// <summary>
+    /// Registers an <see cref="AddUsing{P}"/> after-visitor (once per type) that adds
+    /// <c>using &lt;namespace&gt;;</c> for the namespace of
+    /// <paramref name="fullyQualifiedTypeName"/> when the current source file has been fully
+    /// visited — the C# counterpart of Java's <c>maybeAddImport</c>. No-op when the using is
+    /// already present, when the type is not referenced by its simple name (unless
+    /// <paramref name="onlyIfReferenced"/> is false), or when the file already binds the simple
+    /// name to a different type.
+    /// </summary>
+    public void MaybeAddUsing(string fullyQualifiedTypeName, bool onlyIfReferenced = true)
+    {
+        MaybeDoAfterVisit(new AddUsing<P>(fullyQualifiedTypeName, onlyIfReferenced));
+    }
+
+    public override Marker VisitMarker(Marker marker, P p)
+    {
+        if (marker is TrailingComma trailingComma)
+        {
+            return trailingComma.WithSuffix(VisitSpace(trailingComma.Suffix, p));
+        }
+        if (marker is Struct structMarker)
+        {
+            return structMarker.WithPrefix(VisitSpace(structMarker.Prefix, p));
+        }
+        if (marker is RecordClass recordClass)
+        {
+            return recordClass.WithPrefix(VisitSpace(recordClass.Prefix, p));
+        }
+
+        return base.VisitMarker(marker, p);
+    }
+
     public virtual J VisitCompilationUnit(CompilationUnit compilationUnit, P p)
     {
         return compilationUnit
@@ -166,6 +199,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not UsingDirective node) return stmtResult;
 
         return node
+            .WithGlobal(VisitRightPadded(node.Global, p)!)
+            .WithStatic(VisitLeftPadded(node.Static, p)!)
+            .WithUnsafe(VisitLeftPadded(node.Unsafe, p))
             .WithAlias(VisitRightPadded(node.Alias, p))
             .WithNamespaceOrType((TypeTree)Visit(node.NamespaceOrType, p)!);
     }
@@ -181,6 +217,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithTypeExpression((TypeTree)Visit(node.TypeExpression, p)!)
             .WithInterfaceSpecifier(VisitRightPadded(node.InterfaceSpecifier, p))
             .WithName((Identifier)Visit(node.Name, p)!)
@@ -200,6 +237,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
+            .WithKind(VisitLeftPadded(node.Kind, p)!)
             .WithBody((Block?)Visit(node.Body, p))
             .WithExpressionBody(VisitLeftPadded(node.ExpressionBody, p));
     }
@@ -294,7 +333,21 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (exprResult is not SizeOf node) return exprResult;
 
         return node
-            .WithExpression((Expression)Visit(node.Expression, p)!)
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
+            .WithType((JavaType?)VisitType(node.Type, p));
+    }
+
+    public virtual J VisitTypeOf(TypeOf typeOf, P p)
+    {
+        typeOf = typeOf
+            .WithPrefix(VisitSpace(typeOf.Prefix, p))
+            .WithMarkers(VisitMarkers(typeOf.Markers, p));
+
+        var exprResult = VisitExpression(typeOf, p);
+        if (exprResult is not TypeOf node) return exprResult;
+
+        return node
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
             .WithType((JavaType?)VisitType(node.Type, p));
     }
 
@@ -404,6 +457,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithReturnType((TypeTree?)Visit(node.ReturnType, p))
             .WithLambdaExpression((Lambda)VisitLambda(node.LambdaExpression, p)!);
     }
@@ -418,6 +472,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (exprResult is not RelationalPattern node) return exprResult;
 
         return node
+            .WithOperator(VisitLeftPadded(node.Operator, p)!)
             .WithValue((Expression)Visit(node.Value, p)!);
     }
 
@@ -442,6 +497,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithPrefix(VisitSpace(ctp.Prefix, p))
             .WithMarkers(VisitMarkers(ctp.Markers, p))
             .WithAttributeLists(ListUtils.Map(ctp.AttributeLists, al => Visit(al, p) as AttributeList))
+            .WithVariance(VisitLeftPadded(ctp.Variance, p))
             .WithName((Identifier)Visit(ctp.Name, p)!)
             .WithWhereConstraint(VisitLeftPadded(ctp.WhereConstraint, p))
             .WithConstraints(VisitContainer(ctp.Constraints, p))
@@ -573,6 +629,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not PragmaWarningDirective node) return stmtResult;
 
         return node
+            .WithKeywordSpacing(VisitSpace(node.KeywordSpacing, p))
+            .WithActionSpacing(VisitSpace(node.ActionSpacing, p))
             .WithWarningCodes(ListUtils.Map(node.WarningCodes, c => VisitRightPadded(c, p)));
     }
 
@@ -585,7 +643,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var stmtResult = VisitStatement(pragmaChecksumDirective, p);
         if (stmtResult is not PragmaChecksumDirective node) return stmtResult;
 
-        return node;
+        return node.WithKeywordSpacing(VisitSpace(node.KeywordSpacing, p));
     }
 
     public virtual J VisitNullableDirective(NullableDirective nullableDirective, P p)
@@ -788,6 +846,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithTypeExpressionPadded(VisitLeftPadded(node.TypeExpressionPadded, p)!)
             .WithName((Identifier)Visit(node.Name, p)!)
             .WithInterfaceSpecifier(VisitRightPadded(node.InterfaceSpecifier, p))
@@ -805,6 +864,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithLeft((Expression)Visit(node.Left, p)!)
+            .WithOperator(VisitLeftPadded(node.Operator, p)!)
             .WithRight((Expression)Visit(node.Right, p)!)
             .WithType((JavaType?)VisitType(node.Type, p));
     }
@@ -856,7 +916,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not UsingStatement node) return stmtResult;
 
         return node
-            .WithExpressionPadded(VisitLeftPadded(node.ExpressionPadded, p)!)
+            .WithExpression((ControlParentheses<Expression>)Visit(node.Expression, p)!)
             .WithStatement((Statement)Visit(node.Statement, p)!);
     }
 
@@ -974,6 +1034,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (exprResult is not CsUnary node) return exprResult;
 
         return node
+            .WithOperator(VisitLeftPadded(node.Operator, p)!)
             .WithExpression((Expression)Visit(node.Expression, p)!)
             .WithType((JavaType?)VisitType(node.Type, p));
     }
@@ -1128,6 +1189,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not IndexerDeclaration node) return stmtResult;
 
         return node
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithTypeExpression((TypeTree)Visit(node.TypeExpression, p)!)
             .WithExplicitInterfaceSpecifier(VisitRightPadded(node.ExplicitInterfaceSpecifier, p))
             .WithIndexer((Expression)Visit(node.Indexer, p)!)
@@ -1147,6 +1209,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithAttributes(ListUtils.Map(node.Attributes, al => Visit(al, p) as AttributeList))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithReturnType(VisitLeftPadded(node.ReturnType, p)!)
             .WithIdentifierName((Identifier)Visit(node.IdentifierName, p)!)
             .WithTypeParameters(VisitContainer(node.TypeParameters, p))
@@ -1163,11 +1226,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not ConversionOperatorDeclaration node) return stmtResult;
 
         return node
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
+            .WithKind(VisitLeftPadded(node.Kind, p)!)
             .WithInterfaceSpecifier(VisitRightPadded(node.InterfaceSpecifier, p))
             .WithReturnType(VisitLeftPadded(node.ReturnType, p)!)
             .WithParameters(VisitContainer(node.Parameters, p)!)
             .WithExpressionBody(VisitLeftPadded(node.ExpressionBody, p))
-            .WithBody((Block?)Visit(node.Body, p));
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
     public virtual J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
@@ -1181,9 +1247,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithExplicitInterfaceSpecifier(VisitRightPadded(node.ExplicitInterfaceSpecifier, p))
             .WithOperatorKeyword((Keyword)Visit(node.OperatorKeyword, p)!)
             .WithCheckedKeyword((Keyword?)Visit(node.CheckedKeyword, p))
+            .WithOperatorToken(VisitLeftPadded(node.OperatorToken, p)!)
             .WithReturnType((TypeTree)Visit(node.ReturnType, p)!)
             .WithParameters(VisitContainer(node.Parameters, p)!)
             .WithBody((Block)Visit(node.Body, p)!)
@@ -1203,6 +1271,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithAttributeLists(node.AttributeLists != null
                 ? ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList)
                 : null)
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithNamePadded(VisitLeftPadded(node.NamePadded, p)!)
             .WithBaseType(VisitLeftPadded(node.BaseType, p))
             .WithMembers(VisitContainer(node.Members, p));
@@ -1456,6 +1525,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (exprResult is not FunctionPointerType node) return exprResult;
 
         return node
+            .WithCallingConvention(VisitLeftPadded(node.CallingConvention, p))
             .WithUnmanagedCallingConventionTypes(VisitContainer(node.UnmanagedCallingConventionTypes, p))
             .WithParameterTypes(VisitContainer(node.ParameterTypes, p)!)
             .WithType((JavaType?)VisitType(node.Type, p));
@@ -1512,13 +1582,20 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
+        FormattingListener.BeforeFormat(tree, null, cursor);
+
         // Full CU formatting — do it immediately, no benefit to deferring
         if (tree is CompilationUnit cu)
             return (T)(J)RoslynFormatter.Format(cu);
 
-        _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
-        _deferredFormat.Add(tree);
-        MaybeDoAfterVisit(_deferredFormat);
+        // One per source file: what an earlier file registered must not format or restore nodes of this one
+        var deferredFormat = GetAfterVisit().OfType<RoslynFormatter.DeferredFormatVisitor<P>>().FirstOrDefault();
+        if (deferredFormat == null)
+        {
+            deferredFormat = new RoslynFormatter.DeferredFormatVisitor<P>();
+            DoAfterVisit(deferredFormat);
+        }
+        deferredFormat.Add(tree, cursor);
         return tree;
     }
 
@@ -1542,8 +1619,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var visitor = new AutoFormatVisitor<int>(stopAfter);
         return visitor.Format(after, cursor) as T ?? after;
     }
-
-    private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
 }
 
 /// <summary>

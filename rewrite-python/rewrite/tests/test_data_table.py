@@ -27,6 +27,7 @@ from rewrite.data_table import (
     InMemoryDataTableStore,
     CsvDataTableStore,
     DATA_TABLE_STORE,
+    sanitize_scope,
 )
 
 
@@ -166,7 +167,8 @@ class TestCsvDataTableStore:
             assert lines[0].startswith("# @name ")
             assert lines[1].startswith("# @instanceName ")
             assert lines[2].startswith("# @group")
-            assert lines[3] == "Source Path,Text"
+            # Column NAMES, not display names (matches the Java writer).
+            assert lines[3] == "source_path,text"
             assert lines[4] == "src/foo.py,hello"
             assert lines[5] == "src/bar.py,world"
 
@@ -211,3 +213,181 @@ class TestCsvDataTableStore:
             file_key = store._file_key(table)
             assert store.row_counts[file_key] == 2
             assert file_key in store.table_names
+
+    def test_writes_prefix_and_suffix_columns(self):
+        """Prefix/suffix columns appear in the header and on every row."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = CsvDataTableStore(
+                tmpdir,
+                {"repositoryOrigin": "github.com/acme/example"},
+                {"organization": "acme"},
+            )
+            table = DataTable[SampleRow](
+                "org.openrewrite.test.TestTable",
+                "Test Table",
+                "A test data table.",
+                SampleRow,
+            )
+            ctx = InMemoryExecutionContext()
+
+            store.insert_row(table, ctx, SampleRow("src/foo.py", "written"))
+
+            file_key = store._file_key(table)
+            with open(os.path.join(tmpdir, file_key + ".csv")) as f:
+                content = f.read()
+
+            lines = content.strip().split("\n")
+            assert lines[3] == "repositoryOrigin,source_path,text,organization"
+            assert lines[4] == "github.com/acme/example,src/foo.py,written,acme"
+
+    def test_two_stores_share_one_file_with_single_header(self):
+        """Two writers share one file; the header is written once (keyed on file existence)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            a = CsvDataTableStore(tmpdir, {"repositoryOrigin": "github.com/acme/x"})
+            b = CsvDataTableStore(tmpdir, {"repositoryOrigin": "github.com/acme/x"})
+            table = DataTable[SampleRow](
+                "org.openrewrite.test.TestTable",
+                "Test Table",
+                "A test data table.",
+                SampleRow,
+            )
+            ctx = InMemoryExecutionContext()
+
+            a.insert_row(table, ctx, SampleRow("a.py", "A"))
+            b.insert_row(table, ctx, SampleRow("b.py", "B"))
+
+            file_key = a._file_key(table)
+            with open(os.path.join(tmpdir, file_key + ".csv")) as f:
+                content = f.read()
+
+            header_lines = [
+                line for line in content.split("\n")
+                if line.startswith("repositoryOrigin,")
+            ]
+            assert len(header_lines) == 1
+            assert "a.py" in content
+            assert "b.py" in content
+
+
+class TestFileKeyMatchesJava:
+    """File key must mirror org.openrewrite.CsvDataTableStore#fileKey so Java and Python recipes share a filename."""
+
+    def test_default_table_uses_bare_fully_qualified_name(self):
+        """A default table (instance_name == display_name) resolves to the bare FQN, not '<name>--<suffix>'."""
+        table = DataTable[SampleRow](
+            "org.openrewrite.table.TextMatches",
+            "Text matches",
+            "Text matches.",
+            SampleRow,
+        )
+        assert table.instance_name == table.display_name
+        assert CsvDataTableStore._file_key(table) == "org.openrewrite.table.TextMatches"
+
+    def test_custom_instance_name_appends_sanitized_suffix(self):
+        """A customized instance name gets a '--<sanitize(instanceName)>' suffix."""
+        table = DataTable[SampleRow](
+            "org.openrewrite.test.TestTable",
+            "Test Table",
+            "A test data table.",
+            SampleRow,
+        )
+        table.instance_name = "Custom Name"
+        # 'Custom Name' -> 'custom-name' + '-' + first 4 hex of sha256('Custom Name')
+        assert (
+            CsvDataTableStore._file_key(table)
+            == "org.openrewrite.test.TestTable--custom-name-3ee9"
+        )
+
+    def test_grouped_table_appends_sanitized_group(self):
+        """A grouped table keys off the group, which takes precedence over the instance name."""
+        table = DataTable[SampleRow](
+            "org.openrewrite.test.TestTable",
+            "Test Table",
+            "A test data table.",
+            SampleRow,
+        )
+        table.group = "org.openrewrite.table.SharedDeprecations"
+        table.instance_name = "Custom Name"
+        assert (
+            CsvDataTableStore._file_key(table)
+            == "org.openrewrite.test.TestTable--org-openrewrite-table-dca0"
+        )
+
+    def test_group_equal_to_name_uses_bare_name(self):
+        """When the group equals the table's own name, the bare name is returned (no suffix)."""
+        table = DataTable[SampleRow](
+            "org.openrewrite.test.TestTable",
+            "Test Table",
+            "A test data table.",
+            SampleRow,
+        )
+        table.group = "org.openrewrite.test.TestTable"
+        assert CsvDataTableStore._file_key(table) == "org.openrewrite.test.TestTable"
+
+    def test_sanitize_scope_is_byte_identical_to_java(self):
+        """sanitize() must be byte-identical to Java: truncate-to-30-at-last-dash + 4-hex sha256 of the original value."""
+        assert sanitize_scope("Custom Name") == "custom-name-3ee9"
+        assert (
+            sanitize_scope("org.openrewrite.table.SharedDeprecations")
+            == "org-openrewrite-table-dca0"
+        )
+        assert (
+            sanitize_scope(
+                "A very long custom instance name that exceeds thirty characters"
+            )
+            == "a-very-long-custom-instance-321f"
+        )
+
+
+class TestSetDataTableStoreHandler:
+    """Tests for the SetDataTableStore RPC handshake (only configuration is conveyed, not rows)."""
+
+    def test_reconstructs_csv_store_that_writes_prefix_columns(self):
+        from rewrite.rpc import server
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assert server.handle_set_data_table_store({
+                "kind": "CSV",
+                "outputDir": tmpdir,
+                "prefixColumns": {"repositoryOrigin": "github.com/acme/example"},
+                "suffixColumns": {},
+            }) is True
+
+            store = server._configured_data_table_store
+            assert isinstance(store, CsvDataTableStore)
+
+            table = DataTable[SampleRow](
+                "org.openrewrite.test.TestTable",
+                "Test Table",
+                "A test data table.",
+                SampleRow,
+            )
+            ctx = InMemoryExecutionContext()
+            store.insert_row(table, ctx, SampleRow("src/foo.py", "written"))
+
+            file_key = store._file_key(table)
+            with open(os.path.join(tmpdir, file_key + ".csv")) as f:
+                content = f.read()
+
+            assert "repositoryOrigin" in content
+            assert "github.com/acme/example,src/foo.py,written" in content
+
+    def test_noop_does_not_write_to_disk(self):
+        from rewrite.rpc import server
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            assert server.handle_set_data_table_store({"kind": "NOOP"}) is True
+
+            store = server._configured_data_table_store
+            assert isinstance(store, InMemoryDataTableStore)
+
+            table = DataTable[SampleRow](
+                "org.openrewrite.test.TestTable",
+                "Test Table",
+                "A test data table.",
+                SampleRow,
+            )
+            ctx = InMemoryExecutionContext()
+            store.insert_row(table, ctx, SampleRow("src/foo.py", "dropped"))
+
+            assert [f for f in os.listdir(tmpdir) if f.endswith(".csv")] == []

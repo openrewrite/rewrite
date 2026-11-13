@@ -1,0 +1,2219 @@
+{
+ "pairs": [
+  {
+   "path": "node_modules",
+   "pattern": "**/node_modules/**",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "node_modules/a",
+   "pattern": "**/node_modules/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/node_modules",
+   "pattern": "**/node_modules/**",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/node_modules/b",
+   "pattern": "**/node_modules/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "node_modules/",
+   "pattern": "**/node_modules/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "x/node_modules/",
+   "pattern": "**/node_modules/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/*/",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "packages/a/",
+   "pattern": "packages/*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a/",
+   "pattern": "packages/*/",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/.a",
+   "pattern": "packages/*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "packages/.a",
+   "pattern": "packages/.*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": ".git/a",
+   "pattern": "**",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "",
+   "pattern": "*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "",
+   "pattern": "**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "",
+   "pattern": "",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "#a",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "x",
+   "pattern": "{x,y}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "x3",
+   "pattern": "x{1..5}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "x03",
+   "pattern": "x{01..05}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/\\*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/*",
+   "pattern": "a/\\*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/[!b]",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/c",
+   "pattern": "a/[!b]",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/[^b]",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/[[:alpha:]]",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/1",
+   "pattern": "a/[[:alpha:]]",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/1",
+   "pattern": "a/[[:digit:]]",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "A/B",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a//b",
+   "pattern": "a/b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a//b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "./a",
+   "pattern": "a",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a",
+   "pattern": "./a",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/b/c",
+   "pattern": "a/**/c",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/c",
+   "pattern": "a/**/c",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/.b/c",
+   "pattern": "a/**/c",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/b/.c",
+   "pattern": "a/**/.c",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c",
+   "pattern": "a/**/**/c",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/**/b/**",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/b/",
+   "pattern": "a/**/b/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c",
+   "pattern": "a/**/b/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a/**",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/",
+   "pattern": "a/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "ab",
+   "pattern": "a*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a.b",
+   "pattern": "a*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": ".b",
+   "pattern": "*b",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": ".b",
+   "pattern": ".*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": ".",
+   "pattern": ".",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "..",
+   "pattern": "..",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": ".",
+   "pattern": "*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "..",
+   "pattern": ".*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/..",
+   "pattern": "a/*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/..",
+   "pattern": "a/**",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/../b",
+   "pattern": "a/**/b",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "x",
+   "pattern": "x/",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a\\b",
+   "pattern": "a\\\\b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "aXb",
+   "pattern": "a[X-Z]b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a-b",
+   "pattern": "a[-]b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a]b",
+   "pattern": "a[]]b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "[a",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "[a",
+   "pattern": "[a",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "ab",
+   "pattern": "a{b",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a{b",
+   "pattern": "a{b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a{}",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a{}",
+   "pattern": "a{}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "ab",
+   "pattern": "a{,b}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a{,b}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a$b",
+   "pattern": "a$b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "a/**/b/**/d",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/x/d",
+   "pattern": "a/**/b/**/d",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/x/b/d",
+   "pattern": "a/**/b/**/d",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "**/c/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "**/d",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "a/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "**/b/c/d",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "a/*/*/*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b/c/d",
+   "pattern": "a/*/*",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a.js",
+   "pattern": "*.js",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a.js",
+   "pattern": "*.JS",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": ".a.js",
+   "pattern": "*.js",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/b.js",
+   "pattern": "**/*.js",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a-b",
+   "pattern": "packages/*-*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a b",
+   "pattern": "packages/* *",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "@scope/x",
+   "pattern": "@*/*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "pkg",
+   "pattern": "p?g",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "pkg",
+   "pattern": "p??g",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "péché",
+   "pattern": "p?ch?",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/b/..",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a",
+   "pattern": "a/b/..",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a/b",
+   "pattern": "a/b/.",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a/b/.",
+   "pattern": "a/b/.",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "!packages/a",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "packages/b",
+   "pattern": "!packages/a",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "!!packages/a",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "apps/x",
+   "pattern": "{packages,apps}/*",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/x/y",
+   "pattern": "{packages,apps}/**",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a1",
+   "pattern": "a{1,2}{,x}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a2x",
+   "pattern": "a{1,2}{,x}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "ab",
+   "pattern": "a{b,{c,d}}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "ad",
+   "pattern": "a{b,{c,d}}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a{b",
+   "pattern": "a\\{b",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a{,}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "abc",
+   "pattern": "a{b}c",
+   "options": {},
+   "matches": false
+  },
+  {
+   "path": "a{b}c",
+   "pattern": "a{b}c",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "a-1",
+   "pattern": "a-{1..1}",
+   "options": {},
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/a/b",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/a/b",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a/b",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true
+   },
+   "matches": false
+  },
+  {
+   "path": "packages/a/b",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": false
+  },
+  {
+   "path": "/",
+   "pattern": "anything",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "/",
+   "pattern": "anything",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/*/",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/*/",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a/",
+   "pattern": "packages/a/",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a/",
+   "pattern": "packages/a/",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a/**/b",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a/**/b",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a/x",
+   "pattern": "a/**/b",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a/x",
+   "pattern": "a/**/b",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a/x",
+   "pattern": "a/**",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a/x",
+   "pattern": "a/**",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "**/b",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "**/b",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "",
+   "pattern": "a/b",
+   "options": {
+    "partial": true
+   },
+   "matches": false
+  },
+  {
+   "path": "",
+   "pattern": "a/b",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": false
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true
+   },
+   "matches": true
+  },
+  {
+   "path": "packages/a",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "x",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true
+   },
+   "matches": false
+  },
+  {
+   "path": "x",
+   "pattern": "packages/*",
+   "options": {
+    "partial": true,
+    "windowsPathsNoEscape": true
+   },
+   "matches": false
+  },
+  {
+   "path": "a/b",
+   "pattern": "a\\b",
+   "options": {
+    "windowsPathsNoEscape": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "a\\b",
+   "options": {
+    "windowsPathsNoEscape": true
+   },
+   "matches": false
+  },
+  {
+   "path": ".a",
+   "pattern": "*",
+   "options": {
+    "dot": true
+   },
+   "matches": true
+  },
+  {
+   "path": ".",
+   "pattern": "*",
+   "options": {
+    "dot": true
+   },
+   "matches": false
+  },
+  {
+   "path": "..",
+   "pattern": "*",
+   "options": {
+    "dot": true
+   },
+   "matches": false
+  },
+  {
+   "path": "a/.b/c",
+   "pattern": "a/**/c",
+   "options": {
+    "dot": true
+   },
+   "matches": true
+  },
+  {
+   "path": "#a",
+   "pattern": "#a",
+   "options": {
+    "nocomment": true
+   },
+   "matches": true
+  },
+  {
+   "path": "a",
+   "pattern": "!a",
+   "options": {
+    "nonegate": true
+   },
+   "matches": false
+  },
+  {
+   "path": "!a",
+   "pattern": "!a",
+   "options": {
+    "nonegate": true
+   },
+   "matches": true
+  }
+ ],
+ "layouts": [
+  {
+   "name": "mixed",
+   "manifests": {
+    "packages/a": "{\"name\":\"a\"}",
+    "packages/b": "{\"name\":\"@s/b\"}",
+    "packages/b/nested": "{\"name\":\"nested\"}",
+    "packages/.hidden": "{\"name\":\"hidden\"}",
+    "apps/x": "{\"name\":\"x\"}",
+    "apps/x/node_modules/y": "{\"name\":\"y\"}",
+    "node_modules/z": "{\"name\":\"z\"}",
+    "lib/low": "{\"name\":\"low\"}",
+    "packages/noname": "{}",
+    "packages/c/d/e": "{\"name\":\"deep\"}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "packages/*"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/**"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "deep",
+       "packages/c/d/e"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ],
+      [
+       "deep",
+       "packages/c/d/e"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "**"
+     ],
+     "members": [
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "low",
+       "lib/low"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "deep",
+       "packages/c/d/e"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "project",
+       ""
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "low",
+       "lib/low"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ],
+      [
+       "deep",
+       "packages/c/d/e"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*/*"
+     ],
+     "members": [
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "low",
+       "lib/low"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "low",
+       "lib/low"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/*",
+      "!packages/b"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/*",
+      "!packages/b",
+      "packages/b"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "!packages/b",
+      "packages/*"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "{packages,apps}/*"
+     ],
+     "members": [
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/b/nested",
+      "packages/*"
+     ],
+     "members": [
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "./packages/a",
+      "/packages/b"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/a/",
+      "apps/x/"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "x",
+       "apps/x"
+      ]
+     ],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "apps/x/node_modules/y"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "packages/[ab]"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/?"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "lib/*"
+     ],
+     "members": [
+      [
+       "low",
+       "lib/low"
+      ]
+     ],
+     "virtual": [
+      [
+       "low",
+       "lib/low"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/nopkg"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "packages/noname"
+     ],
+     "members": [
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": {
+      "packages": [
+       "apps/*"
+      ]
+     },
+     "members": [
+      [
+       "x",
+       "apps/x"
+      ]
+     ],
+     "virtual": [
+      [
+       "x",
+       "apps/x"
+      ]
+     ]
+    },
+    {
+     "workspaces": "packages/*",
+     "error": {
+      "code": "EWORKSPACESCONFIG",
+      "message": "workspaces config expects an Array"
+     },
+     "virtualError": {
+      "code": "EWORKSPACESCONFIG",
+      "message": "workspaces config expects an Array"
+     }
+    },
+    {
+     "workspaces": [
+      "packages/*",
+      "apps/*"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ],
+      [
+       "x",
+       "apps/x"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ],
+      [
+       "x",
+       "apps/x"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "apps/*",
+      "packages/*"
+     ],
+     "members": [
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "pack*/*"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/*/"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "packages"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "."
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      ""
+     ],
+     "members": [],
+     "virtual": [
+      [
+       "project",
+       ""
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/c/**"
+     ],
+     "members": [
+      [
+       "deep",
+       "packages/c/d/e"
+      ]
+     ],
+     "virtual": [
+      [
+       "deep",
+       "packages/c/d/e"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/*/*"
+     ],
+     "members": [
+      [
+       "nested",
+       "packages/b/nested"
+      ]
+     ],
+     "virtual": [
+      [
+       "nested",
+       "packages/b/nested"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/*",
+      "!packages/**"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "**/*",
+      "!**/node_modules/**"
+     ],
+     "members": [
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "low",
+       "lib/low"
+      ],
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "deep",
+       "packages/c/d/e"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "nested",
+       "packages/b/nested"
+      ],
+      [
+       "x",
+       "apps/x"
+      ],
+      [
+       "low",
+       "lib/low"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ],
+      [
+       "deep",
+       "packages/c/d/e"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "packages/*",
+      "packages/*"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ],
+      [
+       "@s/b",
+       "packages/b"
+      ],
+      [
+       "noname",
+       "packages/noname"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "!!packages/a"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "!packages/*",
+      "packages/a"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "!packages/b/**",
+      "!packages/b/*",
+      "packages/b/nested"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "!packages/b/*",
+      "!packages/b/**",
+      "packages/b/nested"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "!packages/b",
+      "!packages/*",
+      "!packages/**",
+      "packages/b"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "!packages/*",
+      "!packages/b",
+      "packages/b",
+      "packages/a"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "duplicate-names",
+   "manifests": {
+    "a": "{\"name\":\"same\"}",
+    "b": "{\"name\":\"same\"}",
+    "c": "{\"name\":\"other\"}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "a",
+      "b",
+      "c"
+     ],
+     "error": {
+      "code": "EDUPLICATEWORKSPACE",
+      "message": "must not have multiple workspaces with the same name\npackage 'same' has conflicts in the following paths:\n    {CWD}/a\n    {CWD}/b"
+     },
+     "virtual": [
+      [
+       "same",
+       "b"
+      ],
+      [
+       "other",
+       "c"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "a",
+      "c"
+     ],
+     "members": [
+      [
+       "same",
+       "a"
+      ],
+      [
+       "other",
+       "c"
+      ]
+     ],
+     "virtual": [
+      [
+       "same",
+       "a"
+      ],
+      [
+       "other",
+       "c"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "error": {
+      "code": "EDUPLICATEWORKSPACE",
+      "message": "must not have multiple workspaces with the same name\npackage 'same' has conflicts in the following paths:\n    {CWD}/a\n    {CWD}/b"
+     },
+     "virtual": [
+      [
+       "same",
+       "b"
+      ],
+      [
+       "other",
+       "c"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "root-manifest",
+   "manifests": {
+    "": "{\"name\":\"root\",\"version\":\"1.0.0\"}",
+    "a": "{\"name\":\"a\"}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "."
+     ],
+     "members": [
+      [
+       "root",
+       ""
+      ]
+     ],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "a"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "**"
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ]
+     ],
+     "virtual": [
+      [
+       "project",
+       ""
+      ],
+      [
+       "a",
+       "a"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "a",
+      "."
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "root",
+       ""
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "a"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "invalid-member",
+   "manifests": {
+    "a": "not json",
+    "b": "{\"name\":\"b\"}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "b"
+     ],
+     "members": [
+      [
+       "b",
+       "b"
+      ]
+     ],
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "error": {
+      "code": "EJSONPARSE",
+      "message": "Invalid package.json: JSONParseError: Unexpected token \"o\" (0x6F), \"not json\" is not valid JSON while parsing 'not json'"
+     },
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "member-bin-dir",
+   "manifests": {
+    "a": "{\"name\":\"a\",\"directories\":{\"bin\":\"bin\"}}",
+    "b": "{\"name\":\"b\",\"directories\":{\"bin\":1}}",
+    "c": "{}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "a"
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "a"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "a",
+      "c"
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "c",
+       "c"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "c",
+       "c"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "b"
+     ],
+     "error": {
+      "message": "ref.replace is not a function"
+     },
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "error": {
+      "message": "ref.replace is not a function"
+     },
+     "virtual": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "b",
+       "b"
+      ],
+      [
+       "c",
+       "c"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "member-without-content",
+   "manifests": {
+    "a": "null",
+    "b": "{\"name\":\"b\"}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "b"
+     ],
+     "members": [
+      [
+       "b",
+       "b"
+      ]
+     ],
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "error": {
+      "message": "Can not normalize without content"
+     },
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    }
+   ]
+  }
+ ]
+}

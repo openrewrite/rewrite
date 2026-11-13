@@ -1,0 +1,216 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.test;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Incubating;
+
+/**
+ * Checks of how a recipe behaves and what it produces. {@link TypeValidation} checks the LST the recipe is given.
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Accessors(fluent = true)
+@Builder
+public class RecipeQualityValidation {
+
+    /**
+     * The type attribution the recipe's output is validated to have. When not set, the output is validated as the LST
+     * the recipe was given is.
+     */
+    private @Nullable TypeValidation types;
+
+    /**
+     * Controls whether the recipe is validated to leave the execution context, which every recipe and source file in
+     * a run shares, unchanged. State across source files belongs in a ScanningRecipe's accumulator, and state within
+     * one source file in Cursor messages.
+     */
+    @Builder.Default
+    private boolean executionContextUnchanged = true;
+
+    /**
+     * Controls whether a ScanningRecipe's scanner is validated to make no edits, which the scanning phase discards.
+     */
+    @Builder.Default
+    private boolean noEditsInScanningPhase = true;
+
+    /**
+     * Controls whether a ScanningRecipe's accumulator is validated to keep values, such as coordinates, paths and ids,
+     * and no {@link org.openrewrite.Heavyweight} objects such as trees, which would stay in memory all cycle.
+     */
+    @Builder.Default
+    private boolean lightweightAccumulators = true;
+
+    /**
+     * Controls whether the recipe is validated to add only markers that report, such as search results and markup,
+     * and none that it keeps information in.
+     */
+    @Builder.Default
+    private boolean reportingMarkersOnly = true;
+
+    /**
+     * Controls whether the recipe is validated to format only what it changed, not a whole source file, class or
+     * document root that existed before the run.
+     */
+    @Builder.Default
+    private boolean minimalFormatting = true;
+
+    /**
+     * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
+     * qualified call or the reverse, a fully qualified name for an imported type), and must still change it. Skipped
+     * when the test doesn't validate the type attribution of the recipe's input and output.
+     */
+    @Builder.Default
+    private boolean matchByTypeNotName = true;
+
+    /**
+     * Controls whether the recipe is validated to import the types and static members the code it writes names, and
+     * its templates to declare those they name with imports and staticImports.
+     */
+    @Builder.Default
+    private boolean importReferencedTypes = true;
+
+    /**
+     * Controls whether the recipe is validated to remove the imports that the code it removes was the only use of,
+     * and to add none that nothing uses.
+     */
+    @Builder.Default
+    private boolean removeUnusedImports = true;
+
+    /**
+     * Controls whether the recipe is validated to produce the tree that the source's parser makes of the text the
+     * recipe's output prints, such as a J.Primitive and not a J.Identifier for {@code int}.
+     */
+    @Builder.Default
+    private boolean parserShapedTrees = true;
+
+    /**
+     * Controls how much of the types of the source files the recipe changes has to match the types that their parser
+     * gives the text they print, such as a variable's declared type and not its initializer's. Types the parser
+     * doesn't resolve, such as those of a library missing from the test's classpath, aren't compared. Skipped when the
+     * test doesn't validate the type attribution of the recipe's input and output. {@link ParserTypes#Off} by default
+     * until recipes give their output these types, unless the system property
+     * {@code org.openrewrite.test.parserTypedTrees} is {@code true}, which a build sets for its tests to find the
+     * recipes that don't.
+     */
+    @Builder.Default
+    private ParserTypes parserTypedTrees = Boolean.getBoolean("org.openrewrite.test.parserTypedTrees") ?
+            ParserTypes.Exact : ParserTypes.Off;
+
+    /**
+     * Controls whether the source files the recipe leaves are validated to compile, with the test's
+     * {@link RecipeSpec#afterParser after parser} or else with the parser of its sources. Without an after parser, an
+     * error that the source file had before the recipe ran doesn't fail the test. Skipped when the test doesn't
+     * validate the type attribution of the recipe's input and output. Off unless the system property
+     * {@code org.openrewrite.test.compilableOutput} is {@code true}, which a build sets for its tests.
+     */
+    @Incubating(since = "8.107.0")
+    @Builder.Default
+    private boolean compilableOutput = Boolean.getBoolean("org.openrewrite.test.compilableOutput");
+
+    /**
+     * Controls whether a composite recipe is validated to run each step before the steps that rename what it looks
+     * for, such as a ChangeType of a type in a package before a ChangePackage of that package.
+     */
+    @Builder.Default
+    private boolean orderStepsForEarlierChanges = true;
+
+    /**
+     * Controls whether the recipe is validated to keep no {@link org.openrewrite.TreeVisitor} in a static field, where
+     * every thread visiting source files in parallel would share its state. Recipes a composite lists from dependency
+     * jars are left to the builds of the projects that own them.
+     */
+    @Builder.Default
+    private boolean noStaticVisitors = true;
+
+    /**
+     * How much of a type {@link #parserTypedTrees} compares with the type the parser gives, from least to most.
+     */
+    @Incubating(since = "8.108.0")
+    public enum ParserTypes {
+        Off,
+
+        /**
+         * Compares the names of members, the number of a method's parameters, and the classes that types erase to,
+         * with every bound of an intersection. A type variable only matches one of the same name and bounds. Leaves
+         * out type arguments, flags and thrown exceptions.
+         */
+        Erasure,
+
+        Exact
+    }
+
+    @SuppressWarnings("unused")
+    public static class RecipeQualityValidationBuilder {
+        /**
+         * @param on {@link ParserTypes#Exact} when {@code true}, else {@link ParserTypes#Off}.
+         */
+        public RecipeQualityValidationBuilder parserTypedTrees(boolean on) {
+            return parserTypedTrees(on ? ParserTypes.Exact : ParserTypes.Off);
+        }
+
+        // Lombok leaves out the setter of a name the builder already has, and keeps a default's value in these fields
+        public RecipeQualityValidationBuilder parserTypedTrees(ParserTypes level) {
+            this.parserTypedTrees$value = level;
+            this.parserTypedTrees$set = true;
+            return this;
+        }
+    }
+
+    /**
+     * The recipe quality checks that are on by default, which are all of them except {@link #parserTypedTrees()} and
+     * {@link #compilableOutput()}, each of which its system property turns on.
+     */
+    public static RecipeQualityValidation all() {
+        return new RecipeQualityValidation();
+    }
+
+    /**
+     * The checks a test asks for, without those it still turns off through the deprecated options of
+     * {@link TypeValidation}.
+     */
+    @SuppressWarnings("deprecation")
+    static RecipeQualityValidation of(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        RecipeQualityValidation quality = testMethodSpec.getRecipeQualityValidation() != null ?
+                testMethodSpec.getRecipeQualityValidation() : testClassSpec.getRecipeQualityValidation();
+        if (quality == null) {
+            quality = all();
+        }
+        TypeValidation before = TypeValidation.before(testMethodSpec, testClassSpec);
+        return builder()
+                .types(quality.types())
+                .executionContextUnchanged(quality.executionContextUnchanged() && before.immutableExecutionContext())
+                .noEditsInScanningPhase(quality.noEditsInScanningPhase() && before.immutableScanning())
+                .lightweightAccumulators(quality.lightweightAccumulators())
+                .reportingMarkersOnly(quality.reportingMarkersOnly())
+                .minimalFormatting(quality.minimalFormatting())
+                .matchByTypeNotName(quality.matchByTypeNotName())
+                .importReferencedTypes(quality.importReferencedTypes())
+                .removeUnusedImports(quality.removeUnusedImports())
+                .parserShapedTrees(quality.parserShapedTrees())
+                .parserTypedTrees(quality.parserTypedTrees())
+                .compilableOutput(quality.compilableOutput())
+                .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
+                .noStaticVisitors(quality.noStaticVisitors())
+                .build();
+    }
+}

@@ -43,13 +43,13 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
             String prefix = x.getPrefix();
             if (prefix.contains("\n")) {
                 int indentMultiple = (int) getCursor().getPathAsStream().filter(Xml.Tag.class::isInstance).count() - 1;
+                boolean attributeContinuation = x instanceof Xml.Attribute;
                 boolean docTypeContinuation = isDocTypeContinuation(x);
-                boolean continuationIndent = x instanceof Xml.Attribute || docTypeContinuation;
-                if (getCursor().getValue() instanceof Xml.Attribute ||
+                if (!attributeContinuation && (getCursor().getValue() instanceof Xml.Attribute ||
                         getCursor().getValue() instanceof Xml.CharData ||
                         getCursor().getValue() instanceof Xml.Comment ||
                         getCursor().getValue() instanceof Xml.ProcessingInstruction ||
-                        docTypeContinuation) {
+                        docTypeContinuation)) {
                     indentMultiple++;
                 }
                 if (docTypeContinuation) {
@@ -61,10 +61,16 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
                     if(style.getUseTabCharacter()) {
                         shiftedPrefixBuilder.append("\t");
                     } else {
-                        int indentSize = continuationIndent ? style.getContinuationIndentSize() : style.getIndentSize();
+                        int indentSize = docTypeContinuation ? style.getContinuationIndentSize() : style.getIndentSize();
                         for(int j = 0; j < indentSize; j++) {
                             shiftedPrefixBuilder.append(" ");
                         }
+                    }
+                }
+                if (attributeContinuation) {
+                    String continuationIndent = style.getUseTabCharacter() ? "\t" : " ";
+                    for (int i = 0; i < style.getContinuationIndentSize(); i++) {
+                        shiftedPrefixBuilder.append(continuationIndent);
                     }
                 }
 

@@ -51,23 +51,11 @@ class CSharpRecipeTest implements RewriteTest {
 
     @BeforeAll
     static void setUpFactory() {
-        Path basePath = Paths.get(System.getProperty("user.dir"));
-        Path[] searchPaths = {
-          basePath.resolve("csharp"),
-          basePath.resolve("rewrite-csharp/csharp"),
-        };
-        for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-            if (csproj.toFile().exists()) {
-                CSharpRewriteRpc.setFactory(
-                  CSharpRewriteRpc.builder()
-                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
-                    .log(Paths.get("/tmp/csharp-rpc.log"))
-                );
-                return;
-            }
-        }
-        throw new IllegalStateException("Could not find C# Rewrite project");
+        CSharpRewriteRpc.setFactory(
+          CSharpRewriteRpc.builder()
+            .csharpServerEntry(CSharpServer.entry())
+            .log(Paths.get("/tmp/csharp-rpc.log"))
+        );
     }
 
     @AfterEach
@@ -187,8 +175,8 @@ class CSharpRecipeTest implements RewriteTest {
     void structuredDocCommentSurvivesPrintRoundTrip() throws Exception {
         // A CSharpVisitor pass converts the raw doc comment into a structured CsDocComment tree.
         // When the modified tree is printed (serialized back to the C# side), the structured
-        // comment is decomposed over RPC and the C# side re-flattens it to text. This used to
-        // throw "Unexpected comment type ...$DocComment" / fail to map the type on the C# side.
+        // comment is decomposed over RPC and the C# side must re-flatten it to text without
+        // failing to map the type (e.g. "Unexpected comment type ...$DocComment").
         String source = "class Foo {\n    /// <summary>Does <c>x</c>.</summary>\n    void Test() {\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
         Path tempDir = Files.createTempDirectory("csharp-doc-test-");
@@ -245,7 +233,6 @@ class CSharpRecipeTest implements RewriteTest {
               "Newtonsoft.Json.JsonConvert SerializeObject(..)", "ToJson", null, null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -287,7 +274,6 @@ class CSharpRecipeTest implements RewriteTest {
             .recipe(new FindMethods("Newtonsoft.Json.JsonConvert SerializeObject(..)", null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -329,7 +315,6 @@ class CSharpRecipeTest implements RewriteTest {
             .recipe(new FindTypes("Newtonsoft.Json.JsonConvert", null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -371,7 +356,6 @@ class CSharpRecipeTest implements RewriteTest {
             .recipe(new DeleteMethodArgument("Newtonsoft.Json.JsonConvert SerializeObject(..)", 1))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -417,7 +401,6 @@ class CSharpRecipeTest implements RewriteTest {
               null, null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -461,7 +444,6 @@ class CSharpRecipeTest implements RewriteTest {
               "Newtonsoft.Json.JsonWriter", null))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """
@@ -502,7 +484,6 @@ class CSharpRecipeTest implements RewriteTest {
               "Newtonsoft.Json", "MyJson", true))
             .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
             .typeValidationOptions(TypeValidation.builder()
-              .allowNonWhitespaceInWhitespace(true)
               .build()),
           csproj(
             """

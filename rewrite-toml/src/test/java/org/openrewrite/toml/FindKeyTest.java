@@ -46,6 +46,42 @@ class FindKeyTest implements RewriteTest {
     }
 
     @Test
+    void quotedSegmentMatchesTheKeyItsEscapesStandFor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("hosts.\"a\\\"b\\\\*\"")),
+          toml(
+            """
+              [hosts]
+              "a\\"b\\\\\\nc" = 1
+              other = 2
+              """,
+            """
+              [hosts]
+              ~~>"a\\"b\\\\\\nc" = 1
+              other = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void findKeyInInlineTable() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey(
+            "testcontainers-mongo.name"
+          )),
+          toml(
+            """
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb" }
+              """,
+            """
+              testcontainers-mongo = { group = "org.testcontainers", ~~>name = "mongodb" }
+              """
+          )
+        );
+    }
+
+    @Test
     void findMultipleMatchingKeys() {
         rewriteRun(
           spec -> spec.recipe(new FindKey(

@@ -29,7 +29,7 @@ public sealed class OmitBraces(Guid id) : Marker, IRpcCodec<OmitBraces>
     public OmitBraces WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static OmitBraces Instance { get; } = new(Guid.Empty);
+    public static OmitBraces Instance { get; } = new(new Guid("1e5a0008-0000-4000-8000-000000000008"));
 
     public void RpcSend(OmitBraces after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public OmitBraces RpcReceive(OmitBraces before, RpcReceiveQueue q) =>

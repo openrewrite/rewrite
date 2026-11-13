@@ -62,8 +62,7 @@ class BlankLinesTest implements RewriteTest {
         @Test
         void keepMaximumInDeclarations() {
             rewriteRun(
-              blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(0)))
-                .andThen(spec -> spec.expectedCyclesThatMakeChanges(2)),
+              blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(0))),
               kotlin(
                 """
                   import java.util.List
@@ -392,8 +391,7 @@ class BlankLinesTest implements RewriteTest {
             @Test
             void beforeDeclarationWithComment() {
                 rewriteRun(
-                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3)))
-                    .andThen(spec -> spec.expectedCyclesThatMakeChanges(2)),
+                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3))),
                   kotlin(
                     """
                       annotation class Annotation
@@ -428,8 +426,7 @@ class BlankLinesTest implements RewriteTest {
             @Test
             void feforeAnnotation() {
                 rewriteRun(
-                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3)))
-                    .andThen(spec -> spec.expectedCyclesThatMakeChanges(2)),
+                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3))),
                   kotlin(
                     """
                       annotation class Annotation
@@ -805,7 +802,7 @@ class BlankLinesTest implements RewriteTest {
 
     @Test
     void maximumBlankLinesBetweenHeaderAndPackage() {
-        // keepMaximumBlankLines_BetweenHeaderAndPackage defaults to 2
+        // KEEP_MAXIMUM_BLANK_LINES_BETWEEN_HEADER_AND_PACKAGE defaults to 2
         rewriteRun(
           blankLines(),
           kotlin(
@@ -839,7 +836,7 @@ class BlankLinesTest implements RewriteTest {
 
     @Test
     void minimumBlankLinesBeforePackageStatement() {
-        // minimumBlankLines_BeforePackageStatement defaults to 0
+        // MINIMUM_BLANK_LINES_BEFORE_PACKAGE_STATEMENT defaults to 0
         rewriteRun(
           blankLines(),
           kotlin(

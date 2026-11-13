@@ -38,7 +38,7 @@ public sealed class ParseExceptionResult(
     public static ParseExceptionResult Build(string parserType, Exception ex)
     {
         return new ParseExceptionResult(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             parserType,
             ex.GetType().Name,
             ex.ToString(),

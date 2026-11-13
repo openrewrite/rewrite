@@ -64,11 +64,10 @@ class MappingTest implements RewriteTest {
               type : specs.openrewrite.org/v1beta/visitor # comment with colon :
               name : org.openrewrite.text.ChangeTextToJon
               """,
-            spec -> spec.afterRecipe(y -> {
+            spec -> spec.afterRecipe(y ->
                 assertThat(((Yaml.Mapping) (y.getDocuments().getFirst().getBlock())).getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
-                  .map(Scalar::getValue)).containsExactly("type", "name");
-            })
+                  .map(Scalar::getValue)).containsExactly("type", "name"))
           )
         );
     }
@@ -312,6 +311,25 @@ class MappingTest implements RewriteTest {
               default: &default test
               stage: *default
               """
+          )
+        );
+    }
+
+    @Test
+    void scalarValueOnLineAfterAnchor() {
+        rewriteRun(
+          yaml(
+            """
+              version: &version
+                28-stable
+              stage: *version
+              """,
+            spec -> spec.afterRecipe(y -> {
+                var mapping = (Yaml.Mapping) y.getDocuments().getFirst().getBlock();
+                var anchored = (Scalar) mapping.getEntries().getFirst().getValue();
+                assertThat(anchored.getValue()).isEqualTo("28-stable");
+                assertThat(anchored.getAnchor().getPostfix()).isEqualTo("\n  ");
+            })
           )
         );
     }

@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor} from '../..';
 import {J} from '../../java';
 import {JS} from '../index';
+import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {ConstraintFunction, VariadicOptions} from './types';
@@ -34,11 +34,22 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
  */
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
+/** Symbol to access a match's pattern prefixes without exposing them as public API */
+export const PATTERN_PREFIXES_SYMBOL = Symbol('patternPrefixes');
+
 /**
  * Shared wrapper function name used by both patterns and templates.
  * Using the same name allows cache sharing when pattern and template code is identical.
  */
 export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
+
+/** The module of the file every template and pattern parses as. */
+export const TEMPLATE_MODULE = 'template';
+
+/** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
+export function wrapCode(code: string, expression: boolean): string {
+    return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;
+}
 
 /**
  * Simple LRU (Least Recently Used) cache implementation using Map's insertion order.
@@ -106,14 +117,91 @@ export function generateCacheKey(
     templateParts: string[] | TemplateStringsArray,
     itemsKey: string,
     contextStatements: string[],
-    dependencies: Record<string, string>
+    dependencies: Record<string, string>,
+    types?: string[]
 ): string {
     return [
         Array.from(templateParts).join('|'),
         itemsKey,
         contextStatements.join(';'),
-        JSON.stringify(dependencies)
+        JSON.stringify(dependencies),
+        JSON.stringify(types ?? null)
     ].join('::');
+}
+
+class RandomizeIdVisitor extends JavaScriptVisitor<any> {
+    readonly minted = new Set<string>();
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        const id = randomId();
+        this.minted.add(id);
+        return {...tree, id};
+    }
+}
+
+class CollectIdVisitor extends JavaScriptVisitor<any> {
+    readonly ids = new Set<string>();
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        this.ids.add(tree.id);
+        return tree;
+    }
+}
+
+class RetainIdVisitor extends JavaScriptVisitor<any> {
+    private readonly seen = new Set<string>();
+
+    constructor(private readonly retainable: ReadonlySet<string>) {
+        super();
+    }
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        if (this.retainable.has(tree.id) && !this.seen.has(tree.id)) {
+            this.seen.add(tree.id);
+            return tree;
+        }
+        const id = randomId();
+        this.seen.add(id);
+        return {...tree, id};
+    }
+}
+
+/**
+ * Structural copy of `tree` with a fresh `id` on every `Tree` node, and the ids that were minted;
+ * counterpart of Java's `RandomizeIdVisitor`.
+ */
+export async function randomizeIds<T extends J>(tree: T): Promise<{ tree: T, ids: ReadonlySet<string> }> {
+    const visitor = new RandomizeIdVisitor();
+    return {tree: (await visitor.visit(tree, null)) as T, ids: visitor.minted};
+}
+
+/** The `id` of every `Tree` node in `tree`. */
+export async function treeIds(tree: J): Promise<ReadonlySet<string>> {
+    const visitor = new CollectIdVisitor();
+    await visitor.visit(tree, null);
+    return visitor.ids;
+}
+
+/** Copy of `tree` in which an `id` survives only where it is `retainable` and unused so far. */
+export function retainIds<T extends J>(tree: T, retainable: ReadonlySet<string>): Promise<T> {
+    return new RetainIdVisitor(retainable).visit(tree, null) as Promise<T>;
+}
+
+/**
+ * Strips the indentation a template carries from the recipe source it was written in. Its first
+ * line starts at the opening backtick, so the common indent is the one shared by the lines below.
+ */
+export function dedentTemplate(code: string): string {
+    const lines = code.split("\n");
+    let indent = Infinity;
+    for (const line of lines.slice(1)) {
+        if (line.trim().length > 0) {
+            indent = Math.min(indent, line.length - line.trimStart().length);
+        }
+    }
+    return indent === Infinity || indent === 0 ?
+        code :
+        [lines[0], ...lines.slice(1).map(line => line.slice(indent))].join("\n");
 }
 
 /**
@@ -244,6 +332,15 @@ export class PlaceholderUtils {
         return undefined;
     }
 
+    /** The name of a shorthand property, which is what a placeholder written as `{${x}}` parses to. */
+    static shorthandPropertyName(node: J): J | undefined {
+        if (node.kind === JS.Kind.PropertyAssignment) {
+            const property = node as JS.PropertyAssignment;
+            return property.initializer === undefined ? property.name.element : undefined;
+        }
+        return undefined;
+    }
+
     /**
      * Extracts the relevant AST node from a wrapper function.
      * Used by both pattern and template processors to intelligently extract
@@ -251,9 +348,10 @@ export class PlaceholderUtils {
      *
      * @param lastStatement The last statement from the compilation unit
      * @param contextName Context name for error messages (e.g., 'Pattern', 'Template')
+     * @param expression Whether {@link wrapCode} parenthesized the code
      * @returns The extracted AST node
      */
-    static extractFromWrapper(lastStatement: J, contextName: string): J {
+    static extractFromWrapper(lastStatement: J, contextName: string, expression: boolean = false): J {
         let extracted: J;
 
         // Since we always wrap in function __WRAPPER__() { code }, look for it
@@ -293,6 +391,7 @@ export class PlaceholderUtils {
             extracted = lastStatement;
         }
 
-        return extracted;
+        return expression && extracted.kind === J.Kind.Parentheses ?
+            (extracted as J.Parentheses<J>).tree.element : extracted;
     }
 }

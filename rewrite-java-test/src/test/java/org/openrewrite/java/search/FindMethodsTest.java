@@ -78,7 +78,7 @@ class FindMethodsTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new FindMethods("*..* substring(..)", false))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().methodDeclarations(false).methodInvocations(false)),
           java(
             """
               class Test {

@@ -99,8 +99,14 @@ public class JavaCompilationUnitState {
         );
 
         javaParser = JavaParser.fromJavaVersion()
-                .classpath("jsr305", "classgraph", "jackson-annotations", "micrometer-core",
-                        "jgit", "jspecify", "lombok", "annotations");
+                .classpath(
+                        "jsr305",
+                        "jackson-annotations",
+                        "micrometer-core",
+                        "jgit",
+                        "jspecify",
+                        "lombok",
+                        "annotations");
 //                .logCompilationWarningsAndErrors(true)
 
         typeCache = new MapJavaTypeCache();

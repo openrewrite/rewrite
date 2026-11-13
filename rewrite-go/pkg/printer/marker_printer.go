@@ -22,10 +22,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// CommentWrapper wraps marker output in a language-appropriate comment syntax.
 type CommentWrapper func(output string) string
 
-// GoCommentWrapper wraps marker output in Go block comment syntax: /*~~(output)~~>*/
 func GoCommentWrapper(output string) string {
 	if output == "" {
 		return "/*~~>*/"
@@ -37,31 +35,21 @@ func GoCommentWrapper(output string) string {
 // are rendered in printed output. Go-specific markers (ShortVarDecl, GroupedImport, etc.)
 // are handled directly by the printer's visit methods.
 type MarkerPrinter interface {
-	// BeforePrefix returns text to emit before a node's prefix space.
 	BeforePrefix(marker java.Marker, wrapper CommentWrapper) string
 
-	// BeforeSyntax returns text to emit after a node's prefix but before its syntax.
 	BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string
 
-	// AfterSyntax returns text to emit after a node's syntax.
 	AfterSyntax(marker java.Marker, wrapper CommentWrapper) string
 }
 
-// --- Predefined MarkerPrinter implementations ---
-
-// DefaultMarkerPrinter prints SearchResult and Markup markers as comments before syntax.
 var DefaultMarkerPrinter MarkerPrinter = defaultMarkerPrinter{}
 
-// SearchOnlyMarkerPrinter prints only SearchResult markers (ignores Markup).
 var SearchOnlyMarkerPrinter MarkerPrinter = searchOnlyMarkerPrinter{}
 
-// FencedMarkerPrinter wraps markers with {{uuid}} delimiters before and after syntax.
 var FencedMarkerPrinter MarkerPrinter = fencedMarkerPrinter{}
 
 // SanitizedMarkerPrinter strips all markers from output.
 var SanitizedMarkerPrinter MarkerPrinter = sanitizedMarkerPrinter{}
-
-// --- defaultMarkerPrinter ---
 
 type defaultMarkerPrinter struct{}
 
@@ -77,9 +65,6 @@ func (defaultMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrap
 		}
 		return wrapper("")
 	case java.Markup:
-		if m.Detail != "" {
-			return wrapper("(" + m.Message + ": " + m.Detail + ")")
-		}
 		return wrapper("(" + m.Message + ")")
 	}
 	return ""
@@ -88,8 +73,6 @@ func (defaultMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrap
 func (defaultMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
-
-// --- searchOnlyMarkerPrinter ---
 
 type searchOnlyMarkerPrinter struct{}
 
@@ -111,18 +94,16 @@ func (searchOnlyMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWr
 	return ""
 }
 
-// --- fencedMarkerPrinter ---
-
 type fencedMarkerPrinter struct{}
 
 func (fencedMarkerPrinter) BeforePrefix(marker java.Marker, wrapper CommentWrapper) string {
-	if isFenceable(marker) {
-		return fmt.Sprintf("{{%s}}", marker.ID())
-	}
 	return ""
 }
 
 func (fencedMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string {
+	if isFenceable(marker) {
+		return fmt.Sprintf("{{%s}}", marker.ID())
+	}
 	return ""
 }
 
@@ -140,8 +121,6 @@ func isFenceable(marker java.Marker) bool {
 	}
 	return false
 }
-
-// --- sanitizedMarkerPrinter ---
 
 type sanitizedMarkerPrinter struct{}
 

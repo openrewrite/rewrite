@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
@@ -48,7 +49,7 @@ public class RenameTypeAlias extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new KotlinIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesType<>(fullyQualifiedAliasedType, true), new KotlinIsoVisitor<ExecutionContext>() {
             @Override
             public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, ExecutionContext ctx) {
                 if (!aliasName.equals(typeAlias.getSimpleName()) || !TypeUtils.isOfClassType(typeAlias.getType(), fullyQualifiedAliasedType)) {
@@ -68,7 +69,7 @@ public class RenameTypeAlias extends Recipe {
                 }
                 return i;
             }
-        };
+        });
     }
 
     private boolean isVariableName(Cursor cursor, J.Identifier ident) {

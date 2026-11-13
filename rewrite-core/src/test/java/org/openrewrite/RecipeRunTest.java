@@ -17,15 +17,14 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
-import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.table.ParseFailures;
 import org.openrewrite.table.TextMatches;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.Find;
 
-import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -81,8 +80,10 @@ class RecipeRunTest implements RewriteTest {
                         .findFirst().orElseThrow();
 
                 // Verify the row has multiline content
-                List<?> rows = store.getRows(parseFailuresDt.getName(), parseFailuresDt.getGroup())
-                        .toList();
+                List<?> rows;
+                try (Stream<?> stream = store.getRows(parseFailuresDt.getName(), parseFailuresDt.getGroup())) {
+                    rows = stream.toList();
+                }
                 assertThat(rows).hasSize(1);
             }),
           text(
@@ -102,7 +103,8 @@ class RecipeRunTest implements RewriteTest {
     @Test
     void delegateRecipeWithOnComplete() {
         ExecutionContext ctx = new InMemoryExecutionContext();
-        rewriteRun(recipeSpec -> recipeSpec.recipe(new DelegatingRecipe()).executionContext(ctx).typeValidationOptions(TypeValidation.none()));
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new DelegatingRecipe()).executionContext(ctx)
+          .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()));
         assertThat(ctx.<String>getMessage("org.openrewrite.recipe.oncomplete")).isEqualTo("with delegate recipe.");
     }
 

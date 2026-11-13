@@ -14,8 +14,8 @@ lexer grammar HCLLexer;
     private Stack<String> heredocIdentifier = new Stack<String>();
 }
 
-FOR_BRACE             : '{' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
-FOR_BRACK             : '[' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
+FOR_BRACE             : '{' (WS|NEWLINE|COMMENT|LINE_COMMENT NEWLINE)* 'for' WS;
+FOR_BRACK             : '[' (WS|NEWLINE|COMMENT|LINE_COMMENT NEWLINE)* 'for' WS;
 
 IF              : 'if';
 IN              : 'in';
@@ -76,8 +76,8 @@ fragment Letter
 
 fragment EscapeSequence
     : '\\' [nrt"\\]
-    | '\\' HexDigit HexDigit HexDigit HexDigit
-    | '\\' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
+    | '\\' 'u' HexDigit HexDigit HexDigit HexDigit
+    | '\\' 'U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
     ;
 
 fragment HexDigit

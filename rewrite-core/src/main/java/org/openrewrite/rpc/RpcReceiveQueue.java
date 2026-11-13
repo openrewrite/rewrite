@@ -20,6 +20,7 @@ import org.objenesis.ObjenesisStd;
 
 import java.io.PrintStream;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -34,6 +35,8 @@ public class RpcReceiveQueue {
     private final Supplier<List<RpcObjectData>> pull;
     private final @Nullable String sourceFileType;
     private final @Nullable PrintStream log;
+    private final List<Integer> receivedRefs = new ArrayList<>();
+    private final Map<String, Class<?>> classes = new HashMap<>();
 
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
                            @Nullable String sourceFileType, @Nullable PrintStream log) {
@@ -50,6 +53,22 @@ public class RpcReceiveQueue {
             batch.addAll(data);
         }
         return batch.remove();
+    }
+
+    public RpcObjectData peek() {
+        if (batch.isEmpty()) {
+            batch.addAll(pull.get());
+        }
+        return batch.element();
+    }
+
+    /**
+     * Drop the refs received through this queue, for when what it was receiving failed to arrive
+     * whole. The sender of a failed transfer forgets the refs it assigned in it as well.
+     */
+    public void rollBackRefs() {
+        refs.keySet().removeAll(receivedRefs);
+        receivedRefs.clear();
     }
 
     /**
@@ -123,6 +142,7 @@ public class RpcReceiveQueue {
                         // immutable updates because of its cyclic nature, the before instance will ultimately
                         // be the same as the after instance below.
                         refs.put(ref, before);
+                        receivedRefs.add(ref);
                     }
                 }
                 // Intentional fall-through...
@@ -147,6 +167,10 @@ public class RpcReceiveQueue {
                             "No RPC codec registered on the Java side for '" + message.getValueType() + "'. " +
                                     "The remote side has a codec and sent property messages that will not be consumed, " +
                                     "causing RPC queue desynchronization.");
+                } else if (message.getState() == RpcObjectData.State.ADD) {
+                    // Reading this as null would hide that the remote had something it could not send.
+                    throw new IllegalStateException(
+                            "Received an ADD with no value type, value or ref, so there is nothing to decode: " + message);
                 } else {
                     after = before;
                 }
@@ -188,14 +212,51 @@ public class RpcReceiveQueue {
         }
     }
 
-    private <T> T newObj(String type) {
-        try {
-            Class<?> clazz = Class.forName(type);
-            //noinspection unchecked
-            return (T) objenesis.newInstance(clazz);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+    /**
+     * Streaming variant of {@link #receiveList} that hands each received element to {@code sink}
+     * as it is deserialized instead of collecting a {@link List}. Used by self-contained responses
+     * (e.g. {@code ExportedTypes}) whose element stream is too large to hold whole — the consumer
+     * writes each item and drops it. Same framing as {@link #receiveList}.
+     */
+    @SuppressWarnings("DataFlowIssue")
+    public <T> void receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange, Consumer<? super T> sink) {
+        RpcObjectData msg = take();
+        Trace.traceReceiver(msg, log);
+        switch (msg.getState()) {
+            case NO_CHANGE:
+            case DELETE:
+                return;
+            case ADD:
+                before = new ArrayList<>();
+                // Intentional fall-through...
+            case CHANGE:
+                msg = take(); // the next message should be a CHANGE with a list of positions
+                if (msg.getState() != RpcObjectData.State.CHANGE) {
+                    throw new IllegalStateException("Expected CHANGE with positions in receiveList, but got " +
+                        msg.getState() + " (valueType=" + msg.getValueType() + ", value=" + msg.getValue() + ", ref=" + msg.getRef() + ")");
+                }
+                List<Integer> positions = requireNonNull(msg.getValue());
+                for (int beforeIdx : positions) {
+                    sink.accept(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
+                }
+                return;
+            default:
+                throw new UnsupportedOperationException(msg.getState() + " is not supported for lists.");
         }
+    }
+
+    private <T> T newObj(String type) {
+        Class<?> clazz = classes.get(type);
+        if (clazz == null) {
+            try {
+                clazz = Class.forName(type);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            classes.put(type, clazz);
+        }
+        //noinspection unchecked
+        return (T) objenesis.newInstance(clazz);
     }
 
     /**

@@ -521,4 +521,159 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void classWithTrailingCommaInParameters() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(
+                    val x: String,
+                    val y: Int,
+                )
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaSingleParameter() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(
+                    x: Int,
+                )
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaSingleLine() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int,)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithoutTrailingCommaDoesNotFail() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaAndWhitespaceBeforeComma() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int ,)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaInTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[
+                    A,
+                    B,
+                ](x: A)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaInTypeParametersSingleLine() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[A,](x: A)
+                """
+            )
+        );
+    }
+
+    @Test
+    void colonBodyWithTrailingCommentAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                case class Matchup(users: Users): // score is x10
+                  def nonEmpty = true
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedMembers() {
+        rewriteRun(
+            scala(
+                """
+                class C { val v: Int = 2; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTraitMembers() {
+        rewriteRun(
+            scala(
+                """
+                trait T { val v: Int = 2; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedEnumCases() {
+        rewriteRun(
+            scala(
+                """
+                enum Color { case Red; case Green; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonOnNextLine() {
+        rewriteRun(
+            scala(
+                """
+                class C {
+                  val a = 1
+                  ; val b = 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementBetweenMembers() {
+        rewriteRun(
+            scala(
+                """
+                class C { val a = 1;; val b = 2 }
+                """
+            )
+        );
+    }
 }

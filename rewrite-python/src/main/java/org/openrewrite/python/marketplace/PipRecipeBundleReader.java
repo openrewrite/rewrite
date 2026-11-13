@@ -19,13 +19,11 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.python.rpc.InstallRecipesResponse;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
-import org.openrewrite.rpc.request.GetMarketplaceResponse;
 
 import java.util.Map;
 
@@ -33,19 +31,10 @@ import java.util.Map;
 public class PipRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final PythonRewriteRpc rpc;
-    /**
-     * The response from the install call that produced this reader. Carrying the
-     * row list directly lets {@link #read()} skip the GetMarketplace round trip
-     * (which returns the singleton marketplace's full contents and would
-     * over-attribute every recipe in the process to {@link #bundle}).
-     */
-    private final InstallRecipesResponse installResponse;
 
     @Override
     public RecipeMarketplace read() {
-        GetMarketplaceResponse response = new GetMarketplaceResponse();
-        response.addAll(installResponse.recipesOrEmpty());
-        return response.toMarketplace(bundle);
+        return rpc.getMarketplace(bundle);
     }
 
     @Override

@@ -17,7 +17,8 @@ import * as ts from "typescript";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
 
-const is_statements: string[] = [
+// Built on first use, since ./tree imports the visitor, which imports this module
+const statementKinds = (): string[] => [
     J.Kind.Assert,
     J.Kind.Assignment,
     J.Kind.AssignmentOperation,
@@ -55,7 +56,6 @@ const is_statements: string[] = [
     JS.Kind.ArrowFunction,
     JS.Kind.BindingElement,
     JS.Kind.Delete,
-    JS.Kind.Export,
     JS.Kind.ExportAssignment,
     JS.Kind.ExportDeclaration,
     JS.Kind.ForInLoop,
@@ -70,6 +70,8 @@ const is_statements: string[] = [
     JS.Kind.NamespaceDeclaration,
     JS.Kind.PropertyAssignment,
     JS.Kind.ScopedVariableDeclarations,
+    JS.Kind.Shebang,
+    JS.Kind.Spread,
     JS.Kind.TaggedTemplateExpression,
     JS.Kind.TemplateExpression,
     JS.Kind.TypeDeclaration,
@@ -77,9 +79,9 @@ const is_statements: string[] = [
     JS.Kind.WithStatement,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-]
+];
 
-const is_expressions: string[] = [
+const expressionKinds = (): string[] => [
     J.Kind.AnnotatedType,
     J.Kind.Annotation,
     J.Kind.ArrayAccess,
@@ -88,6 +90,7 @@ const is_expressions: string[] = [
     J.Kind.AssignmentOperation,
     J.Kind.Binary,
     J.Kind.ControlParentheses,
+    J.Kind.DeconstructionPattern,
     J.Kind.Empty,
     J.Kind.Erroneous,
     J.Kind.FieldAccess,
@@ -114,18 +117,23 @@ const is_expressions: string[] = [
     JS.Kind.Alias,
     JS.Kind.ArrayBindingPattern,
     JS.Kind.ArrowFunction,
+    JS.Kind.As,
     JS.Kind.Await,
     JS.Kind.BindingElement,
+    JS.Kind.ComputedPropertyName,
     JS.Kind.ConditionalType,
     JS.Kind.Delete,
     JS.Kind.ExportSpecifier,
     JS.Kind.ExpressionWithTypeArguments,
+    JS.Kind.FunctionCall,
     JS.Kind.FunctionType,
     JS.Kind.ImportType,
     JS.Kind.IndexedAccessType,
     JS.Kind.IndexedAccessTypeIndexType,
     JS.Kind.InferType,
     JS.Kind.Intersection,
+    JS.Kind.JsxEmbeddedExpression,
+    JS.Kind.JsxTag,
     JS.Kind.AssignmentOperation,
     JS.Kind.Binary,
     JS.Kind.ImportSpecifier,
@@ -135,6 +143,7 @@ const is_expressions: string[] = [
     JS.Kind.NamedImports,
     JS.Kind.ObjectBindingPattern,
     JS.Kind.SatisfiesExpression,
+    JS.Kind.Spread,
     JS.Kind.TaggedTemplateExpression,
     JS.Kind.TemplateExpression,
     JS.Kind.Tuple,
@@ -149,14 +158,17 @@ const is_expressions: string[] = [
     JS.Kind.Void,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-]
+];
+
+let is_statements: Set<string> | undefined;
+let is_expressions: Set<string> | undefined;
 
 export function isStatement(statement: J):  statement is Statement {
-    return is_statements.includes(statement.kind);
+    return (is_statements ??= new Set(statementKinds())).has(statement.kind);
 }
 
 export function isExpression(expression: J):  expression is Expression {
-    return is_expressions.includes(expression.kind);
+    return (is_expressions ??= new Set(expressionKinds())).has(expression.kind);
 }
 
 export function getNextSibling(node: ts.Node): ts.Node | undefined {
@@ -351,8 +363,9 @@ export function hasFlowAnnotation(sourceFile: ts.SourceFile) {
 }
 
 export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
-    const diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
-    // checking Parsing and Syntax Errors
+    // Only parse diagnostics decide whether a file gets an LST, so the visitor has to map every slot the
+    // parser fills — including ones the checker would reject — or the file loses text on print.
+    const diagnostics = program.getSyntacticDiagnostics(sourceFile);
     let syntaxErrors : [errorMsg: string, errorCode: number][] = [];
     if (diagnostics.length > 0) {
         const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code, sourceFile));
@@ -373,18 +386,11 @@ export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile
     return syntaxErrors;
 }
 
-const additionalCriticalCodes = new Set([
-    // Syntax errors
-    17019, // "'{0}' at the end of a type is not valid TypeScript syntax. Did you mean to write '{1}'?"
-    17020, // "'{0}' at the start of a type is not valid TypeScript syntax. Did you mean to write '{1}'?"
-
-    // Other critical errors
-]);
-
 // errors code description available at https://github.com/microsoft/TypeScript/blob/main/src/compiler/diagnosticMessages.json
 const excludedCodes = new Set([
     1039, // Initializers are not allowed in ambient contexts.
     1064, // The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<{0}>'?
+    1101, // 'with' statements are not allowed in strict mode.
     1107, // Jump target cannot cross function boundary.
     1111, // Private field '{0}' must be declared in an enclosing class.
     1117, // An object literal cannot have multiple properties with the same name.
@@ -394,6 +400,7 @@ const excludedCodes = new Set([
     1183, // An implementation cannot be declared in ambient contexts.
     1203, // Export assignment cannot be used when targeting ECMAScript modules. Consider using 'export default' or another module format instead.
     1207, // Decorators cannot be applied to multiple get/set accessors of the same name.
+    1212, // Identifier expected. '{0}' is a reserved word in strict mode. The node is still parsed as an identifier.
     1215, // Invalid use of '{0}'. Modules are automatically in strict mode.
     1238, // Unable to resolve signature of class decorator when called as an expression.
     1239, // Unable to resolve signature of parameter decorator when called as an expression.
@@ -422,6 +429,7 @@ const excludedCodes = new Set([
     1375, // 'await' expressions are only allowed at the top level of a file when that file is a module, but this file has no imports or exports. Consider adding an empty 'export {}' to make this file a module.
     1378, // Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
     1432, // Top-level 'for await' loops are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
+    1540, // A 'namespace' declaration should not be declared using the 'module' keyword. The `module` spelling yields a ModuleDeclaration.
 ]);
 
 // Errors to exclude only for JavaScript files (.js, .jsx, .mjs, .cjs)
@@ -444,7 +452,7 @@ function isCriticalDiagnostic(code: number, sourceFile: ts.SourceFile): boolean 
         }
     }
 
-    return (code > 1000 && code < 2000 && !excludedCodes.has(code)) || additionalCriticalCodes.has(code);
+    return code > 1000 && code < 2000 && !excludedCodes.has(code);
 }
 
 export function isValidSurrogateRange(unicodeString: string): boolean {
@@ -477,4 +485,90 @@ export function isValidSurrogateRange(unicodeString: string): boolean {
         }
     }
     return true;
+}
+
+const SURR_FIRST = 0xD800;
+const SURR_LAST = 0xDFFF;
+const HIGH_SURR_LAST = 0xDBFF;
+const LOW_SURR_FIRST = 0xDC00;
+
+/**
+ * Escapes each lone surrogate as `\uXXXX`, the form {@link extractSurrogateEscapes} holds it in.
+ * Print idempotence is measured against this form, and type attribution names members in it.
+ */
+export function escapeLoneSurrogates(source: string): string {
+    let escaped = '';
+    for (let j = 0; j < source.length; j++) {
+        const charCode = source.charCodeAt(j);
+        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const next = source.charCodeAt(j + 1);
+            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
+                escaped += source.charAt(j) + source.charAt(j + 1);
+                j++;
+                continue;
+            }
+            escaped += "\\u" + charCode.toString(16).toUpperCase().padStart(4, '0');
+            continue;
+        }
+        escaped += source.charAt(j);
+    }
+    return escaped;
+}
+
+/**
+ * Extracts invalid UTF-16 surrogate pairs from a string literal's value source.
+ * Unmatched UTF-16 surrogate pairs (composed of two escape and code point pairs) are unserializable
+ * by technologies like Jackson. So we separate and store the code point off and reconstruct
+ * the escape sequence when printing later.
+ * We only escape unicode characters that are part of UTF-16 surrogate pairs. Others are generally
+ * treated well by tools like Jackson.
+ *
+ * Handles both:
+ * 1. Unicode escape sequences (\uXXXX) where XXXX is in the surrogate range
+ * 2. Raw surrogate characters in the source (character codes 0xD800-0xDFFF)
+ */
+export function extractSurrogateEscapes(valueSource: string): { cleanedSource: string, unicodeEscapes: J.LiteralUnicodeEscape[] } {
+    const unicodeEscapes: J.LiteralUnicodeEscape[] = [];
+    let cleanedSource = '';
+    let cleanedIndex = 0;
+
+    for (let j = 0; j < valueSource.length; j++) {
+        const c = valueSource.charAt(j);
+        const charCode = valueSource.charCodeAt(j);
+
+        // Check for unicode escape sequence: \uXXXX
+        // Ensure we're not escaped (previous char is not \) or we're at the start
+        if (c === '\\' && j < valueSource.length - 1 && (j === 0 || valueSource.charAt(j - 1) !== '\\')) {
+            if (valueSource.charAt(j + 1) === 'u' && j < valueSource.length - 5) {
+                const codePoint = valueSource.substring(j + 2, j + 6);
+                const codePointNumeric = parseInt(codePoint, 16);
+                if (!isNaN(codePointNumeric) && codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
+                    unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
+                    j += 5; // Skip the \uXXXX sequence (we're already at \, skip u and 4 hex digits)
+                    continue;
+                }
+            }
+        }
+
+        // A raw surrogate pair spells one code point — an emoji, say — and is carried as itself. A lone
+        // surrogate is not text on its own and does not survive serialization (#6599), so it is held as a
+        // `\uXXXX` escape and prints back as one.
+        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const next = valueSource.charCodeAt(j + 1);
+            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
+                cleanedSource += c + valueSource.charAt(j + 1);
+                cleanedIndex += 2;
+                j++;
+                continue;
+            }
+            const codePoint = charCode.toString(16).toUpperCase().padStart(4, '0');
+            unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
+            continue;
+        }
+
+        cleanedSource += c;
+        cleanedIndex++;
+    }
+
+    return { cleanedSource, unicodeEscapes };
 }

@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.binary.Binary;
+import org.openrewrite.quark.Quark;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -84,14 +86,16 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
                     if (sourceFile instanceof PlainText) {
                         return ((PlainText) sourceFile).withText(fileContents);
                     }
+                    // the contents of a quark or a binary file have no charset to keep
+                    boolean text = !(sourceFile instanceof Quark) && !(sourceFile instanceof Binary);
                     PlainText plainText = PlainText.builder()
                             .id(sourceFile.getId())
                             .sourcePath(sourceFile.getSourcePath())
                             .fileAttributes(sourceFile.getFileAttributes())
-                            .charsetBomMarked(sourceFile.isCharsetBomMarked())
+                            .charsetBomMarked(text && sourceFile.isCharsetBomMarked())
                             .text(fileContents)
                             .build();
-                    if (sourceFile.getCharset() != null) {
+                    if (text && sourceFile.getCharset() != null) {
                         return plainText.withCharset(sourceFile.getCharset());
                     }
                     return plainText;

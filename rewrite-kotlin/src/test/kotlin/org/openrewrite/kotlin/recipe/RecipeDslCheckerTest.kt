@@ -150,4 +150,71 @@ class RecipeDslCheckerTest {
         assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.COMPILATION_ERROR)
         assertThat(result.messages).contains("without a trailing `to { ... }`")
     }
+
+    @Test
+    fun `concatenated metadata compiles cleanly`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            val r = recipe("Use " + "uppercase", "d" + "esc") { edit { java { } } }
+            """.trimIndent(),
+        )
+        assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.OK)
+    }
+
+    @Test
+    fun `text-block metadata with trimIndent compiles cleanly`() {
+        val tq = "\"\"\""
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            val r = recipe("d", $tq
+                A
+                B
+            $tq.trimIndent()) { edit { java { } } }
+            """.trimIndent(),
+        )
+        assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.OK)
+    }
+
+    @Test
+    fun `non-constant displayName fails with a constant-metadata diagnostic`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            val name: String = "computed"
+            val r = recipe(name, "desc") { edit { java { } } }
+            """.trimIndent(),
+        )
+        assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.COMPILATION_ERROR)
+        assertThat(result.messages).contains("must be a compile-time constant String")
+    }
+
+    @Test
+    fun `non-constant description fails with a constant-metadata diagnostic`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            fun describe(): String = "computed"
+            val r = recipe("d", describe()) { edit { java { } } }
+            """.trimIndent(),
+        )
+        assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.COMPILATION_ERROR)
+        assertThat(result.messages).contains("must be a compile-time constant String")
+    }
+
+    @Test
+    fun `non-constant composite recipes displayName fails`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            import org.openrewrite.recipes
+            val name: String = "computed"
+            val A = recipe("A", "first") { edit { java { } } }
+            val Combo = recipes(name, "desc", A)
+            """.trimIndent(),
+        )
+        assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.COMPILATION_ERROR)
+        assertThat(result.messages).contains("must be a compile-time constant String")
+    }
 }

@@ -1,5 +1,7 @@
 from typing import Type, Optional, TypeVar
 
+import pytest
+
 from rewrite import Tree
 from rewrite.java import Literal, JavaType
 from rewrite.python import PythonVisitor
@@ -10,7 +12,7 @@ T = TypeVar('T', bound=Tree)
 
 def test_none():
     # language=python
-    RecipeSpec().rewrite_run(python("assert None", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
+    RecipeSpec().rewrite_run(python("assert None", after_recipe=check_first_literal_type(JavaType.Primitive.Null)))
 
 
 def test_boolean():
@@ -39,19 +41,23 @@ def test_fraction_leading_dot():
     RecipeSpec().rewrite_run(python("assert .0", after_recipe=check_first_literal_type(JavaType.Primitive.Double)))
 
 
-def test_large_int():
+def test_int_above_int32_is_long():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 0xC03A0019", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
+    RecipeSpec().rewrite_run(python("assert 2147483647", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
+    # language=python
+    RecipeSpec().rewrite_run(python("assert 2147483648", after_recipe=check_first_literal_type(JavaType.Primitive.Long)))
 
 
 def test_byte_string_concatenation():
     # language=python
-    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.String)))
+    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
-def test_bigint():
+def test_int_above_int64_has_no_primitive():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 9223372036854775808", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
+    RecipeSpec().rewrite_run(python("assert 9223372036854775807", after_recipe=check_first_literal_type(JavaType.Primitive.Long)))
+    # language=python
+    RecipeSpec().rewrite_run(python("assert 9223372036854775808", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_single_quoted_string():
@@ -148,12 +154,12 @@ def test_double_quoted_string():
 
 def test_complex_number_lowercase():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 1j"))
+    RecipeSpec().rewrite_run(python("assert 1j", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_complex_number_uppercase():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 1J"))
+    RecipeSpec().rewrite_run(python("assert 1J", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_complex_number_uppercase_in_subscript():
@@ -260,6 +266,20 @@ def test_token_types(self, code, types):
     assert actual_types == types + [ENDMARKER]
 '''
     ))
+
+
+def _parenthesized_concatenation(count: int) -> str:
+    return "X = (\n" + "    'a'\n" * count + ")\n"
+
+
+def _backslash_continued_concatenation(count: int) -> str:
+    return "X = \\\n" + "b'00' \\\n" * (count - 1) + "b'00'\n"
+
+
+@pytest.mark.parametrize("count", [200, 1_000, 10_000])
+@pytest.mark.parametrize("source", [_parenthesized_concatenation, _backslash_continued_concatenation])
+def test_long_implicit_concatenation(source, count):
+    RecipeSpec().rewrite_run(python(source(count)))
 
 
 def find_first(tree: Tree, clazz: Type[T]) -> T:
