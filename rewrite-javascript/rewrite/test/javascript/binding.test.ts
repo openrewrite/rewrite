@@ -3166,19 +3166,55 @@ describe("maybeRebind keeps the file's import layout", () => {
         ));
     });
 
-    test("a member renamed within its module keeps its place in the list", async () => {
+    test("an import that replaces the file's last statement takes its place and its comment", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = rebinding(["lodash", "lodash", "extend", "assign"]);
+        spec.recipe = rebinding(["m", "n", "A", "default"]);
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import {map, extend} from "lodash";
-
-            extend(map);`,
+            import {x} from "first";
+            // ui
+            import {A} from "m";`,
             `
-            import {map, assign} from "lodash";
+            import {x} from "first";
+            // ui
+            import A from "n";`
+        ));
+    });
 
-            assign(map);`
+    test("a type-only member and a value moved to one module each go on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "T"], ["m", "n", "V"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                type T,
+                V,
+            } from "m";
+
+            let t: T = V;`,
+            `
+            import {V} from "n";
+            import type {T} from "n";
+
+            let t: T = V;`
+        ));
+    });
+
+    test("members renamed within their module keep the order written, whichever rename runs first", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["lodash", "lodash", "zeta", "zed"], ["lodash", "lodash", "extend", "assign"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {zeta, extend, alpha} from "lodash";
+
+            zeta(extend, alpha);`,
+            `
+            import {zed, assign, alpha} from "lodash";
+
+            zed(assign, alpha);`
         ));
     });
 

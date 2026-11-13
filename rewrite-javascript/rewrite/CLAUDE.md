@@ -348,8 +348,9 @@ import {                        import {Button} from '@acme/ui/button';
 - An import they create takes the statement's place: right after it while it stands, in its place
   once it is dropped. The imports split from it sort by module among themselves.
 - A list made of its members keeps the order written there. A merge into any other import is alphabetical.
-- Several members moved to one module keep a multi-line list's line breaks and trailing comma. A lone
-  member, moved out or left last in place, goes on one line.
+- Several members moved to one module keep a multi-line list's line breaks and trailing comma. A member
+  moved out alone, or the last one rewritten where it stands, goes on one line. A member that stays
+  keeps the list as written.
 
 Rebinds from separate visits each lay out their own import, as a lone move would.
 

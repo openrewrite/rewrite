@@ -957,10 +957,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
             if (placement?.replacing) {
                 const next = compilationUnit.statements[insertionIndex];
+                const nextPrefix = placement.replacing.nextPrefix;
                 draft.statements = [
                     ...compilationUnit.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
-                    {...next, element: {...next.element!, prefix: placement.replacing.nextPrefix}},
+                    ...(next && nextPrefix ? [{...next, element: {...next.element!, prefix: nextPrefix}}] : []),
                     ...compilationUnit.statements.slice(insertionIndex + 1)
                 ];
             } else if (insertionIndex === prologueLength(compilationUnit)) {
@@ -1582,7 +1583,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             // Named import: import { member } from 'module'
 
             const importSpec = this.createImportSpecifier();
-            const layout = this.group?.layoutFor(this.module);
+            const layout = this.group?.layoutFor(this.module, this.typeOnly);
             const braceSpace = layout ? undefined : detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
             // The space after { is in the specifier's prefix, and the space before } is in the rightPadded's
             // after, or in the suffix of a trailing comma.
@@ -1803,7 +1804,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /** Where an import a rebind group creates goes, which is where the statement its members left stands or stood. */
     private placementInGroup(cu: JS.CompilationUnit): {
         index: number;
-        replacing?: {prefix: J.Space; nextPrefix: J.Space};
+        replacing?: {prefix: J.Space; nextPrefix?: J.Space};
     } | undefined {
         const group = this.group;
         if (group === undefined) {
@@ -1820,8 +1821,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         if (source >= 0) {
             return {index: source + 1};
         }
-        const next = group.dropped && indexOf(group.dropped.next);
-        return next !== undefined && next >= 0 ? {index: next, replacing: group.dropped} : undefined;
+        const dropped = group.dropped;
+        if (dropped === undefined) {
+            return undefined;
+        }
+        const next = dropped.next === undefined ? cu.statements.length : indexOf(dropped.next);
+        return next >= 0 ? {index: next, replacing: dropped} : undefined;
     }
 
     /**
@@ -2416,13 +2421,18 @@ const esmStyle = {default: ImportStyle.ES6Default, namespace: ImportStyle.ES6Nam
  * so that the imports they leave behind keep the statement's place, member order and layout.
  */
 export class RebindGroup {
-    /** Each specifier's local name in the order written, a moved one under the name it moves to. */
-    private readonly names: string[];
-    private readonly targets: string[] = [];
+    /** Each specifier's local name in the order written. */
+    private readonly written: string[];
+    /** The same, a moved one under the name it moves to. */
+    private readonly bound: string[];
+    private readonly targets: {module: string; typeOnly: boolean}[] = [];
     /** The imports the moves created, which sit together where the statement was, sorted by module. */
     readonly created: UUID[] = [];
-    /** The statement that followed the dropped one, and the prefixes both had, for an import created in its place. */
-    dropped?: {next: UUID; prefix: J.Space; nextPrefix: J.Space};
+    /**
+     * The dropped statement's prefix, for an import created in its place, and the statement that followed it
+     * with the prefix it had then.
+     */
+    dropped?: {prefix: J.Space; next?: UUID; nextPrefix?: J.Space};
     /** How the statement's named list spans lines, where it does. */
     readonly multiLine?: {first: J.Space; closing: J.Space; trailingComma?: TrailingComma};
 
@@ -2431,7 +2441,8 @@ export class RebindGroup {
         const elements = namedBindings?.kind === JS.Kind.NamedImports
             ? (namedBindings as JS.NamedImports).elements.elements.filter(e => !isEmptyPlaceholder(e.element))
             : [];
-        this.names = elements.map(e => specifierBinding(e.element)?.name ?? '');
+        this.written = elements.map(e => specifierBinding(e.element)?.name ?? '');
+        this.bound = [...this.written];
         const first = elements[0]?.element.prefix;
         if (first?.whitespace.includes('\n')) {
             const last = elements[elements.length - 1];
@@ -2440,25 +2451,36 @@ export class RebindGroup {
         }
     }
 
-    add(localName: string, boundName: string, to: {module: string; member?: string}): void {
-        const index = this.names.indexOf(localName);
+    add(localName: string, boundName: string, to: {module: string; member?: string}, typeOnly: boolean): void {
+        const index = this.written.indexOf(localName);
         if (index >= 0) {
-            this.names[index] = boundName;
+            this.bound[index] = boundName;
         }
         // A default or namespace binding gets an import of its own, so it never shares a named list.
         if (bindingShape(to.member) === "named") {
-            this.targets.push(to.module);
+            this.targets.push({module: to.module, typeOnly});
         }
     }
 
     /** Whether the statement listed several named members, so that one left alone in it stands on a line of its own. */
     get listedSeveral(): boolean {
-        return this.names.length > 1;
+        return this.written.length > 1;
     }
 
-    /** The multi-line layout an import of `module` takes, which only several members moved together keep. */
-    layoutFor(module: string): RebindGroup["multiLine"] {
-        return this.targets.filter(t => sameModule(t, module)).length > 1 ? this.multiLine : undefined;
+    /**
+     * The multi-line layout an import of `module` takes, which only several members moved together keep.
+     * A type-only import and a value import of one module are two lists.
+     */
+    layoutFor(module: string, typeOnly: boolean): RebindGroup["multiLine"] {
+        return this.targets.filter(t => sameModule(t.module, module) && t.typeOnly === typeOnly).length > 1
+            ? this.multiLine
+            : undefined;
+    }
+
+    /** A name's place in the statement, whether its move has run yet or not. */
+    private positionOf(name: string): number {
+        const bound = this.bound.indexOf(name);
+        return bound >= 0 ? bound : this.written.indexOf(name);
     }
 
     /**
@@ -2466,8 +2488,8 @@ export class RebindGroup {
      * or undefined where the list holds a name the statement did not.
      */
     insertionIndex(names: readonly string[], name: string): number | undefined {
-        const position = this.names.indexOf(name);
-        const positions = names.map(n => this.names.indexOf(n));
+        const position = this.positionOf(name);
+        const positions = names.map(n => this.positionOf(n));
         if (position < 0 || positions.some(p => p < 0)) {
             return undefined;
         }
@@ -2476,9 +2498,9 @@ export class RebindGroup {
     }
 }
 
-/** Orders the imports a rebind group leaves where its statement was. */
+/** Orders the imports a rebind group leaves by module and ignoring case, as `OrderImports` does. */
 function compareModules(a: string | undefined, b: string | undefined): number {
-    return (a ?? '').localeCompare(b ?? '');
+    return (a ?? '').toLowerCase().localeCompare((b ?? '').toLowerCase());
 }
 
 /**
@@ -2525,7 +2547,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     private transformedInPlace = false;
-    private inPlace?: UUID;
     private typeOnly = false;
     private cu?: JS.CompilationUnit;
     private dropped?: UUID;
@@ -2543,12 +2564,12 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         this.cu = cu;
         this.movedTypes = movedTypesIn(cu, this.from, this.to, true);
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
-        if (this.dropped !== undefined) {
-            const index = visited.statements.findIndex(s => s.element?.id === this.dropped);
-            const next = visited.statements[index + 1]?.element;
-            const prefix = visited.statements[index].element!.prefix;
-            if (this.group !== undefined && next !== undefined) {
-                this.group.dropped = {next: next.id, prefix, nextPrefix: next.prefix};
+        const droppedAt = visited.statements.findIndex(s => s.element?.id === this.dropped);
+        if (this.dropped !== undefined && droppedAt >= 0) {
+            const next = visited.statements[droppedAt + 1]?.element;
+            const prefix = visited.statements[droppedAt].element!.prefix;
+            if (this.group !== undefined) {
+                this.group.dropped = {prefix, next: next?.id, nextPrefix: next?.prefix};
             }
             visited = withoutStatement(visited, this.dropped);
             // An import split from the statement takes its place whole, comments included, which
@@ -2562,8 +2583,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
                 };
             }
         }
-        if (this.inPlace !== undefined && this.group !== undefined) {
-            visited = withRunSorted(visited, new Set([this.inPlace, ...this.group.created]));
+        if (this.transformedInPlace && this.group !== undefined) {
+            visited = withRunSorted(visited, new Set([this.group.sourceId, ...this.group.created]));
         }
         if (!this.transformedInPlace) {
             // A pinned alias is the whole answer `bindImport` would give, so the import is queued directly,
@@ -2607,7 +2628,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         }
 
         this.transformedInPlace = true;
-        this.inPlace = imp.id;
         const rewritten = produce(imp, draft => {
             const literal = draft.moduleSpecifier!.element as Draft<J.Literal>;
             respecify(literal, spelledLike(this.to.module, String(literal.value)));
