@@ -718,7 +718,7 @@ public class TypeUtilsTests
     }
 
     [Fact]
-    public void IsAssignableTo_NestedGeneric_ArrayArguments()
+    public void IsAssignableTo_NestedGeneric_ArrayArgumentsAreNotMatchedWithoutRankInformation()
     {
         // given
         var candidate = Generic("System.Collections.Generic.List",
@@ -733,7 +733,7 @@ public class TypeUtilsTests
         var matchesDifferent = TypeUtils.IsAssignableTo(candidate, differentTarget);
 
         // then
-        Assert.True(matchesSame);
+        Assert.False(matchesSame);
         Assert.False(matchesDifferent);
     }
 

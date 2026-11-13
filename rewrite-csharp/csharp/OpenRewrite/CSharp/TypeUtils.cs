@@ -469,8 +469,8 @@ public static class TypeUtils
     /// Compare type parameter lists position-by-position. A <see cref="JavaType.GenericTypeVariable"/>
     /// in the target acts as a wildcard (any concrete type matches). If the variable has bounds,
     /// the candidate's type argument must be assignable to all bounds.
-    /// Concrete type parameters are compared invariantly and structurally: nested generic and
-    /// array arguments must match recursively, and other arguments require an exact FQN match.
+    /// Concrete type parameters are compared invariantly and structurally: nested generic
+    /// arguments must match recursively, and other arguments require an exact FQN match.
     /// </summary>
     private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams) =>
         TypeParametersMatch(candidateParams, targetParams, new HashSet<(JavaType, JavaType)>());
@@ -516,10 +516,6 @@ public static class TypeUtils
                 // is still found on the path that reaches a non-cyclic argument.
                 if (!inProgress.Add((candidate, target))) return true;
                 return TypeParametersMatch(candidateParam.TypeParameters, targetParam.TypeParameters, inProgress);
-
-            case JavaType.Array targetArray:
-                return candidate is JavaType.Array candidateArray &&
-                       TypeArgumentMatches(candidateArray.ElemType, targetArray.ElemType, inProgress);
 
             default:
                 var fqn = GetFullyQualifiedName(target);
