@@ -1057,6 +1057,13 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
             if (otherTypeNames == null) {
                 JavaType.FullyQualified outermost = getTopLevelClassName(newType);
+                Map<String, String> importedTypeNames = new HashMap<>();
+                for (J.Import anImport : sf.getImports()) {
+                    if (!anImport.isStatic() && anImport.getAlias() == null &&
+                            !"*".equals(anImport.getQualid().getSimpleName())) {
+                        importedTypeNames.put(anImport.getQualid().getSimpleName(), anImport.getTypeName());
+                    }
+                }
                 otherTypeNames = new JavaIsoVisitor<Set<String>>() {
                     private boolean isTarget(@Nullable JavaType type) {
                         return TypeUtils.isOfClassType(type, newType.getFullyQualifiedName()) ||
@@ -1082,6 +1089,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     @Override
                     public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
                         JavaType type = identifier.getType();
+                        String importedTypeName = importedTypeNames.get(identifier.getSimpleName());
+                        if (type instanceof JavaType.Unknown && importedTypeName != null) {
+                            // a name of unknown type refers to the type the file imports by that name
+                            type = JavaType.ShallowClass.build(importedTypeName);
+                        }
                         if (identifier.getFieldType() == null && type instanceof JavaType.FullyQualified && !isTarget(type) &&
                                 !TypeUtils.isOfClassType(type, originalType.getFullyQualifiedName())) {
                             names.add(identifier.getSimpleName());
