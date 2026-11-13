@@ -956,12 +956,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 : emptyMarkers;
 
             if (placement?.replacing) {
+                // The import goes before the statement `replacing.next` names, or at the end of the file.
+                const following = placement.replacing.next;
                 const next = compilationUnit.statements[insertionIndex];
-                const nextPrefix = placement.replacing.nextPrefix;
                 draft.statements = [
                     ...compilationUnit.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
-                    ...(next && nextPrefix ? [{...next, element: {...next.element!, prefix: nextPrefix}}] : []),
+                    ...(following ? [{...next, element: {...next.element!, prefix: following.prefix}}] : []),
                     ...compilationUnit.statements.slice(insertionIndex + 1)
                 ];
             } else if (insertionIndex === prologueLength(compilationUnit)) {
@@ -1804,7 +1805,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /** Where an import a rebind group creates goes, which is where the statement its members left stands or stood. */
     private placementInGroup(cu: JS.CompilationUnit): {
         index: number;
-        replacing?: {prefix: J.Space; nextPrefix?: J.Space};
+        replacing?: NonNullable<RebindGroup["dropped"]>;
     } | undefined {
         const group = this.group;
         if (group === undefined) {
@@ -1825,7 +1826,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         if (dropped === undefined) {
             return undefined;
         }
-        const next = dropped.next === undefined ? cu.statements.length : indexOf(dropped.next);
+        const next = dropped.next === undefined ? cu.statements.length : indexOf(dropped.next.id);
         return next >= 0 ? {index: next, replacing: dropped} : undefined;
     }
 
@@ -2432,7 +2433,7 @@ export class RebindGroup {
      * The dropped statement's prefix, for an import created in its place, and the statement that followed it
      * with the prefix it had then.
      */
-    dropped?: {prefix: J.Space; next?: UUID; nextPrefix?: J.Space};
+    dropped?: {prefix: J.Space; next?: {id: UUID; prefix: J.Space}};
     /** How the statement's named list spans lines, where it does. */
     readonly multiLine?: {first: J.Space; closing: J.Space; trailingComma?: TrailingComma};
 
@@ -2564,14 +2565,15 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         this.cu = cu;
         this.movedTypes = movedTypesIn(cu, this.from, this.to, true);
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
-        const droppedAt = visited.statements.findIndex(s => s.element?.id === this.dropped);
-        if (this.dropped !== undefined && droppedAt >= 0) {
+        const dropped = this.dropped;
+        const droppedAt = dropped === undefined ? -1 : visited.statements.findIndex(s => s.element?.id === dropped);
+        if (droppedAt >= 0) {
             const next = visited.statements[droppedAt + 1]?.element;
             const prefix = visited.statements[droppedAt].element!.prefix;
             if (this.group !== undefined) {
-                this.group.dropped = {prefix, next: next?.id, nextPrefix: next?.prefix};
+                this.group.dropped = {prefix, next: next && {id: next.id, prefix: next.prefix}};
             }
-            visited = withoutStatement(visited, this.dropped);
+            visited = withoutStatement(visited, dropped!);
             // An import split from the statement takes its place whole, comments included, which
             // `withoutStatement` keeps only for a file header.
             if (next !== undefined && this.group?.created.includes(next.id)) {
