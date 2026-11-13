@@ -174,13 +174,15 @@ export class PrepareRecipe {
         }
 
         if (visitor! instanceof Check) {
-            const wireEntry = this.conditionWireEntry(visitor.check, phase);
+            const wireEntry = this.conditionWireEntry(visitor.check);
             if (wireEntry) {
                 preconditions.push(wireEntry);
                 if (phase === "edit") {
+                    const editor = recipe.editor;
                     recipe = PrepareRecipe.withOverrides(recipe, {
-                        async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                            return visitor.v;
+                        async editor(this: Recipe): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const editVisitor = await editor.call(this);
+                            return editVisitor instanceof Check ? editVisitor.v : editVisitor;
                         }
                     });
                 } else {
@@ -214,11 +216,11 @@ export class PrepareRecipe {
      * condition can't be serialized — the caller leaves the wrapper
      * intact so the gate runs in-process as a fallback.
      */
-    private static conditionWireEntry(condition: CheckArg, phase: "edit" | "scan"): Precondition | undefined {
+    private static conditionWireEntry(condition: CheckArg): Precondition | undefined {
         if (condition instanceof CompositePrecondition) {
             const operands: Precondition[] = [];
             for (const operand of condition.operands) {
-                const entry = this.conditionWireEntry(operand, phase);
+                const entry = this.conditionWireEntry(operand);
                 if (entry === undefined) {
                     return undefined;
                 }
@@ -235,7 +237,8 @@ export class PrepareRecipe {
             return {visitorName: ref.recipeName, visitorOptions: {...ref.options}};
         }
         if (condition instanceof RpcRecipe) {
-            return {visitorName: phase === "edit" ? condition.editVisitor : condition.scanVisitor!};
+            // A recipe gates with its editor in either phase, as Check evaluates it in-process.
+            return {visitorName: condition.editVisitor};
         }
         return undefined;
     }
