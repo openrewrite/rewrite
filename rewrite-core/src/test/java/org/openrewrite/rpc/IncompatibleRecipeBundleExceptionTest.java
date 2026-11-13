@@ -66,7 +66,7 @@ class IncompatibleRecipeBundleExceptionTest {
         PipedOutputStream clientOut = new PipedOutputStream();
         PipedOutputStream serverOut = new PipedOutputStream();
         HeaderDelimitedMessageHandler server = new HeaderDelimitedMessageHandler(new PipedInputStream(clientOut), serverOut);
-        RewriteRpc client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(new PipedInputStream(serverOut), clientOut)),
+        RewriteRpc client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(new PipedInputStream(serverOut), clientOut), new JsonMessageFormatter()),
           new RecipeMarketplace());
         JsonMessageFormatter formatter = new JsonMessageFormatter();
         Thread answer = new Thread(() -> {

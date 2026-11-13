@@ -83,9 +83,9 @@ class CompositeBatchVisitSubclassTest {
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 
