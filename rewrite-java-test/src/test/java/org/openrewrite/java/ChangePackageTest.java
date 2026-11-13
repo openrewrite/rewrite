@@ -293,6 +293,52 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void updateThrownExceptionType() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateThrownTypeVariableBound() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  <E extends Test> void m() throws E {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  <E extends Test> void m() throws E {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVariableType() {
         rewriteRun(
           java(testClassBefore, testClassAfter),
@@ -1528,6 +1574,44 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableBoundThatRefersToTheVariable() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite;
+              public class Node<T extends Node<T>> {
+              }
+              """,
+            """
+              package org.openrewrite.test;
+              public class Node<T extends Node<T>> {
+              }
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiCatch() {
         rewriteRun(
           java(testClassBefore, testClassAfter),
@@ -2580,7 +2664,7 @@ class ChangePackageTest implements RewriteTest {
     void singleElementPackageNameRecursiveKeepsUnresolvedFieldAccess() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               package somepkg;
@@ -2610,6 +2694,37 @@ class ChangePackageTest implements RewriteTest {
               class A extends Missing {
                   Test a;
                   int b = somepkg.count;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeArgumentsWithinTypeArguments() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter, spec -> spec.path("org/openrewrite/Test.java")),
+          java(
+            """
+              import org.openrewrite.Test;
+
+              import java.util.List;
+
+              class B {
+                  List<List<Test>> nested;
+                  List<? extends List<Test>> bound;
+                  List<Test[]> array;
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+
+              import java.util.List;
+
+              class B {
+                  List<List<Test>> nested;
+                  List<? extends List<Test>> bound;
+                  List<Test[]> array;
               }
               """
           )

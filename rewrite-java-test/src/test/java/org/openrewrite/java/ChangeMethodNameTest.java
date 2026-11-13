@@ -27,11 +27,13 @@ import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -573,6 +575,506 @@ class ChangeMethodNameTest implements RewriteTest {
 
                   public T getReferenceById(String key) {
                       return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Language("java")
+    String multi = """
+      package a;
+
+      import java.util.function.Function;
+
+      public interface Multi<T> {
+          @Deprecated
+          default Transform<T> transform() { return null; }
+          Select<T> select();
+
+          @Deprecated
+          default <R> Multi<R> apply(Function<? super T, ? extends R> mapper) { return null; }
+          <R> Multi<R> map(Function<? super T, ? extends R> mapper);
+
+          class Transform<T> {
+              public Multi<T> byTakingFirstItems(long count) { return null; }
+          }
+
+          class Select<T> {
+              public Multi<T> first() { return null; }
+              public Multi<T> first(long count) { return null; }
+              public Multi<T> first(String until) { return null; }
+          }
+      }
+      """;
+
+    @Test
+    void chainedRenamedCallsHaveTheTypesOfTheMethodsTheyCall() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("a.Multi transform()", "select", null, null),
+            new ChangeMethodName("a.Multi.Transform byTakingFirstItems(..)", "first", null, true)),
+          java(multi),
+          java(
+            """
+              import a.Multi;
+
+              class Test {
+                  Object test(Multi<String> multi) {
+                      return multi.transform().byTakingFirstItems(2);
+                  }
+              }
+              """,
+            """
+              import a.Multi;
+
+              class Test {
+                  Object test(Multi<String> multi) {
+                      return multi.select().first(2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallKeepsTheTypesInferredForIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Multi apply(..)", "map", null, null)),
+          java(multi),
+          java(
+            """
+              import a.Multi;
+
+              class Test {
+                  Multi<Integer> test(Multi<String> multi) {
+                      return multi.apply(String::length);
+                  }
+              }
+              """,
+            """
+              import a.Multi;
+
+              class Test {
+                  Multi<Integer> test(Multi<String> multi) {
+                      return multi.map(String::length);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallOnASubtypeHasTheTypeArgumentsOfItsSupertype() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Holder boxed()", "get", null, null)),
+          java(
+            """
+              package a;
+
+              import java.util.List;
+
+              public interface Holder<T> {
+                  default List<T> boxed() { return null; }
+                  default T get() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Names implements Holder<String> {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Lazy<V> implements Holder<V> {
+              }
+              """
+          ),
+          java(
+            """
+              import a.Lazy;
+              import a.Names;
+
+              class Test {
+                  Object test(Names names, Lazy<Integer> lazy) {
+                      return names.boxed() == lazy.boxed();
+                  }
+              }
+              """,
+            """
+              import a.Lazy;
+              import a.Names;
+
+              class Test {
+                  Object test(Names names, Lazy<Integer> lazy) {
+                      return names.get() == lazy.get();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallKeepsItsTypeWhereItsDeclarationIsRenamedToo() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("a.A addItem(String)", "add", null, null),
+            new ChangeMethodName("a.A describe()", "toString", null, null)),
+          java(
+            """
+              package a;
+
+              public class A {
+                  public void addItem(String item) {}
+                  public void add(int count) {}
+
+                  public String describe() { return ""; }
+              }
+              """,
+            """
+              package a;
+
+              public class A {
+                  public void add(String item) {}
+                  public void add(int count) {}
+
+                  public String toString() { return ""; }
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  Object test(a.A a) {
+                      a.addItem("x");
+
+                      return a.describe();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  Object test(a.A a) {
+                      a.add("x");
+
+                      return a.toString();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallOnASubtypeCallsItsOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Base old()", "neu", null, null)),
+          java(
+            """
+              package a;
+              public class Base {
+                  public Object old() { return null; }
+                  public Object neu() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class Sub extends Base {
+                  @Override
+                  public String neu() { return null; }
+                  Object withoutReceiver() {
+                      // no anonymous class, so the call is on a `Sub`
+                      return new java.util.EventObject(old());
+                  }
+              }
+              """,
+            """
+              package a;
+              public class Sub extends Base {
+                  @Override
+                  public String neu() { return null; }
+                  Object withoutReceiver() {
+                      // no anonymous class, so the call is on a `Sub`
+                      return new java.util.EventObject(neu());
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Sub;
+
+              class Test {
+                  Object test(Sub sub) {
+                      return sub.old();
+                  }
+              }
+              """,
+            """
+              import a.Sub;
+
+              class Test {
+                  Object test(Sub sub) {
+                      return sub.neu();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallCallsTheOverloadOfTheNewNameThatItsArgumentsFit() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.A old(String)", "neu", null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                  public Object old(String s) { return null; }
+                  public String neu(String s) { return null; }
+                  public int neu(Integer i) { return 0; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+
+              class Test {
+                  Object test(A a) {
+                      return a.old("");
+                  }
+              }
+              """,
+            """
+              import a.A;
+
+              class Test {
+                  Object test(A a) {
+                      return a.neu("");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallOnARawTypeKeepsItsType() {
+        rewriteRun(
+          // javac has these calls return a `List`, the erasure of `neu()`'s type, where they keep the type of `old()`
+          spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+          java(
+            """
+              package a;
+              import java.util.List;
+              public class Box<T> {
+                  public T old() { return null; }
+                  public List<String> neu() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Box;
+
+              class Test {
+                  Object test(Box box) {
+                      return box.old();
+                  }
+              }
+              """,
+            """
+              import a.Box;
+
+              class Test {
+                  Object test(Box box) {
+                      return box.neu();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(ChangeMethodNameTest::assertCallsReturnObject)
+          ),
+          java(
+            """
+              import a.Box;
+
+              class Strings extends Box<String> {
+                  Object test() {
+                      return new Box() {
+                          Object anonymous = old();
+                      };
+                  }
+              }
+              """,
+            """
+              import a.Box;
+
+              class Strings extends Box<String> {
+                  Object test() {
+                      return new Box() {
+                          Object anonymous = neu();
+                      };
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(ChangeMethodNameTest::assertCallsReturnObject)
+          )
+        );
+    }
+
+    private static void assertCallsReturnObject(J.CompilationUnit cu) {
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                assertThat(requireNonNull(method.getMethodType()).getReturnType()).hasToString("java.lang.Object");
+                return method;
+            }
+        }.visit(cu, 0);
+    }
+
+    @Test
+    void renamedCallOfAStaticMethodOfAGenericTypeHasItsTypes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null)),
+          java(
+            """
+              package a;
+              public interface Box<T> {
+                  static Object old() { return null; }
+                  static String neu() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Box;
+
+              class Test {
+                  Object test() {
+                      return Box.old();
+                  }
+              }
+              """,
+            """
+              import a.Box;
+
+              class Test {
+                  Object test() {
+                      return Box.neu();
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import static a.Box.old;
+
+              class Imported {
+                  Object test() {
+                      return old();
+                  }
+              }
+              """,
+            """
+              import static a.Box.neu;
+
+              class Imported {
+                  Object test() {
+                      return neu();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallWithoutAReceiverInAGenericTypeHasTheNewMethodsTypes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("a.Box old()", "neu", null, null)),
+          java(
+            """
+              package a;
+              public abstract class Box<T> {
+                  abstract Object old();
+                  abstract T neu();
+                  Object test() {
+                      return old();
+                  }
+              }
+              """,
+            """
+              package a;
+              public abstract class Box<T> {
+                  abstract Object old();
+                  abstract T neu();
+                  Object test() {
+                      return neu();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamedCallThrowsTheExceptionsOfTheReceiversTypeArguments() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("a.Action run()", "call", null, null),
+            new ChangeMethodName("a.Action runAll()", "first", null, null)),
+          java(
+            """
+              package a;
+
+              import java.util.List;
+
+              public interface Action<T, E extends Exception> {
+                  default T run() throws E { return null; }
+                  default T call() throws E { return null; }
+
+                  default List<T> runAll() throws E { return null; }
+                  default T first() throws E { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Action;
+
+              import java.io.IOException;
+
+              class Test {
+                  Object test(Action<String, IOException> action) throws IOException {
+                      action.run();
+                      return action.runAll();
+                  }
+              }
+              """,
+            """
+              import a.Action;
+
+              import java.io.IOException;
+
+              class Test {
+                  Object test(Action<String, IOException> action) throws IOException {
+                      action.call();
+                      return action.first();
                   }
               }
               """

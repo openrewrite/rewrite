@@ -858,7 +858,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
         }
         J clazz = convertInstanceOfTree(node);
-        J pattern = getNodePattern(node.getPattern(), type);
+        J pattern = getNodePattern(node.getPattern());
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
@@ -890,10 +890,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
-    private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
+    private @Nullable J getNodePattern(@Nullable PatternTree pattern) {
         if (pattern instanceof JCBindingPattern b) {
+            JavaType.Variable variableType = typeMapping.variableType(b.var.sym);
             return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
+                    variableType != null ? variableType.getType() : null, variableType);
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {

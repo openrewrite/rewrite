@@ -91,7 +91,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String bindType, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, @Nullable String bindType, Set<String> imports,
                          Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, bindType));
     }
@@ -126,6 +126,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = substitutions(withoutCommentsOfReplacedTree(coordinates, parameters));
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
+        // A context-sensitive stub doesn't declare the template's type variables, so those in its types are the
+        // code's own.
+        if (!templateParser.isContextSensitive()) {
+            // the replacement takes the replaced expression's place, so its bind type is that expression's type
+            Expression replaced = coordinates.getMode() == JavaCoordinates.Mode.REPLACEMENT &&
+                                  coordinates.getTree() instanceof Expression ?
+                    (Expression) coordinates.getTree() : null;
+            substitutions.bindTypeVariables(templateParser.getBindType(), replaced);
+        }
 
         JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,
                 substitutedTemplate, coordinates, autoFormat);
@@ -230,7 +239,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
-        private String bindType = "Object";
+        private @Nullable String bindType;
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 

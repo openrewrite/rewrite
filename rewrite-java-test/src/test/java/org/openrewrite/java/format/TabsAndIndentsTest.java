@@ -32,7 +32,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -1275,9 +1274,6 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
-            .types(TypeValidation.none())
-            .build()),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -2020,7 +2016,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void failure1() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all()
+            .identifiers(false).methodDeclarations(false).methodInvocations(false).constructorInvocations(false)),
           java(
             """
               public class Test {
@@ -2652,7 +2649,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               public record RenameRequest(

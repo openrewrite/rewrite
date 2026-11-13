@@ -22,7 +22,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
@@ -601,8 +600,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void leaveTheBuildsOwnPropertiesAloneInKotlinDSL() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null))
-            .typeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
           buildGradleKts(
             """
               plugins {

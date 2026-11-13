@@ -39,8 +39,6 @@ _ALLOWED = (SearchResult, Markup, RecipesThatMadeChanges)
 
 # Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows.
 _REWRITE_RECIPE_MARKERS = frozenset({
-    "org.openrewrite.marker.AlreadyReplaced",
-    "org.openrewrite.maven.marker.AlreadyIncremented",
     "org.openrewrite.yaml.MultilineScalarChanged",
 })
 _FIELDS: Dict[type, Tuple[str, ...]] = {}

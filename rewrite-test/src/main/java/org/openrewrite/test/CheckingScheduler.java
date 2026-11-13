@@ -25,6 +25,7 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -34,13 +35,15 @@ import java.util.List;
 final class CheckingScheduler extends RecipeScheduler {
     private final @Nullable UnchangedTreeIdentity unchangedTreeIdentity;
     private final @Nullable AccumulatorContents accumulatorContents;
+    private final @Nullable Collection<String> scannerEdits;
 
     static RecipeScheduler of(LargeSourceSet sources) {
         if (!(sources instanceof LargeSourceSetCheckingExpectedCycles)) {
             return new RecipeScheduler();
         }
         LargeSourceSetCheckingExpectedCycles checked = (LargeSourceSetCheckingExpectedCycles) sources;
-        return new CheckingScheduler(checked.getUnchangedTreeIdentity(), checked.getAccumulatorContents());
+        return new CheckingScheduler(checked.getUnchangedTreeIdentity(), checked.getAccumulatorContents(),
+                checked.getScannerEdits());
     }
 
     @Override
@@ -75,6 +78,13 @@ final class CheckingScheduler extends RecipeScheduler {
                     accumulatorContents.check(rootCursor, ctxWithWatch, "after editing");
                 }
                 return edited;
+            }
+
+            @Override
+            protected void recordScannerEdit(Recipe recipe, SourceFile source) {
+                if (scannerEdits != null) {
+                    scannerEdits.add(recipe.getName() + "'s scanner changed " + source.getSourcePath());
+                }
             }
 
             @Override

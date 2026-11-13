@@ -30,7 +30,6 @@ import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -2228,7 +2227,6 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void trailingLambdaCall() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlin(
             """
               import kotlin.reflect.full.memberProperties

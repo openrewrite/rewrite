@@ -30,10 +30,13 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.AddImport;
+import org.openrewrite.java.ChangeMethodName;
+import org.openrewrite.java.ChangeMethodTargetToStatic;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaParserExecutionContextView;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.NoStaticImport;
@@ -42,17 +45,21 @@ import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.java.format.AutoFormat;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
@@ -60,8 +67,10 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
+import javax.tools.ToolProvider;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URL;
@@ -79,6 +88,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -2134,6 +2144,684 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class ParserTypedTrees {
+
+        @Test
+        void rejectTypeTheParserGivesDifferently() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Give the code the recipe writes the types its parser gives that code")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.DeclareLongByHand):\n" +
+                                    "    `x = 1` has the variable int x where the parser gives long x")
+              .hasMessageContaining("parserTypedTrees(false)");
+
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder()
+                  .parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+              java("class A { void f() { int x = 1; } }", "class A { void f() { long x = 1; } }")
+            ));
+        }
+
+        @Test
+        void suggestTheErasureLevelThatAcceptsDifferentThrownExceptions() {
+            //language=java
+            String before = """
+              class A {
+                  void m(int i) throws Exception {}
+                  void f() throws Exception {
+                      m(1);
+                  }
+              }
+              """;
+            //language=java
+            String after = """
+              class A {
+                  void m(int i) throws Exception {}
+                  void f() throws Exception {
+                      m(2);
+                  }
+              }
+              """;
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new CallWithTwoThrowingNothingByHand()),
+              java(before, after)
+            ));
+            assertThat(e).hasMessageContaining("throwing nothing where the parser gives")
+              .hasMessageContaining("parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure)")
+              .hasMessageNotContaining("parserTypedTrees(false)");
+
+            rewriteRun(
+              spec -> spec.recipe(new CallWithTwoThrowingNothingByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder()
+                  .parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+              java(before, after)
+            );
+        }
+
+        @Test
+        void acceptStringTypedAsThePrimitiveString() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareStringAsPrimitiveByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          String o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipTypeTheParserCannotResolve() {
+            // a recipe can write code that uses a library the test's parser doesn't have on its classpath
+            rewriteRun(
+              spec -> spec.recipe(new DeclareUnresolvedTypeByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          Missing o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipWhenTheTestDoesNotValidateTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .typeValidationOptions(TypeValidation.all().identifiers(false)),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareLongByHand())
+                .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          int x = 1;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          long x = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class CompilableOutput {
+        private final RecipeQualityValidation compilableOutput =
+          RecipeQualityValidation.builder().compilableOutput(true).build();
+
+        @Test
+        void rejectOutputThatDoesNotCompile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles")
+              .hasMessageContaining("A.java (changed by org.openrewrite.java.ChangeMethodName):\n" +
+                                    "    `String s = String.join(1);` ")
+              .hasMessageContaining("int cannot be converted to java.lang.CharSequence")
+              .hasMessageContaining("spec.afterParser(")
+              .hasMessageContaining("compilableOutput(false)");
+        }
+
+        @Test
+        void acceptErrorsThatTheSourceHadBeforeTheRecipeRan() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "strip", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      void a(String o) {
+                          String s = o.trim().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void a(String o) {
+                          String s = o.strip().length();
+                      }
+                      void b(B o) {
+                          String s = o.trim().length();
+                      }
+                      interface B {
+                          B trim();
+                          int length();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectOnlyTheErrorsThatTheSourceDidNotHaveBeforeTheRecipeRan() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length();
+                      String t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length();
+                      String t = "b".length();
+                  }
+                  """
+              )
+            ));
+            // javac says the same about both lines, and only the second is the recipe's
+            assertThat(e).hasMessageContaining("`String t = \"b\".length();` incompatible types")
+              .hasMessageNotContaining("\"a\".length()");
+        }
+
+        @Test
+        void rejectASecondErrorWithTheSameMessageOnTheSameLine() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "length", null, null))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = "a".length(), t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String s = "a".length(), t = "b".length();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code that compiles");
+        }
+
+        @Test
+        void compileWithTheAfterParser() {
+            //language=java
+            String before = """
+              import a.A;
+
+              class Test {
+                  A a;
+              }
+              """;
+            //language=java
+            String after = """
+              import b.B;
+
+              class Test {
+                  B a;
+              }
+              """;
+            JavaParser.Builder<?, ?> parserOfA = JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class A {
+                }
+                """
+            );
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeType("a.A", "b.B", null))
+                .parser(parserOfA)
+                .recipeQualityValidation(compilableOutput),
+              java(before, after)
+            ));
+            assertThat(e.getMessage()).containsOnlyOnce("`import b.B;` package b does not exist");
+
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("a.A", "b.B", null))
+                .parser(parserOfA)
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                    }
+                    """
+                ))
+                .recipeQualityValidation(compilableOutput),
+              java(before, after)
+            );
+        }
+
+        @Test
+        void skipWhenTheTestDoesNotValidateTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String valueOf(int)", "join", null, null))
+                .typeValidationOptions(TypeValidation.all().identifiers(false))
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class A {
+                      String s = String.valueOf(1);
+                  }
+                  """,
+                """
+                  class A {
+                      String s = String.join(1);
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectUnchangedSourceThatTheAfterParserDoesNotCompile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodName("java.lang.String trim()", "strip", null, null))
+                .afterParser(JavaParser.fromJavaVersion())
+                .recipeQualityValidation(compilableOutput),
+              java(
+                """
+                  class Unchanged {
+                      String s = "a".length();
+                  }
+                  """
+              ),
+              java(
+                """
+                  class A {
+                      String t = "b".trim();
+                  }
+                  """,
+                """
+                  class A {
+                      String t = "b".strip();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("Unchanged.java:\n    `String s = \"a\".length();` incompatible types")
+              .hasMessageNotContaining("spec.afterParser(");
+        }
+    }
+
+    @Nested
+    class AfterParser {
+        //language=java
+        private static final String INSTANCE_METHOD = """
+          package a;
+          public class A {
+              public void method() {}
+          }
+          """;
+
+        //language=java
+        private static final String STATIC_METHOD = """
+          package a;
+          public class A {
+              public static void method() {}
+          }
+          """;
+
+        //language=java
+        private static final String BEFORE = """
+          import a.A;
+          class Test {
+              void test() {
+                  new A().method();
+              }
+          }
+          """;
+
+        //language=java
+        private static final String AFTER = """
+          import a.A;
+          class Test {
+              void test() {
+                  A.method();
+              }
+          }
+          """;
+
+        @Test
+        void compareTypesWithTheAfterParserTypedAfresh(@TempDir Path dir) throws Exception {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(dir.toFile());
+            Path resources = dir.resolve("resources");
+            Path typeTable = resources.resolve("META-INF/rewrite/classpath.tsv.gz");
+            Files.createDirectories(typeTable.getParent());
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(typeTable))) {
+                writer.jar("a", "lib", "1.0").write(jarOf(INSTANCE_METHOD, dir.resolve("1.0")));
+                writer.jar("a", "lib", "2.0").write(jarOf(STATIC_METHOD, dir.resolve("2.0")));
+            }
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            try (URLClassLoader withTypeTable = new URLClassLoader(new URL[]{resources.toUri().toURL()},
+              contextClassLoader)) {
+                Thread.currentThread().setContextClassLoader(withTypeTable);
+                JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().classpathFromResources(ctx, "lib-1");
+                // the first run fills the builder's type cache with the input's a.A, which a clone reads through to
+                for (int run = 0; run < 2; run++) {
+                    rewriteRun(
+                      spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                        .parser(parser)
+                        .afterParser(parser.clone().classpathFromResources(ctx, "lib-2")),
+                      java(BEFORE, AFTER)
+                    );
+                }
+            } finally {
+                Thread.currentThread().setContextClassLoader(contextClassLoader);
+            }
+        }
+
+        private Path jarOf(String stub, Path dir) throws Exception {
+            Path source = dir.resolve("a/A.java");
+            Files.createDirectories(source.getParent());
+            Files.writeString(source, stub);
+            assertThat(ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", dir.toString(),
+              source.toString())).isZero();
+            Path jar = dir.resolve("lib.jar");
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+                out.putNextEntry(new JarEntry("a/A.class"));
+                out.write(Files.readAllBytes(dir.resolve("a/A.class")));
+                out.closeEntry();
+            }
+            return jar;
+        }
+
+        @Test
+        void reportTypeTheAfterParserGivesDifferently() {
+            // the input parser can't resolve b.B, so only the after parser has types to compare with
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "b.B", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                        public void method() {}
+                    }
+                    """
+                )),
+              java(
+                BEFORE,
+                """
+                  import b.B;
+
+                  class Test {
+                      void test() {
+                          B.method();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`B.method()` has the method void b.B.method() with the flags " +
+                                               "[Public, Static] where the parser gives void b.B.method() with " +
+                                               "the flags [Public]");
+        }
+
+        @Test
+        void respellTheInputWithTheInputParser() {
+            // the after parser lacks a.A, so a respelled input it parsed would be dropped for its lost types
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("A", "method"))
+                .parser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package b;
+                    public class B {
+                    }
+                    """
+                )),
+              java(
+                AFTER,
+                """
+                  import a.A;
+                  class Test {
+                      void test() {
+                          /*~~>*/A.method();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
+              .hasMessageContaining("`A.method()` written `method()`");
+        }
+
+        @Test
+        void rejectAfterParserOfADslNoSourceIsIn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "other",
+                  () -> JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD).build())),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of other sources parses nothing");
+        }
+
+        @Test
+        void rejectSecondAfterParserOfADsl() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD))
+                .afterParser(JavaParser.fromJavaVersion()),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources parses nothing");
+        }
+
+        @Test
+        void rejectAfterParserOfTheLanguageTheRecipeTurnsEachSourceFrom() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new YamlToJava())
+                .afterParser(YamlParser.builder()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of yaml sources parses nothing");
+        }
+
+        @Test
+        void reportUnexpectedOutputBeforeTheAfterParserItLeavesWithNothingToParse() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("changed", true))
+                .afterParser(JavaParser.fromJavaVersion()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageContaining("deprecated: changed").hasMessageNotContaining("after parser");
+        }
+
+        @Test
+        void acceptAfterParserOfSourcesTheRecipeLeaves() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(JavaParser.fromJavaVersion().dependsOn(STATIC_METHOD)),
+              java("class Unchanged {}")
+            );
+        }
+
+        @Test
+        void parseSourceTurnedIntoAnotherLanguageWithTheAfterParserOfItsKind() {
+            // the test has no parser of Java sources whose DSL could tell that the after parser is for the output
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new YamlToJava())
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "java", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources threw");
+        }
+
+        @Test
+        void rejectAfterParserThatThrows() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+                .parser(JavaParser.fromJavaVersion().dependsOn(INSTANCE_METHOD))
+                .afterParser(new ParserBuilderOfDsl(J.CompilationUnit.class, "java", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              java(BEFORE, AFTER)
+            ));
+            assertThat(e).hasMessageStartingWith("The test's after parser of java sources threw")
+              .hasRootCauseMessage("no classpath");
+        }
+
+        @Test
+        void explainMarkersWithTheInputParserWhenTheAfterParserFails() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        return m.withArguments(ListUtils.map(m.getArguments(), arg ->
+                          arg.getMarkers().findFirst(OmitParentheses.class).isPresent() ? arg :
+                            arg.withPrefix(Space.SINGLE_SPACE)
+                              .withMarkers(arg.getMarkers().add(new OmitParentheses(Tree.randomId())))));
+                    }
+                }))
+                .afterParser(new ParserBuilderOfDsl(GroovyParser.builder().getSourceFileType(), "groovy", () -> {
+                    throw new IllegalStateException("no classpath");
+                })),
+              groovy(
+                """
+                  println("hello")
+                  """,
+                """
+                  println "hello"
+                  """
+              )
+            );
+        }
+
+        @Nested
+        class InDefaults implements RewriteTest {
+
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.afterParser(JavaParser.fromJavaVersion());
+            }
+
+            @Test
+            void acceptAfterParserOfADslNoSourceIsIn() {
+                rewriteRun(
+                  spec -> spec.recipe(new ChangeFirstValue("changed", true)),
+                  yaml("key: value", "key: changed")
+                );
+            }
+        }
+    }
+
+    @Nested
     class NoStaticVisitors {
 
         @Test
@@ -2767,6 +3455,106 @@ class ReturnNullByHand extends Recipe {
                 }
                 return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
                   Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+class ParserBuilderOfDsl extends Parser.Builder {
+    private final String dslName;
+    private final Supplier<Parser> parser;
+
+    ParserBuilderOfDsl(Class<? extends SourceFile> sourceFileType, String dslName, Supplier<Parser> parser) {
+        super(sourceFileType);
+        this.dslName = dslName;
+        this.parser = parser;
+    }
+
+    @Override
+    public Parser build() {
+        return parser.get();
+    }
+
+    @Override
+    public String getDslName() {
+        return dslName;
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareLongByHand extends Recipe {
+
+    String displayName = "Declare `long`";
+
+    String description = "Replaces the `int` of a variable declaration by `long`, leaving the variable typed `int`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Primitive visitPrimitive(J.Primitive primitive, ExecutionContext ctx) {
+                return primitive.getType() == JavaType.Primitive.Int &&
+                       getCursor().getParentTreeCursor().getValue() instanceof J.VariableDeclarations ?
+                  primitive.withType(JavaType.Primitive.Long) : primitive;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareStringAsPrimitiveByHand extends Recipe {
+
+    String displayName = "Declare `String`";
+
+    String description = "Replaces the `Object` of a variable declaration by `String`, typed as the primitive `String`, " +
+                         "which `TypeUtils.isOfType` takes to be the class `java.lang.String`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                if (type == null || !TypeUtils.isOfClassType(type.getType(), "java.lang.Object")) {
+                    return multiVariable;
+                }
+                return multiVariable
+                  .withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY, emptyList(),
+                    "String", JavaType.Primitive.String, null))
+                  .withVariables(ListUtils.map(multiVariable.getVariables(), v -> {
+                      J.VariableDeclarations.NamedVariable typed = v.withType(JavaType.Primitive.String);
+                      return typed.withName(typed.getName().withType(JavaType.Primitive.String)
+                        .withFieldType(typed.getVariableType()));
+                  }));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareUnresolvedTypeByHand extends Recipe {
+
+    String displayName = "Declare `Missing`";
+
+    String description = "Replaces the `Object` of a variable declaration by `Missing`, a class the parser can't resolve.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                return type != null && TypeUtils.isOfClassType(type.getType(), "java.lang.Object") ?
+                  multiVariable.withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY,
+                    emptyList(), "Missing", JavaType.ShallowClass.build("Missing"), null)) : multiVariable;
             }
         };
     }

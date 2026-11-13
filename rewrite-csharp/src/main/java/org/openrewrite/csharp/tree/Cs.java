@@ -25,12 +25,14 @@ import org.openrewrite.csharp.CSharpPrinter;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.service.CSharpAutoFormatService;
 import org.openrewrite.csharp.service.CSharpNamingService;
+import org.openrewrite.csharp.service.CSharpImportService;
 import org.openrewrite.csharp.service.CSharpWhitespaceValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -280,6 +282,9 @@ public interface Cs extends J {
         public <S, T extends S> T service(Class<S> service) {
             if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) new CSharpAutoFormatService();
+            }
+            if (ImportService.class.getName().equals(service.getName())) {
+                return (T) new CSharpImportService();
             }
             if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new CSharpNamingService();

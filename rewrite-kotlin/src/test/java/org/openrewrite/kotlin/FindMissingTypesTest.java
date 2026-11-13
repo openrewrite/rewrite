@@ -20,7 +20,9 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -106,5 +108,24 @@ class FindMissingTypesTest implements RewriteTest {
           .parse(ctx, "class A { String newline = String.format(\"%n\"); }").findFirst().orElseThrow();
 
         assertThat(FindMissingTypes.findMissingTypes(java, false)).isEmpty();
+    }
+
+    @Test
+    void untypedReturnTypeExpression() {
+        K.CompilationUnit cu = (K.CompilationUnit) KotlinParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> fail("parse failed", t)), "fun foo(): String = \"\"")
+          .findFirst().orElseThrow();
+        J withUntypedReturnType = new KotlinIsoVisitor<Integer>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+                //noinspection DataFlowIssue
+                return m.withReturnTypeExpression(m.getReturnTypeExpression().withType(JavaType.Unknown.getInstance()));
+            }
+        }.visitNonNull(cu, 0);
+
+        assertThat(Assertions.findMissingTypes(withUntypedReturnType))
+          .extracting(FindMissingTypes.MissingTypeResult::getMessage)
+          .containsExactly("Identifier type is missing or malformed");
     }
 }

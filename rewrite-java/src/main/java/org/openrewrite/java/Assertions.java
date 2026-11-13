@@ -23,6 +23,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.internal.HashMapJavaTypeCache;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -55,6 +56,7 @@ import static org.openrewrite.test.SourceSpecs.dir;
 public class Assertions {
     static {
         HashMapJavaTypeCache.useForParsers();
+        JdkClassSharingTypeFactory.useForParsers();
     }
 
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();

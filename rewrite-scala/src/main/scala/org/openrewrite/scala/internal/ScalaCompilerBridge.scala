@@ -18,7 +18,7 @@ package org.openrewrite.scala.internal
 import dotty.tools.dotc.ast.Trees.*
 import dotty.tools.dotc.ast.{tpd, untpd}
 import dotty.tools.dotc.core.Contexts.*
-import dotty.tools.dotc.core.{Flags, Periods, Phases}
+import dotty.tools.dotc.core.{Flags, Periods, Phases, RecursionOverflow}
 import dotty.tools.dotc.core.NameOps.*
 import dotty.tools.dotc.core.Names.Name
 import dotty.tools.dotc.core.Phases.Phase
@@ -31,7 +31,9 @@ import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
+import scala.annotation.nowarn
 import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 import java.io.File
 import java.nio.file.Paths
 import java.util.{ArrayList, Collections, HashMap, IdentityHashMap, LinkedHashSet, List => JList, Map => JMap, Set => JSet}
@@ -91,6 +93,8 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
    *
    * On per-unit typer failure, that unit gets typedTree=None while others succeed.
    */
+  // Any failure leaves the compiler unfit for reuse, a fatal one included, and the catch rethrows it.
+  @nowarn("id=E235")
   def compileAll(sources: JList[SourceEntry], classpath: JList[String], outputDir: String = null): JMap[String, ScalaParseResult] = {
     val cpString = ScalaCompilerBridge.buildClasspath(classpath)
     val comp = if (compilers == null) new ScalaCompiler(cpString, reuse = false) else compilers.acquire(cpString)
@@ -137,7 +141,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
         comp.ran(r)
         (Some(r), r.runContext)
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
           comp.reusable = false
           (None, configuredCtx)
       }
@@ -147,7 +151,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     val units = new ArrayList[CompilationUnit]()
     val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
     val sourceEntries = new ArrayList[SourceEntry]()
-    val parsedTrees = new ArrayList[untpd.Tree]()
+    val parsedTrees = new HashMap[String, untpd.Tree]()
 
     val srcIter = sources.iterator()
     while (srcIter.hasNext) {
@@ -162,14 +166,15 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
         // The typer records types on the untyped trees it is given, so it gets
         // trees of its own rather than the ones the LST is built from.
         val unit = parseForTyping(entry)
-        units.add(unit)
         val index = UntypedNodeIndex(unit.untpdTree)
         indexes.put(unit, index)
         recorder.track(index)
+        units.add(unit)
         sourceEntries.add(entry)
-        parsedTrees.add(parsed.rawTree)
+        parsedTrees.put(entry.path, parsed.rawTree)
       } catch {
-        case _: Throwable =>
+        // Dotty's recursive descent parser runs out of stack on deeply nested source.
+        case NonFatal(_) | _: StackOverflowError =>
           // Leave this entry out of the results so the caller falls back to a
           // single-file parse, surfacing the failure as a ParseError for this
           // file only instead of aborting the whole batch.
@@ -181,13 +186,15 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     runOpt.foreach { firstRun =>
       try {
         comp.enters(units)(using firstRun.runContext)
-        firstRun.compileUnits(toScalaList(units))
+        val firstTyping = Typing(firstRun, sourceEntries, units, typerTrees, recorder, indexes)
+        val typed = typeIsolatingOverflows(firstTyping, configuredCtx, comp, runId)
 
-        val unresolvable = unresolvableWildcardImports(units, typerTrees)(using firstRun.runContext)
-        val firstTyping = Typing(firstRun, units, typerTrees, recorder, indexes)
-        val Typing(run, typedUnits, typedTrees, typedRecorder, typedIndexes) =
-          if (unresolvable.isEmpty) firstTyping
-          else retypeWithoutImports(sourceEntries, unresolvable, configuredCtx, comp, runId).getOrElse(firstTyping)
+        val unresolvable = unresolvableWildcardImports(typed.units, typed.typerTrees)(using typed.run.runContext)
+        val Typing(run, typedEntries, typedUnits, typedTrees, typedRecorder, typedIndexes) =
+          if (unresolvable.isEmpty) typed
+          else retypeWithoutImports(typed.entries, unresolvable, configuredCtx, comp, runId)
+            .map { retyped => typed.recorder.clear(); retyped }
+            .getOrElse(typed)
 
         // Use the run's context — symbols from tpd.Tree are only valid in this context
         given runCtx: Context = run.runContext
@@ -195,7 +202,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
         // Extract typed trees per unit
         for (i <- 0 until typedUnits.size()) {
           val unit = typedUnits.get(i)
-          val entry = sourceEntries.get(i)
+          val entry = typedEntries.get(i)
           val path = entry.path
           val existing = results.get(path)
 
@@ -203,18 +210,18 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
             val typedTree = Option(typedTrees.get(unit)).getOrElse(unit.tpdTree)
             if (typedTree != null && !typedTree.isEmpty) {
               val typedNodes = Option(typedIndexes.get(unit))
-                .map(TypedNodes.pair(parsedTrees.get(i), _, typedRecorder))
+                .map(TypedNodes.pair(parsedTrees.get(path), _, typedRecorder))
                 .getOrElse(TypedNodes.empty)
               results.put(path, existing.copy(typedTree = Some(typedTree), typedNodes = typedNodes, context = runCtx))
             }
           } catch {
-            case _: Throwable =>
+            case NonFatal(_) =>
               comp.reusable = false
           }
         }
         typedRecorder.clear()
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
           // Batch compilation failed entirely; all units keep typedTree=None
           comp.reusable = false
       } finally {
@@ -269,7 +276,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
           }
         }.traverse(Option(typerTrees.get(unit)).getOrElse(unit.tpdTree))
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
       }
       if (spans.nonEmpty) found += unit.source.path -> spans.toSet
     }
@@ -277,11 +284,34 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
   }
 
   /**
+   * Type-checks the units of the typing. A unit on which Dotty's typer runs out of
+   * recursion depth is left out, and the others are type-checked in a fresh run.
+   */
+  private def typeIsolatingOverflows(typing: Typing,
+                                     ctx0: Context,
+                                     comp: ScalaCompiler,
+                                     runId: Periods.RunId): Typing =
+    try {
+      typing.run.compileUnits(toScalaList(typing.units))
+      typing
+    } catch {
+      // The overflow's context is that of the unit whose trees were being typed, even when
+      // another unit's reference to one of its definitions set off the typing.
+      case overflow: RecursionOverflow if typing.units.contains(overflow.ctx.compilationUnit) =>
+        // An overflow can leave a classpath symbol half-completed, a cyclic reference to later compilations
+        comp.reusable = false
+        typing.recorder.clear()
+        val overflowing = overflow.ctx.compilationUnit
+        // A reference into the source would otherwise type its deep definitions again
+        comp.forget(overflowing)(using typing.run.runContext)
+        val others = new ArrayList[SourceEntry](typing.entries)
+        others.remove(typing.units.indexOf(overflowing))
+        typeIsolatingOverflows(newTyping(others, Map.empty, ctx0, comp, runId), ctx0, comp, runId)
+    }
+
+  /**
    * Type-check the sources once more in a fresh run, leaving out the given imports, so
-   * that names they shadowed resolve again. Sources are parsed anew since the typer
-   * attaches symbols to the untyped trees of the previous run; spans are unaffected,
-   * so the typed trees still line up with the originally parsed ones. Diagnostics of
-   * this run are discarded: the ones of the first run describe the actual sources.
+   * that names they shadowed resolve again.
    */
   private def retypeWithoutImports(entries: JList[SourceEntry],
                                    imports: Map[String, Set[(Int, Int)]],
@@ -289,38 +319,53 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
                                    comp: ScalaCompiler,
                                    runId: Periods.RunId): Option[Typing] =
     try {
-      val typerTrees = new IdentityHashMap[CompilationUnit, tpd.Tree]()
-      val recorder = new TyperRecorder
-      val run = new TyperTreeCapturingCompiler(typerTrees, recorder, runId)
-        .newRun(using ctx0.fresh.setReporter(new StoreReporter(null)))
-      comp.ran(run)
-      given Context = run.runContext
-      val units = new ArrayList[CompilationUnit]()
-      val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
-      entries.forEach { entry =>
-        val unit = parseForTyping(entry)
-        val dropped = imports.getOrElse(entry.path, Set.empty)
-        if (dropped.nonEmpty) {
-          unit.untpdTree = new untpd.UntypedTreeMap {
-            override def transformStats(trees: List[untpd.Tree], exprOwner: dotty.tools.dotc.core.Symbols.Symbol)(using Context): List[untpd.Tree] =
-              super.transformStats(trees.filterNot {
-                case imp: untpd.Import => imp.span.exists && dropped.contains((imp.span.start, imp.span.end))
-                case _ => false
-              }, exprOwner)
-          }.transform(unit.untpdTree)
-        }
-        units.add(unit)
-        val index = UntypedNodeIndex(unit.untpdTree)
-        indexes.put(unit, index)
-        recorder.track(index)
-      }
-      run.compileUnits(toScalaList(units))
-      Some(Typing(run, units, typerTrees, recorder, indexes))
+      val typing = newTyping(entries, imports, ctx0, comp, runId)
+      typing.run.compileUnits(toScalaList(typing.units))
+      Some(typing)
     } catch {
-      case _: Throwable =>
+      case NonFatal(_) =>
         comp.reusable = false
         None
     }
+
+  /**
+   * A fresh run for the given sources, without the given imports. The sources are parsed
+   * anew, since the typer attaches symbols to the untyped trees of the previous run. Spans
+   * are unaffected, so the typed trees still line up with the originally parsed ones. The
+   * run discards its diagnostics, so that the sources keep those of the first run.
+   */
+  private def newTyping(entries: JList[SourceEntry],
+                        imports: Map[String, Set[(Int, Int)]],
+                        ctx0: Context,
+                        comp: ScalaCompiler,
+                        runId: Periods.RunId): Typing = {
+    val typerTrees = new IdentityHashMap[CompilationUnit, tpd.Tree]()
+    val recorder = new TyperRecorder
+    val run = new TyperTreeCapturingCompiler(typerTrees, recorder, runId)
+      .newRun(using ctx0.fresh.setReporter(new StoreReporter(null)))
+    comp.ran(run)
+    given Context = run.runContext
+    val units = new ArrayList[CompilationUnit]()
+    val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
+    entries.forEach { entry =>
+      val unit = parseForTyping(entry)
+      val dropped = imports.getOrElse(entry.path, Set.empty)
+      if (dropped.nonEmpty) {
+        unit.untpdTree = new untpd.UntypedTreeMap {
+          override def transformStats(trees: List[untpd.Tree], exprOwner: dotty.tools.dotc.core.Symbols.Symbol)(using Context): List[untpd.Tree] =
+            super.transformStats(trees.filterNot {
+              case imp: untpd.Import => imp.span.exists && dropped.contains((imp.span.start, imp.span.end))
+              case _ => false
+            }, exprOwner)
+        }.transform(unit.untpdTree)
+      }
+      units.add(unit)
+      val index = UntypedNodeIndex(unit.untpdTree)
+      indexes.put(unit, index)
+      recorder.track(index)
+    }
+    Typing(run, entries, units, typerTrees, recorder, indexes)
+  }
 
   private def parseForTyping(entry: SourceEntry)(using Context): CompilationUnit = {
     val parsed = parseOne(entry.path, entry.content, reportDiagnostics = false)
@@ -357,7 +402,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     given Context = try {
       (new Compiler()).newRun(using configuredCtx).runContext
     } catch {
-      case _: Throwable => configuredCtx
+      case NonFatal(_) => configuredCtx
     }
 
     val parsed = parseOne(path, content)
@@ -552,7 +597,7 @@ object ScalaCompilerBridge {
     val url = cs.getLocation
     if (url == null) return None
     try Some(Paths.get(url.toURI).toString)
-    catch { case _: Throwable => None }
+    catch { case NonFatal(_) => None }
   }
 }
 
@@ -626,26 +671,45 @@ private[internal] final class ScalaCompiler(val classpath: String, reuse: Boolea
   /** Records the members of the packages the units declare definitions in, before the units are entered. */
   def enters(units: JList[CompilationUnit])(using Context): Unit =
     if (reusable && packages.isEmpty) {
-      val declared = new LinkedHashSet[Symbol]()
-      declared.add(ctx.definitions.RootClass)
-      declared.add(ctx.definitions.EmptyPackageClass)
-      units.forEach { unit =>
-        for (path <- packagePaths(unit.untpdTree, Nil)) {
-          var owner: Symbol = ctx.definitions.RootClass
-          for (name <- path if owner.exists) {
-            val pkg = owner.info.decls.lookup(name.toTermName)
-            owner = if (pkg.is(Flags.Package)) pkg.moduleClass else NoSymbol
-            if (owner.exists) declared.add(owner)
-          }
-        }
-      }
-      declared.forEach { pkg =>
+      declaredPackages(units).forEach { pkg =>
         val members = Collections.newSetFromMap(new IdentityHashMap[Symbol, java.lang.Boolean]())
         pkg.info.decls.toList.foreach(members.add)
         packages = (pkg, members) :: packages
       }
       firstSymbolId = ctx.base.nextSymId
     }
+
+  /** Removes the definitions of the unit's source from their packages, so that no reference resolves to them. */
+  def forget(unit: CompilationUnit)(using Context): Unit = {
+    val path = unit.source.file.path
+    declaredPackages(Collections.singletonList(unit)).forEach { pkg =>
+      val scope = pkg.info.decls.openForMutations
+      for (sym <- scope.toList) {
+        val file = sym.associatedFile
+        // Not forcing the symbol's denotation, like Dotty's PackageClassDenotation.unlinkFromFile
+        if (file != null && file.path == path) scope.unlink(sym, sym.lastKnownDenotation.name)
+      }
+      pkg.asClass.classDenot.invalidateMemberCaches()
+    }
+  }
+
+  /** The packages the units declare definitions in, with the root and empty packages. */
+  private def declaredPackages(units: JList[CompilationUnit])(using Context): JSet[Symbol] = {
+    val declared = new LinkedHashSet[Symbol]()
+    declared.add(ctx.definitions.RootClass)
+    declared.add(ctx.definitions.EmptyPackageClass)
+    units.forEach { unit =>
+      for (path <- packagePaths(unit.untpdTree, Nil)) {
+        var owner: Symbol = ctx.definitions.RootClass
+        for (name <- path if owner.exists) {
+          val pkg = owner.info.decls.lookup(name.toTermName)
+          owner = if (pkg.is(Flags.Package)) pkg.moduleClass else NoSymbol
+          if (owner.exists) declared.add(owner)
+        }
+      }
+    }
+    declared
+  }
 
   /** The packages a tree declares definitions in, with its package clauses and package objects. */
   private def packagePaths(tree: untpd.Tree, prefix: List[Name]): List[List[Name]] = tree match {
@@ -688,7 +752,7 @@ private[internal] final class ScalaCompiler(val classpath: String, reuse: Boolea
           pkg.asClass.classDenot.invalidateMemberCaches()
         }
       } catch {
-        case _: Throwable => reusable = false
+        case NonFatal(_) => reusable = false
       }
     }
     packages = Nil
@@ -726,8 +790,9 @@ final class ScalaCompilerCache {
     if (compiler.thread == Thread.currentThread() && compiler.clean()) idle.set(compiler)
 }
 
-/** The outcome of type-checking a batch of units in one run. */
+/** A batch of sources parsed for one run, and what the run's typer records of them. */
 private case class Typing(run: Run,
+                          entries: JList[SourceEntry],
                           units: JList[CompilationUnit],
                           typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree],
                           recorder: TyperRecorder,

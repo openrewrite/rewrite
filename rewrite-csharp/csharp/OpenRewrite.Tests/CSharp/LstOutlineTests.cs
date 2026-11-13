@@ -77,8 +77,9 @@ public class LstOutlineTests
         var outline = Outline("using a;\n");
 
         Assert.Equal("Cs.CompilationUnit", outline.Root.Type);
-        Assert.Equal("Cs.UsingDirective", outline.Root.Children.Single().Type);
-        Assert.Equal("J.Identifier", outline.Root.Children.Single().Children.Single().Type);
+        var usingDirective = Assert.Single(outline.Root.Children, child => !child.IsMarker);
+        Assert.Equal("Cs.UsingDirective", usingDirective.Type);
+        Assert.Equal("J.Identifier", Assert.Single(usingDirective.Children, child => !child.IsMarker).Type);
     }
 
     [Fact]
