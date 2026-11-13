@@ -28,7 +28,7 @@ interface Token {
 
 const KEYWORDS = new Set<TokenType>(["and", "or", "text", "comment", "node", "processing-instruction"]);
 const NODE_TYPES = new Set<TokenType>(["text", "comment", "node", "processing-instruction"]);
-const STEP_STARTS = new Set<TokenType>([".", "..", "@", "*", "QNAME", "NCNAME", ...NODE_TYPES]);
+const STEP_STARTS = new Set<TokenType>([".", "..", "@", "*", "QNAME", "NCNAME", ...KEYWORDS]);
 
 function isNameStartChar(c: number): boolean {
     return (c >= 0x61 && c <= 0x7A) || (c >= 0x41 && c <= 0x5A) || c === 0x5F ||
@@ -358,7 +358,7 @@ class Parser {
             return {kind: "abbreviated", dotdot: abbreviated.type === "..", predicates: []};
         }
         if (this.accept("@")) {
-            const name = this.expect("QNAME", "NCNAME", "*").text;
+            const name = this.expect("QNAME", "NCNAME", "*", ...KEYWORDS).text;
             return {kind: "attribute", name, predicates: this.predicates()};
         }
         let axis: string | undefined;
@@ -371,7 +371,7 @@ class Parser {
     }
 
     private nodeTest(): NodeTest {
-        const name = this.accept("*", "QNAME", "NCNAME");
+        const name = this.accept("*", "QNAME", "NCNAME", ...(this.peek(1).type === "(" ? [] : [...KEYWORDS]));
         if (name) {
             return {name: name.text};
         }
@@ -410,7 +410,7 @@ export type CompiledExpr =
     { readonly type: "and" | "or", readonly left: CompiledExpr, readonly right: CompiledExpr } |
     { readonly type: "function", readonly functionType: FunctionType, readonly args: CompiledExpr[] } |
     { readonly type: "attribute" | "child", readonly name: string } |
-    { readonly type: "path", readonly steps: CompiledExpr[], readonly terminalFunction?: FunctionType } |
+    { readonly type: "path", readonly steps: CompiledExpr[], readonly pathSteps?: CompiledStep[] } |
     { readonly type: "absolutePath", readonly path: string } |
     { readonly type: "parent" | "self" };
 
@@ -432,7 +432,7 @@ export interface CompiledStep {
 export interface CompiledFilterExpr {
     readonly path: string
     readonly predicates: CompiledExpr[]
-    readonly trailingPath?: string
+    readonly trailingPath?: CompiledStep[]
     readonly trailingIsDescendant: boolean
 }
 
@@ -454,10 +454,6 @@ export function compileXPath(expression: string): CompiledXPath {
         cache.set(expression, compiled);
     }
     return compiled;
-}
-
-function unsupported(description: string): never {
-    throw new Error(`Unsupported XPath expression: ${description}`);
 }
 
 function isBacktrack(step: CompiledStep): boolean {
@@ -501,7 +497,7 @@ class Compiler {
                 filter: {
                     path: this.parser.text(pathExpr.expr!),
                     predicates: pathExpr.predicates.map(p => this.orExpr(p)),
-                    trailingPath: pathExpr.trailingPath && this.parser.text(pathExpr.trailingPath),
+                    trailingPath: pathExpr.trailingPath && this.relativeSteps(pathExpr.trailingPath),
                     trailingIsDescendant: pathExpr.trailingPath !== undefined && pathExpr.trailingSeparator === "//"
                 }
             };
@@ -518,10 +514,11 @@ class Compiler {
             case "attribute":
                 return {...base, type: "attribute", name: step.name};
         }
-        if (step.axis !== undefined) {
-            const axis: AxisType = step.axis === "parent" || step.axis === "self" || step.axis === "child" ?
+        if (step.axis !== undefined && step.axis !== "child") {
+            const axis: AxisType = step.axis === "parent" || step.axis === "self" ?
                 step.axis : "other";
-            return {...base, type: "axis", name: nodeTestName(step.nodeTest), axis};
+            return {...base, type: "axis", name: nodeTestName(step.nodeTest), axis,
+                nodeType: step.nodeTest.nodeType as NodeTypeTest ?? "unknown"};
         }
         if (step.nodeTest.nodeType !== undefined) {
             return {...base, type: "nodeType", nodeType: step.nodeTest.nodeType as NodeTypeTest};
@@ -573,37 +570,30 @@ class Compiler {
             case "number": {
                 const text = pathExpr.token!.text;
                 const value = Number(text);
-                if (!/^\d+$/.test(text) || value > 2147483647) {
-                    unsupported(`invalid number: ${text}`);
-                }
                 return {type: "numeric", value};
             }
         }
     }
 
+    private relativeSteps(relativePath: RelativeLocationPath): CompiledStep[] {
+        return relativePath.steps.map((s, i) => this.step(s, i > 0 && relativePath.separators[i - 1] === "//"));
+    }
+
     private relativePathAsExpr(relativePath: RelativeLocationPath): CompiledExpr {
-        const steps = relativePath.steps;
-        const last = steps[steps.length - 1];
-        let terminalFunction: FunctionType | undefined;
-        let elementStepCount = steps.length;
-        if (last.kind === "node" && last.nodeTest.nodeType !== undefined) {
-            terminalFunction = last.nodeTest.nodeType as FunctionType;
-            elementStepCount--;
-        }
-        const pathSteps = steps.slice(0, elementStepCount).map((step): CompiledExpr => {
-            switch (step.kind) {
-                case "abbreviated":
-                    return {type: step.dotdot ? "parent" : "self"};
-                case "attribute":
-                    return {type: "attribute", name: step.name};
-                case "node":
-                    return {type: "child", name: nodeTestName(step.nodeTest)};
+        const step = relativePath.steps[0];
+        if (relativePath.steps.length === 1 && step.predicates.length === 0 &&
+            (step.kind !== "node" || step.axis === undefined)) {
+            if (step.kind === "abbreviated") {
+                return {type: step.dotdot ? "parent" : "self"};
             }
-        });
-        if (pathSteps.length === 1 && terminalFunction === undefined) {
-            return pathSteps[0];
+            if (step.kind === "attribute") {
+                return {type: "attribute", name: step.name};
+            }
+            if (step.nodeTest.name !== undefined) {
+                return {type: "child", name: step.nodeTest.name};
+            }
         }
-        return {type: "path", steps: pathSteps, terminalFunction};
+        return {type: "path", steps: [], pathSteps: this.relativeSteps(relativePath)};
     }
 
     private functionCall(functionCall: FunctionCall): CompiledExpr {

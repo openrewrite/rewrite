@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from "../tree";
-import {getValue, isAttribute, isDocument, isTag, isXml, Xml} from "./tree";
+import {getValue, isAttribute, isCharData, isDocument, isTag, isXml, Xml} from "./tree";
 import {localName} from "./namespaces";
 import {ComparisonOp, CompiledExpr, CompiledFilterExpr, CompiledStep, CompiledXPath, compileXPath} from "./xpath-compiler";
 
@@ -54,8 +54,8 @@ function parentTagCursor(cursor: Cursor | undefined): Cursor | undefined {
     return parent;
 }
 
-function matchesElementName(pattern: string | undefined, name: string): boolean {
-    return pattern === undefined || pattern === "*" || pattern === "node" || name === pattern;
+function matchesElementName(step: CompiledStep, name: string): boolean {
+    return step.nodeType === "node" || step.nodeType === "unknown" && matchesName(step.name, name);
 }
 
 function matchesName(pattern: string | undefined, name: string): boolean {
@@ -91,7 +91,7 @@ class PathMatch {
         }
 
         if (last.type === "dot" || (last.type === "axis" && last.axis === "self")) {
-            if (!value || !isTag(value) || (last.type === "axis" && !matchesElementName(last.name, value.name))) {
+            if (!value || !isTag(value) || (last.type === "axis" && !matchesElementName(last, value.name))) {
                 return false;
             }
             return this.matchRemaining(cursor, steps.length - 2);
@@ -108,7 +108,7 @@ class PathMatch {
             return false;
         }
         const tag = cursor.value;
-        if (step.type === "axis" && !matchesElementName(step.name, tag.name)) {
+        if (step.type === "axis" && !matchesElementName(step, tag.name)) {
             return false;
         }
         if (previous < 0) {
@@ -196,12 +196,12 @@ class PathMatch {
     private matchAxisStep(step: CompiledStep, cursor: Cursor | undefined, index: number): boolean {
         switch (step.axis) {
             case "parent":
-                if (isTagCursor(cursor) && !matchesElementName(step.name, cursor.value.name)) {
+                if (isTagCursor(cursor) && !matchesElementName(step, cursor.value.name)) {
                     return false;
                 }
                 return this.matchParentStepInMiddle(cursor, index - 1);
             case "self":
-                if (isTagCursor(cursor) && !matchesElementName(step.name, cursor.value.name)) {
+                if (isTagCursor(cursor) && !matchesElementName(step, cursor.value.name)) {
                     return false;
                 }
                 return this.matchRemaining(cursor, index - 1);
@@ -218,7 +218,7 @@ function matchStepAgainstTag(step: CompiledStep, tag: Xml.Tag, cursor: Cursor): 
     switch (step.type) {
         case "nodeTest":
             return matchesName(step.name, tag.name) &&
-                (step.predicates.length === 0 || evaluatePredicates(step.predicates, tag, cursor));
+                (step.predicates.length === 0 || evaluatePredicates(step, tag, cursor));
         case "dot":
             return true;
         case "nodeType":
@@ -228,23 +228,30 @@ function matchStepAgainstTag(step: CompiledStep, tag: Xml.Tag, cursor: Cursor): 
     }
 }
 
-function evaluatePredicates(predicates: CompiledExpr[], tag: Xml.Tag, cursor: Cursor): boolean {
-    let position = 1;
-    let size = 1;
-    const parent = cursor.parent;
-    if (isTagCursor(parent) && parent.value.content) {
-        let count = 0;
-        for (const c of parent.value.content) {
-            if (isTag(c) && c.name === tag.name) {
-                count++;
-                if (c === tag) {
-                    position = count;
-                }
-            }
-        }
-        size = count > 0 ? count : 1;
+function needsPosition(expr: CompiledExpr): boolean {
+    switch (expr.type) {
+        case "numeric":
+            return true;
+        case "function":
+            return expr.functionType === "position" || expr.functionType === "last" || expr.args.some(needsPosition);
+        case "comparison":
+        case "and":
+        case "or":
+            return needsPosition(expr.left) || needsPosition(expr.right);
+        default:
+            return false;
     }
-    return predicates.every(p => evaluateExpr(p, tag, undefined, cursor, position, size));
+}
+
+function evaluatePredicates(step: CompiledStep, tag: Xml.Tag, cursor: Cursor): boolean {
+    if (!step.predicates.some(needsPosition)) {
+        return step.predicates.every(p => evaluateExpr(p, tag, undefined, cursor, 1, 1));
+    }
+    const parent = cursor.parent;
+    const candidates = isTagCursor(parent) ? (parent.value.content ?? [])
+        .filter((c: Xml.Content): c is Xml.Tag => isTag(c) && matchesName(step.name, c.name))
+        .map((c: Xml.Tag) => new Cursor(c, parent)) : [cursor];
+    return filterCandidates(candidates, step.predicates).some(c => c.value === tag);
 }
 
 function evaluateExpr(expr: CompiledExpr, tag: Xml.Tag | undefined, attr: Xml.Attribute | undefined,
@@ -268,7 +275,7 @@ function evaluateExpr(expr: CompiledExpr, tag: Xml.Tag | undefined, attr: Xml.At
         case "child":
             return tag !== undefined && findChildTag(tag, expr.name) !== undefined;
         case "path":
-            return tag !== undefined && pathExists(tag, expr.steps);
+            return tag !== undefined && (expr.pathSteps ? selectSteps([cursor], expr.pathSteps).length > 0 : pathExists(tag, expr.steps));
         case "attribute":
             return tag !== undefined && tag.attributes.some(a => matchesName(expr.name, a.key.name));
         default:
@@ -300,8 +307,15 @@ function resolveValue(expr: CompiledExpr, tag: Xml.Tag | undefined, attr: Xml.At
                 }
             }
             return undefined;
-        case "path":
-            return tag && resolvePathValue(expr, tag);
+        case "self":
+            return tag ? stringValue(tag) : attr?.value.value;
+        case "path": {
+            if (expr.pathSteps) {
+                const first = selectSteps([cursor], expr.pathSteps)[0];
+                return first && stringValue(first.value);
+            }
+            return tag && resolvePathValue(expr.steps, tag);
+        }
         case "absolutePath": {
             const root = rootTag(cursor);
             const first = root && [...findTagsByPath(root, expr.path).values()][0];
@@ -349,7 +363,7 @@ function resolveFunctionValue(expr: CompiledExpr & { type: "function" }, tag: Xm
     const args = expr.args;
     const stringArg = (i: number): string | undefined => {
         const value = resolveValue(args[i], tag, attr, cursor, position, size);
-        return value === undefined ? undefined : String(value);
+        return value === undefined ? undefined : functionStringValue(value);
     };
     switch (expr.functionType) {
         case "position":
@@ -469,12 +483,12 @@ function pathExists(tag: Xml.Tag, steps: CompiledExpr[]): boolean {
     return true;
 }
 
-function resolvePathValue(expr: CompiledExpr & { type: "path" }, tag: Xml.Tag): string | undefined {
-    if (expr.steps.length === 0 && expr.terminalFunction !== "text") {
+function resolvePathValue(steps: CompiledExpr[], tag: Xml.Tag): string | undefined {
+    if (steps.length === 0) {
         return undefined;
     }
     let current: Xml.Tag | undefined = tag;
-    for (const step of expr.steps) {
+    for (const step of steps) {
         current = step.type === "child" ? findChildTag(current, step.name) : undefined;
         if (!current) {
             return undefined;
@@ -484,25 +498,37 @@ function resolvePathValue(expr: CompiledExpr & { type: "path" }, tag: Xml.Tag): 
 }
 
 function compareValues(left: string | number | boolean, right: string | number | boolean, op: ComparisonOp): boolean {
-    if (typeof left === "number" && typeof right === "number") {
-        return compareOrdered(left, right, op);
+    if (typeof left === "number" || typeof right === "number" || op !== "=" && op !== "!=") {
+        return compareOrdered(numberValue(left), numberValue(right), op);
     }
-    if (typeof left === "boolean" && typeof right === "boolean") {
-        return op === "=" ? left === right : op === "!=" ? left !== right : false;
+    return op === "=" ? String(left) === String(right) : String(left) !== String(right);
+}
+
+function numberValue(value: string | number | boolean): number {
+    if (typeof value === "number") {
+        return value;
     }
-    const l = String(left);
-    const r = String(right);
-    if (op === "=") {
-        return l === r;
-    } else if (op === "!=") {
-        return l !== r;
+    const text = javaTrim(String(value));
+    return /^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(text) ? Number(text) : NaN;
+}
+
+function functionStringValue(value: string | number | boolean): string {
+    const text = String(value);
+    if (typeof value !== "number" || !Number.isFinite(value) || !text.includes("e")) {
+        return text;
     }
-    const ln = parseJavaDouble(l);
-    const rn = parseJavaDouble(r);
-    if (ln !== undefined && rn !== undefined) {
-        return compareOrdered(ln, rn, op);
+    const [coefficient, exponent] = text.split("e");
+    const sign = coefficient.startsWith("-") ? "-" : "";
+    const unsigned = coefficient.substring(sign.length);
+    const digits = unsigned.replace(".", "");
+    const point = (unsigned.includes(".") ? unsigned.indexOf(".") : unsigned.length) + Number(exponent);
+    if (point <= 0) {
+        return `${sign}0.${"0".repeat(-point)}${digits}`;
     }
-    return compareOrdered(l < r ? -1 : l > r ? 1 : 0, 0, op);
+    if (point >= digits.length) {
+        return sign + digits + "0".repeat(point - digits.length);
+    }
+    return `${sign}${digits.substring(0, point)}.${digits.substring(point)}`;
 }
 
 function compareOrdered(left: number, right: number, op: ComparisonOp): boolean {
@@ -520,40 +546,6 @@ function compareOrdered(left: number, right: number, op: ComparisonOp): boolean 
         case ">=":
             return left >= right;
     }
-}
-
-const JAVA_DOUBLE = /^[+-]?(NaN|Infinity|(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?[fFdD]?)$/;
-const JAVA_HEX_DOUBLE = /^([+-]?)0[xX]([\da-fA-F]+(?:\.[\da-fA-F]*)?|\.[\da-fA-F]+)[pP]([+-]?\d+)[fFdD]?$/;
-
-function parseJavaDouble(s: string): number | undefined {
-    const trimmed = javaTrim(s);
-    const hex = JAVA_HEX_DOUBLE.exec(trimmed);
-    if (hex) {
-        const sign = hex[1] === "-" ? -1 : 1;
-        const [whole, fraction = ""] = hex[2].split(".");
-        const bits = (whole + fraction).split("")
-            .map(digit => parseInt(digit, 16).toString(2).padStart(4, "0")).join("").replace(/^0+/, "");
-        if (bits.length === 0) {
-            return sign * 0;
-        }
-        const exponent = Number(hex[3]) - 4 * fraction.length + bits.length - 1;
-        if (exponent > 1023) {
-            return sign * Infinity;
-        }
-        if (exponent < -1075) {
-            return sign * 0;
-        }
-        const precision = Math.min(53, exponent + 1075);
-        let significand = parseInt(bits.substring(0, precision).padEnd(precision, "0"), 2) || 0;
-        if (bits[precision] === "1" && (significand % 2 !== 0 || bits.substring(precision + 1).includes("1"))) {
-            significand++;
-        }
-        return sign * significand * Math.pow(2, exponent - precision + 1);
-    }
-    if (!JAVA_DOUBLE.test(trimmed)) {
-        return undefined;
-    }
-    return Number(trimmed.replace(/[fFdD]$/, "").replace(/^\+/, ""));
 }
 
 function javaTrim(s: string): string {
@@ -641,47 +633,14 @@ function matchFilterExpr(filter: CompiledFilterExpr, cursor: Cursor): boolean {
     if (!root) {
         return false;
     }
-    const all = [...findTagsByPath(root, filter.path).values()];
-    const filtered = all.filter((tag, i) => filter.predicates.every(p => evaluateFilterPredicate(p, tag, i + 1, all.length)));
-    if (filtered.length === 0 || !isTagCursor(cursor)) {
-        return false;
-    }
-    const id = cursor.value.id;
-    if (filter.trailingPath === undefined) {
-        return filtered.some(t => t.id === id);
-    }
-    return filtered.some(t => (filter.trailingIsDescendant ?
-        findDescendants(t, filter.trailingPath!) : findChildrenByPath(t, filter.trailingPath!)).has(id));
-}
-
-function evaluateFilterPredicate(expr: CompiledExpr, tag: Xml.Tag, position: number, size: number): boolean {
-    switch (expr.type) {
-        case "numeric":
-            return position === expr.value;
-        case "function":
-            return expr.functionType === "last" ? position === size : expr.functionType === "position" && position > 0;
-        case "comparison": {
-            const left = resolveFilterValue(expr.left, tag, position, size);
-            const right = resolveFilterValue(expr.right, tag, position, size);
-            return left !== undefined && right !== undefined && compareValues(left, right, expr.op);
+    let nodes = filterCandidates(findNodesByPath(root, filter.path), filter.predicates);
+    if (filter.trailingPath) {
+        if (filter.trailingIsDescendant) {
+            nodes = nodes.flatMap(c => collectDescendants(c));
         }
-        default:
-            return true;
+        nodes = selectSteps(nodes, filter.trailingPath);
     }
-}
-
-function resolveFilterValue(expr: CompiledExpr, tag: Xml.Tag, position: number, size: number): Value {
-    switch (expr.type) {
-        case "string":
-        case "numeric":
-            return expr.value;
-        case "function":
-            return expr.functionType === "position" ? position :
-                expr.functionType === "last" ? size :
-                    expr.functionType === "local-name" ? localName(tag.name) : undefined;
-        default:
-            return undefined;
-    }
+    return nodes.some(c => c.value === cursor.value);
 }
 
 function rootTag(cursor: Cursor): Xml.Tag | undefined {
@@ -694,67 +653,124 @@ function rootTag(cursor: Cursor): Xml.Tag | undefined {
 
 type Tags = Map<string, Xml.Tag>;
 
-function findTagsByPath(start: Xml.Tag, path: string): Tags {
-    if (path.startsWith("//")) {
-        let name = path.substring(2);
-        if (name.includes("/")) {
-            name = name.substring(0, name.indexOf("/"));
+function findTagsByPath(root: Xml.Tag, path: string): Tags {
+    return new Map(findNodesByPath(root, path).filter(isTagCursor).map(c => [c.value.id, c.value]));
+}
+
+function findNodesByPath(root: Xml.Tag, path: string): Cursor[] {
+    if (compileXPath(path).type !== "path") {
+        throw new Error(`Unsupported XPath expression: parenthesized expression must be a location path: ${path}`);
+    }
+    const matcher = new XPathMatcher(path);
+    const matches: Cursor[] = [];
+    for (const candidate of collectDescendants(new Cursor(root))) {
+        if (matcher.matches(candidate)) {
+            matches.push(candidate);
         }
-        return findDescendants(start, name);
-    }
-    const absolute = path.startsWith("/");
-    const steps = javaSplit(absolute ? path.substring(1) : path);
-    if (steps.length === 0) {
-        return new Map();
-    }
-    if (!absolute) {
-        return followChildren(new Map([[start.id, start]]), steps);
-    }
-    if (steps[0] !== "*" && start.name !== steps[0]) {
-        return new Map();
-    }
-    return followChildren(new Map([[start.id, start]]), steps.slice(1));
-}
-
-function findChildrenByPath(parent: Xml.Tag, path: string): Tags {
-    return followChildren(new Map([[parent.id, parent]]), javaSplit(path));
-}
-
-function followChildren(start: Tags, steps: string[]): Tags {
-    let current = start;
-    for (const step of steps) {
-        const next: Tags = new Map();
-        for (const tag of current.values()) {
-            for (const child of tag.content ?? []) {
-                if (isTag(child) && (step === "*" || child.name === step)) {
-                    next.set(child.id, child);
+        if (isTagCursor(candidate)) {
+            for (const attr of candidate.value.attributes) {
+                const attrCursor = new Cursor(attr, candidate);
+                if (matcher.matches(attrCursor)) {
+                    matches.push(attrCursor);
                 }
             }
         }
-        current = next;
     }
-    return current;
+    return matches;
 }
 
-function findDescendants(tag: Xml.Tag, name: string, result: Tags = new Map()): Tags {
-    if (name === "*" || tag.name === name) {
-        result.set(tag.id, tag);
-    }
-    for (const child of tag.content ?? []) {
-        if (isTag(child)) {
-            findDescendants(child, name, result);
+function collectDescendants(cursor: Cursor, result: Cursor[] = []): Cursor[] {
+    result.push(cursor);
+    if (isTagCursor(cursor)) {
+        for (const child of cursor.value.content ?? []) {
+            if (isTag(child)) {
+                collectDescendants(new Cursor(child, cursor), result);
+            }
         }
     }
     return result;
 }
 
-function javaSplit(s: string): string[] {
-    if (!s.includes("/")) {
-        return [s];
+function selectSteps(contexts: Cursor[], steps: CompiledStep[]): Cursor[] {
+    for (const step of steps) {
+        const next: Cursor[] = [];
+        for (const context of contexts) {
+            const origins = step.isDescendant ? collectDescendants(context) : [context];
+            for (const origin of origins) {
+                const candidates: Cursor[] = [];
+                const value = origin.value;
+                if (step.type === "dot" || step.type === "axis" && step.axis === "self") {
+                    if (step.type === "dot" || matchesNodeTest(step, value)) {
+                        candidates.push(origin);
+                    }
+                } else if (step.type === "dotdot" || step.type === "axis" && step.axis === "parent") {
+                    const parent = parentTagCursor(origin);
+                    if (isTagCursor(parent) && (step.type === "dotdot" || matchesElementName(step, parent.value.name))) {
+                        candidates.push(parent);
+                    }
+                } else if (isTagCursor(origin)) {
+                    if (step.type === "attribute") {
+                        for (const attr of origin.value.attributes) {
+                            if (matchesName(step.name, attr.key.name)) {
+                                candidates.push(new Cursor(attr, origin));
+                            }
+                        }
+                    } else if (step.type === "nodeType") {
+                        for (const content of origin.value.content ?? []) {
+                            if (matchesNodeTest(step, content)) {
+                                candidates.push(new Cursor(content, origin));
+                            }
+                        }
+                    } else {
+                        for (const child of origin.value.content ?? []) {
+                            if (isTag(child) && (step.type === "axis" ? matchesElementName(step, child.name) :
+                                matchesName(step.name, child.name))) {
+                                candidates.push(new Cursor(child, origin));
+                            }
+                        }
+                    }
+                }
+                next.push(...filterCandidates(candidates, step.predicates));
+            }
+        }
+        contexts = next;
     }
-    const parts = s.split("/");
-    while (parts.length > 0 && parts[parts.length - 1] === "") {
-        parts.pop();
+    return contexts;
+}
+
+function filterCandidates(candidates: Cursor[], predicates: CompiledExpr[]): Cursor[] {
+    for (const predicate of predicates) {
+        candidates = candidates.filter((candidate, i) => {
+            const value = candidate.value;
+            return evaluateExpr(predicate, isTagCursor(candidate) ? value : undefined,
+                isXml(value) && isAttribute(value) ? value : undefined, candidate, i + 1, candidates.length);
+        });
     }
-    return parts;
+    return candidates;
+}
+
+function stringValue(node: Xml): string {
+    if (isAttribute(node)) {
+        return node.value.value;
+    }
+    if (isCharData(node)) {
+        return node.text;
+    }
+    return isTag(node) ? (node.content ?? []).filter(c => isTag(c) || c.kind === Xml.Kind.CharData)
+        .map(stringValue).join("") : "";
+}
+
+function matchesNodeTest(step: CompiledStep, value: Xml): boolean {
+    switch (step.nodeType) {
+        case "node":
+            return true;
+        case "text":
+            return value.kind === Xml.Kind.CharData;
+        case "comment":
+            return value.kind === Xml.Kind.Comment;
+        case "processing-instruction":
+            return value.kind === Xml.Kind.ProcessingInstruction;
+        default:
+            return isTag(value) && matchesName(step.name, value.name);
+    }
 }

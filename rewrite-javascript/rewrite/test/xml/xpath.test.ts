@@ -1048,41 +1048,24 @@ describe("XPathMatcher", () => {
         });
     });
 
-    test.each([
-        ["0x1p3", "7", ">", true],
-        ["-0X1.CP+2D", "-6", "<", true],
-        ["0x.8p4f", "8", ">=", true],
-        ["0x1p1024", "Infinity", ">=", true],
-        ["-0x1p1024", "-Infinity", "<=", true],
-        ["0x1.fffffffffffffp1023", "1.7976931348623157e308", ">=", true],
-        ["0x1.fffffffffffffp1023", "1.7976931348623157e308", ">", false],
-        ["0x1p-1074", "4.9e-324", ">=", true],
-        ["0x1p-1075", "0", ">", false],
-        ["0x1.0000000000001p-1075", "0", ">", true],
-        ["0x1.00000000000008p0", "1", ">", false],
-        ["0x1.000000000000080001p0", "1", ">", true],
-        ["0x1.00000000000018p0", "1.0000000000000004", ">=", true],
-        ["0x0p999999", "0", ">", false],
-        ["0x1p-999999", "0", ">", false],
-        ["0x1p3", "7", "<", false],
-        ["0x1p3", "9", ">", false],
-        ["0x1", "7", ">", false],
-    ])("compare Java hexadecimal double %s %s %s", async (value, bound, operator, expected) => {
-        // given
-        const document = await parse(`<root><n>${value}</n></root>`);
+    test.each(["0x1p3", "-0X1.CP+2D", "0x.8p4f", "0x1p1024", "0x1p-1074", "1e1", "10f", "+10"])(
+        "reject Java-only numeric syntax %s", async value => {
+            // given
+            const document = await parse(`<root><n>${value}</n></root>`);
 
-        // when
-        const count = await matchCount(`/root/n[text() ${operator} '${bound}']`, document);
+            // when
+            const count = await matchCount("/root/n[text() > 0]", document);
 
-        // then
-        expect(count).toBe(expected ? 1 : 0);
-    });
+            // then
+            expect(count).toBe(0);
+        }
+    );
 
     test.each([
-        ["self::node()", 0],
+        ["self::node()", 2],
         ["self::comment()", 0],
         ["self::processing-instruction()", 0],
-        ["self::text()", 1],
+        ["self::text()", 0],
         ["child::text()", 1],
         ["b/node()", 1],
     ])("resolve the value of %s in a predicate", async (path, expected) => {
@@ -1094,6 +1077,103 @@ describe("XPathMatcher", () => {
 
         // then
         expect(count).toBe(expected);
+    });
+
+    test.each([
+        ["<root><n>10f</n><n>1e1</n><n>0x1.4p3</n><n>+10</n><n>10</n><n>10.0</n></root>", "//n[text() = 10]", 2],
+        ["<root><n>10f</n><n>1e1</n><n>0x1.4p3</n><n>+10</n><n>10</n><n>10.0</n></root>", "//n[text() > 9]", 2],
+        [documents.xmlDoc, "//dependency[contains('1', 1)]", 2],
+        [documents.xmlDoc, "//dependency[string-length(123) = 3]", 2],
+        [documents.xmlDoc, "//dependency[substring-after('v1', 1) = '']", 2],
+        [documents.xmlDoc, "//dependency[starts-with(1.5, '1.5')]", 2],
+        [documents.xmlDoc, "//dependency[not(position() = 1)]", 1],
+        [documents.xmlDoc, "//dependency[contains('2', position())]", 1],
+        [documents.xmlDoc, "//dependency[not(position() = last())]", 1],
+        [documents.xmlDoc, "(//dependency)[1]/missing/..", 0],
+        [documents.xmlDoc, "(//dependency)[1]/artifactId/..", 1],
+        [documents.xmlDoc, "(//dependency)[1]/artifactId[@scope='missing']/..", 0],
+        [documents.xmlDoc, "//dependency[artifactId/parent::missing]", 0],
+        [documents.xmlDoc, "//dependency[artifactId/parent::dependency]", 2],
+        [documents.xmlDoc, "//dependency[artifactId/parent::node()]", 2],
+        [documents.xmlDoc, "//dependency[self::node]", 0],
+        [documents.xmlDoc, "//dependency[self::node()]", 2],
+        [documents.xmlDoc, "//dependency[self::text()]", 0],
+        [documents.xmlDoc, "(//artifactId)[1]/@scope/self::missing", 0],
+        [documents.xmlDoc, "(//artifactId)[1]/@scope/self::node()", 1],
+        [documents.xmlDoc, "/dependencies/child::dependency", 2],
+        [documents.xmlDoc, "/dependencies/child::*", 2],
+        [documents.xmlDoc, "/dependencies/child::node()", 2],
+        [documents.xmlDoc, "/dependencies/child::dependency[2]", 1],
+        [documents.xmlDoc, "/dependencies/child::dependency/child::artifactId", 2],
+        [documents.xmlDoc, "//dependency[artifactId[@scope='test']]", 1],
+        [documents.xmlDoc, "//dependency[artifactId[@scope='missing']]", 0],
+        [documents.xmlDoc, "//dependency[artifactId/@scope='test']", 1],
+        [documents.xmlDoc, "//dependency[artifactId/@scope]", 2],
+        [documents.xmlDoc, "//artifactId[.='assertj-core']", 1],
+        [documents.xmlDoc, "//artifactId[contains(., 'rewrite')]", 1],
+        ["<root><a/><a/><b/><b/></root>", "/root/*[2]", 1],
+        ["<root><a/><a/><b/><b/></root>", "/root/*[2][self::b]", 0],
+        ["<root><a/><a/><b/><b/></root>", "/root/b[2]", 1],
+        ["<root><a/><a/><b/><b/></root>", "/root/*[last()]", 1],
+        ["<root><a/><a/><b/><b/></root>", "/root/*[position() > 2][1]", 1],
+        ["<root><a/><a/><b/><b/></root>", "/root/*[position() > 2][1][self::b]", 1],
+        ["<root><n>abc</n><n>10</n><n>9</n></root>", "//n[text() > 9]", 1],
+        ["<root><n>abc</n><n>10</n><n>9</n></root>", "//n[text() < 'z']", 0],
+        ["<root><n>abc</n><n>10</n><n>9</n></root>", "//n[text() = 10.0]", 1],
+        [documents.pomXml1, "//target[text() >= 1.8]", 1],
+        [documents.pomXml1, "//target[text() > 1.8]", 0],
+        [documents.xmlDoc, "//dependency[1.5]", 0],
+        [documents.xmlDoc, "(//dependency)[1]/artifactId/@scope", 1],
+        [documents.xmlDoc, "(//dependency)[1]//artifactId/@scope", 1],
+        [documents.xmlDoc, "(/dependencies/dependency[1])[1]", 1],
+        [documents.xmlDoc, "(//dependency/artifactId[@scope='test'])[1]", 1],
+        [documents.xmlDoc, "(//dependency)[artifactId/@scope='test']/artifactId", 1],
+        [documents.xmlDoc, "(//dependency)[position() > 1][1]/artifactId", 1],
+    ])("follow Java fixes for %s with %s", async (text, xpath, expected) => {
+        // given
+        const document = await parse(text);
+
+        // when
+        const count = await matchCount(xpath, document);
+
+        // then
+        expect(count).toBe(expected);
+    });
+
+    test.each(["text", "comment", "node", "processing-instruction", "and", "or"])(
+        "match element and attribute named %s", async name => {
+            // given
+            const document = await parse(`<root><${name} ${name}="yes"/></root>`);
+
+            // when
+            const counts = await Promise.all([`//${name}`, `//@${name}`, `//*[@${name}='yes']`]
+                .map(xpath => matchCount(xpath, document)));
+
+            // then
+            expect(counts).toEqual([1, 1, 1]);
+        }
+    );
+
+    test.each(["1000000000000000000000", "0.0000001"])("convert numeric argument %s to plain text", async literal => {
+        // given
+        const document = await parse("<root/>");
+
+        // when
+        const count = await matchCount(`/root[contains(${literal}, '${literal}')]`, document);
+
+        // then
+        expect(count).toBe(1);
+    });
+
+    test("reject a parenthesized expression that is not a location path", async () => {
+        // given
+        const cursor = await rootTagCursor("<root/>");
+
+        // when
+        const match = () => new XPathMatcher("(contains('a', 'a'))[1]").matches(cursor);
+
+        // then
+        expect(match).toThrow("parenthesized expression must be a location path");
     });
 
     test("an expression that does not parse throws when it is first matched", async () => {
@@ -1116,13 +1196,11 @@ describe("XPathMatcher", () => {
         // when
         const union = match("//groupId | //artifactId");
         const unknownFunction = match("//dependency[lower-case(groupId) = 'x']");
-        const decimal = match("//dependency[1.5]");
         const trailing = match("//dependency groupId");
 
         // then
         expect(union).toThrow("token recognition error at: '|'");
         expect(unknownFunction).toThrow("Unsupported XPath function: lower-case()");
-        expect(decimal).toThrow("Unsupported XPath expression: invalid number: 1.5");
         expect(trailing).toThrow("extraneous input 'groupId'");
     });
 
