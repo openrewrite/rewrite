@@ -90,7 +90,7 @@ rewrite-javascript/rewrite/
 │   │   └── templating/                  # Template engine
 │   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
 │   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
-│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions)
+│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions, XPathMatcher)
 │   ├── search/                          # Cross-language search utilities
 │   ├── text/                            # Plain text support
 │   ├── rpc/                             # RPC infrastructure
