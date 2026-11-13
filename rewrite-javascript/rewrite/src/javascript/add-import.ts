@@ -1009,7 +1009,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         });
 
-        return formatImport(withoutModuleMarker(withImport), newImport.id, p, detectBraceSpacing(compilationUnit));
+        const formatted = await formatImport(withoutModuleMarker(withImport), newImport.id, p,
+            detectBraceSpacing(compilationUnit));
+        return this.group ? withRunSorted(formatted, new Set(this.group.created)) : formatted;
     }
 
     /**
@@ -1808,11 +1810,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return undefined;
         }
         const indexOf = (id: UUID) => cu.statements.findIndex(s => s.element?.id === id);
-        const created = group.created.map(indexOf).filter(i => i >= 0).sort((a, b) => a - b);
-        if (created.length > 0) {
-            const after = created.find(i =>
-                compareModules(importedModule(cu.statements[i].element as JS.Import), this.module) > 0);
-            return {index: after ?? created[created.length - 1] + 1};
+        // The import joins the end of the run, which is then sorted with each slot keeping its prefix,
+        // so a comment or blank line before the run stays before it.
+        const created = Math.max(-1, ...group.created.map(indexOf));
+        if (created >= 0) {
+            return {index: created + 1};
         }
         const source = indexOf(group.sourceId);
         if (source >= 0) {
@@ -2438,12 +2440,15 @@ export class RebindGroup {
         }
     }
 
-    add(localName: string, boundName: string, toModule: string): void {
+    add(localName: string, boundName: string, to: {module: string; member?: string}): void {
         const index = this.names.indexOf(localName);
         if (index >= 0) {
             this.names[index] = boundName;
         }
-        this.targets.push(toModule);
+        // A default or namespace binding gets an import of its own, so it never shares a named list.
+        if (bindingShape(to.member) === "named") {
+            this.targets.push(to.module);
+        }
     }
 
     /** Whether the statement listed several named members, so that one left alone in it stands on a line of its own. */
@@ -2541,14 +2546,21 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (this.dropped !== undefined) {
             const index = visited.statements.findIndex(s => s.element?.id === this.dropped);
             const next = visited.statements[index + 1]?.element;
+            const prefix = visited.statements[index].element!.prefix;
             if (this.group !== undefined && next !== undefined) {
-                this.group.dropped = {
-                    next: next.id,
-                    prefix: visited.statements[index].element!.prefix,
-                    nextPrefix: next.prefix
-                };
+                this.group.dropped = {next: next.id, prefix, nextPrefix: next.prefix};
             }
             visited = withoutStatement(visited, this.dropped);
+            // An import split from the statement takes its place whole, comments included, which
+            // `withoutStatement` keeps only for a file header.
+            if (next !== undefined && this.group?.created.includes(next.id)) {
+                visited = {
+                    ...visited,
+                    statements: visited.statements.map(s => s.element?.id === next.id
+                        ? {...s, element: {...s.element, prefix}}
+                        : s)
+                };
+            }
         }
         if (this.inPlace !== undefined && this.group !== undefined) {
             visited = withRunSorted(visited, new Set([this.inPlace, ...this.group.created]));

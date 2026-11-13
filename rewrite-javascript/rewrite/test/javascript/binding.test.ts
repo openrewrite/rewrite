@@ -3048,60 +3048,60 @@ describe("maybeRebind keeps the file's import layout", () => {
     test("members split across modules land where their import was, in the order written, one line per lone member", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebinding(
-            ["@angular/material", "@angular/material/dialog", "MatDialogModule"],
-            ["@angular/material", "@angular/material/button", "MatButtonModule"],
-            ["@angular/material", "@angular/material/dialog", "MatDialog"]
+            ["@acme/ui", "@acme/ui/dialog", "DialogModule"],
+            ["@acme/ui", "@acme/ui/button", "ButtonModule"],
+            ["@acme/ui", "@acme/ui/dialog", "Dialog"]
         );
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import {NgModule} from '@angular/core';
+            import {Module} from '@acme/core';
             import {
-                MatDialogModule,
-                MatButtonModule,
-                MatDialog,
-            } from '@angular/material';
+                DialogModule,
+                ButtonModule,
+                Dialog,
+            } from '@acme/ui';
             import {Other} from 'other';
 
-            const used = [NgModule, MatDialogModule, MatButtonModule, MatDialog, Other];`,
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`,
             `
-            import {NgModule} from '@angular/core';
-            import {MatButtonModule} from '@angular/material/button';
+            import {Module} from '@acme/core';
+            import {ButtonModule} from '@acme/ui/button';
             import {
-                MatDialogModule,
-                MatDialog,
-            } from '@angular/material/dialog';
+                DialogModule,
+                Dialog,
+            } from '@acme/ui/dialog';
             import {Other} from 'other';
 
-            const used = [NgModule, MatDialogModule, MatButtonModule, MatDialog, Other];`
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`
         ));
     });
 
     test("the member left last in a multi-line import collapses onto one line, sorted among the imports split from it", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebinding(
-            ["@angular/material", "@angular/material/card", "MatCardModule"],
-            ["@angular/material", "@angular/material/tooltip", "MatTooltip"],
-            ["@angular/material", "@angular/material/core", "MAT_DATE_FORMATS"]
+            ["@acme/ui", "@acme/ui/card", "CardModule"],
+            ["@acme/ui", "@acme/ui/tooltip", "Tooltip"],
+            ["@acme/ui", "@acme/ui/core", "DATE_FORMATS"]
         );
         //language=typescript
         await spec.rewriteRun(typescript(
             `
             import {
-                MatTooltip as Tooltip,
-                MAT_DATE_FORMATS,
-                MatCardModule
-            } from "@angular/material";
+                Tooltip as Tip,
+                DATE_FORMATS,
+                CardModule
+            } from "@acme/ui";
             import {Other} from "other";
 
-            const used = [Tooltip, MAT_DATE_FORMATS, MatCardModule, Other];`,
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`,
             `
-            import {MatCardModule} from "@angular/material/card";
-            import {MAT_DATE_FORMATS} from "@angular/material/core";
-            import {MatTooltip as Tooltip} from "@angular/material/tooltip";
+            import {CardModule} from "@acme/ui/card";
+            import {DATE_FORMATS} from "@acme/ui/core";
+            import {Tooltip as Tip} from "@acme/ui/tooltip";
             import {Other} from "other";
 
-            const used = [Tooltip, MAT_DATE_FORMATS, MatCardModule, Other];`
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`
         ));
     });
 
@@ -3122,6 +3122,47 @@ describe("maybeRebind keeps the file's import layout", () => {
             import {z} from "last";
 
             act(a, z);`
+        ));
+    });
+
+    test("imports split from a dropped statement keep the comment before it, sorted below it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "z", "A"], ["m", "a", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A, B} from "m";
+
+            use(x, A, B);`,
+            `
+            import {x} from "first";
+            // ui
+            import B from "a";
+            import {A} from "z";
+
+            use(x, A, B);`
+        ));
+    });
+
+    test("a named member moved beside a default of the same module goes on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A"], ["m", "n", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                A,
+                B,
+            } from "m";
+
+            use(A, B);`,
+            `
+            import {A} from "n";
+            import B from "n";
+
+            use(A, B);`
         ));
     });
 

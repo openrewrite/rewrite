@@ -425,7 +425,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
             group = queued.find((v): v is RebindImport<any> =>
                     v instanceof RebindImport && v.group?.sourceId === statement.id)?.group ??
                 new RebindGroup(statement.id, statement as JS.Import);
-            group.add(existing.localName, boundName, options.to.module);
+            group.add(existing.localName, boundName, options.to);
         }
         visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, group));
     }
