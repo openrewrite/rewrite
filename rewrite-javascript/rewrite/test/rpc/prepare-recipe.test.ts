@@ -50,11 +50,28 @@ describe("PrepareRecipe", () => {
 
         // then
         expect(scanner).toBe(recipe.scanVisitor);
-        expect(recipe.scannedAccumulators).toEqual([undefined, acc]);
+        expect(recipe.scannedAccumulators).toEqual([new Map(), acc]);
         expect(recipe.scannedAccumulators[1]).toBe(acc);
         expect(preconditions).toEqual([
             {visitorName: "org.openrewrite.FindSourceFiles", visitorOptions: {filePattern: "**/package.json"}},
             {visitorName: "org.openrewrite.rpc.internal.FindTreesOfType", visitorOptions: {type: "org.openrewrite.json.tree.Json"}}
         ]);
+    });
+
+    test("a scanner that cannot be built outside a run keeps its precondition", async () => {
+        // given
+        const recipe = new class extends ScanningRecipeWithPrecondition {
+            initialValue(): Map<string, string> {
+                throw new Error("only available during a run");
+            }
+        };
+        const preconditions: any[] = [];
+
+        // when
+        const prepared = await PrepareRecipe["optimizePreconditions"](recipe, "scan", preconditions);
+
+        // then
+        expect(prepared).toBe(recipe);
+        expect(preconditions).toEqual([]);
     });
 });

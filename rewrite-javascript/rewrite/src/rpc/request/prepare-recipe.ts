@@ -160,14 +160,17 @@ export class PrepareRecipe {
      */
     private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
         let visitor: TreeVisitor<any, ExecutionContext>;
-        if (phase === "edit") {
-            visitor = await recipe.editor();
-        } else if (phase === "scan") {
-            if (recipe instanceof ScanningRecipe) {
-                visitor = await recipe.scanner(undefined);
+        try {
+            if (phase === "edit") {
+                visitor = await recipe.editor();
+            } else if (recipe instanceof ScanningRecipe) {
+                visitor = await recipe.scanner(recipe.initialValue(new ExecutionContext()));
             } else {
                 return recipe;
             }
+        } catch {
+            // A visitor that can only be built during a run keeps its preconditions, which it then checks itself.
+            return recipe;
         }
 
         if (visitor! instanceof Check) {
