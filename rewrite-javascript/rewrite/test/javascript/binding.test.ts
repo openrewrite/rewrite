@@ -1900,8 +1900,8 @@ describe("maybeRebind", () => {
 
             a(b);`,
             `
-            import {x as b} from "m3";
             import {x} from "m2";
+            import {x as b} from "m3";
             import {x as x_1} from "m4";
 
             x(b);`
@@ -2490,7 +2490,7 @@ describe("maybeRebind", () => {
             `const modules = [${module}];\n` +
             `export {${http === "Http" ? http : `${http} as Http`}};\n`;
         const after = `import {request} from 'legacy-http';\n` +
-            `import {HttpClient, HttpClientModule, HttpHeaders} from '@acme/common/http';\n\n` +
+            `import {HttpHeaders, HttpClient, HttpClientModule} from '@acme/common/http';\n\n` +
             body("HttpClient", "HttpHeaders", "HttpClientModule");
         let rebound: string[] = [];
         let parsed: string[] = [];
@@ -2897,7 +2897,6 @@ describe("maybeRebind", () => {
             //language=javascript
             `
             import act from "new";
-
             const fs = require("fs");
 
             act();`
@@ -3029,6 +3028,215 @@ describe("maybeRebind", () => {
             import {b} from "n";
 
             const x = [a, b];`
+        ));
+    });
+});
+
+describe("maybeRebind keeps the file's import layout", () => {
+    /** One `maybeRebind` per move, in the order given, all in one visit. */
+    function rebinding(...moves: [from: string, to: string, member: string, toMember?: string][]) {
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                for (const [from, to, member, toMember] of moves) {
+                    maybeRebind(this, {from: {module: from, member}, to: {module: to, member: toMember ?? member}});
+                }
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+    }
+
+    test("members split across modules land where their import was, in the order written, one line per lone member", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(
+            ["@acme/ui", "@acme/ui/dialog", "DialogModule"],
+            ["@acme/ui", "@acme/ui/button", "ButtonModule"],
+            ["@acme/ui", "@acme/ui/dialog", "Dialog"]
+        );
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {Module} from '@acme/core';
+            import {
+                DialogModule,
+                ButtonModule,
+                Dialog,
+            } from '@acme/ui';
+            import {Other} from 'other';
+
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`,
+            `
+            import {Module} from '@acme/core';
+            import {ButtonModule} from '@acme/ui/button';
+            import {
+                DialogModule,
+                Dialog,
+            } from '@acme/ui/dialog';
+            import {Other} from 'other';
+
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`
+        ));
+    });
+
+    test("the member left last in a multi-line import collapses onto one line, sorted among the imports split from it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(
+            ["@acme/ui", "@acme/ui/card", "CardModule"],
+            ["@acme/ui", "@acme/ui/tooltip", "Tooltip"],
+            ["@acme/ui", "@acme/ui/core", "DATE_FORMATS"]
+        );
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                Tooltip as Tip,
+                DATE_FORMATS,
+                CardModule
+            } from "@acme/ui";
+            import {Other} from "other";
+
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`,
+            `
+            import {CardModule} from "@acme/ui/card";
+            import {DATE_FORMATS} from "@acme/ui/core";
+            import {Tooltip as Tip} from "@acme/ui/tooltip";
+            import {Other} from "other";
+
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`
+        ));
+    });
+
+    test("an import that replaces a dropped one takes its place", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["old", "new", "act", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {a} from "first";
+            import {act} from "old";
+            import {z} from "last";
+
+            act(a, z);`,
+            `
+            import {a} from "first";
+            import act from "new";
+            import {z} from "last";
+
+            act(a, z);`
+        ));
+    });
+
+    test("imports split from a dropped statement keep the comment before it, sorted below it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "z", "A"], ["m", "a", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A, B} from "m";
+
+            use(x, A, B);`,
+            `
+            import {x} from "first";
+            // ui
+            import B from "a";
+            import {A} from "z";
+
+            use(x, A, B);`
+        ));
+    });
+
+    test("a named member moved beside a default of the same module goes on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A"], ["m", "n", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                A,
+                B,
+            } from "m";
+
+            use(A, B);`,
+            `
+            import {A} from "n";
+            import B from "n";
+
+            use(A, B);`
+        ));
+    });
+
+    test("an import that replaces the file's last statement takes its place and its comment", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A} from "m";`,
+            `
+            import {x} from "first";
+            // ui
+            import A from "n";`
+        ));
+    });
+
+    test("a type-only member and a value moved to one module each go on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "T"], ["m", "n", "V"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                type T,
+                V,
+            } from "m";
+
+            let t: T = V;`,
+            `
+            import {V} from "n";
+            import type {T} from "n";
+
+            let t: T = V;`
+        ));
+    });
+
+    test("members renamed within their module keep the order written, whichever rename runs first", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["lodash", "lodash", "zeta", "zed"], ["lodash", "lodash", "extend", "assign"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {zeta, extend, alpha} from "lodash";
+
+            zeta(extend, alpha);`,
+            `
+            import {zed, assign, alpha} from "lodash";
+
+            zed(assign, alpha);`
+        ));
+    });
+
+    test("an import split from a multi-line list spaces its braces as the file's export lists do", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "b"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                a,
+                b,
+            } from "m";
+
+            export { a, b };`,
+            `
+            import {
+                a,
+            } from "m";
+            import { b } from "n";
+
+            export { a, b };`
         ));
     });
 });
@@ -4120,8 +4328,8 @@ describe("a node: specifier and the bare name of its built-in", () => {
 
             a(net);`,
             `
-            import net from 'node:tls';
             import {strict as a} from 'node:assert/strict';
+            import net from 'node:tls';
 
             a(net);`
         ));
