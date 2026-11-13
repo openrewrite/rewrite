@@ -989,14 +989,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 const after = cu.statements.slice(insertionIndex);
 
                 //The `after` space is empty, spacing comes from next statement's prefix
-                // Ensure the next statement has at least one newline in its prefix
+                // A next statement on the import's line moves to its own, with the comments ahead of it
                 if (after.length > 0 && after[0].element) {
                     const currentPrefix = after[0].element.prefix;
                     const needsNewline = !currentPrefix.whitespace.includes('\n');
 
                     const updatedNextStatement = needsNewline ? {
                         ...after[0],
-                        element: {...after[0].element, prefix: space("\n" + currentPrefix.whitespace)}
+                        element: {...after[0].element, prefix: {...currentPrefix, whitespace: "\n"}}
                     } : after[0];
 
                     draft.statements = [
