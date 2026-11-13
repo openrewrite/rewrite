@@ -92,15 +92,18 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         var indices = new List<int>();
         foreach (var comment in space.Comments)
         {
-            if (!comment.Multiline)
+            if (DirectiveIndex(comment) is { } index)
             {
-                var match = GhostPattern().Match(comment.Text);
-                if (match.Success)
-                {
-                    indices.Add(int.Parse(match.Groups[1].Value));
-                }
+                indices.Add(index);
             }
         }
         return indices;
     }
+
+    /// <summary>The <see cref="ConditionalDirective.DirectiveLines"/> index a ghost comment stands
+    /// for, or null for any other comment.</summary>
+    internal static int? DirectiveIndex(Comment comment) =>
+        !comment.Multiline && GhostPattern().Match(comment.Text) is { Success: true } match
+            ? int.Parse(match.Groups[1].Value)
+            : null;
 }

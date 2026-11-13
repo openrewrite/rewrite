@@ -33,6 +33,13 @@ namespace OpenRewrite.CSharp;
 /// ordinal or Visual Studio's System-first order, whichever the file already satisfies — and an
 /// unsorted list appends after its last using.
 /// </para>
+/// <para>
+/// A file with <c>#if</c> blocks gets the using at the compilation unit level, above its first
+/// conditional directive. The text above that directive is the same in every branch, and every
+/// configuration compiles it. Extern aliases, global usings and <c>#define</c> or <c>#undef</c>
+/// lines must precede a plain using, so a file with a conditional directive before one of them is
+/// left alone.
+/// </para>
 /// </summary>
 public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
 {
@@ -69,7 +76,18 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             return cu;
         }
 
-        return Insert(cu);
+        // Each branch is the whole file as one set of symbols compiles it.
+        if (cu.Members is [{ Element: ConditionalDirective directive } member])
+        {
+            if (directive.Branches.Any(branch => HasDirectiveBeforeWhatMustPrecedeUsings(branch.Element)))
+            {
+                return cu;
+            }
+            return cu.WithMembers([member.WithElement(directive.WithBranches(directive.Branches
+                .Select(branch => branch.WithElement(Insert(branch.Element, inBranch: true)))
+                .ToList()))]);
+        }
+        return Insert(cu, inBranch: false);
     }
 
     private bool IsReferenced(CompilationUnit cu)
@@ -79,32 +97,132 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         return finder.Found;
     }
 
-    private CompilationUnit Insert(CompilationUnit cu)
+    private CompilationUnit Insert(CompilationUnit cu, bool inBranch)
     {
         var newline = DetectNewline(cu);
 
-        if (cu.Usings.Any(u => u.Element is UsingDirective))
+        if (inBranch && InsertAboveOpeningDirective(cu, newline) is { } opened)
         {
-            return cu.WithUsings(InsertInto(cu.Usings, newline));
+            return opened;
         }
 
-        foreach (var ns in AddUsing.Namespaces(cu.Members))
+        var shared = inBranch
+            ? cu.Usings.TakeWhile(u => IndexOfDirectiveLine(u.Element.Prefix) < 0).Count()
+            : cu.Usings.Count;
+        if (cu.Usings.Take(shared).Any(u => u.Element is UsingDirective))
         {
-            if (ns.Name.Markers.FindFirst<Semicolon>() == null &&
-                ns.Usings.Any(u => u.Element is UsingDirective))
+            return cu.WithUsings(InsertInto(cu.Usings, shared, newline));
+        }
+        if (shared < cu.Usings.Count)
+        {
+            return cu.WithUsings(InsertAboveDirectiveLine(cu.Usings, shared, newline));
+        }
+
+        // A branch keeps the using at the compilation unit level, as a namespace's usings can sit
+        // below a conditional directive.
+        if (!inBranch)
+        {
+            foreach (var ns in AddUsing.Namespaces(cu.Members))
             {
-                return (CompilationUnit)new ReplaceNamespaceUsings(ns.Id, InsertInto(ns.Usings, newline))
-                    .Visit(cu, 0)!;
+                if (ns.Name.Markers.FindFirst<Semicolon>() == null &&
+                    ns.Usings.Any(u => u.Element is UsingDirective))
+                {
+                    return (CompilationUnit)new ReplaceNamespaceUsings(ns.Id,
+                            InsertInto(ns.Usings, ns.Usings.Count, newline))
+                        .Visit(cu, 0)!;
+                }
             }
         }
 
         return InsertFirstUsing(cu, newline);
     }
 
-    private List<JRightPadded<Statement>> InsertInto(IList<JRightPadded<Statement>> list, string newline)
+    private static bool HasDirectiveBeforeWhatMustPrecedeUsings(CompilationUnit branch)
     {
+        static bool MustPrecede(JRightPadded<Statement> u) =>
+            u.Element is UsingDirective { Global.Element: true } or DefineDirective or UndefDirective;
+        return IndexOfDirectiveLine(branch.Prefix) >= 0
+            ? branch.Externs.Count > 0 || branch.Usings.Any(MustPrecede)
+            : branch.Externs.Any(e => IndexOfDirectiveLine(e.Element.Prefix) >= 0)
+              || branch.Usings.SkipWhile(u => IndexOfDirectiveLine(u.Element.Prefix) < 0).Any(MustPrecede);
+    }
+
+    /// <summary>A branch whose prefix holds a conditional directive gets the using right above it,
+    /// after any file header.</summary>
+    private CompilationUnit? InsertAboveOpeningDirective(CompilationUnit cu, string newline)
+    {
+        if (IndexOfDirectiveLine(cu.Prefix) < 0)
+        {
+            return null;
+        }
+
+        var (above, from) = SplitAtDirectiveLine(cu.Prefix, newline);
+        var added = JRightPadded<Statement>.Build(CreateUsing(Space.Empty));
+        cu = cu.WithPrefix(above);
+        // The prefix holds the first token's leading trivia, so whatever follows it has an empty prefix.
+        if (cu.Usings.Count > 0)
+        {
+            var first = cu.Usings[0];
+            return cu.WithUsings([added, first.WithElement(J.SetPrefix(first.Element, from)), .. cu.Usings.Skip(1)]);
+        }
+        return WithDeclarationPrefix(cu.WithUsings([added]), _ => from);
+    }
+
+    private List<JRightPadded<Statement>> InsertAboveDirectiveLine(IList<JRightPadded<Statement>> list, int index,
+        string newline)
+    {
+        var below = list[index];
+        var result = new List<JRightPadded<Statement>>(list);
+        if (index > 0 && below.Element.Prefix.Whitespace.Contains('\n'))
+        {
+            // The blank lines and comments above the directive stay with it.
+            result.Insert(index, JRightPadded<Statement>.Build(CreateUsing(Space.Format(newline))));
+            return result;
+        }
+
+        var (above, from) = SplitAtDirectiveLine(below.Element.Prefix, newline);
+        result[index] = below.WithElement(J.SetPrefix(below.Element, from));
+        result.Insert(index, JRightPadded<Statement>.Build(CreateUsing(above)));
+        return result;
+    }
+
+    /// <summary>Splits a space before its first conditional directive line, which starts the second
+    /// part on a new line. Doc comments right above the directive document the declaration below it,
+    /// so they go with the directive.</summary>
+    private static (Space Above, Space From) SplitAtDirectiveLine(Space space, string newline)
+    {
+        var at = IndexOfDirectiveLine(space);
+        while (at > 0 && space.Comments[at - 1] is CsDocComment)
+        {
+            at--;
+        }
+        return (new Space(space.Whitespace, space.Comments.Take(at).ToList()),
+            new Space(newline, space.Comments.Skip(at).ToList()));
+    }
+
+    private static int IndexOfDirectiveLine(Space space)
+    {
+        for (var i = 0; i < space.Comments.Count; i++)
+        {
+            if (DirectiveBoundaryInjector.DirectiveIndex(space.Comments[i]) != null)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>Inserts among the first <paramref name="count"/> elements of the list. The element
+    /// after them, if any, starts with a conditional directive line.</summary>
+    private List<JRightPadded<Statement>> InsertInto(IList<JRightPadded<Statement>> list, int count, string newline)
+    {
+        var index = InsertionIndex(list, count);
+        if (index == count && count < list.Count)
+        {
+            return InsertAboveDirectiveLine(list, index, newline);
+        }
+
         var linePrefix = Space.Format(newline + IndentOf(list));
-        var index = InsertionIndex(list);
 
         var result = new List<JRightPadded<Statement>>(list);
         if (index == 0)
@@ -120,11 +238,11 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         return result;
     }
 
-    private int InsertionIndex(IList<JRightPadded<Statement>> list)
+    private int InsertionIndex(IList<JRightPadded<Statement>> list, int count)
     {
         var plain = new List<(int Index, string Name)>();
         var lastUsing = -1;
-        for (var i = 0; i < list.Count; i++)
+        for (var i = 0; i < count; i++)
         {
             if (list[i].Element is UsingDirective directive)
             {
@@ -258,38 +376,33 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             cu = cu.WithPrefix(cu.Prefix.WithComments(headerComments.Take(split).ToList()));
         }
 
+        if (cu.AttributeLists.Count == 0 && cu.Members.Count == 0)
+        {
+            return cu;
+        }
         var blank = newline + newline;
+        return WithDeclarationPrefix(cu, prefix =>
+            moved.Count > 0 ? new Space(blank, moved.Concat(prefix.Comments).ToList())
+            : prefix.Whitespace.Contains('\n') ? prefix
+            : prefix.WithWhitespace(blank));
+    }
+
+    /// <summary>Maps the prefix of the first assembly attribute list, else of the first member, else
+    /// the end of the file.</summary>
+    private static CompilationUnit WithDeclarationPrefix(CompilationUnit cu, Func<Space, Space> map)
+    {
         if (cu.AttributeLists.Count > 0)
         {
-            if (!cu.AttributeLists[0].Prefix.Whitespace.Contains('\n'))
-            {
-                var lists = new List<AttributeList>(cu.AttributeLists);
-                lists[0] = lists[0].WithPrefix(lists[0].Prefix.WithWhitespace(blank));
-                cu = cu.WithAttributeLists(lists);
-            }
+            var list = cu.AttributeLists[0];
+            return cu.WithAttributeLists([list.WithPrefix(map(list.Prefix)), .. cu.AttributeLists.Skip(1)]);
         }
-        else if (cu.Members.Count > 0)
+        if (cu.Members.Count > 0)
         {
             var first = cu.Members[0];
-            var prefix = first.Element.Prefix;
-            if (moved.Count > 0)
-            {
-                prefix = new Space(blank, moved.Concat(prefix.Comments).ToList());
-            }
-            else if (!prefix.Whitespace.Contains('\n'))
-            {
-                prefix = prefix.WithWhitespace(blank);
-            }
-            if (!ReferenceEquals(prefix, first.Element.Prefix))
-            {
-                var members = new List<JRightPadded<Statement>>(cu.Members)
-                {
-                    [0] = first.WithElement(J.SetPrefix(first.Element, prefix)),
-                };
-                cu = cu.WithMembers(members);
-            }
+            return cu.WithMembers([first.WithElement(J.SetPrefix(first.Element, map(first.Element.Prefix))),
+                .. cu.Members.Skip(1)]);
         }
-        return cu;
+        return cu.WithEof(map(cu.Eof));
     }
 
     private UsingDirective CreateUsing(Space prefix) =>
@@ -396,11 +509,15 @@ public static class AddUsing
 
     /// <summary>True when the file already has a plain (non-static, non-alias) using for
     /// <paramref name="ns"/> — at the compilation unit level or on any namespace declaration,
-    /// including <c>global using</c> directives.</summary>
+    /// including <c>global using</c> directives. In a file with <c>#if</c> blocks, every
+    /// configuration that declares something has to have it.</summary>
     public static bool HasNamespaceUsing(CompilationUnit cu, string ns) =>
-        UsingLists(cu).SelectMany(list => list).Any(padded =>
-            padded.Element is UsingDirective { IsStatic: false, Alias: null } directive
-            && string.Equals(QualifiedNameOf(directive.NamespaceOrType), ns, StringComparison.Ordinal));
+        cu.Members is [{ Element: ConditionalDirective directive }]
+            ? directive.Branches.All(branch => branch.Element is { Members.Count: 0, AttributeLists.Count: 0 }
+                || HasNamespaceUsing(branch.Element, ns))
+            : UsingLists(cu).SelectMany(list => list).Any(padded =>
+                padded.Element is UsingDirective { IsStatic: false, Alias: null } directive
+                && string.Equals(QualifiedNameOf(directive.NamespaceOrType), ns, StringComparison.Ordinal));
 
     internal static IEnumerable<IList<JRightPadded<Statement>>> UsingLists(CompilationUnit cu)
     {

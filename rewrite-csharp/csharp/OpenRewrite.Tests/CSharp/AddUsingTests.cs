@@ -241,6 +241,264 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
+    public void FileWithConditionalDirectivesGetsTheUsingAfterALeadingDirective()
+    {
+        var after = ApplyAddUsing(
+            """
+            #nullable enable
+
+            // A comment
+            public static class Some
+            {
+                public static object Fail() => new object();
+            #if FEATURE_X
+                public static int X => 1;
+            #endif
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            #nullable enable
+            using System.Threading.Tasks;
+
+            // A comment
+            public static class Some
+            {
+                public static object Fail() => new object();
+            #if FEATURE_X
+                public static int X => 1;
+            #endif
+            }
+            """, after);
+    }
+
+    [Fact]
+    public void FileOpeningWithAConditionalBlockGetsTheUsingAboveIt()
+    {
+        var after = ApplyAddUsing(
+            """
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System.Threading.Tasks;
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+
+            public class C
+            {
+            }
+            """, after);
+
+        var wholeFile = ApplyAddUsing(
+            """
+            #if !FEATURE_X
+            public class C
+            {
+            }
+            #endif
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System.Threading.Tasks;
+            #if !FEATURE_X
+            public class C
+            {
+            }
+            #endif
+            """, wholeFile);
+    }
+
+    [Fact]
+    public void DocCommentAboveAnOpeningDirectiveStaysWithTheDeclaration()
+    {
+        var after = ApplyAddUsing(
+            """
+            /// <summary>Doc.</summary>
+            #if FEATURE_X
+            [System.Obsolete]
+            #endif
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System.Threading.Tasks;
+            /// <summary>Doc.</summary>
+            #if FEATURE_X
+            [System.Obsolete]
+            #endif
+            public class C
+            {
+            }
+            """, after);
+    }
+
+    [Fact]
+    public void UsingStaysAboveAConditionalBlockAmongTheUsings()
+    {
+        var after = ApplyAddUsing(
+            """
+            using System;
+
+            // Diagnostics only where FEATURE_X is defined
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+            using Xunit;
+
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System;
+            using System.Threading.Tasks;
+
+            // Diagnostics only where FEATURE_X is defined
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+            using Xunit;
+
+            public class C
+            {
+            }
+            """, after);
+    }
+
+    [Fact]
+    public void ConditionalDirectiveBeforeWhatMustPrecedeUsingsLeavesTheFileAlone()
+    {
+        var cu = Parse(
+            """
+            extern alias A;
+            #if FEATURE_X
+            extern alias B;
+            #endif
+
+            public class C
+            {
+            }
+            """);
+
+        Assert.Same(cu, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0));
+
+        var globalUsing = Parse(
+            """
+            global using System;
+            #if FEATURE_X
+            global using System.Diagnostics;
+            #endif
+
+            public class C
+            {
+            }
+            """);
+
+        Assert.Same(globalUsing,
+            new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(globalUsing, 0));
+
+        var define = Parse(
+            """
+            #if FEATURE_X
+            #define TRACE_ON
+            #endif
+            using System;
+
+            public class C
+            {
+            }
+            """);
+
+        Assert.Same(define, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(define, 0));
+    }
+
+    [Fact]
+    public void UsingPresentInEveryConfigurationThatDeclaresSomethingIsANoOp()
+    {
+        var cu = Parse(
+            """
+            using System.Threading.Tasks;
+
+            public class C
+            {
+            #if FEATURE_X
+                private Task field;
+            #endif
+            }
+            """);
+
+        Assert.Same(cu, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0));
+
+        var wholeFile = Parse(
+            """
+            #if !FEATURE_X
+            using System.Threading.Tasks;
+
+            public class C
+            {
+            }
+            #endif
+            """);
+
+        Assert.Same(wholeFile, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(wholeFile, 0));
+    }
+
+    [Fact]
+    public void UsingPresentInOnlySomeConfigurationsIsAddedForAll()
+    {
+        var after = ApplyAddUsing(
+            """
+            #if FEATURE_X
+            using System.Threading.Tasks;
+            #endif
+
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System.Threading.Tasks;
+            #if FEATURE_X
+            using System.Threading.Tasks;
+            #endif
+
+            public class C
+            {
+            }
+            """, after);
+    }
+
+    [Fact]
     public void AlreadyPresentUsingIsReferenceEqualNoOp()
     {
         var cu = Parse(
