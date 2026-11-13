@@ -80,6 +80,7 @@ class ScalaTreeVisitor(
   private var isInImportContext = false
   private var currentSyntheticParams: Set[String] = Set.empty
   private var inPattern = false
+  private var assignmentTarget: Trees.Tree[?] = null
   private val namedArgumentCalls = new java.util.IdentityHashMap[Trees.NamedArg[?], Trees.Apply[?]]()
 
   private def patternContext[T](pattern: Boolean)(visit: => T): T = {
@@ -1647,15 +1648,41 @@ class ScalaTreeVisitor(
         Markers.build(Collections.singletonList(new TypeProjection(Tree.randomId())))
       } else Markers.EMPTY
 
-      new J.FieldAccess(
-        Tree.randomId(),
-        prefix,
-        faMarkers,
-        target,
-        new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
-        name.getType
-      )
+      argumentlessCallOf(sel) match {
+        case Some(methodType) if !isTypeProjection =>
+          new J.MethodInvocation(
+            Tree.randomId(),
+            prefix,
+            Markers.EMPTY,
+            new JRightPadded(target, beforeDotSpace, Markers.EMPTY),
+            null,
+            typedMethodName(name, methodType),
+            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+            methodType
+          )
+        case _ =>
+          new J.FieldAccess(
+            Tree.randomId(),
+            prefix,
+            faMarkers,
+            target,
+            new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
+            name.getType
+          )
+      }
     }
+  }
+
+  /** An assignment target names the member being written, even when the write goes through a setter. */
+  private def argumentlessCallOf(sel: Trees.Select[?]): Option[JavaType.Method] =
+    if (sel eq assignmentTarget) None
+    else typeMapping.flatMap(_.argumentlessCallOf(sel.asInstanceOf[untpd.Tree]))
+
+  private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
+    val enclosingTarget = assignmentTarget
+    assignmentTarget = lhs
+    try visitTree(lhs) finally assignmentTarget = enclosingTarget
   }
   
   private def visitInfixOp(infixOp: untpd.InfixOp): J = {
@@ -1680,7 +1707,7 @@ class ScalaTreeVisitor(
       val prefix = extractPrefix(infixOp.span)
       
       // Visit the left side (variable)
-      val variable = visitTree(infixOp.left) match {
+      val variable = visitAssignmentTarget(infixOp.left) match {
         case expr: Expression => expr
         case j: J => new S.StatementExpression(Tree.randomId(), j)
         case null => throw unmappedException(infixOp)
@@ -4220,7 +4247,7 @@ class ScalaTreeVisitor(
     
     // Visit the left-hand side. LHS is typically an Identifier/Select but be tolerant
     // of unusual J types by wrapping via StatementExpression.
-    val variable = visitTree(asg.lhs) match {
+    val variable = visitAssignmentTarget(asg.lhs) match {
       case expr: Expression => expr
       case j: J => new S.StatementExpression(Tree.randomId(), j)
       case null => throw unmappedException(asg)

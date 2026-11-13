@@ -529,16 +529,80 @@ class ScalaTypeAttributionTest implements RewriteTest {
           scala(
             """
             class Foo {
-              val xs = List(1)
-              val it = xs.toIterator
+              val size = 1
+            }
+            object Bar {
+              val foo = new Foo
+              val s = foo.size
+              val n = scala.math.Pi
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                J.FieldAccess toIterator = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toIterator"));
-                assertThat(TypeUtils.asFullyQualified(toIterator.getType()).getFullyQualifiedName())
-                  .isEqualTo("scala.collection.Iterator");
-                assertThat(toIterator.getName().getType()).isEqualTo(toIterator.getType());
-                assertThat(toIterator.getName().getFieldType()).isNull();
+                J.FieldAccess size = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("size"));
+                assertThat(size.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(size.getName().getFieldType()).isNotNull();
+                assertThat(size.getName().getFieldType().getName()).isEqualTo("size");
+                J.FieldAccess pi = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("Pi"));
+                assertThat(pi.getType()).isEqualTo(JavaType.Primitive.Double);
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterlessMethodCallIsAMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+            class A {
+              val xs = List(1, 2)
+              val r = xs.reverse
+              val l = "abc".length
+              val t = xs.sum
+              val h = xs.reverse.headOption
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(collect(cu, J.FieldAccess.class, f -> true)).isEmpty();
+
+                J.MethodInvocation reverse = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("reverse"));
+                assertThat(reverse.getArguments()).isEmpty();
+                assertThat(reverse.getMethodType()).isNotNull();
+                assertThat(reverse.getName().getType()).isSameAs(reverse.getMethodType());
+                assertThat(TypeUtils.asFullyQualified(reverse.getType()).getFullyQualifiedName())
+                  .isEqualTo("scala.collection.immutable.List");
+
+                assertThat(new MethodMatcher("java.lang.String length()").matches(
+                  find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("length")))).isTrue();
+                assertThat(new MethodMatcher("scala.collection.immutable.List reverse()").matches(reverse)).isTrue();
+
+                J.MethodInvocation sum = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("sum"));
+                assertThat(sum.getType()).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterlessMethodCallKeepsItsShapeWhereItIsNotACall() {
+        rewriteRun(
+          scala(
+            """
+            class Counter {
+              private var n = 0
+              def count: Int = n
+              def count_=(v: Int): Unit = n = v
+            }
+            class B {
+              val c = new Counter
+              c.count = 5
+              val f: () => String = "abc".toUpperCase
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Assignment assignment = find(cu, J.Assignment.class, a -> !(a.getVariable() instanceof J.Identifier));
+                assertThat(assignment.getVariable()).isInstanceOf(J.FieldAccess.class);
+                assertThat(collect(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("toUpperCase"))).isEmpty();
             })
           )
         );
@@ -826,7 +890,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
                 assertThat(explicit.getMarkers().findFirst(ImplicitArguments.class)).isEmpty();
 
-                J.FieldAccess sorted = find(cu, J.FieldAccess.class, fa -> fa.getSimpleName().equals("sorted"));
+                J.MethodInvocation sorted = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("sorted"));
                 assertThat(sorted.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments())
                   .extracting(arg -> arg instanceof JavaType.Method m ? m.getName() : ((JavaType.Variable) arg).getName())
                   .containsExactly("Tuple2", "Int", "String");
@@ -2287,7 +2351,13 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     private static <T extends J> List<T> findAll(J cu, Class<T> type, Predicate<T> matching) {
-        List<T> found = new ScalaIsoVisitor<List<T>>() {
+        List<T> found = collect(cu, type, matching);
+        assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
+        return found;
+    }
+
+    private static <T extends J> List<T> collect(J cu, Class<T> type, Predicate<T> matching) {
+        return new ScalaIsoVisitor<List<T>>() {
             @Override
             public @Nullable J preVisit(J tree, List<T> acc) {
                 if (type.isInstance(tree) && matching.test(type.cast(tree))) {
@@ -2296,7 +2366,5 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 return tree;
             }
         }.reduce(cu, new ArrayList<>());
-        assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
-        return found;
     }
 }
