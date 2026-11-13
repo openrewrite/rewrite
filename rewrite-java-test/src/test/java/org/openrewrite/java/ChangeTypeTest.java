@@ -4358,4 +4358,40 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepImportOfTheOuterClassWhenTheTypeMovesWithinIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Old", "a.Outer$New", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+
+                public class Outer {
+                    public static class Old {
+                    }
+
+                    public static class New {
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import a.Outer;
+
+              class Test {
+                  Outer.Old o;
+              }
+              """,
+            """
+              import a.Outer;
+
+              class Test {
+                  Outer.New o;
+              }
+              """
+          )
+        );
+    }
 }
