@@ -4107,42 +4107,42 @@ describe("a node: specifier and the bare name of its built-in", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "_stream_duplex"}, to: {module: "stream", member: "Duplex"}});
-                maybeRebind(this, {from: {module: "_tls_wrap"}, to: {module: "tls"}});
+                maybeRebind(this, {from: {module: "assert"}, to: {module: "assert/strict", member: "strict"}});
+                maybeRebind(this, {from: {module: "net"}, to: {module: "tls"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import D from 'node:_stream_duplex';
-            import tlsWrap from 'node:_tls_wrap';
+            import a from 'node:assert';
+            import net from 'node:net';
 
-            new D(tlsWrap);`,
+            a(net);`,
             `
-            import tlsWrap from 'node:tls';
-            import {Duplex as D} from 'node:stream';
+            import net from 'node:tls';
+            import {strict as a} from 'node:assert/strict';
 
-            new D(tlsWrap);`
+            a(net);`
         ));
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "_stream_duplex", member: "Duplex"}, to: {module: "stream", member: "Duplex"}});
+                maybeRebind(this, {from: {module: "assert", member: "strict"}, to: {module: "assert/strict", member: "strict"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import {Duplex, x} from 'node:_stream_duplex';
+            import {strict, ok} from 'node:assert';
 
-            new Duplex(x);`,
+            strict(ok);`,
             `
-            import {x} from 'node:_stream_duplex';
-            import {Duplex} from 'node:stream';
+            import {ok} from 'node:assert';
+            import {strict} from 'node:assert/strict';
 
-            new Duplex(x);`
+            strict(ok);`
         ));
     });
 });
@@ -4166,28 +4166,28 @@ describe("maybeRebind on a require", () => {
 
     test("a whole module moves to a member, keeping the name the file chose and its node: spelling", async () => {
         const bound: (string | undefined)[] = [];
-        const spec = rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound);
+        const spec = rebind({module: "assert"}, {module: "assert/strict", member: "strict"}, bound);
         await spec.rewriteRun(
             //language=javascript
             javascript(`
-                const Duplex = require('_stream_duplex');
+                const strict = require('assert');
 
-                new Duplex();`,
+                strict(true);`,
                 `
-                const {Duplex} = require('stream');
+                const {strict} = require('assert/strict');
 
-                new Duplex();`),
+                strict(true);`),
             //language=javascript
             javascript(`
-                const D = require('node:_stream_duplex');
+                const a = require('node:assert');
 
-                new D();`,
+                a(true);`,
                 `
-                const {Duplex: D} = require('node:stream');
+                const {strict: a} = require('node:assert/strict');
 
-                new D();`)
+                a(true);`)
         );
-        expect(bound).toEqual(["Duplex", "D"]);
+        expect(bound).toEqual(["strict", "a"]);
     });
 
     test("a whole module moves to a whole module, and a member to a member", async () => {
