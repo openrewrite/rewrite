@@ -36,13 +36,16 @@
  *
  * The classpath is resolved via {@link findTestClasspath}; the suite is skipped
  * (via {@link describeJavaRpc}) when no classpath has been configured.
+ *
+ * This is an ES module, since vitest cannot be loaded with `require`. A CommonJS TypeScript
+ * file needs `module: nodenext` or `moduleResolution: bundler` to type-check its import.
  */
 import {describe, type SuiteAPI, test as base} from "vitest";
-import {findTestClasspath, JavaRpcTestServer} from "../rpc/java-rpc-client";
-import {RewriteRpc} from "../rpc/rewrite-rpc";
+import {findTestClasspath, JavaRpcTestServer} from "../rpc/java-rpc-client.js";
+import {RewriteRpc} from "../rpc/rewrite-rpc.js";
 
-export {findTestClasspath, JavaRpcTestServer} from "../rpc/java-rpc-client";
-export type {JavaRpcOptions} from "../rpc/java-rpc-client";
+export {findTestClasspath, JavaRpcTestServer} from "../rpc/java-rpc-client.js";
+export type {JavaRpcOptions} from "../rpc/java-rpc-client.js";
 
 interface JavaRpcFixtures {
     /**

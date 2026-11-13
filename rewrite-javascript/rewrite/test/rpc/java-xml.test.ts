@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
+import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc.mjs";
 import {RecipeSpec} from "../../src/test";
 import {prepareJavaRecipe} from "../../src/rpc";
 import {ExecutionContext} from "../../src/execution";
