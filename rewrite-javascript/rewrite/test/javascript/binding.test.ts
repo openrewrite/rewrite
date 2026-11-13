@@ -3239,6 +3239,66 @@ describe("maybeRebind keeps the file's import layout", () => {
             export { a, b };`
         ));
     });
+
+    test("a comment ending the line of the statement a member leaves stays on that line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "x", "b"]);
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import {a, b} from "m"; // note
+                import {z} from "z";
+
+                a(b, z);`,
+                `
+                import {a} from "m"; // note
+                import {b} from "x";
+                import {z} from "z";
+
+                a(b, z);`
+            ),
+            //language=typescript
+            typescript(
+                `
+                import {a, b} from "m"; // note
+                a(b);`,
+                `
+                import {a} from "m"; // note
+                import {b} from "x";
+                a(b);`
+            ),
+            //language=typescript
+            typescript(
+                `
+                import {a, b} from "m"; // note
+                `,
+                `
+                import {a} from "m"; // note
+                import {b} from "x";
+                `
+            )
+        );
+    });
+
+    test("a comment ending the line of a statement every member leaves stays where the statement was", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "x", "a"], ["m", "k", "b"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {a, b} from "m"; // note
+            import {z} from "z";
+
+            a(b, z);`,
+            `
+            import {b} from "k"; // note
+            import {a} from "x";
+            import {z} from "z";
+
+            a(b, z);`
+        ));
+    });
 });
 
 // Why test.fails?
