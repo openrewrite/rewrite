@@ -768,7 +768,8 @@ function detectSemi(cu: JS.CompilationUnit): boolean {
 
 /**
  * Whether a brace list added to `cu` is written `{ x }` rather than `{x}`. A Prettier configuration
- * settles it. Short of one, the file's own single-line import and `require` lists decide, then the style in force.
+ * settles it. Short of one, the file's own single-line import, export and `require` lists decide,
+ * then the style in force.
  */
 function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
     const bracketSpacing = prettierOption(cu, 'bracketSpacing', true);
@@ -777,13 +778,14 @@ function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
     }
     let score = 0;
     for (const statement of cu.statements) {
-        const namedBindings = statement.element?.kind === JS.Kind.Import
-            ? (statement.element as JS.Import).importClause?.namedBindings
-            : undefined;
-        const declaration = requireDeclarationOf(statement.element);
+        const element = statement.element;
+        const namedBindings = element?.kind === JS.Kind.Import
+            ? (element as JS.Import).importClause?.namedBindings
+            : element?.kind === JS.Kind.ExportDeclaration ? (element as JS.ExportDeclaration).exportClause : undefined;
+        const declaration = requireDeclarationOf(element);
         const pattern = declaration && requirePattern(declaration);
-        const first = namedBindings?.kind === JS.Kind.NamedImports
-            ? (namedBindings as JS.NamedImports).elements.elements[0]?.element
+        const first = namedBindings?.kind === JS.Kind.NamedImports || namedBindings?.kind === JS.Kind.NamedExports
+            ? (namedBindings as JS.NamedImports | JS.NamedExports).elements.elements[0]?.element
             : isObjectBindingPattern(pattern) ? pattern.bindings.elements[0]?.element : undefined;
         // A list laid out one per line says nothing about how a one-line list is spaced.
         if (first && !isEmptyPlaceholder(first) && !first.prefix.whitespace.includes('\n')) {
@@ -854,7 +856,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      */
     readonly anyNameAnswers: boolean;
 
-    constructor(options: AddImportOptions, bindingName?: string) {
+    /**
+     * @param group The rebind moves this import takes in. It goes where their statement was,
+     * laid out and ordered as it was.
+     */
+    constructor(options: AddImportOptions, bindingName?: string, private readonly group?: RebindGroup) {
         super();
 
         validate(options);
@@ -937,8 +943,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
         // Find the position to insert the import
-        const insertionIndex = this.findImportInsertionIndex(compilationUnit);
-        const newImport = await this.createImportStatement(compilationUnit, insertionIndex, p);
+        const placement = this.placementInGroup(compilationUnit);
+        const insertionIndex = placement?.index ?? this.findImportInsertionIndex(compilationUnit);
+        const created = await this.createImportStatement(compilationUnit, insertionIndex, p);
+        const newImport = placement?.replacing ? {...created, prefix: placement.replacing.prefix} : created;
+        this.group?.created.push(newImport.id);
 
         const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
             // Insert the import at the appropriate position
@@ -946,7 +955,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 ? markers({kind: J.Markers.Semicolon, id: randomId()})
                 : emptyMarkers;
 
-            if (insertionIndex === prologueLength(compilationUnit)) {
+            if (placement?.replacing) {
+                const next = compilationUnit.statements[insertionIndex];
+                draft.statements = [
+                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    rightPadded(newImport, emptySpace, semicolonMarkers),
+                    {...next, element: {...next.element!, prefix: placement.replacing.nextPrefix}},
+                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                ];
+            } else if (insertionIndex === prologueLength(compilationUnit)) {
                 // The `after` space should be empty since any semicolon is printed after it
                 const next = compilationUnit.statements[insertionIndex];
                 draft.statements = [
@@ -1017,15 +1034,16 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         const namedImports = importClause.namedBindings as JS.NamedImports;
                         const existingElements = namedImports.elements.elements;
 
-                        // Find the correct insertion position (alphabetical, case-insensitive)
+                        // A list the rebind group's statement wrote keeps that order. Any other list is
+                        // taken as alphabetical, case-insensitive.
+                        const names = existingElements.map(elem => elem.element?.kind === JS.Kind.ImportSpecifier
+                            ? specifierBinding(elem.element as JS.ImportSpecifier)?.name ?? ''
+                            : '');
                         const newName = this.bindingName!.toLowerCase();
-                        let insertIndex = existingElements.findIndex(elem => {
-                            if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                                const name = specifierBinding(elem.element as JS.ImportSpecifier)?.name ?? '';
-                                return newName.localeCompare(name.toLowerCase()) < 0;
-                            }
-                            return false;
-                        });
+                        let insertIndex = this.group?.insertionIndex(names, this.bindingName!) ??
+                            names.findIndex((name, j) =>
+                                existingElements[j].element?.kind === JS.Kind.ImportSpecifier &&
+                                newName.localeCompare(name.toLowerCase()) < 0);
                         if (insertIndex === -1) insertIndex = existingElements.length;
 
                         // Detect spacing style from existing elements:
@@ -1561,12 +1579,17 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         } else {
             // Named import: import { member } from 'module'
 
-            const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
-
             const importSpec = this.createImportSpecifier();
-            // Apply brace spacing: the space after { is in the specifier's prefix,
-            // and the space before } is in the rightPadded's after
-            const importSpecWithSpacing = {...importSpec, prefix: braceSpace};
+            const layout = this.group?.layoutFor(this.module);
+            const braceSpace = layout ? undefined : detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
+            // The space after { is in the specifier's prefix, and the space before } is in the rightPadded's
+            // after, or in the suffix of a trailing comma.
+            const element = layout
+                ? layout.trailingComma
+                    ? rightPadded({...importSpec, prefix: layout.first}, emptySpace,
+                        markers({...layout.trailingComma, id: randomId()}))
+                    : rightPadded({...importSpec, prefix: layout.first}, layout.closing)
+                : rightPadded({...importSpec, prefix: braceSpace!}, braceSpace!);
 
             const namedImports: JS.NamedImports = {
                 id: randomId(),
@@ -1576,7 +1599,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 elements: {
                     kind: J.Kind.Container,
                     before: this.typeOnly ? singleSpace : emptySpace,
-                    elements: [rightPadded(importSpecWithSpacing, braceSpace)],
+                    elements: [element],
                     markers: emptyMarkers
                 }
             };
@@ -1773,6 +1796,30 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // If inserting after other statements, ensure we have at least one newline
         // to separate from the previous statement
         return space("\n");
+    }
+
+    /** Where an import a rebind group creates goes, which is where the statement its members left stands or stood. */
+    private placementInGroup(cu: JS.CompilationUnit): {
+        index: number;
+        replacing?: {prefix: J.Space; nextPrefix: J.Space};
+    } | undefined {
+        const group = this.group;
+        if (group === undefined) {
+            return undefined;
+        }
+        const indexOf = (id: UUID) => cu.statements.findIndex(s => s.element?.id === id);
+        const created = group.created.map(indexOf).filter(i => i >= 0).sort((a, b) => a - b);
+        if (created.length > 0) {
+            const after = created.find(i =>
+                compareModules(importedModule(cu.statements[i].element as JS.Import), this.module) > 0);
+            return {index: after ?? created[created.length - 1] + 1};
+        }
+        const source = indexOf(group.sourceId);
+        if (source >= 0) {
+            return {index: source + 1};
+        }
+        const next = group.dropped && indexOf(group.dropped.next);
+        return next !== undefined && next >= 0 ? {index: next, replacing: group.dropped} : undefined;
     }
 
     /**
@@ -2150,6 +2197,9 @@ export interface ExistingImportBinding {
 
     /** Whether a `let` or `var` declares it, which the file may reassign. */
     reassignable: boolean;
+
+    /** The import or `require` declaration that binds it. */
+    statement: JS.Import | J.VariableDeclarations;
 }
 
 /**
@@ -2172,7 +2222,8 @@ export function existingImportBinding(
                 aliased: required !== memberName(member),
                 typeOnly: false,
                 viaRequire: true,
-                reassignable: keywordsOf(declaration!) !== 'const'
+                reassignable: keywordsOf(declaration!) !== 'const',
+                statement: declaration!
             };
         }
         if (element?.kind !== JS.Kind.Import) {
@@ -2186,7 +2237,8 @@ export function existingImportBinding(
                 aliased: localName !== memberName(member),
                 typeOnly: bindsTypeOnly(element as JS.Import, member),
                 viaRequire: false,
-                reassignable: false
+                reassignable: false,
+                statement: element as JS.Import
             };
         }
     }
@@ -2293,6 +2345,36 @@ function removeBinding(jsImport: JS.Import, member: string | undefined, localNam
     return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
 }
 
+/** `jsImport` with a named list of one member that spans lines put on one line, without a trailing comma. */
+function onOneLine(jsImport: JS.Import, braceSpacing: boolean): JS.Import {
+    const namedBindings = jsImport.importClause?.namedBindings;
+    if (namedBindings?.kind !== JS.Kind.NamedImports) {
+        return jsImport;
+    }
+    const namedImports = namedBindings as JS.NamedImports;
+    const [only, ...rest] = namedImports.elements.elements;
+    if (only === undefined || rest.length > 0 || !only.element.prefix.whitespace.includes('\n')) {
+        return jsImport;
+    }
+    const braceSpace = braceSpacing ? singleSpace : emptySpace;
+    const element: J.RightPadded<JS.ImportSpecifier> = {
+        ...only,
+        element: {...only.element, prefix: braceSpace},
+        after: braceSpace,
+        markers: {...only.markers, markers: only.markers.markers.filter(m => m.kind !== J.Markers.TrailingComma)}
+    };
+    return {
+        ...jsImport,
+        importClause: {
+            ...jsImport.importClause!,
+            namedBindings: {
+                ...namedImports,
+                elements: {...namedImports.elements, elements: [element]}
+            } as JS.NamedImports
+        }
+    };
+}
+
 /** `cu` without the statement `id`, its prefix carried onto the next one so a file header survives. */
 export function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
     const formatter = new ElementRemovalFormatter<J>(true);
@@ -2328,6 +2410,97 @@ function replacesStatement(
 const esmStyle = {default: ImportStyle.ES6Default, namespace: ImportStyle.ES6Namespace, named: ImportStyle.ES6Named};
 
 /**
+ * The moves out of one import statement queued in one visit, shared by the `RebindImport`s that carry them out
+ * so that the imports they leave behind keep the statement's place, member order and layout.
+ */
+export class RebindGroup {
+    /** Each specifier's local name in the order written, a moved one under the name it moves to. */
+    private readonly names: string[];
+    private readonly targets: string[] = [];
+    /** The imports the moves created, which sit together where the statement was, sorted by module. */
+    readonly created: UUID[] = [];
+    /** The statement that followed the dropped one, and the prefixes both had, for an import created in its place. */
+    dropped?: {next: UUID; prefix: J.Space; nextPrefix: J.Space};
+    /** How the statement's named list spans lines, where it does. */
+    readonly multiLine?: {first: J.Space; closing: J.Space; trailingComma?: TrailingComma};
+
+    constructor(readonly sourceId: UUID, jsImport: JS.Import) {
+        const namedBindings = jsImport.importClause?.namedBindings;
+        const elements = namedBindings?.kind === JS.Kind.NamedImports
+            ? (namedBindings as JS.NamedImports).elements.elements.filter(e => !isEmptyPlaceholder(e.element))
+            : [];
+        this.names = elements.map(e => specifierBinding(e.element)?.name ?? '');
+        const first = elements[0]?.element.prefix;
+        if (first?.whitespace.includes('\n')) {
+            const last = elements[elements.length - 1];
+            const trailingComma = findMarker<TrailingComma>(last, J.Markers.TrailingComma);
+            this.multiLine = {first, closing: trailingComma ? trailingComma.suffix : last.after, trailingComma};
+        }
+    }
+
+    add(localName: string, boundName: string, toModule: string): void {
+        const index = this.names.indexOf(localName);
+        if (index >= 0) {
+            this.names[index] = boundName;
+        }
+        this.targets.push(toModule);
+    }
+
+    /** Whether the statement listed several named members, so that one left alone in it stands on a line of its own. */
+    get listedSeveral(): boolean {
+        return this.names.length > 1;
+    }
+
+    /** The multi-line layout an import of `module` takes, which only several members moved together keep. */
+    layoutFor(module: string): RebindGroup["multiLine"] {
+        return this.targets.filter(t => sameModule(t, module)).length > 1 ? this.multiLine : undefined;
+    }
+
+    /**
+     * Where `name` goes among a list's `names` to keep the order the statement wrote them in,
+     * or undefined where the list holds a name the statement did not.
+     */
+    insertionIndex(names: readonly string[], name: string): number | undefined {
+        const position = this.names.indexOf(name);
+        const positions = names.map(n => this.names.indexOf(n));
+        if (position < 0 || positions.some(p => p < 0)) {
+            return undefined;
+        }
+        const after = positions.findIndex(p => p > position);
+        return after < 0 ? names.length : after;
+    }
+}
+
+/** Orders the imports a rebind group leaves where its statement was. */
+function compareModules(a: string | undefined, b: string | undefined): number {
+    return (a ?? '').localeCompare(b ?? '');
+}
+
+/**
+ * `cu` with the run of statements `ids` names sorted by module, each slot keeping its prefix so that a
+ * header or blank line before the run stays where it is. A run that is not contiguous is left alone.
+ */
+function withRunSorted(cu: JS.CompilationUnit, ids: ReadonlySet<UUID>): JS.CompilationUnit {
+    const indices = cu.statements.flatMap((s, i) => s.element && ids.has(s.element.id) ? [i] : []);
+    if (indices.length < 2 || indices[indices.length - 1] - indices[0] !== indices.length - 1) {
+        return cu;
+    }
+    const slots = indices.map(i => cu.statements[i]);
+    const moduleOf = (s: J.RightPadded<Statement>) => s.element?.kind === JS.Kind.Import
+        ? importedModule(s.element as JS.Import)
+        : undefined;
+    const sorted = [...slots].sort((a, b) => compareModules(moduleOf(a), moduleOf(b)));
+    if (sorted.every((s, k) => s === slots[k])) {
+        return cu;
+    }
+    const statements = [...cu.statements];
+    indices.forEach((i, k) => {
+        statements[i] = {...sorted[k], element: {...sorted[k].element!, prefix: slots[k].element!.prefix}};
+    });
+    return {...cu, statements};
+}
+
+/**
  * Moves the binding `from` names to `to`, binding it under `boundName`, and the file's references
  * follow a `boundName` of its own. Whether the statement is rewritten in place or replaced is decided
  * when this visitor runs, because a sibling rebind may empty the statement first.
@@ -2340,12 +2513,14 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly from: {module: string; member?: string},
         readonly to: {module: string; member?: string},
         readonly localName: string,
-        readonly boundName: string
+        readonly boundName: string,
+        readonly group?: RebindGroup
     ) {
         super();
     }
 
     private transformedInPlace = false;
+    private inPlace?: UUID;
     private typeOnly = false;
     private cu?: JS.CompilationUnit;
     private dropped?: UUID;
@@ -2364,10 +2539,24 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         this.movedTypes = movedTypesIn(cu, this.from, this.to, true);
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         if (this.dropped !== undefined) {
+            const index = visited.statements.findIndex(s => s.element?.id === this.dropped);
+            const next = visited.statements[index + 1]?.element;
+            if (this.group !== undefined && next !== undefined) {
+                this.group.dropped = {
+                    next: next.id,
+                    prefix: visited.statements[index].element!.prefix,
+                    nextPrefix: next.prefix
+                };
+            }
             visited = withoutStatement(visited, this.dropped);
         }
+        if (this.inPlace !== undefined && this.group !== undefined) {
+            visited = withRunSorted(visited, new Set([this.inPlace, ...this.group.created]));
+        }
         if (!this.transformedInPlace) {
-            bindImport(this, {
+            // A pinned alias is the whole answer `bindImport` would give, so the import is queued directly,
+            // where it can carry the group.
+            this.afterVisit.push(new AddImport({
                 module: this.fromModule === undefined ? this.to.module : spelledLike(this.to.module, this.fromModule),
                 member: this.to.member,
                 alias: this.boundName,
@@ -2376,7 +2565,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
                 quoteStyle: this.droppedQuote,
                 // The binding keeps its lane, though the file may read otherwise without the statement it left.
                 style: this.viaRequire ? ImportStyle.CommonJS : esmStyle[bindingShape(this.to.member)]
-            });
+            }, this.boundName, this.group));
         }
         return visited;
     }
@@ -2406,7 +2595,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         }
 
         this.transformedInPlace = true;
-        return produce(imp, draft => {
+        this.inPlace = imp.id;
+        const rewritten = produce(imp, draft => {
             const literal = draft.moduleSpecifier!.element as Draft<J.Literal>;
             respecify(literal, spelledLike(this.to.module, String(literal.value)));
 
@@ -2420,6 +2610,9 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             }
             rewriteNamedSpecifier(draft.importClause, key, memberName(this.to.member) ?? key, this.boundName);
         });
+        return this.group?.listedSeveral && this.group.multiLine
+            ? onOneLine(rewritten, detectBraceSpacing(cu))
+            : rewritten;
     }
 
     override async visitVariableDeclarations(declaration: J.VariableDeclarations, p: P): Promise<J | undefined> {
