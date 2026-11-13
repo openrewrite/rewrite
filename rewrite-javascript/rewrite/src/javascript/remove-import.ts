@@ -241,9 +241,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const identifier = defaultName as J.Identifier;
                 const name = identifier.simpleName;
 
-                // `'default'` or no member asks for it, whatever its local name
-                const shouldRemove = this.asksFor(bindingsOf(jsImport).find(b => b.form === "default")) &&
-                    !usedNames.has(name);
+                // `'default'` or no member asks for it, whatever its local name, and so does its local name:
+                // `RemoveImport("vue", "Vue")` removes an unused `import Vue from "vue"`, as recipes ask for it so
+                const asked = this.asksFor(bindingsOf(jsImport).find(b => b.form === "default")) || this.member === name;
+                const shouldRemove = asked && !usedNames.has(name);
 
                 if (shouldRemove) {
                     // If there are no named imports, remove the entire import

@@ -267,11 +267,12 @@ const X = await import("m")    // dynamic-import: the namespace object
 
 `RemoveImport` removes the unused rows a request asks for. A member also asks for the module objects `exportOf`
 reads it through, so a recipe that has rewritten the file's last `fs.readFile` asks for `"readFile"`, and an unused
-`import * as fs from "fs"` goes too. A default import is not one of them. What a request removes, when unused:
+`import * as fs from "fs"` goes too. A default import is not one of them, but its own local name asks for it, as
+recipes do with `maybeRemoveImport(this, "vue", "Vue")`. What a request removes, when unused:
 
 | binding | no member | `'default'` | `'*'` | another member |
 |---|---|---|---|---|
-| `import D from "m"` | removed | removed | kept | kept |
+| `import D from "m"` | removed | removed | kept | kept, but `'D'` removes it |
 | `import * as NS from "m"` | removed | removed | removed | removed |
 | `import X = require("m")` | removed | removed | removed | removed |
 | `const X = require("m")` | removed | removed | removed | removed |

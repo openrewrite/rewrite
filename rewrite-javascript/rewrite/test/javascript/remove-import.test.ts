@@ -2368,19 +2368,26 @@ describe("RemoveImport reading the binding table", () => {
         );
     });
 
-    // Only a request for the default or for the whole module removes a default import, as the table gives it no member
-    test("a request for a member named like a default import keeps the default import", async () => {
+    // Recipes ask for a default import by its local name: a migration off `new Vue(...)` calls
+    // `maybeRemoveImport(this, "vue", "Vue")` once it has replaced the file's last `Vue`
+    test("a request for a default import's local name removes it", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new RemoveImport("react", "React"));
-        // Before: `import React from "react";` was removed, its local name read as the member it imports
+        spec.recipe = fromVisitor(new RemoveImport("vue", "Vue"));
         await spec.rewriteRun(
             //language=typescript
-            typescript(`
-                import React from "react";
-                import {useState} from "react";
+            typescript(
+                `
+                    import Vue from "vue";
+                    import {createApp} from "vue";
 
-                export const useCounter = () => useState(0);
-            `)
+                    createApp({}).mount("#app");
+                `,
+                `
+                    import {createApp} from "vue";
+
+                    createApp({}).mount("#app");
+                `
+            )
         );
     });
 });
