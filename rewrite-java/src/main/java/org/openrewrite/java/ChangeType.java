@@ -182,7 +182,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
     private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
-        private final JavaType targetType;
+        private JavaType targetType;
 
 
         private J.@Nullable Identifier importAlias;
@@ -212,6 +212,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
+                if (!(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
+                    targetType = targetType(cu);
+                }
                 keepsDefinition = ignoreDefinition ||
                         declaresNestedTypeThatStays(cu, originalType.getFullyQualifiedName(), newFullyQualifiedTypeName);
                 if (!keepsDefinition) {
@@ -238,6 +241,22 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 return super.visit(cu, ctx);
             }
             return super.visit(tree, ctx);
+        }
+
+        private JavaType.FullyQualified targetType(JavaSourceFile cu) {
+            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+                if (TypeUtils.isOfClassType(fq, newFullyQualifiedTypeName)) {
+                    return fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : requireNonNull(fq);
+                }
+            }
+            return buildTargetType(newFullyQualifiedTypeName);
+        }
+
+        private static JavaType.Class buildTargetType(String name) {
+            int nested = name.lastIndexOf('$');
+            return JavaType.ShallowClass.build(name).withOwningClass(
+                    nested < 0 ? null : buildTargetType(name.substring(0, nested)));
         }
 
         @Override
@@ -402,7 +421,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             J.FieldAccess fa = updateParameterizedFieldAccess(fieldAccess, originalType, fqTarget, ctx);
                             if (getCursor().firstEnclosing(J.Import.class) == null &&
                                     getCursor().firstEnclosing(Javadoc.class) == null) {
-                                doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                                doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(fa));
                             }
                             return fa;
                         }
@@ -415,7 +434,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     }
                     if (getCursor().firstEnclosing(J.Import.class) == null &&
                             getCursor().firstEnclosing(Javadoc.class) == null) {
-                        doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(qualified));
+                        doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn((J) qualified));
                     }
                     return qualified;
                 } else if (targetType instanceof JavaType.Primitive) {
