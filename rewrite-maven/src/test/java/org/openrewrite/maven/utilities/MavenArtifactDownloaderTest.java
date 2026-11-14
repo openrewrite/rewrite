@@ -416,6 +416,41 @@ class MavenArtifactDownloaderTest {
         }
     }
 
+    @Test
+    void emptyClassifierResolvesTheUnclassifiedArtifact(@TempDir Path tempDir) throws Exception {
+        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
+
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.enqueue(new MockResponse().setResponseCode(200)
+              .setBody(new okio.Buffer().write(jarBytes)));
+            mockRepo.start();
+
+            String repoUrl = "http://" + mockRepo.getHostName() + ":" + mockRepo.getPort();
+            MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            MavenArtifactDownloader downloader = new MavenArtifactDownloader(
+              artifactCache, null, error::set, new InMemoryExecutionContext());
+
+            MavenRepository repo = new MavenRepository(
+              "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
+            ResolvedDependency dep = emptyClassifier(resolvedDependency(repo, repoUrl, "test-lib"));
+
+            assertThat(downloader.downloadArtifact(dep)).isNotNull();
+            assertThat(error.get()).isNull();
+            assertThat(mockRepo.takeRequest().getPath())
+              .isEqualTo("/com/example/test-lib/1.0.0/test-lib-1.0.0.jar");
+        }
+    }
+
+    /**
+     * A POM may spell the absence of a classifier out as {@code <classifier></classifier>}, which
+     * deserializes to an empty string rather than to null.
+     */
+    private static ResolvedDependency emptyClassifier(ResolvedDependency dependency) {
+        return dependency.withClassifier("")
+          .withRequested(dependency.getRequested().withClassifier(""));
+    }
+
     private static ResolvedDependency resolvedDependency(MavenRepository repo, String repoUrl, String artifactId) {
         GroupArtifactVersion gav = new GroupArtifactVersion("com.example", artifactId, "1.0.0");
         return ResolvedDependency.builder()

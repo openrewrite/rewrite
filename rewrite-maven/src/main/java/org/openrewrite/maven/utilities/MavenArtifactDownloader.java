@@ -52,6 +52,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StreamUtils.readAllBytes;
+import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
 
 public class MavenArtifactDownloader {
     private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
@@ -134,7 +135,8 @@ public class MavenArtifactDownloader {
                           dependency.getVersion() + '/' +
                           dependency.getArtifactId() + '-' +
                           (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                          (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
+                          // An empty classifier is unclassified, as it is to Maven: a POM may spell the absence out
+                          (isNullOrEmpty(dependency.getClassifier()) ? "" : "-" + dependency.getClassifier()) +
                           ".jar";
             String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
@@ -186,7 +188,7 @@ public class MavenArtifactDownloader {
                     if (responseBytes == null) {
                         onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d%s",
                                 dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
-                                dependency.getClassifier() == null ? "" : ":" + dependency.getClassifier(),
+                                isNullOrEmpty(dependency.getClassifier()) ? "" : ":" + dependency.getClassifier(),
                                 uri, responseCode, ProxyStatus.render(proxyStatus)), null,
                                 dependency.getRequested().getGav()));
                         return null;

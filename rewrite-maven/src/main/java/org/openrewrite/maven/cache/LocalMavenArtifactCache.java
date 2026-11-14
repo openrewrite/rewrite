@@ -30,6 +30,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
+
 @EqualsAndHashCode
 @ToString
 public class LocalMavenArtifactCache implements MavenArtifactCache {
@@ -104,7 +106,8 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
 
         return resolvedPath.resolve(dependency.getArtifactId() + "-" +
                                     (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                                    (dependency.getRequested().getClassifier() == null ? "" : "-" + dependency.getRequested().getClassifier()) +
+                                    // Empty is unclassified, as it is to Maven, whose layout ~/.m2 and this cache share
+                                    (isNullOrEmpty(dependency.getRequested().getClassifier()) ? "" : "-" + dependency.getRequested().getClassifier()) +
                                     ".jar");
     }
 }

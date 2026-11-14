@@ -235,6 +235,18 @@ class LocalMavenArtifactCacheTest {
         assertThat(Files.readString(second)).isEqualTo("v1");
     }
 
+    @Test
+    void emptyClassifierIsTheSameArtifactAsNoClassifier(@TempDir Path tempDir) {
+        cache = new LocalMavenArtifactCache(tempDir);
+
+        Path written = cache.putArtifact(releaseDependency(),
+                new ByteArrayInputStream("the whole jar".getBytes(StandardCharsets.UTF_8)), Throwable::printStackTrace);
+
+        // The literal name matters: it is the one ~/.m2 holds, which this cache reads directly
+        assertThat(written).hasFileName("rewrite-testing-frameworks-1.6.0.jar");
+        assertThat(cache.getArtifact(emptyClassifier(releaseDependency()))).isEqualTo(written);
+    }
+
     /**
      * Serves the start of a jar, then fails.
      */
@@ -308,6 +320,16 @@ class LocalMavenArtifactCacheTest {
                 .licenses(emptyList())
                 .depth(0)
                 .build();
+    }
+
+    /**
+     * A POM may spell the absence of a classifier out as {@code <classifier></classifier>}, which
+     * deserializes to an empty string rather than to null.
+     */
+    private static ResolvedDependency emptyClassifier(ResolvedDependency dependency) {
+        return dependency
+                .withClassifier("")
+                .withRequested(dependency.getRequested().withClassifier(""));
     }
 
     private static ResolvedDependency releaseDependency() {
