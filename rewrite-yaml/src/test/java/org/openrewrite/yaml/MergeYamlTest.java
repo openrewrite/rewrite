@@ -5063,4 +5063,160 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mergeMultilineScalarIntoExistingKeyOfIdentifiedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - name: compile
+                  run: |
+                    ./gradlew assemble
+                    ./gradlew check
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      run: |
+                        ./gradlew build
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      run: |
+                        ./gradlew assemble
+                        ./gradlew check
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMultilineScalarToIdentifiedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - name: compile
+                  run: |
+                    ./gradlew assemble
+                    ./gradlew check
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      uses: gradle
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      uses: gradle
+                      run: |
+                        ./gradlew assemble
+                        ./gradlew check
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeVisitorOnDocumentsMergesMultilineScalar() {
+        Yaml incoming = MergeYaml.parse(
+          //language=yaml
+          """
+            script: |
+              echo one
+              echo two
+            """
+        );
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlVisitor<>() {
+              @Override
+              public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                  Yaml.Mapping job = (Yaml.Mapping) ((Yaml.Mapping) documents.getDocuments().get(0).getBlock())
+                    .getEntries().get(0).getValue();
+                  return new MergeYamlVisitor<>(job, incoming, false, null, null, null).visitNonNull(documents, ctx);
+              }
+          })),
+          yaml(
+            """
+              job:
+                script: |
+                  echo zero
+                stage: test
+              """,
+            """
+              job:
+                script: |
+                  echo one
+                  echo two
+                stage: test
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeVisitorAfterVisitAddsMultilineScalar() {
+        Yaml incoming = MergeYaml.parse(
+          //language=yaml
+          """
+            script: |
+              echo one
+              echo two
+            """
+        );
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlIsoVisitor<>() {
+              @Override
+              public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                  Yaml.Mapping job = (Yaml.Mapping) ((Yaml.Mapping) document.getBlock()).getEntries().get(0).getValue();
+                  doAfterVisit(new MergeYamlVisitor<>(job, incoming, false, null, true, null, null));
+                  return document;
+              }
+          })),
+          yaml(
+            """
+              job:
+                stage: test
+              """,
+            """
+              job:
+                stage: test
+                script: |
+                  echo one
+                  echo two
+              """
+          )
+        );
+    }
 }

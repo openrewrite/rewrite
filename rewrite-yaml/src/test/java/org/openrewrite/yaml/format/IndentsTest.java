@@ -18,12 +18,20 @@ package org.openrewrite.yaml.format;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.MultilineScalarChanged;
+import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
+import org.openrewrite.yaml.tree.Yaml;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -55,6 +63,39 @@ class IndentsTest implements RewriteTest {
                       b: 0
               """
           )
+        );
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void honoursMultilineScalarChangedMarker() {
+        Yaml.Documents documents = (Yaml.Documents) new YamlParser().parse(
+          """
+            job:
+              script: |
+                echo one
+                echo two\
+            """
+        ).findFirst().orElseThrow();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        Yaml.Documents marked = (Yaml.Documents) new YamlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
+                return scalar.getValue().contains("\n") ?
+                  scalar.withMarkers(scalar.getMarkers().add(new MultilineScalarChanged(randomId(), true, 4))) :
+                  scalar;
+            }
+        }.visitNonNull(documents, ctx);
+
+        Yaml.Documents indented = (Yaml.Documents) new IndentsVisitor<>(YamlDefaultStyles.indents(), null).visitNonNull(marked, ctx);
+
+        assertThat(indented.printAll()).isEqualTo(
+          """
+            job:
+              script: |
+                  echo one
+                  echo two\
+            """
         );
     }
 

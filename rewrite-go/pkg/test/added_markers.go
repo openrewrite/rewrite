@@ -266,7 +266,6 @@ func (w *placementWalker) walk(v reflect.Value, root bool) {
 // rewriteRecipeMarkers are markers that rewrite's own Java recipes still leave
 // for themselves, as the Java harness allows.
 var rewriteRecipeMarkers = map[string]bool{
-	"org.openrewrite.yaml.MultilineScalarChanged":        true,
 	"org.openrewrite.java.search.UsesMethod$MethodMatch": true,
 }
 
