@@ -120,8 +120,13 @@ class SetupCfgParserTest {
                 singletonList(Parser.Input.fromFile(tempDir.resolve("setup.cfg"))), tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
 
-        assertThat(parsed.getMarkers().findFirst(PythonResolutionResult.class)).get()
-                .extracting(PythonResolutionResult::getRequiresPython).isEqualTo(">=3.9");
+        PythonResolutionResult marker = parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+        assertThat(marker.getRequiresPython()).isEqualTo(">=3.9");
+        assertThat(marker.getDependencies()).singleElement().satisfies(six -> {
+            assertThat(six.getName()).isEqualTo("six");
+            assertThat(six.getResolved()).isNotNull()
+                    .extracting(ResolvedDependency::getVersion).isEqualTo("1.16.0");
+        });
     }
 
     private static List<Path> listFiles(Path dir) throws IOException {

@@ -280,12 +280,12 @@ public enum DependencyManifest {
         }
         Path setupPy = projectDir.resolve("setup.py");
         if (Files.isRegularFile(setupPy)) {
-            Matcher pythonRequires = SETUP_PY_PYTHON_REQUIRES.matcher(readString(setupPy));
+            String setupPyText = readString(setupPy);
+            Matcher pythonRequires = SETUP_PY_PYTHON_REQUIRES.matcher(setupPyText);
             if (pythonRequires.find()) {
                 return pythonRequires.group("specifier").trim();
             }
             // python_requires=REQUIRES_PYTHON, with REQUIRES_PYTHON = '>=3.6' at the top of the file
-            String setupPyText = readString(setupPy);
             Matcher constant = SETUP_PY_PYTHON_REQUIRES_CONSTANT.matcher(setupPyText);
             if (constant.find()) {
                 Matcher value = Pattern.compile("(?m)^" + Pattern.quote(constant.group("name")) +

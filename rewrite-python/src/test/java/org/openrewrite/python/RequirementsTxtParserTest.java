@@ -27,6 +27,7 @@ import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +38,7 @@ import java.util.Set;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class RequirementsTxtParserTest {
@@ -174,20 +176,26 @@ class RequirementsTxtParserTest {
                 """);
         Path env = tempDir.resolve(".venv");
         Path sitePackages = env.resolve("lib/python3.12/site-packages");
-        for (String dist : List.of("fastapi-0.115.0", "python_dotenv-1.0.0")) {
-            Path distInfo = Files.createDirectories(sitePackages.resolve(dist + ".dist-info"));
-            String[] nameVersion = dist.split("-");
-            Files.writeString(distInfo.resolve("METADATA"),
-                    "Metadata-Version: 2.1\nName: " + nameVersion[0] + "\nVersion: " + nameVersion[1] + "\n");
-        }
+        writeDist(sitePackages, "fastapi", "0.115.0");
+        writeDist(sitePackages, "python-dotenv", "1.0.0");
 
         SourceFile parsed = new RequirementsTxtParser(env).parseInputs(
                 singletonList(Parser.Input.fromFile(tempDir.resolve("requirements.txt"))), tempDir,
                 new InMemoryExecutionContext()).findFirst().orElseThrow();
 
         PythonResolutionResult marker = parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
-        assertThat(marker.getDependencies()).isNotEmpty();
+        assertThat(marker.getDependencies())
+                .extracting(dep -> PythonResolutionResult.normalizeName(dep.getName()),
+                        dep -> dep.getResolved() == null ? null : dep.getResolved().getVersion())
+                .containsExactlyInAnyOrder(tuple("fastapi", "0.115.0"), tuple("python_dotenv", "1.0.0"));
         assertThat(marker.getRequiresPython()).isNull();
+    }
+
+    private static void writeDist(Path sitePackages, String name, String version) throws IOException {
+        Path distInfo = Files.createDirectories(
+                sitePackages.resolve(name.replace('-', '_') + "-" + version + ".dist-info"));
+        Files.writeString(distInfo.resolve("METADATA"),
+                "Metadata-Version: 2.1\nName: " + name + "\nVersion: " + version + "\n");
     }
 
     @Test
