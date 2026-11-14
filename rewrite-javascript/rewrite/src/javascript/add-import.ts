@@ -12,7 +12,11 @@ import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, i
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
-import ts from "typescript";
+import {
+    bindingsOf, bindingTable, isRequireCall, ModuleBinding, moduleNameOf, requiredModule, requiredModuleOf, specifierBinding
+} from "./binding-table";
+
+export {moduleNameOf, requiredModuleOf};
 
 export type QuoteChar = "'" | '"';
 
@@ -147,10 +151,10 @@ export function bindImport(
     // only a pinned alias, returned above, asks for a binding of its own. Queuing a second import
     // would, on the next cycle, derive a suffixed name from the binding this call just added.
     const scope = scopeOf(cursor);
-    for (const binding of moduleScopeBindings(cu)) {
-        if (binding.module !== undefined && sameModule(binding.module, module) && binding.member === memberName(options.member) &&
+    for (const binding of bindingTable(cu)) {
+        if (sameModule(binding.module, module) && bindsMember(binding, memberName(options.member)) &&
             scope.declaringScope(binding.name) === cu) {
-            if (!answersTypeOnly(binding.typeOnly ?? false, typeOnly)) {
+            if (!answersTypeOnly(binding.typeOnly, typeOnly)) {
                 // The queued request finds this binding and drops its `type`, so the name stays
                 visitor.afterVisit.push(new AddImport(options, binding.name));
             }
@@ -222,7 +226,10 @@ export function memberName(member: string | undefined): string | undefined {
     return member === 'default' ? undefined : member;
 }
 
-/** A name introduced into the file's module scope, and where it came from when that is an import. */
+/**
+ * A name a top-level import or `require` binds, in the vocabulary of {@link AddImportOptions.member}: a
+ * request for `member` of `module` reuses it. `module` is unset where no request reuses it.
+ */
 export interface ModuleScopeBinding {
     name: string;
     module?: string;
@@ -231,31 +238,79 @@ export interface ModuleScopeBinding {
     typeOnly?: boolean;
 }
 
-/** What the file's imports and `require`s bind at module scope, and the module each name comes from. */
+/**
+ * {@link bindingTable} as {@link ModuleScopeBinding}s, the rows this function listed before the table, so a
+ * caller asking "which name answers this request" keeps its vocabulary.
+ * `import D from "m"`, `import D = require("m")` and `const D = require("m")` → `{name: "D", module: "m", member: undefined}`;
+ * `import * as NS from "m"` → `{member: "*"}`; `{a as b}` and `const {a: b} = require("m")` → `{name: "b", member: "a"}`.
+ * `import X = A.B` and `...rest` of a require keep only their name, and `const X = await import("m")` is left out.
+ */
 export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
-
-    const declaredByVariables = (varDecl: J.VariableDeclarations): void => {
-        for (const variable of varDecl.variables) {
-            const required = requiredModule(variable.element?.initializer?.element);
-            if (required !== undefined) {
-                bindings.push(...requireBindings(variable.element?.name, required));
+    for (const {element} of cu.statements) {
+        for (const binding of bindingsOf(element)) {
+            const row = asScopeBinding(binding);
+            if (row !== undefined) {
+                bindings.push(row);
             }
         }
-    };
-
-    for (const stmt of cu.statements) {
-        const statement = stmt.element;
-        if (statement?.kind === JS.Kind.Import) {
-            bindings.push(...importBindings(statement as JS.Import));
-            continue;
-        }
-        for (const declaration of declarationsOf(statement)) {
-            declaredByVariables(declaration);
+        const alias = namespaceAliasOf(element);
+        if (alias !== undefined) {
+            bindings.push(alias);
         }
     }
-
     return bindings;
+}
+
+function asScopeBinding(binding: ModuleBinding): ModuleScopeBinding | undefined {
+    switch (binding.form) {
+        case "default":
+        case "import-equals":
+        case "require":
+            return {name: binding.name, module: binding.module, member: undefined, typeOnly: binding.typeOnly};
+        case "namespace":
+            return {name: binding.name, module: binding.module, member: '*', typeOnly: binding.typeOnly};
+        case "named":
+        case "require-member":
+            return {name: binding.name, module: binding.module, member: binding.member, typeOnly: binding.typeOnly};
+        case "require-pattern":
+            return {name: binding.name};
+        case "dynamic-import":
+            return undefined;
+    }
+}
+
+/** `X` of `import X = A.B`, which names a TypeScript namespace and loads no module, so the table has no row for it. */
+function namespaceAliasOf(statement: J | undefined): ModuleScopeBinding | undefined {
+    const jsImport = statement?.kind === JS.Kind.Import ? statement as JS.Import : undefined;
+    const local = jsImport?.importClause?.name?.element;
+    return jsImport?.initializer === undefined || local?.kind !== J.Kind.Identifier ||
+        requiredModule(jsImport.initializer.element) !== undefined ? undefined :
+        {name: (local as J.Identifier).simpleName, module: undefined, member: undefined, typeOnly: jsImport.importClause!.typeOnly};
+}
+
+/**
+ * Whether `binding` is what a request for `member` of its module asks for, `member` read by {@link memberName}:
+ * `import D from "m"` answers `undefined` and `import * as NS from "m"` answers `'*'`, while `import D = require("m")`
+ * and `const D = require("m")` answer both, since CommonJS has no such split. `{a as b}` and
+ * `const {a: b} = require("m")` answer `"a"`. `const X = await import("m")` and `...rest` of a require answer no
+ * request, since {@link moduleScopeBindings} never gave them a module.
+ */
+export function bindsMember(binding: ModuleBinding, member: string | undefined): boolean {
+    switch (binding.form) {
+        case "default":
+            return member === undefined;
+        case "import-equals":
+        case "require":
+            return member === undefined || member === '*';
+        case "namespace":
+            return member === '*';
+        case "named":
+        case "require-member":
+            return binding.member === member;
+        default:
+            return false;
+    }
 }
 
 /**
@@ -422,44 +477,6 @@ export function requiredModuleOfDeclaration(declaration: J.VariableDeclarations)
         : undefined;
 }
 
-/** The module a `require('...')` initializer names, `undefined` for an initializer that is anything else. */
-function requiredModule(initializer: J | undefined): string | undefined {
-    return initializer?.kind === J.Kind.MethodInvocation
-        ? requiredModuleOf(initializer as J.MethodInvocation)
-        : undefined;
-}
-
-/** A `require(...)` call, whatever it is passed. `obj.require('x')` selects a method rather than loading a module. */
-function isRequireCall(methodInv: J.MethodInvocation): boolean {
-    return !methodInv.select && methodInv.name?.kind === J.Kind.Identifier &&
-        (methodInv.name as J.Identifier).simpleName === 'require';
-}
-
-/**
- * The module a `require(...)` call loads. `obj.require('x')` selects a method rather than loading a
- * module, and a specifier that is not a string literal names none that can be read here.
- */
-export function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
-    if (!isRequireCall(methodInv)) {
-        return undefined;
-    }
-    const argument = methodInv.arguments?.elements[0]?.element;
-    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === 'string'
-        ? moduleNameOf(argument as J.Literal)
-        : undefined;
-}
-
-/** A `require` binds a module the way an import does, so the pool records it the same way. */
-function requireBindings(pattern: J | undefined, module: string): ModuleScopeBinding[] {
-    // A whole-module require binds no member, exactly as a default import does.
-    if (pattern?.kind === J.Kind.Identifier) {
-        return [{name: (pattern as J.Identifier).simpleName, module, member: undefined, typeOnly: false}];
-    }
-    return bindingNames(pattern).map(bound => bound.member === undefined
-        ? {name: bound.name}
-        : {name: bound.name, module, member: bound.member, typeOnly: false});
-}
-
 /** Whether a binding answers a request, given which of the two is type-only. A value import binds the type too. */
 function answersTypeOnly(bindingTypeOnly: boolean, requestTypeOnly: boolean): boolean {
     return requestTypeOnly || !bindingTypeOnly;
@@ -516,61 +533,6 @@ function isEmptyPlaceholder(element: J | undefined): boolean {
         (element?.kind === JS.Kind.ImportSpecifier && (element as JS.ImportSpecifier).specifier.kind === J.Kind.Empty);
 }
 
-/** The member a specifier imports and the name it binds it under, which are the same absent an alias. */
-function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member: string } | undefined {
-    if (specifier.specifier?.kind === J.Kind.Identifier) {
-        const name = (specifier.specifier as J.Identifier).simpleName;
-        return {name, member: name};
-    }
-    if (specifier.specifier?.kind !== JS.Kind.Alias) {
-        return undefined;
-    }
-    const alias = specifier.specifier as JS.Alias;
-    return alias.propertyName?.element && alias.alias?.kind === J.Kind.Identifier
-        ? {name: (alias.alias as J.Identifier).simpleName, member: moduleExportName(alias.propertyName.element)}
-        : undefined;
-}
-
-function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
-    const moduleSpecifier = jsImport.moduleSpecifier?.element;
-    const module = moduleSpecifier?.kind === J.Kind.Literal
-        ? moduleNameOf(moduleSpecifier as J.Literal)
-        : undefined;
-    const importClause = jsImport.importClause;
-    if (!importClause) {
-        return [];
-    }
-
-    const typeOnly = importClause.typeOnly;
-    const bindings: ModuleScopeBinding[] = [];
-
-    if (importClause.name?.element?.kind === J.Kind.Identifier) {
-        bindings.push({name: (importClause.name.element as J.Identifier).simpleName, module, member: undefined, typeOnly});
-    }
-
-    const namedBindings = importClause.namedBindings;
-    if (namedBindings?.kind === J.Kind.Identifier) {
-        bindings.push({name: (namedBindings as J.Identifier).simpleName, module, member: '*', typeOnly});
-    } else if (namedBindings?.kind === JS.Kind.Alias) {
-        const alias = (namedBindings as JS.Alias).alias;
-        if (alias?.kind === J.Kind.Identifier) {
-            bindings.push({name: (alias as J.Identifier).simpleName, module, member: '*', typeOnly});
-        }
-    } else if (namedBindings?.kind === JS.Kind.NamedImports) {
-        for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
-            const bound = elem.element?.kind === JS.Kind.ImportSpecifier
-                ? specifierBinding(elem.element as JS.ImportSpecifier)
-                : undefined;
-            if (bound) {
-                const specifier = elem.element as JS.ImportSpecifier;
-                bindings.push({...bound, module, typeOnly: typeOnly || specifier.importType.element});
-            }
-        }
-    }
-
-    return bindings;
-}
-
 /**
  * `names`, plus those pending `AddImport`s and `RebindImport`s on the `afterVisit` queue have
  * claimed. A queued `RemoveImport` does not free one: it removes only what the file leaves unused,
@@ -596,40 +558,6 @@ export function nameTaken(name: string, names: ReadonlySet<string>, visitor: Jav
 
 function claimedName(v: unknown): string | undefined {
     return v instanceof AddImport ? v.bindingName : v instanceof RebindImport ? v.boundName : undefined;
-}
-
-/**
- * The parser lifts surrogate pairs out of `valueSource` into `unicodeEscapes` and, when it does,
- * sets `value` to the quoted source (`parser.ts` `mapLiteral`), so neither field alone is the
- * module name. Reuniting them and reading the quoted text as the language does yields it for
- * either shape of literal.
- */
-export function moduleNameOf(module: string | J.Literal): string {
-    if (typeof module === 'string') {
-        return module;
-    }
-    const source = module.valueSource;
-    if (source === undefined) {
-        return String(module.value);
-    }
-    let restored = '';
-    let cut = 0;
-    for (const escape of module.unicodeEscapes ?? []) {
-        restored += source.slice(cut, escape.valueSourceIndex) + String.fromCharCode(parseInt(escape.codePoint, 16));
-        cut = escape.valueSourceIndex;
-    }
-    restored += source.slice(cut);
-    // an escape such as `\u00dc` names the character it spells
-    const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, restored);
-    const token = scanner.scan();
-    if ((token === ts.SyntaxKind.StringLiteral || token === ts.SyntaxKind.NoSubstitutionTemplateLiteral) &&
-        scanner.getTokenEnd() === restored.length) {
-        return scanner.getTokenValue();
-    }
-    const quote = restored.charAt(0);
-    return (quote === "'" || quote === '"' || quote === '`') && restored.endsWith(quote) && restored.length > 1
-        ? restored.slice(1, -1)
-        : restored;
 }
 
 function quoteOf(expression: J | undefined): QuoteChar | undefined {
@@ -903,7 +831,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             const statements = compilationUnit.statements.map(stmt => {
                 const element = stmt.element;
                 return element?.kind === JS.Kind.Import &&
-                    importBindings(element as JS.Import).some(b => b.typeOnly && this.bindsSameName(b))
+                    bindingsOf(element).some(b => b.typeOnly && this.bindsSameName(b))
                     ? {...stmt, element: asValueImport(element as JS.Import, memberName(this.member))}
                     : stmt;
             });
@@ -1236,47 +1164,33 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Check if the import matches what we're trying to add
      */
     private isMatchingImport(jsImport: JS.Import): boolean {
-        const moduleSpecifier = jsImport.moduleSpecifier?.element;
-        const module = moduleSpecifier && this.getModuleName(moduleSpecifier);
-        if (module === undefined || !sameModule(module, this.module)) {
-            return false;
-        }
-
         // A side-effect import is the clause-less one, and no import carrying bindings stands in
         // for it — nor it for them.
         const importClause = jsImport.importClause;
         if (!importClause || this.sideEffectOnly) {
-            return !importClause && this.sideEffectOnly;
+            const moduleSpecifier = jsImport.moduleSpecifier?.element;
+            const module = moduleSpecifier && this.getModuleName(moduleSpecifier);
+            return !importClause && this.sideEffectOnly && module !== undefined && sameModule(module, this.module);
         }
 
-        return importBindings(jsImport).some(binding => this.answeredBy(binding));
+        // `import X = require("m")` has no `from`, and its row reads the module from the `require`
+        return bindingsOf(jsImport).some(binding => this.answeredBy(binding));
     }
 
     /** Whether a binding the file already has serves this request. */
-    private answeredBy(binding: ModuleScopeBinding): boolean {
-        return this.bindsSameName(binding) && answersTypeOnly(binding.typeOnly ?? false, this.typeOnly);
+    private answeredBy(binding: ModuleBinding): boolean {
+        return this.bindsSameName(binding) && answersTypeOnly(binding.typeOnly, this.typeOnly);
     }
 
     /** Whether `binding` binds this request's member under its name, whether or not it is type-only. */
-    private bindsSameName(binding: ModuleScopeBinding): boolean {
-        return binding.module !== undefined && sameModule(binding.module, this.module) &&
-            binding.member === memberName(this.member) &&
+    private bindsSameName(binding: ModuleBinding): boolean {
+        return sameModule(binding.module, this.module) && bindsMember(binding, memberName(this.member)) &&
             (this.anyNameAnswers || binding.name === this.bindingName);
     }
 
-    /**
-     * Check if this is a matching CommonJS require statement
-     */
+    /** Whether `varDecl` is a `require` of one variable that serves this request. */
     private isMatchingRequire(varDecl: J.VariableDeclarations): boolean {
-        if (varDecl.variables.length !== 1) {
-            return false;
-        }
-        const namedVar = varDecl.variables[0].element;
-        const module = requiredModule(namedVar?.initializer?.element);
-        if (module === undefined || !sameModule(module, this.module)) {
-            return false;
-        }
-        return requireBindings(namedVar!.name, module).some(binding => this.answeredBy(binding));
+        return varDecl.variables.length === 1 && bindingsOf(varDecl).some(binding => this.answeredBy(binding));
     }
 
     /**
@@ -2003,20 +1917,13 @@ export function requireBinds(
     module: string,
     member: string | undefined
 ): string | undefined {
-    const required = requiredModuleOfDeclaration(declaration);
-    if (required === undefined || !sameModule(required, module)) {
-        return undefined;
-    }
-    const pattern = requirePattern(declaration);
     const key = memberName(member);
-    if (key === undefined || key === '*') {
-        return isIdentifier(pattern) ? pattern.simpleName : undefined;
-    }
     // Taking a member out from beside a rest element would add it to the rest object.
-    if (hasRest(pattern)) {
+    if (declaration.variables.length !== 1 || key !== undefined && key !== '*' && hasRest(requirePattern(declaration))) {
         return undefined;
     }
-    return requireBindings(pattern, required).find(b => b.member === key)?.name;
+    return bindingsOf(declaration).find(b => sameModule(b.module, module) &&
+        (key === undefined || key === '*' ? b.form === "require" : b.form === "require-member" && b.member === key))?.name;
 }
 
 /**
@@ -2071,43 +1978,17 @@ function isOnlyRequired(declaration: J.VariableDeclarations): boolean {
  * {@link memberName}.
  */
 function importBinds(jsImport: JS.Import, module: string, member: string | undefined): string | undefined {
-    const specifier = jsImport.moduleSpecifier?.element;
-    if (specifier?.kind !== J.Kind.Literal || !sameModule(moduleNameOf(specifier as J.Literal), module)) {
-        return undefined;
-    }
-    const importClause = jsImport.importClause;
-    if (!importClause) {
-        return undefined;
-    }
+    return importBinding(jsImport, module, member)?.name;
+}
+
+/**
+ * The row of `jsImport` that binds `member` of `module`: `undefined` or `'default'` reads its default import,
+ * `'*'` its namespace import, and a name the named specifier importing it, `import {a as b}` → `b` for `"a"`.
+ */
+function importBinding(jsImport: JS.Import, module: string, member: string | undefined): ModuleBinding | undefined {
     const key = memberName(member);
-    if (key === undefined) {
-        const nameElem = importClause.name?.element;
-        return nameElem && isIdentifier(nameElem) ? nameElem.simpleName : undefined;
-    }
-    if (key === '*') {
-        const namedBindings = importClause.namedBindings;
-        return namedBindings?.kind === JS.Kind.Alias && isIdentifier((namedBindings as JS.Alias).alias)
-            ? ((namedBindings as JS.Alias).alias as J.Identifier).simpleName
-            : undefined;
-    }
-    const namedBindings = importClause.namedBindings;
-    if (namedBindings?.kind !== JS.Kind.NamedImports) {
-        return undefined;
-    }
-    for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
-        const specifierNode = elem.element.specifier;
-        if (!namedSpecifierImports(specifierNode, key)) {
-            continue;
-        }
-        if (isIdentifier(specifierNode)) {
-            return specifierNode.simpleName;
-        }
-        const alias = (specifierNode as JS.Alias).alias;
-        if (isIdentifier(alias)) {
-            return alias.simpleName;
-        }
-    }
-    return undefined;
+    return bindingsOf(jsImport).find(b => sameModule(b.module, module) &&
+        (key === undefined ? b.form === "default" : key === '*' ? b.form === "namespace" : b.form === "named" && b.member === key));
 }
 
 /** Whether `specifier` imports the member `key`, under whatever local name it binds it to. */
@@ -2117,27 +1998,6 @@ function namedSpecifierImports(specifier: JS.ImportSpecifier["specifier"], key: 
     }
     if (specifier.kind === JS.Kind.Alias) {
         return moduleExportName((specifier as JS.Alias).propertyName.element) === key;
-    }
-    return false;
-}
-
-/** Whether `imp` binds `member` type-only, by its clause's `type` or the specifier's own. */
-function bindsTypeOnly(imp: JS.Import, member: string | undefined): boolean {
-    const key = memberName(member);
-    return (imp.importClause?.typeOnly ?? false) ||
-        (key !== undefined && key !== '*' && namedSpecifierIsTypeOnly(imp, key));
-}
-
-/** Whether the named specifier binding `key` carries its own inline `type`, as in `{type a, b}`. */
-function namedSpecifierIsTypeOnly(imp: JS.Import, key: string): boolean {
-    const namedBindings = imp.importClause?.namedBindings;
-    if (namedBindings?.kind !== JS.Kind.NamedImports) {
-        return false;
-    }
-    for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
-        if (namedSpecifierImports(elem.element.specifier, key)) {
-            return elem.element.importType.element;
-        }
     }
     return false;
 }
@@ -2203,8 +2063,11 @@ export interface ExistingImportBinding {
     /** Whether a top-level `require` declaration binds it rather than an import. */
     viaRequire: boolean;
 
-    /** Whether a `let` or `var` declares it, which the file may reassign. */
-    reassignable: boolean;
+    /**
+     * Whether a plain `const` `require` declares it, which a binding can leave for a new `const` one or join.
+     * `let x = require("m")` may be reassigned, and `export const {a} = require("m")` publishes `a`, so neither is.
+     */
+    plainConst: boolean;
 
     /** The import or `require` declaration that binds it. */
     statement: JS.Import | J.VariableDeclarations;
@@ -2230,22 +2093,22 @@ export function existingImportBinding(
                 aliased: required !== memberName(member),
                 typeOnly: false,
                 viaRequire: true,
-                reassignable: keywordsOf(declaration!) !== 'const',
+                plainConst: keywordsOf(declaration!) === 'const',
                 statement: declaration!
             };
         }
         if (element?.kind !== JS.Kind.Import) {
             continue;
         }
-        const localName = importBinds(element as JS.Import, module, member);
-        if (localName !== undefined) {
+        const binding = importBinding(element as JS.Import, module, member);
+        if (binding !== undefined) {
             return {
-                localName,
+                localName: binding.name,
                 onlyMemberOfStatement: isOnlyMember(element as JS.Import),
-                aliased: localName !== memberName(member),
-                typeOnly: bindsTypeOnly(element as JS.Import, member),
+                aliased: binding.name !== memberName(member),
+                typeOnly: binding.typeOnly,
                 viaRequire: false,
-                reassignable: false,
+                plainConst: false,
                 statement: element as JS.Import
             };
         }
@@ -2612,12 +2475,14 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         // One call moves one module-scope binding, and no two of those share a local name, so the
         // name read from the matched statement is what picks it back out of the file.
         const cu = this.cu;
-        if (!cu?.statements.some(s => s.element === jsImport) ||
-            importBinds(imp, this.from.module, this.from.member) !== this.localName) {
+        const binding = cu?.statements.some(s => s.element === jsImport)
+            ? importBinding(jsImport, this.from.module, this.from.member)
+            : undefined;
+        if (cu === undefined || binding?.name !== this.localName) {
             return imp;
         }
         // The replacement takes the moved binding's `type` marking to stay type-safe.
-        this.typeOnly = bindsTypeOnly(imp, this.from.member);
+        this.typeOnly = binding.typeOnly;
         this.fromModule = importedModule(imp);
 
         if (!isOnlyMember(imp)) {

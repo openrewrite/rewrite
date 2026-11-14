@@ -246,6 +246,37 @@ shadows it, `maybeBind` binds the module again under a name that reaches — a s
 second AMD dependency — because a caller mid-rewrite needs a name it can emit. `maybeRebind` answers
 with the name its binding carries after the move, whether or not the cursor reaches it.
 
+### The binding table
+
+`bindingTable(cu)` (`src/javascript/binding-table.ts`) lists every name the file's top level binds to a
+module, and `bindingsOf(statement)` one statement's rows. Every reader of "what binds a module here" reads
+it rather than the import and `require` syntax: `moduleBindings`, `maybeBind`, `maybeRebind`, `AddImport`,
+`RebindImport`, `RemoveImport` and `moduleScopeBindings`, which is a view of it in `AddImportOptions.member`'s vocabulary.
+Each row says its `form`, since forms that read alike hold different values:
+
+```ts
+import D from "m"              // default: the default export, the module only with `export =` typings
+import * as NS from "m"        // namespace: the namespace object
+import {a as b} from "m"       // named, member "a"
+import X = require("m")        // import-equals: the whole module
+const X = require("m")         // require: the whole module, and `reassignable` for `let` and `var`
+const {a: b} = require("m")    // require-member, member "a"
+const {...rest} = require("m") // require-pattern: no one member, as `{a: {b}}` and `[x]`
+const X = await import("m")    // dynamic-import: the namespace object
+```
+
+`RemoveImport` removes the unused rows a request asks for. A member also asks for the module objects `importedAt`
+reads it through, so a recipe that has rewritten the file's last `fs.readFile` asks for `"readFile"`, and an unused
+`import * as fs from "fs"` goes too. A default import is not one of them, but its own local name asks for it, as
+recipes do with `maybeRemoveImport(this, "vue", "Vue")`. What a request removes, when unused:
+
+| binding | no member | `'default'` | `'*'` | another member |
+|---|---|---|---|---|
+| `import D from "m"` | removed | removed | kept | kept, but `'D'` removes it |
+| `import * as NS from "m"` | removed | removed | removed | removed |
+| `import X = require("m")` | removed | removed | removed | removed |
+| `const X = require("m")` | removed | removed | removed | removed |
+
 ### Which name a rebind binds
 
 `to.alias` settles it when given, or refuses the move where that name is taken.
@@ -303,6 +334,24 @@ export {Y} from "m2";
 They move even where nothing binds `from`, and `maybeRebind` still returns `undefined`. Where the
 move is refused, none of them move. Left alone: `D.Old` after `import D from "m"`, since the default
 export is the module only with `export =`, and `NS.Old` where the file reassigns a `let` or `var` `NS`.
+
+### Which module member a reference reads
+
+`moduleBindings(visitor).importedAt(ref)` answers which module member `ref` reads where the cursor
+stands, through whatever binding the file reaches it by: a named import (aliased or type-only too), a
+namespace import, `import X = require`, a `require` the file never reassigns, an AMD factory parameter, or an
+`import("m").X` type. It reads the member's other spellings as `maybeRebind` moves them, except a
+`const {X} = NS` below the top level. `via` says which, and under what local name, so a replacement can be spelled
+the way the file spells the original. A name a nearer scope binds with the meaning its position reads
+answers `undefined`, while a value does not hide the namespace a type reads (`const React = {}` leaves
+`React.FC` in a type reading the global). `meaningAt(cursor)` is that reading: `'type'`, `'value'` or
+`'namespace'`.
+
+Two module objects are the caller's to name, since type attribution does not tell them apart:
+
+- a default import is the module only where `export =` typings make it so, as React's do;
+  `defaultIsModule: ["react"]` says so, and otherwise `D.X` reads a property of the default export
+- a UMD global stands for its module where nothing binds it; `globals: {React: "react"}` maps it
 
 ### What a rebind's attribution follows
 
@@ -402,7 +451,8 @@ The four above that still apply, plus these:
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out
-- `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
+- `from` is destructured in a `let`, `var` or `export const` `require` beside other names, since it would move
+  into a plain `const` `require`, losing its `let` or its export
 - `from`'s `require` has a type annotation, which describes the pattern the move would change
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"

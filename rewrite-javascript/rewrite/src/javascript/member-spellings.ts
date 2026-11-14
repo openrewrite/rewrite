@@ -64,25 +64,22 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return sameModule(this.from.module, this.to.module);
     }
 
-    /**
-     * Whether `qualifier.member` reads the moved member through a module object: `NS.Old`, `(NS).Old`.
-     * For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`.
-     */
-    private readsMovedMember(qualifier: J | undefined, member: string): boolean {
-        let object = qualifier, cursor = this.cursor;
-        while (object?.kind === J.Kind.Parentheses) {
-            cursor = new Cursor(object, cursor);
-            object = (object as J.Parentheses<J>).tree.element;
-        }
-        return this.withinModule && member === this.from.member &&
-            object !== undefined && isIdentifier(object) && this.moduleObjects.has(object.simpleName) &&
-            resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
+    /** Whether `read` goes through one of the module objects of `from`'s module, as the file's top level binds it. */
+    private throughModuleObject(read: ObjectRead | undefined): boolean {
+        return this.withinModule && read !== undefined && this.moduleObjects.has(read.object.simpleName) &&
+            resolve(read.at, read.object)?.kind === JS.Kind.CompilationUnit;
+    }
+
+    /** Whether `node` reads the moved member through a module object: `NS.Old`, `(NS).Old`, `NS["Old"]`, `NS.Old()`. */
+    private readsMovedMember(node: J): boolean {
+        const read = memberRead(node, this.cursor);
+        return read?.member === this.from.member && this.throughModuleObject(read);
     }
 
     /** `NS.Old` → `NS.New` */
     override async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
         const visited = await super.visitFieldAccess(fieldAccess, p);
-        if (visited?.kind !== J.Kind.FieldAccess || !this.readsMovedMember(fieldAccess.target, fieldAccess.name.element.simpleName)) {
+        if (visited?.kind !== J.Kind.FieldAccess || !this.readsMovedMember(fieldAccess)) {
             return visited;
         }
         return produce(visited as J.FieldAccess, draft => {
@@ -93,7 +90,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     /** `NS.Old()` → `NS.New()` */
     override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
         const visited = await super.visitMethodInvocation(method, p);
-        if (visited?.kind !== J.Kind.MethodInvocation || !this.readsMovedMember(method.select?.element, method.name.simpleName)) {
+        if (visited?.kind !== J.Kind.MethodInvocation || !this.readsMovedMember(method)) {
             return visited;
         }
         return produce(visited as J.MethodInvocation, draft => {
@@ -107,8 +104,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     /** `NS["Old"]` → `NS["New"]` */
     override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
         const visited = await super.visitArrayAccess(arrayAccess, p);
-        const index = arrayAccess.dimension.index.element;
-        if (visited?.kind !== J.Kind.ArrayAccess || !isStringLiteral(index) || !this.readsMovedMember(arrayAccess.indexed, index.value)) {
+        if (visited?.kind !== J.Kind.ArrayAccess || !this.readsMovedMember(arrayAccess)) {
             return visited;
         }
         return produce(visited as J.ArrayAccess, draft => {
@@ -124,7 +120,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         }
         const named = visited as J.VariableDeclarations.NamedVariable;
         const pattern = named.name;
-        if (!isObjectBindingPattern(pattern) || !this.readsMovedMember(variable.initializer?.element, this.from.member)) {
+        if (!isObjectBindingPattern(pattern) || !this.throughModuleObject(objectRead(variable.initializer?.element, this.cursor))) {
             return visited;
         }
         const elements = pattern.bindings.elements.map((e, i) => {
@@ -147,11 +143,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         if (visited?.kind !== JS.Kind.ImportType) {
             return visited;
         }
-        const argument = importType.argumentAndAttributes.elements[0]?.element;
-        const literal = argument?.kind === JS.Kind.LiteralType ? (argument as JS.LiteralType).literal : undefined;
-        const qualifier = rootName(importType.qualifier?.element);
-        if (!isStringLiteral(literal) || !sameModule(moduleNameOf(literal), this.from.module) ||
-            qualifier === undefined || !isIdentifier(qualifier) || qualifier.simpleName !== this.from.member) {
+        const named = importTypeMember(importType);
+        if (named === undefined || !sameModule(named.module, this.from.module) || named.member !== this.from.member) {
             return visited;
         }
         return produce(visited as JS.ImportType, draft => {
@@ -281,25 +274,82 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
 
     /** Whether the entry is `Old`, `Old as X` or `"Old" as X`. */
     private reExportsMember(element: J): boolean {
-        if (element.kind !== JS.Kind.ExportSpecifier) {
-            return false;
-        }
-        const specifier = (element as JS.ExportSpecifier).specifier;
-        const read = specifier.kind === JS.Kind.Alias ? (specifier as JS.Alias).propertyName.element : specifier;
-        return (read.kind === J.Kind.Identifier || read.kind === J.Kind.Literal) &&
-            moduleExportName(read as J.Identifier | J.Literal) === this.from.member;
+        const read = reExportedName(element);
+        return read !== undefined && moduleExportName(read) === this.from.member;
     }
 }
 
-/** `statement` as an `export {…} from "<module>"` declaration, where it is one. */
-function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclaration | undefined {
+/** A name read through an object, and the cursor to resolve the object from. */
+export interface ObjectRead {
+    object: J.Identifier;
+    at: Cursor;
+}
+
+/**
+ * The object `qualifier` names, where `cursor` stands on the node holding it: `NS` → NS, `(NS)` → NS.
+ * For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`.
+ */
+export function objectRead(qualifier: J | undefined, cursor: Cursor): ObjectRead | undefined {
+    let object = qualifier, at = cursor;
+    while (object?.kind === J.Kind.Parentheses) {
+        at = new Cursor(object, at);
+        object = (object as J.Parentheses<J>).tree.element;
+    }
+    return object !== undefined && isIdentifier(object) ? {object, at} : undefined;
+}
+
+/**
+ * The member `node` reads through an object, where `cursor` stands on `node`:
+ * `NS.X`, `(NS).X`, `NS["X"]` and `NS.X()` → `{object: NS, member: "X"}`.
+ */
+export function memberRead(node: J, cursor: Cursor): (ObjectRead & {member: string}) | undefined {
+    let qualifier: J | undefined, member: string | undefined;
+    if (node.kind === J.Kind.FieldAccess) {
+        [qualifier, member] = [(node as J.FieldAccess).target, (node as J.FieldAccess).name.element.simpleName];
+    } else if (node.kind === J.Kind.MethodInvocation) {
+        [qualifier, member] = [(node as J.MethodInvocation).select?.element, (node as J.MethodInvocation).name.simpleName];
+    } else if (node.kind === J.Kind.ArrayAccess) {
+        const index = (node as J.ArrayAccess).dimension.index.element;
+        [qualifier, member] = [(node as J.ArrayAccess).indexed, isStringLiteral(index) ? index.value : undefined];
+    }
+    const read = member === undefined ? undefined : objectRead(qualifier, cursor);
+    return read && {...read, member: member!};
+}
+
+/** The member an `import()` type names, which no import binds: `import("m").X.Y` → `{module: "m", member: "X"}`. */
+export function importTypeMember(importType: JS.ImportType): {module: string, member: string} | undefined {
+    const argument = importType.argumentAndAttributes.elements[0]?.element;
+    const literal = argument?.kind === JS.Kind.LiteralType ? (argument as JS.LiteralType).literal : undefined;
+    const member = rootName(importType.qualifier?.element);
+    return isStringLiteral(literal) && member !== undefined && isIdentifier(member)
+        ? {module: moduleNameOf(literal), member: member.simpleName} : undefined;
+}
+
+/** `statement` as an `export {…} from "m"` declaration, with the module it re-exports from. */
+export function reExportDeclaration(statement: J | undefined): {declaration: JS.ExportDeclaration, module: string} | undefined {
     if (statement?.kind !== JS.Kind.ExportDeclaration) {
         return undefined;
     }
     const declaration = statement as JS.ExportDeclaration;
     const source = declaration.moduleSpecifier?.element;
-    return isStringLiteral(source) && sameModule(moduleNameOf(source), module) && declaration.exportClause?.kind === JS.Kind.NamedExports
-        ? declaration : undefined;
+    return isStringLiteral(source) && declaration.exportClause?.kind === JS.Kind.NamedExports
+        ? {declaration, module: moduleNameOf(source)} : undefined;
+}
+
+/** The name an entry of `export {…} from "m"` reads from `m`: `X` in `X`, `X as Y` and `"X" as Y`. */
+export function reExportedName(element: J): J.Identifier | J.Literal | undefined {
+    if (element.kind !== JS.Kind.ExportSpecifier) {
+        return undefined;
+    }
+    const specifier = (element as JS.ExportSpecifier).specifier;
+    const read = specifier.kind === JS.Kind.Alias ? (specifier as JS.Alias).propertyName.element : specifier;
+    return read.kind === J.Kind.Identifier || read.kind === J.Kind.Literal ? read as J.Identifier | J.Literal : undefined;
+}
+
+/** `statement` as an `export {…} from "<module>"` declaration, where it is one. */
+function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclaration | undefined {
+    const found = reExportDeclaration(statement);
+    return found !== undefined && sameModule(found.module, module) ? found.declaration : undefined;
 }
 
 /**

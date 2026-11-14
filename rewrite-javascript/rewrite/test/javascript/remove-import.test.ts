@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {npm, packageJson, RemoveImport, tsx, typescript} from "../../src/javascript";
+import {javascript, npm, packageJson, RemoveImport, tsx, typescript} from "../../src/javascript";
 import {withDir} from "tmp-promise";
 
 describe('RemoveImport visitor', () => {
@@ -576,6 +576,71 @@ describe('RemoveImport visitor', () => {
                         import * as React from 'react';
 
                         const el: React.ReactNode = null;
+                    `
+                )
+            );
+        });
+
+        // A recipe that has rewritten the file's last `ReactDOM.render` asks for `render`, and nothing reads the
+        // namespace it was read through any more
+        test('removing a member removes the unused namespace import it was read through', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react-dom", "render"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as ReactDOM from 'react-dom';
+                        import {createRoot} from 'react-dom/client';
+
+                        const root = createRoot(document.getElementById('root'));
+                        root.render(<App/>);
+                    `,
+                    `
+                        import {createRoot} from 'react-dom/client';
+
+                        const root = createRoot(document.getElementById('root'));
+                        root.render(<App/>);
+                    `
+                )
+            );
+        });
+
+        test('removing a member keeps the namespace import it was read through while another member is read', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react-dom", "render"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as ReactDOM from 'react-dom';
+                        import {createRoot} from 'react-dom/client';
+
+                        const root = createRoot(document.getElementById('root'));
+                        root.render(<App/>);
+                        ReactDOM.unmountComponentAtNode(document.getElementById('legacy'));
+                    `
+                )
+            );
+        });
+
+        // `React.default` reads the default through the namespace, so a request for the default asks for it too
+        test('removing the default removes an unused namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "default"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as React from 'react';
+
+                        export const x = 1;
+                    `,
+                    `
+                        export const x = 1;
                     `
                 )
             );
@@ -2264,4 +2329,65 @@ describe('RemoveImport visitor', () => {
         });
     });
 
+});
+
+/** What `RemoveImport` removes where its own rules read the syntax differently from the binding table. */
+describe("RemoveImport reading the binding table", () => {
+    test("a module name holding a quote character is the name the specifier spells", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("./author's-notes"));
+        // Before: kept, since RemoveImport stripped every quote character from the literal's value, reading "./authors-notes"
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    import notes from "./author's-notes";
+
+                    export const title = "Notes";
+                `,
+                `
+                    export const title = "Notes";
+                `
+            )
+        );
+    });
+
+    // `container.require("logger")` calls a method of `container`, which the table does not count as a `require`
+    test("a method named require binds no module", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("logger"));
+        // Before: the statement was removed, since any call named `require` counted, whatever it was called on
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(`
+                const container = createContainer();
+                const logger = container.require("logger");
+
+                container.start();
+            `)
+        );
+    });
+
+    // Recipes ask for a default import by its local name: a migration off `new Vue(...)` calls
+    // `maybeRemoveImport(this, "vue", "Vue")` once it has replaced the file's last `Vue`
+    test("a request for a default import's local name removes it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RemoveImport("vue", "Vue"));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    import Vue from "vue";
+                    import {createApp} from "vue";
+
+                    createApp({}).mount("#app");
+                `,
+                `
+                    import {createApp} from "vue";
+
+                    createApp({}).mount("#app");
+                `
+            )
+        );
+    });
 });

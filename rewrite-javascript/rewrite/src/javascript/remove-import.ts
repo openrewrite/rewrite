@@ -3,6 +3,8 @@ import {isIdentifier, J, TextComment} from "../java";
 import {bindingNames, namesReferencedAsTypesWithin, namesReferencedWithin, valuesDeclaredAtTopLevel, walk} from "./scope";
 import {sameModule} from "./package-name";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
+import {bindingsOf, ModuleBinding, moduleNameOf, requiredModule} from "./binding-table";
+import {bindsMember, memberName} from "./add-import";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 import {randomId} from "../uuid";
@@ -25,6 +27,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      *               - 'default': Removes the default import from the module if unused,
      *                 regardless of its local name
      *               - '*': Removes the namespace import if unused
+     *               Any member also removes the unused module objects it is read through: a namespace import,
+     *               `import X = require` and whole `require`, so `"readFile"` removes an unused
+     *               `import * as fs from "fs"`. A default import goes only for `'default'` or no member.
      */
     constructor(readonly module: string,
                 readonly member?: string) {
@@ -236,15 +241,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const identifier = defaultName as J.Identifier;
                 const name = identifier.simpleName;
 
-                // Check if we should remove this default import
-                let shouldRemove: boolean;
-                if (this.member === 'default') {
-                    // Special case: member 'default' means remove any default import from the target module if unused
-                    shouldRemove = !usedNames.has(name);
-                } else {
-                    // Regular case: check if the import name matches the removal criteria
-                    shouldRemove = this.shouldRemoveImport(name, usedNames, name);
-                }
+                // `'default'` or no member asks for it, whatever its local name, and so does its local name:
+                // `RemoveImport("vue", "Vue")` removes an unused `import Vue from "vue"`, as recipes ask for it so
+                const asked = this.asksFor(bindingsOf(jsImport).find(b => b.form === "default")) || this.member === name;
+                const shouldRemove = asked && !usedNames.has(name);
 
                 if (shouldRemove) {
                     // If there are no named imports, remove the entire import
@@ -281,47 +281,13 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         if (importClause.namedBindings) {
             const namedBindings = importClause.namedBindings;
 
-            // Handle namespace import: import * as X from 'module'
-            if (namedBindings.kind === J.Kind.Identifier) {
-                const identifier = namedBindings as J.Identifier;
-                const name = identifier.simpleName;
-
-                // A member-scoped removal removes the whole namespace when it's unused
-                if (this.member !== undefined) {
-                    if (!usedNames.has(name)) {
-                        if (!importClause.name) {
-                            return undefined;
-                        }
-                        return this.updateImportClause(jsImport, importClause, draft => {
-                            draft.namedBindings = undefined;
-                        }, p);
-                    }
-                } else if (this.shouldRemoveImport(name, usedNames, name)) {
-                    // If there's no default import, remove the entire import
-                    if (!importClause.name) {
-                        return undefined;
-                    }
-                    // Otherwise, just remove the namespace import
-                    return this.updateImportClause(jsImport, importClause, draft => {
-                        draft.namedBindings = undefined;
-                    }, p);
-                }
-            } else if (namedBindings.kind === JS.Kind.Alias) {
+            if (namedBindings.kind === JS.Kind.Alias) {
                 // Handle import * as X from 'module' - represented as Alias with propertyName = "*"
                 const alias = namedBindings as JS.Alias;
                 const aliasName = (alias.alias as J.Identifier).simpleName;
 
-                // Same as above: member-scoped removal removes unused namespace
-                if (this.member !== undefined) {
-                    if (!usedNames.has(aliasName)) {
-                        if (!importClause.name) {
-                            return undefined;
-                        }
-                        return this.updateImportClause(jsImport, importClause, draft => {
-                            draft.namedBindings = undefined;
-                        }, p);
-                    }
-                } else if (this.shouldRemoveImport(aliasName, usedNames, aliasName)) {
+                // Every request asks for it, as any member is read through it
+                if (this.asksFor(bindingsOf(jsImport).find(b => b.form === "namespace")) && !usedNames.has(aliasName)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
                         return undefined;
@@ -369,14 +335,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         usedNames: ReadonlySet<string>,
         p: P
     ): Promise<JS.Import | undefined> {
-        const initializer = jsImport.initializer?.element;
-        if (!initializer || !isRequireCall(initializer)) {
-            return jsImport;
-        }
-
-        const methodInv = initializer as J.MethodInvocation;
-        const moduleName = this.getModuleNameFromRequire(methodInv);
-        if (!moduleName || !this.matchesTargetModule(moduleName)) {
+        const moduleName = requiredModule(jsImport.initializer?.element);
+        if (moduleName === undefined || !sameModule(moduleName, this.module)) {
             return jsImport;
         }
 
@@ -389,9 +349,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         const importedName = (importClause.name.element as J.Identifier).simpleName;
 
-        // For import-equals-require, we can only remove the entire import since
-        // it imports the whole module as a single identifier
-        if (this.shouldRemoveIdentifier(importedName, usedNames)) {
+        // It binds the whole module, which every request asks for, as any member is read through it
+        if (this.asksFor(bindingsOf(jsImport)[0]) && !usedNames.has(importedName)) {
             return undefined;
         }
 
@@ -399,20 +358,14 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Check if the module name matches the target module
+     * Whether this removal asks for `binding`: every binding of the module when no member is given, else the one
+     * {@link bindsMember} reads for the member, and the module objects any member is read through, as `importedAt`
+     * reads `fs.readFile`: a namespace import, `import X = require` and whole `require`. `'default'` asks for `D` of
+     * `import D from "m"`, while `"D"` and `"readFile"` do not.
      */
-    private matchesTargetModule(moduleName: string): boolean {
-        return sameModule(moduleName, this.module);
-    }
-
-    /**
-     * Check if an identifier should be removed based on usage
-     */
-    private shouldRemoveIdentifier(name: string, usedNames: ReadonlySet<string>): boolean {
-        // For CommonJS and import-equals-require, we're removing the entire import
-        // if the identifier is not used (member is typically undefined for these cases,
-        // or we're checking if a specific binding is used)
-        return !usedNames.has(name);
+    private asksFor(binding: ModuleBinding | undefined): boolean {
+        return binding !== undefined && (this.member === undefined || bindsMember(binding, memberName(this.member)) ||
+            binding.form === "namespace" || binding.form === "import-equals" || binding.form === "require");
     }
 
     private async processNamedImports(
@@ -494,19 +447,15 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return varDecls;
         }
 
-        const initializer = namedVar.initializer?.element;
-        if (!initializer || !isRequireCall(initializer)) {
-            return varDecls;
-        }
-
-        const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
+        // As the binding table reads one: `container.require("m")` calls a method rather than loading a module
+        const moduleName = requiredModule(namedVar.initializer?.element);
         const pattern = namedVar.name;
-        if (!moduleName || !this.matchesTargetModule(moduleName) || !pattern) {
+        if (moduleName === undefined || !sameModule(moduleName, this.module) || !pattern) {
             return varDecls;
         }
 
-        // Handle: const fs = require('fs')
-        if (isIdentifier(pattern) && !usedNames.has(pattern.simpleName)) {
+        // Handle: const fs = require('fs'), the whole module, which every request asks for
+        if (isIdentifier(pattern) && this.asksFor(bindingsOf(varDecls)[0]) && !usedNames.has(pattern.simpleName)) {
             return undefined; // Remove the entire require statement
         }
 
@@ -530,23 +479,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         return varDecls;
-    }
-
-    /**
-     * Get the module name from a require() call
-     */
-    private getModuleNameFromRequire(methodInv: J.MethodInvocation): string | undefined {
-        const args = methodInv.arguments?.elements;
-        if (!args || args.length === 0) {
-            return undefined;
-        }
-
-        const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
-            return undefined;
-        }
-
-        return (firstArg as J.Literal).value?.toString();
     }
 
     private async processObjectBindingPattern(
@@ -659,11 +591,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return false;
         }
 
-        const literal = moduleSpecifier as J.Literal;
-        const moduleName = literal.value?.toString().replace(/['"`]/g, '');
-
-        // Match the module name
-        return moduleName !== undefined && sameModule(moduleName, this.module);
+        // As the binding table reads it, so `"./author's-notes"` keeps its quote
+        return sameModule(moduleNameOf(moduleSpecifier as J.Literal), this.module);
     }
 
 }
@@ -723,14 +652,6 @@ function hasJsx(cu: JS.CompilationUnit): boolean {
         return !found;
     });
     return found;
-}
-
-function isRequireCall(node: J): boolean {
-    if (node.kind !== J.Kind.MethodInvocation) {
-        return false;
-    }
-    const name = (node as J.MethodInvocation).name;
-    return name?.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === 'require';
 }
 
 function hasModuleSyntax(statements: J.RightPadded<J>[]): boolean {

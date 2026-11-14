@@ -40,12 +40,15 @@ export type {Scope, Meaning, Reference} from "./scope";
 // the free functions that have no visitor to reach it through are already in this list.
 export {
     scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesUsedWithin, namesReferencedWithin, bindingNames,
-    deconflict, isReference, isValueReference, isWrite, isAssignmentTarget, resolve, referencesOf, declarationsOf,
-    compilationUnitOf, walk
+    deconflict, isReference, isValueReference, isWrite, isAssignmentTarget, meaningAt, resolve, referencesOf,
+    declarationsOf, compilationUnitOf, walk
 } from "./scope";
-export type {QuoteChar, AddImportOptions} from "./add-import";
+export type {ModuleBinding} from "./binding-table";
+export {bindingTable} from "./binding-table";
+export type {QuoteChar, AddImportOptions, ModuleScopeBinding} from "./add-import";
 export {
-    ImportStyle, moduleNameOf, AddImport, hasEsmSyntax, isCommonJs, isDirective, prologueLength, withStringValue
+    ImportStyle, moduleNameOf, moduleScopeBindings, AddImport, hasEsmSyntax, isCommonJs, isDirective, prologueLength,
+    withStringValue
 } from "./add-import";
 export {
     isObjectLiteral, isFunctionOrClassExpression, functionExpressionOf, leftmostExpression, leftmostChild,
@@ -59,7 +62,9 @@ export {
     withDependency, withUnboundDependency, withoutDependencyAt, withFactoryBody,
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
-export type {MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings} from "./binding";
+export type {
+    ImportedAtOptions, ImportedMember, MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings
+} from "./binding";
 export {maybeBind, maybeUnbind, maybeRebind, moduleBindings, isAmdBlock, maybeRemoveImport, maybeAddImport} from "./binding";
 export * from "./remove-import";
 export * from "./cleanup/index";
