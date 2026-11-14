@@ -153,4 +153,220 @@ class ReplaceConstantTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2579")
+    @Test
+    void addsExplicitCastWhenReplacingWithNullAndOverloadRequiresIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("com.abc.A", "VAR", "null")),
+          java(
+            """
+              package com.abc;
+              class A {
+                  public static final String VAR = "default";
+                  private String m1() {
+                      return m2(VAR);
+                  }
+                  private String m2(String s) {
+                      return s;
+                  }
+                  private String m2(Integer i) {
+                      return i.toString();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              class A {
+                  public static final String VAR = "default";
+                  private String m1() {
+                      return m2((String) null);
+                  }
+                  private String m2(String s) {
+                      return s;
+                  }
+                  private String m2(Integer i) {
+                      return i.toString();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesNullAssignmentsAndExistingCasts() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("A", "VAR", "null")),
+          java(
+            """
+              class A {
+                  static final String VAR = "default";
+                  Object value = VAR;
+                  String m() {
+                      return m((String) VAR);
+                  }
+                  String m(String s) { return s; }
+                  String m(Integer i) { return i.toString(); }
+              }
+              """,
+            """
+              class A {
+                  static final String VAR = "default";
+                  Object value = null;
+                  String m() {
+                      return m((String) null);
+                  }
+                  String m(String s) { return s; }
+                  String m(Integer i) { return i.toString(); }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void castsQualifiedConstantInConstructorArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("A", "VAR", "null")),
+          java(
+            """
+              import java.util.List;
+
+              class A {
+                  static final List<String> VAR = null;
+                  A(List<String> value) {}
+                  A(Integer value) {}
+                  static A create() {
+                      return new A(A.VAR);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class A {
+                  static final List<String> VAR = null;
+                  A(List<String> value) {}
+                  A(Integer value) {}
+                  static A create() {
+                      return new A((List<String>) null);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void castsParenthesizedArrayArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("A", "VAR", "null")),
+          java(
+            """
+              class A {
+                  static final String[] VAR = {"default"};
+                  String m() {
+                      return m((VAR));
+                  }
+                  String m(String[] values) { return "array"; }
+                  String m(Integer value) { return "integer"; }
+              }
+              """,
+            """
+              class A {
+                  static final String[] VAR = {"default"};
+                  String m() {
+                      return m(((String[]) null));
+                  }
+                  String m(String[] values) { return "array"; }
+                  String m(Integer value) { return "integer"; }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesVarargsInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("A", "VAR", "null")),
+          java(
+            """
+              class A {
+                  static final String VAR = "default";
+                  int count() {
+                      return count(VAR);
+                  }
+                  int count(Object... values) {
+                      return values.length;
+                  }
+              }
+              """,
+            """
+              class A {
+                  static final String VAR = "default";
+                  int count() {
+                      return count((Object) null);
+                  }
+                  int count(Object... values) {
+                      return values.length;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotExposeInaccessibleConstantType() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("Holder", "VAR", "null")),
+          java(
+            """
+              class Holder {
+                  private static class Value {}
+                  static final Value VAR = null;
+              }
+              class A {
+                  Object m() { return m(Holder.VAR); }
+                  Object m(Object value) { return value; }
+              }
+              """,
+            """
+              class Holder {
+                  private static class Value {}
+                  static final Value VAR = null;
+              }
+              class A {
+                  Object m() { return m((Object) null); }
+                  Object m(Object value) { return value; }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesGenericMethodInference() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstant("A", "VAR", "null")),
+          java(
+            """
+              class A {
+                  static final String VAR = "default";
+                  String m() { return identity(VAR); }
+                  static <T> T identity(T value) { return value; }
+              }
+              """,
+            """
+              class A {
+                  static final String VAR = "default";
+                  String m() { return identity((String) null); }
+                  static <T> T identity(T value) { return value; }
+              }
+              """
+          )
+        );
+    }
 }
