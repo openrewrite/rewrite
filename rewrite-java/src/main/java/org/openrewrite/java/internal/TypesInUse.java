@@ -350,9 +350,11 @@ public class TypesInUse {
                 String keyword = p.getKeyword();
                 if (keyword != null && visited.add(keyword)) {
                     trie.insert(keyword, explicit);
-                }
-                if (p == JavaType.Primitive.String && visited.add("java.lang.String")) {
-                    trie.insert("java.lang.String", explicit);
+                    // The "java.lang.String" visited key belongs to the String class, which walks its
+                    // supertypes when it claims the key, so the literal leaves it alone
+                    if (p == JavaType.Primitive.String) {
+                        trie.insert("java.lang.String", explicit);
+                    }
                 }
                 if (visited.add("java.lang.Object")) {
                     trie.insert("java.lang.Object", explicit);
