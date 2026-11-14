@@ -515,6 +515,27 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void delegatesToRecipeOnClasspathButNotInMarketplace() {
+        assertThat(marketplace.findRecipe("org.openrewrite.FindSourceFiles")).isNull();
+        Recipe recipe = client.recipeFromPrepareResponse(delegatingResponse("org.openrewrite.FindSourceFiles",
+          Map.of("filePattern", "**/*.txt")));
+        assertThat(recipe).isInstanceOf(FindSourceFiles.class);
+        assertThat(((FindSourceFiles) recipe).getFilePattern()).isEqualTo("**/*.txt");
+    }
+
+    @Test
+    void delegatesToUnknownRecipeFails() {
+        assertThatThrownBy(() -> client.recipeFromPrepareResponse(delegatingResponse("org.example.DoesNotExist", emptyMap())))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("org.example.DoesNotExist");
+    }
+
+    private static PrepareRecipeResponse delegatingResponse(String recipeName, Map<String, Object> options) {
+        return new PrepareRecipeResponse("id", null, "edit:id", emptyList(), null, emptyList(),
+          new PrepareRecipeResponse.DelegatesTo(recipeName, options), null, null);
+    }
+
+    @Test
     void dataTableStoreConfigurationCrossesRpc(@TempDir Path tmp) {
         client.dataTableStore(new CsvDataTableStore(tmp,
           singletonMap("repositoryOrigin", "github.com/acme/example"),
