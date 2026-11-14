@@ -15,6 +15,7 @@
  */
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp;
@@ -114,6 +115,20 @@ internal class CSharpTypeMapping
         if (symbol is IMethodSymbol methodSymbol)
         {
             return MapMethod(methodSymbol);
+        }
+        // Delegate creation has no SymbolInfo constructor, unlike ordinary `new`.
+        // Its operation still identifies a valid delegate target and constructed type.
+        // Use that type's runtime constructor so NewClass.Type is attributed too.
+        if (node is BaseObjectCreationExpressionSyntax &&
+            _model.GetOperation(node) is IDelegateCreationOperation
+            {
+                Type: INamedTypeSymbol { TypeKind: TypeKind.Delegate } delegateType
+            } creation &&
+            (creation.Target is IMethodReferenceOperation or IAnonymousFunctionOperation ||
+             creation.Target is not IInvalidOperation && creation.Target.Type is INamedTypeSymbol { TypeKind: TypeKind.Delegate }) &&
+            delegateType.InstanceConstructors is [var constructor])
+        {
+            return MapMethod(constructor);
         }
         return null;
     }
