@@ -296,6 +296,35 @@ class DependencyManifestTest {
     }
 
     @Test
+    void requiresPythonOfSetupPyFromAModuleLevelConstant() throws IOException {
+        // the widely copied setup.py template, e.g. deadc0de6/i3altlayout and facebookresearch/audiocraft
+        write("setup.py", """
+          from setuptools import setup
+
+          REQUIRES_PYTHON = '>=3.8.0'
+
+          setup(
+              name="audiocraft",
+              python_requires=REQUIRES_PYTHON,
+          )
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.8.0");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyInParentheses() throws IOException {
+        // google/distla_core
+        write("setup.py", "setup(name='x', python_requires=('>=3.8.0'),)\n");
+        assertThat(requiresPython(dir)).isEqualTo(">=3.8.0");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyWithAnUnresolvableConstantIsNull() throws IOException {
+        write("setup.py", "setup(name='x', python_requires=compute(),)\npython_requires = None\n");
+        assertThat(requiresPython(dir)).isNull();
+    }
+
+    @Test
     void requiresPythonOfSetupPyBesideToolOnlyPyproject() throws IOException {
         // huggingface/datasets
         write("pyproject.toml", """

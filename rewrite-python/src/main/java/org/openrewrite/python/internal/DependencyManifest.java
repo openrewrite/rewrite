@@ -67,7 +67,9 @@ public enum DependencyManifest {
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{(\\w+)}");
     private static final Pattern INDEX_NAME = Pattern.compile("[A-Za-z0-9_-]+");
     private static final Pattern SETUP_PY_PYTHON_REQUIRES = Pattern.compile(
-            "(?m)^[^#\\n]*\\bpython_requires['\"]?\\s*[=:]\\s*[rRuU]?(['\"])(?<specifier>[^'\"\\n]+)\\1");
+            "(?m)^[^#\\n]*\\bpython_requires['\"]?\\s*[=:]\\s*\\(?\\s*[rRuU]?(['\"])(?<specifier>[^'\"\\n]+)\\1");
+    private static final Pattern SETUP_PY_PYTHON_REQUIRES_CONSTANT = Pattern.compile(
+            "(?m)^[^#\\n]*\\bpython_requires\\s*=\\s*\\(?\\s*(?<name>[A-Za-z_]\\w*)\\s*\\)?\\s*[,)]");
     private static final List<String> PIPFILE_LOCAL_KEYS = Arrays.asList("path", "file", "git", "hg", "svn", "bzr");
 
     /**
@@ -277,6 +279,16 @@ public enum DependencyManifest {
             Matcher pythonRequires = SETUP_PY_PYTHON_REQUIRES.matcher(readString(setupPy));
             if (pythonRequires.find()) {
                 return pythonRequires.group("specifier").trim();
+            }
+            // python_requires=REQUIRES_PYTHON, with REQUIRES_PYTHON = '>=3.6' at the top of the file
+            String setupPyText = readString(setupPy);
+            Matcher constant = SETUP_PY_PYTHON_REQUIRES_CONSTANT.matcher(setupPyText);
+            if (constant.find()) {
+                Matcher value = Pattern.compile("(?m)^" + Pattern.quote(constant.group("name")) +
+                        "\\s*=\\s*[rRuU]?(['\"])(?<specifier>[^'\"\\n]+)\\1").matcher(setupPyText);
+                if (value.find()) {
+                    return value.group("specifier").trim();
+                }
             }
         }
         return null;
