@@ -248,6 +248,170 @@ class DependencyManifestTest {
         assertThat(pythonVersion(singletonList("<3.8"))).isNull();
     }
 
+    @Test
+    void poetryProjectWithoutProjectTableStillGetsNoEnv() throws IOException {
+        write("pyproject.toml", """
+          [tool.poetry]
+          name = "llm-twin-course"
+
+          [tool.poetry.dependencies]
+          python = "~3.11"
+          pydantic = "^2.6.3"
+          """);
+        assertThat(choose(dir)).isNull();
+    }
+
+    @Test
+    void requiresPythonOfSetupPyAlone() throws IOException {
+        // ModelTC/LightLLM
+        write("setup.py", """
+          from setuptools import setup, find_packages
+
+          setup(
+              name="lightllm",
+              version="1.2.0",
+              python_requires=">=3.10",
+              install_requires=[
+                  "pyzmq",
+                  "xgrammar>=0.2.8,<0.3",
+              ],
+          )
+          """);
+        write("requirements.txt", "pyzmq==25.1.2\n");
+        assertThat(requiresPython(dir)).isEqualTo(">=3.10");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyKeywordsInADict() throws IOException {
+        // python-poetry/poetry's build script and aliyun/tea-util pass the keywords as a dict
+        write("setup.py", """
+          from setuptools import setup
+
+          kwargs = {
+              'name': 'tea_util',
+              'python_requires': '>=3.6',
+          }
+          setup(**kwargs)
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.6");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyFromAModuleLevelConstant() throws IOException {
+        // the widely copied setup.py template, e.g. deadc0de6/i3altlayout and facebookresearch/audiocraft
+        write("setup.py", """
+          from setuptools import setup
+
+          REQUIRES_PYTHON = '>=3.8.0'
+
+          setup(
+              name="audiocraft",
+              python_requires=REQUIRES_PYTHON,
+          )
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.8.0");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyInParentheses() throws IOException {
+        // google/distla_core
+        write("setup.py", "setup(name='x', python_requires=('>=3.8.0'),)\n");
+        assertThat(requiresPython(dir)).isEqualTo(">=3.8.0");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyWithAnUnresolvableConstantIsNull() throws IOException {
+        write("setup.py", "setup(name='x', python_requires=compute(),)\npython_requires = None\n");
+        assertThat(requiresPython(dir)).isNull();
+    }
+
+    @Test
+    void requiresPythonOfSetupPyBesideToolOnlyPyproject() throws IOException {
+        // huggingface/datasets
+        write("pyproject.toml", """
+          [tool.ruff]
+          line-length = 119
+          """);
+        write("setup.py", """
+          setup(
+              name="datasets",
+              version="4.4.2.dev0",
+              package_dir={"": "src"},
+              python_requires=">=3.10.0",
+              install_requires=REQUIRED_PKGS,
+          )
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.10.0");
+    }
+
+    @Test
+    void requiresPythonOfSetupPyWhenSetupCfgDeclaresNone() throws IOException {
+        // McGill-NLP/llm2vec
+        write("setup.cfg", """
+          # Inside of setup.cfg
+          [metadata]
+          description-file = README.md
+          """);
+        write("setup.py", """
+          setup(
+              name="llm2vec",
+              version=version["__version__"],
+              python_requires=">=3.8",
+              packages=find_packages(include=[f"{package_name}*"]),
+          )
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.8");
+    }
+
+    @Test
+    void setupCfgPythonRequiresComesBeforeSetupPy() throws IOException {
+        write("setup.cfg", """
+          [options]
+          python_requires = >=3.9
+          """);
+        write("setup.py", "setup(python_requires='>=3.7')\n");
+        assertThat(requiresPython(dir)).isEqualTo(">=3.9");
+    }
+
+    @Test
+    void pyprojectRequiresPythonComesBeforeSetuptools() throws IOException {
+        write("pyproject.toml", """
+          [tool.poetry.dependencies]
+          python = "^3.11"
+          """);
+        write("setup.py", "setup(python_requires='>=3.7')\n");
+        assertThat(requiresPython(dir)).isEqualTo(">=3.11,<4.0");
+
+        write("pyproject.toml", """
+          [project]
+          name = "demo"
+          requires-python = ">=3.12"
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.12");
+    }
+
+    @Test
+    void computedPythonRequiresIsNotRead() throws IOException {
+        // huggingface/transformers
+        write("setup.py", """
+          if __name__ == "__main__":
+              min_version, max_version = SUPPORTED_PYTHON_VERSIONS
+              python_requires = f">=3.{min_version}.0"
+
+              setup(
+                  name="transformers",
+                  python_requires=python_requires,
+              )
+          """);
+        assertThat(requiresPython(dir)).isNull();
+    }
+
+    @Test
+    void requirementsFilesAloneDeclareNoPythonVersion() throws IOException {
+        write("requirements.txt", "fastapi\npython-dotenv==1.0.0\n");
+        assertThat(requiresPython(dir)).isNull();
+    }
+
     private void write(String path, String content) throws IOException {
         Path file = dir.resolve(path);
         Files.createDirectories(file.getParent());

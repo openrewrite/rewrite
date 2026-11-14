@@ -15,10 +15,14 @@
  */
 package org.openrewrite.python.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.TomlParser;
@@ -280,6 +284,126 @@ class PythonDependencyParserTest {
 
         assertThat(marker).isNotNull();
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Poetry);
+    }
+
+    @Test
+    void poetryPythonConstraintIsRequiresPythonWithoutProjectTable() {
+        // PacktPublishing/LLM-Engineers-Handbook
+        String toml = """
+          [tool.poetry]
+          name = "llm-engineering"
+          version = "0.1.0"
+          description = ""
+          authors = ["iusztinpaul <p.b.iusztin@gmail.com>"]
+          license = "MIT"
+          readme = "README.md"
+
+          [tool.poetry.dependencies]
+          python = "~3.11"
+          zenml = { version = "0.74.0", extras = ["server"] }
+          pymongo = "^4.6.2"
+
+          [build-system]
+          requires = ["poetry-core"]
+          build-backend = "poetry.core.masonry.api"
+          """;
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(parseToml(toml), null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getName()).isEqualTo("llm-engineering");
+        assertThat(marker.getVersion()).isEqualTo("0.1.0");
+        assertThat(marker.getLicense()).isEqualTo("MIT");
+        assertThat(marker.getRequiresPython()).isEqualTo(">=3.11,<3.12");
+        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Poetry);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiterString = "->", nullValues = "null", value = {
+      // confident-ai/deepeval
+      ">=3.9, <4.0 -> >=3.9, <4.0",
+      // trypromptly/LLMStack
+      ">=3.10,<4 -> >=3.10,<4",
+      // xusenlinzy/api-for-open-llm libs/langchain_llm
+      ">=3.8.1,<4.0 -> >=3.8.1,<4.0",
+      "^3.10 -> >=3.10,<4.0",
+      "^3.10.2 -> >=3.10.2,<4.0.0",
+      "^3 -> >=3,<4",
+      "~3.10 -> >=3.10,<3.11",
+      "~3.10.2 -> >=3.10.2,<3.11.0",
+      "~=3.10 -> ~=3.10",
+      "3.11 -> ==3.11",
+      "3.11.* -> ==3.11.*",
+      ">=3.9 <3.13 -> >=3.9,<3.13",
+      ">= 3.9, ^3.10 -> >=3.9,>=3.10,<4.0",
+      "* -> null",
+      "^2.7 || ^3.6 -> null",
+    })
+    void poetryPythonConstraintTranslatesToPep440(String poetry, @Nullable String pep440) {
+        String toml = """
+          [tool.poetry]
+          name = "demo"
+
+          [tool.poetry.dependencies]
+          python = "%s"
+          """.formatted(poetry);
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(parseToml(toml), null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getRequiresPython()).isEqualTo(pep440);
+        if (pep440 != null) {
+            assertThat(PythonVersionSpecifierSet.parse(pep440)).isNotNull();
+        }
+    }
+
+    @Test
+    void projectRequiresPythonWinsOverPoetryPython() {
+        String toml = """
+          [project]
+          name = "demo"
+          requires-python = ">=3.12"
+
+          [tool.poetry.dependencies]
+          python = "^3.10"
+          """;
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(parseToml(toml), null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getRequiresPython()).isEqualTo(">=3.12");
+    }
+
+    @Test
+    void poetryPythonFillsInForProjectTableWithoutRequiresPython() {
+        String toml = """
+          [project]
+          name = "demo"
+          dependencies = ["requests>=2.28"]
+
+          [tool.poetry.dependencies]
+          python = "^3.10"
+          """;
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(parseToml(toml), null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getName()).isEqualTo("demo");
+        assertThat(marker.getRequiresPython()).isEqualTo(">=3.10,<4.0");
+    }
+
+    @Test
+    void toolSettingsAloneGetNoMarker() {
+        // huggingface/datasets declares its Python version in setup.py, not here
+        String toml = """
+          [tool.ruff]
+          line-length = 119
+
+          [tool.pytest.ini_options]
+          filterwarnings = ["ignore::DeprecationWarning"]
+          """;
+
+        assertThat(PythonDependencyParser.createMarker(parseToml(toml), null)).isNull();
     }
 
     private static Toml.Document parseToml(String content) {

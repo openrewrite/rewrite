@@ -115,7 +115,13 @@ public class PipfileParser implements Parser {
         }
 
         Toml.Table requiresTable = tables.get("requires");
-        String requiresPython = requiresTable != null ? getStringValue(requiresTable, "python_version") : null;
+        String requiresPython = null;
+        if (requiresTable != null) {
+            requiresPython = getStringValue(requiresTable, "python_version");
+            if (requiresPython == null) {
+                requiresPython = getStringValue(requiresTable, "python_full_version");
+            }
+        }
 
         return new PythonResolutionResult(
                 randomId(),
