@@ -120,7 +120,8 @@ reference
     :   (EntityRef | CharRef) ;
 
 attribute
-    :   Name '=' STRING ; // Our STRING is AttValue in spec
+    :   Name ('=' STRING)? ; // Our STRING is AttValue in spec. The value is optional only to admit HTML boolean
+                             // attributes like `<input disabled>`; XmlParserVisitor rejects its absence outside HTML.
 
 chardata
     :   (TEXT | QUESTION_MARK | SEA_WS) ;
