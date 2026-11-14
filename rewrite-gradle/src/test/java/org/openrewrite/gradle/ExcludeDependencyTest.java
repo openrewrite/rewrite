@@ -118,12 +118,11 @@ class ExcludeDependencyTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 assertThat(resolved(cu, "compileClasspath"))
                   .as("the pre-existing httpcore exclude must survive re-resolution")
                   .doesNotContain("commons-logging:commons-logging", "org.apache.httpcomponents:httpcore")
-                  .contains("commons-codec:commons-codec");
-            })
+                  .contains("commons-codec:commons-codec"))
           )
         );
     }
