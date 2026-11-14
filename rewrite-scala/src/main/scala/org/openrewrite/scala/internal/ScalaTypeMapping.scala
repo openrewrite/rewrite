@@ -235,6 +235,37 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _ => None
   }
 
+  /**
+   * The method a reference calls without an argument list, as `xs.reverse`, `"abc".length` or
+   * `xs.sum` do, with its types instantiated as the typer applied it. Doesn't hold for a method
+   * the typer eta-expanded instead. The method type is null when it can't be mapped.
+   */
+  def argumentlessCallOf(tree: untpd.Tree): Option[JavaType.Method] =
+    typedNodes.get(tree).flatMap { node =>
+      val reference = resolved(node)
+      val sym = try reference.symbol catch { case NonFatal(_) => Symbols.NoSymbol }
+      val isCall = try {
+        sym != null && sym.exists && sym.is(Flags.Method) && !sym.isConstructor && !isErrorSymbol(sym) &&
+          !isClosure(node.adapted) && callableWithoutArguments(sym.info)
+      } catch {
+        case NonFatal(_) => false
+      }
+      if (!isCall) None
+      else Some(try {
+        instantiatedInfo(sym, node.adapted).orElse(instantiatedInfo(sym, reference)) match {
+          case Some(info) => mapMethodType(sym, info)
+          case None => mapMethodType(sym)
+        }
+      } catch {
+        case NonFatal(_) => null
+      })
+    }
+
+  private def callableWithoutArguments(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => (mt.paramInfos.isEmpty || mt.isImplicitMethod) && callableWithoutArguments(mt.resultType)
+    case _ => true
+  }
+
   private def isParameterless(sym: Symbol): Boolean =
     sym.is(Flags.Method) && !takesParameters(sym.info)
 
