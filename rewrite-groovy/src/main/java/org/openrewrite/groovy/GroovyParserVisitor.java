@@ -3452,6 +3452,14 @@ public class GroovyParserVisitor {
             }
 
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
+            // A declared type spelled with space around its dots (`java . util . Map m`) doesn't start
+            // the source as one name, and was kept as whitespace; typeTree reads it, its spacing included.
+            if (!expression.isDynamicTyped() && expression.getOriginType().getUnresolvedName().contains(".") &&
+                !source.startsWith(expression.getOriginType().getUnresolvedName(), indexOfNextNonWhitespace(cursor, source)) &&
+                source.startsWith(expression.getOriginType().getUnresolvedName().substring(0,
+                        expression.getOriginType().getUnresolvedName().indexOf('.')), indexOfNextNonWhitespace(cursor, source))) {
+                return visitTypeTree(expression.getOriginType());
+            }
             Space prefix = whitespace();
             String typeName = "";
 
@@ -4094,6 +4102,30 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         String maybeFullyQualified = name();
+        // A qualified class name may break around a dot (`new Outer.\n  Inner(…)`);
+        // name() stops at the whitespace. Read on across a dot until the name
+        // reaches the class's own simple name, and only then: `List\n  .of(1)` is a call on List, not a longer name.
+        if (classNode != null) {
+            String simple = classNode.getNameWithoutPackage();
+            simple = simple.substring(Math.max(simple.lastIndexOf('$'), simple.lastIndexOf('.')) + 1);
+            while (!lastNameSegment(maybeFullyQualified).equals(simple)) {
+                int save = cursor;
+                int next = indexOfNextNonWhitespace(cursor, source);
+                if (maybeFullyQualified.endsWith(".") && next < source.length() && Character.isJavaIdentifierStart(source.charAt(next))) {
+                    String gap = source.substring(cursor, next);
+                    cursor = next;
+                    maybeFullyQualified += gap + name();
+                } else if (!maybeFullyQualified.endsWith(".") && next + 1 < source.length() && source.charAt(next) == '.' &&
+                           source.charAt(next + 1) != '.') {
+                    String gap = source.substring(cursor, next + 1);
+                    cursor = next + 1;
+                    maybeFullyQualified += gap + name();
+                } else {
+                    cursor = save;
+                    break;
+                }
+            }
+        }
         String[] parts = maybeFullyQualified.split("\\.");
 
         // Walk classNode's outer-class chain (outermost first) and align it
@@ -4118,15 +4150,20 @@ public class GroovyParserVisitor {
             }
 
             if (i == 0) {
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, segmentType, null);
+                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part.trim(), segmentType, null);
             } else {
+                // The space after this dot leads this part; the space before it trails the previous part.
+                // (matches() on "^\\s*" never matched a part with a name in it, and the before-dot space came from the
+                // wrong part, so `A. B` and `A .B` printed as `A.B`.)
                 Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
-                Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : EMPTY;
+                Space identFmt = whitespacePrefix.lookingAt() ? format(whitespacePrefix.group(0)) : EMPTY;
 
-                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
-                //noinspection ResultOfMethodCallIgnored
-                whitespaceSuffix.matches();
-                Space namePrefix = i == parts.length - 1 ? EMPTY : format(whitespaceSuffix.group(1));
+                String previous = parts[i - 1];
+                int end = previous.length();
+                while (end > 0 && Character.isWhitespace(previous.charAt(end - 1))) {
+                    end--;
+                }
+                Space namePrefix = format(previous.substring(end));
 
                 expr = new J.FieldAccess(
                         randomId(),
@@ -4154,6 +4191,11 @@ public class GroovyParserVisitor {
             }
         }
         return expr.withPrefix(prefix);
+    }
+
+    private static String lastNameSegment(String dotted) {
+        String trimmed = dotted.trim();
+        return trimmed.substring(trimmed.lastIndexOf('.') + 1).trim();
     }
 
     private TypeTree arrayType(ClassNode classNode) {
