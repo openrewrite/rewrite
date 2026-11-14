@@ -210,7 +210,10 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (inFirstPrefix) {
                 // '*' characters are considered a part of the margin until a non '*' is parsed.
                 if (Character.isWhitespace(c) || c == '*' && isPrefixAsterisk) {
-                    if (isPrefixAsterisk && i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
+                    // javac strips a margin `*` on the opening line after whitespace too (as some code
+                    // generators write it: `/**   * Get x`); a run of '*' ends the margin, whitespace
+                    // before it doesn't. It was turned off at the first space, and the margin was read as text.
+                    if (c == '*' && isPrefixAsterisk && i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
                         isPrefixAsterisk = false;
                     }
                     firstPrefixBuilder.append(c);
