@@ -28,11 +28,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
+    private static final String UPDATED_PROJECT_POMS = "org.openrewrite.maven.updatedProjectPoms";
 
     @Override
     public Xml visitDocument(Xml.Document document, P p) {
@@ -139,19 +141,56 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
 
         try {
-            Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
+            Map<Path, Pom> projectPoms = currentProjectPoms(ctx, resolutionResult);
             Path sourcePath = requested.getSourcePath();
             if (sourcePath != null) {
                 projectPoms.put(sourcePath, requested);
             }
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     projectPoms);
+            if (sourcePath != null) {
+                ctx.<Map<Path, Pom>>computeMessageIfAbsent(UPDATED_PROJECT_POMS, k -> new ConcurrentHashMap<>())
+                        .put(sourcePath, requested);
+            }
             markDirtyForAmbiguityRecipes(ctx, document, updated);
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
         }
+    }
+
+    /// A document's marker holds its own snapshot of every other pom in the project, which goes stale as soon as
+    /// another document's model is updated. Overlay the poms updated so far in this run on top of that snapshot.
+    private static Map<Path, Pom> currentProjectPoms(ExecutionContext ctx, MavenResolutionResult resolutionResult) {
+        Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
+        Map<Path, Pom> updatedProjectPoms = ctx.getMessage(UPDATED_PROJECT_POMS);
+        if (updatedProjectPoms != null) {
+            projectPoms.replaceAll((path, pom) -> updatedProjectPoms.getOrDefault(path, pom));
+        }
+        return projectPoms;
+    }
+
+    static Xml.Document refreshIfAncestorUpdated(Xml.Document document, ExecutionContext ctx) {
+        Map<Path, Pom> updatedProjectPoms = ctx.getMessage(UPDATED_PROJECT_POMS);
+        MavenResolutionResult resolutionResult = document.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+        if (updatedProjectPoms == null || resolutionResult == null || !hasUpdatedAncestor(resolutionResult, updatedProjectPoms)) {
+            return document;
+        }
+        Xml.Document refreshed = (Xml.Document) new UpdateMavenModel<ExecutionContext>().visitNonNull(document, ctx);
+        return refreshed.getMarkers().findFirst(MavenResolutionResult.class).orElse(null) == resolutionResult ?
+                document : refreshed;
+    }
+
+    private static boolean hasUpdatedAncestor(MavenResolutionResult resolutionResult, Map<Path, Pom> updatedProjectPoms) {
+        for (MavenResolutionResult parent = resolutionResult.getParent(); parent != null; parent = parent.getParent()) {
+            Pom requested = parent.getPom().getRequested();
+            Pom updated = requested.getSourcePath() == null ? null : updatedProjectPoms.get(requested.getSourcePath());
+            if (updated != null && updated != requested) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
