@@ -309,6 +309,33 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void yamlPreconditionMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.MarkThenChange
+            description: Test.
+            recipeList:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**"
+              - org.openrewrite.PreconditionTest
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/*.txt"
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                 toText: 2
+            """, "org.openrewrite.MarkThenChange"),
+          text("1", "~~>2")
+        );
+    }
+
+    @Test
     void yamlDeclarativeRecipeAsPrecondition() {
         rewriteRun(
           spec -> spec.recipeFromYaml(

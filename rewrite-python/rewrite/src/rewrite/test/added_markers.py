@@ -40,7 +40,6 @@ _ALLOWED = (SearchResult, Markup, RecipesThatMadeChanges)
 # Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows.
 _REWRITE_RECIPE_MARKERS = frozenset({
     "org.openrewrite.yaml.MultilineScalarChanged",
-    "org.openrewrite.java.search.UsesMethod$MethodMatch",
 })
 _FIELDS: Dict[type, Tuple[str, ...]] = {}
 

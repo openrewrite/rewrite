@@ -157,6 +157,30 @@ class PreconditionsTest implements RewriteTest {
     }
 
     @Test
+    void checkMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(new FindSourceFiles("**"), recipe(contains("h"))),
+          text("hello", "~~>goodbye")
+        );
+    }
+
+    @Test
+    void notMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(new FindSourceFiles("**"), recipe(Preconditions.not(contains("z")))),
+          text("hello", "~~>goodbye")
+        );
+    }
+
+    @Test
+    void orMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(new FindSourceFiles("**"), recipe(Preconditions.or(contains("z"), contains("h")))),
+          text("hello", "~~>goodbye")
+        );
+    }
+
+    @Test
     void andOrNotExposeStructure() {
         TreeVisitor<?, ExecutionContext> a = contains("a");
         TreeVisitor<?, ExecutionContext> b = contains("b");

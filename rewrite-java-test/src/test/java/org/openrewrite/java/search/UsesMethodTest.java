@@ -17,7 +17,13 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.Issue;
+import org.openrewrite.Preconditions;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -200,6 +206,69 @@ class UsesMethodTest implements RewriteTest {
                  public static class C {
                      public void foo() {}
                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4035")
+    @Test
+    void preconditionMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindSourceFiles("**/*.java"),
+            toRecipe(() -> Preconditions.check(new UsesMethod<>("java.util.Collections emptyList()"), new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    return SearchResult.found(classDecl, "edited");
+                }
+            }))
+          ),
+          java(
+            """
+              import java.util.Collections;
+
+              class Test {
+                  Object o = Collections.emptyList();
+              }
+              """,
+            """
+              /*~~>*/import java.util.Collections;
+
+              /*~~(edited)~~>*/class Test {
+                  Object o = Collections.emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preconditionMatchesFileAlreadyMarkedBySameUsesMethod() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new UsesMethod<>("java.util.Collections emptyList()")),
+            toRecipe(() -> Preconditions.check(new UsesMethod<>("java.util.Collections emptyList()"), new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    return SearchResult.found(classDecl, "edited");
+                }
+            }))
+          ),
+          java(
+            """
+              import java.util.Collections;
+
+              class Test {
+                  Object o = Collections.emptyList();
+              }
+              """,
+            """
+              /*~~>*/import java.util.Collections;
+
+              /*~~(edited)~~>*/class Test {
+                  Object o = Collections.emptyList();
               }
               """
           )

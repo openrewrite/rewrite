@@ -45,8 +45,7 @@ internal static class AddedMarkersCheck
     /// <summary>Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows.</summary>
     private static readonly HashSet<string> RewriteRecipeMarkers =
     [
-        "org.openrewrite.yaml.MultilineScalarChanged",
-        "org.openrewrite.java.search.UsesMethod$MethodMatch"
+        "org.openrewrite.yaml.MultilineScalarChanged"
     ];
 
     public static HashSet<Placement> Placements(IEnumerable<SourceFile> sources) =>

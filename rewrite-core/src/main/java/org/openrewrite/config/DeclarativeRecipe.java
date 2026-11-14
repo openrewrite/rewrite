@@ -232,8 +232,14 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    Tree t = resolve(ctx).visit(tree, ctx);
-                    preconditionApplicable = t != tree;
+                    preconditionApplicable = false;
+                    Preconditions.check(resolve(ctx), new TreeVisitor<Tree, ExecutionContext>() {
+                        @Override
+                        public @Nullable Tree visit(@Nullable Tree applicable, ExecutionContext p) {
+                            preconditionApplicable = true;
+                            return applicable;
+                        }
+                    }).visit(tree, ctx);
                     return tree;
                 }
 

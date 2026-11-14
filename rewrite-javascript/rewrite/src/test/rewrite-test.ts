@@ -763,7 +763,6 @@ const reportingMarkerKinds = new Set<string>([
 /** Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows. */
 const rewriteRecipeMarkerKinds = new Set<string>([
     "org.openrewrite.yaml.MultilineScalarChanged",
-    "org.openrewrite.java.search.UsesMethod$MethodMatch",
 ]);
 
 function mayBeAdded({marker, element}: MarkerPlacement): boolean {
