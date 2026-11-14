@@ -231,6 +231,118 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
+        test("joins no import of the target module that carries other attributes", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "old-pkg",
+                oldMember: "Config",
+                newModule: "new-pkg"
+            });
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import type { Config } from 'old-pkg' with { 'resolution-mode': 'require' };
+                    import type { Options } from 'new-pkg';
+
+                    let c: Config;
+                    let o: Options;
+                    `,
+                    `
+                    import type { Config } from 'new-pkg' with { 'resolution-mode': 'require' };
+                    import type { Options } from 'new-pkg';
+
+                    let c: Config;
+                    let o: Options;
+                    `
+                )
+            );
+        });
+
+        test("a moved member keeps its import attributes rather than joining an import of the target without them", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "./macros/legacy.ts",
+                oldMember: "buildTime",
+                newModule: "./macros/build.ts"
+            });
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import {buildTime} from "./macros/legacy.ts" with {type: "macro"};
+                    import {gitHash} from "./macros/build.ts";
+
+                    export const banner = \`\${buildTime()} \${gitHash()}\`;
+                    `,
+                    `
+                    import {buildTime} from "./macros/build.ts" with {type: "macro"};
+                    import {gitHash} from "./macros/build.ts";
+
+                    export const banner = \`\${buildTime()} \${gitHash()}\`;
+                    `
+                )
+            );
+        });
+
+        test("a moved member without import attributes joins no import of the target that carries some", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "./util.ts",
+                oldMember: "formatDate",
+                newModule: "./macros/build.ts"
+            });
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import {formatDate} from "./util.ts";
+                    import {gitHash} from "./macros/build.ts" with {type: "macro"};
+
+                    formatDate(gitHash());
+                    `,
+                    `
+                    import {formatDate} from "./macros/build.ts";
+                    import {gitHash} from "./macros/build.ts" with {type: "macro"};
+
+                    formatDate(gitHash());
+                    `
+                )
+            );
+        });
+
+        test("a moved member joins no import of the target under // @ts-ignore", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "./old.ts",
+                oldMember: "a",
+                newModule: "./m.ts"
+            });
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import {a} from "./old.ts";
+                    // @ts-ignore
+                    import {b} from "./m.ts";
+
+                    a(b);
+                    `,
+                    `
+                    import {a} from "./m.ts";
+                    // @ts-ignore
+                    import {b} from "./m.ts";
+
+                    a(b);
+                    `
+                )
+            );
+        });
+
         test("preserves aliased import", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
