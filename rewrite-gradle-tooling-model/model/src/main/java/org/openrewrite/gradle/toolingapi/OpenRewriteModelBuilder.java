@@ -35,6 +35,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("JavadocLinkAsPlainText")
 public class OpenRewriteModelBuilder {
@@ -84,7 +85,27 @@ public class OpenRewriteModelBuilder {
      * </pre>
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
+        return forProjectDirectory(projectDir, buildFile, initScript, null);
+    }
+
+    /**
+     * As {@link #forProjectDirectory(File, File, String)}, but builds in the given Gradle user home, like TestKit's
+     * {@code GradleRunner.withTestKitDir}. Builds in separate homes don't wait on each other's cache locks.
+     * Distributions stay in the default home.
+     * <p>
+     * A fresh home has none of the default home's {@code gradle.properties} or {@code init.d} scripts, so settings,
+     * credentials and repository mirrors configured there don't apply.
+     *
+     * @param gradleUserHome The Gradle user home to build in, or null for the default one.
+     */
+    public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript, @Nullable File gradleUserHome) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+        if (gradleUserHome != null) {
+            connector.useGradleUserHomeDir(gradleUserHome);
+            connector.useDistributionBaseDir(defaultGradleUserHome());
+            // No other JVM reuses these daemons
+            connector.daemonMaxIdleTime(2, TimeUnit.MINUTES);
+        }
         Path wrapperProperties = projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties");
         String gradleVersion;
         if (Files.exists(wrapperProperties)) {
@@ -310,6 +331,14 @@ public class OpenRewriteModelBuilder {
         } catch (IOException ignored) {
         }
         return null;
+    }
+
+    private static File defaultGradleUserHome() {
+        String home = System.getProperty("gradle.user.home");
+        if (home == null) {
+            home = System.getenv("GRADLE_USER_HOME");
+        }
+        return home == null ? new File(System.getProperty("user.home"), ".gradle") : new File(home);
     }
 
     /**
