@@ -56,6 +56,15 @@ public class NpmRegistryClient {
     }
 
     /**
+     * Whether the injected sender is the host's own client rather than the default URL sender. Such a sender
+     * already applies the host's network: its proxy and certificate variables. A manager-configured route it must
+     * still bind explicitly, through {@link RegistryTransport}.
+     */
+    public boolean sendsThroughHostNetwork() {
+        return RegistryTransport.isHostSender(httpSender);
+    }
+
+    /**
      * A transport-bound client with its own credential and response caches. No response fetched on another route
      * can satisfy a request on this route, including one whose configuration must be refused.
      */

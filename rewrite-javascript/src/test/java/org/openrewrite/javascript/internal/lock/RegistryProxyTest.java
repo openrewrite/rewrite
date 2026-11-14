@@ -42,6 +42,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -132,6 +134,79 @@ class RegistryProxyTest {
         assertThat(result.getErrorMessage()).doesNotContain("network policy");
     }
 
+    /**
+     * As a sandboxed Moderne recipe worker starts the CLI: its only route out is a local forward proxy, which every
+     * tool is pointed at through the standard proxy variables, with that proxy's CA bundle. The host's own sender
+     * already sends through it, so neither the route nor the CA is a policy the lock regeneration must refuse.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"npm", "pnpm", "yarn1", "yarn4", "bun"})
+    void theHostsOwnProxyVariablesReachTheHostsOwnSender(String manager) {
+        AtomicInteger sent = new AtomicInteger();
+        Map<String, String> worker = new HashMap<>();
+        for (String name : List.of("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy")) {
+            worker.put(name, "http://127.0.0.1:3128");
+        }
+        worker.put("NO_PROXY", "localhost,127.0.0.1");
+        worker.put("no_proxy", "localhost,127.0.0.1");
+        for (String name : List.of("SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS")) {
+            worker.put(name, "/nonexistent-registry-proxy-test/ca-bundle.pem");
+        }
+        Environment environment = new Environment() {
+            public String getenv(String name) { return worker.get(name); }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        Request.RequestBuilder request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"));
+        Port port;
+        HostInputs.HostInputsBuilder host = HostInputs.builder().now(Instant.EPOCH).system(environment);
+        switch (manager) {
+            case "npm":
+                request.lock("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"lockfileVersion\":3,\"packages\":{\"\":{\"name\":\"proxy-control\",\"version\":\"1.0.0\"}}}")
+                        .packageManagerFile(Paths.get(".npmrc"), "registry=https://registry.invalid/\n");
+                host.packageManager(PackageManager.Npm).packageManagerVersion("11.19.1");
+                port = NpmInputs.PORT;
+                break;
+            case "pnpm":
+                request.lock("lockfileVersion: '9.0'\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\nimporters:\n  .: {}\n")
+                        .packageManagerFile(Paths.get(".npmrc"), "registry=https://registry.invalid/\n")
+                        .packageManagerFile(Paths.get("pnpm-workspace.yaml"), "packages:\n  - .\nminimumReleaseAge: 0\n");
+                host.packageManager(PackageManager.Pnpm).packageManagerVersion("11.10.0");
+                port = PnpmInputs.PORT;
+                break;
+            case "yarn1":
+                request.lock("# yarn lockfile v1\n")
+                        .packageManagerFile(Paths.get(".npmrc"), "registry=https://registry.invalid/\n");
+                host.packageManager(PackageManager.YarnClassic).packageManagerVersion("1.22.22");
+                port = YarnClassicInputs.PORT;
+                break;
+            case "yarn4":
+                request.lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n")
+                        .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: https://registry.invalid/\n");
+                host.packageManager(PackageManager.YarnBerry).packageManagerVersion("4.17.0");
+                port = YarnBerryInputs.PORT;
+                break;
+            default:
+                request.lock("{\"lockfileVersion\":1,\"workspaces\":{\"\":{\"name\":\"proxy-control\"}},\"packages\":{}}")
+                        .packageManagerFile(Paths.get(".npmrc"), "registry=https://registry.invalid/\n");
+                host.packageManager(PackageManager.Bun).packageManagerVersion("1.3.14");
+                port = BunInputs.PORT;
+        }
+        Result result;
+        try {
+            result = port.regenerate(LockDirectory.of(request.build()), host.build(), new NpmRegistryClient(r -> {
+                sent.incrementAndGet();
+                throw new IllegalStateException("synthetic sender boundary");
+            }));
+        } catch (NodeRegistryException e) {
+            result = Result.failure(LockOnlyInstall.failure(e));
+        }
+        assertThat(result.getErrorMessage()).doesNotContain("network policy", "withProxy");
+        assertThat(sent).hasPositiveValue();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"yarn1", "yarn4", "bun"})
     void anUnboundManagerPolicyCannotSendDirectRequests(String manager) {
@@ -160,11 +235,15 @@ class RegistryProxyTest {
         HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
                 .packageManager("yarn4".equals(manager) ? PackageManager.YarnBerry : "yarn1".equals(manager) ? PackageManager.YarnClassic : PackageManager.Bun)
                 .packageManagerVersion("yarn4".equals(manager) ? "4.17.0" : "yarn1".equals(manager) ? "1.22.22" : "1.3.14").build();
-        Result result = ("yarn1".equals(manager) ? YarnClassicInputs.PORT : "yarn4".equals(manager) ? YarnBerryInputs.PORT : BunInputs.PORT).regenerate(
-                LockDirectory.of(request.build()), host, new NpmRegistryClient(r -> {
+        // Bun's is the host's HTTP_PROXY, which only the host's own sender applies: the default URL sender would
+        // send around it, so it must refuse before any request.
+        NpmRegistryClient client = "bun".equals(manager) ? new NpmRegistryClient(new HttpUrlConnectionSender()) :
+                new NpmRegistryClient(r -> {
                     sent.incrementAndGet();
                     throw new IllegalStateException("a direct request escaped the configured proxy policy");
-                }));
+                });
+        Result result = ("yarn1".equals(manager) ? YarnClassicInputs.PORT : "yarn4".equals(manager) ? YarnBerryInputs.PORT : BunInputs.PORT).regenerate(
+                LockDirectory.of(request.build()), host, client);
         assertThat(sent).hasValue(0);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).contains("network policy").doesNotContain("synthetic-password");

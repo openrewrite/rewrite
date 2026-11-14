@@ -79,7 +79,7 @@ final class HostRegistrySource implements RegistrySource {
     }
 
     private NodeRegistry request(String name, String url, @Nullable String authorization) {
-        NetworkPolicy.requireDirect("Yarn", hostNetwork);
+        NetworkPolicy.requireDirect("Yarn", hostNetwork, client.sendsThroughHostNetwork());
         NodeRegistry host = registries.registryAt(name, url);
         String token = authorization != null && authorization.startsWith(BEARER) ?
                 authorization.substring(BEARER.length()) : null;
