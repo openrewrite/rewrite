@@ -21,7 +21,7 @@ import {ModuleScopeBinding} from '../add-import';
 import {opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, slotOf, TemplateSlot, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -250,7 +250,7 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(expression: boolean, values?: Pick<Map<string, J | J[]>, 'get'>): Promise<J> {
+    private async getTemplateTree(expression: TemplateSlot, values?: Pick<Map<string, J | J[]>, 'get'>): Promise<J> {
         // The types of the bound values shape the parse, so each set of them is a tree of its own
         const preamble = TemplateEngine.parameterPreamble(this.parameters, values);
         const instanceKey = `${expression}::${preamble.join('')}`;
@@ -272,7 +272,7 @@ export class Template {
                 return `raw:${value.code}`;
             }
             return i.toString();
-        }).join(',') + (expression ? '::expression' : '');
+        }).join(',') + (expression ? `::${expression === true ? 'expression' : expression}` : '');
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
@@ -428,7 +428,8 @@ export class Template {
             }
         }
 
-        const expression = opensWithBrace(this.templateParts) && await replacedByObjectLiteral(tree, cursor);
+        const expression: TemplateSlot = slotOf(tree, cursor) ??
+            (opensWithBrace(this.templateParts) && await replacedByObjectLiteral(tree, cursor));
         const ast = await this.getTemplateTree(expression, normalizedValues);
 
         // Delegate to TemplateEngine for placeholder substitution and application
