@@ -524,6 +524,240 @@ public class TypeUtilsTests
     }
 
     // =============================================================
+    // IsAssignableTo — nested generic arguments
+    // =============================================================
+
+    private static JavaType.Parameterized Generic(string fqn, params JavaType[] typeArguments) =>
+        new(MakeClass(fqn), typeArguments);
+
+    private static JavaType.GenericTypeVariable TypeVariable(string name, params JavaType.FullyQualified[] bounds) =>
+        new(name, JavaType.GenericTypeVariable.VarianceKind.Invariant, bounds.Length == 0 ? null : bounds);
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_DifferentInnermostArgument()
+    {
+        // given
+        var candidate = Generic("List", Generic("List", MakeClass("System.String")));
+        var target = Generic("List", Generic("List", MakeClass("System.Int32")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_FullyQualified_DifferentInnermostArgument()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.String")));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.Int32")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_EqualArguments()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.String")));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.String")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.True(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_ThreeLevels_EqualArguments()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.Dictionary",
+            MakeClass("System.String"),
+            Generic("System.Collections.Generic.List",
+                Generic("System.Collections.Generic.HashSet", MakeClass("System.Int32"))));
+        var target = Generic("System.Collections.Generic.Dictionary",
+            MakeClass("System.String"),
+            Generic("System.Collections.Generic.List",
+                Generic("System.Collections.Generic.HashSet", MakeClass("System.Int32"))));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.True(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_ThreeLevels_DifferentInnermostArgument()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.Dictionary",
+            MakeClass("System.String"),
+            Generic("System.Collections.Generic.List",
+                Generic("System.Collections.Generic.HashSet", MakeClass("System.Int32"))));
+        var target = Generic("System.Collections.Generic.Dictionary",
+            MakeClass("System.String"),
+            Generic("System.Collections.Generic.List",
+                Generic("System.Collections.Generic.HashSet", MakeClass("System.Int64"))));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_DifferentRawInnerType()
+    {
+        // given
+        var innerList = Generic("System.Collections.Generic.List", MakeClass("System.String"));
+        innerList.Type = MakeClass("System.Collections.Generic.List",
+            interfaces: [Generic("System.Collections.Generic.IList", MakeClass("System.String"))]);
+        var candidate = Generic("System.Collections.Generic.List", innerList);
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.IList", MakeClass("System.String")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_RawTargetArgumentRequiresParameterizedCandidate()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List", MakeClass("System.Collections.Generic.List"));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.String")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_UnboundedTypeVariableMatchesAnyInnerArgument()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.String")));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", TypeVariable("T")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.True(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_TypeVariableDoesNotWidenRawInnerType()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.HashSet", MakeClass("System.String")));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", TypeVariable("T")));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_BoundedTypeVariableSatisfied()
+    {
+        // given
+        var stringClass = MakeClass("System.String", interfaces: [MakeClass("System.IComparable")]);
+        var candidate = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", stringClass));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", TypeVariable("T", MakeClass("System.IComparable"))));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.True(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_BoundedTypeVariableNotSatisfied()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", MakeClass("System.Object")));
+        var target = Generic("System.Collections.Generic.List",
+            Generic("System.Collections.Generic.List", TypeVariable("T", MakeClass("System.IComparable"))));
+
+        // when
+        var matches = TypeUtils.IsAssignableTo(candidate, target);
+
+        // then
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_ArrayArgumentsAreNotMatchedWithoutRankInformation()
+    {
+        // given
+        var candidate = Generic("System.Collections.Generic.List",
+            new JavaType.Array(Generic("System.Collections.Generic.List", MakeClass("System.String")), null));
+        var sameTarget = Generic("System.Collections.Generic.List",
+            new JavaType.Array(Generic("System.Collections.Generic.List", MakeClass("System.String")), null));
+        var differentTarget = Generic("System.Collections.Generic.List",
+            new JavaType.Array(Generic("System.Collections.Generic.List", MakeClass("System.Int32")), null));
+
+        // when
+        var matchesSame = TypeUtils.IsAssignableTo(candidate, sameTarget);
+        var matchesDifferent = TypeUtils.IsAssignableTo(candidate, differentTarget);
+
+        // then
+        Assert.False(matchesSame);
+        Assert.False(matchesDifferent);
+    }
+
+    [Fact]
+    public void IsAssignableTo_NestedGeneric_CyclicArguments()
+    {
+        // given
+        var candidateNode = Generic("Node");
+        candidateNode.TypeParameters = [candidateNode];
+        var sameTargetNode = Generic("Node");
+        sameTargetNode.TypeParameters = [sameTargetNode];
+        var differentTargetNode = Generic("Node");
+        differentTargetNode.TypeParameters = [Generic("Node", MakeClass("System.String"))];
+
+        // when
+        var matchesSame = TypeUtils.IsAssignableTo(candidateNode, sameTargetNode);
+        var matchesDifferent = TypeUtils.IsAssignableTo(candidateNode, differentTargetNode);
+
+        // then
+        Assert.True(matchesSame);
+        Assert.False(matchesDifferent);
+    }
+
+    // =============================================================
     // IsAssignableTo — Array types
     // =============================================================
 

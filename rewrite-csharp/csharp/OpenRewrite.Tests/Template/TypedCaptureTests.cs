@@ -439,6 +439,94 @@ public class TypedCaptureTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void ConcreteNestedGenericCapture_RejectsDifferentInnerArgument()
+    {
+        var list = Capture.Expression("list", type: "List<List<string>>");
+        var pat = CSharpPattern.Expression($"{list}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var l = new List<List<int>>();
+                        var n = l.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConcreteArrayGenericCapture_RejectsDifferentArrayRank()
+    {
+        var list = Capture.Expression("list", type: "List<string[]>");
+        var pat = CSharpPattern.Expression($"{list}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M(List<string[,]> l)
+                    {
+                        var n = l.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConcreteNestedGenericCapture_MatchesEqualInnerArgument()
+    {
+        var list = Capture.Expression("list", type: "List<List<string>>");
+        var pat = CSharpPattern.Expression($"{list}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var l = new List<List<string>>();
+                        var n = l.Count;
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var l = new List<List<string>>();
+                        var n = /*~~>*/l.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
     // ===============================================================
     // Recipe factories
     // ===============================================================

@@ -67,7 +67,7 @@ public static class TypeUtils
     /// <see cref="JavaType.GenericTypeVariable"/> type parameters, those positions are treated
     /// as wildcards: any concrete type argument satisfies an unbounded type variable, and
     /// bounded type variables check that the candidate's type argument satisfies the bound.
-    /// Concrete type parameters require an exact FQN match.
+    /// Concrete type parameters must match exactly, recursing into nested generic arguments.
     /// </para>
     /// </summary>
     public static bool IsAssignableTo(JavaType? type, JavaType? targetType)
@@ -469,43 +469,59 @@ public static class TypeUtils
     /// Compare type parameter lists position-by-position. A <see cref="JavaType.GenericTypeVariable"/>
     /// in the target acts as a wildcard (any concrete type matches). If the variable has bounds,
     /// the candidate's type argument must be assignable to all bounds.
-    /// Concrete type parameters require exact FQN match.
+    /// Concrete type parameters are compared invariantly and structurally: nested generic
+    /// arguments must match recursively, and other arguments require an exact FQN match.
     /// </summary>
-    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams)
+    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams) =>
+        TypeParametersMatch(candidateParams, targetParams, new HashSet<(JavaType, JavaType)>());
+
+    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams,
+        HashSet<(JavaType, JavaType)> inProgress)
     {
         if (targetParams == null || targetParams.Count == 0) return true;
         if (candidateParams == null || candidateParams.Count != targetParams.Count) return false;
 
         for (int i = 0; i < targetParams.Count; i++)
         {
-            var targetParam = targetParams[i];
-            var candidateParam = candidateParams[i];
+            if (!TypeArgumentMatches(candidateParams[i], targetParams[i], inProgress))
+                return false;
+        }
+        return true;
+    }
 
-            if (targetParam is JavaType.GenericTypeVariable gtv)
-            {
-                // Unbounded type variable — any type matches
-                if (gtv.Bounds == null || gtv.Bounds.Count == 0)
-                    continue;
+    private static bool TypeArgumentMatches(JavaType? candidate, JavaType? target,
+        HashSet<(JavaType, JavaType)> inProgress)
+    {
+        if (candidate == null || target == null) return false;
 
-                // Bounded — candidate must be assignable to all bounds
+        switch (target)
+        {
+            case JavaType.GenericTypeVariable gtv:
+                if (gtv.Bounds == null) return true;
                 foreach (var bound in gtv.Bounds)
                 {
                     var boundFqn = GetFullyQualifiedName(bound);
-                    if (boundFqn != null && !IsAssignableTo(candidateParam, boundFqn))
+                    if (boundFqn != null && !IsAssignableTo(candidate, boundFqn))
                         return false;
                 }
-            }
-            else
-            {
-                // Concrete type parameter — require exact FQN match
-                var targetFqn = GetFullyQualifiedName(targetParam);
-                var candidateFqn = GetFullyQualifiedName(candidateParam);
-                if (targetFqn == null || candidateFqn == null ||
-                    !string.Equals(targetFqn, candidateFqn, StringComparison.Ordinal))
+                return true;
+
+            case JavaType.Parameterized { TypeParameters.Count: > 0 } targetParam:
+                if (candidate is not JavaType.Parameterized candidateParam) return false;
+                var targetFqn = GetFullyQualifiedName(targetParam.Type);
+                if (targetFqn == null ||
+                    !string.Equals(targetFqn, GetFullyQualifiedName(candidateParam.Type), StringComparison.Ordinal))
                     return false;
-            }
+                // A pair already being compared is assumed to match; any real difference
+                // is still found on the path that reaches a non-cyclic argument.
+                if (!inProgress.Add((candidate, target))) return true;
+                return TypeParametersMatch(candidateParam.TypeParameters, targetParam.TypeParameters, inProgress);
+
+            default:
+                var fqn = GetFullyQualifiedName(target);
+                return fqn != null &&
+                       string.Equals(fqn, GetFullyQualifiedName(candidate), StringComparison.Ordinal);
         }
-        return true;
     }
 
     /// <summary>
