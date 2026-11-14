@@ -395,8 +395,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    // `type`, or a default name and its comma, stands between keyword and bindings
-                    const afterClause = draft.importClause.name || draft.importClause.typeOnly ? " " : "";
+                    // `type`, `defer`, or a default name and its comma, stands between keyword and bindings
+                    const clause = draft.importClause;
+                    const afterClause = clause.name || clause.typeOnly || clause.deferred ? " " : "";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
                         // For named imports the space before `{` sits in the container, as the parser

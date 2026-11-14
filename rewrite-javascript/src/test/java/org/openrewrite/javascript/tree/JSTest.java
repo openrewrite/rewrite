@@ -16,7 +16,9 @@
 package org.openrewrite.javascript.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
@@ -24,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
@@ -45,5 +48,47 @@ class JSTest {
 
         // then
         assertThat(distinct).hasSize(4);
+    }
+
+    @Test
+    void binaryHasSideEffectsOfItsOperands() {
+        // given
+        J.Assignment call = assignment();
+        J.Assignment other = assignment();
+
+        // when
+        JS.Binary power = binary(call, JS.Binary.Type.Exponentiation, other);
+        JS.Binary pure = binary(identifier("a"), JS.Binary.Type.IdentityEquals, identifier("b"));
+
+        // then
+        assertThat(power.getSideEffects()).containsExactly(call, other);
+        assertThat(pure.getSideEffects()).isEmpty();
+    }
+
+    @Test
+    void nullishCoalescingIsKeptWholeOnlyWhenTheRightHasSideEffects() {
+        // given
+        J.Assignment left = assignment();
+
+        // when
+        JS.Binary sideEffectOnRight = binary(identifier("a"), JS.Binary.Type.QuestionQuestion, assignment());
+        JS.Binary pureRight = binary(left, JS.Binary.Type.QuestionQuestion, identifier("b"));
+
+        // then
+        assertThat(sideEffectOnRight.getSideEffects()).containsExactly(sideEffectOnRight);
+        assertThat(pureRight.getSideEffects()).containsExactly(left);
+    }
+
+    private static JS.Binary binary(Expression left, JS.Binary.Type operator, Expression right) {
+        return new JS.Binary(randomId(), Space.EMPTY, Markers.EMPTY, left, JLeftPadded.build(operator), right, null);
+    }
+
+    private static J.Assignment assignment() {
+        return new J.Assignment(randomId(), Space.EMPTY, Markers.EMPTY, identifier("x"),
+          JLeftPadded.build(identifier("y")), null);
+    }
+
+    private static J.Identifier identifier(String name) {
+        return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null);
     }
 }

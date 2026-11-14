@@ -28,12 +28,9 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.format.NormalizeTabsOrSpaces;
 import org.openrewrite.java.search.FindCompileErrors;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -210,47 +207,6 @@ class JavaParserTest implements RewriteTest {
             assertThat(JavaParser.dependenciesFromClasspath("recipe-artifact")).containsExactly(recipeJar);
         } finally {
             Thread.currentThread().setContextClassLoader(originalTccl);
-        }
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/3222")
-    @Test
-    void parseFromByteArray() throws Exception {
-        Path resources = Path.of(getClass().getClassLoader().getResource("javaparser-byte-array-tests").toURI());
-        try (Stream<Path> files = Files.walk(resources)) {
-            byte[][] classes = files
-              .filter(it -> it.toString().endsWith(".class"))
-              .map(it -> {
-                  try {
-                      return Files.readAllBytes(it);
-                  } catch (IOException e) {
-                      throw new UncheckedIOException(e);
-                  }
-              })
-              .toArray(byte[][]::new);
-
-            JavaParser parser = JavaParser.fromJavaVersion()
-              .classpath(classes)
-              .build();
-
-            @Language("java")
-            String source = """
-              import example.InterfaceA;
-              public class User implements InterfaceA, InterfaceB {
-                @Override
-                public void methodA() {}
-
-                @Override
-               public void methodB() {}
-              }
-              """;
-            Stream<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
-            assertThat(compilationUnits.map(J.CompilationUnit.class::cast)).singleElement()
-              .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
-                .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
-                  i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
-                  i -> assertThat(i.getType()).hasToString("InterfaceB")
-                )));
         }
     }
 

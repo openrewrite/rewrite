@@ -1330,6 +1330,10 @@ public interface JS extends J {
         @With
         boolean typeOnly;
 
+        @Getter
+        @With
+        boolean deferred;
+
         @Nullable
         JRightPadded<J.Identifier> name;
 
@@ -1376,7 +1380,7 @@ public interface JS extends J {
             }
 
             public ImportClause withName(@Nullable JRightPadded<J.Identifier> name) {
-                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, name, t.namedBindings);
+                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, t.deferred, name, t.namedBindings);
             }
         }
     }
@@ -1820,6 +1824,19 @@ public interface JS extends J {
 
         @Transient
         @Override
+        public List<J> getSideEffects() {
+            List<J> rightSideEffects = right.getSideEffects();
+            if (getOperator() == Type.QuestionQuestion && !rightSideEffects.isEmpty()) {
+                return singletonList(this);
+            }
+            List<J> sideEffects = new ArrayList<>(2);
+            sideEffects.addAll(left.getSideEffects());
+            sideEffects.addAll(rightSideEffects);
+            return sideEffects;
+        }
+
+        @Transient
+        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -1829,7 +1846,8 @@ public interface JS extends J {
             IdentityNotEquals,
             In,
             QuestionQuestion,
-            Comma
+            Comma,
+            Exponentiation
         }
 
         public JS.Binary.Padding getPadding() {
@@ -5121,6 +5139,10 @@ public interface JS extends J {
             QuestionQuestion,
             And,
             Or,
+            /**
+             * @deprecated {@code a ** b} is a {@link JS.Binary} of type {@link JS.Binary.Type#Exponentiation}.
+             */
+            @Deprecated
             Power,
             Exp
         }

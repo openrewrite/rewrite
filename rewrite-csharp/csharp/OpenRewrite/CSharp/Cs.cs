@@ -16,6 +16,7 @@
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
+using OpenRewrite.Java.Rpc;
 
 namespace OpenRewrite.CSharp;
 
@@ -359,20 +360,32 @@ public sealed class PrimaryConstructor(
 /// Marker indicating a struct declaration.
 /// Applied to ClassDeclaration to distinguish structs from classes.
 /// The printer checks for this marker and prints "struct" instead of "class".
-/// For record structs, both KindType.Record and Struct marker are used.
+/// For record structs, both KindType.Record and Struct marker are used, and <see cref="Prefix"/>
+/// holds the space between <c>record</c> and <c>struct</c>.
 /// </summary>
 public sealed class Struct(
-    Guid id
+    Guid id,
+    Space? prefix = null
 ) : Marker, IRpcCodec<Struct>, IEquatable<Struct>
 {
     public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix ?? Space.Empty;
 
     public Struct WithId(Guid id) =>
-        id == Id ? this : new(id);
+        id == Id ? this : new(id, Prefix);
+    public Struct WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix);
 
-    public void RpcSend(Struct after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public void RpcSend(Struct after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => JavaSender.SpaceRef(m.Prefix), s => new JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
+    }
+
     public Struct RpcReceive(Struct before, RpcReceiveQueue q) =>
-        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithPrefix(q.Receive(before.Prefix, s => new JavaReceiver().VisitSpace(s, q)));
 
     public bool Equals(Struct? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Struct);
@@ -383,19 +396,31 @@ public sealed class Struct(
 /// Marker indicating "record class" syntax was used (vs. just "record").
 /// Applied to ClassDeclaration to preserve the explicit "class" keyword.
 /// The printer checks for this marker and prints "record class" instead of "record".
+/// <see cref="Prefix"/> holds the space between <c>record</c> and <c>class</c>.
 /// </summary>
 public sealed class RecordClass(
-    Guid id
+    Guid id,
+    Space? prefix = null
 ) : Marker, IRpcCodec<RecordClass>, IEquatable<RecordClass>
 {
     public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix ?? Space.Empty;
 
     public RecordClass WithId(Guid id) =>
-        id == Id ? this : new(id);
+        id == Id ? this : new(id, Prefix);
+    public RecordClass WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix);
 
-    public void RpcSend(RecordClass after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public void RpcSend(RecordClass after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => JavaSender.SpaceRef(m.Prefix), s => new JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
+    }
+
     public RecordClass RpcReceive(RecordClass before, RpcReceiveQueue q) =>
-        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithPrefix(q.Receive(before.Prefix, s => new JavaReceiver().VisitSpace(s, q)));
 
     public bool Equals(RecordClass? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as RecordClass);
@@ -3447,7 +3472,8 @@ public sealed class ConversionOperatorDeclaration(
     JLeftPadded<TypeTree> returnType,
     JContainer<Statement> parameters,
     JLeftPadded<Expression>? expressionBody,
-    Block? body
+    Block? body,
+    JavaType.Method? methodType
 ) : Cs, Statement, IEquatable<ConversionOperatorDeclaration>
 {
     public Guid Id { get; } = id;
@@ -3461,27 +3487,30 @@ public sealed class ConversionOperatorDeclaration(
     public JContainer<Statement> Parameters { get; } = parameters;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
     public Block? Body { get; } = body;
+    public JavaType.Method? MethodType { get; } = methodType;
 
     public ConversionOperatorDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithKind(JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithInterfaceSpecifier(JRightPadded<TypeTree>? interfaceSpecifier) =>
-        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithReturnType(JLeftPadded<TypeTree> returnType) =>
-        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body);
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body, MethodType);
+    public ConversionOperatorDeclaration WithMethodType(JavaType.Method? methodType) =>
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, methodType);
 
     public enum ExplicitImplicit { Implicit, Explicit }
     Tree Tree.WithId(Guid id) => WithId(id);

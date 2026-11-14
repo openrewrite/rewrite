@@ -57,6 +57,24 @@ class YamlParserTest implements RewriteTest {
         assertThat(title.getValue()).isEqualTo("b");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"  ", ""})
+    void anchoredBlockSequenceAcrossSnakeYamlBufferBoundary(String dashIndent) {
+        for (int padding = 0; padding < 1100; padding++) {
+            String source = """
+              # %s
+              rules:
+                - changes: &files
+              %s    - one
+              %s    - two
+              other: *files
+              """.formatted("x".repeat(padding), dashIndent, dashIndent);
+            SourceFile sourceFile = YamlParser.builder().build().parse(source).findFirst().orElseThrow();
+            assertThat(sourceFile).as("padding %d", padding).isNotInstanceOf(ParseError.class);
+            assertThat(sourceFile.printAll()).as("padding %d", padding).isEqualTo(source);
+        }
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2062")
     @Test
     void fourBytesUnicode() {

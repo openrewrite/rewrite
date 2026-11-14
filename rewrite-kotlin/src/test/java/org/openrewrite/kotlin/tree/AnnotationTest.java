@@ -641,7 +641,7 @@ class AnnotationTest implements RewriteTest {
     @Test
     void arrayOfCallWithInAnnotation() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               @Target(AnnotationTarget.FUNCTION)
@@ -800,7 +800,7 @@ class AnnotationTest implements RewriteTest {
                     return super.visitMethodInvocation(method, ctx);
                 }
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               fun main() {

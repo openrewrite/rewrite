@@ -774,4 +774,23 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void straySemicolonsInBody() {
+        rewriteRun(
+          kotlin(
+            """
+              class A { ; fun f() {} }
+              class B {
+                  fun f() {};
+                  ;
+                  fun g() {} ; /*c*/ ;
+              }
+              class C { ; }
+              enum class D { X, Y; ; fun f() {} }
+              enum class E { ; ; }
+              """
+          )
+        );
+    }
+
 }

@@ -239,7 +239,7 @@ declare namespace FakeIntl { interface FakeFormat { format(n: number): string; }
                 "package.json": JSON.stringify({name: "real-fixture", version: "2.0.0", types: "index.d.ts"}),
                 "index.d.ts": `export declare class FromRealCopy { r(): void; }\n`,
             });
-            expect(fqns(exportedTypes([aliased], []))).toEqual(["alias-fixture.FromAliasCopy"]);
+            expect(fqns(exportedTypes([aliased], []))).toEqual(["alias-fixture.FromAliasCopy", "alias-fixture", "npm:real-fixture"]);
 
             // pnpm: node_modules/<name> is a symlink into the content-addressed store.
             const {pkg: stored} = writeFiles(root.path, path.join(".pnpm", "pnpm-fixture@1.0.0", "node_modules", "pnpm-fixture"), {
@@ -322,6 +322,208 @@ declare namespace FakeIntl { interface FakeFormat { format(n: number): string; }
             expect(returnTypes("second-lib-fixture")).toEqual(first);
         }, {unsafeCleanup: true});
     }, 60000);
+
+    describe("what a package does not own", () => {
+        test("leaves out the placeholder an object type maps to", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "placeholder-fixture", {
+                    "package.json": JSON.stringify({name: "placeholder-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `declare const defaults: { a: number };\nexport type Options = typeof defaults;\nexport type Anything = object;\nexport declare class Keep {}\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules])).sort()).toEqual(["npm:placeholder-fixture", "placeholder-fixture", "placeholder-fixture.Keep"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("leaves out a global an exported alias renames", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "global-alias-fixture", {
+                    "package.json": JSON.stringify({name: "global-alias-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export type Callback = Function;\nexport type Mark = Symbol;\nexport type Failure = Error;\nexport declare class Keep {}\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules])).sort()).toEqual(["global-alias-fixture", "global-alias-fixture.Keep", "npm:global-alias-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("leaves out a global an ambient declaration merges with", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "global-merge-fixture", {
+                    "package.json": JSON.stringify({name: "global-merge-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `interface Function { extra(): void; }\ninterface OwnGlobal { own(): void; }\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules])).sort()).toEqual(["OwnGlobal", "global-merge-fixture", "npm:global-merge-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("leaves out what another package declares, however it is reached", async () => {
+            await withDir(async (root) => {
+                writeFiles(root.path, "other-fixture", {
+                    "package.json": JSON.stringify({name: "other-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export declare class Foreign {}\nexport declare class Renamed {}\n`,
+                });
+                const {pkg, nodeModules} = writeFiles(root.path, "reexport-fixture", {
+                    "package.json": JSON.stringify({name: "reexport-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export {Foreign} from "other-fixture";\nexport type Local = import("other-fixture").Renamed;\nexport declare class Keep {}\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules])).sort()).toEqual(["npm:reexport-fixture", "reexport-fixture", "reexport-fixture.Keep"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("leaves out a package nested in its own node_modules", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "nesting-fixture", {
+                    "package.json": JSON.stringify({name: "nesting-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export {Nested} from "nested-fixture";\nexport declare class Keep {}\n`,
+                    "node_modules/nested-fixture/package.json": JSON.stringify({name: "nested-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "node_modules/nested-fixture/index.d.ts": `export declare class Nested {}\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules])).sort()).toEqual(["nesting-fixture", "nesting-fixture.Keep", "npm:nesting-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("keeps an alias that names a structure, and one of the package's own classes", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "own-alias-fixture", {
+                    "package.json": JSON.stringify({name: "own-alias-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `declare class Hidden {}\nexport type Shape = { a: number };\nexport type Renamed = Hidden;\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules]))).toEqual(expect.arrayContaining(["own-alias-fixture.Shape", "own-alias-fixture.Hidden"]));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a runtime declaration file keeps the globals it adds to", async () => {
+            await withDir(async (root) => {
+                const lib = path.join(root.path, "lib.fake.d.ts");
+                fs.writeFileSync(lib, `interface Array<T> { fakeMember(): T; }\n`);
+
+                expect(fqns(exportedTypes([lib], [lib]))).toEqual(["Array"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+    });
+
+    describe("the module a package defines", () => {
+        function moduleEntry(types: Type.FullyQualified[], name: string): Type.Class | undefined {
+            return types.find(t => Type.FullyQualified.getFullyQualifiedName(t) === name) as Type.Class | undefined;
+        }
+
+        test("is an empty class named after the package", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writePackage(root.path);
+
+                const entry = moduleEntry(exportedTypes([pkg], [nodeModules]), "exported-types-fixture");
+                expect(entry).toMatchObject({kind: Type.Kind.Class, classKind: Type.Class.Kind.Class, methods: [], members: []});
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("is all an untyped package defines", async () => {
+            await withDir(async (root) => {
+                const {pkg} = writeFiles(root.path, "untyped-fixture", {
+                    "package.json": JSON.stringify({name: "untyped-fixture", version: "1.0.0", main: "index.js"}),
+                    "index.js": `module.exports = function () {};\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], []))).toEqual(["untyped-fixture", "npm:untyped-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("keeps the scope of a scoped package", async () => {
+            await withDir(async (root) => {
+                const {pkg} = writeFiles(root.path, "@scope/untyped-fixture", {
+                    "package.json": JSON.stringify({name: "@scope/untyped-fixture", version: "1.0.0", main: "index.js"}),
+                    "index.js": ``,
+                });
+
+                expect(fqns(exportedTypes([pkg], []))).toEqual(["@scope/untyped-fixture", "npm:@scope/untyped-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("of a DefinitelyTyped package is the package it types", async () => {
+            await withDir(async (root) => {
+                const typing = {"package.json": JSON.stringify({version: "1.0.0", types: "index.d.ts"}), "index.d.ts": `export declare class Thing {}\n`};
+                const plain = writeFiles(root.path, "@types/plain-fixture", typing);
+                const scoped = writeFiles(root.path, "@types/babel__core", typing);
+
+                expect(fqns(exportedTypes([plain.pkg], [plain.nodeModules]))).toContain("plain-fixture");
+                expect(fqns(exportedTypes([scoped.pkg], [scoped.nodeModules]))).toContain("@babel/core");
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("stands beside the package's own id, which is what a symbol names its package by", async () => {
+            await withDir(async (root) => {
+                const typing = (name?: string) => ({
+                    "package.json": JSON.stringify({name, version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export declare class Thing {}\n`,
+                });
+                const named = writeFiles(root.path, "@types/named-fixture", typing("@types/named-fixture"));
+                const nameless = writeFiles(root.path, "@types/nameless-fixture", typing());
+                const scoped = writeFiles(root.path, "@types/babel__core", typing("@types/babel__core"));
+
+                expect(fqns(exportedTypes([named.pkg], [named.nodeModules]))).toEqual(expect.arrayContaining(["named-fixture", "npm:@types/named-fixture"]));
+                expect(fqns(exportedTypes([nameless.pkg], [nameless.nodeModules]))).toEqual(expect.arrayContaining(["nameless-fixture", "npm:@types/nameless-fixture"]));
+                expect(fqns(exportedTypes([scoped.pkg], [scoped.nodeModules]))).toEqual(expect.arrayContaining(["@babel/core", "npm:@types/babel__core"]));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("is never the package's id, even where the two are the same name", async () => {
+            await withDir(async (root) => {
+                const {pkg} = writeFiles(root.path, "same-fixture", {
+                    "package.json": JSON.stringify({name: "same-fixture", version: "1.0.0", main: "index.js"}),
+                    "index.js": ``,
+                });
+
+                expect(fqns(exportedTypes([pkg], []))).toEqual(["same-fixture", "npm:same-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("defines an empty class for an id, as it does for a module", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "@types/empty-fixture", {
+                    "package.json": JSON.stringify({name: "@types/empty-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export declare class Thing {}\n`,
+                });
+
+                const entry = moduleEntry(exportedTypes([pkg], [nodeModules]), "npm:@types/empty-fixture");
+                expect(entry).toMatchObject({kind: Type.Kind.Class, classKind: Type.Class.Kind.Class, methods: [], members: []});
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("goes by any namespace the package exports for itself too", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "umd-fixture", {
+                    "package.json": JSON.stringify({name: "umd-fixture", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export as namespace UmdGlobal;\nexport declare function run(): void;\n`,
+                });
+
+                expect(fqns(exportedTypes([pkg], [nodeModules])).sort()).toEqual(["UmdGlobal", "npm:umd-fixture", "umd-fixture"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("gives way to a type of the same name", async () => {
+            await withDir(async (root) => {
+                const {pkg, nodeModules} = writeFiles(root.path, "GlobalThing", {
+                    "package.json": JSON.stringify({name: "GlobalThing", version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `declare class GlobalThing { run(): void; }\n`,
+                });
+
+                const entry = moduleEntry(exportedTypes([pkg], [nodeModules]), "GlobalThing");
+                expect(entry?.methods.map(m => m.name)).toEqual(["run"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a runtime declaration file defines no module", async () => {
+            await withDir(async (root) => {
+                const lib = path.join(root.path, "lib.fake.d.ts");
+                fs.writeFileSync(lib, `interface FakeThing { poke(): void; }\n`);
+
+                expect(fqns(exportedTypes([lib], [lib]))).toEqual(["FakeThing"]);
+            }, {unsafeCleanup: true});
+        }, 60000);
+    });
 });
 
 /** Register a DependencyTypes handler on a mock connection and return the captured request handler. */
@@ -330,6 +532,11 @@ function captureHandler(batchSize: number): (req: any) => Promise<RpcObjectData[
     const connection = {onRequest: (_t: any, h: any) => { handler = h; }} as any;
     DependencyTypes.handle(connection, batchSize);
     return handler!;
+}
+
+/** The fully qualified names a response carries, among its other string values. */
+function names(data: RpcObjectData[]): string[] {
+    return data.filter(d => typeof d.value === "string").map(d => d.value as string);
 }
 
 describe("DependencyTypes.handle", () => {
@@ -416,6 +623,60 @@ describe("DependencyTypes.handle", () => {
 
             const data = await captureHandler(100000)({name: "plainlib", version: "2.0.0"});
             expect(data.some(d => d.value === "plainlib.Helper")).toBe(true);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test("a fallback goes by the package it stands for, and its DefinitelyTyped id stays with that package", async () => {
+        await withDir(async (root) => {
+            writeFiles(root.path, "plainlib", {
+                "package.json": JSON.stringify({name: "plainlib", version: "2.0.0", main: "index.js"}),
+                "index.js": `module.exports.helper = function () {};\n`,
+            });
+            writeFiles(root.path, "@types/plainlib", {
+                "package.json": JSON.stringify({name: "@types/plainlib", version: "2.0.0", types: "index.d.ts"}),
+                "index.d.ts": `export declare class Helper { assist(): void; }\n`,
+            });
+            setLastParsedProject(root.path);
+
+            const fallback = names(await captureHandler(100000)({name: "plainlib", version: "2.0.0"}));
+            expect(fallback).toEqual(expect.arrayContaining(["plainlib", "npm:plainlib", "plainlib.Helper"]));
+            expect(fallback).not.toContain("npm:@types/plainlib");
+
+            const definitelyTyped = names(await captureHandler(100000)({name: "@types/plainlib", version: "2.0.0"}));
+            expect(definitelyTyped).toContain("npm:@types/plainlib");
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test("falls back for an untyped package installed under an alias, whose own names are two", async () => {
+        await withDir(async (root) => {
+            writeFiles(root.path, "aliaslib", {
+                "package.json": JSON.stringify({name: "plainlib", version: "2.0.0", main: "index.js"}),
+                "index.js": `module.exports.helper = function () {};\n`,
+            });
+            writeFiles(root.path, "@types/aliaslib", {
+                "package.json": JSON.stringify({name: "@types/aliaslib", version: "2.0.0", types: "index.d.ts"}),
+                "index.d.ts": `export declare class Helper { assist(): void; }\n`,
+            });
+            setLastParsedProject(root.path);
+
+            const data = await captureHandler(100000)({name: "aliaslib", version: "2.0.0"});
+            expect(data.some(d => d.value === "aliaslib.Helper")).toBe(true);
+            expect(names(data)).toEqual(expect.arrayContaining(["aliaslib", "npm:plainlib"]));
+            expect(names(data)).not.toContain("npm:@types/aliaslib");
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test("an untyped package with no DefinitelyTyped package defines its module and stops there", async () => {
+        await withDir(async (root) => {
+            writeFiles(root.path, "plainlib", {
+                "package.json": JSON.stringify({name: "plainlib", version: "2.0.0", main: "index.js"}),
+                "index.js": `module.exports.helper = function () {};\n`,
+            });
+            setLastParsedProject(root.path);
+
+            const data = await captureHandler(100000)({name: "plainlib", version: "2.0.0"});
+            expect(data.filter(d => typeof d.value === "string").map(d => d.value)).toContain("plainlib");
+            expect(data[data.length - 1].state).toBe(RpcObjectState.END_OF_OBJECT);
         }, {unsafeCleanup: true});
     }, 60000);
 

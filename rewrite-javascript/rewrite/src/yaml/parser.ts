@@ -417,9 +417,13 @@ class YamlCstReader {
         let pendingPrefix = "";
 
         for (const item of cst.items) {
-            const result = this.convertSequenceEntry(item, true, pendingPrefix);
-            entries.push(result.entry);
-            pendingPrefix = result.trailingContent;
+            if (item.value !== undefined || (item.start || []).some(t => t.type === 'seq-item-ind')) {
+                const result = this.convertSequenceEntry(item, true, pendingPrefix);
+                entries.push(result.entry);
+                pendingPrefix = result.trailingContent;
+            } else {
+                pendingPrefix += this.concatenateSources(item.start || []);
+            }
         }
 
         return {

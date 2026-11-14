@@ -49,11 +49,17 @@ import {
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
+import {JavaScriptNameResolver} from "./name-resolver";
 import {TsConfigResolver} from "./tsconfig";
 import {castDraft, create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
+
+/**
+ * The parse option that attaches a {@link ResolvedNames} marker to each compilation unit.
+ */
+export const RESOLVE_NAMES = "resolveNames";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
@@ -95,6 +101,8 @@ type WithInvalidSyntaxSlots<T> = T & {
 interface CompiledProject {
     readonly program: ts.Program;
     readonly typeMapping: JavaScriptTypeMapping;
+    /** Present when the parse asked for {@link RESOLVE_NAMES}. */
+    readonly nameResolver?: JavaScriptNameResolver;
 }
 
 /**
@@ -293,7 +301,7 @@ export class JavaScriptParser extends Parser {
                              inputDirectories: Set<string>): Promise<SourceFile> {
         // Built when the first of a project's inputs comes up and let go with its last, so that the
         // programs alive at any one time are those of the projects still being worked through.
-        const {program, typeMapping} = project.compiled ??=
+        const {program, typeMapping, nameResolver} = project.compiled ??=
             this.compile(project, carryForward, inputFiles, inputDirectories);
         if (--project.unmapped === 0) {
             project.compiled = undefined;
@@ -323,6 +331,9 @@ export class JavaScriptParser extends Parser {
                     if (this.styles) {
                         draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
                     }
+                    if (nameResolver) {
+                        draft.markers = replaceMarkerByKind(draft.markers, nameResolver.resolvedNames(sourceFile));
+                    }
                 }), input, escapeLoneSurrogates(sourceFile.getFullText()));
         } catch (error) {
             return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
@@ -333,8 +344,8 @@ export class JavaScriptParser extends Parser {
                     inputDirectories: Set<string>): CompiledProject {
         // TypeScript carries the previous program's bound files forward when the root paths match,
         // so a parser held across parses of one path costs a fraction of a freshly built one.
-        const program = ts.createProgram(project.rootNames, project.options,
-            this.createCompilerHost(project.options, inputFiles, inputDirectories), this.oldPrograms.get(project.key));
+        const host = this.createCompilerHost(project.options, inputFiles, inputDirectories);
+        const program = ts.createProgram(project.rootNames, project.options, host, this.oldPrograms.get(project.key));
         if (carryForward) {
             this.oldPrograms.set(project.key, program);
         } else {
@@ -343,7 +354,20 @@ export class JavaScriptParser extends Parser {
 
         // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
         // the TypeChecker that issued it, so each program needs its own.
-        return {program, typeMapping: new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo)};
+        const typeMapping = new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo);
+        if (!this.ctx.getBoolean(RESOLVE_NAMES, false)) {
+            return {program, typeMapping};
+        }
+        const resolveModule = (specifier: ts.StringLiteralLike) => {
+            const file = specifier.getSourceFile();
+            return host.resolveModuleNameLiterals!([specifier], file.fileName, undefined, project.options, file, undefined)[0]
+                .resolvedModule?.resolvedFileName;
+        };
+        return {
+            program,
+            typeMapping,
+            nameResolver: new JavaScriptNameResolver(program, resolveModule, host.getCurrentDirectory())
+        };
     }
 
     private createCompilerHost(compilerOptions: ts.CompilerOptions, inputFiles: Map<SourcePath, ParserInput>,
@@ -997,13 +1021,9 @@ export class JavaScriptParserVisitor {
     visitNumericLiteral(node: ts.NumericLiteral): J.Literal {
         // Parse the numeric value from the text
         const text = node.text;
-        let value: number | bigint | string;
+        let value: number;
 
-        // Check if it's a BigInt literal (ends with 'n')
-        if (text.endsWith('n')) {
-            // TODO consider adding `JS.Literal`
-            value = text.slice(0, -1);
-        } else if (text.includes('.') || text.toLowerCase().includes('e')) {
+        if (text.includes('.') || text.toLowerCase().includes('e')) {
             // Floating point number
             value = parseFloat(text);
         } else {
@@ -1125,11 +1145,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitBigIntLiteral(node: ts.BigIntLiteral): J.Literal {
-        // Parse BigInt value, removing the 'n' suffix
-        const text = node.text;
-        // TODO consider adding `JS.Literal`
-        const value = text.slice(0, -1);
-        return this.mapLiteral(node, value);
+        // TypeScript normalizes separators and octal/binary digits out of `text`, but keeps hex
+        return this.mapLiteral(node, BigInt(node.text.slice(0, -1)));
     }
 
     visitStringLiteral(node: ts.StringLiteral): J.Literal {
@@ -1137,12 +1154,12 @@ export class JavaScriptParserVisitor {
     }
 
     visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral): J.Literal {
-        // TODO consider adding `JS.Literal`
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        // A RegExp has no serializable value, so the literal holds its whole source, slashes and flags included
+        return this.mapLiteral(node, node.text);
     }
 
     visitNoSubstitutionTemplateLiteral(node: ts.NoSubstitutionTemplateLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        return this.mapLiteral(node, node.text);
     }
 
     visitTemplateHead(node: ts.TemplateHead): J.Literal {
@@ -2677,6 +2694,9 @@ export class JavaScriptParserVisitor {
             case ts.SyntaxKind.CommaToken:
                 binaryOperator = JS.Binary.Type.Comma;
                 break;
+            case ts.SyntaxKind.AsteriskAsteriskToken:
+                binaryOperator = JS.Binary.Type.Exponentiation;
+                break;
         }
 
         if (binaryOperator !== undefined) {
@@ -2717,9 +2737,6 @@ export class JavaScriptParserVisitor {
                     break;
                 case ts.SyntaxKind.BarBarEqualsToken:
                     assignmentOperation = JS.AssignmentOperation.Type.Or;
-                    break;
-                case ts.SyntaxKind.AsteriskAsteriskToken:
-                    assignmentOperation = JS.AssignmentOperation.Type.Power;
                     break;
                 case ts.SyntaxKind.AsteriskAsteriskEqualsToken:
                     assignmentOperation = JS.AssignmentOperation.Type.Exp;
@@ -3880,6 +3897,7 @@ export class JavaScriptParserVisitor {
                 })(),
                 markers: emptyMarkers,
                 typeOnly: node.isTypeOnly,
+                deferred: false,
                 name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
                 namedBindings: undefined
             },
@@ -3915,6 +3933,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             typeOnly: node.isTypeOnly,
+            deferred: node.phaseModifier === ts.SyntaxKind.DeferKeyword,
             name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             namedBindings: node.namedBindings && this.visit(node.namedBindings)
         };

@@ -45,13 +45,14 @@ final class ImportedNames {
         this.removeUnusedImports = removeUnusedImports;
     }
 
-    static ImportedNames of(RecipeQualityValidation quality, Recipe recipe, List<SourceFile> sources) {
-        boolean removeUnusedImports = quality.removeUnusedImports() && !Probes.isAdHoc(recipe);
-        if (quality.importReferencedTypes() || removeUnusedImports) {
+    static ImportedNames of(boolean importReferencedTypes, boolean removeUnusedImports, Recipe recipe,
+                            List<SourceFile> sources) {
+        removeUnusedImports &= !Probes.isAdHoc(recipe);
+        if (importReferencedTypes || removeUnusedImports) {
             for (SourceFile source : sources) {
                 ImportValidationService service = service(source);
                 if (service != null) {
-                    return new ImportedNames(service, quality.importReferencedTypes(), removeUnusedImports);
+                    return new ImportedNames(service, importReferencedTypes, removeUnusedImports);
                 }
             }
         }
@@ -69,8 +70,14 @@ final class ImportedNames {
         }
     }
 
-    void assertImports(Collection<Result> results) {
-        if (service == null) {
+    /**
+     * @param importReferencedTypes  Whether to check the imports of what the recipe's code names, if recorded.
+     * @param removeUnusedImports    Whether to check for imports the recipe leaves unused, if recorded.
+     */
+    void assertImports(Collection<Result> results, boolean importReferencedTypes, boolean removeUnusedImports) {
+        importReferencedTypes &= this.importReferencedTypes;
+        removeUnusedImports &= this.removeUnusedImports;
+        if (service == null || !importReferencedTypes && !removeUnusedImports) {
             return;
         }
         StringBuilder unimported = new StringBuilder();
@@ -103,7 +110,7 @@ final class ImportedNames {
                          "A JavaTemplate's imports(..) tells only the template's own parser about a type, not the " +
                          "file it is applied to.");
         }
-        if (!undeclared.isEmpty()) {
+        if (importReferencedTypes && !undeclared.isEmpty()) {
             StringBuilder names = new StringBuilder();
             for (String name : undeclared) {
                 names.append("  ").append(name).append('\n');

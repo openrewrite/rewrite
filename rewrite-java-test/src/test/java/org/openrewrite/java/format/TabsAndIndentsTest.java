@@ -32,7 +32,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -1007,6 +1006,137 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void forEachLoop() {
+        rewriteRun(
+          autoFormat(style -> style.withContinuationIndent(2)),
+          java(
+            """
+              import java.util.List;
+              public class Test {
+                  public void test(List<String> list) {
+                  for (
+                   String s
+                   :
+                   list
+                  ) {
+                  }
+                  for (String s :
+                   list) {
+                  }
+                  for (String s
+                   : list) {
+                  }
+                  labeled: for (String s :
+                   list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              public class Test {
+                  public void test(List<String> list) {
+                      for (
+                        String s
+                        :
+                        list
+                      ) {
+                      }
+                      for (String s :
+                        list) {
+                      }
+                      for (String s
+                        : list) {
+                      }
+                      labeled: for (String s :
+                        list) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoopWithLambdaInIterable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.function.Supplier;
+
+              public class Test {
+                  public void test(Supplier<List<String>> supplier) {
+                  for (String s : get(() -> {
+                  return List.of("a");
+                  })) {
+                  }
+                  }
+                  List<String> get(Supplier<List<String>> supplier) {
+                      return supplier.get();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.function.Supplier;
+
+              public class Test {
+                  public void test(Supplier<List<String>> supplier) {
+                      for (String s : get(() -> {
+                          return List.of("a");
+                      })) {
+                      }
+                  }
+                  List<String> get(Supplier<List<String>> supplier) {
+                      return supplier.get();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachLoopVariableWithModifierOrAnnotationOnOwnLine() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                  for (final
+                   String s : list) {
+                  }
+                  for (@SuppressWarnings("unused")
+                   String s
+                   : list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                      for (final
+                              String s : list) {
+                      }
+                      for (@SuppressWarnings("unused")
+                              String s
+                              : list) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodDeclaration() {
         rewriteRun(
           autoFormat(style -> style.withContinuationIndent(2)),
@@ -1144,9 +1274,6 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
-            .types(TypeValidation.none())
-            .build()),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -1889,7 +2016,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void failure1() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all()
+            .identifiers(false).methodDeclarations(false).methodInvocations(false).constructorInvocations(false)),
           java(
             """
               public class Test {
@@ -2521,7 +2649,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               public record RenameRequest(

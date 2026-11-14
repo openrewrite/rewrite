@@ -437,6 +437,9 @@ const RELEASE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A
  * It runs as the parser's other package manager commands do, with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0`, no input and
  * a short timeout, so it never prompts and never throws.
  *
+ * npm is asked once per process where `npm` on PATH is npm's own `npm-cli.js` ({@link npmEntryPoint}). That prints
+ * the version of the package it belongs to, whatever the project configures, so its answer is the same in every root.
+ *
  * @param pm The package manager to ask
  * @param cwd The project's root directory
  * @param timeout Timeout in milliseconds
@@ -444,6 +447,54 @@ const RELEASE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A
  *          that is no version
  */
 export function runVersion(pm: PackageManager, cwd: string, timeout: number = 10000): string | undefined {
+    const entryPoint = pm === PackageManager.Npm ? npmEntryPoint(cwd) : undefined;
+    const known = entryPoint === undefined ? undefined : npmVersions.get(entryPoint);
+    if (known !== undefined) {
+        return known;
+    }
+    const answer = spawnVersion(pm, cwd, timeout);
+    // a failure, such as a timeout on a busy machine, is asked again
+    if (entryPoint !== undefined && answer !== undefined) {
+        npmVersions.set(entryPoint, answer);
+    }
+    return answer;
+}
+
+const npmVersions = new Map<string, string>();
+
+const NPM_CLI = path.sep + path.join('npm', 'bin', 'npm-cli.js');
+
+/**
+ * The `npm-cli.js` that `npm` on PATH runs in `cwd`, with its change time, so that an npm upgraded in place is asked
+ * again. Installers may keep the archive's modification time, but writing the file moves its change time. A relative
+ * directory on PATH is resolved against `cwd`, as the spawn resolves it. Undefined where `npm` is something else, such
+ * as a shim that picks a release per project or a Windows `.cmd` script.
+ */
+function npmEntryPoint(cwd: string): string | undefined {
+    if (os.platform() === 'win32' || process.env.PATH === undefined) {
+        return undefined;
+    }
+    for (const dir of process.env.PATH.split(path.delimiter)) {
+        const candidate = path.resolve(cwd, dir, 'npm');
+        try {
+            if (!fs.statSync(candidate).isFile()) {
+                continue;
+            }
+            fs.accessSync(candidate, fs.constants.X_OK);
+        } catch {
+            continue;
+        }
+        try {
+            const real = fs.realpathSync(candidate);
+            return real.endsWith(NPM_CLI) ? `${real}\0${fs.statSync(real).ctimeMs}` : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+    return undefined;
+}
+
+function spawnVersion(pm: PackageManager, cwd: string, timeout: number): string | undefined {
     const [cmd, ...args] = PACKAGE_MANAGER_CONFIGS[pm].versionCommand;
     try {
         const result = spawnSync(getPlatformCommand(cmd), args, {
@@ -617,6 +668,8 @@ export interface BaseProjectUpdateInfo {
     packageJsonPath: string;
     /** The package manager used by this project */
     packageManager: PackageManager;
+    /** Selected lock path relative to the source root, when it is shared by workspace members. */
+    lockFilePath?: string;
 }
 
 /**
@@ -690,9 +743,13 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
     // Parse the updated package.json and lock file to create new marker
     const updatedPackageJson = acc.updatedPackageJsons.get(updateInfo.packageJsonPath);
     const lockFileName = getLockFileName(updateInfo.packageManager);
-    const updatedLockFile = acc.updatedLockFiles.get(
-        updateInfo.packageJsonPath.replace('package.json', lockFileName)
-    );
+    // A shared lock root must be supplied by the caller that selected it. Merely
+    // finding an ancestor lock in the accumulator cannot rule out an independent
+    // (unchanged) lock beside this manifest.
+    const manifestDir = path.posix.dirname(updateInfo.packageJsonPath.replace(/\\/g, '/'));
+    const lockPath = updateInfo.lockFilePath?.replace(/\\/g, '/') ?? path.posix.join(manifestDir, lockFileName);
+    const lockDir = path.posix.dirname(lockPath);
+    const updatedLockFile = acc.updatedLockFiles.get(lockPath);
 
     let packageJsonContent: PackageJsonContent;
     let lockContent: PackageLockContent | undefined;
@@ -731,7 +788,8 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
         lockContent,
         existingMarker.workspacePackagePaths,
         existingMarker.packageManager,
-        existingMarker.npmrcConfigs
+        existingMarker.npmrcConfigs,
+        updatedLockFile === undefined ? "" : path.posix.relative(lockDir, manifestDir)
     );
 
     // If the new marker is structurally identical to the existing one (ignoring the

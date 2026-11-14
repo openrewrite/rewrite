@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const exclude = ['**/node_modules/**', '**/dist/**'];
 // The tests that start the Java RPC server or read this module's Java sources. Gradle runs them as npmTestJava, which
 // a change to the Java side reruns too, and the rest as npmTestTypeScript.
-const javaTests = ['test/rpc/java-*.test.ts', 'test/javascript/completeness.test.ts'];
+const javaTests = ['test/rpc/java-*.test.ts', 'test/javascript/completeness.test.ts', 'test/xml/completeness.test.ts'];
 
 export default defineConfig({
     test: {

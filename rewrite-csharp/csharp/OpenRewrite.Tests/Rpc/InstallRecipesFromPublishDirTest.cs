@@ -191,4 +191,36 @@ public class InstallRecipesFromPublishDirTest : IDisposable
         Assert.Equal(1, byPackageForm.RecipesInstalled);
         Assert.Equal("1.0.0", byPackageForm.Version);
     }
+
+    [Fact]
+    public async Task ReinstallRepublishesAPackageRebuiltUnderTheSameVersion()
+    {
+        var first = await InstallPrimary();
+
+        // A local rebuild packs the same version again and clears its extracted copy, which a restore never refreshes.
+        // Its assembly gets the first build's size and timestamp, the case PublishBundle's swap is for.
+        var primaryDir = Path.Combine(_root, "Primary");
+        var primaryCs = Path.Combine(primaryDir, "Primary.cs");
+        File.WriteAllText(primaryCs, File.ReadAllText(primaryCs).Replace("Primary composite recipe", "Rebuilt composite recipe"));
+        DotnetCli.Run($"build \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release");
+        File.SetLastWriteTimeUtc(Path.Combine(primaryDir, "bin", "Release", "net10.0", "Primary.dll"),
+            File.GetLastWriteTimeUtc(Path.Combine(first.PublishDir!, "Primary.dll")));
+        DotnetCli.Run($"pack \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release --no-build -o \"{Path.Combine(_root, "feed")}\"");
+        Directory.Delete(Path.Combine(_root, "packages", "primary", "1.0.0"), true);
+
+        var rebuilt = await InstallPrimary();
+        Assert.False(rebuilt.Unchanged);
+        Assert.Equal(first.PublishDir, rebuilt.PublishDir);
+        // This process already loaded the first build from that path, so only the bytes can show the rebuild.
+        Assert.Equal(File.ReadAllBytes(Path.Combine(_root, "packages", "primary", "1.0.0", "lib", "net10.0", "Primary.dll")),
+            File.ReadAllBytes(Path.Combine(rebuilt.PublishDir!, "Primary.dll")));
+
+        Assert.True((await InstallPrimary()).Unchanged);
+    }
+
+    private Task<InstallRecipesResponse> InstallPrimary() =>
+        new RewriteRpcServer(new RecipeMarketplace(), _installDir).InstallRecipes(new InstallRecipesRequest
+        {
+            Recipes = JsonSerializer.SerializeToElement(new { packageName = "Primary", version = "1.0.0" })
+        });
 }

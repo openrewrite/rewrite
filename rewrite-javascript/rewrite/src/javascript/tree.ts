@@ -264,6 +264,7 @@ export namespace JS {
     export interface ImportClause extends JS {
         readonly kind: typeof Kind.ImportClause;
         readonly typeOnly: boolean;
+        readonly deferred: boolean;
         readonly name?: J.RightPadded<J.Identifier>;
         readonly namedBindings?: Expression;
     }
@@ -346,7 +347,8 @@ export namespace JS {
             IdentityNotEquals = "IdentityNotEquals",
             In = "In",
             QuestionQuestion = "QuestionQuestion",
-            Comma = "Comma"
+            Comma = "Comma",
+            Exponentiation = "Exponentiation"
         }
     }
 
@@ -580,6 +582,7 @@ export namespace JS {
             QuestionQuestion = "QuestionQuestion",
             And = "And",
             Or = "Or",
+            /** @deprecated `a ** b` is a {@link JS.Binary} of type {@link JS.Binary.Type.Exponentiation}. */
             Power = "Power",
             Exp = "Exp"
         }

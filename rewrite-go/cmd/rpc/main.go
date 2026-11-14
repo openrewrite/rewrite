@@ -125,11 +125,9 @@ type server struct {
 	// the workspace binary is stale or missing its implementation.
 	preparedRecipeNames map[string]string
 
-	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
-	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
-	// returns the unwrapped editor — otherwise the precondition would also
-	// run Go-side and double the cost. Keyed by the prepared recipe ID.
-	preparedEditorOverrides map[string]recipe.TreeVisitor
+	// Visitor names ("edit:<id>", "scan:<id>") whose preconditions.Check went to
+	// the host at PrepareRecipe. Dispatch unwraps that Check, so only the host evaluates it.
+	preparedHoistedVisitors map[string]bool
 
 	// Per-prepared-recipe accumulator for ScanningRecipe. Lazily created on
 	// the first scan Visit call. Lifetime = prepared recipe instance; freed
@@ -252,7 +250,7 @@ func newServer(cfg serverConfig) *server {
 		refCheckpoints:          make(map[string]evictCheckpoint),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
-		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
+		preparedHoistedVisitors: make(map[string]bool),
 		preparedAccumulators:    make(map[string]any),
 		preparedContexts:        make(map[string]*recipe.ExecutionContext),
 		batchSize:               1000,
@@ -1426,7 +1424,7 @@ func (s *server) handleReset() bool {
 	s.refCheckpoints = make(map[string]evictCheckpoint)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
-	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
+	s.preparedHoistedVisitors = make(map[string]bool)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
 	s.refCheckpoints = make(map[string]evictCheckpoint)
@@ -2037,22 +2035,7 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string, acceptsCau
 		resp.CausesAnotherCycle = c.CausesAnotherCycle()
 	}
 
-	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
-	// precondition's wire identity (so the Java host can evaluate it locally and skip the visit
-	// RPC for non-matching files) and cache the bare editor (so a subsequent dispatch via
-	// instantiateVisitor returns the unwrapped editor — otherwise the precondition runs Go-side
-	// too and doubles the cost).
-	_, isScan := instance.(recipe.ScanningRecipe)
-	if !isScan {
-		if editor := instance.Editor(); editor != nil {
-			if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
-				if entry, ok := preconditionWireEntry(checkV.Check); ok {
-					resp.EditPreconditions = append(resp.EditPreconditions, entry)
-					s.preparedEditorOverrides[recipeID] = checkV.V
-				}
-			}
-		}
-	}
+	sr, isScan := instance.(recipe.ScanningRecipe)
 	if isScan {
 		scanVis := "scan:" + recipeID
 		resp.ScanVisitor = &scanVis
@@ -2064,6 +2047,15 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string, acceptsCau
 			Options:    del.JavaOptions(),
 		}
 		return resp, nil
+	}
+
+	// A scanning recipe's editor depends on its accumulator, so only its scanner is hoisted.
+	if isScan {
+		resp.ScanPreconditions = s.hoistPreconditions(*resp.ScanVisitor, builtOutsideARun(func() recipe.TreeVisitor {
+			return sr.Scanner(sr.InitialValue(recipe.NewExecutionContext()))
+		}))
+	} else {
+		resp.EditPreconditions = s.hoistPreconditions(resp.EditVisitor, builtOutsideARun(instance.Editor))
 	}
 
 	// Whole-tree: prepare each child. A child that delegates to a Java recipe is emitted as
@@ -2096,6 +2088,50 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string, acceptsCau
 	return resp, nil
 }
 
+// hoistPreconditions returns the wire preconditions of the visitor dispatched as visitorName.
+// A Check whose precondition has a Java implementation goes to the host, which then skips the
+// files it rejects. A Go visitor also gets the language gate.
+func (s *server) hoistPreconditions(visitorName string, v recipe.TreeVisitor) []any {
+	entries := []any{}
+	if check, ok := v.(*preconditions.CheckVisitor); ok {
+		if entry, ok := preconditionWireEntry(check.Check); ok {
+			entries = append(entries, entry)
+			s.preparedHoistedVisitors[visitorName] = true
+		}
+		v = check.V
+	}
+	if _, ok := v.(visitor.VisitorI); ok {
+		entries = append(entries, goLanguageGate)
+	}
+	return entries
+}
+
+// builtOutsideARun returns the visitor build makes at PrepareRecipe, outside a run, or nil if
+// build panics there. The peer then keeps that visitor's precondition.
+func builtOutsideARun(build func() recipe.TreeVisitor) (v recipe.TreeVisitor) {
+	defer func() {
+		if recover() != nil {
+			v = nil
+		}
+	}()
+	return build()
+}
+
+// goLanguageGate is an "or" because a Go visitor visits three Java tree types that share no
+// narrower supertype than SourceFile.
+var goLanguageGate = map[string]any{"op": "or", "operands": []any{
+	findTreesOfType("org.openrewrite.golang.tree.Go"),
+	findTreesOfType("org.openrewrite.golang.tree.GoMod"),
+	findTreesOfType("org.openrewrite.golang.tree.GoSum"),
+}}
+
+func findTreesOfType(javaType string) map[string]any {
+	return map[string]any{
+		"visitorName":    "org.openrewrite.rpc.internal.FindTreesOfType",
+		"visitorOptions": map[string]any{"type": javaType},
+	}
+}
+
 // preconditionWireEntry translates a precondition condition (operand) to
 // a wire entry matching org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition.
 //
@@ -2103,14 +2139,13 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string, acceptsCau
 // operands (a list of nested wire entries). Returns ok=false when the
 // condition can't be serialized (e.g. an opaque local TreeVisitor with
 // no recipe identity) — the caller leaves the wrapper intact so the
+// peer evaluates it.
 func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bool) {
 	switch c := condition.(type) {
 	case *preconditions.RecipeRef:
-		entry := map[string]any{"visitorName": c.RecipeName}
-		if len(c.Options) > 0 {
-			entry["visitorOptions"] = c.Options
-		}
-		return entry, true
+		return javaRecipeWireEntry(c.RecipeName, c.Options), true
+	case recipe.DelegatesTo:
+		return javaRecipeWireEntry(c.JavaRecipeName(), c.JavaOptions()), true
 	case *preconditions.Composite:
 		operands := make([]any, 0, len(c.Operands))
 		for _, operand := range c.Operands {
@@ -2124,6 +2159,14 @@ func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bo
 	default:
 		return nil, false
 	}
+}
+
+func javaRecipeWireEntry(recipeName string, options map[string]any) map[string]any {
+	entry := map[string]any{"visitorName": recipeName}
+	if len(options) > 0 {
+		entry["visitorOptions"] = options
+	}
+	return entry
 }
 
 type visitRequest struct {
@@ -2268,23 +2311,24 @@ func (s *server) instantiateVisitor(visitorName string, ctx *recipe.ExecutionCon
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
 			return sr.EditorWithData(acc)
 		}
-		// If the recipe wrapped its editor in preconditions.Check(...) and
-		// we captured the bare editor at PrepareRecipe time, return it here
-		// so the precondition isn't re-evaluated Go-side.
-		if bare, ok := s.preparedEditorOverrides[recipeID]; ok {
-			return bare
-		}
-		return r.Editor()
+		return s.withoutHoistedPrecondition(visitorName, r.Editor())
 	case "scan":
 		if sr, ok := r.(recipe.ScanningRecipe); ok {
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			if scanner := sr.Scanner(acc); scanner != nil {
+			if scanner := s.withoutHoistedPrecondition(visitorName, sr.Scanner(acc)); scanner != nil {
 				return &scanOnlyVisitor{scanner: scanner}
 			}
 		}
 		return nil
 	}
 	return nil
+}
+
+func (s *server) withoutHoistedPrecondition(visitorName string, v recipe.TreeVisitor) recipe.TreeVisitor {
+	if check, ok := v.(*preconditions.CheckVisitor); ok && s.preparedHoistedVisitors[visitorName] {
+		return check.V
+	}
+	return v
 }
 
 // scanOnlyVisitor runs a scanner for its effect on the accumulator and hands

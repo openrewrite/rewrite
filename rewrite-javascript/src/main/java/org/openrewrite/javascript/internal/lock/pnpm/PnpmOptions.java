@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
+
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
@@ -28,6 +29,7 @@ import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
+import org.openrewrite.javascript.internal.registry.RegistryTransport;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -65,6 +67,50 @@ public final class PnpmOptions {
      * The settings by name: the defaults, the .npmrc's, pnpm-workspace.yaml's, then the environment's.
      */
     private final Map<String, @Nullable Object> config;
+    private final Map<String, String> transportEnvironment;
+    private final boolean bootstrapTransport;
+    private final boolean workspaceFetchTimeout;
+
+    /** Request routes after this release has filtered its config sources. */
+    public RegistryTransport transport() {
+        return transport(Collections.emptyMap());
+    }
+
+    /** Selected host request settings, kept out of project placeholder expansion. */
+    public RegistryTransport transport(Map<String, String> requestEnvironment) {
+        if (bootstrapTransport) {
+            return RegistryTransport.pnpmBootstrap(trustedRegistryConfig, transportEnvironment);
+        }
+        // Defaults in the normalized config are not a request for a custom deadline.
+        Map<String, @Nullable Object> transportConfig = new LinkedHashMap<>(config);
+        if (!explicitlySetKeys.contains("fetchTimeout")) {
+            transportConfig.remove("fetchTimeout");
+        }
+        if (release.readsSettingsFromNpmrc()) {
+            // npm-conf's environment precedes workspace settings in pnpm 10.
+            String key = envVarOf(requestEnvironment, "npm_config_", "fetch_timeout");
+            if (!workspaceFetchTimeout && key != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, requestEnvironment.get(key), requestEnvironment);
+                if (value != Js.UNDEFINED) {
+                    transportConfig.put("fetchTimeout", value);
+                }
+            }
+        } else {
+            // pnpm 11's typed environment follows the workspace. Invalid numeric values are ignored.
+            Object previous = Js.UNDEFINED;
+            for (ConfigPair pair : parseEnvVars(ENV_TYPES, requestEnvironment, release)) {
+                if (!"fetchTimeout".equals(pair.key) || pair.value == Js.UNDEFINED) {
+                    continue;
+                }
+                if (previous != Js.UNDEFINED && !Js.strictEquals(previous, pair.value)) {
+                    throw new CannotKnow("conflicting upper- and lower-case pnpm fetchTimeout environment settings");
+                }
+                transportConfig.put("fetchTimeout", pair.value);
+                previous = pair.value;
+            }
+        }
+        return RegistryTransport.pnpm(transportConfig, transportEnvironment);
+    }
 
     private final Set<String> explicitlySetKeys;
 
@@ -74,6 +120,14 @@ public final class PnpmOptions {
      * The registry of every package ({@code default}) and of each scope that has its own, normalized.
      */
     private final Map<String, String> registries;
+
+    private final Map<String, @Nullable Object> registryConfig;
+    private final Map<String, @Nullable Object> trustedRegistryConfig;
+
+    /** Credentials after this release has applied source trust, precedence and environment substitution. */
+    public PnpmAuthHeaders authHeaders() {
+        return new PnpmAuthHeaders(registryConfig, release);
+    }
 
     /**
      * 11.5.3's {@code packageManagerRegistries}: the registries of the user's .npmrc and the environment alone, which
@@ -107,7 +161,14 @@ public final class PnpmOptions {
                         @Nullable Map<String, String> packageManagerRegistries,
                         @Nullable List<String> workspacePackagePatterns,
                         @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion,
-                        PnpmRelease release) {
+                        PnpmRelease release, Map<String, @Nullable Object> registryConfig,
+                        Map<String, @Nullable Object> trustedRegistryConfig, Map<String, String> transportEnvironment, boolean bootstrapTransport,
+                        boolean workspaceFetchTimeout) {
+        this.workspaceFetchTimeout = workspaceFetchTimeout;
+        this.bootstrapTransport = bootstrapTransport;
+        this.transportEnvironment = transportEnvironment;
+        this.registryConfig = registryConfig;
+        this.trustedRegistryConfig = trustedRegistryConfig;
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
@@ -125,7 +186,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withPackageManagerVersion(String version) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, version, release);
+                workspacePackagePatterns, wantedPackageManager, version, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport, workspaceFetchTimeout);
     }
 
     /**
@@ -133,7 +194,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withRelease(PnpmRelease release) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release);
+                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport, workspaceFetchTimeout);
     }
 
     /**
@@ -143,7 +204,7 @@ public final class PnpmOptions {
      * asked where the two differ.
      */
     PnpmOptions packageManagerBootstrap(PnpmRelease running) {
-        if (packageManagerRegistries == null || packageManagerRegistries.equals(registries) ||
+        if (packageManagerRegistries == null ||
             !running.resolvesThePackageManagerFromTrustedConfig()) {
             return this;
         }
@@ -151,7 +212,7 @@ public final class PnpmOptions {
         bootstrapConfig.put("registries", packageManagerRegistries);
         return new PnpmOptions(bootstrapConfig, explicitlySetKeys, catalogs, packageManagerRegistries,
                 packageManagerRegistries, workspacePackagePatterns, wantedPackageManager, packageManagerVersion,
-                release);
+                release, trustedRegistryConfig, trustedRegistryConfig, transportEnvironment, true, workspaceFetchTimeout);
     }
 
     @Value
@@ -227,6 +288,17 @@ public final class PnpmOptions {
             }
         }
 
+        // npm-conf supplies pnpm 10's npm_config_ settings before workspace settings. pnpm 11 reads
+        // pnpm_config_ instead, below. Keep this request policy out of unrelated configuration parsing.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            String timeout = envVarOf(env, "npm_config_", "fetch_timeout");
+            if (timeout != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, env.get(timeout), env);
+                if (value != Js.UNDEFINED) {
+                    mergedConfig.put("fetch-timeout", value);
+                }
+            }
+        }
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
         for (String key : Js.keys(defaultOptions)) {
             config.put(camelcase(key), defaultOptions.get(key));
@@ -237,6 +309,11 @@ public final class PnpmOptions {
             }
         }
         Set<String> explicitlySetKeys = new LinkedHashSet<>();
+        if (mergedConfig.containsKey("fetch-timeout") &&
+            (userConfig.containsKey("fetch-timeout") || workspaceNpmrc.containsKey("fetch-timeout") ||
+             env != null && envVarOf(env, "npm_config_", "fetch_timeout") != null && release.readsSettingsFromNpmrc())) {
+            explicitlySetKeys.add("fetchTimeout");
+        }
         for (String option : CLI_OPTIONS) {
             explicitlySetKeys.add(camelcase(option));
         }
@@ -246,6 +323,16 @@ public final class PnpmOptions {
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
+        Map<String, @Nullable Object> trustedRegistryConfig = new LinkedHashMap<>();
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
+                envScopedConfig, jsonAuth.auth)) {
+            trustedRegistryConfig.putAll(pickIniConfig(source));
+            for (String key : NETWORK_INI_KEYS) {
+                if (source.containsKey(key)) {
+                    trustedRegistryConfig.put(key, source.get(key));
+                }
+            }
+        }
         Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig,
                 envScopedConfig, jsonAuth, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
@@ -277,6 +364,7 @@ public final class PnpmOptions {
 
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
+        boolean workspaceFetchTimeout = false;
         if (workspaceManifest != null) {
             Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest,
                     release);
@@ -287,6 +375,7 @@ public final class PnpmOptions {
                 if (!release.readsSettingsFromWorkspaceManifest()) {
                     newSettings.clear();
                 }
+                workspaceFetchTimeout = newSettings.containsKey("fetchTimeout");
                 for (String option : CLI_OPTIONS) {
                     newSettings.put(camelcase(option), true);
                 }
@@ -342,7 +431,8 @@ public final class PnpmOptions {
 
         Map<String, String> fromEnv = new LinkedHashMap<>();
         for (ConfigPair pair : parseEnvVars(ENV_TYPES, env, release)) {
-            if (pair.value == Js.UNDEFINED) {
+            if (pair.value == Js.UNDEFINED ||
+                "fetchTimeout".equals(pair.key) && release.readsSettingsFromNpmrc()) {
                 continue;
             }
             if (CLI_OPTIONS.contains(kebabCase(pair.key))) {
@@ -381,7 +471,7 @@ public final class PnpmOptions {
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries, patterns,
-                wantedPackageManager, release.toString(), release);
+                wantedPackageManager, release.toString(), release, authConfig, trustedRegistryConfig, env == null ? Collections.emptyMap() : env, false, workspaceFetchTimeout);
     }
 
     // config/config src/getOptionsFromRootManifest.ts: only these package.json#pnpm keys are settings.
@@ -883,6 +973,19 @@ public final class PnpmOptions {
             // pnpm warns of the file and reads nothing from it
             return result;
         }
+        // npm-conf (pnpm 10) discards the whole file when any substitution fails, before its trust filter runs.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            try {
+                for (String key : Js.keys(raw)) {
+                    envReplace(key, env);
+                    if (raw.get(key) instanceof String) {
+                        envReplace((String) raw.get(key), env);
+                    }
+                }
+            } catch (JsError e) {
+                return result;
+            }
+        }
         for (String rawKey : Js.keys(raw)) {
             Object rawValue = raw.get(rawKey);
             boolean keyFromEnv = repositoryControlled && hasEnvPlaceholder(rawKey);
@@ -903,7 +1006,7 @@ public final class PnpmOptions {
                     continue;
                 }
                 // a credential or network value reaches no lock, so an environment the host does not know is no matter
-                value = env == null && !readByALockOnlyInstall(key) ? rawValue :
+                value = env == null && !readByALockOnlyInstall(key) && !isAuthValueKey(key) ? rawValue :
                         substituteEnv((String) rawValue, env, release);
             }
             if (isNpmrcReadableKey(key) || release.readsSettingsFromNpmrc()) {
@@ -973,9 +1076,9 @@ public final class PnpmOptions {
         return scoped;
     }
 
-    // an entry a lock-only install does not read ends the same kept or left out, so the release is asked of the others
+    // Credentials are read by registry requests, even though they never appear in the resulting lock.
     private static boolean leavesOutAnEntryFromTheEnvironment(String key, PnpmRelease release) {
-        return !readByALockOnlyInstall(key) || release.ignoresTheEnvironmentInRepositoryRequestDestinations();
+        return release.ignoresTheEnvironmentInRepositoryRequestDestinations();
     }
 
     private static final Pattern ENV_PLACEHOLDER = Pattern.compile("\\$\\{[^}]+}");
@@ -1104,7 +1207,7 @@ public final class PnpmOptions {
 
     /**
      * getNetworkConfigs: the scoped registries, after the checks pnpm makes of each registry's credentials; the
-     * credentials themselves and the certificates are the host's.
+     * credentials are retained for the store controller's fetcher; certificates remain the host's.
      */
     static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {
         Map<String, String> registries = new LinkedHashMap<>();
@@ -1245,7 +1348,7 @@ public final class PnpmOptions {
 
     // parseCreds' decodeBase64Credential of 11.1.3, its padding mended before it fails; before, atob alone, whose
     // InvalidCharacterError pnpm does not catch (PnpmRelease#decodesACredentialForgivingItsPadding)
-    private static String decodeBase64Credential(String value, String key, PnpmRelease release) {
+    static String decodeBase64Credential(String value, String key, PnpmRelease release) {
         String decoded = atob(value);
         if (decoded == null && !release.decodesACredentialForgivingItsPadding()) {
             throw new JsError("InvalidCharacterError", atobError(value));

@@ -521,7 +521,7 @@ class KotlinTypeMapping(
                         // TODO
                     } else if (declaration is FirField) {
                         // TODO
-                    } else if (declaration !is FirRegularClass) {
+                    } else if (declaration !is FirRegularClass && declaration !is FirTypeAlias) {
                         throw UnsupportedOperationException("Unsupported FirDeclaration: ${declaration.javaClass.name}")
                     }
                 }

@@ -189,7 +189,7 @@ export function readSourceSync(sourcePath: ParserInput) {
 
 type ParserConstructor<T extends Parser> = new (options?: ParserOptions) => T;
 
-export type ParserType = "javascript" | "packageJson" | "json" | "yaml" | "plainText";
+export type ParserType = "javascript" | "packageJson" | "json" | "yaml" | "xml" | "plainText";
 
 export class Parsers {
     private static registry = new Map<ParserType, ParserConstructor<Parser>>();

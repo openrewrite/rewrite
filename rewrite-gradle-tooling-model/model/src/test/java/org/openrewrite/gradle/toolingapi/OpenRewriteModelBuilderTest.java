@@ -18,8 +18,15 @@ package org.openrewrite.gradle.toolingapi;
 import org.gradle.tooling.GradleConnectionException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.gradle.DependencyVersionSelector;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,6 +37,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class OpenRewriteModelBuilderTest {
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void centralMirrorPreservesPluginPortal(boolean explicitPluginPortal, @TempDir Path projectDir) throws Exception {
+        // The test process may also have a mirror configured, whose script uses the same local variable names.
+        String init = OpenRewriteModelBuilder.generateInitScriptFromManifest() + "\n({ ->\n" +
+          OpenRewriteModelBuilder.mirrorScriptSnippet("https://central-mirror.example/repository", "user", "password") + "\n})()\n";
+        Files.write(projectDir.resolve("settings.gradle"), (explicitPluginPortal ?
+          "pluginManagement { repositories { gradlePluginPortal() } }" : "").getBytes(StandardCharsets.UTF_8));
+        Files.write(projectDir.resolve("build.gradle"),
+          "plugins { id 'java' }\nrepositories { mavenCentral() }".getBytes(StandardCharsets.UTF_8));
+
+        OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, init);
+
+        assertThat(model.getGradleProject().getMavenRepositories())
+          .extracting(MavenRepository::getUri)
+          .isNotEmpty()
+          .doesNotContain("https://repo.maven.apache.org/maven2/");
+        assertThat(model.getGradleProject().getBuildscript().getMavenRepositories())
+          .extracting(MavenRepository::getUri)
+          .containsExactly("https://plugins.gradle.org/m2");
+        // Boot 2.1 plugin markers were published only to the plugin portal, not Maven Central.
+        assertThat(new DependencyVersionSelector(null, model.getGradleProject(), null).select(
+          new GroupArtifact("org.springframework.boot", "org.springframework.boot.gradle.plugin"),
+          "classpath", "2.1.x", null, new InMemoryExecutionContext()))
+          .matches("2\\.1\\.\\d+\\.RELEASE");
+    }
 
     @Test
     void defaultInitScriptLoadsThePluginAtTheModelsOwnVersion() throws IOException {

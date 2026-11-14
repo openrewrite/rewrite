@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.objectweb.asm.Attribute;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Opcodes;
@@ -46,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -524,6 +528,38 @@ class TypeTableTest implements RewriteTest {
             try (JarFile jar = new JarFile(classesDir.toFile())) {
                 assertThat(jar.stream().map(JarEntry::getName))
                   .anyMatch("test/validation/TestValidation.class"::equals);
+            }
+        }
+
+        @Test
+        void scalaSignatureKeepsItsScalaSigAttribute() throws Exception {
+            var cw = new ClassWriter(0);
+            cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "test/scala/Predef", null, "java/lang/Object", null);
+            var av = cw.visitAnnotation("Lscala/reflect/ScalaSignature;", true);
+            av.visit("bytes", "\u0006\u0005\r=r!B<y");
+            av.visitEnd();
+            cw.visitEnd();
+            Path classFile = tempDir.resolve("test/scala/Predef.class");
+            Files.createDirectories(classFile.getParent());
+            Files.write(classFile, cw.toByteArray());
+            Path testJar = createJarFromClasses("scala-lib.jar", classFile);
+
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+                writer.jar("test.group", "scala-lib", "1.0").write(testJar);
+            }
+
+            Path stubJar = new TypeTable(ctx, tsv.toUri().toURL(), List.of("scala-lib")).load("scala-lib");
+            assertThat(stubJar).isNotNull();
+            try (JarFile jar = new JarFile(stubJar.toFile());
+                 InputStream is = jar.getInputStream(jar.getEntry("test/scala/Predef.class"))) {
+                List<String> attributes = new ArrayList<>();
+                new ClassReader(is).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitAttribute(Attribute attribute) {
+                        attributes.add(attribute.type);
+                    }
+                }, 0);
+                assertThat(attributes).containsExactly("ScalaSig");
             }
         }
 

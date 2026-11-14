@@ -574,6 +574,56 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
+    void leaveTheBuildsOwnPropertiesAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              ext.versions = [java: JavaVersion.VERSION_17]
+
+              java {
+                  sourceCompatibility = versions.java
+                  targetCompatibility = project.ext.versions.java
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(versions.java.majorVersion)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAloneInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              object Versions {
+                  val java = JavaVersion.VERSION_17
+              }
+
+              java {
+                  sourceCompatibility = Versions.java
+                  targetCompatibility = Versions.java
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void compatibilityFromLocalVariable() {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),

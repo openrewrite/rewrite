@@ -245,7 +245,7 @@ class PythonVisitor(JavaVisitor[P]):
             conditions=list_map(
                 lambda c: cast('ComprehensionExpression.Condition', self.visit(c, p)),
                 clause.conditions
-            )
+            ) if clause.conditions is not None else None
         )
         return clause
 

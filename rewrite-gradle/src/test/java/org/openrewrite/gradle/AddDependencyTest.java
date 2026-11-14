@@ -245,7 +245,8 @@ class AddDependencyTest implements RewriteTest {
     void onlyIfUsingMultipleScopes(String onlyIfUsing) {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all()
+              .classDeclarations(false).identifiers(false).methodDeclarations(false)),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -287,7 +288,8 @@ class AddDependencyTest implements RewriteTest {
         var addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, Boolean.TRUE);
         rewriteRun(
           spec -> spec.recipe(addDep)
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all()
+              .classDeclarations(false).identifiers(false).methodDeclarations(false)),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -345,7 +347,8 @@ class AddDependencyTest implements RewriteTest {
         var addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, "com.google.common.math.IntMath", null, null, null, Boolean.TRUE);
         rewriteRun(
           spec -> spec.recipe(addDep)
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all()
+              .classDeclarations(false).identifiers(false).methodDeclarations(false)),
           mavenProject("project",
             srcSmokeTestJava(
               java(usingGuavaIntMath)
@@ -400,7 +403,8 @@ class AddDependencyTest implements RewriteTest {
         var addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, "com.google.common.math.IntMath", null, null, null, Boolean.TRUE);
         rewriteRun(
           spec -> spec.recipe(addDep)
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all()
+              .classDeclarations(false).identifiers(false).methodDeclarations(false)),
           mavenProject("project",
             srcSmokeTestJava(
               java(usingGuavaIntMath)

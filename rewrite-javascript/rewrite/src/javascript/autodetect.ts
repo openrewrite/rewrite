@@ -19,7 +19,8 @@ import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {J} from "../java";
+import {J, TrailingComma} from "../java";
+import {Marker} from "../markers";
 import {
     IntelliJ,
     SpacesStyle,
@@ -254,32 +255,54 @@ class FindIndentVisitor extends JavaScriptVisitor<any> {
         super();
     }
 
-    /** The indent of the statements in each enclosing block, innermost last. */
-    private readonly enclosing: number[] = [];
+    /** The indent of the line the visit has reached, so a block measures its statements from the line its `{` is on. */
+    private lineIndent = 0;
 
     protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
-        const outer = this.enclosing[this.enclosing.length - 1] ?? 0;
-        let own: number | undefined;
+        const outer = lastLineIndent(block.prefix.whitespace) ?? this.lineIndent;
         for (const stmt of block.statements) {
             const whitespace = stmt.element.prefix?.whitespace;
-            const indent = whitespace ? this.analyzeIndent(whitespace, outer) : undefined;
-            own ??= indent;
+            if (whitespace) {
+                this.analyzeIndent(whitespace, outer);
+            }
         }
-        this.enclosing.push(own ?? outer);
-        try {
-            return await super.visitBlock(block, p);
-        } finally {
-            this.enclosing.pop();
-        }
+        return super.visitBlock(block, p);
     }
 
-    /** Records the indent `whitespace` ends in, relative to `outer`, and returns it if it is spaces. */
-    private analyzeIndent(whitespace: string, outer: number): number | undefined {
+    public async visitSpace(space: J.Space, _p: any): Promise<J.Space> {
+        this.advance(space.whitespace);
+        for (const comment of space.comments) {
+            this.advance(comment.suffix);
+        }
+        return space;
+    }
+
+    protected async visitMarker<M extends Marker>(marker: M, p: any): Promise<M> {
+        // A trailing comma's marker holds the line break before the closing `]` or `)`
+        if (marker.kind === J.Markers.TrailingComma) {
+            await this.visitSpace((marker as unknown as TrailingComma).suffix, p);
+        }
+        return marker;
+    }
+
+    protected async visitLiteral(literal: J.Literal, p: any): Promise<J | undefined> {
+        const ret = await super.visitLiteral(literal, p);
+        // JSX text and template strings hold their line breaks in their source
+        this.advance(literal.valueSource ?? "");
+        return ret;
+    }
+
+    private advance(text: string): void {
+        this.lineIndent = lastLineIndent(text) ?? this.lineIndent;
+    }
+
+    /** Records the indent `whitespace` ends in, relative to `outer`. */
+    private analyzeIndent(whitespace: string, outer: number): void {
         const newlineIndex = whitespace.lastIndexOf('\n');
-        if (newlineIndex < 0) return undefined;
+        if (newlineIndex < 0) return;
 
         const indent = whitespace.substring(newlineIndex + 1);
-        if (indent.length === 0) return 0;
+        if (indent.length === 0) return;
 
         // Check first character to determine type
         if (indent[0] === '\t') {
@@ -292,10 +315,17 @@ class FindIndentVisitor extends JavaScriptVisitor<any> {
                 else break;
             }
             this.stats.recordSpaceIndent(spaceCount - outer);
-            return spaceCount;
         }
-        return undefined;
     }
+}
+
+/** The number of spaces the last line of `text` starts with, or `undefined` if `text` is one line. */
+function lastLineIndent(text: string): number | undefined {
+    const newline = text.lastIndexOf('\n');
+    if (newline < 0) return undefined;
+    let spaces = 0;
+    while (text[newline + 1 + spaces] === ' ') spaces++;
+    return spaces;
 }
 
 /**

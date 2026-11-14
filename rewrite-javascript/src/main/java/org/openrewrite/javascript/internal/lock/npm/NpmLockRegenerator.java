@@ -259,7 +259,7 @@ public final class NpmLockRegenerator {
             VirtualTreeLoader.ProjectFiles files = projectFiles(truthy(inputs.getLock()) ?
                 new LockFile(inputs.getLock()) : null, inputs.getManifests());
             path = projectPath(files);
-            IdealTreeBuilder arb = new IdealTreeBuilder(path, files, options, registry, inputs.getHost(),
+            IdealTreeBuilder arb = new IdealTreeBuilder(path, files, options, registry.withOptions(options), inputs.getHost(),
                     inputs.getNow(), allowNoLock);
             arb.buildIdealTree();
             if (!options.isSave() || options.isDryRun()) {
@@ -516,7 +516,7 @@ public final class NpmLockRegenerator {
     }
 
     private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
-        return new IdealTreeBuilder(path, files, options, registry, inputs.getHost(), inputs.getNow());
+        return new IdealTreeBuilder(path, files, options, registry.withOptions(options), inputs.getHost(), inputs.getNow());
     }
 
     // reify.js #saveIdealTree: the lock takes the indent of the root package.json, two spaces when it has none

@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -229,7 +228,7 @@ class RemoveImportTest implements RewriteTest {
                   // only the nested type is attributed
                   return "Map".equals(identifier.getSimpleName()) ? identifier.withType(null) : identifier;
               }
-          })).afterTypeValidationOptions(TypeValidation.none()),
+          })),
           java(
             """
               import java.util.*;
@@ -241,6 +240,50 @@ class RemoveImportTest implements RewriteTest {
               import java.util.Map;
               class A {
                  Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStarImportOfThePackageWhenRemovingANestedTypeNamedWithDollar() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.*;
+              import java.util.Map.Entry;
+
+              class A {
+                 List<String> l;
+              }
+              """,
+            """
+              import java.util.*;
+
+              class A {
+                 List<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedStarImportOfThePackageWhenRemovingANestedTypeNamedWithDollar() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.*;
+              import java.util.Map.Entry;
+
+              class A {
+              }
+              """,
+            """
+              class A {
               }
               """
           )
@@ -1365,6 +1408,36 @@ class RemoveImportTest implements RewriteTest {
               import static java.util.Collections.*;
 
               class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticImportOfAFieldNamedLikeTheRemovedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("a.Outer$Inner")),
+          java(
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+
+                  public static Inner Inner;
+              }
+              """
+          ),
+          java(
+            """
+              package c;
+
+              import static a.Outer.Inner;
+
+              class C {
+                  Object o = Inner;
               }
               """
           )

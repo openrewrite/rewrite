@@ -661,7 +661,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitYield(Rb.Yield yield, PrintOutputCapture<P> p) {
         beforeSyntax(yield, RubySpace.Location.YIELD_DATA, p);
         p.append("yield");
-        JContainer<Statement> args = yield.getPadding().getData();
+        JContainer<Expression> args = yield.getPadding().getData();
         if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             visitContainer("", args, RubyContainer.Location.YIELD_DATA, ",", "", p);
         } else {

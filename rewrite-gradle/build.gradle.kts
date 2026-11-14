@@ -38,7 +38,8 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
     // 3.19.2 is the last release with both the `develocity` and the legacy `gradleEnterprise` extension types;
-    // 4.x removed the latter, which settings scripts still awaiting MigrateGradleEnterpriseToDevelocity rely on
+    // 4.x removed the latter, which settings scripts still awaiting rewrite-migrate-gradle's
+    // `migrate.plugins.MigrateGradleEnterpriseToDevelocity` rely on
     parserClasspath("com.gradle:develocity-gradle-plugin:3.19.2")
 
     testParserClasspath("com.android.tools.build:gradle-api:9.4.1")

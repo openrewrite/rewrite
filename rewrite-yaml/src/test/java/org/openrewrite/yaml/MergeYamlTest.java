@@ -4109,6 +4109,39 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void wildcardMatchesEachSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.list.services.*",
+            //language=yaml
+            "beta: fixedValue",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              list:
+                services:
+                  - alpha: randomValue1
+                  - alpha: randomValue2
+              """,
+            """
+              list:
+                services:
+                  - alpha: randomValue1
+                    beta: fixedValue
+                  - alpha: randomValue2
+                    beta: fixedValue
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2834")
     @Test
     void mergeFlowStyleSequence() {

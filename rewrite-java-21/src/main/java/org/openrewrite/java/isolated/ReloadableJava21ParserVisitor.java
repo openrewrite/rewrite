@@ -80,6 +80,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     private static final Map<String, Modifier> MODIFIER_BY_KEYWORD =
             Stream.of(Modifier.values()).collect(toUnmodifiableMap(Modifier::toString, Function.identity()));
 
+    // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+    private static final Method GET_COMMENT_TREE = getCommentTreeMethod();
 
     private final Path sourcePath;
 
@@ -856,7 +858,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
         }
         J clazz = convertInstanceOfTree(node);
-        J pattern = getNodePattern(node.getPattern(), type);
+        J pattern = getNodePattern(node.getPattern());
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
@@ -888,10 +890,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
-    private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
+    private @Nullable J getNodePattern(@Nullable PatternTree pattern) {
         if (pattern instanceof JCBindingPattern b) {
+            JavaType.Variable variableType = typeMapping.variableType(b.var.sym);
             return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
+                    variableType != null ? variableType.getType() : null, variableType);
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {
@@ -1899,17 +1902,28 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
-            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree((JCTree) t)));
             return j;
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
-            reportJavaParsingException(ex);
-            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;
+        }
+    }
+
+    private static Method getCommentTreeMethod() {
+        try {
+            return DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException("Failed to find getCommentTree method", ex);
+        }
+    }
+
+    private @Nullable DocCommentTree commentTree(JCTree t) {
+        try {
+            return (DocCommentTree) GET_COMMENT_TREE.invoke(docCommentTable, t);
+        } catch (InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         }
     }
 
@@ -2143,13 +2157,15 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                JCTree first = (JCTree) treeGroup.get(0);
+                String prefix = source.substring(cursor, max(first.getStartPosition(), cursor));
                 cursor += prefix.length();
 
                 Tree last = treeGroup.get(treeGroup.size() - 1);
 
                 @SuppressWarnings("unchecked")
-                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup,
+                        formatWithCommentTree(prefix, first, commentTree(first)));
                 JRightPadded<Statement> paddedVars = padRight(vars, semiDelim.apply(last));
                 cursor(max(endPos(last), cursor));
                 converted.add(paddedVars);
