@@ -18,9 +18,13 @@ package org.openrewrite.groovy.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,7 +35,6 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue", "GrUnnecessaryDefModifier"})
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -263,5 +266,97 @@ class VariableDeclarationsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void aDeclaredTypeWhoseInitializerInfersMoreTypeArguments() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+
+              def m() {
+                Set<Thread> t = ConcurrentHashMap.newKeySet()
+              }
+              """,
+            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void followedByAClosure() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+
+              def m() {
+                Set<Thread> t = ConcurrentHashMap.newKeySet()
+                foo { R r -> }
+              }
+              """,
+            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void nestedTypeArgumentsBesideIt() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+
+              def m() {
+                Map<String, List<Integer>> t = new HashMap<>()
+                Set<Thread> s = ConcurrentHashMap.newKeySet()
+              }
+              """,
+            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void ordinaryDeclarations() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                List<String> a = []
+                Map<String, Integer> b = [:]
+              }
+              """,
+            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    /**
+     * Printing back alone can't tell whether source text was parsed: text the parser never visits is kept as
+     * whitespace and still prints. Each source here must leave none.
+     */
+    private static void nothingKeptAsWhitespace(SourceFile sf) {
+        List<String> kept = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                if (!space.getWhitespace().isBlank()) {
+                    kept.add(loc + ": " + space.getWhitespace().strip());
+                }
+                for (Comment c : space.getComments()) {
+                    if (!c.getSuffix().isBlank()) {
+                        kept.add(loc + ": " + c.getSuffix().strip());
+                    }
+                }
+                return space;
+            }
+        }.visit(sf, 0);
+        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
