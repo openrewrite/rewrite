@@ -38,6 +38,8 @@ export {DelegatingRecipe, prepareJavaRecipe} from "./java-recipe";
 export {findTestClasspath, JavaRpcTestServer} from "./java-rpc-client";
 export type {JavaRpcOptions} from "./java-rpc-client";
 export {registerVisitor} from "./request/visitor-registry";
+// Registers the codecs for the Java Python marker, which a Java host sends on Python project files
+export * from "./python-resolution-result";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     rpcReceive(before: Checksum, q: RpcReceiveQueue): Checksum {
