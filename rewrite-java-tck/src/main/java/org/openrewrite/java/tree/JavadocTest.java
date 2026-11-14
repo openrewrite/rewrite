@@ -2765,6 +2765,28 @@ class JavadocTest implements RewriteTest {
     }
 
     @Test
+    void tabAfterMarginBeforeHtmlElement() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * States: <br>
+               * <ol>
+               * \t<li> 1. Pending read
+               *  <li> 2. Header assembled
+               * </ol>
+               * <ul>
+               * \t<li><b>100:</b> Local storage</li>
+               * </ul>
+               * @author Someone
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
     void nonBreakingSpaceAfterMargin() {
         rewriteRun(
           java(

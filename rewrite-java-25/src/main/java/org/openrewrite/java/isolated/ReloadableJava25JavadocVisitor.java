@@ -1177,7 +1177,10 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
+                // Only the stripped indentation is missing: stop at whitespace the node keeps,
+                // like the tab in ` * \t<li>`, or the next character is consumed in its place.
+                char next = node.charAt(i + 1);
+                text.append(whitespaceBeforeAsString(ch -> ch != next && isInlineWhitespace(ch)));
             }
         }
 
