@@ -30,6 +30,7 @@ rewrite-java-25
 # Other language modules
 
 rewrite-android
+rewrite-coldfusion
 rewrite-csharp
 rewrite-docker
 rewrite-go

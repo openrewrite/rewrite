@@ -586,6 +586,29 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
+    void removeStaticMethodCalledOnFullyQualifiedType() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
+          // language=java
+          java(
+            """
+              class Test {
+                  void method() {
+                      org.junit.jupiter.api.Assertions.assertTrue(true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepStaticMethodWithAssignment() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),

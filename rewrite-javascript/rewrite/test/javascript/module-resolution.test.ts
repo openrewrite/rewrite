@@ -77,3 +77,21 @@ test("types published only through exports conditions are attributed", async () 
     }, "uses.ts");
     expect(await firstInvocationReturnType(importConditionOnly)).toEqual(Type.Primitive.String);
 });
+
+test("a node16 project's extensionless relative import is attributed", async () => {
+    const parsed = await parseProject({
+        "tsconfig.json": JSON.stringify({compilerOptions: {module: "node16", moduleResolution: "node16"}}),
+        "package.json": JSON.stringify({name: "cjs-project", version: "1.0.0"}),
+        "greeter.ts": `export class Greeter {}`,
+        "uses.ts": `import {Greeter} from "./greeter";\nnew Greeter();`
+    }, "uses.ts");
+
+    let constructed: Type | undefined;
+    await new class extends JavaScriptVisitor<void> {
+        protected override async visitNewClass(newClass: J.NewClass, p: void) {
+            constructed ??= newClass.constructorType?.returnType;
+            return super.visitNewClass(newClass, p);
+        }
+    }().visit(parsed, undefined);
+    expect(constructed).toMatchObject({kind: Type.Kind.Class, fullyQualifiedName: "greeter.Greeter"});
+});

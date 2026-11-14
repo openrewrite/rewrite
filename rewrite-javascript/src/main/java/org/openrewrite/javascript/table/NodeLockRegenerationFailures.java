@@ -42,10 +42,15 @@ public class NodeLockRegenerationFailures extends DataTable<NodeLockRegeneration
         @Nullable
         String packageName;
 
+        @Column(displayName = "Kind",
+                description = "CANNOT_KNOW when the outcome depends on what the engine is not given, PM_REJECTS or " +
+                        "PM_FAILS when the package manager itself rejects or fails on the edit, SECOND_INSTALL when " +
+                        "its next install would reject or rewrite the lock.")
+        String kind;
+
         @Column(displayName = "Reason",
-                description = "The structured failure reason, e.g. REGISTRY_UNREACHABLE or RESOLUTION_REQUIRED. " +
-                        "Absent for unstructured failures.")
-        @Nullable
+                description = "The structured failure reason, e.g. REGISTRY_UNREACHABLE, RESOLUTION_REQUIRED or " +
+                        "PEER_CONFLICT.")
         String reason;
 
         @Column(displayName = "Detail",

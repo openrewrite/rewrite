@@ -2329,7 +2329,7 @@ public interface Py extends J {
             public MatchCase withGuard(JLeftPadded<Expression> guard) {
                 return guard == t.guard ?
                         t :
-                        new MatchCase(t.id, t.prefix, t.markers, t.pattern, guard, null);
+                        new MatchCase(t.id, t.prefix, t.markers, t.pattern, guard, t.type);
             }
         }
 

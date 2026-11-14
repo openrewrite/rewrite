@@ -147,6 +147,12 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
         boolean useCRLFNewLines;
         Path matchingExtensionsXmlFile;
         Path matchingGradleEnterpriseXmlFile;
+
+        /**
+         * Whether the repository has a `.mvn/extensions.xml` that isn't XML the recipe can read, such as one its parser
+         * failed on, so that the extension can't be added to it.
+         */
+        boolean unreadableExtensionsXml;
     }
 
     @Override
@@ -172,10 +178,11 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                                 .isUseCRLFNewLines());
                         break;
                     case EXTENSIONS_XML_PATH:
-                        if (!(sourceFile instanceof Xml.Document)) {
-                            throw new RuntimeException("The extensions.xml is not xml document type");
+                        if (sourceFile instanceof Xml.Document) {
+                            acc.setMatchingExtensionsXmlFile(sourceFile.getSourcePath());
+                        } else {
+                            acc.setUnreadableExtensionsXml(true);
                         }
-                        acc.setMatchingExtensionsXmlFile(sourceFile.getSourcePath());
                         break;
                     case GRADLE_ENTERPRISE_XML_PATH:
                     case DEVELOCITY_XML_PATH:
@@ -192,7 +199,8 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Override
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
         // This recipe makes change for maven project only, or if the file `.mvn/gradle-enterprise.xml` already exists, do nothing
-        if (!acc.isMavenProject() || acc.getMatchingGradleEnterpriseXmlFile() != null) {
+        if (!acc.isMavenProject() || acc.getMatchingGradleEnterpriseXmlFile() != null ||
+            acc.isUnreadableExtensionsXml()) {
             return emptyList();
         }
 
@@ -239,7 +247,8 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 }
 
                 SourceFile sourceFile = (SourceFile) tree;
-                if (sourceFile.getSourcePath().equals(acc.getMatchingExtensionsXmlFile())) {
+                if (sourceFile instanceof Xml.Document &&
+                    sourceFile.getSourcePath().equals(acc.getMatchingExtensionsXmlFile())) {
                     Xml.Document extensionsXml = (Xml.Document) sourceFile;
 
                     // find extension, do nothing if it already exists,

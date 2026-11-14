@@ -146,7 +146,7 @@ describe('template dependencies integration', () => {
                 : undefined;
         };
 
-        expect(await processDeclaringTypeWith(['node'])).toBe('global.NodeJS.Process');
+        expect(await processDeclaringTypeWith(['node'])).toBe('NodeJS.Process');
 
         expect(await processDeclaringTypeWith([])).toBeUndefined();
     }, 120000);
@@ -389,6 +389,7 @@ describe('template dependencies integration', () => {
                 return await swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -409,6 +410,7 @@ describe('template dependencies integration', () => {
                 return await swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript('const result = 1 + 2;', 'const result = 2 + 1;')

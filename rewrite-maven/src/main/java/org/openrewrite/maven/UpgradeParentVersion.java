@@ -64,7 +64,11 @@ public class UpgradeParentVersion extends ScanningRecipe<ChangeParentPom.Accumul
     }
 
     String description = "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
-               "or to a specific version number.";
+               "or to a specific version number. " +
+               "Dependency management and properties inherited from the old parent version that the new version no longer provides are retained, " +
+               "but only what the project uses: a managed version is copied in only for a dependency that this pom or one of its modules declares without a version, " +
+               "and a property only when the pom references it. " +
+               "Removes redundant dependency versions already managed by the new parent.";
 
     @Override
     public Validated<Object> validate() {

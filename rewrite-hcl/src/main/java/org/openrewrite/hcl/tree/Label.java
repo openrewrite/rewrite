@@ -15,5 +15,22 @@
  */
 package org.openrewrite.hcl.tree;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openrewrite.Incubating;
+import org.openrewrite.hcl.internal.HclPrinter;
+
 public interface Label extends Hcl {
+
+    /**
+     * @return The name of this label. Quoted labels like {@code "aws_instance"} yield their unquoted content.
+     */
+    @Incubating(since = "8.94.0")
+    @JsonIgnore
+    default String getSimpleName() {
+        if (this instanceof Hcl.Identifier) {
+            return ((Hcl.Identifier) this).getName();
+        }
+        String value = this instanceof Expression ? HclValues.stringValue((Expression) this) : null;
+        return value != null ? value : printTrimmed(new HclPrinter<>());
+    }
 }

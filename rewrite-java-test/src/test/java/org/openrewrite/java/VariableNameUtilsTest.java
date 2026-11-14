@@ -51,7 +51,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @SuppressWarnings("all")
@@ -513,12 +513,12 @@ class VariableNameUtilsTest implements RewriteTest {
                   if (((J.VariableDeclarations) lambda.getParameters().getParameters().getFirst()).getVariables().getFirst().getSimpleName().startsWith("i")) {
                       var declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
                       J.VariableDeclarations.NamedVariable variable = declarations.getVariables().getFirst();
-                      variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
+                      variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor().getParentOrThrow(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
                       lambda = lambda.withParameters(lambda.getParameters().withParameters(List.of(declarations.withVariables(List.of(variable)))));
                   }
                   return lambda;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import java.util.function.Consumer;
@@ -567,7 +567,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @SuppressWarnings("all")

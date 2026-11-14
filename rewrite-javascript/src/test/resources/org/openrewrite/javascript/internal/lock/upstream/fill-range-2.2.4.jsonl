@@ -1,0 +1,198 @@
+{"header":"fill-range 2.2.4: every call its own tests (test/test.js) make, with its answer; generate/upstream-calls.js generate/upstream/fill-range.js <checkout> 2.2.4"}
+{"test":"test/test.js > error handling > should throw when the first arg is not a string.","fn":"fill","args":[],"threw":{"$":"error","name":"Error","message":"fill-range expects the first and second args to be strings."}}
+{"test":"test/test.js > error handling > should throw when range arguments are invalid and `silent` is false.","fn":"fill","args":["0a","0z",{"silent":false}],"threw":{"$":"error","name":"RangeError","message":"fill-range: invalid range arguments."}}
+{"test":"test/test.js > error handling > should throw when range arguments are invalid and `silent` is false.","fn":"fill","args":["!","$",{"silent":false}],"threw":{"$":"error","name":"RangeError","message":"fill-range: invalid range arguments."}}
+{"test":"test/test.js > error handling > should throw when args are incompatible.","fn":"fill","args":["a",10,{"silent":false}],"threw":{"$":"error","name":"TypeError","message":"fill-range: first range argument is incompatible with second."}}
+{"test":"test/test.js > error handling > should throw when args are incompatible.","fn":"fill","args":[1,"z",{"silent":false}],"threw":{"$":"error","name":"TypeError","message":"fill-range: first range argument is incompatible with second."}}
+{"test":"test/test.js > error handling > should throw when the step is bad.","fn":"fill","args":["1","10","z",{"silent":false}],"threw":{"$":"error","name":"TypeError","message":"fill-range: invalid step."}}
+{"test":"test/test.js > error handling > should throw when the step is bad.","fn":"fill","args":["a","z","a",{"silent":false}],"threw":{"$":"error","name":"TypeError","message":"fill-range: invalid step."}}
+{"test":"test/test.js > error handling > should throw when the step is bad.","fn":"fill","args":["a","z","0a",{"silent":false}],"threw":{"$":"error","name":"TypeError","message":"fill-range: invalid step."}}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":["1","10"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":["1","3"],"out":["1","2","3"]}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":["5","8"],"out":["5","6","7","8"]}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":[1,"9"],"out":["1","2","3","4","5","6","7","8","9"]}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":[1,3],"out":["1","2","3"]}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":[1,9],"out":["1","2","3","4","5","6","7","8","9"]}
+{"test":"test/test.js > ranges: numbers > should increment numerical ranges","fn":"fill","args":[5,8],"out":["5","6","7","8"]}
+{"test":"test/test.js > ranges: numbers > should decrement numerical ranges","fn":"fill","args":["0","-5"],"out":["0","-1","-2","-3","-4","-5"]}
+{"test":"test/test.js > ranges: numbers > should decrement numerical ranges","fn":"fill","args":[-10,-1],"out":["-10","-9","-8","-7","-6","-5","-4","-3","-2","-1"]}
+{"test":"test/test.js > ranges: numbers > should decrement numerical ranges","fn":"fill","args":[0,-5],"out":["0","-1","-2","-3","-4","-5"]}
+{"test":"test/test.js > ranges: numbers > should handle ranges ranges that are positive and negative:","fn":"fill","args":[9,-4],"out":["9","8","7","6","5","4","3","2","1","0","-1","-2","-3","-4"]}
+{"test":"test/test.js > ranges: numbers > should handle ranges ranges that are positive and negative:","fn":"fill","args":[-5,5],"out":["-5","-4","-3","-2","-1","0","1","2","3","4","5"]}
+{"test":"test/test.js > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["a","e"],"out":["a","b","c","d","e"]}
+{"test":"test/test.js > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["A","E"],"out":["A","B","C","D","E"]}
+{"test":"test/test.js > ranges: letters > should decrement alphabetical ranges","fn":"fill","args":["a","C"],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C"]}
+{"test":"test/test.js > ranges: letters > should decrement alphabetical ranges","fn":"fill","args":["E","A"],"out":["E","D","C","B","A"]}
+{"test":"test/test.js > ranges: letters > should decrement alphabetical ranges","fn":"fill","args":["z","m"],"out":["z","y","x","w","v","u","t","s","r","q","p","o","n","m"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","10","1"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","10","2"],"out":["1","3","5","7","9"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["0","1000","200"],"out":["0","200","400","600","800","1000"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","10",2],"out":["1","3","5","7","9"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","20","2"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","20","20"],"out":["1"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["10","1","-2"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["10","1","2"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,"2"],"out":["2","4","6","8","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,1],"out":["2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,2],"out":["2","4","6","8","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,3],"out":["2","5","8"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,"10","2"],"out":["2","4","6","8","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,"10",1],"out":["2","3","4","5","6","7","8","9","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,"10","2"],"out":["2","4","6","8","10"]}
+{"test":"test/test.js > steps: numbers > should increment ranges using the given step","fn":"fill","args":["2",10,"3"],"out":["2","5","8"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":["-1","-10","-2"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":["-1","-10","2"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":["1","10","2"],"out":["1","3","5","7","9"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":["1","20","2"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":["1","20","20"],"out":["1"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":["10","1","-2"],"out":["10","8","6","4","2"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":[-10,-2,2],"out":["-10","-8","-6","-4","-2"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":[-2,-10,1],"out":["-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":[-2,-10,2],"out":["-2","-4","-6","-8","-10"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":[-2,-10,3],"out":["-2","-5","-8"]}
+{"test":"test/test.js > steps: numbers > should fill in negative ranges using the given step","fn":"fill","args":[-9,9,3],"out":["-9","-6","-3","0","3","6","9"]}
+{"test":"test/test.js > steps: letters > should use increments with alphabetical ranges","fn":"fill","args":["a","e",2],"out":["a","c","e"]}
+{"test":"test/test.js > steps: letters > should use increments with alphabetical ranges","fn":"fill","args":["E","A",2],"out":["E","C","A"]}
+{"test":"test/test.js > options: step > should use the step defined on the options:","fn":"fill","args":["a","e",{"step":2}],"out":["a","c","e"]}
+{"test":"test/test.js > options: step > should use the step defined on the options:","fn":"fill","args":["E","A",{"step":2,"silent":true}],"out":["E","C","A"]}
+{"test":"test/test.js > padding: numbers > should pad numbers:","fn":"fill","args":["01","03"],"out":["01","02","03"]}
+{"test":"test/test.js > padding: numbers > should pad numbers:","fn":"fill","args":["0001","0003"],"out":["0001","0002","0003"]}
+{"test":"test/test.js > padding: numbers > should pad numbers:","fn":"fill","args":["-10","00"],"out":["-10","-09","-08","-07","-06","-05","-04","-03","-02","-01","000"]}
+{"test":"test/test.js > padding: numbers > should pad numbers:","fn":"fill","args":["05","100"],"out":["005","006","007","008","009","010","011","012","013","014","015","016","017","018","019","020","021","022","023","024","025","026","027","028","029","030","031","032","033","034","035","036","037","038","039","040","041","042","043","044","045","046","047","048","049","050","051","052","053","054","055","056","057","058","059","060","061","062","063","064","065","066","067","068","069","070","071","072","073","074","075","076","077","078","079","080","081","082","083","084","085","086","087","088","089","090","091","092","093","094","095","096","097","098","099","100"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["1","05","3"],"out":["01","04"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["1","005","3"],"out":["001","004"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["00","1000","200"],"out":["0000","0200","0400","0600","0800","1000"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["0","01000","200"],"out":["00000","00200","00400","00600","00800","01000"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["001","5","3"],"out":["001","004"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["02","10",2],"out":["02","04","06","08","10"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["002","10",2],"out":["002","004","006","008","010"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["002","010",2],"out":["002","004","006","008","010"]}
+{"test":"test/test.js > padding: numbers > should pad numbers when a step is passed:","fn":"fill","args":["-04",4,2],"out":["-04","-02","000","002","004"]}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1.1","2.1"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1.2","2"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1.20","2"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","0f"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","10","ff"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","10.f"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","10f"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","20","2f"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","20","f2"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","2f","2"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","ff","2"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","ff"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["1","f"],"out":null}
+{"test":"test/test.js > padding: numbers > should return `null` for invalid ranges:","fn":"fill","args":["f","1"],"out":null}
+{"test":"test/test.js > special cases > should convert `-0` to `0`:","fn":"fill","args":["-5","-0","-1"],"out":["-5","-4","-3","-2","-1","0"]}
+{"test":"test/test.js > special cases > should convert `-0` to `0`:","fn":"fill","args":["1","-0","2"],"out":["1"]}
+{"test":"test/test.js > special cases > should convert `-0` to `0`:","fn":"fill","args":["1","-0","0"],"out":["1","0"]}
+{"test":"test/test.js > special cases > should adjust padding for negative numbers:","fn":"fill","args":["-01","5"],"out":["-01","000","001","002","003","004","005"]}
+{"test":"test/test.js > special characters: > should use the step defined on the options:","fn":"fill","args":["a","e",{"step":"~"}],"out":["[a-e]"]}
+{"test":"test/test.js > special characters: > should use the step defined on the options:","fn":"fill","args":["E","A",{"step":"~","silent":true}],"out":["(E|D|C|B|A)"]}
+{"test":"test/test.js > special characters: > repeat: > should repeat the first arg `n` times:","fn":"fill","args":["a",3,"+"],"out":["a","a","a"]}
+{"test":"test/test.js > special characters: > repeat: > should repeat the first arg `n` times:","fn":"fill","args":["abc",2,"+"],"out":["abc","abc"]}
+{"test":"test/test.js > special characters: > join: > should join values when `>` is passed:","fn":"fill","args":["a","e",">"],"out":["abcde"]}
+{"test":"test/test.js > special characters: > join: > should join values when `>` is passed:","fn":"fill","args":["A","E",">"],"out":["ABCDE"]}
+{"test":"test/test.js > special characters: > join: > should join values when `>` is passed:","fn":"fill","args":["E","A",">"],"out":["EDCBA"]}
+{"test":"test/test.js > special characters: > join: > should join values when `>` is passed:","fn":"fill","args":["5","8",">"],"out":["5678"]}
+{"test":"test/test.js > special characters: > join: > should use steps with joined values:","fn":"fill","args":["A","Z",">5"],"out":["AFKPUZ"]}
+{"test":"test/test.js > special characters: > join: > should use steps with joined values:","fn":"fill","args":["2","20","2>"],"out":["2468101214161820"]}
+{"test":"test/test.js > special characters: > join: > should use steps with joined values:","fn":"fill","args":["2","20",">2"],"out":["2468101214161820"]}
+{"test":"test/test.js > special characters: > randomize: > should randomize using the first two args when `?` is passed:","fn":"fill","args":["A0",5,"?"],"out":["831DX"]}
+{"test":"test/test.js > special characters: > randomize: > should randomize using the first two args when `?` is passed:","fn":"fill","args":["A0",5,"?"],"out":["0MB4X"]}
+{"test":"test/test.js > special characters: > randomize: > should randomize using the first two args when `?` is passed:","fn":"fill","args":["A",5,"?"],"out":["FSBBU"]}
+{"test":"test/test.js > special characters: > randomize: > should randomize using the first two args when `?` is passed:","fn":"fill","args":["*",5,"?"],"out":["7pH%s"]}
+{"test":"test/test.js > special characters: > randomize: > should randomize using the first two args when `?` is passed:","fn":"fill","args":["aA0",10,"?"],"out":["QLQWdkEoAs"]}
+{"test":"test/test.js > special characters: > regex string: > should respect padding when special chars are used:","fn":"fill","args":["05","100","10"],"out":["005","015","025","035","045","055","065","075","085","095"]}
+{"test":"test/test.js > special characters: > regex string: > should respect padding when special chars are used:","fn":"fill","args":["05","100","10|"],"out":["(005|015|025|035|045|055|065|075|085|095)"]}
+{"test":"test/test.js > special characters: > regex string: > should respect padding when special chars are used:","fn":"fill","args":["05","100","|10"],"out":["(005|015|025|035|045|055|065|075|085|095)"]}
+{"test":"test/test.js > special characters: > regex string: > should respect padding when special chars are used:","fn":"fill","args":["05","100","10~"],"out":["(005|015|025|035|045|055|065|075|085|095)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["c","a","|"],"out":["(c|b|a)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["z","a","|5"],"out":["(z|u|p|k|f|a)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["a","e","2|"],"out":["(a|c|e)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["a","e","|2"],"out":["(a|c|e)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["a","z","|5"],"out":["(a|f|k|p|u|z)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["a","C","|"],"out":["(a|_|Z|Y|X|W|V|U|T|S|R|Q|P|O|N|M|L|K|J|I|H|G|F|E|D|C)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex logical `or`:","fn":"fill","args":["a","C","~"],"out":["(a|_|Z|Y|X|W|V|U|T|S|R|Q|P|O|N|M|L|K|J|I|H|G|F|E|D|C)"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex character class (range):","fn":"fill","args":["a","c","|"],"out":["[a-c]"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex character class (range):","fn":"fill","args":["1","3","|"],"out":["[1-3]"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex character class when `optimize` is true:","fn":"fill","args":["a","c",{"optimize":true}],"out":["[a-c]"]}
+{"test":"test/test.js > special characters: > regex string: > should create a regex character class when `optimize` is true:","fn":"fill","args":["1","3",{"optimize":true}],"out":["[1-3]"]}
+{"test":"test/test.js > special characters: > regex string: > should not create a regex character class when `optimize` is false:","fn":"fill","args":["a","c",{"optimize":false}],"out":["a","b","c"]}
+{"test":"test/test.js > special characters: > regex string: > should not create a regex character class when `optimize` is false:","fn":"fill","args":["1","3",{"optimize":false}],"out":["1","2","3"]}
+{"test":"test/test.js > special characters: > regex string: > should not create a regex character class for negative numbers:","fn":"fill","args":["-1","2"],"out":["-1","0","1","2"]}
+{"test":"test/test.js > special characters: > regex string: > should not create a regex character class for negative numbers:","fn":"fill","args":["-1","2","~"],"out":["-1","0","1","2"]}
+{"test":"test/test.js > special characters: > regex string: > should not create a regex character class for negative numbers:","fn":"fill","args":["0","-2"],"out":["0","-1","-2"]}
+{"test":"test/test.js > special characters: > regex string: > should not create a regex character class for negative numbers:","fn":"fill","args":["0","-2","~"],"out":["0","-1","-2"]}
+{"test":"test/test.js > special characters: > regex string: > should not wrap a single value:","fn":"fill","args":[1,1,"~"],"out":["1"]}
+{"test":"test/test.js > special characters: > regex string: > should not wrap a single value:","fn":"fill","args":["e","e","~"],"out":["e"]}
+{"test":"test/test.js > special characters: > regex string: > when a step is zero it should be coerced to a one:","fn":"fill","args":["a","e","0"],"out":["a","b","c","d","e"]}
+{"test":"test/test.js > special characters: > regex string: > when a step is zero it should be coerced to a one:","fn":"fill","args":["a","e","0|"],"out":["[a-e]"]}
+{"test":"test/test.js > special characters: > regex string: > when a step is zero it should be coerced to a one:","fn":"fill","args":["a","e","~0"],"out":["[a-e]"]}
+{"test":"test/test.js > special characters: > regex string: > when a step is zero it should be coerced to a one:","fn":"fill","args":["a","e","|0"],"out":["[a-e]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":[1,3,"~"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":[1,3,"~1"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":[1,3,"|"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":[1,3,"|1"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":["1","3","|"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":["1","3","|1"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":["1","3","~"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":["1","3","~1"],"out":["[1-3]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":["0","9","|"],"out":["[0-9]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for numbers:","fn":"fill","args":["0","9","~"],"out":["[0-9]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for descending numbers:","fn":"fill","args":["5","1","|"],"out":["(5|4|3|2|1)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for descending numbers:","fn":"fill","args":["5","1","~"],"out":["(5|4|3|2|1)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for descending numbers:","fn":"fill","args":["3","1","~1"],"out":["(3|2|1)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for descending numbers:","fn":"fill","args":["3","1","~|"],"out":["(3|2|1)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for letters:","fn":"fill","args":["a","c","~"],"out":["[a-c]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for letters:","fn":"fill","args":["a","c","|"],"out":["[a-c]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for letters:","fn":"fill","args":["a","z","~"],"out":["[a-z]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid character classes for letters:","fn":"fill","args":["a","z","|"],"out":["[a-z]"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":["1","10","~"],"out":["(1|2|3|4|5|6|7|8|9|10)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":["10","11","~"],"out":["(10|11)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":["10","11","|"],"out":["(10|11)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":["11","10","~"],"out":["(11|10)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":["11","10","|"],"out":["(11|10)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":[10,20,"|"],"out":["(10|11|12|13|14|15|16|17|18|19|20)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":[10,20,"~"],"out":["(10|11|12|13|14|15|16|17|18|19|20)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for numbers:","fn":"fill","args":[9,9,"|"],"out":["9"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["c","a","|"],"out":["(c|b|a)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["c","a","~"],"out":["(c|b|a)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["a","z","5~"],"out":["(a|f|k|p|u|z)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["a","z","5~"],"out":["(a|f|k|p|u|z)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["z","a","5|"],"out":["(z|u|p|k|f|a)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["z","a","5~"],"out":["(z|u|p|k|f|a)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["a","C","|"],"out":["(a|_|Z|Y|X|W|V|U|T|S|R|Q|P|O|N|M|L|K|J|I|H|G|F|E|D|C)"]}
+{"test":"test/test.js > syntax detection: > should determine the correct syntax to avoid creating out-of-order ranges: > should create valid logical `or`s for letters:","fn":"fill","args":["a","C","~"],"out":["(a|_|Z|Y|X|W|V|U|T|S|R|Q|P|O|N|M|L|K|J|I|H|G|F|E|D|C)"]}
+{"test":"test/test.js > prefixes: > logical or: > should add a prefix to a logical or when passed on the options:","fn":"fill","args":["c","a","|",{"regexPrefix":"?:"}],"out":["(?:c|b|a)"]}
+{"test":"test/test.js > prefixes: > logical or: > should add a prefix to a logical or when passed on the options:","fn":"fill","args":["c","a","~",{"regexPrefix":"?:"}],"out":["(?:c|b|a)"]}
+{"test":"test/test.js > prefixes: > logical or: > should add a prefix to a logical or when passed on the options:","fn":"fill","args":["1","10","|",{"regexPrefix":"?!"}],"out":["(?!1|2|3|4|5|6|7|8|9|10)"]}
+{"test":"test/test.js > prefixes: > character classes: > should add a negation prefix to a character class:","fn":"fill","args":["a","c","~",{"regexPrefix":"^"}],"out":["[^a-c]"]}
+{"test":"test/test.js > prefixes: > character classes: > should add a negation prefix to a character class:","fn":"fill","args":["a","c","~",{"regexPrefix":"^"}],"out":["[^a-c]"]}
+{"test":"test/test.js > prefixes: > character classes: > should add a negation prefix to a character class:","fn":"fill","args":["a","c","|",{"regexPrefix":"^"}],"out":["[^a-c]"]}
+{"test":"test/test.js > prefixes: > character classes: > should not add the wrong prefix to a character class:","fn":"fill","args":["a","c","~",{"regexPrefix":"?!"}],"out":["[a-c]"]}
+{"test":"test/test.js > prefixes: > character classes: > should not add the wrong prefix to a character class:","fn":"fill","args":["a","c","~",{"regexPrefix":"?:"}],"out":["[a-c]"]}
+{"test":"test/test.js > prefixes: > character classes: > should not add the wrong prefix to a character class:","fn":"fill","args":["a","c","|",{"regexPrefix":"foo"}],"out":["[a-c]"]}
+{"test":"test/test.js > custom function for expansions: > should expose the current value as the first param.","fn":"fill","args":[1,5,{"$":"function","name":""}],"out":[1,2,3,4,5]}
+{"test":"test/test.js > custom function for expansions: > should expose the `isNumber` boolean as the second param.","fn":"fill","args":["a","e",{"$":"function","name":""}],"out":["a","b","c","d","e"]}
+{"test":"test/test.js > custom function for expansions: > should expose padding as the third param.","fn":"fill","args":["01","05",{"$":"function","name":""}],"out":["001","002","003","004","005"]}
+{"test":"test/test.js > custom function for expansions: > should expose the index as the fourth param.","fn":"fill","args":["a","e",{"$":"function","name":""}],"out":["a0","b1","c2","d3","e4"]}
+{"test":"differences","fn":"fill","args":["1","3",{"makeRe":true}],"out":["[1-3]"]}
+{"test":"differences","fn":"fill","args":["a","c",{"makeRe":true}],"out":["[a-c]"]}
+{"test":"differences","fn":"fill","args":["01","03",{"makeRe":true}],"out":["[01-02-03]"]}
+{"test":"differences","fn":"fill","args":["1","10","3",{"makeRe":true}],"out":["(1|4|7|10)"]}
+{"test":"differences","fn":"fill","args":["-1","2",{"makeRe":true}],"out":["-1","0","1","2"]}
+{"test":"differences","fn":"fill","args":["a","A",{"makeRe":true}],"out":["(a|_|Z|Y|X|W|V|U|T|S|R|Q|P|O|N|M|L|K|J|I|H|G|F|E|D|C|B|A)"]}
+{"test":"differences","fn":"fill","args":["3","1",{"makeRe":true}],"out":["(3|2|1)"]}
+{"test":"differences","fn":"fill","args":["a","e","x",{"makeRe":true}],"out":["[a-e]"]}
+{"test":"differences","fn":"fill","args":["1","5","+",{"makeRe":true}],"out":["1","1","1","1","1"]}
+{"test":"differences","fn":"fill","args":["1","5","|",{"makeRe":true}],"out":["[1-5]"]}
+{"test":"differences","fn":"fill","args":["1","5",">",{"makeRe":true}],"out":["[1-5]"]}
+{"test":"differences","fn":"fill","args":["0","-0",{"makeRe":true}],"out":["0"]}
+{"test":"differences","fn":"fill","args":["1","20",{"makeRe":true}],"out":["(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20)"]}
+{"test":"differences","fn":"fill","args":["1.1","2",{"makeRe":true}],"out":null}
+{"test":"differences","fn":"fill","args":["a","1",{"makeRe":true}],"out":null}
+{"test":"differences","fn":"fill","args":["","2",{"makeRe":true}],"out":null}
+{"test":"differences","fn":"fill","args":["1","9","2~",{"makeRe":true}],"out":["[1-9]"]}
+{"test":"differences","fn":"fill","args":["10","1","-3",{"makeRe":true}],"out":["10","7","4","1"]}
+{"test":"differences","fn":"fill","args":["z","a","5",{"makeRe":true}],"out":["(z|u|p|k|f|a)"]}
+{"test":"differences","fn":"fill","args":["001","10",{"makeRe":true}],"out":["(001|002|003|004|005|006|007|008|009|010)"]}

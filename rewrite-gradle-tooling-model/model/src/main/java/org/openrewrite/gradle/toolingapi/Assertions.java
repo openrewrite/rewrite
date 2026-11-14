@@ -31,6 +31,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 import org.opentest4j.TestAbortedException;
 
+import javax.annotation.CheckReturnValue;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +46,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
+@CheckReturnValue
 public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(URI distributionUrl) {
@@ -64,6 +66,7 @@ public class Assertions {
         return sourceFiles -> {
             try {
                 Path tempDirectory = Files.createTempDirectory("project");
+                File gradleUserHome = testGradleUserHome();
                 // Usage of Assertions.mavenProject() might result in gradle files inside a subdirectory.
                 // Determine the build root from the shallowest build/settings file so that, in a
                 // multi-module build, the wrapper lands at the root rather than the last-iterated subproject.
@@ -129,7 +132,8 @@ public class Assertions {
                                  ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
                                  "zipStoreBase=GRADLE_USER_HOME\n" +
                                  "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
+                        // No gradle-wrapper.jar: the tooling API reads only the properties, and the jar would have to be
+                        // extracted from a download of most of the distribution
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
                         Files.copy(gradleWrapper.gradlew().getInputStream(), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
@@ -153,11 +157,11 @@ public class Assertions {
                             OpenRewriteModel model;
                             if (settingsDir.equals(projectDir)) {
                                 if (rootModel == null) {
-                                    rootModel = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, initScriptContents);
+                                    rootModel = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, initScriptContents, gradleUserHome);
                                 }
                                 model = rootModel;
                             } else {
-                                model = OpenRewriteModelBuilder.forProjectDirectory(settingsDir.toFile(), null, initScriptContents);
+                                model = OpenRewriteModelBuilder.forProjectDirectory(settingsDir.toFile(), null, initScriptContents, gradleUserHome);
                             }
                             GradleSettings gradleSettings = model.getGradleSettings();
                             if(gradleSettings != null) {
@@ -167,11 +171,11 @@ public class Assertions {
                             // Every tooling API build reports all projects in the build, so one build of the root
                             // serves each build file it includes; only files outside that build need their own.
                             if (rootModel == null) {
-                                rootModel = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, initScriptContents);
+                                rootModel = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, initScriptContents, gradleUserHome);
                             }
                             GradleProject gradleProject = rootModel.getGradleProjectsByPath().get(gradlePathFor(tempDirectory, projectDir, sourceFile));
                             if (gradleProject == null) {
-                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile(), initScriptContents);
+                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile(), initScriptContents, gradleUserHome);
                                 gradleProject = model.getGradleProject();
                                 GradleProject projectForPath = model.getGradleProjectsByPath().get(gradlePathFor(tempDirectory, projectDir, sourceFile));
                                 if (projectForPath != null) {
@@ -200,7 +204,7 @@ public class Assertions {
                         // Construct a synthetic marker to apply to freestanding Gradle scripts to aid recipes in resolving dependencies
                         GradleProject freestandingScriptMarker = new GradleProject(
                                 randomId(), "", "", "", "", emptyList(), new ArrayList<>(allRepositories),
-                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()), null);
+                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()), null, null);
                         for (int i = 0; i < sourceFiles.size(); i++) {
                             SourceFile sourceFile = sourceFiles.get(i);
                             if ((sourceFile.getSourcePath().toString().endsWith(".gradle") || sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) &&
@@ -233,6 +237,16 @@ public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> withToolingApi() {
         return withToolingApi((GradleWrapper) null, null);
+    }
+
+    /**
+     * A Gradle user home of this test JVM's own under the directory named by the
+     * {@code org.openrewrite.gradle.local.gradle-user-homes} system property, or null if unset. Left for the build to
+     * delete when the test task next starts, as the home's daemons are still writing to it after this JVM exits.
+     */
+    private static @Nullable File testGradleUserHome() {
+        String homes = System.getProperty("org.openrewrite.gradle.local.gradle-user-homes");
+        return homes == null ? null : new File(homes, System.getProperty("org.gradle.test.worker", "0"));
     }
 
     private static void deleteDirectory(File directoryToBeDeleted) {

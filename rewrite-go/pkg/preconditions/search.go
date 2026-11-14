@@ -43,6 +43,8 @@ type IsSourceFileVisitor struct {
 	pattern string
 }
 
+func (*IsSourceFileVisitor) IsHeavyweight() {}
+
 func NewIsSourceFile(filePattern string) *IsSourceFileVisitor {
 	return &IsSourceFileVisitor{pattern: filePattern}
 }
@@ -68,6 +70,8 @@ func (v *IsSourceFileVisitor) Visit(t java.Tree, _ any) java.Tree {
 type UsesTypeVisitor struct {
 	pattern string
 }
+
+func (*UsesTypeVisitor) IsHeavyweight() {}
 
 func NewUsesType(fullyQualifiedType string) *UsesTypeVisitor {
 	return &UsesTypeVisitor{pattern: fullyQualifiedType}
@@ -133,6 +137,8 @@ func nodeType(node java.Tree) java.JavaType {
 type UsesMethodVisitor struct {
 	matcher *matcher.MethodMatcher
 }
+
+func (*UsesMethodVisitor) IsHeavyweight() {}
 
 func NewUsesMethod(methodPattern string) *UsesMethodVisitor {
 	return &UsesMethodVisitor{matcher: matcher.NewMethodMatcher(methodPattern)}

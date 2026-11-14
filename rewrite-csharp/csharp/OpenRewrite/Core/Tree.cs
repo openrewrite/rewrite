@@ -18,7 +18,7 @@ namespace OpenRewrite.Core;
 /// <summary>
 /// The base interface for all LST (Lossless Semantic Tree) elements.
 /// </summary>
-public interface Tree
+public interface Tree : IHeavyweight
 {
     /// <summary>
     /// An id names a node and carries no secret, so it is drawn in userspace from a per-thread

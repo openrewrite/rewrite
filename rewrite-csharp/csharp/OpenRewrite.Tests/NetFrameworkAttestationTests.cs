@@ -25,6 +25,7 @@ namespace OpenRewrite.Tests;
 /// parsed without type attestation. <c>FrameworkPathOverride</c> is cleared for the duration
 /// because a developer machine may export it as a workaround for this very problem.
 /// </summary>
+[Collection(ProcessEnvironmentCollection.Name)]
 public class NetFrameworkAttestationTests : IDisposable
 {
     private readonly string _tempDir;

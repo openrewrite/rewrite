@@ -21,6 +21,7 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
@@ -39,7 +40,7 @@ import static org.openrewrite.Tree.randomId;
 @With
 @AllArgsConstructor(onConstructor_ = { @JsonCreator})
 @Builder
-public class GradleSettings implements Marker, Serializable {
+public class GradleSettings implements Marker, Heavyweight, Serializable {
 
     @Builder.Default
     UUID id = randomId();

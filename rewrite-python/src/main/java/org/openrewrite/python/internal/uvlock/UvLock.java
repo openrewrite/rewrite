@@ -32,7 +32,7 @@ public class UvLock {
     int version;
 
     /**
-     * Lockfile revision: absent for uv &lt; 0.6 locks, 2 for ~0.7, 3 for current uv.
+     * Lockfile revision: absent for uv &lt; 0.6 locks, 2 for ~0.7, 3 up to uv 0.12.21, 5 from 0.12.22.
      * Drives whether artifacts carry {@code upload-time}; in-place edits must match it.
      */
     @Nullable

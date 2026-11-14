@@ -17,10 +17,78 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.java.tree.J;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class LabelsTest implements RewriteTest {
+
+    @Test
+    void multipleLabelsBeforeIf() {
+        rewriteRun(
+          groovy(
+            """
+              setup : /* first */
+              when: if (true) assert false
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Label.class);
+                J.Label setup = (J.Label) cu.getStatements().get(0);
+                assertThat(setup.getLabel().getSimpleName()).isEqualTo("setup");
+                assertThat(setup.getStatement()).isInstanceOf(J.Label.class);
+                J.Label when = (J.Label) setup.getStatement();
+                assertThat(when.getLabel().getSimpleName()).isEqualTo("when");
+                assertThat(when.getStatement()).isInstanceOf(J.If.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void labelsInIfBranches() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  void test(boolean a, boolean b) {
+                      setup: if (a) {
+                          expect: if (b) assert true
+                          else assert false
+                      } else if (b) {
+                          when: if (a) assert false
+                      } else {
+                          cleanup: if (b) {
+                              assert true
+                          } else {
+                              assert false
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void labelBeforeIf() {
+        rewriteRun(
+          groovy(
+            """
+              setup: if (true) assert false
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Label.class);
+                J.Label label = (J.Label) cu.getStatements().get(0);
+                assertThat(label.getLabel().getSimpleName()).isEqualTo("setup");
+                assertThat(label.getStatement()).isInstanceOf(J.If.class);
+                assertThat(label.getStatement().getPrefix().getWhitespace()).isEqualTo(" ");
+            })
+          )
+        );
+    }
 
     @Test
     void singleLabel() {

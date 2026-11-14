@@ -125,6 +125,16 @@ public class AddMethodParameter extends Recipe {
                 method = method.withParameters(ListUtils.insert(originalParameters, parameter, parameterIndex));
             }
 
+            JavaType.Method methodType = method.getMethodType();
+            if (methodType != null) {
+                int index = parameterIndex == null ? methodType.getParameterNames().size() : parameterIndex;
+                JavaType type = parameter.getType() == null ? JavaType.Unknown.getInstance() : parameter.getType();
+                methodType = methodType
+                        .withParameterNames(ListUtils.insert(methodType.getParameterNames(), parameterName, index))
+                        .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), type, index));
+                method = method.withMethodType(methodType).withName(method.getName().withType(methodType));
+            }
+
             if (parameter.getTypeExpression() != null && !(parameter.getTypeExpression() instanceof J.Identifier || parameter.getTypeExpression() instanceof J.Primitive)) {
                 doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(parameter.getTypeExpression()));
             }
@@ -193,8 +203,11 @@ public class AddMethodParameter extends Recipe {
             if (genericsIndex != -1) {
                 TypeTree rawType = createTypeTree(typeName.substring(0, genericsIndex));
                 List<JRightPadded<Expression>> typeParameters = new ArrayList<>();
+                List<JavaType> typeArguments = new ArrayList<>();
                 for (String typeParam : typeName.substring(genericsIndex + 1, typeName.lastIndexOf('>')).split(",")) {
-                    typeParameters.add(JRightPadded.build((Expression) createTypeTree(typeParam.trim())));
+                    TypeTree typeArgument = createTypeTree(typeParam.trim());
+                    typeParameters.add(JRightPadded.build((Expression) typeArgument));
+                    typeArguments.add(typeArgumentType(typeArgument));
                 }
                 return new J.ParameterizedType(
                         randomId(),
@@ -202,11 +215,12 @@ public class AddMethodParameter extends Recipe {
                         Markers.EMPTY,
                         rawType,
                         JContainer.build(Space.EMPTY, typeParameters, Markers.EMPTY),
-                        new JavaType.Parameterized(null, (JavaType.FullyQualified) rawType.getType(), null)
+                        new JavaType.Parameterized(null, (JavaType.FullyQualified) rawType.getType(), typeArguments)
                 );
             }
             JavaType.Primitive type = JavaType.Primitive.fromKeyword(typeName);
-            if (type != null) {
+            // the parser makes String a name of the class, not a primitive
+            if (type != null && type != JavaType.Primitive.String) {
                 return new J.Primitive(
                         randomId(),
                         Space.EMPTY,
@@ -255,6 +269,25 @@ public class AddMethodParameter extends Recipe {
             }
             return typeTree;
         }
+    }
+
+    /**
+     * A wildcard has no type of its own, so its type as an argument is the generic type variable the parser makes of
+     * it, without the bound {@code Object}, which the parser leaves out.
+     */
+    private static JavaType typeArgumentType(TypeTree typeArgument) {
+        if (!(typeArgument instanceof J.Wildcard)) {
+            return typeArgument.getType() == null ? JavaType.Unknown.getInstance() : typeArgument.getType();
+        }
+        J.Wildcard wildcard = (J.Wildcard) typeArgument;
+        JavaType bound = wildcard.getBoundedType() == null ? null : wildcard.getBoundedType().getType();
+        JavaType.GenericTypeVariable.Variance variance = wildcard.getBound() == null ?
+                JavaType.GenericTypeVariable.Variance.INVARIANT :
+                wildcard.getBound() == J.Wildcard.Bound.Extends ?
+                        JavaType.GenericTypeVariable.Variance.COVARIANT :
+                        JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+        return new JavaType.GenericTypeVariable(null, "?", variance,
+                bound == null || TypeUtils.isObject(bound) ? emptyList() : singletonList(bound));
     }
 
     private static class DeclaresMatchingType extends JavaIsoVisitor<ExecutionContext> {

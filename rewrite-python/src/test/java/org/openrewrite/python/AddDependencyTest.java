@@ -313,9 +313,9 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void markerRefreshedAndFailureSurfacedWhenAdditionNeedsResolution() {
-        // Resolving into a lock restricted to a subset of environments ([tool.uv] environments,
-        // recorded as supported-markers) needs marker-space resolution the native engine defers;
-        // the edit still lands, the marker reflects it, and the failure is surfaced on both files.
+        // Resolving into a lock that requires wheels for some environments ([tool.uv] required-environments,
+        // recorded as required-markers) is deferred by the native engine. The edit still lands, the marker
+        // reflects it, and the failure is surfaced on both files.
         rewriteRun(
           spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           pyproject(
@@ -353,7 +353,7 @@ class AddDependencyTest implements RewriteTest {
               resolution-markers = [
                   "sys_platform == 'linux'",
               ]
-              supported-markers = [
+              required-markers = [
                   "sys_platform == 'linux'",
               ]
 
@@ -415,7 +415,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     private static String uvResource(String name) {
-        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

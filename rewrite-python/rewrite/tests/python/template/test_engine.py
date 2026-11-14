@@ -14,11 +14,14 @@
 
 """Tests for template engine."""
 
+import shutil
+import sys
+
 import pytest
 
-from rewrite.java import tree as j
+from rewrite.java import JavaType, tree as j
 from rewrite.python.template import capture, TemplateEngine
-from rewrite.python.template.engine import TemplateOptions
+from rewrite.python.template.engine import TemplateOptions, _stdlib_only_venv
 
 
 class TestTemplateEngine:
@@ -97,7 +100,7 @@ class TestTemplateEngine:
     def test_generate_wrapper_expression(self):
         """Test wrapper generation for expression."""
         from rewrite.python.template.engine import TemplateOptions
-        wrapper = TemplateEngine._generate_wrapper("x + 1", TemplateOptions())
+        wrapper = TemplateEngine._generate_wrapper("x + 1", TemplateOptions(), {})
 
         assert "def __WRAPPER__():" in wrapper
         assert "return x + 1" in wrapper
@@ -105,7 +108,7 @@ class TestTemplateEngine:
     def test_generate_wrapper_statement(self):
         """Test wrapper generation for statement."""
         from rewrite.python.template.engine import TemplateOptions
-        wrapper = TemplateEngine._generate_wrapper("return 42", TemplateOptions())
+        wrapper = TemplateEngine._generate_wrapper("return 42", TemplateOptions(), {})
 
         assert "def __WRAPPER__():" in wrapper
         # Statement should be indented, not have return
@@ -205,7 +208,7 @@ class TestEngineEdgeCases:
 
     def test_wrapper_with_imports(self):
         """Test that wrapper generation includes imports."""
-        wrapper = TemplateEngine._generate_wrapper("x", TemplateOptions(imports=("import os",)))
+        wrapper = TemplateEngine._generate_wrapper("x", TemplateOptions(imports=("import os",)), {})
         assert "import os" in wrapper
 
     def test_indented_template_dedented(self):
@@ -263,7 +266,7 @@ class TestEngineContextAndDependencies:
     def test_wrapper_with_context(self):
         """Test that wrapper generation includes context statements."""
         wrapper = TemplateEngine._generate_wrapper(
-            "x", TemplateOptions(context=("MyType = int",))
+            "x", TemplateOptions(context=("MyType = int",)), {}
         )
         assert "MyType = int" in wrapper
 
@@ -275,11 +278,46 @@ class TestEngineContextAndDependencies:
                 imports=("import os",),
                 context=("MY_CONST = 42",),
             ),
+            {},
         )
         assert "import os" in wrapper
         assert "MY_CONST = 42" in wrapper
         # imports come before context
         assert wrapper.index("import os") < wrapper.index("MY_CONST = 42")
+
+
+    @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not installed")
+    def test_dependencies_resolve_from_their_workspace_venv(self, monkeypatch):
+        # The runner's environment, which lacks the declared dependency.
+        monkeypatch.setenv("VIRTUAL_ENV", sys.prefix)
+        TemplateEngine.clear_cache()
+
+        tree = TemplateEngine.get_template_tree(
+            "semver.Version(1, 2, 3)",
+            {},
+            TemplateOptions(imports=("import semver",), dependencies=(("semver", "3.0.4"),)),
+        )
+
+        assert isinstance(tree.type, JavaType.FullyQualified)
+        assert tree.type.fully_qualified_name == "semver.version.Version"
+
+    def test_undeclared_dependencies_leave_only_the_standard_library(self):
+        # pytest is installed wherever this test runs, so only the template's environment hides it.
+        third_party = TemplateEngine.get_template_tree(
+            "pytest.fail", {}, TemplateOptions(context=("import pytest",)))
+        stdlib = TemplateEngine.get_template_tree(
+            "os.getcwd()", {}, TemplateOptions(context=("import os",)))
+
+        assert isinstance(third_party.type, JavaType.Unknown)
+        assert stdlib.type == JavaType.Primitive.String
+
+    def test_a_removed_stdlib_venv_is_rebuilt(self):
+        shutil.rmtree(_stdlib_only_venv())
+
+        tree = TemplateEngine.get_template_tree(
+            "os.getcwd()", {}, TemplateOptions(context=("import os",)))
+
+        assert tree.type == JavaType.Primitive.String
 
 
 class TestAutoFormatIntegration:

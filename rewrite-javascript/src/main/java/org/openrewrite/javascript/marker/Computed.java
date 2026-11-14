@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 /**
  * A name written in brackets where the model has room for an identifier only, as the member
  * of {@code enum A { ['b'] }} is. The identifier holds the bracketed literal.
@@ -44,7 +47,7 @@ public class Computed implements Marker, RpcCodec<Computed> {
     @Override
     public void rpcSend(Computed after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, Computed::getSuffix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getSuffix()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

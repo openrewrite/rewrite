@@ -63,6 +63,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -257,8 +258,7 @@ public class KotlinParser implements Parser {
             if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
                 sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), emptyMap());
             } else {
-                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, false);
+                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath);
             }
         }
         return sourceSetProvenance;
@@ -287,12 +287,13 @@ public class KotlinParser implements Parser {
 
         private List<Input> dependsOn = emptyList();
         private JavaTypeCache typeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
 
         @Nullable
         private JavaTypeFactory typeFactory;
 
         private boolean logCompilationWarningsAndErrors;
-        private final List<NamedStyles> styles = new ArrayList<>();
+        private List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
         private boolean isKotlinScript = false;
@@ -309,6 +310,7 @@ public class KotlinParser implements Parser {
             this.classpath = base.classpath;
             this.dependsOn = base.dependsOn;
             this.typeCache = base.typeCache;
+            this.typeCacheConfigured = base.typeCacheConfigured;
             this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
@@ -388,6 +390,7 @@ public class KotlinParser implements Parser {
         @Deprecated
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            this.typeCacheConfigured = true;
             return this;
         }
 
@@ -425,6 +428,7 @@ public class KotlinParser implements Parser {
         @Override
         public KotlinParser build() {
             Collection<Path> cp = resolvedClasspath();
+            typeCache = HashMapJavaTypeCache.forParser(typeCache, typeCacheConfigured || typeFactory != null);
             JavaTypeFactory factory = typeFactory;
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
@@ -441,6 +445,7 @@ public class KotlinParser implements Parser {
         public KotlinParser.Builder clone() {
             KotlinParser.Builder clone = (KotlinParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }

@@ -16,14 +16,20 @@
 package org.openrewrite.kotlin.style;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -746,8 +752,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(3);
     }
 
-    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
-              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Disabled("Detector.build() doesn't use the folded import counts recorded in ImportLayoutSamples; " +
+              "enable once they are connected, as for detectStarImport()")
     @Test
     void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
         var cus = kp().parse(
@@ -784,8 +790,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(5);
     }
 
-    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
-              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Disabled("Detector.build() doesn't use the folded import counts recorded in ImportLayoutSamples; " +
+              "enable once they are connected, as for detectStarImport()")
     @Test
     void staticStarImportCountsStaticallyImportedMethods() {
         var cus = kp().parse(
@@ -1409,5 +1415,89 @@ class AutodetectTest implements RewriteTest {
         // We expect this to be 2 because that's the dominant style in the project
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(2);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(2);
+    }
+    @Nested
+    class Merge {
+        // Each file disagrees with the others somewhere, so the merged result has to reproduce the vote
+        private final List<SourceFile> sources = kp().parse(
+          """
+            import java.io.File
+            import kotlin.collections.List
+            import org.example.Foo as Bar
+
+            class A {
+            	fun a(o: Any?): Int {
+            		if(o == null) {
+            			return 0
+            		}
+            		return listOf(
+            			1,
+            			2,
+            		).size
+            	}
+            }
+            """,
+          """
+            import kotlin.collections.List
+            import java.io.File
+
+            class B {
+                fun b(n: Int, m: Int) {
+                    if (n > 0) {
+                        println(n)
+                    }
+                    for(i in 0 until n) {
+                        foo(i , m)
+                    }
+                }
+            }
+            """,
+          """
+            class C {
+              fun c(s: String?) {
+                if(s == null) {
+                  println(listOf(
+                    1,
+                    2
+                  ))
+                }
+                else {
+                  println(s)
+                }
+              }
+            }
+            """,
+          "class D {\r\n    fun d() {\r\n        try {\r\n        } catch(e: Exception) {\r\n        }\r\n    }\r\n}\r\n"
+        ).toList();
+
+        @Test
+        void mergedDetectorsMatchOneDetectorThatSampledEverything() {
+            var all = detector(sources);
+            assertSameStyles(Autodetect.detector().merge(detector(sources.subList(0, 2))).merge(detector(sources.subList(2, 4))), all);
+            assertSameStyles(detector(sources.subList(2, 3)).merge(detector(sources.subList(3, 4))).merge(detector(sources.subList(0, 2))), all);
+        }
+
+        @Test
+        void serializedDetectorsRoundTrip() throws Exception {
+            var all = detector(sources);
+            for (ObjectMapper mapper : List.of(new ObjectMapper().findAndRegisterModules(), ObjectMappers.propertyBasedMapper(null))) {
+                var first = mapper.readValue(mapper.writeValueAsBytes(detector(sources.subList(0, 1))), Autodetect.Detector.class);
+                var second = mapper.readValue(mapper.writeValueAsBytes(detector(sources.subList(1, 4))), Autodetect.Detector.class);
+                assertSameStyles(first.merge(second), all);
+            }
+        }
+
+        private Autodetect.Detector detector(List<SourceFile> sources) {
+            var detector = Autodetect.detector();
+            sources.forEach(detector::sample);
+            return detector;
+        }
+
+        private void assertSameStyles(Autodetect.Detector actual, Autodetect.Detector expected) {
+            assertThat(actual.build().getStyles())
+              .usingRecursiveComparison()
+              .withEqualsForType((a, b) -> a.pattern().equals(b.pattern()), Pattern.class)
+              .isEqualTo(expected.build().getStyles());
+        }
     }
 }

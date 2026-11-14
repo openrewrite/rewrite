@@ -34,9 +34,8 @@ import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 
 /**
- * A dependency recipe that visits the lock before its package.json computes the edit from the
- * package.json captured at scan time. A change an earlier recipe in the same run made to that
- * package.json must survive, rather than being reverted when the package.json is visited.
+ * A recipe that visits the lock before its package.json computes the edit from the scanned package.json; a change an
+ * earlier recipe in the run made to it must survive.
  */
 class DependencyEditAfterEarlierPackageJsonChangeTest implements RewriteTest {
 
@@ -49,7 +48,8 @@ class DependencyEditAfterEarlierPackageJsonChangeTest implements RewriteTest {
         });
         HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
+                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true,
+                        false)));
         spec.executionContext(ctx);
     }
 
@@ -119,7 +119,8 @@ class DependencyEditAfterEarlierPackageJsonChangeTest implements RewriteTest {
                             }
                           }
                         }
-                        """
+                        """,
+                        s -> s.noTrim()
                 ),
                 packageJson(
                         """

@@ -16,15 +16,37 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
+from uuid import UUID
 
+from rewrite import Marker, random_id
 from rewrite.java import J
 from rewrite.java import tree as j
 from rewrite.java.support_types import JContainer, JRightPadded
 from rewrite.python import tree as py
 from rewrite.python.visitor import PythonVisitor
+from rewrite.utils import lst_dataclass
 from .placeholder import from_placeholder
 from .precedence import enclosing_tree, maybe_parenthesize
+
+
+@lst_dataclass
+class SubstitutedValue(Marker):
+    """Marks a value the template substituted, whose layout is the source's rather than the template's."""
+    _id: int | UUID
+
+
+def substitution_marker(tree: J) -> Optional[SubstitutedValue]:
+    """The `SubstitutedValue` in `tree`'s own markers. An `ExpressionStatement` reports its expression's
+    markers as its own, and is not the value."""
+    own = getattr(tree, '_markers', None)
+    return own.find_first(SubstitutedValue) if own is not None else None
+
+
+def _substitute(value: J, prefix: j.Space) -> J:
+    """`value` under the prefix of the slot it fills, marked as a `SubstitutedValue`."""
+    return value.replace(prefix=prefix,
+                         markers=value.markers.add(SubstitutedValue(random_id())))
 
 
 class PlaceholderReplacementVisitor(PythonVisitor[None]):
@@ -66,10 +88,8 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
 
         if capture_name is not None and capture_name in self._values:
             replacement = self._values[capture_name]
-
-            # Preserve the placeholder's prefix (whitespace before)
-            if hasattr(replacement, 'prefix'):
-                replacement = replacement.replace(prefix=ident.prefix)
+            if isinstance(replacement, J):
+                replacement = _substitute(replacement, ident.prefix)
 
             # The cursor is still on the placeholder, so its parent owns the slot the value lands in
             parent = enclosing_tree(self.cursor.parent) if self.cursor is not None else None
@@ -101,9 +121,8 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
                     capture_name = from_placeholder(expr.simple_name)
                     if capture_name is not None and capture_name in self._values:
                         replacement = self._values[capture_name]
-                        # Preserve the placeholder's whitespace prefix
-                        if hasattr(replacement, '_prefix'):
-                            replacement = replacement.replace(_prefix=expr.prefix)
+                        if isinstance(replacement, J):
+                            replacement = _substitute(replacement, expr.prefix)
                         new_stmts.append(rp.replace(element=replacement))
                         changed = True
                         continue
@@ -163,7 +182,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
                             # Splice the list into the argument positions
                             for i, item in enumerate(value):
                                 prefix = elem.prefix if i == 0 else j.Space([], ' ')
-                                spliced = item.replace(prefix=prefix) if hasattr(item, 'prefix') else item
+                                spliced = _substitute(item, prefix) if isinstance(item, J) else item
                                 new_padded.append(JRightPadded(
                                     spliced, j.Space([], ''), j.Markers.EMPTY,
                                 ))

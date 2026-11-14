@@ -22,6 +22,8 @@ import org.openrewrite.rpc.request.RpcRequest;
 /**
  * One dependency whose public API to enumerate, named by its npm coordinate. A {@code null}
  * version names one of TypeScript's {@code lib.*} runtime declarations instead (e.g. {@code lib.dom}).
+ * {@code path} is a directory whose {@code node_modules} holds the package when the caller has one;
+ * otherwise the package is found under the last parsed project's.
  */
 @Value
 public class Dependency implements RpcRequest {
@@ -29,4 +31,7 @@ public class Dependency implements RpcRequest {
 
     @Nullable
     String version;
+
+    @Nullable
+    String path;
 }

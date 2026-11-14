@@ -15,17 +15,31 @@
  */
 package org.openrewrite.javascript;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.lang.reflect.Modifier;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.javascript;
+import static org.openrewrite.javascript.Assertions.typescript;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
  * Every newline the JavaScript printer emits must be reachable by an in-process {@link JavaScriptVisitor}
@@ -87,4 +101,143 @@ class JavaScriptVisitorTest implements RewriteTest {
         assertVisitorSeesEveryNewline("// header\n/* block\n   comment */\nclass C {\n    m() {\n        return 1; // trailing\n    }\n}");
         assertVisitorSeesEveryNewline("const s = `line one\nline two\nline three`;");
     }
+
+    @Test
+    void deleteOperandIsVisited() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  J.Identifier i = super.visitIdentifier(identifier, ctx);
+                  return "obj".equals(i.getSimpleName()) ? i.withSimpleName("o2") : i;
+              }
+          })),
+          javascript(
+            """
+              const obj = {a: 1};
+              delete obj.a;
+              """,
+            """
+              const o2 = {a: 1};
+              delete o2.a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteIsVisitedAsStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public Statement visitStatement(Statement statement, ExecutionContext ctx) {
+                  Statement s = super.visitStatement(statement, ctx);
+                  return s instanceof JS.Delete ? SearchResult.found(s) : s;
+              }
+          })),
+          javascript(
+            """
+              const obj = {a: 1};
+              delete obj.a;
+              """,
+            """
+              const obj = {a: 1};
+              /*~~>*/delete obj.a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void forOfLoopAwaitSpaceIsVisited() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaScriptIsoVisitor<>() {
+              @Override
+              public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                  Space s = super.visitSpace(space, loc, ctx);
+                  return s.withComments(ListUtils.map(s.getComments(), c ->
+                    c instanceof TextComment && " c ".equals(((TextComment) c).getText()) ? ((TextComment) c).withText(" d ") : c));
+              }
+          })),
+          typescript(
+            "async function f(xs: AsyncIterable<number>) { for /* c */ await (const x of xs) {} }",
+            "async function f(xs: AsyncIterable<number>) { for /* d */ await (const x of xs) {} }"
+          )
+        );
+    }
+
+    @Test
+    void visitsTheTypeOfEveryJsNode() {
+        rewriteRun(typescript(TYPED_NODES, spec -> spec.afterRecipe(cu -> {
+            List<Tree> typedNodes = new ArrayList<>();
+            Set<Tree> typeVisited = Collections.newSetFromMap(new IdentityHashMap<>());
+            new JavaScriptVisitor<Integer>() {
+                @Override
+                public J preVisit(J tree, Integer p) {
+                    if (tree instanceof JS && declaresType(tree.getClass())) {
+                        typedNodes.add(tree);
+                    }
+                    return tree;
+                }
+
+                @Override
+                public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
+                    typeVisited.add(getCursor().getValue());
+                    return javaType;
+                }
+            }.visit(cu, 0);
+
+            assertThat(typedNodes).extracting(Object::getClass)
+              .containsAll(nestedClasses(JS.class).filter(JavaScriptVisitorTest::declaresType).toList());
+            assertThat(typedNodes).filteredOn(t -> !typeVisited.contains(t))
+              .extracting(t -> t.getClass().getSimpleName())
+              .isEmpty();
+        })));
+    }
+
+    private static Stream<Class<?>> nestedClasses(Class<?> c) {
+        return Arrays.stream(c.getDeclaredClasses()).flatMap(n -> Stream.concat(Stream.of(n), nestedClasses(n)));
+    }
+
+    private static boolean declaresType(Class<?> c) {
+        return Arrays.stream(c.getDeclaredFields())
+          .anyMatch(f -> !Modifier.isStatic(f.getModifiers()) && JavaType.class.isAssignableFrom(f.getType()));
+    }
+
+    static final String TYPED_NODES = """
+      import { a as a1, b } from "m";
+      export { a1 as c };
+      type M = import("m");
+      type L = "lit";
+      type Tu = [number, string];
+      type O = { a: number };
+      type U = string | number;
+      type I = O & { b: string };
+      type Q = typeof b;
+      type V = O["a"];
+      type Mp<T> = { [K in keyof T]: T[K] };
+      type C<T> = T extends Array<infer E> ? E : never;
+      type F = (x: number) => string;
+      interface Ix { [k: string]: number }
+      class Base<T> {}
+      class D extends Base<string> {
+          [Symbol.iterator]() { return [][Symbol.iterator](); }
+      }
+      function isS(x: unknown): x is string { return typeof x === "string"; }
+      function tag(s: TemplateStringsArray) { return s; }
+      async function g(p: Promise<number>, xs: number[], fs: (() => void)[], n?: number) {
+          const v = await p;
+          const s = p as unknown;
+          let m = n;
+          m ??= 1;
+          const [x, y] = xs;
+          const { length } = xs;
+          const z = [...xs];
+          const t = `a${v}`;
+          const tt = tag`b`;
+          const sat = {} satisfies object;
+          fs[0]();
+          const eq = x === y;
+      }
+      """;
 }

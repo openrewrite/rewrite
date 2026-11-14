@@ -15,17 +15,23 @@
  */
 package org.openrewrite.python;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.python.tree.Py;
 
-import java.util.List;
+import java.lang.reflect.Modifier;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,8 +43,7 @@ class PythonVisitorCompletenessTest {
     }
 
     long visitorNewlines(SourceFile cu) {
-        AtomicInteger n = new AtomicInteger();
-        new PythonVisitor<AtomicInteger>() {
+        return new PythonVisitor<AtomicInteger>() {
             @Override
             public Space visitSpace(Space s, Space.Location l, AtomicInteger a) {
                 a.addAndGet((int) nl(s.getWhitespace()));
@@ -54,8 +59,7 @@ class PythonVisitorCompletenessTest {
                 a.addAndGet((int) nl(lit.getValueSource()));
                 return super.visitLiteral(lit, a);
             }
-        }.visit(cu, n);
-        return n.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     void check(String src) {
@@ -231,4 +235,71 @@ class PythonVisitorCompletenessTest {
       "g = (\n    x\n    for x in items\n    if x\n)\n",
       "match x:\n    case [\n        1,\n        2,\n    ]:\n        pass\n"
     );
+
+    @Python3Only
+    @Test
+    void visitsTheTypeOfEveryPyNode() {
+        SourceFile cu = PythonParser.builder().build()
+          .parse(new InMemoryExecutionContext(), TYPED_NODES)
+          .findFirst().orElseThrow();
+
+        List<Tree> typedNodes = new ArrayList<>();
+        Set<Tree> typeVisited = Collections.newSetFromMap(new IdentityHashMap<>());
+        new PythonVisitor<Integer>() {
+            @Override
+            public J preVisit(J tree, Integer p) {
+                if (tree instanceof Py && declaresType(tree.getClass())) {
+                    typedNodes.add(tree);
+                }
+                return tree;
+            }
+
+            @Override
+            public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
+                typeVisited.add(getCursor().getValue());
+                return javaType;
+            }
+        }.visit(cu, 0);
+
+        // The parser never produces a Py.SpecialParameter, so no source can cover it.
+        assertThat(typedNodes).extracting(Object::getClass).containsAll(nestedClasses(Py.class)
+          .filter(c -> declaresType(c) && c != Py.SpecialParameter.class)
+          .toList());
+        assertThat(typedNodes).filteredOn(t -> !typeVisited.contains(t))
+          .extracting(t -> t.getClass().getSimpleName())
+          .isEmpty();
+    }
+
+    private static Stream<Class<?>> nestedClasses(Class<?> c) {
+        return Arrays.stream(c.getDeclaredClasses()).flatMap(n -> Stream.concat(Stream.of(n), nestedClasses(n)));
+    }
+
+    private static boolean declaresType(Class<?> c) {
+        return Arrays.stream(c.getDeclaredFields())
+          .anyMatch(f -> !Modifier.isStatic(f.getModifiers()) && JavaType.class.isAssignableFrom(f.getType()));
+    }
+
+    static final String TYPED_NODES = """
+      import asyncio
+      type Alias = int | str
+      a = b = 0
+      x: int = 1
+      async def f() -> None:
+          await asyncio.sleep(0)
+      def g(ys):
+          d = {1: 2}
+          s = {3}
+          c = [y for y in ys]
+          print(*ys, sep="")
+          r = 1 in ys
+          try:
+              pass
+          except ValueError as e:
+              raise RuntimeError() from e
+          match ys:
+              case [1, *rest] if rest:
+                  pass
+      def gen(xs):
+          yield from xs
+      """;
 }

@@ -17,24 +17,35 @@
 from __future__ import annotations
 
 import ast
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from types import FrameType
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 from rewrite import (
+    Cursor,
+    DelegatingExecutionContext,
     ExecutionContext,
     InMemoryExecutionContext,
     InMemoryLargeSourceSet,
+    PrintOutputCapture,
     Recipe,
     TreeVisitor,
 )
+from rewrite.data_table import DATA_TABLE_STORE, DataTable, InMemoryDataTableStore, Row
 from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
 
+from .accumulators import AccumulatorContents
+from .added_markers import assert_no_added_markers
+from .formatting_scope import FormattingScope
+from .probes import assert_none_throw_on_empty, assert_none_throw_on_unparsed
 from .spec import SourceSpec, AfterRecipeText, dedent
+from .tree_shapes import problems as shape_problems
 from .well_formed import assert_well_formed
 
 if TYPE_CHECKING:
@@ -107,11 +118,17 @@ class _Workspace:
     """Where a run's sources sit on disk while they parse."""
 
     paths: Dict[int, Path]
+    texts: Dict[int, str]
     written: Dict[int, str]
     ty_client: Optional[Any]
+    # Whether ty attributed this run, and if not, why.
+    ty_status: str
 
     def source_path(self, spec: SourceSpec) -> Path:
         return self.paths[id(spec)]
+
+    def text(self, spec: SourceSpec) -> str:
+        return self.texts[id(spec)]
 
     def file_path(self, spec: SourceSpec) -> Optional[str]:
         # Only a ty session reads this path; an untyped parse has no use for it.
@@ -152,9 +169,44 @@ class RecipeSpec:
     # Whether to allow empty diffs (recipe modifies AST but printed output unchanged)
     allow_empty_diff: bool = False
 
+    # Whether to fail a recipe that leaves markers on the LST that neither its inputs
+    # nor a fresh parse of its output carry
+    check_reporting_markers_only: bool = True
+
+    # Whether to fail a recipe that puts messages on the execution context, which every
+    # recipe and source file in a run shares
+    check_execution_context_unchanged: bool = True
+
+    # Whether to fail a ScanningRecipe whose scanner changes a tree, which the scanning phase discards
+    check_no_edits_in_scanning_phase: bool = True
+
+    # Whether to fail a ScanningRecipe whose accumulator keeps trees, cursors or other Heavyweight objects
+    check_lightweight_accumulators: bool = True
+
+    # Whether to fail a recipe whose output holds nodes the parser builds differently from the
+    # text they print, such as an identifier where the parser builds a literal
+    check_parser_shaped_trees: bool = True
+
+    # Whether to fail a recipe that auto-formats a whole source file or class that existed
+    # before the run, instead of only what it changed
+    check_minimal_formatting: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
+
+    # The cycles to run, by default one more than `expected_cycles_that_make_changes` and at least two.
+    # The cycles after the expected ones, and a run on a fresh parse of the output, fail the test if
+    # they change anything, so setting this to 1 turns the stability checks off.
+    cycles: Optional[int] = None
+
+    # How many cycles a recipe needs to settle, by default 1. A recipe that only reaches its result
+    # over several cycles declares how many here, and the test then compares the output of the last
+    # of them.
+    expected_cycles_that_make_changes: Optional[int] = None
+
+    # Assertions on the rows the first cycle writes to a data table, each with the name of its table
+    data_table_assertions: List[Tuple[str, Callable[[List[Any]], None]]] = field(default_factory=list)
 
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return replace(self, recipe=recipe)
@@ -167,6 +219,27 @@ class RecipeSpec:
             return self.with_recipe(recipes[0])
         return self.with_recipe(_CompositeRecipe(list(recipes)))
 
+    def data_table(
+        self, table: Union[str, DataTable[Row]], assertion: Callable[[List[Row]], None],
+    ) -> "RecipeSpec":
+        """
+        Assert on the rows the first cycle of each ``rewrite_run`` writes to a data table,
+        failing the run when the recipe wrote none.
+
+        Example:
+            def expect_usages(rows: List[DeprecatedUsage]) -> None:
+                assert rows == [DeprecatedUsage("a.py", "foo")]
+
+            spec = RecipeSpec(recipe=FindDeprecatedUsages()).data_table(
+                FindDeprecatedUsages.table, expect_usages)
+
+        Args:
+            table: The data table, or its fully qualified name
+            assertion: Called with the rows the recipe wrote to the table
+        """
+        name = table if isinstance(table, str) else table.name
+        return replace(self, data_table_assertions=[*self.data_table_assertions, (name, assertion)])
+
     def rewrite_run(self, *source_specs: SourceSpec) -> None:
         """
         Execute the recipe test with the given source specifications.
@@ -175,8 +248,16 @@ class RecipeSpec:
         1. Groups specs by kind (language)
         2. Parses them using appropriate parsers
         3. Validates parse/print idempotence if enabled
-        4. Runs the recipe
-        5. Compares results with expected "after" states
+        4. Runs the recipe for ``expected_cycles_that_make_changes`` cycles, each on the
+           output of the one before
+        5. Checks that the recipe left the execution context unchanged, edited nothing while
+           scanning, kept no trees in its accumulators and added no markers for its own use, if enabled
+        6. Compares results with expected "after" states
+        7. Checks that the recipe auto-formatted only what it changed, if enabled
+        8. Checks that a fresh parse of the output builds the nodes the recipe built, if enabled
+        9. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
+        10. Runs a recipe that changed a source on an empty file of its kind, and without the source, as when
+            its parser failed on it, where it has to raise nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that
@@ -193,7 +274,9 @@ class RecipeSpec:
 
         # Parse and validate all source files
         all_parsed: List[Tuple[SourceSpec, SourceFile]] = []
-        with self._workspace(specs) as workspace:
+        texts = {id(spec): dedent(spec.before) for spec in specs if spec.before is not None}
+        with self._workspace(specs, texts) as workspace:
+            ty_status = workspace.ty_status
             for kind, kind_specs in specs_by_kind.items():
                 parsed = self._parse(kind_specs, workspace)
                 self._expect_no_parse_failures(parsed)
@@ -209,15 +292,36 @@ class RecipeSpec:
             for spec, sf in all_parsed
         ]
 
-        # Run the recipe
         source_files = [sf for _, sf in all_parsed]
-        lss = InMemoryLargeSourceSet(source_files)
-        results = self.recipe.run(lss, self.execution_context)
+        expected_cycles = self.expected_cycles_that_make_changes
+        if expected_cycles is None:
+            expected_cycles = 1
+        cycles = self.cycles if self.cycles is not None else max(2, expected_cycles + 1)
+        if cycles < max(1, expected_cycles):
+            raise ValueError(
+                f"cycles={cycles} has to be at least 1 and at least "
+                f"expected_cycles_that_make_changes={expected_cycles}"
+            )
+        data_tables = InMemoryDataTableStore()
+        self.execution_context.put_message(DATA_TABLE_STORE, data_tables)
+        checks = _RunChecks()
+        formatting = FormattingScope(self.recipe, self.check_minimal_formatting)
+        with formatting.record():
+            results, unsettled = self._run_cycles(source_files, cycles, expected_cycles, checks)
+        self._expect_execution_context_unchanged(checks)
+        checks.accumulators.assert_none_found()
+        if self.check_reporting_markers_only:
+            assert_no_added_markers(source_files, results, self._reparse)
 
         # Build result map: source_file.id -> after_source_file
         result_map: Dict[Any, Optional[SourceFile]] = {}
+        generated: List[SourceFile] = []
         for result in results:
-            if result._before is not None:
+            if result._before is None:
+                # A file the recipe created, which no spec's `before` can be keyed by.
+                if result._after is not None:
+                    generated.append(result._after)
+            else:
                 # Check if there was a change
                 if result._after is not None and result._after is not result._before:
                     result_map[result._before.id] = result._after
@@ -225,7 +329,240 @@ class RecipeSpec:
                     result_map[result._before.id] = None
 
         # Validate results match expected after states
-        self._expect_results_to_match_after(source_specs, all_parsed, result_map)
+        self._expect_results_to_match_after(source_specs, all_parsed, result_map, ty_status)
+        self._expect_generated(source_specs, generated)
+        if unsettled is not None:
+            cycle, changes = unsettled
+            self._expect_no_further_changes(
+                changes,
+                f"Expected recipe to complete in {_plural_cycles(expected_cycles)}, but cycle {cycle} changed",
+            )
+        formatting.assert_formatted_only_what_changed(results)
+        reparsed: Dict[int, Union[SourceFile, str]] = {}
+        if self.check_parser_shaped_trees or cycles > expected_cycles:
+            reparsed = self._reparse_output(specs, all_parsed, results)
+        if self.check_parser_shaped_trees:
+            self._expect_parser_shaped(results, reparsed)
+        if cycles > expected_cycles:
+            self._expect_stable_on_fresh_parse(results, reparsed, checks)
+            self._expect_execution_context_unchanged(checks)
+            checks.accumulators.assert_none_found()
+        self._expect_data_tables(data_tables)
+        self._expect_no_throw_on_other_sources(source_files, results, cycles)
+
+    def _expect_no_throw_on_other_sources(self, sources: List[SourceFile], results: List[Result], cycles: int) -> None:
+        """Run the recipe where a repository differs from the test: on an empty file, and without a file it changed."""
+        changed = {r._before.id for r in results if r._before is not None and r._before is not r._after}
+        if not changed or _is_test_scaffolding(self.recipe):
+            return
+
+        def context() -> ExecutionContext:
+            return _ProbeContext(self.execution_context)
+
+        assert_none_throw_on_empty(self.recipe, sources, changed, self._parse_empty, context, cycles)
+        assert_none_throw_on_unparsed(self.recipe, sources, changed, context, cycles)
+
+    def _parse_empty(self, before: SourceFile) -> Optional[SourceFile]:
+        from rewrite.python.tree import CompilationUnit
+        if not isinstance(before, CompilationUnit):
+            return None
+        try:
+            return self._parse_python("", Path(str(before.source_path)), None, None)
+        except Exception:
+            return None
+
+    def _expect_data_tables(self, store: InMemoryDataTableStore) -> None:
+        written = store.get_data_tables()
+        for name, assertion in self.data_table_assertions:
+            data_table = next((dt for dt in written if dt.name == name), None)
+            if data_table is None:
+                found = list(dict.fromkeys(dt.name for dt in written))
+                raise AssertionError(f"No data table named {name}"
+                                     + (f"\nFound data tables: {', '.join(found)}" if found else ""))
+            assertion(list(store.get_rows(name, data_table.group)))
+
+    def _recipe_context(self, later_cycle: bool, checks: _RunChecks) -> ExecutionContext:
+        """The context of one run of the recipe, which the checks that watch the run look through."""
+        ctx = _LaterCycleContext(self.execution_context) if later_cycle else self.execution_context
+        messages = {
+            ExecutionContext.SCANNING_MUTATION_VALIDATION: self.check_no_edits_in_scanning_phase,
+            ExecutionContext.ACCUMULATOR_INSPECTION:
+                checks.accumulators.inspect if self.check_lightweight_accumulators else None,
+        }
+        return _CheckedContext(ctx, messages, checks.context_puts if self.check_execution_context_unchanged else None)
+
+    def _expect_execution_context_unchanged(self, checks: _RunChecks) -> None:
+        if checks.context_puts:
+            raise AssertionError(
+                "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source "
+                "file in cursor messages, e.g. self.cursor.put_message(...) and self.cursor.get_nearest_message(...).\n"
+                f"{self.recipe.name} put messages on the execution context, which every recipe and source file in a "
+                "run shares, so what it keeps there leaks into the others:\n"
+                + "".join(f'  "{key}" at {site}\n' for key, site in checks.context_puts.items())
+                + "A recipe that must change the execution context opts out with "
+                  "RecipeSpec(check_execution_context_unchanged=False)."
+            )
+
+    def _run_cycles(
+        self, sources: List[SourceFile], cycles: int, expected_cycles: int, checks: _RunChecks,
+    ) -> Tuple[List[Result], Optional[Tuple[int, List[Result]]]]:
+        """Run the recipe cycle after cycle on what the cycle before produced.
+
+        Returns the changes of the expected cycles, from the parsed sources to the output of the
+        last of them, and the cycle that changed the sources after that, with its changes.
+        """
+        # Each entry follows one source file from where it started to where it is now, either
+        # end being None for a file a cycle generated or deleted.
+        lineages: List[List[Optional[SourceFile]]] = [[sf, sf] for sf in sources]
+
+        def changeset() -> List[Result]:
+            return [Result(origin, latest) for origin, latest in lineages]
+
+        settled: Optional[List[Result]] = changeset() if expected_cycles == 0 else None
+        cycles_that_made_changes = 0
+        for cycle in range(1, cycles + 1):
+            live = [latest for _, latest in lineages if latest is not None]
+            ctx = self._recipe_context(cycle > 1, checks)
+            changes = [r for r in self.recipe.run(InMemoryLargeSourceSet(live), ctx) if r._before is not r._after]
+            if not changes:
+                break
+            if settled is not None:
+                return settled, (cycle, changes)
+            cycles_that_made_changes += 1
+            for change in changes:
+                lineage = next((lineage for lineage in lineages
+                                if change._before is not None and lineage[1] is change._before), None)
+                if lineage is not None:
+                    lineage[1] = change._after
+                else:
+                    lineages.append([None, change._after])
+            if cycle >= expected_cycles:
+                settled = changeset()
+        if expected_cycles > 1 and cycles_that_made_changes < expected_cycles:
+            raise AssertionError(
+                f"Expected recipe to complete in {_plural_cycles(expected_cycles)}, but it settled after "
+                f"{_plural_cycles(cycles_that_made_changes)}. Lower expected_cycles_that_make_changes."
+            )
+        return (settled if settled is not None else changeset()), None
+
+    def _expect_no_further_changes(self, changes: List[Result], headline: str, sanitized: bool = False) -> None:
+        found: List[str] = []
+        for change in changes:
+            before, after = change._before, change._after
+            if before is None:
+                if after is not None:
+                    found.append(f"  {after.source_path}, which it generated")
+            elif after is None:
+                found.append(f"  {before.source_path}, which it deleted")
+            else:
+                expected, actual = _print(before, sanitized), _print(after, sanitized)
+                if expected != actual:
+                    found.append(f"  {after.source_path}\nExpected:\n{expected}\n\nActual:\n{actual}")
+                elif not sanitized and not self.allow_empty_diff:
+                    found.append(f"  {after.source_path}, whose LST it changed without changing the printed source")
+        if found:
+            raise AssertionError("\n".join([
+                f"{headline} the sources again:",
+                *found,
+                "A recipe should recognize code it has already changed and leave it alone, so that running it "
+                "again changes nothing. A recipe that is meant to need more cycles declares how many with "
+                "expected_cycles_that_make_changes.",
+            ]))
+
+    def _reparse_output(
+        self,
+        specs: List[SourceSpec],
+        parsed: List[Tuple[SourceSpec, SourceFile]],
+        results: List[Result],
+    ) -> Dict[int, Union[SourceFile, str]]:
+        """A fresh parse of what each Python source of the recipe's output prints, by the ``id`` of that source, or
+        why the text isn't Python. A text the parser doesn't print back as it read it is the parser's to fix, and is
+        left out."""
+        from rewrite.python.tree import CompilationUnit
+        if not any(r._before is not r._after for r in results):
+            return {}
+        finals = [r._after for r in results if r._after is not None]
+
+        spec_of: Dict[int, SourceSpec] = {}
+        for result in results:
+            if result._after is None:
+                continue
+            spec = next((s for s, sf in parsed if sf is result._before), None) if result._before is not None else None
+            spec_of[id(result._after)] = spec if spec is not None else SourceSpec("python", None)
+
+        reparsable = [sf for sf in finals if isinstance(sf, CompilationUnit) and _in_workspace(sf.source_path)]
+        reparse_specs = {id(sf): replace(spec_of[id(sf)], path=Path(str(sf.source_path))) for sf in reparsable}
+        texts = {id(reparse_specs[id(sf)]): _print(sf, True) for sf in reparsable}
+        # The rest of the run's specs, like a pyproject(), shape the workspace as they did the first parse.
+        others = [s for s in specs if s.kind != "python" and s.before is not None]
+        texts.update({id(s): dedent(s.before) for s in others})
+
+        reparsed_by_final: Dict[int, Union[SourceFile, str]] = {}
+        with self._workspace([*reparse_specs.values(), *others], texts) as workspace:
+            for sf in reparsable:
+                spec = reparse_specs[id(sf)]
+                try:
+                    reparsed = self._parse_python(
+                        workspace.text(spec), workspace.source_path(spec), workspace.file_path(spec),
+                        workspace.ty_client,
+                    )
+                except Exception:
+                    error = _syntax_error(workspace.text(spec))
+                    if error is not None:
+                        reparsed_by_final[id(sf)] = error
+                    continue
+                if _print(reparsed, True) == workspace.text(spec):
+                    # What the source file carries, like its styles, comes from outside its text.
+                    reparsed_by_final[id(sf)] = reparsed.replace(markers=sf.markers)
+        return reparsed_by_final
+
+    def _expect_parser_shaped(self, results: List[Result], reparsed: Dict[int, Union[SourceFile, str]]) -> None:
+        found: List[str] = []
+        for result in results:
+            before, after = result._before, result._after
+            fresh = None if after is None or after is before else reparsed.get(id(after))
+            if after is None or fresh is None:
+                continue
+            printed = _print(after, True)
+            if not printed.strip() or before is not None and _print(before, True) == printed:
+                continue
+            problems = ([f"the text it prints doesn't parse: {fresh}"] if isinstance(fresh, str)
+                        else shape_problems(after, fresh))
+            if problems:
+                found.append(f"  {after.source_path}:")
+                found.extend(f"    {problem}" for problem in problems)
+        if found:
+            raise AssertionError(
+                "Write code with a template (rewrite.python.template) or the Python parser, or build the nodes the "
+                "way the parser builds the text they print.\n"
+                f"The output of {self.recipe.name} holds nodes that the parser makes differently of the same text:\n"
+                + "\n".join(found) + "\n"
+                "A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that "
+                "parsed code never holds. If the output is meant to differ from parsed code, opt out with "
+                "RecipeSpec(check_parser_shaped_trees=False)."
+            )
+
+    def _expect_stable_on_fresh_parse(
+        self,
+        results: List[Result],
+        reparsed: Dict[int, Union[SourceFile, str]],
+        checks: _RunChecks,
+    ) -> None:
+        """Run the recipe once more on a fresh parse of its output.
+
+        Code that the next run reads is parsed from the printed output, not the LST this run
+        produced, and a recipe that recognizes its own output only by the shape of that LST
+        changes it again.
+        """
+        fresh = {key: sf for key, sf in reparsed.items() if not isinstance(sf, str)}
+        if not fresh:
+            return
+
+        sources = [fresh.get(id(r._after), r._after) for r in results if r._after is not None]
+        ctx = self._recipe_context(True, checks)
+        changes = [r for r in self.recipe.run(InMemoryLargeSourceSet(sources), ctx) if r._before is not r._after]
+        self._expect_no_further_changes(
+            changes, "Running the recipe on a fresh parse of its output changed", sanitized=True)
 
     def _group_by_kind(self, specs: List[SourceSpec]) -> Dict[str, List[SourceSpec]]:
         """Group source specs by their kind."""
@@ -253,7 +590,7 @@ class RecipeSpec:
                 continue
 
             parsed = self._parse_python(
-                dedent(spec.before),
+                workspace.text(spec),
                 workspace.source_path(spec),
                 workspace.file_path(spec),
                 workspace.ty_client,
@@ -262,20 +599,21 @@ class RecipeSpec:
             # Reports the attribution this run produced, which is the one a
             # pattern written for this test has to match.
             from rewrite.python.type_report import dump_types_if_requested
-            dump_types_if_requested(parsed)
+            dump_types_if_requested(parsed, ty_status=workspace.ty_status)
 
             result.append((spec, parsed))
 
         return result
 
     @contextmanager
-    def _workspace(self, specs: List[SourceSpec]):
+    def _workspace(self, specs: List[SourceSpec], texts: Dict[int, str]):
         """Hold every source in the run in one directory while it parses.
 
         ty reads the sources and the project metadata from there, so a declared
         Python version picks the typeshed and the sources resolve against each
         other. ``uv()`` supplies its dependency workspace through the specs;
-        otherwise the run owns one.
+        otherwise the run owns one. ``texts`` holds each source's contents by
+        the ``id`` of its spec.
         """
         import shutil
         import tempfile
@@ -284,7 +622,7 @@ class RecipeSpec:
         paths = {id(spec): spec.path or Path(f"_{uuid4().hex}.{spec.ext}") for spec in specs}
 
         if not self.type_attribution:
-            yield _Workspace(paths, {}, None)
+            yield _Workspace(paths, texts, {}, None, "off, type_attribution=False")
             return
 
         root = next((spec.project_root for spec in specs if spec.project_root), None)
@@ -295,12 +633,13 @@ class RecipeSpec:
         written: Dict[int, str] = {}
         created: List[Path] = []
         ty_client = None
+        ty_status = "on"
         try:
             for spec in specs:
-                if spec.before is None:
+                if id(spec) not in texts:
                     continue
                 logical = paths[id(spec)]
-                if logical.is_absolute() or ".." in logical.parts:
+                if not _in_workspace(logical):
                     # The run removes what it writes, so a path leading out of the
                     # workspace would write and delete on the caller's tree.
                     raise ValueError(f"a source path stays inside the workspace: {logical}")
@@ -309,18 +648,20 @@ class RecipeSpec:
                 if not destination.exists():
                     created.append(destination)
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_text(dedent(spec.before))
+                destination.write_text(texts[id(spec)])
                 written[id(spec)] = str(destination)
 
             try:
                 from rewrite.python.ty_client import TyTypesClient
                 # handle_parse resolves this same version for a real parse.
                 ty_client = TyTypesClient(python_version=ty_python_version(detect_from_project(root)))
-                ty_client.initialize(root)
-            except (ImportError, RuntimeError):
+                if not ty_client.initialize(root):
+                    ty_status = f"off, ty could not initialize against {root}"
+            except (ImportError, RuntimeError) as exc:
                 ty_client = None
+                ty_status = f"off, ty-types unavailable: {exc}"
 
-            yield _Workspace(paths, written, ty_client)
+            yield _Workspace(paths, texts, written, ty_client, ty_status)
         finally:
             if ty_client is not None:
                 ty_client.shutdown()
@@ -360,6 +701,13 @@ class RecipeSpec:
         cu = visitor.visit_Module(tree)
         return cu.replace(source_path=source_path)
 
+    def _reparse(self, source_file: SourceFile) -> Optional[SourceFile]:
+        """Parse what ``source_file`` prints, or return None for a source this harness cannot parse."""
+        from rewrite.python.tree import CompilationUnit
+        if not isinstance(source_file, CompilationUnit):
+            return None
+        return self._parse_python(_print(source_file, True), source_file.source_path, None, None)
+
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]
     ) -> None:
@@ -387,6 +735,7 @@ class RecipeSpec:
         specs: Tuple[SourceSpec, ...],
         parsed: List[Tuple[SourceSpec, SourceFile]],
         result_map: Dict[Any, Optional[SourceFile]],
+        ty_status: str,
     ) -> None:
         """Validate recipe results match expected after states."""
         # Build a map from spec to parsed source file
@@ -394,7 +743,8 @@ class RecipeSpec:
 
         for spec in specs:
             if spec.before is None:
-                # Generated file case - not implemented yet
+                # A generated file, which `_expect_generated` checks: there is no parsed
+                # source file here to key a result by.
                 continue
 
             source_file = parsed_map.get(id(spec))
@@ -427,7 +777,7 @@ class RecipeSpec:
                 if after_sf is None:
                     from rewrite.python.type_report import attribution_hint
                     before_sf = parsed_map.get(id(spec))
-                    hint = "" if before_sf is None else attribution_hint(before_sf)
+                    hint = "" if before_sf is None else attribution_hint(before_sf, ty_status=ty_status)
                     raise AssertionError(
                         f"Expected recipe to produce a change for:\n{dedent(spec.before)}{hint}"
                     )
@@ -445,6 +795,67 @@ class RecipeSpec:
                 final_sf = after_sf if after_sf is not None else source_file
                 spec.after_recipe(final_sf)
 
+    def _match_generated(
+        self, spec: SourceSpec, unclaimed: List[SourceFile],
+    ) -> Optional[SourceFile]:
+        """The generated file `spec` describes, or None when the recipe produced no match.
+
+        Matched on the source path when the spec gives one, and otherwise on contents, which
+        is what the Java test framework does and is the only thing left to match on.
+        """
+        if spec.path is not None:
+            for source_file in unclaimed:
+                if Path(str(source_file.source_path)) == Path(spec.path):
+                    return source_file
+            return None
+        for source_file in unclaimed:
+            actual = source_file.print_all()
+            if actual == self._resolve_after(spec.after, actual):
+                return source_file
+        return None
+
+    def _expect_generated(
+        self,
+        specs: Tuple[SourceSpec, ...],
+        generated: List[SourceFile],
+    ) -> None:
+        """Check the files the recipe created against the specs that have no `before`."""
+        unclaimed = list(generated)
+        for spec in specs:
+            if spec.before is not None:
+                continue
+            if spec.after is None:
+                raise AssertionError(
+                    "A source spec with neither a `before` nor an `after` describes nothing. "
+                    "Pass the expected contents as `after`, and a `path` when the recipe "
+                    "chooses where the file lands."
+                )
+
+            match = self._match_generated(spec, unclaimed)
+            if match is None:
+                raise AssertionError(
+                    "Expected the recipe to generate a source file%s, and it generated:\n%s"
+                    % ("" if spec.path is None else f" at {spec.path}",
+                       _source_paths(generated))
+                )
+            unclaimed.remove(match)
+            assert_well_formed(match)
+
+            actual = match.print_all()
+            expected = self._resolve_after(spec.after, actual)
+            assert actual == expected, (
+                f"Generated {match.source_path} does not match expected.\n"
+                f"Expected:\n{repr(expected)}\n\nActual:\n{repr(actual)}"
+            )
+            if spec.after_recipe:
+                spec.after_recipe(match)
+
+        if unclaimed:
+            raise AssertionError(
+                "The recipe generated source files the test did not expect:\n%s"
+                % _source_paths(unclaimed)
+            )
+
     def _resolve_after(self, after: AfterRecipeText, actual: str) -> str:
         """Resolve the expected after value."""
         if callable(after):
@@ -452,7 +863,131 @@ class RecipeSpec:
             if result is None:
                 return actual  # Callable returned None = actual is acceptable
             return result
-        return dedent(after) if after else actual
+        return actual if after is None else dedent(after)
+
+
+class _LaterCycleContext(DelegatingExecutionContext):
+    """The context of a cycle after the first, which writes no data tables, as in Java."""
+
+    def __init__(self, delegate: ExecutionContext):
+        super().__init__(delegate)
+        self._data_tables = None
+
+    def get_message(self, key, default_value=None):
+        if key == DATA_TABLE_STORE:
+            return default_value if self._data_tables is None else self._data_tables
+        return super().get_message(key, default_value)
+
+    def put_message(self, key, value):
+        if key == DATA_TABLE_STORE:
+            self._data_tables = value
+        else:
+            super().put_message(key, value)
+
+
+class _ProbeContext(DelegatingExecutionContext):
+    """The context of a probe, which reads the test's messages but keeps its own, and its data tables, to itself."""
+
+    def __init__(self, delegate: ExecutionContext):
+        super().__init__(delegate)
+        self._messages: Dict[str, Any] = {}
+
+    def get_message(self, key, default_value=None):
+        if key in self._messages:
+            return self._messages[key]
+        return default_value if key == DATA_TABLE_STORE else super().get_message(key, default_value)
+
+    def put_message(self, key, value):
+        self._messages[key] = value
+
+
+# The messages the framework itself puts on the execution context while a recipe runs.
+_FRAMEWORK_MESSAGES = frozenset({DATA_TABLE_STORE, ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT})
+
+
+@dataclass
+class _RunChecks:
+    """What the checks that watch the recipe run find, over every run of one ``rewrite_run``."""
+
+    # Each message the recipe put on the execution context, with where it first put it.
+    context_puts: Dict[str, str] = field(default_factory=dict)
+    accumulators: AccumulatorContents = field(default_factory=AccumulatorContents)
+
+
+class _CheckedContext(DelegatingExecutionContext):
+    """The context a recipe runs under, which holds the messages that turn checks on and records those the
+    recipe puts on it."""
+
+    def __init__(self, delegate: ExecutionContext, messages: Dict[str, Any], puts: Optional[Dict[str, str]]):
+        super().__init__(delegate)
+        self._messages = messages
+        self._puts = puts
+
+    def get_message(self, key, default_value=None):
+        if key in self._messages:
+            return self._messages[key]
+        return super().get_message(key, default_value)
+
+    def put_message(self, key, value):
+        if self._puts is not None and key not in _FRAMEWORK_MESSAGES and key not in self._puts:
+            self._puts[key] = _call_site(sys._getframe(1))
+        super().put_message(key, value)
+
+
+def _call_site(frame: Optional[FrameType]) -> str:
+    # The code that called put_message, past any execution context that passed the call on.
+    while frame is not None and frame.f_code.co_name == "put_message":
+        frame = frame.f_back
+    if frame is None:
+        return "an unknown place"
+    code = frame.f_code
+    return f"{code.co_qualname.rsplit('<locals>.', 1)[-1]} ({Path(code.co_filename).name}:{frame.f_lineno})"
+
+
+def _print(source_file: SourceFile, sanitized: bool = False) -> str:
+    if not sanitized:
+        return source_file.print_all()
+    # Printed without search markers, which print as comments that are not Python.
+    return source_file.print(Cursor(None, Cursor.ROOT_VALUE),
+                             PrintOutputCapture(0, PrintOutputCapture.MarkerPrinter.SANITIZED))
+
+
+def _syntax_error(text: str) -> Optional[str]:
+    """Why ``text`` isn't Python, or None when it is."""
+    try:
+        ast.parse(text[1:] if text.startswith('\ufeff') else text)
+    except SyntaxError as e:
+        line = (e.text or "").strip()
+        return f"{e.msg} on line {e.lineno}" + (f", `{line}`" if line else "")
+    except ValueError as e:
+        return str(e)
+    return None
+
+
+def _in_workspace(path: Any) -> bool:
+    path = Path(str(path))
+    return not path.is_absolute() and ".." not in path.parts
+
+
+def _is_test_scaffolding(recipe: Recipe) -> bool:
+    """Whether a test made the recipe up to exercise something else: an ad-hoc recipe, one whose class is defined in
+    a function, or one with such a step."""
+    if isinstance(recipe, (NoopRecipe, AdHocRecipe)) or "<locals>" in type(recipe).__qualname__:
+        return True
+    try:
+        return any(_is_test_scaffolding(child) for child in recipe.recipe_list())
+    except Exception:
+        return True
+
+
+def _plural_cycles(n: int) -> str:
+    return f"{n} cycle" if n == 1 else f"{n} cycles"
+
+
+def _source_paths(source_files: List[SourceFile]) -> str:
+    if not source_files:
+        return "    (nothing)"
+    return "\n".join(f"    {source_file.source_path}" for source_file in source_files)
 
 
 class _CompositeRecipe(Recipe):

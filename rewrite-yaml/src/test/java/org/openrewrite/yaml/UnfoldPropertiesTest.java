@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -439,6 +440,8 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void preserveCommentsOnDuplicatedNestedSections() {
         rewriteRun(
+          // a comment keeps the sections from merging, so the output repeats a key
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
           yaml(
             """
               spring:
@@ -464,6 +467,8 @@ class UnfoldPropertiesTest implements RewriteTest {
     // TODO implement handling of comments, remove this test and enable the `mergeDuplicatedSectionsWitComments` test
     void mergeDuplicatedSectionsCommentsAreIgnored() {
         rewriteRun(
+          // the output repeats a key until comments are handled
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
           yaml(
             """
               logging.level:

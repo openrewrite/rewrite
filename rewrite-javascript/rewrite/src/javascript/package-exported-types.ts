@@ -16,9 +16,9 @@
 import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
-import {JavaScriptTypeMapping} from "./type-mapping";
-
-const TYPESCRIPT_FILE = /\.[cm]?tsx?$/;
+import {JavaScriptTypeMapping, moduleClass} from "./type-mapping";
+import {packageNameOf} from "./package-name";
+import {isTypeScript} from "./tree";
 
 // Free functions are not exported-type entries; only nominal types (and value modules, which are
 // descended into for nested types) qualify.
@@ -35,6 +35,9 @@ const TYPE_SYMBOL_FLAGS =
  * a {@code ts.Program} is rooted at each package's declaration entry, the {@code references}
  * closure supplies node_modules resolution, and the types each own package exports are
  * mapped with full members and methods. Types reached transitively come back shallow.
+ * A package also defines its module, any `export as namespace` name, and its own id, as empty
+ * classes: a call on the module is declared by the first, and a symbol names its declaring package
+ * by the last. An untyped package defines nothing else.
  *
  * @param ownArtifacts package directories whose public types should be defined (full bodies)
  * @param references node_modules roots / sibling packages used only for symbol resolution
@@ -56,7 +59,7 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         forceConsistentCasingInFileNames: false,
     };
 
-    const host = ts.createCompilerHost(compilerOptions);
+    const host = withCachedLibFiles(ts.createCompilerHost(compilerOptions), compilerOptions);
     // Default node resolution from each file's on-disk location, falling back to the
     // explicit reference roots when a dependency isn't co-located with the own package.
     host.resolveModuleNameLiterals = (moduleLiterals, containingFile) =>
@@ -81,19 +84,27 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
             entries.push(path.normalize(entry));
         }
     }
+    const moduleNames = new Set(ownArtifacts.filter(ts.sys.directoryExists).flatMap(packageNames));
     if (entries.length === 0) {
-        return [];
+        return [...moduleNames].map(moduleClass);
     }
 
     const program = ts.createProgram(entries, compilerOptions, host);
     const checker = program.getTypeChecker();
     const typeMapping = new JavaScriptTypeMapping(checker);
 
+    const ownFiles = ownFilesOf(ownArtifacts);
+    const declaredHere = (symbol: ts.Symbol): boolean => {
+        const files = (symbol.declarations ?? []).map(declaration => declaration.getSourceFile());
+        // A runtime declaration file adds to globals the other runtime files declare too.
+        return files.some(ownFiles) && (moduleNames.size === 0 || !files.some(program.isSourceFileDefaultLibrary));
+    };
+
     // Lowest arity wins for a given FQN, mirroring the C# byFqn dedup.
     const byFqn = new Map<string, Type.Class>();
     const collect = (cls: Type.Class): void => {
         const fqn = cls.fullyQualifiedName;
-        if (!fqn || fqn === "unknown" || fqn === "<unknown>" || fqn === Type.FUNCTION_TYPE_NAME) {
+        if (!fqn || fqn === "unknown" || fqn === "<unknown>" || fqn === Type.FUNCTION_TYPE_NAME || fqn === Type.OBJECT_TYPE_NAME) {
             return;
         }
         const existing = byFqn.get(fqn);
@@ -106,6 +117,9 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         for (const symbol of symbols) {
             // Isolate per-symbol mapping: one throwing export must not abort the coordinate.
             try {
+                if (!declaredHere(aliasTarget(checker, symbol))) {
+                    continue;
+                }
                 const declNodes = classLikeDeclarations(symbol);
                 if (declNodes.length > 0) {
                     const cls = typeMapping.declarationType(declNodes[0]);
@@ -152,7 +166,81 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         }
     }
 
+    if (moduleNames.size > 0) {
+        for (const name of [...moduleNames, ...namespaceExports(program, ownFiles)]) {
+            if (!byFqn.has(name)) {
+                byFqn.set(name, moduleClass(name));
+            }
+        }
+    }
     return [...byFqn.values()];
+}
+
+/**
+ * What a package's own names are: the module consumers import it as, and its id. The module is the
+ * directory it is installed in, since an npm alias installs a package under a name of the alias's
+ * choosing, and a DefinitelyTyped package's module is the package it types, where its id is its own.
+ * The id is written `npm:<package>`, so that it is never a module's name: a stale `@types/uuid` defines
+ * the module `uuid`, and `uuid`, which ships its own types, is still the only package whose id that is.
+ */
+export function packageNames(dir: string): string[] {
+    const installed = path.resolve(dir).split(path.sep).join("/");
+    const nodeModules = "/node_modules/";
+    const at = installed.lastIndexOf(nodeModules);
+    const manifestName = packageManifest(dir)?.name;
+    const directory = at >= 0 ? installed.substring(at + nodeModules.length) : path.basename(installed);
+    const id = typeof manifestName === "string" ? manifestName : directory;
+    return [packageNameOf(at >= 0 ? directory : id), `npm:${id}`];
+}
+
+/** Whether a file is one of the artifacts, or inside one and not in a package installed beneath it. */
+function ownFilesOf(artifacts: string[]): (file: ts.SourceFile) => boolean {
+    const roots = artifacts.flatMap(artifact => [path.resolve(artifact), ts.sys.realpath?.(artifact) ?? artifact]);
+    return file => {
+        const fileName = path.resolve(file.fileName);
+        return roots.some(root => fileName === root ||
+            containedIn(root, fileName) && !fileName.substring(root.length).includes(`${path.sep}node_modules${path.sep}`));
+    };
+}
+
+/** What a type alias stands for: its own name where the alias names a structure, else the type it renames. */
+function aliasTarget(checker: ts.TypeChecker, symbol: ts.Symbol): ts.Symbol {
+    if (!(symbol.flags & ts.SymbolFlags.TypeAlias)) {
+        return symbol;
+    }
+    const declared = checker.getDeclaredTypeOfSymbol(symbol);
+    return declared.aliasSymbol ?? declared.symbol ?? symbol;
+}
+
+function namespaceExports(program: ts.Program, ownFiles: (file: ts.SourceFile) => boolean): string[] {
+    return program.getSourceFiles().filter(ownFiles).flatMap(file =>
+        file.statements.filter(ts.isNamespaceExportDeclaration).map(statement => statement.name.text));
+}
+
+/**
+ * Every package's program loads TypeScript's default lib: 93 files, 3 MB of declarations, against a
+ * typical package's few KB. Parsed and bound once and shared by every program after, as a language
+ * service shares them across projects, a package costs only its own files.
+ */
+const LIB_SOURCE_FILES = new Map<string, ts.SourceFile>();
+
+function withCachedLibFiles(host: ts.CompilerHost, options: ts.CompilerOptions): ts.CompilerHost {
+    const libDir = path.dirname(ts.getDefaultLibFilePath(options)) + path.sep;
+    const getSourceFile = host.getSourceFile;
+    host.getSourceFile = (fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) => {
+        if (!fileName.startsWith(libDir)) {
+            return getSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+        }
+        let sourceFile = LIB_SOURCE_FILES.get(fileName);
+        if (sourceFile === undefined) {
+            sourceFile = getSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+            if (sourceFile) {
+                LIB_SOURCE_FILES.set(fileName, sourceFile);
+            }
+        }
+        return sourceFile;
+    };
+    return host;
 }
 
 function arity(cls: Type.Class): number {
@@ -161,7 +249,7 @@ function arity(cls: Type.Class): number {
 
 /** A TypeScript declaration/source FILE (e.g. a `lib.*.d.ts` of ambient globals), used directly as a program entry. */
 function declarationFileEntry(artifact: string): string | undefined {
-    return ts.sys.fileExists(artifact) && TYPESCRIPT_FILE.test(artifact) ? artifact : undefined;
+    return ts.sys.fileExists(artifact) && isTypeScript(artifact) ? artifact : undefined;
 }
 
 /** Top-level ambient type declarations of a script (non-module) file — a `lib.*.d.ts`'s globals; namespaces descended for nested types. */
@@ -205,7 +293,7 @@ function resolvePackageEntry(dir: string, options: ts.CompilerOptions, host: ts.
         for (const attempt of [conditions, [...conditions, "require"]]) {
             const resolved = ts.resolveModuleName(manifest.name, path.join(dir, "__entry__.ts"),
                 {...options, customConditions: attempt}, host).resolvedModule?.resolvedFileName;
-            if (resolved && TYPESCRIPT_FILE.test(resolved) && containedIn(dir, resolved)) {
+            if (resolved && isTypeScript(resolved) && containedIn(dir, resolved)) {
                 return resolved;
             }
         }

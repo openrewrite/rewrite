@@ -12,12 +12,12 @@ from rewrite.java.support_types import Space as Space
 
 @dataclass(frozen=True)
 class Semicolon(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
 @dataclass(frozen=True)
 class TrailingComma(Marker):
-    _id: UUID
+    _id: int | UUID
     _suffix: Space
 
 
@@ -26,5 +26,5 @@ class TrailingComma(Marker):
 
 @dataclass(frozen=True)
 class OmitParentheses(Marker):
-    _id: UUID
+    _id: int | UUID
 

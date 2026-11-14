@@ -47,7 +47,7 @@ import static java.util.Objects.requireNonNull;
  * @param <T> The type of tree.
  * @param <P> An input object that is passed to every visit method.
  */
-public abstract class TreeVisitor<T extends @Nullable Tree, P> {
+public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyweight {
     private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
     private static final int DEADLINE_CHECK_MASK = 255;
 
@@ -143,14 +143,6 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
-        assert parent.isRoot() ||
-               !(parent.getValue() instanceof Tree) ||
-               !((Tree) parent.getValue()).isScope(tree) ||
-               !(p instanceof ExecutionContext) ||
-               !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
-                "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
-                "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
-                "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
         this.cursor = parent;
         return visit(tree, p);
     }

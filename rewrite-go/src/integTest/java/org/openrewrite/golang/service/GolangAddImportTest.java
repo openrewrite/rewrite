@@ -102,7 +102,7 @@ class GolangAddImportTest implements RewriteTest {
                     .withName(m.getName().withSimpleName("ToUpper"))
                     .withMethodType(m.getMethodType().withDeclaringType(strings).withName("ToUpper"));
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main

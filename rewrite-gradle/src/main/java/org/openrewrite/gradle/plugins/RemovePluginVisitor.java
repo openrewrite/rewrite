@@ -19,17 +19,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.gradle.internal.RemoveStatementsVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.tree.K;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
+public class RemovePluginVisitor extends RemoveStatementsVisitor<ExecutionContext> {
     String pluginId;
 
     // Wildcard type because KTS extension functions have a file-level declaring type, not Project/Settings
@@ -51,49 +51,24 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             return b;
         }
 
-        return b.withStatements(ListUtils.map(b.getStatements(), statement -> {
-            J.MethodInvocation m;
-            if (statement instanceof J.MethodInvocation) {
-                m = (J.MethodInvocation) statement;
-            } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation) {
-                m = (J.MethodInvocation) ((J.Return) statement).getExpression();
-            } else {
-                return statement;
+        for (Statement statement : b.getStatements()) {
+            J expression = statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement;
+            if (expression instanceof J.MethodInvocation && isPluginDeclaration((J.MethodInvocation) expression)) {
+                remove((J.MethodInvocation) expression);
             }
+        }
+        return b;
+    }
 
-            // Check for id("pluginId")
-            if (isIdMethodInvocation(m)) {
-                if (isPluginLiteral(m.getArguments().get(0))) {
-                    return null;
-                }
-            }
-            // Check for id("pluginId").version("...")
-            else if (isVersionMethodInvocation(m)) {
-                if (m.getSelect() instanceof J.MethodInvocation &&
-                        isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
-                    return null;
-                }
-            }
-            // Check for id("pluginId").apply(...) or id("pluginId").version("...").apply(...)
-            else if (isApplyMethodInvocation(m)) {
-                if (isIdMethodInvocation(m.getSelect())) {
-                    if (m.getSelect() instanceof J.MethodInvocation &&
-                            isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
-                        return null;
-                    }
-                } else if (isVersionMethodInvocation(m.getSelect())) {
-                    if (m.getSelect() instanceof J.MethodInvocation &&
-                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect())) {
-                        if (((J.MethodInvocation) m.getSelect()).getSelect() instanceof J.MethodInvocation &&
-                                isPluginLiteral(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
-                            return null;
-                        }
-                    }
-                }
-            }
-
-            return statement;
-        }));
+    private boolean isPluginDeclaration(J.MethodInvocation m) {
+        Expression spec = m;
+        if (isApplyMethodInvocation(spec)) {
+            spec = ((J.MethodInvocation) spec).getSelect();
+        }
+        if (isVersionMethodInvocation(spec)) {
+            spec = ((J.MethodInvocation) spec).getSelect();
+        }
+        return isIdMethodInvocation(spec) && isPluginLiteral(((J.MethodInvocation) spec).getArguments().get(0));
     }
 
     private boolean isPluginsMethod(J.MethodInvocation m) {
@@ -130,7 +105,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
         // Check for empty plugins{} block
@@ -138,7 +113,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             if (m.getArguments().get(0) instanceof J.Lambda &&
                     ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block &&
                     ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
-                return null;
+                remove(m);
             }
         }
         // Check for TOP-LEVEL apply plugin: "..." or apply(plugin = "...")
@@ -148,13 +123,13 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                     G.MapEntry me = (G.MapEntry) arg;
                     if (me.getKey() instanceof J.Literal && "plugin".equals(((J.Literal) me.getKey()).getValue()) &&
                             me.getValue() instanceof J.Literal && pluginId.equals(((J.Literal) me.getValue()).getValue())) {
-                        return null;
+                        remove(m);
                     }
                 } else if (arg instanceof J.Assignment) {
                     J.Assignment as = (J.Assignment) arg;
                     if (as.getVariable() instanceof J.Identifier && "plugin".equals(((J.Identifier) as.getVariable()).getSimpleName()) &&
                             as.getAssignment() instanceof J.Literal && pluginId.equals(((J.Literal) as.getAssignment()).getValue())) {
-                        return null;
+                        remove(m);
                     }
                 }
             }

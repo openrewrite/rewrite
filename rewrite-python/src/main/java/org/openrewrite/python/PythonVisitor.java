@@ -69,7 +69,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         await = (Py.Await) tempExpression;
         await = await.withMarkers(visitMarkers(await.getMarkers(), p));
-        return await.withExpression(visitAndCast(await.getExpression(), p));
+        await = await.withExpression(visitAndCast(await.getExpression(), p));
+        return await.withType(visitType(await.getType(), p));
     }
 
     public J visitBinary(Py.Binary binary, P p) {
@@ -84,7 +85,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         binary = binary.withLeft(visitAndCast(binary.getLeft(), p));
         binary = binary.getPadding().withOperator(visitLeftPadded(binary.getPadding().getOperator(), PyLeftPadded.Location.BINARY_OPERATOR, p));
         binary = binary.withNegation(visitSpace(binary.getNegation(), PySpace.Location.BINARY_NEGATION, p));
-        return binary.withRight(visitAndCast(binary.getRight(), p));
+        binary = binary.withRight(visitAndCast(binary.getRight(), p));
+        return binary.withType(visitType(binary.getType(), p));
     }
 
     public J visitChainedAssignment(Py.ChainedAssignment chainedAssignment, P p) {
@@ -97,13 +99,15 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         chainedAssignment = (Py.ChainedAssignment) tempStatement;
         chainedAssignment = chainedAssignment.withMarkers(visitMarkers(chainedAssignment.getMarkers(), p));
         chainedAssignment = chainedAssignment.getPadding().withVariables(ListUtils.map(chainedAssignment.getPadding().getVariables(), el -> visitRightPadded(el, PyRightPadded.Location.CHAINED_ASSIGNMENT_VARIABLES, p)));
-        return chainedAssignment.withAssignment(visitAndCast(chainedAssignment.getAssignment(), p));
+        chainedAssignment = chainedAssignment.withAssignment(visitAndCast(chainedAssignment.getAssignment(), p));
+        return chainedAssignment.withType(visitType(chainedAssignment.getType(), p));
     }
 
     public J visitExceptionType(Py.ExceptionType exceptionType, P p) {
         exceptionType = exceptionType.withPrefix(visitSpace(exceptionType.getPrefix(), PySpace.Location.EXCEPTION_TYPE_PREFIX, p));
         exceptionType = exceptionType.withMarkers(visitMarkers(exceptionType.getMarkers(), p));
-        return exceptionType.withExpression((Expression) visitTypeNameIfNameTree(visitAndCast(exceptionType.getExpression(), p), p));
+        exceptionType = exceptionType.withExpression((Expression) visitTypeNameIfNameTree(visitAndCast(exceptionType.getExpression(), p), p));
+        return exceptionType.withType(visitType(exceptionType.getType(), p));
     }
 
     // Python type positions hold `Expression`/`J` children (to allow e.g. `None`, subscripts, or forward-reference
@@ -121,13 +125,15 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         literalType = (Py.LiteralType) tempExpression;
         literalType = literalType.withMarkers(visitMarkers(literalType.getMarkers(), p));
-        return literalType.withLiteral(visitAndCast(literalType.getLiteral(), p));
+        literalType = literalType.withLiteral(visitAndCast(literalType.getLiteral(), p));
+        return literalType.withType(visitType(literalType.getType(), p));
     }
 
     public J visitTypeHint(Py.TypeHint typeHint, P p) {
         typeHint = typeHint.withPrefix(visitSpace(typeHint.getPrefix(), PySpace.Location.TYPE_HINT_PREFIX, p));
         typeHint = typeHint.withMarkers(visitMarkers(typeHint.getMarkers(), p));
-        return typeHint.withTypeTree((Expression) visitTypeNameIfNameTree(visitAndCast(typeHint.getTypeTree(), p), p));
+        typeHint = typeHint.withTypeTree((Expression) visitTypeNameIfNameTree(visitAndCast(typeHint.getTypeTree(), p), p));
+        return typeHint.withType(visitType(typeHint.getType(), p));
     }
 
     public J visitCompilationUnit(Py.CompilationUnit compilationUnit, P p) {
@@ -181,7 +187,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         keyValue = (Py.KeyValue) tempExpression;
         keyValue = keyValue.withMarkers(visitMarkers(keyValue.getMarkers(), p));
         keyValue = keyValue.getPadding().withKey(visitRightPadded(keyValue.getPadding().getKey(), PyRightPadded.Location.KEY_VALUE_KEY, p));
-        return keyValue.withValue(visitAndCast(keyValue.getValue(), p));
+        keyValue = keyValue.withValue(visitAndCast(keyValue.getValue(), p));
+        return keyValue.withType(visitType(keyValue.getType(), p));
     }
 
     public J visitDictLiteral(Py.DictLiteral dictLiteral, P p) {
@@ -193,7 +200,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         dictLiteral = (Py.DictLiteral) tempExpression;
         dictLiteral = dictLiteral.withMarkers(visitMarkers(dictLiteral.getMarkers(), p));
-        return dictLiteral.getPadding().withElements(visitContainer(dictLiteral.getPadding().getElements(), PyContainer.Location.DICT_LITERAL_ELEMENTS, p));
+        dictLiteral = dictLiteral.getPadding().withElements(visitContainer(dictLiteral.getPadding().getElements(), PyContainer.Location.DICT_LITERAL_ELEMENTS, p));
+        return dictLiteral.withType(visitType(dictLiteral.getType(), p));
     }
 
     public J visitCollectionLiteral(Py.CollectionLiteral collectionLiteral, P p) {
@@ -205,7 +213,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         collectionLiteral = (Py.CollectionLiteral) tempExpression;
         collectionLiteral = collectionLiteral.withMarkers(visitMarkers(collectionLiteral.getMarkers(), p));
-        return collectionLiteral.getPadding().withElements(visitContainer(collectionLiteral.getPadding().getElements(), PyContainer.Location.COLLECTION_LITERAL_ELEMENTS, p));
+        collectionLiteral = collectionLiteral.getPadding().withElements(visitContainer(collectionLiteral.getPadding().getElements(), PyContainer.Location.COLLECTION_LITERAL_ELEMENTS, p));
+        return collectionLiteral.withType(visitType(collectionLiteral.getType(), p));
     }
 
     public J visitFormattedString(Py.FormattedString formattedString, P p) {
@@ -270,7 +279,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         comprehensionExpression = comprehensionExpression.withMarkers(visitMarkers(comprehensionExpression.getMarkers(), p));
         comprehensionExpression = comprehensionExpression.withResult(visitAndCast(comprehensionExpression.getResult(), p));
         comprehensionExpression = comprehensionExpression.withClauses(ListUtils.map(comprehensionExpression.getClauses(), el -> (Py.ComprehensionExpression.Clause)visit(el, p)));
-        return comprehensionExpression.withSuffix(visitSpace(comprehensionExpression.getSuffix(), PySpace.Location.COMPREHENSION_EXPRESSION_SUFFIX, p));
+        comprehensionExpression = comprehensionExpression.withSuffix(visitSpace(comprehensionExpression.getSuffix(), PySpace.Location.COMPREHENSION_EXPRESSION_SUFFIX, p));
+        return comprehensionExpression.withType(visitType(comprehensionExpression.getType(), p));
     }
 
     public J visitComprehensionCondition(Py.ComprehensionExpression.Condition condition, P p) {
@@ -300,7 +310,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         typeAlias = typeAlias.withName(visitAndCast(typeAlias.getName(), p));
         typeAlias = typeAlias.getPadding().withTypeParameters(visitContainer(typeAlias.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         typeAlias = typeAlias.getPadding().withValue(visitLeftPadded(typeAlias.getPadding().getValue(), PyLeftPadded.Location.TYPE_ALIAS_VALUE, p));
-        return typeAlias.getPadding().withValue(typeAlias.getPadding().getValue().withElement(visitTypeNameIfNameTree(typeAlias.getPadding().getValue().getElement(), p)));
+        typeAlias = typeAlias.getPadding().withValue(typeAlias.getPadding().getValue().withElement(visitTypeNameIfNameTree(typeAlias.getPadding().getValue().getElement(), p)));
+        return typeAlias.withType(visitType(typeAlias.getType(), p));
     }
 
     public J visitYieldFrom(Py.YieldFrom yieldFrom, P p) {
@@ -312,7 +323,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         yieldFrom = (Py.YieldFrom) tempExpression;
         yieldFrom = yieldFrom.withMarkers(visitMarkers(yieldFrom.getMarkers(), p));
-        return yieldFrom.withExpression(visitAndCast(yieldFrom.getExpression(), p));
+        yieldFrom = yieldFrom.withExpression(visitAndCast(yieldFrom.getExpression(), p));
+        return yieldFrom.withType(visitType(yieldFrom.getType(), p));
     }
 
     public J visitUnionType(Py.UnionType unionType, P p) {
@@ -325,7 +337,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         unionType = (Py.UnionType) tempExpression;
         unionType = unionType.withMarkers(visitMarkers(unionType.getMarkers(), p));
         unionType = unionType.getPadding().withTypes(ListUtils.map(unionType.getPadding().getTypes(), el -> visitRightPadded(el, PyRightPadded.Location.UNION_TYPE_TYPES, p)));
-        return unionType.getPadding().withTypes(ListUtils.map(unionType.getPadding().getTypes(), el -> el.withElement((Expression) visitTypeNameIfNameTree(el.getElement(), p))));
+        unionType = unionType.getPadding().withTypes(ListUtils.map(unionType.getPadding().getTypes(), el -> el.withElement((Expression) visitTypeNameIfNameTree(el.getElement(), p))));
+        return unionType.withType(visitType(unionType.getType(), p));
     }
 
     public J visitVariableScope(Py.VariableScope variableScope, P p) {
@@ -355,7 +368,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
     public J visitSpecialParameter(Py.SpecialParameter specialParameter, P p) {
         specialParameter = specialParameter.withPrefix(visitSpace(specialParameter.getPrefix(), PySpace.Location.SPECIAL_PARAMETER_PREFIX, p));
         specialParameter = specialParameter.withMarkers(visitMarkers(specialParameter.getMarkers(), p));
-        return specialParameter.withTypeHint(visitAndCast(specialParameter.getTypeHint(), p));
+        specialParameter = specialParameter.withTypeHint(visitAndCast(specialParameter.getTypeHint(), p));
+        return specialParameter.withType(visitType(specialParameter.getType(), p));
     }
 
     public J visitStar(Py.Star star, P p) {
@@ -367,7 +381,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         star = (Py.Star) tempExpression;
         star = star.withMarkers(visitMarkers(star.getMarkers(), p));
-        return star.withExpression(visitAndCast(star.getExpression(), p));
+        star = star.withExpression(visitAndCast(star.getExpression(), p));
+        return star.withType(visitType(star.getType(), p));
     }
 
     public J visitNamedArgument(Py.NamedArgument namedArgument, P p) {
@@ -380,7 +395,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         namedArgument = (Py.NamedArgument) tempExpression;
         namedArgument = namedArgument.withMarkers(visitMarkers(namedArgument.getMarkers(), p));
         namedArgument = namedArgument.withName(visitAndCast(namedArgument.getName(), p));
-        return namedArgument.getPadding().withValue(visitLeftPadded(namedArgument.getPadding().getValue(), PyLeftPadded.Location.NAMED_ARGUMENT_VALUE, p));
+        namedArgument = namedArgument.getPadding().withValue(visitLeftPadded(namedArgument.getPadding().getValue(), PyLeftPadded.Location.NAMED_ARGUMENT_VALUE, p));
+        return namedArgument.withType(visitType(namedArgument.getType(), p));
     }
 
     public J visitTypeHintedExpression(Py.TypeHintedExpression typeHintedExpression, P p) {
@@ -393,7 +409,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         typeHintedExpression = (Py.TypeHintedExpression) tempExpression;
         typeHintedExpression = typeHintedExpression.withMarkers(visitMarkers(typeHintedExpression.getMarkers(), p));
         typeHintedExpression = typeHintedExpression.withExpression(visitAndCast(typeHintedExpression.getExpression(), p));
-        return typeHintedExpression.withTypeHint(visitAndCast(typeHintedExpression.getTypeHint(), p));
+        typeHintedExpression = typeHintedExpression.withTypeHint(visitAndCast(typeHintedExpression.getTypeHint(), p));
+        return typeHintedExpression.withType(visitType(typeHintedExpression.getType(), p));
     }
 
     public J visitErrorFrom(Py.ErrorFrom errorFrom, P p) {
@@ -406,7 +423,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         errorFrom = (Py.ErrorFrom) tempExpression;
         errorFrom = errorFrom.withMarkers(visitMarkers(errorFrom.getMarkers(), p));
         errorFrom = errorFrom.withError(visitAndCast(errorFrom.getError(), p));
-        return errorFrom.getPadding().withFrom(visitLeftPadded(errorFrom.getPadding().getFrom(), PyLeftPadded.Location.ERROR_FROM_FROM, p));
+        errorFrom = errorFrom.getPadding().withFrom(visitLeftPadded(errorFrom.getPadding().getFrom(), PyLeftPadded.Location.ERROR_FROM_FROM, p));
+        return errorFrom.withType(visitType(errorFrom.getType(), p));
     }
 
     public J visitMatchCase(Py.MatchCase matchCase, P p) {
@@ -419,7 +437,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         matchCase = (Py.MatchCase) tempExpression;
         matchCase = matchCase.withMarkers(visitMarkers(matchCase.getMarkers(), p));
         matchCase = matchCase.withPattern(visitAndCast(matchCase.getPattern(), p));
-        return matchCase.getPadding().withGuard(visitLeftPadded(matchCase.getPadding().getGuard(), PyLeftPadded.Location.MATCH_CASE_GUARD, p));
+        matchCase = matchCase.getPadding().withGuard(visitLeftPadded(matchCase.getPadding().getGuard(), PyLeftPadded.Location.MATCH_CASE_GUARD, p));
+        return matchCase.withType(visitType(matchCase.getType(), p));
     }
 
     public J visitMatchCasePattern(Py.MatchCase.Pattern pattern, P p) {
@@ -431,7 +450,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         pattern = (Py.MatchCase.Pattern) tempExpression;
         pattern = pattern.withMarkers(visitMarkers(pattern.getMarkers(), p));
-        return pattern.getPadding().withChildren(visitContainer(pattern.getPadding().getChildren(), PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, p));
+        pattern = pattern.getPadding().withChildren(visitContainer(pattern.getPadding().getChildren(), PyContainer.Location.MATCH_CASE_PATTERN_CHILDREN, p));
+        return pattern.withType(visitType(pattern.getType(), p));
     }
 
     public J visitSlice(Py.Slice slice, P p) {

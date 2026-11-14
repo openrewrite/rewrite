@@ -22,14 +22,18 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.search.FindDependency;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
+
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 public class RetainVersions {
 
@@ -107,6 +111,63 @@ public class RetainVersions {
             }
         }
         return recipes;
+    }
+
+    /**
+     * Retain management dropped by an upgraded BOM on behalf of descendant modules. The importing
+     * POM owns this management: restoring it there leaves explicit dependency versions and child
+     * dependency-management overrides in place.
+     */
+    public static List<ResolvedManagedDependency> planForModules(MavenResolutionResult importer,
+                                                                ResolvedGroupArtifactVersion oldBom,
+                                                                ResolvedPom newBom,
+                                                                List<String> retainVersions) {
+        Map<GroupArtifactClassifierType, ResolvedManagedDependency> retained = new LinkedHashMap<>();
+        for (ResolvedManagedDependency managed : importer.getPom().getDependencyManagement()) {
+            if (!oldBom.equals(managed.getBomGav()) ||
+                newBom.getManagedDependency(managed.getGroupId(), managed.getArtifactId(),
+                        managed.getType(), managed.getClassifier()) != null) {
+                continue;
+            }
+            for (String gav : retainVersions) {
+                if (StringUtils.isBlank(gav)) {
+                    continue;
+                }
+                String[] parts = gav.split(":");
+                if (matchesGlob(managed.getGroupId(), parts[0]) && matchesGlob(managed.getArtifactId(), parts[1]) &&
+                    usedByDescendant(importer, managed)) {
+                    ResolvedManagedDependency dependency = parts.length == 3 ?
+                            managed.withGav(managed.getGav().withVersion(parts[2])) : managed;
+                    retained.put(new GroupArtifactClassifierType(managed.getGroupId(), managed.getArtifactId(),
+                            managed.getClassifier(), managed.getType()), dependency);
+                }
+            }
+        }
+        return new ArrayList<>(retained.values());
+    }
+
+    private static boolean usedByDescendant(MavenResolutionResult parent, ResolvedManagedDependency managed) {
+        for (MavenResolutionResult module : parent.getModules()) {
+            ResolvedPom pom = module.getPom();
+            ResolvedManagedDependency inherited = pom.getManagedDependency(managed.getGroupId(), managed.getArtifactId(),
+                    managed.getType(), managed.getClassifier());
+            if (inherited == null || !Objects.equals(managed.getBomGav(), inherited.getBomGav())) {
+                continue;
+            }
+            // An equal BOM provenance may come from a local re-import. That import is also
+            // upgraded by the recipe and will no longer supply this dependency.
+            for (Dependency dependency : pom.getRequested().getDependencies()) {
+                if (dependency.getVersion() == null &&
+                    managed.matches(pom.getValue(dependency.getGroupId()), pom.getValue(dependency.getArtifactId()),
+                            pom.getValue(dependency.getType()), pom.getValue(dependency.getClassifier()))) {
+                    return true;
+                }
+            }
+            if (usedByDescendant(module, managed)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static <T> boolean noneMatch(Set<T> existingDependencies, Predicate<T> predicate) {

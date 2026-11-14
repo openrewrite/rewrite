@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {ExecutionContext} from "./execution";
-import {rootCursor, SourceFile} from "./tree";
+import {Cursor, rootCursor, SourceFile} from "./tree";
 import {createTwoFilesPatch} from "diff";
 import {TreePrinters} from "./print";
 import {Recipe, ScanningRecipe} from "./recipe";
@@ -83,6 +83,25 @@ async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext, recipe
     }
 }
 
+/**
+ * Under this key a test harness puts an {@link AccumulatorListener} on the execution context, which the scheduler
+ * calls with the accumulator of each scanning recipe after the scanning phase and again after the editing phase.
+ */
+export const ACCUMULATOR_LISTENER = "org.openrewrite.test.accumulatorListener";
+
+export type AccumulatorListener =
+    (accumulators: Map<ScanningRecipe<any>, any>, phase: "after scanning" | "after editing") => void;
+
+async function accumulators(recipe: Recipe, recipeLists: RecipeLists, cursor: Cursor,
+                            ctx: ExecutionContext): Promise<Map<ScanningRecipe<any>, any>> {
+    return (await recurseRecipeList(recipe, new Map<ScanningRecipe<any>, any>(), recipeLists, async (r, found) => {
+        if (r instanceof ScanningRecipe && !found.has(r)) {
+            found.set(r, r.accumulator(cursor, ctx));
+        }
+        return found;
+    }))!;
+}
+
 export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: ExecutionContext): Promise<RecipeRun> {
     const changeset: Result[] = [];
     for await (const result of scheduleRunStreaming(recipe, before, ctx)) {
@@ -135,13 +154,21 @@ export async function* scheduleRunStreaming(
             // of the recipe list, leaving nested scanners unrun.
             await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
-                    await (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor);
+                    const scanned = await (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor);
+                    if (scanned !== b2 && ctx.getBoolean(ExecutionContext.SCANNING_MUTATION_VALIDATION, false)) {
+                        throw new Error("Record what the scanner finds in the accumulator, and make the edits in " +
+                            `editorWithData(acc). ${recipe.name}'s scanner ${scanned ? "changed" : "deleted"} ` +
+                            `${b2.sourcePath}, and the scanning phase discards edits. A scanner that reuses an ` +
+                            "editing visitor opts out with spec.checkNoEditsInScanningPhase = false.");
+                    }
                 }
                 return b2;
             });
         }
 
         const totalFiles = files.length;
+        const listener: AccumulatorListener | undefined = ctx.messages[ACCUMULATOR_LISTENER];
+        listener?.(await accumulators(recipe, recipeLists, cursor, ctx), "after scanning");
 
         // Phase 2: Collect generated files
         const generated = (await recurseRecipeList(recipe, [] as SourceFile[], recipeLists, async (recipe, generated) => {
@@ -169,6 +196,7 @@ export async function* scheduleRunStreaming(
                 yield new Result(undefined, editedG);
             }
         }
+        listener?.(await accumulators(recipe, recipeLists, cursor, ctx), "after editing");
     } else {
         // For non-scanning recipes, process files immediately as they come in
         let processCount = 0;

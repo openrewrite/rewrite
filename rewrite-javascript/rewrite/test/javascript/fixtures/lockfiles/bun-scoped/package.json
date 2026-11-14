@@ -1,0 +1,9 @@
+{
+  "name": "test-scoped-lockfile-project",
+  "version": "1.0.0",
+  "description": "Test project for scoped packages in bun.lock",
+  "dependencies": {
+    "@inquirer/confirm": "^5.1.21",
+    "is-odd": "^3.0.1"
+  }
+}

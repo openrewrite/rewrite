@@ -220,7 +220,7 @@ internal class PatternMatchingComparator
             {
                 var c = (Identifier)candidate;
                 return MatchValue(p.Annotations, c.Annotations, cursor)
-                    && p.SimpleName == c.SimpleName;
+                    && (p.SimpleName == c.SimpleName || Cs.GetValueText(p) == Cs.GetValueText(c));
             }
             case Binary p:
             {

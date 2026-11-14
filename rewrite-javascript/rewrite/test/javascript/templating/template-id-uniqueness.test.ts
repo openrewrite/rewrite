@@ -148,9 +148,14 @@ describe('template id uniqueness', () => {
         spec.recipe = fromVisitor(matchAndReplace(doubleNegation, booleanCall));
 
         return spec.rewriteRun({
+            //language=typescript
             ...typescript(
-                'const a = !!foo;\nconst b = !!bar;',
-                'const a = Boolean(foo);\nconst b = Boolean(bar);'
+                `
+                const a = !!foo;
+                const b = !!bar;`,
+                `
+                const a = Boolean(foo);
+                const b = Boolean(bar);`
             ),
             afterRecipe: expectUniqueIds
         });
@@ -162,9 +167,14 @@ describe('template id uniqueness', () => {
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args})`));
 
         return spec.rewriteRun({
+            //language=typescript
             ...typescript(
-                'foo(1, 2);\nfoo(3, 4);',
-                'bar(1, 2);\nbar(3, 4);'
+                `
+                foo(1, 2);
+                foo(3, 4);`,
+                `
+                bar(1, 2);
+                bar(3, 4);`
             ),
             afterRecipe: expectUniqueIds
         });
@@ -244,9 +254,14 @@ describe('template id uniqueness', () => {
         });
 
         return spec.rewriteRun({
+            //language=typescript
             ...typescript(
-                'wrap(1);\nwrap(2);',
-                'f(1);\nf(1);'
+                `
+                wrap(1);
+                wrap(2);`,
+                `
+                f(1);
+                f(1);`
             ),
             afterRecipe: expectUniqueIds
         });

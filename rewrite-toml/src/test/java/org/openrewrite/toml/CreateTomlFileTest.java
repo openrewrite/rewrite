@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.toml.Assertions.toml;
 
 class CreateTomlFileTest implements RewriteTest {
@@ -228,5 +230,98 @@ class CreateTomlFileTest implements RewriteTest {
             spec -> spec.path("config/settings.toml")
           )
         );
+    }
+
+    @Test
+    void repeatSubtablesOfEachArrayOfTablesElement() {
+        rewriteRun(
+          spec -> spec.recipe(new CreateTomlFile(
+            "poetry.lock",
+            """
+              [[package]]
+              name = "certifi"
+              version = "2024.8.30"
+
+              [package.source]
+              type = "legacy"
+              url = "https://pypi.example.com/simple"
+
+              [[package]]
+              name = "requests"
+              version = "2.32.3"
+
+              [package.dependencies]
+              certifi = ">=2017.4.17"
+
+              [package.source]
+              type = "legacy"
+              url = "https://pypi.example.com/simple"
+              """,
+            null,
+            null
+          )),
+          toml(
+            doesNotExist(),
+            """
+              [[package]]
+              name = "certifi"
+              version = "2024.8.30"
+
+              [package.source]
+              type = "legacy"
+              url = "https://pypi.example.com/simple"
+
+              [[package]]
+              name = "requests"
+              version = "2.32.3"
+
+              [package.dependencies]
+              certifi = ">=2017.4.17"
+
+              [package.source]
+              type = "legacy"
+              url = "https://pypi.example.com/simple"
+              """,
+            spec -> spec.path("poetry.lock")
+          )
+        );
+    }
+
+    @Test
+    void rejectSubtableRepeatedWithinOneArrayOfTablesElement() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(new CreateTomlFile(
+            "poetry.lock",
+            """
+              [[package]]
+              name = "certifi"
+              version = "2024.8.30"
+
+              [package.source]
+              type = "legacy"
+
+              [package.source]
+              url = "https://pypi.example.com/simple"
+              """,
+            null,
+            null
+          )),
+          toml(
+            doesNotExist(),
+            """
+              [[package]]
+              name = "certifi"
+              version = "2024.8.30"
+
+              [package.source]
+              type = "legacy"
+
+              [package.source]
+              url = "https://pypi.example.com/simple"
+              """,
+            spec -> spec.path("poetry.lock")
+          )
+        ));
+        assertThat(e).hasMessageContaining("the table `package.source` appears twice, which TOML doesn't allow");
     }
 }

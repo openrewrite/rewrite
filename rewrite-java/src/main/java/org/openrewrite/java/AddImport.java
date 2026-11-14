@@ -105,6 +105,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
+            // Languages that don't model imports as J.Import (e.g. JavaScript, Python) leave these null
+            //noinspection ConstantValue
+            if (cu.getPadding().getImports() == null) {
+                return cu;
+            }
             if (packageName == null || JavaType.Primitive.fromKeyword(fullyQualifiedName) != null) {
                 return cu;
             }
@@ -171,11 +176,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 // (which could include license headers and the like)
                 Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
                 importToAdd = importToAdd.withPrefix(firstClassPrefix
-                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                        .withComments(ListUtils.filter(firstClassPrefix.getComments(), comment -> !(comment instanceof Javadoc)))
                         .withWhitespace(""));
 
                 cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                        clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                        clazz.withComments(ListUtils.filter(clazz.getComments(), comment -> comment instanceof Javadoc))
                 ));
             }
 
@@ -217,7 +222,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 continue;
             }
             if (imp.isStatic()) {
-                if (imp.getTypeName().equals(fullyQualifiedName)) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(imp.getTypeName(), fullyQualifiedName)) {
                     if (ending.equals(member)) {
                         return ImportStatus.EXPLICITLY_IMPORTED;
                     } else if ("*".equals(ending)) {
@@ -258,12 +263,16 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private Optional<JavaType> getTypeReference(NameTree t) {
+        // Only the type's simple name, as in `RoundingMode.HALF_EVEN`, needs the type imported, not a qualified
+        // name like `Outer.Nested.CONST`, a variable like `node.next`, or a `var` that infers the type.
         if (!(t instanceof J.FieldAccess)) {
-           return Optional.ofNullable(t.getType());
-
+            return t.getMarkers().findFirst(JavaVarKeyword.class).isPresent() ?
+                    Optional.empty() : Optional.ofNullable(t.getType());
         }
-        if (isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName)) {
-            return Optional.ofNullable(((J.FieldAccess) t).getTarget().getType());
+        Expression target = ((J.FieldAccess) t).getTarget();
+        if (target instanceof J.Identifier && ((J.Identifier) target).getFieldType() == null &&
+                isOfClassType(target.getType(), fullyQualifiedName)) {
+            return Optional.ofNullable(target.getType());
         }
         return Optional.empty();
     }
@@ -282,7 +291,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private Optional<JavaType> findTypeReference(JavaSourceFile compilationUnit) {
         if (member == null) {
             //Non-static imports, we just look for field accesses.
-            for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
+            for (NameTree t : FindTypes.find(compilationUnit.withImports(emptyList()), fullyQualifiedName)) {
                 if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) {
                     Optional<JavaType> mayBeTypeReference = getTypeReference(t);
                     if (mayBeTypeReference.isPresent()) {

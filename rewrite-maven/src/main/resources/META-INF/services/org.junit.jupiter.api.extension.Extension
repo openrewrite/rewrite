@@ -1,0 +1,2 @@
+org.openrewrite.maven.SharedMavenPomCacheExtension
+org.openrewrite.maven.MavenCentralMirrorExtension

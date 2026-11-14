@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 
@@ -25,6 +26,7 @@ import static java.util.Collections.emptyList;
 public class PythonExecutionContextView extends DelegatingExecutionContext {
     private static final String PACKAGE_INDEXES = "org.openrewrite.python.packageIndexes";
     private static final String INDEX_CREDENTIALS = "org.openrewrite.python.indexCredentials";
+    private static final String UV_VERSION = "org.openrewrite.python.uvVersion";
 
     public PythonExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -63,5 +65,18 @@ public class PythonExecutionContextView extends DelegatingExecutionContext {
 
     public List<PythonIndexCredentials> getIndexCredentials() {
         return getMessage(INDEX_CREDENTIALS, emptyList());
+    }
+
+    /**
+     * The uv release the host runs the project with. A changed {@code uv.lock} is then written
+     * with that release's revision stamp. Without it the lock keeps its own.
+     */
+    public PythonExecutionContextView setUvVersion(@Nullable String uvVersion) {
+        putMessage(UV_VERSION, uvVersion);
+        return this;
+    }
+
+    public @Nullable String getUvVersion() {
+        return getMessage(UV_VERSION);
     }
 }

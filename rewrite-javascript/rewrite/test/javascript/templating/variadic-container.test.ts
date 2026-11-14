@@ -288,6 +288,7 @@ describe('variadic pattern matching in containers', () => {
                 return await afterTemplate.apply(method, this.cursor);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -317,6 +318,7 @@ describe('variadic pattern matching in containers', () => {
                 return await afterTemplate.apply(method, this.cursor);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -340,6 +342,7 @@ describe('variadic pattern matching in containers', () => {
                 return await afterTemplate.apply(method, this.cursor);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -364,6 +367,7 @@ describe('variadic pattern matching in containers', () => {
                 return await afterTemplate.apply(method, this.cursor);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun({
             //language=typescript

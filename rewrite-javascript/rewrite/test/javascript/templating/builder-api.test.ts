@@ -83,6 +83,7 @@ describe('Builder API', () => {
                     return literal;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 typescript('const a = 1',
@@ -210,6 +211,7 @@ describe('Builder API', () => {
                     return binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 typescript('1 + 2', '2 + 1'),
@@ -254,6 +256,7 @@ describe('Builder API', () => {
                     return methodInvocation;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 typescript('myFunction(1, 2, 3)', 'myFunction(3, 2, 1)'),
@@ -336,6 +339,7 @@ describe('Builder API', () => {
                     return binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 typescript('1 + 2', '2 + 1'),
@@ -374,6 +378,7 @@ describe('Builder API', () => {
                     return invocation;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 typescript('processArgs(1, 2, 3)', 'processArgs(3, 2, 1)'),

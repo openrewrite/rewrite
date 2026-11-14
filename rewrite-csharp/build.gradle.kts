@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.LicenseExtension
@@ -39,7 +37,7 @@ dependencies {
     testImplementation(project(":rewrite-xml"))
     testImplementation(project(":rewrite-maven"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -68,7 +66,7 @@ fun findDotnet(): String {
     throw GradleException(".NET SDK not found. Please install .NET 10.0+ SDK and ensure 'dotnet' is on your PATH.")
 }
 
-val csharpBuild by tasks.registering(Exec::class) {
+val csharpBuild = tasks.register<Exec>("csharpBuild") {
     group = "csharp"
     description = "Build C# projects"
 
@@ -80,9 +78,12 @@ val csharpBuild by tasks.registering(Exec::class) {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.LstViewer")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.LstViewer/bin"))
 
     doFirst {
         commandLine(findDotnet(), "build")
@@ -92,7 +93,7 @@ val csharpBuild by tasks.registering(Exec::class) {
 
 // Writes the test runtime classpath to a file so the C# RpcFixture can
 // launch JavaRewriteRpc via `java -cp <classpath> ...` without a fat JAR.
-val rpcTestClasspath by tasks.registering {
+val rpcTestClasspath = tasks.register("rpcTestClasspath") {
     group = "csharp"
     description = "Write the Java RPC test server classpath for C# integration tests"
     dependsOn(tasks.named("testClasses"))
@@ -119,7 +120,7 @@ val rpcTestClasspath by tasks.registering {
 
 val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
 
-val csharpTest by tasks.registering(Exec::class) {
+val csharpTest = tasks.register<Exec>("csharpTest") {
     group = "csharp"
     description = "Run C# xunit tests"
     dependsOn(csharpBuild, rpcTestClasspath)
@@ -138,6 +139,9 @@ val csharpTest by tasks.registering(Exec::class) {
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }
 
+    // -PverboseTests restores the per-passing-test console output. It is read here, while configuring, because
+    // Gradle 10 fails a build that calls Task.project at execution time.
+    val dotnetVerbosity = if (project.hasProperty("verboseTests")) "normal" else "minimal"
     doFirst {
         // Target the OpenRewrite.Tests project explicitly. Running 'dotnet test' at solution
         // level would also probe OpenRewrite and OpenRewrite.Tool (neither carries the junit
@@ -145,8 +149,6 @@ val csharpTest by tasks.registering(Exec::class) {
         // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
         // TargetDir, so pin the absolute path and pass --results-directory to match.
         junitXmlFile.parentFile.mkdirs()
-        // -PverboseTests restores the per-passing-test console output
-        val dotnetVerbosity = if (project.hasProperty("verboseTests")) "normal" else "minimal"
         commandLine(
             findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
             "--no-build", "--verbosity", dotnetVerbosity,
@@ -156,8 +158,6 @@ val csharpTest by tasks.registering(Exec::class) {
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
 }
-
-ImportJUnitXmlReports.register(tasks, csharpTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(csharpTest)
@@ -173,7 +173,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-xml"))
                 implementation("org.assertj:assertj-core:latest.release")
@@ -184,19 +184,25 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        // These tests spawn the freshly built C# tool. dependsOn(csharpBuild) is
-                        // also applied by the tasks.withType<Test> block below, but a plain
-                        // dependsOn only orders the build — it does NOT make a C# source change
-                        // invalidate this task's up-to-date/cache state. Declaring the C# sources
-                        // as inputs does: without it a C# regression can slip through a cached test
-                        // run (e.g. the System.Text.Json `IConvertible` break that reached main).
+                        // These tests spawn the freshly built C# tool, which the unit tests do not, so
+                        // this task depends on csharpBuild. A plain dependsOn only orders the build — it
+                        // does NOT make a C# source change invalidate this task's up-to-date/cache state.
+                        // Declaring the C# sources as inputs does: without it a C# regression can slip
+                        // through a cached test run (e.g. the System.Text.Json `IConvertible` break that
+                        // reached main). CSharpPrinterParityTest parses the sources of all four projects.
                         dependsOn(csharpBuild)
                         inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
                             .withPathSensitivity(PathSensitivity.RELATIVE)
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
                         inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
                             .withPathSensitivity(PathSensitivity.RELATIVE)
-                        // Avoid two tasks driving C# RPC processes at the same time.
-                        shouldRunAfter(tasks.named("test"))
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite.LstViewer")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                        // Tiered PGO first runs hot code instrumented, which the short-lived C# processes
+                        // these tests start pay for without living long enough to profit from: without it
+                        // they parse CSharpPrinterParityTest's own sources in less than half the time.
+                        environment("DOTNET_TieredPGO", "0")
                     }
                 }
             }
@@ -211,11 +217,9 @@ tasks.named("check") {
     dependsOn(testing.suites.named("integTest"))
 }
 
-// Run tests serially to avoid issues with concurrent C# RPC processes
+// One test JVM, running a class at a time: CSharpPrinterParityTest compares on several C# processes
+// at once, and a second fork was measured to add CPU without reliably saving time.
 tasks.withType<Test> {
-    // Ensure C# is built before running tests
-    dependsOn(csharpBuild)
-
     maxParallelForks = 1
     maxHeapSize = "8g"
     // Exclude working-set tests by default:
@@ -240,7 +244,7 @@ tasks.withType<Test> {
             events("started", "passed", "failed", "skipped")
             showStandardStreams = true
         } else {
-            events("failed", "skipped")
+            events("failed")
         }
     }
 }
@@ -280,7 +284,7 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
 fun nugetApiKey(): String? =
     project.findProperty("nugetApiKey")?.toString()?.takeIf { it.isNotBlank() }
 
-val generateVersionTxt by tasks.registering {
+val generateVersionTxt = tasks.register("generateVersionTxt") {
     group = "csharp"
     description = "Generate META-INF/rewrite-csharp-version.txt for RPC version pinning"
 
@@ -306,7 +310,7 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 
 // Task to pack C# projects as NuGet packages
 // Packs both the SDK library and the tool; version is injected via /p:Version
-val csharpBuildRelease by tasks.registering(Exec::class) {
+val csharpBuildRelease = tasks.register<Exec>("csharpBuildRelease") {
     group = "csharp"
     description = "Build C# projects in Release configuration"
 
@@ -324,7 +328,7 @@ val csharpBuildRelease by tasks.registering(Exec::class) {
     }
 }
 
-val csharpPack by tasks.registering(Exec::class) {
+val csharpPack = tasks.register<Exec>("csharpPack") {
     group = "csharp"
     description = "Pack C# projects as NuGet packages"
 
@@ -339,9 +343,9 @@ val csharpPack by tasks.registering(Exec::class) {
 
     doFirst {
         csharpDir.resolve("dist").deleteRecursively()
+        // Building here restores the NuGet packages, which an up-to-date csharpBuildRelease does not
         commandLine(
             findDotnet(), "pack",
-            "--no-build",
             "--configuration", "Release",
             "--output", "dist",
             "/p:Version=$nugetVersion"
@@ -351,7 +355,7 @@ val csharpPack by tasks.registering(Exec::class) {
 }
 
 // Task to publish NuGet package
-val csharpPublish by tasks.registering(Exec::class) {
+val csharpPublish = tasks.register<Exec>("csharpPublish") {
     group = "csharp"
     description = "Publish C# NuGet package"
 
@@ -378,7 +382,7 @@ fun cgpPublishToken(): String? =
     project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
 
 // Task to publish NuGet packages to the Code Genome Project
-val csharpPublishCgp by tasks.registering(Exec::class) {
+val csharpPublishCgp = tasks.register<Exec>("csharpPublishCgp") {
     group = "csharp"
     description = "Publish C# NuGet packages to the Code Genome Project"
 
@@ -423,7 +427,7 @@ val csharpPublishCgp by tasks.registering(Exec::class) {
 
 // Task to publish the C# SDK library to a local NuGet feed for cross-repo development.
 // Usage: ./gradlew :rewrite-csharp:csharpPublishLocal
-val csharpPublishLocal by tasks.registering {
+val csharpPublishLocal = tasks.register("csharpPublishLocal") {
     group = "csharp"
     description = "Pack and install C# NuGet packages into local NuGet cache"
 
@@ -551,7 +555,7 @@ extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
 }
 
-val licenseCsharp by tasks.registering(LicenseCheck::class) {
+val licenseCsharp = tasks.register<LicenseCheck>("licenseCsharp") {
     group = "license"
     description = "Check license headers on C# files"
     source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
@@ -560,7 +564,7 @@ val licenseCsharp by tasks.registering(LicenseCheck::class) {
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
 }
 
-val licenseFormatCsharp by tasks.registering(LicenseFormat::class) {
+val licenseFormatCsharp = tasks.register<LicenseFormat>("licenseFormatCsharp") {
     group = "license"
     description = "Apply license headers to C# files"
     source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }

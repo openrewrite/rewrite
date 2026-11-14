@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 using LibGit2Sharp;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.NuGet;
 using Serilog;
@@ -36,6 +39,144 @@ public class SolutionParserTests : IDisposable
     {
         try { Directory.Delete(_tempDir, true); }
         catch { /* best effort cleanup */ }
+    }
+
+    [Fact]
+    public void LanguageVersionsOfEveryTargetFramework()
+    {
+        // given
+        var projectPath = WriteFile("Sample.csproj", "<Project><PropertyGroup><TargetFrameworks>net8.0;net9.0</TargetFrameworks></PropertyGroup></Project>");
+        const string source = "class C {}";
+        var sourcePath = WriteFile("C.cs", source);
+        using var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+        foreach (var (framework, version) in new[]
+                 {
+                     ("net8.0", LanguageVersion.CSharp12),
+                     ("net9.0", LanguageVersion.CSharp13)
+                 })
+        {
+            var id = ProjectId.CreateNewId();
+            solution = solution.AddProject(ProjectInfo.Create(id, VersionStamp.Create(),
+                    $"Sample ({framework})", "Sample", LanguageNames.CSharp, filePath: projectPath,
+                    parseOptions: new CSharpParseOptions(version)))
+                .AddDocument(DocumentId.CreateNewId(id), "C.cs", SourceText.From(source), filePath: sourcePath);
+        }
+
+        // when
+        var files = new SolutionParser().ParseProject(solution, projectPath, _tempDir);
+
+        // then
+        var cu = Assert.IsType<CompilationUnit>(Assert.Single(files));
+        var marker = cu.Markers.FindFirst<CSharpLanguageVersion>();
+        Assert.NotNull(marker);
+        Assert.Equal("12.0", marker.Version);
+        Assert.True(marker.IsTargetFrameworkCoverageComplete);
+        Assert.Collection(marker.TargetFrameworkVersions,
+            v => { Assert.Equal("net8.0", v.TargetFramework); Assert.Equal("12.0", v.Version); },
+            v => { Assert.Equal("net9.0", v.TargetFramework); Assert.Equal("13.0", v.Version); });
+    }
+
+    [Theory]
+    [InlineData("Sample", "net10.0", "net10.0", true)]
+    [InlineData("Sample (net10.0)", "net10.0;net99.0", "net10.0", false)]
+    [InlineData("Sample (net10.0)", "", "net10.0", false)]
+    [InlineData("Sample", "net10.0;net99.0", null, false)]
+    public void LanguageVersionFrameworkCoverage(string projectName, string frameworks,
+        string? expectedFramework, bool expectedComplete)
+    {
+        // given
+        WriteFile("Framework.props", $"<Project><PropertyGroup><TargetFrameworks>{frameworks}</TargetFrameworks></PropertyGroup></Project>");
+        var projectPath = WriteFile("Sample.csproj", "<Project><Import Project=\"Framework.props\" /></Project>");
+        const string source = "class C {}";
+        var sourcePath = WriteFile("C.cs", source);
+        using var workspace = new AdhocWorkspace();
+        var id = ProjectId.CreateNewId();
+        var solution = workspace.CurrentSolution.AddProject(ProjectInfo.Create(id, VersionStamp.Create(),
+                projectName, "Sample", LanguageNames.CSharp, filePath: projectPath,
+                parseOptions: new CSharpParseOptions(LanguageVersion.CSharp12)))
+            .AddDocument(DocumentId.CreateNewId(id), "C.cs", SourceText.From(source), filePath: sourcePath);
+
+        // when
+        var files = new SolutionParser().ParseProject(solution, projectPath, _tempDir);
+
+        // then
+        var cu = Assert.IsType<CompilationUnit>(Assert.Single(files));
+        var marker = cu.Markers.FindFirst<CSharpLanguageVersion>();
+        Assert.NotNull(marker);
+        if (expectedFramework != null)
+            Assert.Equal(expectedFramework, Assert.Single(marker.TargetFrameworkVersions).TargetFramework);
+        Assert.Equal(expectedComplete, marker.IsTargetFrameworkCoverageComplete);
+    }
+
+    [Fact]
+    public void LanguageVersionUsesEvaluatedFrameworkMetadataBeforeProjectName()
+    {
+        // given
+        var projectPath = WriteFile("Sample.csproj", "<Project><PropertyGroup><TargetFrameworks>net10.0;net9.0</TargetFrameworks></PropertyGroup></Project>");
+        const string source = "class C {}";
+        var sourcePath = WriteFile("C.cs", source);
+        using var workspace = new AdhocWorkspace();
+        var id = ProjectId.CreateNewId();
+        var solution = workspace.CurrentSolution.AddProject(ProjectInfo.Create(id, VersionStamp.Create(),
+                "Sample (wrong)", "Sample", LanguageNames.CSharp, filePath: projectPath,
+                parseOptions: new CSharpParseOptions(LanguageVersion.Preview)))
+            .AddDocument(DocumentId.CreateNewId(id), "C.cs", SourceText.From(source), filePath: sourcePath)
+            .AddAnalyzerConfigDocument(DocumentId.CreateNewId(id), "Sample.globalconfig",
+                SourceText.From("is_global = true\nbuild_property.TargetFramework = net10.0\n"),
+                filePath: Path.Combine(_tempDir, "Sample.globalconfig"));
+
+        // when
+        var files = new SolutionParser().ParseProject(solution, projectPath, _tempDir);
+
+        // then
+        var marker = Assert.IsType<CompilationUnit>(Assert.Single(files)).Markers.FindFirst<CSharpLanguageVersion>();
+        Assert.NotNull(marker);
+        var framework = Assert.Single(marker.TargetFrameworkVersions);
+        Assert.Equal("net10.0", framework.TargetFramework);
+        Assert.Equal("preview", framework.Version);
+    }
+
+    [Theory]
+    [InlineData("netstandard2.0", true)]
+    [InlineData("netstandard2.0;net8.0", false)]
+    public void ConditionalBranchesShareProjectLanguageVersionMetadata(string frameworks, bool complete)
+    {
+        // given
+        var projectPath = WriteFile("Sample.csproj", $"<Project><PropertyGroup><TargetFrameworks>{frameworks}</TargetFrameworks></PropertyGroup></Project>");
+        const string source = """
+            #if DEBUG
+            class C { object value; void M(object other) { value = value ?? other; } }
+            #else
+            class C { object value; void M(object other) { value = value ?? other; } }
+            #endif
+            """;
+        var sourcePath = WriteFile("C.cs", source);
+        using var workspace = new AdhocWorkspace();
+        var id = ProjectId.CreateNewId();
+        var solution = workspace.CurrentSolution.AddProject(ProjectInfo.Create(id, VersionStamp.Create(),
+                "Sample (netstandard2.0)", "Sample", LanguageNames.CSharp, filePath: projectPath,
+                parseOptions: new CSharpParseOptions(LanguageVersion.CSharp7_3)))
+            .AddDocument(DocumentId.CreateNewId(id), "C.cs", SourceText.From(source), filePath: sourcePath);
+
+        // when
+        var files = new SolutionParser().ParseProject(solution, projectPath, _tempDir);
+
+        // then
+        var cu = Assert.IsType<CompilationUnit>(Assert.Single(files));
+        var directive = Assert.IsType<ConditionalDirective>(Assert.Single(cu.Members).Element);
+        Assert.Equal(2, directive.Branches.Count);
+        Assert.All(new[] { cu }.Concat(directive.Branches.Select(b => b.Element)), unit =>
+        {
+            var marker = unit.Markers.FindFirst<CSharpLanguageVersion>();
+            Assert.NotNull(marker);
+            Assert.Equal("7.3", marker.Version);
+            Assert.Equal(complete, marker.IsTargetFrameworkCoverageComplete);
+            var framework = Assert.Single(marker.TargetFrameworkVersions);
+            Assert.Equal("netstandard2.0", framework.TargetFramework);
+            Assert.Equal("7.3", framework.Version);
+        });
+        Assert.Equal(source, new CSharpPrinter<int>().Print(cu));
     }
 
     private string WriteFile(string relativePath, string content)
@@ -76,6 +217,10 @@ public class SolutionParserTests : IDisposable
 
         var printed = new CSharpPrinter<int>().Print(cu);
         Assert.Equal("namespace Test { public class HelloWorld { } }\n", printed);
+        var languageVersion = cu.Markers.FindFirst<CSharpLanguageVersion>();
+        Assert.NotNull(languageVersion);
+        Assert.Equal("net10.0", Assert.Single(languageVersion.TargetFrameworkVersions).TargetFramework);
+        Assert.True(languageVersion.IsTargetFrameworkCoverageComplete);
     }
 
     [Fact]
@@ -272,7 +417,8 @@ public class SolutionParserTests : IDisposable
         WriteFile("Unsupported.csproj", """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
-                <TargetFramework>net99.0</TargetFramework>
+                <TargetFramework>net10.0</TargetFramework>
+                <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
               </PropertyGroup>
             </Project>
             """);
@@ -314,6 +460,221 @@ public class SolutionParserTests : IDisposable
 
         Assert.NotNull(dgSpec);
         Assert.NotEmpty(dgSpec.Projects);
+    }
+
+    [Fact]
+    public async Task OnlyTargetFrameworksTheSdkSupportsAreParsed()
+    {
+        var csproj = WriteFile("Multi.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net99.0;net10.0</TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : Newtonsoft.Json.JsonException { }\n");
+
+        var parser = new SolutionParser();
+        Microsoft.CodeAnalysis.Solution? solution = null;
+        var errors = await CaptureErrors(async () => solution = await parser.LoadAsync(csproj));
+
+        Assert.Empty(parser.ProjectsNotParsed);
+        var error = Assert.Single(errors, e => e.Contains("Multi.csproj"));
+        Assert.Contains("is parsed for net10.0 only", error);
+        Assert.Contains("net99.0", error);
+        Assert.Contains("newer .NET SDK", error);
+
+        var results = parser.ParseProject(solution!, csproj, _tempDir);
+        var cu = Assert.IsType<CompilationUnit>(Assert.Single(results));
+        AssertWidgetExtends("Newtonsoft.Json.JsonException", cu);
+        var marker = cu.Markers.FindFirst<CSharpLanguageVersion>();
+        Assert.NotNull(marker);
+        Assert.False(marker.IsTargetFrameworkCoverageComplete);
+        Assert.Equal("net10.0", Assert.Single(marker.TargetFrameworkVersions).TargetFramework);
+    }
+
+    [Fact]
+    public async Task EmptyEntryInTargetFrameworksDoesNotHideTheProject()
+    {
+        // What `$(TargetFrameworks);net10.0` evaluates to when nothing set TargetFrameworks before it.
+        var csproj = WriteFile("Multi.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>;net10.0</TargetFrameworks>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : System.Exception { }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(csproj);
+
+        var results = parser.ParseProject(solution, csproj, _tempDir);
+        AssertWidgetExtendsException(Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
+    [Theory]
+    [InlineData("TargetFramework", "net99.0")]
+    [InlineData("TargetFrameworks", "net99.0")]
+    [InlineData("TargetFramework", "netstandard9.0")]
+    [InlineData("TargetFramework", "net99.0-ios")]
+    [InlineData("TargetFrameworks", "net99.0-android;net99.0-ios")]
+    public async Task ProjectNeedingANewerSdkIsNotParsed(string property, string targetFramework)
+    {
+        var csproj = WriteFile("Future.csproj", $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <{property}>{targetFramework}</{property}>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : System.Exception { }\n");
+
+        var parser = new SolutionParser();
+        var errors = await CaptureErrors(() => parser.LoadAsync(csproj));
+
+        Assert.Contains(parser.ProjectsNotParsed, p => p.EndsWith("Future.csproj"));
+        var error = Assert.Single(errors, e => e.Contains("Future.csproj"));
+        Assert.Contains("is not parsed", error);
+        Assert.Contains(targetFramework.Replace(";", ", "), error);
+        Assert.Contains("newer .NET SDK", error);
+        Assert.DoesNotContain("workload", error);
+    }
+
+    [Theory]
+    [InlineData("TargetFramework")]
+    [InlineData("TargetFrameworks")]
+    public async Task ProjectWithoutItsWorkloadIsNotParsed(string property)
+    {
+        var csproj = WriteFile("Handset.csproj", $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <{property}>net10.0-ios</{property}>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : System.Exception { }\n");
+
+        var parser = new SolutionParser();
+        var errors = await CaptureErrors(() => parser.LoadAsync(csproj));
+
+        Assert.Contains(parser.ProjectsNotParsed, p => p.EndsWith("Handset.csproj"));
+        var error = Assert.Single(errors, e => e.Contains("Handset.csproj"));
+        Assert.Contains("is not parsed", error);
+        Assert.Contains("net10.0-ios", error);
+    }
+
+    [Fact]
+    public async Task OnlyTargetFrameworksWithTheirWorkloadAreParsed()
+    {
+        var csproj = WriteFile("Tablet.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net10.0-ios;net9.0</TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : Newtonsoft.Json.JsonException { }\n");
+
+        var parser = new SolutionParser();
+        Microsoft.CodeAnalysis.Solution? solution = null;
+        var errors = await CaptureErrors(async () => solution = await parser.LoadAsync(csproj));
+
+        Assert.Empty(parser.ProjectsNotParsed);
+        Assert.Contains(parser.RestoredLockFiles.Keys, k => k.EndsWith("Tablet.csproj"));
+        var error = Assert.Single(errors, e => e.Contains("Tablet.csproj"));
+        Assert.Contains("is parsed for net9.0 only", error);
+        Assert.Contains("net10.0-ios", error);
+
+        var results = parser.ParseProject(solution!, csproj, _tempDir);
+        AssertWidgetExtends("Newtonsoft.Json.JsonException", Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
+    [Fact]
+    public async Task ProjectWithoutItsWorkloadDoesNotStopTheRestOfTheSolution()
+    {
+        WriteFile("Phone/Phone.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0-ios</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Phone/PhoneWidget.cs", "class PhoneWidget { }\n");
+        var library = WriteFile("Library/Library.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Library/Widget.cs", "class Widget : System.Exception { }\n");
+        var slnx = WriteFile("Devices.slnx", """
+            <Solution>
+              <Project Path="Phone/Phone.csproj" />
+              <Project Path="Library/Library.csproj" />
+            </Solution>
+            """);
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(slnx);
+
+        Assert.Contains(parser.ProjectsNotParsed, p => p.EndsWith("Phone.csproj"));
+        var results = parser.ParseProject(solution, library, _tempDir);
+        AssertWidgetExtendsException(Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
+    [Fact]
+    public void RestoreGraphLeavesOutTargetFrameworksWithoutTheirWorkload()
+    {
+        var csproj = WriteFile("Watch.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net10.0;net10.0-ios</TargetFrameworks>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(csproj);
+
+        Assert.NotNull(dgSpec);
+        var framework = Assert.Single(dgSpec.Projects.Single().TargetFrameworks);
+        Assert.Equal("net10.0", framework.TargetAlias);
+    }
+
+    private static async Task<List<string>> CaptureErrors(Func<Task> action)
+    {
+        var errors = new List<string>();
+        var previousLogger = Log.Logger;
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Error()
+            .WriteTo.Sink(new CollectingSink(errors))
+            .CreateLogger();
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+        }
+        return errors;
+    }
+
+    private static void AssertWidgetExtendsException(CompilationUnit cu) =>
+        AssertWidgetExtends("System.Exception", cu);
+
+    private static void AssertWidgetExtends(string supertype, CompilationUnit cu)
+    {
+        var widget = Assert.IsType<OpenRewrite.Java.ClassDeclaration>(cu.Members[0].Element);
+        var type = Assert.IsType<OpenRewrite.Java.JavaType.Class>(widget.Type);
+        Assert.Equal(supertype, Assert.IsType<OpenRewrite.Java.JavaType.Class>(type.Supertype).FullyQualifiedName);
     }
 
     [Fact]

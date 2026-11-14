@@ -20,13 +20,11 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.HashSet;
@@ -48,7 +46,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public BlankLinesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this.style = getStyle(BlankLinesStyle.class, styles, IntelliJ::blankLines);
+        this.style = StyleHelper.getStyle(BlankLinesStyle.class, styles, (Supplier<BlankLinesStyle>) IntelliJ::blankLines);
         this.stopAfter = stopAfter;
     }
 
@@ -359,14 +357,5 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 }

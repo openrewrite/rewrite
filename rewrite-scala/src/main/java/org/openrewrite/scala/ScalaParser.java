@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.scala.internal.ScalaCompilerCache;
 import org.openrewrite.scala.internal.ScalaCompilerContext;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.style.NamedStyles;
@@ -34,6 +35,7 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -47,6 +49,7 @@ public class ScalaParser implements Parser {
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
     private final JavaTypeFactory typeFactory;
+    private final @Nullable ScalaCompilerCache compilers;
 
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+([.\\w]+)");
     private static final Pattern CLASS_PATTERN = Pattern.compile("(class|object|trait|case\\s+class)\\s*(<[^>]*>)?\\s+(\\w+)");
@@ -86,7 +89,8 @@ public class ScalaParser implements Parser {
         ScalaCompilerContext compilerContext = new ScalaCompilerContext(
             classpath,
             logCompilationWarningsAndErrors,
-            ctx
+            ctx,
+            compilers
         );
 
         // Collect all inputs eagerly for batch compilation
@@ -107,6 +111,12 @@ public class ScalaParser implements Parser {
             compiledResults = Collections.emptyMap();
         }
         Map<String, ScalaCompilerContext.ParseResult> finalCompiledResults = compiledResults;
+
+        // The trees and contexts of the compilation are in use until the last input is converted
+        AtomicInteger unconverted = new AtomicInteger(inputList.size());
+        if (inputList.isEmpty()) {
+            compilerContext.release();
+        }
 
         // Map results back to SourceFiles
         return inputList.stream()
@@ -152,8 +162,13 @@ public class ScalaParser implements Parser {
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
                         return ParseError.build(this, input, relativeTo, ctx, t);
+                    } finally {
+                        if (unconverted.decrementAndGet() == 0) {
+                            compilerContext.release();
+                        }
                     }
-                });
+                })
+                .onClose(compilerContext::release);
     }
 
     @Override
@@ -195,6 +210,8 @@ public class ScalaParser implements Parser {
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
+        private @Nullable ScalaCompilerCache compilers;
+
         public Builder() {
             super(S.CompilationUnit.class);
         }
@@ -207,10 +224,21 @@ public class ScalaParser implements Parser {
             this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
+            this.compilers = base.compilers;
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+            return this;
+        }
+
+        /**
+         * Reuse one Scala compiler, which loads the classes of the classpath once, across the parses of the parsers
+         * this builder and its clones build; each parse still sees only its own sources.
+         * This is an internal API which is subject to removal or change.
+         */
+        public Builder reuseCompiler(boolean reuseCompiler) {
+            this.compilers = reuseCompiler ? new ScalaCompilerCache() : null;
             return this;
         }
 
@@ -285,7 +313,7 @@ public class ScalaParser implements Parser {
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }
-            return new ScalaParser(cp, logCompilationWarningsAndErrors, typeCache, factory);
+            return new ScalaParser(cp, logCompilationWarningsAndErrors, typeCache, factory, compilers);
         }
 
         @Override
@@ -295,7 +323,9 @@ public class ScalaParser implements Parser {
 
         @Override
         public Builder clone() {
-            return new Builder(this);
+            Builder clone = new Builder(this);
+            clone.typeCache = typeCache.clone();
+            return clone;
         }
     }
 }

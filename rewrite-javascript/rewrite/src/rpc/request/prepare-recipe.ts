@@ -26,7 +26,10 @@ import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
 
 export class PrepareRecipe {
-    constructor(private readonly id: string, private readonly options?: any) {
+    constructor(private readonly id: string,
+                private readonly options?: any,
+                // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
+                private readonly acceptsCausesAnotherCycle?: boolean) {
     }
 
     static handle(connection: MessageConnection,
@@ -41,18 +44,19 @@ export class PrepareRecipe {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.id;
+                    const accepts = request.acceptsCausesAnotherCycle === true;
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
                         // A miss means the host owns this recipe (e.g. a Java-delegate child a host
                         // re-prepares by name), so answer with a delegatesTo stand-in for it to resolve.
                         return await PrepareRecipe.prepareInstance(new DelegatingRecipe(request.id, request.options ?? {}),
-                            snowflake, preparedRecipes, marketplace);
+                            snowflake, preparedRecipes, marketplace, accepts);
                     }
                     if (!recipeCtor[1]) {
                         throw new Error(`Recipe ${request.id} was installed without a constructor`);
                     }
                     return await PrepareRecipe.prepareInstance(new recipeCtor[1](request.options),
-                        snowflake, preparedRecipes, marketplace);
+                        snowflake, preparedRecipes, marketplace, accepts);
                 }
             )
         );
@@ -68,7 +72,8 @@ export class PrepareRecipe {
     private static async prepareInstance(recipe: Recipe,
                                          snowflake: ReturnType<typeof SnowflakeId>,
                                          preparedRecipes: Map<String, Recipe>,
-                                         marketplace: RecipeMarketplace): Promise<PrepareRecipeResponse> {
+                                         marketplace: RecipeMarketplace,
+                                         acceptsCausesAnotherCycle: boolean): Promise<PrepareRecipeResponse> {
         const id = snowflake.generate();
         const delegatesTo = PrepareRecipe.delegatesTo(recipe);
         if (delegatesTo) {
@@ -106,6 +111,9 @@ export class PrepareRecipe {
             scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
             scanPreconditions: scanPreconditions
         };
+        if (acceptsCausesAnotherCycle && recipe.causesAnotherCycle === true) {
+            response.causesAnotherCycle = true;
+        }
 
         const childResponses: PrepareRecipeResponse[] = [];
         for (const child of await recipe.recipeList()) {
@@ -118,7 +126,7 @@ export class PrepareRecipe {
                     }
                 }
                 childResponses.push(await PrepareRecipe.prepareInstance(new DelegatingRecipe(child.name, options),
-                    snowflake, preparedRecipes, marketplace));
+                    snowflake, preparedRecipes, marketplace, acceptsCausesAnotherCycle));
                 continue;
             }
             // Register a child that was instantiated in recipeList() but never installed, so a peer
@@ -126,7 +134,8 @@ export class PrepareRecipe {
             if (!PrepareRecipe.delegatesTo(child) && !marketplace.findRecipe(child.name)) {
                 await marketplace.install(child.constructor as any, []);
             }
-            childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace));
+            childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace,
+                acceptsCausesAnotherCycle));
         }
         response.recipeList = childResponses;
 
@@ -151,42 +160,50 @@ export class PrepareRecipe {
      */
     private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
         let visitor: TreeVisitor<any, ExecutionContext>;
-        if (phase === "edit") {
-            visitor = await recipe.editor();
-        } else if (phase === "scan") {
-            if (recipe instanceof ScanningRecipe) {
-                visitor = await recipe.scanner(undefined);
+        try {
+            if (phase === "edit") {
+                visitor = await recipe.editor();
+            } else if (recipe instanceof ScanningRecipe) {
+                visitor = await recipe.scanner(recipe.initialValue(new ExecutionContext()));
             } else {
                 return recipe;
             }
+        } catch {
+            // A visitor that can only be built during a run keeps its preconditions, which it then checks itself.
+            return recipe;
         }
 
         if (visitor! instanceof Check) {
-            const wireEntry = this.conditionWireEntry(visitor.check, phase);
+            const wireEntry = this.conditionWireEntry(visitor.check);
             if (wireEntry) {
                 preconditions.push(wireEntry);
-                recipe = Object.assign(
-                    Object.create(Object.getPrototypeOf(recipe)),
-                    recipe,
-                    phase === "edit" ?
-                        {
-                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                                return visitor.v;
-                            }
-                        } :
-                        {
-                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
-                                const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
-                                return (checkVisitor as Check<any>).v;
-                            }
+                if (phase === "edit") {
+                    const editor = recipe.editor;
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async editor(this: Recipe): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const editVisitor = await editor.call(this);
+                            return editVisitor instanceof Check ? editVisitor.v : editVisitor;
                         }
-                )
+                    });
+                } else {
+                    const scanner = (recipe as ScanningRecipe<any>).scanner;
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async scanner(this: ScanningRecipe<any>, acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const scanVisitor = await scanner.call(this, acc);
+                            return scanVisitor instanceof Check ? scanVisitor.v : scanVisitor;
+                        }
+                    });
+                }
             }
             await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
             await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
+    }
+
+    private static withOverrides(recipe: Recipe, overrides: object): Recipe {
+        return Object.assign(Object.create(Object.getPrototypeOf(recipe)), recipe, overrides);
     }
 
     /**
@@ -199,11 +216,11 @@ export class PrepareRecipe {
      * condition can't be serialized — the caller leaves the wrapper
      * intact so the gate runs in-process as a fallback.
      */
-    private static conditionWireEntry(condition: CheckArg, phase: "edit" | "scan"): Precondition | undefined {
+    private static conditionWireEntry(condition: CheckArg): Precondition | undefined {
         if (condition instanceof CompositePrecondition) {
             const operands: Precondition[] = [];
             for (const operand of condition.operands) {
-                const entry = this.conditionWireEntry(operand, phase);
+                const entry = this.conditionWireEntry(operand);
                 if (entry === undefined) {
                     return undefined;
                 }
@@ -220,7 +237,8 @@ export class PrepareRecipe {
             return {visitorName: ref.recipeName, visitorOptions: {...ref.options}};
         }
         if (condition instanceof RpcRecipe) {
-            return {visitorName: phase === "edit" ? condition.editVisitor : condition.scanVisitor!};
+            // A recipe gates with its editor in either phase, as Check evaluates it in-process.
+            return {visitorName: condition.editVisitor};
         }
         return undefined;
     }
@@ -276,6 +294,7 @@ export interface PrepareRecipeResponse {
      * locally from these instead of re-preparing each child by name (the whole-tree optimization).
      */
     recipeList?: PrepareRecipeResponse[]
+    causesAnotherCycle?: boolean
 }
 
 /**

@@ -18,17 +18,25 @@ package org.openrewrite.scala.internal
 import dotty.tools.dotc.ast.Trees.*
 import dotty.tools.dotc.ast.{tpd, untpd}
 import dotty.tools.dotc.core.Contexts.*
-import dotty.tools.dotc.core.Phases
-import dotty.tools.dotc.parsing.Parsers
+import dotty.tools.dotc.core.{Flags, Periods, Phases, RecursionOverflow}
+import dotty.tools.dotc.core.NameOps.*
+import dotty.tools.dotc.core.Names.Name
+import dotty.tools.dotc.core.Phases.Phase
+import dotty.tools.dotc.core.StdNames.nme
+import dotty.tools.dotc.core.Symbols.{NoSymbol, Symbol}
+import dotty.tools.dotc.typer.TyperPhase
+import dotty.tools.dotc.parsing.{Parser, Parsers}
 import dotty.tools.dotc.util.SourceFile
 import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
+import scala.annotation.nowarn
 import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 import java.io.File
 import java.nio.file.Paths
-import java.util.{ArrayList, HashMap, LinkedHashSet, List => JList, Map => JMap}
+import java.util.{ArrayList, Collections, HashMap, IdentityHashMap, LinkedHashSet, List => JList, Map => JMap, Set => JSet}
 
 /**
  * Bridge to the Scala 3 (Dotty) compiler for parsing and type-checking Scala source files.
@@ -36,8 +44,15 @@ import java.util.{ArrayList, HashMap, LinkedHashSet, List => JList, Map => JMap}
  * Supports two modes:
  * - parse(): Parse-only (legacy, for single files)
  * - compileAll(): Batch parse + type-check for type attribution
+ *
+ * `compileAll` takes its compiler from `compilers` when given, and [[release]] hands it back.
  */
-class ScalaCompilerBridge {
+class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
+
+  def this() = this(null)
+
+  /** The compiler of the last `compileAll`, whose trees and symbols are in use until [[release]]. */
+  private var compiler: ScalaCompiler = null
 
   // Create a custom driver class to access protected members
   private class ParsingDriver extends Driver {
@@ -45,12 +60,12 @@ class ScalaCompilerBridge {
   }
 
   /**
-   * Creates a fully configured compiler context on a new `ContextBase`:
-   * Scala 2 compat source version, `postfixOps`, the given reporter, and
-   * (when non-empty) output directory and classpath.
+   * Creates a fully configured compiler context on the `ContextBase` of the
+   * given initial context: Scala 2 compat source version, `postfixOps`, the
+   * given reporter, and (when non-empty) output directory and classpath.
    */
-  private def configuredContext(reporter: StoreReporter, classpath: String, outputDir: String = null): Context = {
-    val fresh = new ParsingDriver().getInitialContext.fresh
+  private def configuredContext(initialContext: Context, reporter: StoreReporter, classpath: String, outputDir: String = null): Context = {
+    val fresh = initialContext.fresh
     // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
     fresh.setSetting(fresh.settings.source, "3.6-migration")
     // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
@@ -78,54 +93,65 @@ class ScalaCompilerBridge {
    *
    * On per-unit typer failure, that unit gets typedTree=None while others succeed.
    */
+  // Any failure leaves the compiler unfit for reuse, a fatal one included, and the catch rethrows it.
+  @nowarn("id=E235")
   def compileAll(sources: JList[SourceEntry], classpath: JList[String], outputDir: String = null): JMap[String, ScalaParseResult] = {
+    val cpString = ScalaCompilerBridge.buildClasspath(classpath)
+    val comp = if (compilers == null) new ScalaCompiler(cpString, reuse = false) else compilers.acquire(cpString)
+    compiler = comp
+    try compileAll(comp, sources, cpString, outputDir)
+    catch {
+      case t: Throwable =>
+        comp.reusable = false
+        throw t
+    }
+  }
+
+  /**
+   * Hands the compiler of the last `compileAll` back to `compilers` for reuse. Call it once
+   * nothing uses the trees, symbols or contexts of the results any more.
+   */
+  def release(): Unit = {
+    val comp = compiler
+    compiler = null
+    if (comp != null && compilers != null) compilers.release(comp)
+  }
+
+  private def compileAll(comp: ScalaCompiler, sources: JList[SourceEntry], cpString: String, outputDir: String): JMap[String, ScalaParseResult] = {
     val results = new HashMap[String, ScalaParseResult]()
 
     // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
     val storeReporter = new StoreReporter(null)
 
-    val cpString = ScalaCompilerBridge.buildClasspath(classpath)
-    val configuredCtx: Context = configuredContext(storeReporter, cpString, outputDir)
+    val configuredCtx: Context = configuredContext(comp.initialContext, storeReporter, cpString, outputDir)
+    val runId = comp.nextRunId()
+    val typerTrees = new IdentityHashMap[CompilationUnit, tpd.Tree]()
+    val recorder = new TyperRecorder
 
     // Create the Run up front. Run construction initializes Definitions and
     // ContextBase state (e.g., `ctx.base.TypeBoundsEmpty`) that the parser
     // requires when it sees `A with B` types — those go through
     // `untpd.makeAndType` → `Definitions.andType`, which would throw
     // MissingCoreLibraryException on an uninitialized base. Parsing under
-    // `run.runContext` keeps that path safe.
-    //
-    // Run construction requires the Scala stdlib on dotty's classpath (to
-    // resolve `scala.Any`, etc.). When the caller's classpath lacks it — or
-    // overrides dotty's default lookup, as in a fat-jar environment — retry
-    // with the compiler's own core library jars (located via ProtectionDomain)
-    // appended, but use the resulting Run for *parsing only*: callers that
-    // narrow the classpath (e.g. ScalaTemplate) do so to avoid type
-    // resolution, so type attribution stays off for them; they only need the
-    // initialized ContextBase so `with` types parse. The retry needs an
-    // entirely new context: the failed attempt has already initialized (and
-    // cached) the ContextBase's platform classpath, so updating the setting
-    // on a `fresh` of the same base would have no effect. Only if the retry
-    // also fails do we fall back to a bare context, where `with` types fail
-    // per-file.
+    // `run.runContext` keeps that path safe. If the Run can't be constructed
+    // at all, fall back to a bare context, where `with` types fail per-file.
     val (runOpt, parseContext) =
       try {
-        val r = (new Compiler()).newRun(using configuredCtx)
+        val r = new TyperTreeCapturingCompiler(typerTrees, recorder, runId).newRun(using configuredCtx)
+        comp.ran(r)
         (Some(r), r.runContext)
       } catch {
-        case _: Throwable =>
-          try {
-            val healedCp = ScalaCompilerBridge.appendStdlib(cpString)
-            val r = (new Compiler()).newRun(using configuredContext(storeReporter, healedCp, outputDir))
-            (None, r.runContext)
-          } catch {
-            case _: Throwable => (None, configuredCtx)
-          }
+        case NonFatal(_) =>
+          comp.reusable = false
+          (None, configuredCtx)
       }
     given ctx: Context = parseContext
 
     // Phase 1: Parse all sources into CompilationUnits
     val units = new ArrayList[CompilationUnit]()
+    val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
     val sourceEntries = new ArrayList[SourceEntry]()
+    val parsedTrees = new HashMap[String, untpd.Tree]()
 
     val srcIter = sources.iterator()
     while (srcIter.hasNext) {
@@ -137,52 +163,69 @@ class ScalaCompilerBridge {
 
         // Track unit for batch type-checking. The *raw* parsed tree (pre-unwrap)
         // is what the typer needs — it's the form the parser actually produced.
-        parsed.unit.untpdTree = parsed.rawTree
-        units.add(parsed.unit)
+        // The typer records types on the untyped trees it is given, so it gets
+        // trees of its own rather than the ones the LST is built from.
+        val unit = parseForTyping(entry)
+        val index = UntypedNodeIndex(unit.untpdTree)
+        indexes.put(unit, index)
+        recorder.track(index)
+        units.add(unit)
         sourceEntries.add(entry)
+        parsedTrees.put(entry.path, parsed.rawTree)
       } catch {
-        case _: Throwable =>
+        // Dotty's recursive descent parser runs out of stack on deeply nested source.
+        case NonFatal(_) | _: StackOverflowError =>
           // Leave this entry out of the results so the caller falls back to a
           // single-file parse, surfacing the failure as a ParseError for this
           // file only instead of aborting the whole batch.
+          comp.reusable = false
       }
     }
 
     // Phase 2: Attempt batch type-checking (only if we managed to create a Run).
-    runOpt.foreach { run =>
+    runOpt.foreach { firstRun =>
       try {
-        // Convert to Scala list for the compiler
-        val unitList = {
-          val buf = new ListBuffer[CompilationUnit]()
-          val uIter = units.iterator()
-          while (uIter.hasNext) buf += uIter.next()
-          buf.toList
-        }
+        comp.enters(units)(using firstRun.runContext)
+        val firstTyping = Typing(firstRun, sourceEntries, units, typerTrees, recorder, indexes)
+        val typed = typeIsolatingOverflows(firstTyping, configuredCtx, comp, runId)
 
-        run.compileUnits(unitList)
+        val unresolvable = unresolvableWildcardImports(typed.units, typed.typerTrees)(using typed.run.runContext)
+        val Typing(run, typedEntries, typedUnits, typedTrees, typedRecorder, typedIndexes) =
+          if (unresolvable.isEmpty) typed
+          else retypeWithoutImports(typed.entries, unresolvable, configuredCtx, comp, runId)
+            .map { retyped => typed.recorder.clear(); retyped }
+            .getOrElse(typed)
 
         // Use the run's context — symbols from tpd.Tree are only valid in this context
         given runCtx: Context = run.runContext
 
         // Extract typed trees per unit
-        for (i <- 0 until units.size()) {
-          val unit = units.get(i)
-          val entry = sourceEntries.get(i)
+        for (i <- 0 until typedUnits.size()) {
+          val unit = typedUnits.get(i)
+          val entry = typedEntries.get(i)
           val path = entry.path
           val existing = results.get(path)
 
           try {
-            val typedTree = unit.tpdTree
+            val typedTree = Option(typedTrees.get(unit)).getOrElse(unit.tpdTree)
             if (typedTree != null && !typedTree.isEmpty) {
-              results.put(path, existing.copy(typedTree = Some(typedTree), context = runCtx))
+              val typedNodes = Option(typedIndexes.get(unit))
+                .map(TypedNodes.pair(parsedTrees.get(path), _, typedRecorder))
+                .getOrElse(TypedNodes.empty)
+              results.put(path, existing.copy(typedTree = Some(typedTree), typedNodes = typedNodes, context = runCtx))
             }
           } catch {
-            case _: Throwable =>
+            case NonFatal(_) =>
+              comp.reusable = false
           }
         }
+        typedRecorder.clear()
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
           // Batch compilation failed entirely; all units keep typedTree=None
+          comp.reusable = false
+      } finally {
+        recorder.clear()
       }
     }
 
@@ -202,6 +245,132 @@ class ScalaCompilerBridge {
     }
 
     results
+  }
+
+  private def toScalaList(units: JList[CompilationUnit]): List[CompilationUnit] = {
+    val buf = new ListBuffer[CompilationUnit]()
+    units.forEach(u => buf += u)
+    buf.toList
+  }
+
+  /**
+   * Wildcard imports whose qualifier didn't resolve, by source path. Dotty treats every
+   * name as a member of an erroneous import qualifier, so such an import shadows all
+   * outer definitions, including the `scala` package and `Predef`: with
+   * `import doobie.implicits._` and no doobie on the classpath, `List(1)` no longer
+   * resolves. Typically that just means the classpath is incomplete.
+   */
+  private def unresolvableWildcardImports(units: JList[CompilationUnit],
+                                          typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree])(using Context): Map[String, Set[(Int, Int)]] = {
+    var found = Map.empty[String, Set[(Int, Int)]]
+    units.forEach { unit =>
+      val spans = scala.collection.mutable.Set.empty[(Int, Int)]
+      try {
+        new tpd.TreeTraverser {
+          override def traverse(tree: tpd.Tree)(using Context): Unit = tree match {
+            case imp: tpd.Import =>
+              if (imp.span.exists && imp.selectors.exists(_.isWildcard) && imp.expr.tpe.isErroneous) {
+                spans += ((imp.span.start, imp.span.end))
+              }
+            case _ => traverseChildren(tree)
+          }
+        }.traverse(Option(typerTrees.get(unit)).getOrElse(unit.tpdTree))
+      } catch {
+        case NonFatal(_) =>
+      }
+      if (spans.nonEmpty) found += unit.source.path -> spans.toSet
+    }
+    found
+  }
+
+  /**
+   * Type-checks the units of the typing. A unit on which Dotty's typer runs out of
+   * recursion depth is left out, and the others are type-checked in a fresh run.
+   */
+  private def typeIsolatingOverflows(typing: Typing,
+                                     ctx0: Context,
+                                     comp: ScalaCompiler,
+                                     runId: Periods.RunId): Typing =
+    try {
+      typing.run.compileUnits(toScalaList(typing.units))
+      typing
+    } catch {
+      // The overflow's context is that of the unit whose trees were being typed, even when
+      // another unit's reference to one of its definitions set off the typing.
+      case overflow: RecursionOverflow if typing.units.contains(overflow.ctx.compilationUnit) =>
+        // An overflow can leave a classpath symbol half-completed, a cyclic reference to later compilations
+        comp.reusable = false
+        typing.recorder.clear()
+        val overflowing = overflow.ctx.compilationUnit
+        // A reference into the source would otherwise type its deep definitions again
+        comp.forget(overflowing)(using typing.run.runContext)
+        val others = new ArrayList[SourceEntry](typing.entries)
+        others.remove(typing.units.indexOf(overflowing))
+        typeIsolatingOverflows(newTyping(others, Map.empty, ctx0, comp, runId), ctx0, comp, runId)
+    }
+
+  /**
+   * Type-check the sources once more in a fresh run, leaving out the given imports, so
+   * that names they shadowed resolve again.
+   */
+  private def retypeWithoutImports(entries: JList[SourceEntry],
+                                   imports: Map[String, Set[(Int, Int)]],
+                                   ctx0: Context,
+                                   comp: ScalaCompiler,
+                                   runId: Periods.RunId): Option[Typing] =
+    try {
+      val typing = newTyping(entries, imports, ctx0, comp, runId)
+      typing.run.compileUnits(toScalaList(typing.units))
+      Some(typing)
+    } catch {
+      case NonFatal(_) =>
+        comp.reusable = false
+        None
+    }
+
+  /**
+   * A fresh run for the given sources, without the given imports. The sources are parsed
+   * anew, since the typer attaches symbols to the untyped trees of the previous run. Spans
+   * are unaffected, so the typed trees still line up with the originally parsed ones. The
+   * run discards its diagnostics, so that the sources keep those of the first run.
+   */
+  private def newTyping(entries: JList[SourceEntry],
+                        imports: Map[String, Set[(Int, Int)]],
+                        ctx0: Context,
+                        comp: ScalaCompiler,
+                        runId: Periods.RunId): Typing = {
+    val typerTrees = new IdentityHashMap[CompilationUnit, tpd.Tree]()
+    val recorder = new TyperRecorder
+    val run = new TyperTreeCapturingCompiler(typerTrees, recorder, runId)
+      .newRun(using ctx0.fresh.setReporter(new StoreReporter(null)))
+    comp.ran(run)
+    given Context = run.runContext
+    val units = new ArrayList[CompilationUnit]()
+    val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
+    entries.forEach { entry =>
+      val unit = parseForTyping(entry)
+      val dropped = imports.getOrElse(entry.path, Set.empty)
+      if (dropped.nonEmpty) {
+        unit.untpdTree = new untpd.UntypedTreeMap {
+          override def transformStats(trees: List[untpd.Tree], exprOwner: dotty.tools.dotc.core.Symbols.Symbol)(using Context): List[untpd.Tree] =
+            super.transformStats(trees.filterNot {
+              case imp: untpd.Import => imp.span.exists && dropped.contains((imp.span.start, imp.span.end))
+              case _ => false
+            }, exprOwner)
+        }.transform(unit.untpdTree)
+      }
+      units.add(unit)
+      val index = UntypedNodeIndex(unit.untpdTree)
+      indexes.put(unit, index)
+      recorder.track(index)
+    }
+    Typing(run, entries, units, typerTrees, recorder, indexes)
+  }
+
+  private def parseForTyping(entry: SourceEntry)(using Context): CompilationUnit = {
+    val parsed = parseOne(entry.path, entry.content, reportDiagnostics = false)
+    parsed.unit.untpdTree = parsed.rawTree
+    parsed.unit
   }
 
   private def diagnosticSourcePath(d: Diagnostic): String =
@@ -226,23 +395,14 @@ class ScalaCompilerBridge {
     // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
     val storeReporter = new StoreReporter(null)
 
-    val configuredCtx: Context = configuredContext(storeReporter, "")
+    val configuredCtx: Context = configuredContext(new ParsingDriver().getInitialContext, storeReporter, ScalaCompilerBridge.buildClasspath(null))
 
     // Best-effort Run init so `ctx.base` is wired up for `A with B` parsing
     // (which goes through `Definitions.andType` and throws on a bare context).
-    // Same self-heal as compileAll: when dotty's default classpath lookup
-    // can't find the stdlib (fat-jar environments), retry Run construction on
-    // a new context with the compiler's own core library jars; only then
-    // degrade to the bare context, where `A with B` types fail to parse.
     given Context = try {
       (new Compiler()).newRun(using configuredCtx).runContext
     } catch {
-      case _: Throwable =>
-        try {
-          (new Compiler()).newRun(using configuredContext(storeReporter, ScalaCompilerBridge.appendStdlib(""))).runContext
-        } catch {
-          case _: Throwable => configuredCtx
-        }
+      case NonFatal(_) => configuredCtx
     }
 
     val parsed = parseOne(path, content)
@@ -267,7 +427,7 @@ class ScalaCompilerBridge {
    * single-line expression wrapper is the pre-existing path used by
    * recipe/template machinery to coerce bare expressions through the parser.
    */
-  private def parseOne(path: String, content: String)(using ctx: Context): ParsedUnit = {
+  private def parseOne(path: String, content: String, reportDiagnostics: Boolean = true)(using ctx: Context): ParsedUnit = {
     val wrapping =
       if (path != null && path.endsWith(".sbt")) Wrapping.ObjectScript
       else if (isSimpleExpression(content)) Wrapping.Expression
@@ -303,7 +463,7 @@ class ScalaCompilerBridge {
         if (hasSyntaxErrors(secondDiags)) (first, firstDiags) else (second, secondDiags)
       } else (first, firstDiags)
 
-    chosenDiags.foreach(d => ctx.reporter.report(d))
+    if (reportDiagnostics) chosenDiags.foreach(d => ctx.reporter.report(d))
     chosen
   }
 
@@ -351,11 +511,14 @@ class ScalaCompilerBridge {
     !startsWithAnnotation &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
+    !trimmed.startsWith(";") &&
     trimmed.nonEmpty
   }
 }
 
 object ScalaCompilerBridge {
+
+  private val ScalaLibraryProbe: Class[?] = classOf[scala.Option[?]]
 
   /**
    * Probe classes covering every jar dotty needs to type-check any Scala source:
@@ -366,24 +529,22 @@ object ScalaCompilerBridge {
    * `ProtectionDomain.getCodeSource()` regardless of what the caller passes.
    */
   private val StdlibProbeClasses: List[Class[?]] = List(
-    classOf[scala.Option[?]],
+    ScalaLibraryProbe,
     classOf[dotty.tools.tasty.TastyFormat.type],
     classOf[dotty.tools.dotc.core.Contexts.type]
   )
 
   /**
-   * Build the classpath string for dotty. Caller entries come first; stdlib
-   * jars are appended only when the caller's classpath already looks like a
-   * Scala project classpath (i.e. it contains at least one `scala*`, `tasty*`
-   * or `dotty*` artifact) but is missing one of the stdlib jars dotty needs.
-   * Without stdlib on the classpath, dotty's `Definitions` can't resolve
-   * foundational types like `scala.Unit`, leading to `ClassCastException` /
-   * "Bad symbolic reference" failures in the typer. The bridge is loaded from
-   * those same jars so we can always locate them via `ProtectionDomain`.
+   * Build the classpath string for dotty. Caller entries come first; the Scala
+   * standard library the bridge is loaded from is always appended (like the
+   * Kotlin parser always adds kotlin-stdlib), because a non-empty classpath
+   * overrides dotty's default lookup and without the stdlib dotty's
+   * `Definitions` can't resolve foundational types like `scala.Unit`.
    *
-   * Restricting self-heal to Scala-looking classpaths preserves the behaviour
-   * expected by callers (such as `ScalaTemplate`) that intentionally pass a
-   * narrow non-Scala classpath to avoid type resolution.
+   * When the caller's classpath already looks like a Scala project classpath
+   * (it contains at least one `scala*`, `tasty*` or `dotty*` artifact), the
+   * remaining jars dotty needs (tasty-core, scala3-compiler) are appended too,
+   * avoiding "Bad symbolic reference" failures when sources import dotty APIs.
    */
   private[internal] def buildClasspath(classpath: JList[String]): String = {
     val sb = new StringBuilder()
@@ -402,30 +563,12 @@ object ScalaCompilerBridge {
         }
       }
     }
-    if (hasScalaArtifact) {
-      appendStdlibTo(sb, present)
-    }
+    appendJarsOf(if (hasScalaArtifact) StdlibProbeClasses else List(ScalaLibraryProbe), sb, present)
     sb.toString()
   }
 
-  /**
-   * Append the compiler's own core library jars (located via `ProtectionDomain`)
-   * to an existing classpath string, skipping entries already present. Used to
-   * retry `Run` construction when the configured classpath lacks the Scala
-   * stdlib that dotty's `Definitions` needs to initialize.
-   */
-  private[internal] def appendStdlib(cpString: String): String = {
-    val sb = new StringBuilder(cpString)
-    val present = new LinkedHashSet[String]()
-    if (cpString.nonEmpty) {
-      cpString.split(File.pathSeparator).foreach(e => if (e.nonEmpty) present.add(fileName(e)))
-    }
-    appendStdlibTo(sb, present)
-    sb.toString()
-  }
-
-  private def appendStdlibTo(sb: StringBuilder, present: LinkedHashSet[String]): Unit = {
-    for (cls <- StdlibProbeClasses) {
+  private def appendJarsOf(probes: List[Class[?]], sb: StringBuilder, present: LinkedHashSet[String]): Unit = {
+    for (cls <- probes) {
       locateJar(cls).foreach { jar =>
         if (!present.contains(fileName(jar))) {
           if (sb.nonEmpty) sb.append(File.pathSeparator)
@@ -454,8 +597,221 @@ object ScalaCompilerBridge {
     val url = cs.getLocation
     if (url == null) return None
     try Some(Paths.get(url.toURI).toString)
-    catch { case _: Throwable => None }
+    catch { case NonFatal(_) => None }
   }
+}
+
+/**
+ * The full compiler pipeline replaces `unit.tpdTree` phase by phase, so after
+ * `compileUnits` it holds the lowered (erased, lambda-lifted, ...) tree for any
+ * unit that compiled without errors. Type attribution needs the typer's tree,
+ * whose spans and types still correspond to the source, so capture it right
+ * after typing while letting the later phases run for their diagnostics.
+ *
+ * Units are type-checked from the untyped trees the bridge parsed, rather than
+ * being parsed again by the compiler's parser phase, and the typer records the
+ * typed tree of each of their nodes.
+ *
+ * Its runs have the given id, which a [[ScalaCompiler]] increases from one
+ * compilation to the next, as Dotty requires of the runs on one `ContextBase`.
+ */
+private class TyperTreeCapturingCompiler(typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree],
+                                         recorder: TyperRecorder,
+                                         runId: Periods.RunId) extends Compiler {
+  override def nextRunId: Periods.RunId = runId
+
+  override def phases: List[List[Phase]] = {
+    val all = super.phases.map(_.map {
+      case _: Parser => new KeepParsedTrees
+      case _: TyperPhase => new RecordingTyperPhase(recorder)
+      case phase => phase
+    })
+    val typerGroup = all.indexWhere(_.exists(_.isInstanceOf[TyperPhase]))
+    if (typerGroup < 0) all
+    else {
+      val (upToTyper, rest) = all.splitAt(typerGroup + 1)
+      upToTyper ::: List(new CaptureTyperTrees(typerTrees)) :: rest
+    }
+  }
+}
+
+/**
+ * A compiler whose symbol table outlives a compilation, so that a [[ScalaCompilerCache]]
+ * can reuse the symbols it loaded from the classpath. A compilation enters its top-level
+ * definitions into the packages of that symbol table, and [[clean]] removes them again so
+ * that no compilation sees the sources of another.
+ */
+private[internal] final class ScalaCompiler(val classpath: String, reuse: Boolean) {
+  val initialContext: Context = (new ContextBase).initialCtx
+
+  /** Dotty allows only the thread that first compiled with a `ContextBase` to compile with it. */
+  val thread: Thread = Thread.currentThread()
+
+  /** Whether [[clean]] can restore the symbol table to what it was before the last compilation. */
+  var reusable: Boolean = reuse
+
+  private var runId: Periods.RunId = Periods.InitialRunId
+  private var lastContext: Context = null
+
+  /** The members of the packages the last compilation declares definitions in, from before it. */
+  private var packages: List[(Symbol, JSet[Symbol])] = Nil
+
+  /** The id of the first symbol the last compilation created. */
+  private var firstSymbolId: Int = 0
+
+  def nextRunId(): Periods.RunId = {
+    runId += 1
+    runId
+  }
+
+  /** Records the latest run of a compilation, in whose context [[clean]] works. */
+  def ran(run: Run): Unit =
+    lastContext = run.runContext
+
+  /** Records the members of the packages the units declare definitions in, before the units are entered. */
+  def enters(units: JList[CompilationUnit])(using Context): Unit =
+    if (reusable && packages.isEmpty) {
+      declaredPackages(units).forEach { pkg =>
+        val members = Collections.newSetFromMap(new IdentityHashMap[Symbol, java.lang.Boolean]())
+        pkg.info.decls.toList.foreach(members.add)
+        packages = (pkg, members) :: packages
+      }
+      firstSymbolId = ctx.base.nextSymId
+    }
+
+  /** Removes the definitions of the unit's source from their packages, so that no reference resolves to them. */
+  def forget(unit: CompilationUnit)(using Context): Unit = {
+    val path = unit.source.file.path
+    declaredPackages(Collections.singletonList(unit)).forEach { pkg =>
+      val scope = pkg.info.decls.openForMutations
+      for (sym <- scope.toList) {
+        val file = sym.associatedFile
+        // Not forcing the symbol's denotation, like Dotty's PackageClassDenotation.unlinkFromFile
+        if (file != null && file.path == path) scope.unlink(sym, sym.lastKnownDenotation.name)
+      }
+      pkg.asClass.classDenot.invalidateMemberCaches()
+    }
+  }
+
+  /** The packages the units declare definitions in, with the root and empty packages. */
+  private def declaredPackages(units: JList[CompilationUnit])(using Context): JSet[Symbol] = {
+    val declared = new LinkedHashSet[Symbol]()
+    declared.add(ctx.definitions.RootClass)
+    declared.add(ctx.definitions.EmptyPackageClass)
+    units.forEach { unit =>
+      for (path <- packagePaths(unit.untpdTree, Nil)) {
+        var owner: Symbol = ctx.definitions.RootClass
+        for (name <- path if owner.exists) {
+          val pkg = owner.info.decls.lookup(name.toTermName)
+          owner = if (pkg.is(Flags.Package)) pkg.moduleClass else NoSymbol
+          if (owner.exists) declared.add(owner)
+        }
+      }
+    }
+    declared
+  }
+
+  /** The packages a tree declares definitions in, with its package clauses and package objects. */
+  private def packagePaths(tree: untpd.Tree, prefix: List[Name]): List[List[Name]] = tree match {
+    case untpd.PackageDef(pid, stats) =>
+      val path = if (pid.name == nme.EMPTY_PACKAGE) prefix else prefix ++ qualifiedName(pid)
+      path :: stats.flatMap {
+        case pkg: untpd.PackageDef => packagePaths(pkg, path)
+        case obj: untpd.ModuleDef if obj.mods.is(Flags.Package) => List(path :+ obj.name)
+        case _ => Nil
+      }
+    case _ => Nil
+  }
+
+  private def qualifiedName(tree: untpd.Tree): List[Name] = tree match {
+    case untpd.Ident(name) => List(name)
+    case untpd.Select(qual, name) => qualifiedName(qual) :+ name
+    case _ => Nil
+  }
+
+  /**
+   * Removes the symbols the last compilation entered into packages: its definitions, the
+   * packages, companions and proxies the namer added for them, and the nested classes later
+   * phases lifted out of them. Returns whether the compiler can be reused, which it can't
+   * when one of its definitions replaced a member of the classpath.
+   */
+  def clean(): Boolean = {
+    val context = lastContext
+    lastContext = null
+    if (reusable && context != null) {
+      given Context = context
+      try {
+        for ((pkg, before) <- packages) {
+          val scope = pkg.info.decls.openForMutations
+          val now = scope.toList
+          val added = now.filter(sym => sym.id >= firstSymbolId && !synthesized(pkg, sym))
+          for (sym <- added; name <- enteredNames(sym)) scope.unlink(sym, name)
+          if (now.count(before.contains) != before.size || scope.toList.exists(added.contains)) {
+            reusable = false
+          }
+          pkg.asClass.classDenot.invalidateMemberCaches()
+        }
+      } catch {
+        case NonFatal(_) => reusable = false
+      }
+    }
+    packages = Nil
+    reusable
+  }
+
+  /** A class lifted out of another is entered under the flat name the last phases gave it. */
+  private def enteredNames(sym: Symbol)(using Context): Set[Name] = {
+    val denot = sym.lastKnownDenotation
+    Set(denot.initial.name, denot.name, atPhase(ctx.base.allPhases.last)(sym.denot.name))
+  }
+
+  /** Classes of the `scala` package that any compilation creates on first use, like `Function23`. */
+  private def synthesized(pkg: Symbol, sym: Symbol)(using Context): Boolean =
+    pkg == ctx.definitions.ScalaPackageClass && {
+      val name = sym.lastKnownDenotation.name
+      name.isTypeName && name.isSyntheticFunction
+    }
+}
+
+/**
+ * The compilers of the parsers of one `ScalaParser.Builder` and its clones, kept between
+ * parses, one for each thread that parses.
+ */
+final class ScalaCompilerCache {
+  private val idle = new ThreadLocal[ScalaCompiler]
+
+  private[internal] def acquire(classpath: String): ScalaCompiler = {
+    val compiler = idle.get()
+    idle.remove()
+    if (compiler != null && compiler.classpath == classpath) compiler else new ScalaCompiler(classpath, reuse = true)
+  }
+
+  private[internal] def release(compiler: ScalaCompiler): Unit =
+    if (compiler.thread == Thread.currentThread() && compiler.clean()) idle.set(compiler)
+}
+
+/** A batch of sources parsed for one run, and what the run's typer records of them. */
+private case class Typing(run: Run,
+                          entries: JList[SourceEntry],
+                          units: JList[CompilationUnit],
+                          typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree],
+                          recorder: TyperRecorder,
+                          indexes: IdentityHashMap[CompilationUnit, UntypedNodeIndex])
+
+private class KeepParsedTrees extends Parser {
+  override def parse(using ctx: Context): Boolean =
+    !ctx.compilationUnit.untpdTree.isEmpty || super.parse
+}
+
+private class CaptureTyperTrees(typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree]) extends Phase {
+  override def phaseName: String = "captureTyperTrees"
+
+  override def isRunnable(using Context): Boolean = true
+
+  override def isCheckable: Boolean = false
+
+  override protected def run(using ctx: Context): Unit =
+    typerTrees.put(ctx.compilationUnit, ctx.compilationUnit.tpdTree)
 }
 
 /**
@@ -511,7 +867,8 @@ case class ScalaParseResult(
   warnings: JList[ScalaWarning],
   wasWrapped: Boolean = false,
   wasObjectWrapped: Boolean = false,
-  context: Context
+  context: Context,
+  typedNodes: TypedNodes = TypedNodes.empty
 )
 
 private[internal] object ScalaParseResultConstants:

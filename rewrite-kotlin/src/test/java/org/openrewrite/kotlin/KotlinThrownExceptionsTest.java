@@ -99,6 +99,61 @@ class KotlinThrownExceptionsTest implements RewriteTest {
     }
 
     @Test
+    void javaMethodTakingArrays() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.nio.file.Files
+              import java.nio.file.Path
+
+              fun test(path: Path, bytes: ByteArray) {
+                  Files.write(path, bytes)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType.Method> write = new AtomicReference<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        write.set(method.getMethodType());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                // `write(Path, byte[], OpenOption...)`: a primitive array and a vararg in the descriptor.
+                assertThat(thrown(write.get())).containsExactly("java.io.IOException");
+            })
+          )
+        );
+    }
+
+    @Test
+    void javaMethodOfParameterizedReceiver() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.concurrent.LinkedBlockingQueue
+
+              fun test(queue: LinkedBlockingQueue<String>) {
+                  queue.put("")
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType.Method> put = new AtomicReference<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        put.set(method.getMethodType());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                // The descriptor is `put(Object)`, the erasure of the declared `E`.
+                assertThat(thrown(put.get())).containsExactly("java.lang.InterruptedException");
+            })
+          )
+        );
+    }
+
+    @Test
     void kotlinFunctionAnnotatedWithThrows() {
         rewriteRun(
           kotlin(

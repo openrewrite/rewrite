@@ -26,11 +26,15 @@ import org.junit.jupiter.api.Timeout;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.python.internal.pipfilelock.PipfileLockHash;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,7 +45,7 @@ import static org.openrewrite.python.Assertions.pipfile;
 /**
  * End-to-end recipe test of native Pipfile.lock regeneration against a stub package
  * index. The expected {@code _meta.hash} was recorded from the repo's python3 oracle
- * ({@code src/test/resources/pipfilelock/oracle.py hash --sources-json ...}).
+ * ({@code record/pipenv-oracle.py hash --sources-json ...}).
  */
 class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
 
@@ -50,6 +54,11 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
     private static final String WHEEL_2310 = "c".repeat(64);
     private static final String SDIST_2310 = "d".repeat(64);
     private static final String CERTIFI = "e".repeat(64);
+
+    private static final String REQUESTS_2280 = """
+      [packages]
+      requests = ">=2.28.0"
+      """;
 
     private static final String HASH_AFTER = "80cda6d1b04efef5989eb4f2d396bdcbbf070bac9c80c86c9ff134e34a0c2097";
 
@@ -122,7 +131,7 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
               {
                   "_meta": {
                       "hash": {
-                          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "sha256": "%s"
                       },
                       "pipfile-spec": 6,
                       "requires": {},
@@ -154,7 +163,7 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
                   },
                   "develop": {}
               }
-              """.formatted(CERTIFI, WHEEL_2310, SDIST_2310),
+              """.formatted(recorded(REQUESTS_2280), CERTIFI, WHEEL_2310, SDIST_2310),
             """
               {
                   "_meta": {
@@ -199,13 +208,19 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
 
     @Test
     @Timeout(120)
-    void unrelatedStaleDependencyDoesNotBlockUpgrade() {
-        // The Pipfile declares click, but it predates the lock (absent from it) — a pre-existing
-        // inconsistency the recipe never touched. Upgrading requests must still succeed, leaving
-        // click alone rather than aborting with "click is not in the existing lock".
+    void lockOutOfDateBeforeTheUpgradeIsRefused() {
+        // The Pipfile declares click, but the lock predates it: its hash records the Pipfile without click.
+        // Refreshing the hash over that drift would let `pipenv install --deploy` accept a lock missing click,
+        // so the lock is left as it was and the refusal is reported.
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.32.0", null, null))
-            .executionContext(ctx),
+            .executionContext(ctx)
+            .dataTable(PythonLockRegenerationFailures.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getSourcePath()).isEqualTo("Pipfile");
+                assertThat(rows.get(0).getReason()).isEqualTo("RESOLUTION_REQUIRED");
+                assertThat(rows.get(0).getDetail()).contains("out of date");
+            }),
           pipfile(
             """
               [packages]
@@ -216,15 +231,15 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
                 assertThat(actual).contains("requests = \">=2.32.0\"");
                 return actual;
             }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
-              .as("upgrade should not warn about the unrelated stale dependency")
-              .isEmpty())
+              .as("manifest should carry the lock-regeneration-failure warning")
+              .isPresent())
           ),
           json(
             """
               {
                   "_meta": {
                       "hash": {
-                          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "sha256": "%s"
                       },
                       "pipfile-spec": 6,
                       "requires": {},
@@ -256,9 +271,9 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
                   },
                   "develop": {}
               }
-              """.formatted(CERTIFI, WHEEL_2310, SDIST_2310),
+              """.formatted(recorded(REQUESTS_2280), CERTIFI, WHEEL_2310, SDIST_2310),
             spec -> spec.path("Pipfile.lock").noTrim().after(actual -> {
-                assertThat(actual).contains("\"version\": \"==2.32.4\"");
+                assertThat(actual).as("the lock is left as it was").contains("\"version\": \"==2.31.0\"");
                 assertThat(actual).doesNotContain("click");
                 return actual;
             })
@@ -295,7 +310,7 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
               {
                   "_meta": {
                       "hash": {
-                          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                          "sha256": "%s"
                       },
                       "pipfile-spec": 6,
                       "requires": {},
@@ -318,7 +333,7 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
                   },
                   "develop": {}
               }
-              """.formatted(WHEEL_2310),
+              """.formatted(recorded(REQUESTS_2280), WHEEL_2310),
             spec -> spec.path("Pipfile.lock")
               .after(actual -> actual)
               .afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
@@ -326,5 +341,16 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
                 .isPresent())
           )
         );
+    }
+
+    /** The hash pipenv records for a Pipfile without sources, hashed against the fixture lock's pypi source. */
+    private static String recorded(String pipfile) {
+        Toml.Document parsed = (Toml.Document) new TomlParser().parse(new InMemoryExecutionContext(), pipfile)
+          .findFirst().orElseThrow();
+        Map<String, Object> pypi = new LinkedHashMap<>();
+        pypi.put("name", "pypi");
+        pypi.put("url", "https://pypi.org/simple");
+        pypi.put("verify_ssl", true);
+        return PipfileLockHash.hash(parsed, List.of(pypi), PipfileLockHash.HashVariant.LEGACY);
     }
 }

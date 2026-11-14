@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.NuGet;
+using OpenRewrite.Xml;
 
 namespace OpenRewrite.Tests;
 
@@ -113,31 +115,45 @@ public class NuGetRestoreGraphTests : IDisposable
     }
 
     [Fact]
-    public void SharedRootFailureStopsTheFallbackEarly()
+    public void ProjectsFailingAloneDoNotCostHealthyProjectsTheirGraph()
     {
-        var names = Enumerable.Range(1, 10).Select(i => "Proj" + i).ToArray();
-        foreach (var name in names)
+        var broken = Enumerable.Range(1, 4).Select(i => "Broken" + i).ToArray();
+        foreach (var name in broken)
         {
-            WriteFile($"{name}/{name}.csproj", """
+            WriteFile($"{name}/{name}.csproj", $"""
                 <Project Sdk="Microsoft.NET.Sdk">
-                  <Import Project="../Missing/Shared.props" />
+                  <Import Project="{name}.Missing.props" />
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
                   </PropertyGroup>
                 </Project>
                 """);
         }
-        var entries = string.Join("\n", names.Select(n => $"  <Project Path=\"{n}/{n}.csproj\" />"));
-        WriteFile("Broken.slnx", $"<Solution>\n{entries}\n</Solution>");
+        var healthy = new[] { "Healthy1", "Healthy2", "Healthy3" };
+        foreach (var name in healthy)
+        {
+            WriteFile($"{name}/{name}.csproj", """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+        }
+        var entries = string.Join("\n", broken.Concat(healthy).Select(n => $"  <Project Path=\"{n}/{n}.csproj\" />"));
+        WriteFile("Mixed.slnx", $"<Solution>\n{entries}\n</Solution>");
 
         var before = NuGetResolver.GraphEvaluationsUnder(_tempDir);
-        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(Path.Combine(_tempDir, "Broken.slnx"));
+        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(Path.Combine(_tempDir, "Mixed.slnx"));
         var evaluations = NuGetResolver.GraphEvaluationsUnder(_tempDir) - before;
 
-        Assert.Null(dgSpec);
-        Assert.True(evaluations <= 5,
-            $"{evaluations} evaluations for 10 projects failing the same way; the fallback did " +
-            "not stop after recognizing one shared root cause");
+        Assert.NotNull(dgSpec);
+        Assert.Equal(1 + broken.Length + healthy.Length, evaluations);
+        var names = dgSpec.Projects
+            .Select(p => Path.GetFileNameWithoutExtension(p.RestoreMetadata?.ProjectPath ?? p.FilePath))
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.Equal(healthy, names);
     }
 
     [Fact]
@@ -171,5 +187,44 @@ public class NuGetRestoreGraphTests : IDisposable
         Assert.Equal(
             firstLockFile.Libraries.Select(l => l.Name + "/" + l.Version).OrderBy(x => x).ToArray(),
             secondLockFile.Libraries.Select(l => l.Name + "/" + l.Version).OrderBy(x => x).ToArray());
+    }
+
+    [Fact]
+    public void ProjectReachedThroughSymbolicLinkKeepsItsProjectReferences()
+    {
+        WriteFile("real/src/Lib/Lib.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        const string app = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="..\Lib\Lib.csproj" />
+              </ItemGroup>
+            </Project>
+            """;
+        WriteFile("real/src/App/App.csproj", app);
+        var linked = Path.Combine(_tempDir, "linked");
+        try
+        {
+            Directory.CreateSymbolicLink(linked, Path.Combine(_tempDir, "real"));
+        }
+        catch (Exception ex) when (OperatingSystem.IsWindows() && ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        var document = new XmlParser().Parse(app, "src/App/App.csproj");
+        var marker = MSBuildProjectHelper.CreateMarker(document, linked);
+
+        Assert.NotNull(marker);
+        var tf = Assert.Single(marker.TargetFrameworks);
+        Assert.Equal("Lib", Assert.Single(tf.ProjectReferences).Name);
     }
 }

@@ -306,11 +306,31 @@ class RewriteRpcProcessTest {
         RewriteRpcProcess.setMemoryLimit(6L << 30);
         try {
             assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand())
-                    .containsExactly("/bin/sh", "-c", "ulimit -d 6291456; exec \"$@\"", "sh", "noop", "--flag");
+                    .containsExactly("/bin/sh", "-c",
+                            "{ echo 1000 > /proc/self/oom_score_adj; } 2>/dev/null; ulimit -d 6291456; exec \"$@\"",
+                            "sh", "noop", "--flag");
         } finally {
             RewriteRpcProcess.setMemoryLimit(0);
         }
         assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand()).containsExactly("noop", "--flag");
+    }
+
+    /** It can only rise without privilege, so a capped peer has the most a process can have. */
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void cappedPeerIsTheOomKillersFirstChoice() throws Exception {
+        RewriteRpcProcess.setMemoryLimit(1L << 30);
+        try {
+            List<String> command = RewriteRpcProcess.forLanguage("test")
+                    .command("cat", "/proc/self/oom_score_adj").build().launchCommand();
+            Process p = new ProcessBuilder(command).redirectErrorStream(true).start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                assertThat(reader.readLine()).isEqualTo("1000");
+            }
+            assertThat(p.waitFor()).isZero();
+        } finally {
+            RewriteRpcProcess.setMemoryLimit(0);
+        }
     }
 
     @Test

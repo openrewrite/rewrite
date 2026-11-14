@@ -60,7 +60,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitArrayAccess(J.ArrayAccess arrayAccess, RpcReceiveQueue q) {
         return arrayAccess
                 .withIndexed(q.receive(arrayAccess.getIndexed(), i -> (Expression) visitNonNull(i, q)))
-                .withDimension(q.receive(arrayAccess.getDimension(), d -> (J.ArrayDimension) visitNonNull(d, q)));
+                .withDimension(q.receive(arrayAccess.getDimension(), d -> (J.ArrayDimension) visitNonNull(d, q)))
+                .withType(q.receive(arrayAccess.getType(), t -> visitType(t, q)));
     }
 
     @Override
@@ -395,10 +396,13 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withSelect(q.receive(method.getPadding().getSelect(), s -> visitRightPadded(s, q)))
                 .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)));
         J.Identifier name = q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q));
-        return method
+        method = method
                 .getPadding().withArguments(q.receive(method.getPadding().getArguments(), a -> visitContainer(a, q)))
-                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)))
-                .withName(name);
+                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
+        // The received method type stands as sent. withName would re-derive it from the name.
+        return method.getName() == name ? method : new J.MethodInvocation(method.getId(), method.getPrefix(),
+                method.getMarkers(), method.getPadding().getSelect(), method.getPadding().getTypeParameters(),
+                name, method.getPadding().getArguments(), method.getMethodType());
     }
 
     @Override

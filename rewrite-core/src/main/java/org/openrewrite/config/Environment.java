@@ -51,13 +51,6 @@ public class Environment {
         Map<String, Recipe> dependencyRecipeMap = new HashMap<>();
         dependencyRecipes.forEach(r -> dependencyRecipeMap.putIfAbsent(r.getName(), r));
 
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                recipeExamples.putAll(r.listRecipeExamples());
-            }
-        }
-
         List<Recipe> recipes = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             recipes.addAll(r.listRecipes());
@@ -67,10 +60,6 @@ public class Environment {
         recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));
 
         for (Recipe recipe : recipes) {
-            if (recipeExamples.containsKey(recipe.getName())) {
-                recipe.setExamples(recipeExamples.get(recipe.getName()));
-            }
-
             if (recipe instanceof DeclarativeRecipe) {
                 ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get);
             }
@@ -85,38 +74,9 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                recipeToExamples.putAll(r.listRecipeExamples());
-            } else if (r instanceof ClasspathScanningLoader) {
-                ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
-                Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
-                for (String key : examplesMap.keySet()) {
-                    if (recipeToExamples.containsKey(key)) {
-                        recipeToExamples.get(key).addAll(examplesMap.get(key));
-                    } else {
-                        recipeToExamples.put(key, examplesMap.get(key));
-                    }
-                }
-            }
-        }
-
-        List<RecipeDescriptor> result = new ArrayList<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples)));
-            } else {
-                Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
-                for (RecipeDescriptor descriptor : descriptors) {
-                    if (recipeToExamples.containsKey(descriptor.getName())) {
-                        descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
-                    }
-                }
-                result.addAll(descriptors);
-            }
-        }
-        return result;
+        return resourceLoaders.stream()
+                .flatMap(r -> r.listRecipeDescriptors().stream())
+                .collect(toList());
     }
 
     public Recipe activateRecipes(Collection<String> activeRecipes) {
@@ -186,21 +146,6 @@ public class Environment {
         }
         if (recipe == null) {
             return null;
-        }
-
-        boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
-
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        if (includeExamples) {
-            for (ResourceLoader r : resourceLoaders) {
-                if (r instanceof YamlResourceLoader) {
-                    recipeExamples.putAll(r.listRecipeExamples());
-                }
-            }
-        }
-
-        if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
-            recipe.setExamples(recipeExamples.get(recipe.getName()));
         }
 
         if (recipe instanceof DeclarativeRecipe) {

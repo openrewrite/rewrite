@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.semver.Semver;
@@ -30,11 +31,148 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class UpgradePluginVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi());
+    }
+
+    @Test
+    void upgradesTomlVersionCatalogPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.40.0"
+              """,
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.41.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesTomlVersionCatalogInlinePlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version = "5.40.0" }
+              """,
+            """
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version = "5.41.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesTomlVersionCatalogPluginVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [versions]
+              openrewrite = "5.40.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite" }
+              """,
+            """
+              [versions]
+              openrewrite = "5.41.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesSettingsVersionCatalogPluginVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('openrewrite', '5.40.0')
+                          plugin('openrewrite', 'org.openrewrite.rewrite').versionRef('openrewrite')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('openrewrite', '5.41.0')
+                          plugin('openrewrite', 'org.openrewrite.rewrite').versionRef('openrewrite')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotUpgradeTomlPluginVersionReferenceSharedWithLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [versions]
+              shared = "5.40.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "shared" }
+
+              [libraries]
+              unrelated = { module = "org.example:unrelated", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesSettingsVersionCatalogPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          plugin('openrewrite', 'org.openrewrite.rewrite').version('5.40.0')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          plugin('openrewrite', 'org.openrewrite.rewrite').version('5.41.0')
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample("Upgrading a build plugin")
@@ -601,16 +739,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
-    void doesNotPinPropertyManagedVersions() {
+    void pinsVersionNoLongerManagedThroughImportedBom() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradePluginVersion("org.springframework.boot", "2.5.x", null)),
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "4.0.0", null)),
           buildGradle(
             """
               plugins {
                   id 'java'
-                  id 'org.springframework.boot' version '2.5.14'
-                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  id 'org.springframework.boot' version '3.5.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
               }
 
               repositories {
@@ -618,14 +756,14 @@ class UpgradePluginVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  runtimeOnly 'mysql:mysql-connector-java'
+                  testImplementation 'io.rest-assured:rest-assured'
               }
               """,
             """
               plugins {
                   id 'java'
-                  id 'org.springframework.boot' version '2.5.15'
-                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  id 'org.springframework.boot' version '4.0.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
               }
 
               repositories {
@@ -633,7 +771,7 @@ class UpgradePluginVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  runtimeOnly 'mysql:mysql-connector-java'
+                  testImplementation 'io.rest-assured:rest-assured:5.5.2'
               }
               """
           )
@@ -663,5 +801,55 @@ class UpgradePluginVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class OnGradle8 implements RewriteTest {
+
+        // Spring Boot 2's Gradle plugin calls Configuration#getUploadTaskName, which Gradle 9 removed
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.beforeRecipe(withToolingApi("8.14.5"));
+        }
+
+        @Test
+        void doesNotPinPropertyManagedVersions() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradePluginVersion("org.springframework.boot", "2.5.x", null)),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java'
+                      id 'org.springframework.boot' version '2.5.14'
+                      id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'mysql:mysql-connector-java'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java'
+                      id 'org.springframework.boot' version '2.5.15'
+                      id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'mysql:mysql-connector-java'
+                  }
+                  """
+              )
+            );
+        }
     }
 }

@@ -27,6 +27,7 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -54,7 +55,7 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  */
 @Value
 @With
-public class PythonResolutionResult implements Marker, RpcCodec<PythonResolutionResult> {
+public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<PythonResolutionResult> {
     UUID id;
 
     @ToString.Include
@@ -373,7 +374,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     @AllArgsConstructor
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static final class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+    public static final class ResolvedDependency implements Heavyweight, RpcCodec<ResolvedDependency> {
         @ToString.Include
         String name;
 

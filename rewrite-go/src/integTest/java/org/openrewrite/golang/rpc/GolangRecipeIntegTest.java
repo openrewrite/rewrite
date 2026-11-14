@@ -90,7 +90,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -135,7 +135,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return super.visitSwitch(switch_, ctx);
               }
-          })).expectedCyclesThatMakeChanges(0).cycles(1),
+          })),
           go(
             """
               package main
@@ -175,7 +175,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -208,7 +208,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -412,7 +412,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return b;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -447,7 +447,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -480,7 +480,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return m;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -594,7 +594,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main

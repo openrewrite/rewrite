@@ -17,7 +17,7 @@ AddLiteralMethodArgument recipe for Python that delegates to Java's AddLiteralMe
 
 This recipe adds a literal argument to method invocations matching a pattern.
 """
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from rewrite import Recipe, option
 from rewrite.decorators import categorize
@@ -26,6 +26,7 @@ from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
+@dataclass
 class AddLiteralMethodArgument(Recipe):
     """
     Add a literal argument to method invocations matching a pattern.
@@ -40,33 +41,23 @@ class AddLiteralMethodArgument(Recipe):
         )
     """
 
-    method_pattern: str = field(metadata=option(
+    method_pattern: str = field(default="", metadata=option(
         display_name="Method pattern",
         description="A method pattern that matches method invocations to modify.",
         example="datetime.datetime now()"
     ))
 
-    argument_index: int = field(metadata=option(
+    argument_index: int = field(default=0, metadata=option(
         display_name="Argument index",
         description="The zero-based position where to insert the argument.",
         example="0"
     ))
 
-    literal: str = field(metadata=option(
+    literal: str = field(default="", metadata=option(
         display_name="Literal",
         description="The literal value to add as an argument.",
         example="datetime.UTC"
     ))
-
-    def __init__(
-        self,
-        method_pattern: str = "",
-        argument_index: int = 0,
-        literal: str = ""
-    ):
-        self.method_pattern = method_pattern
-        self.argument_index = argument_index
-        self.literal = literal
 
     @property
     def name(self) -> str:

@@ -23,14 +23,11 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
+import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.marker.AlreadyReplaced;
 
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -64,16 +61,15 @@ public class FindAndReplaceLiteral extends Recipe {
     Boolean caseSensitive;
 
     @Override
+    public int maxCycles() {
+        return 1;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new HclIsoVisitor<ExecutionContext>() {
             @Override
             public Hcl.Literal visitLiteral(final Hcl.Literal literal, final ExecutionContext ctx) {
-                for (AlreadyReplaced alreadyReplaced : literal.getMarkers().findAll(AlreadyReplaced.class)) {
-                    if (Objects.equals(find, alreadyReplaced.getFind()) &&
-                        Objects.equals(replace, alreadyReplaced.getReplace())) {
-                        return literal;
-                    }
-                }
                 String searchStr = find;
                 if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
@@ -86,7 +82,8 @@ public class FindAndReplaceLiteral extends Recipe {
                 if (literal.getValue() == null) {
                     return literal;
                 }
-                Matcher matcher = pattern.matcher(literal.getValue().toString());
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                Matcher matcher = pattern.matcher(written(literal, parent));
                 if (!matcher.find()) {
                     return literal;
                 }
@@ -94,9 +91,27 @@ public class FindAndReplaceLiteral extends Recipe {
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
-                String newLiteral = matcher.replaceAll(replacement);
-                return literal.withValue(newLiteral).withValueSource(newLiteral)
-                        .withMarkers(literal.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
+                return withWritten(literal, matcher.replaceAll(replacement), parent);
+            }
+
+            // a string is matched as written, without the quotes a block label's source holds
+            private String written(Hcl.Literal literal, Object parent) {
+                if (!(literal.getValue() instanceof String)) {
+                    return literal.getValue().toString();
+                }
+                String source = literal.getValueSource();
+                return parent instanceof Hcl.Block ? source.substring(1, source.length() - 1) : source;
+            }
+
+            private Hcl.Literal withWritten(Hcl.Literal literal, String text, Object parent) {
+                if (!(literal.getValue() instanceof String)) {
+                    return literal.withValue(text).withValueSource(text);
+                } else if (parent instanceof Hcl.Block) {
+                    return literal.withValue(HclString.decodeQuoted(text)).withValueSource('"' + text + '"');
+                } else if (parent instanceof Hcl.HeredocTemplate) {
+                    return literal.withValue(HclString.decodeHeredoc(text)).withValueSource(text);
+                }
+                return literal.withValue(HclString.decodeQuoted(text)).withValueSource(text);
             }
         };
     }

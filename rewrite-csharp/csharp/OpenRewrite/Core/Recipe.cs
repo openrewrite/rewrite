@@ -42,11 +42,24 @@ public abstract class Recipe
 
     public virtual TimeSpan? EstimatedEffortPerOccurrence => TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Whether changes made by this recipe should trigger another recipe cycle.
+    /// </summary>
+    public virtual bool CausesAnotherCycle => false;
+
     public virtual IReadOnlyList<DataTableDescriptor> DataTables => [];
 
     public virtual List<Recipe> GetRecipeList() => [];
 
     public virtual ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
+
+    /// <summary>
+    /// Checks option values that the per-option <c>Required</c> flag cannot express, such as a
+    /// constraint spanning several options ("at least one of A or B"). Return one message per
+    /// problem, phrased for the person configuring the recipe. A non-empty result fails recipe
+    /// preparation, so the problem is reported once instead of on every source file.
+    /// </summary>
+    public virtual IEnumerable<string> Validate() => [];
 
     public RecipeDescriptor GetDescriptor()
     {
@@ -129,7 +142,9 @@ public interface IScanningRecipe
 /// <summary>
 /// A recipe that first scans source files to accumulate data, then transforms them.
 /// </summary>
-/// <typeparam name="TAccumulator">The type of the accumulator for scanning data.</typeparam>
+/// <typeparam name="TAccumulator">The type of the accumulator for scanning data. It stays in memory until the cycle
+/// ends, so it should hold values such as coordinates, paths and ids, not trees or other <see cref="IHeavyweight"/>
+/// objects.</typeparam>
 public abstract class ScanningRecipe<TAccumulator> : Recipe, IScanningRecipe
 {
     public abstract TAccumulator GetInitialValue(ExecutionContext ctx);

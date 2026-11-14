@@ -21,8 +21,10 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.internal.JsonPrinter;
+import org.openrewrite.json.internal.JsonTreeShapeValidationService;
 import org.openrewrite.json.service.JsonCommentService;
 import org.openrewrite.marker.Markers;
 
@@ -195,6 +197,8 @@ public interface Json extends Tree {
         public <S, T extends S> T service(Class<S> service) {
             if (CommentService.class.getName().equals(service.getName())) {
                 return (T) new JsonCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new JsonTreeShapeValidationService();
             }
             return SourceFile.super.service(service);
         }

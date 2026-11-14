@@ -53,7 +53,7 @@ public class RenameFile extends Recipe {
                         return ((SourceFile) tree).withSourcePath(sourcePath.resolveSibling(fileName).normalize());
                     }
                 }
-                return super.visit(tree, ctx);
+                return tree;
             }
         };
     }

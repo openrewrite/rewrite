@@ -101,7 +101,6 @@ public class JavaCompilationUnitState {
         javaParser = JavaParser.fromJavaVersion()
                 .classpath(
                         "jsr305",
-                        "classgraph",
                         "jackson-annotations",
                         "micrometer-core",
                         "jgit",

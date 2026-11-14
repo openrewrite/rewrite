@@ -108,6 +108,71 @@ class AddAnnotationProcessorTest implements RewriteTest {
     }
 
     @Test
+    void keepFormattingOutsideTheBuild() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                         <java.version>17</java.version>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok</artifactId>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                         <java.version>17</java.version>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok</artifactId>
+                                      </path>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                          <version>0.2.0</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/7384")
     void omitVersionWhenManagedByParentAndCompilerPluginSupportsIt() {
         // When the processor's version is already managed via <dependencyManagement>

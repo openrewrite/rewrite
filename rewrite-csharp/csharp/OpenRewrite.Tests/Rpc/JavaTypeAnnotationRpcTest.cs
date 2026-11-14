@@ -159,7 +159,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
     private const string CsCompilationUnitType = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
 
     [Fact]
-    public void RepeatedValueBearingAnnotationsRoundTripThroughJava()
+    public async Task RepeatedValueBearingAnnotationsRoundTripThroughJava()
     {
         var source = """
             using System;
@@ -176,7 +176,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
             public class Both { }
             """;
 
-        var both = FindClassDeclaration(ProbeOnJava(source, "Both.cs", "Both"), "Both");
+        var both = FindClassDeclaration(await ProbeOnJavaAsync(source, "Both.cs", "Both"), "Both");
 
         var marker = both.Markers.FindFirst<SearchResult>();
         Assert.NotNull(marker);
@@ -203,7 +203,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
     }
 
     [Fact]
-    public void NullInAttributeArgumentArrayRoundTripsThroughJava()
+    public async Task NullInAttributeArgumentArrayRoundTripsThroughJava()
     {
         var source = """
             using System;
@@ -218,7 +218,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
             public class Rows { }
             """;
 
-        var rows = FindClassDeclaration(ProbeOnJava(source, "Rows.cs", "Rows"), "Rows");
+        var rows = FindClassDeclaration(await ProbeOnJavaAsync(source, "Rows.cs", "Rows"), "Rows");
 
         Assert.Equal("@RowAttribute(Values=[null,a,null])", rows.Markers.FindFirst<SearchResult>()?.Description);
 
@@ -234,7 +234,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
     /// failing the whole file's serialization.
     /// </summary>
     [Fact]
-    public void NonFiniteConstantsRoundTripThroughJava()
+    public async Task NonFiniteConstantsRoundTripThroughJava()
     {
         var source = """
             using System;
@@ -257,7 +257,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
             public class NonFinite { }
             """;
 
-        var nonFinite = FindClassDeclaration(ProbeOnJava(source, "NonFinite.cs", "NonFinite"), "NonFinite");
+        var nonFinite = FindClassDeclaration(await ProbeOnJavaAsync(source, "NonFinite.cs", "NonFinite"), "NonFinite");
 
         var marker = nonFinite.Markers.FindFirst<SearchResult>();
         Assert.NotNull(marker);
@@ -282,12 +282,11 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
         Assert.Equal(["NaN", "Infinity", "-Infinity", 1.5], data!);
     }
 
-    private static J ProbeOnJava(string source, string path, string type)
+    private static async Task<J> ProbeOnJavaAsync(string source, string path, string type)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, path: path);
-        var references = Assemblies.Net90
-            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, CancellationToken.None)
-            .GetAwaiter().GetResult();
+        var references = await Assemblies.Net90
+            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, CancellationToken.None);
         var compilation = CSharpCompilation.Create("AnnotationRpcTest")
             .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                 .WithNullableContextOptions(NullableContextOptions.Enable))

@@ -109,35 +109,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     public @Nullable Tree visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-            boolean implicit = Boolean.TRUE.equals(includeImplicit);
-
-            if (TYPES_IN_USE_HAS_TRIE_API) {
-                // Exact FQN: O(1) closure lookup on TypesInUse.
-                if (fullyQualifiedType != null) {
-                    return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu) : cu;
-                }
-                // Package-shaped wildcards (com.foo.* / com.foo..*): O(prefix-depth) trie lookup.
-                if (typePattern instanceof PackagePattern) {
-                    return cu.getTypesInUse().hasTypeInPackage(((PackagePattern) typePattern).getName(), implicit)
-                            ? SearchResult.found(cu) : cu;
-                }
-                if (typePattern instanceof PackagePrefixPattern) {
-                    return cu.getTypesInUse().hasTypeInPackageOrSubpackage(((PackagePrefixPattern) typePattern).getPrefix(), implicit)
-                            ? SearchResult.found(cu) : cu;
-                }
-                // GenericPattern (regex-like): one trie walk, memoized per (matcher, implicit).
-                if (typePattern instanceof GenericPattern) {
-                    return cu.getTypesInUse().hasTypeMatching(((GenericPattern) typePattern).getMatcher(), implicit)
-                            ? SearchResult.found(cu) : cu;
-                }
-                return cu;
-            }
-
-            // Legacy fallback: TypesInUse on the runtime classpath predates the trie API. Iterate
-            // types-in-use, imports, and (when implicit) used-method types directly. Kept verbatim
-            // from the pre-trie implementation so behavior matches whatever older versions of
-            // rewrite-java do.
-            return legacyVisit(cu);
+            Tree found = visitTypes(cu);
+            return found != cu || !importsUnresolvedMatch(cu) ? found : SearchResult.found(cu);
         } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.References references = sourceFile.getReferences();
@@ -146,6 +119,75 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             }
         }
         return tree;
+    }
+
+    /// An unresolved import still names a type whose uses [TypesInUse] can't see, as when parsed without it on
+    /// the classpath. Package imports are skipped, as they have no type even when resolved.
+    private boolean importsUnresolvedMatch(JavaSourceFile cu) {
+        for (J.Import anImport : cu.getImports()) {
+            J.FieldAccess qualid = anImport.getQualid();
+            if ("*".equals(qualid.getSimpleName())) {
+                continue;
+            }
+            JavaType type = anImport.isStatic() ? qualid.getTarget().getType() : qualid.getType();
+            if (type != null && !(type instanceof JavaType.Unknown)) {
+                continue;
+            }
+            if (nameMatches(anImport.getTypeName(), anImport.getPackageName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean nameMatches(String typeName, String packageName) {
+        if (fullyQualifiedType != null) {
+            return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedType, typeName);
+        }
+        if (typePattern instanceof GenericPattern) {
+            return ((GenericPattern) typePattern).getMatcher().matches(typeName.replace('$', '.')) ||
+                   ((GenericPattern) typePattern).getMatcher().matches(typeName);
+        }
+        if (typePattern instanceof PackagePattern) {
+            return packageName.equals(((PackagePattern) typePattern).getName());
+        }
+        if (typePattern instanceof PackagePrefixPattern) {
+            String prefix = ((PackagePrefixPattern) typePattern).getPrefix();
+            return packageName.equals(prefix) || packageName.startsWith(prefix + '.');
+        }
+        return false;
+    }
+
+    private Tree visitTypes(JavaSourceFile cu) {
+        boolean implicit = Boolean.TRUE.equals(includeImplicit);
+
+        if (TYPES_IN_USE_HAS_TRIE_API) {
+            // Exact FQN: O(1) closure lookup on TypesInUse.
+            if (fullyQualifiedType != null) {
+                return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu) : cu;
+            }
+            // Package-shaped wildcards (com.foo.* / com.foo..*): O(prefix-depth) trie lookup.
+            if (typePattern instanceof PackagePattern) {
+                return cu.getTypesInUse().hasTypeInPackage(((PackagePattern) typePattern).getName(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            if (typePattern instanceof PackagePrefixPattern) {
+                return cu.getTypesInUse().hasTypeInPackageOrSubpackage(((PackagePrefixPattern) typePattern).getPrefix(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            // GenericPattern (regex-like): one trie walk, memoized per (matcher, implicit).
+            if (typePattern instanceof GenericPattern) {
+                return cu.getTypesInUse().hasTypeMatching(((GenericPattern) typePattern).getMatcher(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            return cu;
+        }
+
+        // Legacy fallback: TypesInUse on the runtime classpath predates the trie API. Iterate
+        // types-in-use, imports, and (when implicit) used-method types directly. Kept verbatim
+        // from the pre-trie implementation so behavior matches whatever older versions of
+        // rewrite-java do.
+        return legacyVisit(cu);
     }
 
     private JavaSourceFile legacyVisit(JavaSourceFile cu) {

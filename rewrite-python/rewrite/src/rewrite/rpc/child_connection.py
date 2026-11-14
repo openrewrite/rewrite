@@ -6,7 +6,6 @@ as the Java<->Python link. stdio is point-to-point, so the facade owns the child
 to it directly here. A child's *outbound* callbacks toward Java (``GetObject`` etc.) are relayed
 by handling inbound requests inside ``request``'s read loop.
 """
-import json
 import os
 import re
 import subprocess
@@ -15,50 +14,50 @@ import traceback
 from importlib import metadata
 from pathlib import Path
 
-from rewrite.rpc import venv_manager
+from rewrite.rpc import json_codec, venv_manager
 
 _ENGINE_ROOT = str(Path(__file__).resolve().parents[2])
 _ENGINE_DIST = "openrewrite"
 _REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 
-def _path_key(path: str) -> str:
-    return os.path.normcase(os.path.abspath(path))
-
-
-def _engine_roots() -> list:
+def _engine_roots(exclude_paths=()) -> list:
     """Directories supplying the engine *and its runtime dependencies*.
 
     The platform a child needs is not just the ``rewrite`` package: a recipe may parse a Python
     template, which reaches ``parso``. A bundle venv has neither, so both must travel on the
-    child's ``PYTHONPATH``.
+    child's ``PYTHONPATH``. A bundle venv hosted in this process carries its own copies, so the
+    metadata is looked up outside ``exclude_paths``.
     """
+    path = venv_manager.path_without(exclude_paths)
     roots: list = []
     seen: set = set()
 
     def add(path: str) -> None:
-        key = _path_key(path)
+        key = venv_manager.path_key(path)
         if key not in seen:
             seen.add(key)
             roots.append(path)
 
     add(_ENGINE_ROOT)
-    try:
-        requires = metadata.distribution(_ENGINE_DIST).requires or []
-    except metadata.PackageNotFoundError:
+    engine = _distribution(_ENGINE_DIST, path)
+    if engine is None:
         return roots  # running straight from source with no installed metadata
 
-    for requirement in requires:
+    for requirement in engine.requires or []:
         if "extra ==" in requirement:
             continue  # dev/publish/profiling extras are not part of a child's platform
         name = _REQUIREMENT_NAME.match(requirement.strip())
         if name is None:
             continue
-        try:
-            add(str(metadata.distribution(name.group(0)).locate_file("")))
-        except metadata.PackageNotFoundError:
-            continue  # declared but absent: contribute no path rather than fail the spawn
+        dependency = _distribution(name.group(0), path)
+        if dependency is not None:  # declared but absent contributes no path rather than fail the spawn
+            add(str(dependency.locate_file("")))
     return roots
+
+
+def _distribution(name: str, path: list):
+    return next(iter(metadata.distributions(name=name, path=path)), None)
 
 
 def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None) -> list:
@@ -93,15 +92,15 @@ def _child_env(exclude_paths=()) -> dict:
     """
     env = dict(os.environ)
 
-    engine = _engine_roots()
-    excluded = {_path_key(p) for p in (*exclude_paths, *engine)}
+    engine = _engine_roots(exclude_paths)
+    excluded = {venv_manager.path_key(p) for p in (*exclude_paths, *engine)}
     inherited = [p for p in env.get("PYTHONPATH", "").split(os.pathsep)
-                 if p and _path_key(p) not in excluded]
+                 if p and venv_manager.path_key(p) not in excluded]
     env["PYTHONPATH"] = os.pathsep.join([*engine, *inherited])
 
     scripts = sysconfig.get_path("scripts")
     path = [p for p in env.get("PATH", "").split(os.pathsep) if p]
-    if scripts and _path_key(scripts) not in {_path_key(p) for p in path}:
+    if scripts and venv_manager.path_key(scripts) not in {venv_manager.path_key(p) for p in path}:
         path.append(scripts)
     env["PATH"] = os.pathsep.join(path)
     return env
@@ -166,9 +165,10 @@ class ChildConnection:
             self._proc.kill()
 
     def _write(self, msg: dict) -> None:
-        data = json.dumps(msg).encode("utf-8")
+        data = json_codec.dumps(msg)
         header = ("Content-Length: %d\r\n\r\n" % len(data)).encode("ascii")
-        self._proc.stdin.write(header + data)
+        self._proc.stdin.write(header)
+        self._proc.stdin.write(data)
         self._proc.stdin.flush()
 
     def _read(self):
@@ -190,4 +190,4 @@ class ChildConnection:
             if not chunk:
                 return None
             body += chunk
-        return json.loads(body.decode("utf-8"))
+        return json_codec.loads(body)

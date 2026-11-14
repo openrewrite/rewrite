@@ -90,8 +90,18 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             if (property.getPadding().getExpressionBody() != null || property.getPadding().getInitializer() != null) {
                 p.append(';');
             }
+        } else if (statement instanceof Cs.IndexerDeclaration) {
+            if (((Cs.IndexerDeclaration) statement).getPadding().getExpressionBody() != null) {
+                p.append(';');
+            }
+        } else if (statement instanceof Cs.ConversionOperatorDeclaration) {
+            if (((Cs.ConversionOperatorDeclaration) statement).getPadding().getExpressionBody() != null) {
+                p.append(';');
+            }
         } else if (statement instanceof Cs.AnnotatedStatement) {
             printStatementTerminator(((Cs.AnnotatedStatement) statement).getStatement(), p);
+        } else if (statement instanceof J.Label) {
+            printStatementTerminator(((J.Label) statement).getStatement(), p);
         }
     }
 
@@ -1044,19 +1054,28 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
                statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent();
     }
 
+    private void visitRecordKeywordPrefix(Space prefix, PrintOutputCapture<P> p) {
+        visitSpace(prefix.isEmpty() ? Space.SINGLE_SPACE : prefix, p);
+    }
+
     @Override
     public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
         beforeSyntax(classDecl, p);
         visitModifiers(classDecl.getModifiers(), p);
 
         visitSpace(classDecl.getPadding().getKind().getPrefix(), p);
-        boolean struct = classDecl.getMarkers().findFirst(Struct.class).isPresent();
+        Struct struct = classDecl.getMarkers().findFirst(Struct.class).orElse(null);
+        RecordClass recordClass = classDecl.getMarkers().findFirst(RecordClass.class).orElse(null);
         boolean record = classDecl.getKind() == J.ClassDeclaration.Kind.Type.Record;
-        if (record && struct) {
-            p.append("record struct");
-        } else if (record && classDecl.getMarkers().findFirst(RecordClass.class).isPresent()) {
-            p.append("record class");
-        } else if (struct) {
+        if (record && struct != null) {
+            p.append("record");
+            visitRecordKeywordPrefix(struct.getPrefix(), p);
+            p.append("struct");
+        } else if (record && recordClass != null) {
+            p.append("record");
+            visitRecordKeywordPrefix(recordClass.getPrefix(), p);
+            p.append("class");
+        } else if (struct != null) {
             p.append("struct");
         } else {
             switch (classDecl.getKind()) {
@@ -1313,7 +1332,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         beforeSyntax(label, p);
         visitRightPadded(label.getPadding().getLabel(), ":", p);
         visit(label.getStatement(), p);
-        printStatementTerminator(label.getStatement(), p);
         afterSyntax(label, p);
         return label;
     }
@@ -1339,8 +1357,8 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         List<JRightPadded<Statement>> init = control.getPadding().getInit();
         for (int i = 0; i < init.size(); i++) {
             visitForLoopControlStatement(init.get(i).getElement(), p);
+            visitSpace(init.get(i).getAfter(), p);
             if (i < init.size() - 1) {
-                visitSpace(init.get(i).getAfter(), p);
                 p.append(',');
             }
         }
@@ -2292,17 +2310,7 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
         for (int i = 0; i < variables.size(); i++) {
-            J.VariableDeclarations.NamedVariable variable = variables.get(i).getElement();
-            beforeSyntax(variable, p);
-            visit(variable.getName(), p);
-
-            JLeftPadded<Expression> initializer = variable.getPadding().getInitializer();
-            if (initializer != null) {
-                visitSpace(initializer.getBefore(), p);
-                p.append('=');
-                visit(initializer.getElement(), p);
-            }
-            afterSyntax(variable, p);
+            visit(variables.get(i).getElement(), p);
 
             if (i < variables.size() - 1) {
                 visitSpace(variables.get(i).getAfter(), p);
@@ -2312,6 +2320,22 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
 
         afterSyntax(multiVariable, p);
         return multiVariable;
+    }
+
+    @Override
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+        beforeSyntax(variable, p);
+        visit(variable.getName(), p);
+
+        JLeftPadded<Expression> initializer = variable.getPadding().getInitializer();
+        if (initializer != null) {
+            visitSpace(initializer.getBefore(), p);
+            p.append('=');
+            visit(initializer.getElement(), p);
+        }
+
+        afterSyntax(variable, p);
+        return variable;
     }
 
     /**
@@ -3021,7 +3045,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             visitSpace(expressionBody.getBefore(), p);
             p.append("=>");
             visit(expressionBody.getElement(), p);
-            p.append(';');
         } else if (indexerDeclaration.getAccessors() != null) {
             visitBlock(indexerDeclaration.getAccessors(), p);
         }
@@ -3152,7 +3175,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             visitSpace(expressionBody.getBefore(), p);
             p.append("=>");
             visit(expressionBody.getElement(), p);
-            p.append(';');
         } else if (conversionOperatorDeclaration.getBody() != null) {
             visitBlock(conversionOperatorDeclaration.getBody(), p);
         }

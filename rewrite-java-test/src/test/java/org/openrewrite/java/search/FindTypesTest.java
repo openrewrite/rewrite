@@ -739,4 +739,28 @@ class FindTypesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void stringSupertypeWithStringLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("java.io.Serializable", true)),
+          java(
+            """
+              class WelcomeController {
+                  public String welcome() {
+                      return "welcome";
+                  }
+              }
+              """,
+            """
+              class WelcomeController {
+                  public /*~~>*/String welcome() {
+                      return "welcome";
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

@@ -100,4 +100,29 @@ class FindDeprecatedFieldsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deprecatedLocalDoesNotMarkSameNamedLocalInSiblingBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new FindDeprecatedFields(null, null, null)),
+          java(
+            """
+              class Test {
+                  void test(boolean b) {
+                      if (b) { @Deprecated String s = "a"; System.out.println(s); }
+                      else { String s = "b"; System.out.println(s); }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(boolean b) {
+                      if (b) { @Deprecated String /*~~>*/s = "a"; System.out.println(/*~~>*/s); }
+                      else { String s = "b"; System.out.println(s); }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

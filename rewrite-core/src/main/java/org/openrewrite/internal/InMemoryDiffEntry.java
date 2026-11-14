@@ -42,6 +42,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.stream.Collectors.joining;
+import static org.openrewrite.PathUtils.toSlashPath;
 
 public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
@@ -106,7 +107,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                             this.oldId = inserter.insert(Constants.OBJ_BLOB, printAllAsBytes(before, markerPrinter)).abbreviate(40);
                             this.oldMode = before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
                         }
-                        this.oldPath = (relativeTo == null ? before.getSourcePath() : relativeTo.relativize(before.getSourcePath())).toString().replace("\\", "/");
+                        this.oldPath = toSlashPath(relativeTo == null ? before.getSourcePath() : relativeTo.relativize(before.getSourcePath()));
                     }
 
                     if (after == null) {
@@ -118,7 +119,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                         this.newMode = after.getMarkers().findFirst(GitTreeEntry.class)
                                 .map(entry -> FileMode.fromBits(entry.getFileMode()))
                                 .orElseGet(() -> after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE);
-                        this.newPath = (relativeTo == null ? after.getSourcePath() : relativeTo.relativize(after.getSourcePath())).toString().replace("\\", "/");
+                        this.newPath = toSlashPath(relativeTo == null ? after.getSourcePath() : relativeTo.relativize(after.getSourcePath()));
                     }
                     inserter.flush();
                 }
@@ -163,7 +164,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                 if (originalFilePath != null) {
                     this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource).abbreviate(40);
                     this.oldMode = oldMode;
-                    this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
+                    this.oldPath = toSlashPath(relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath));
                 } else {
                     this.oldId = A_ZERO;
                     this.oldMode = FileMode.MISSING;
@@ -173,7 +174,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
                 if (filePath != null) {
                     this.newId = inserter.insert(Constants.OBJ_BLOB, newSource).abbreviate(40);
                     this.newMode = newMode;
-                    this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
+                    this.newPath = toSlashPath(relativeTo == null ? filePath : relativeTo.relativize(filePath));
                 } else {
                     this.newId = A_ZERO;
                     this.newMode = FileMode.MISSING;

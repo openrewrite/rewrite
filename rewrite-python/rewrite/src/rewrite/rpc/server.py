@@ -30,12 +30,10 @@ import select
 import sys
 import tempfile
 import time
-import tokenize
 import traceback
 import threading
 
 from datetime import datetime, timezone
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
@@ -51,6 +49,7 @@ from rewrite.python._version_detect import (
     detect_from_project, detect_from_source, requested_python_version, ty_python_version)
 from rewrite.python.printer import PythonPrinter
 from rewrite.result import Result
+from rewrite.rpc import json_codec
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -151,7 +150,7 @@ def _issue_request(method: str, params: dict) -> Any:
     }
 
     if _trace_rpc:
-        logger.debug(f"Sending request to Java: {json.dumps(request)}")
+        logger.debug(f"Sending request to Java: {json_codec.dumps(request).decode()}")
 
     # Send the request to Java via stdout
     write_message(request)
@@ -189,7 +188,7 @@ def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0)
                 continue
 
             if _trace_rpc:
-                logger.debug(f"Received response from Java: {json.dumps(response)}")
+                logger.debug(f"Received response from Java: {json_codec.dumps(response).decode()}")
 
             if 'error' in response:
                 error = response['error']
@@ -396,27 +395,8 @@ def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=No
                       project_language_level: Optional[str] = None,
                       check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    # Decoded from bytes rather than read as text, which keeps the file's own line endings.
-    with open(path, 'rb') as f:
-        raw = f.read()
-    # The encoding the interpreter reads the file in: a coding line names one, and UTF-8 is the default.
-    try:
-        declared, _ = tokenize.detect_encoding(BytesIO(raw).readline)
-    except SyntaxError:
-        # A coding line the interpreter rejects: read as before one was looked for.
-        declared = 'utf-8'
-    charset_name = None
-    if declared in ('utf-8', 'utf-8-sig'):
-        # A byte order mark is left in the text for the parser, which records it.
-        source = raw.decode('utf-8')
-    else:
-        source = raw.decode(declared)
-        try:
-            # Reported to the host only where the bytes depend on it, as a name it may not know.
-            if raw.decode('utf-8') != source:
-                charset_name = declared
-        except UnicodeDecodeError:
-            charset_name = declared
+    from rewrite.python._parser_visitor import read_source
+    source, charset_name = read_source(path)
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
                                project_language_level=project_language_level,
@@ -777,23 +757,42 @@ DEFAULT_PARSE_EXCLUSIONS = [
 
 # Build output, which only ever sits at the project root; deeper down these are
 # ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
-ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+ROOT_PARSE_EXCLUSIONS = ['/build', '/dist']
+
+
+class _Exclusions:
+    """Patterns as ``exclusions`` in ``ParseProjectOptions`` describes them."""
+
+    def __init__(self, patterns: List[str]):
+        self._names, self._paths = set(), set()
+        self._name_globs, self._path_globs = [], []
+        for pattern in patterns:
+            anchored = '/' in pattern
+            pattern = os.path.normcase(pattern.lstrip('/'))
+            # A caller can list thousands of files, so a pattern without wildcards is a lookup.
+            if any(c in pattern for c in '*?['):
+                (self._path_globs if anchored else self._name_globs).append(pattern)
+            else:
+                (self._paths if anchored else self._names).add(pattern)
+
+    def cover(self, name: str, path: str) -> bool:
+        import fnmatch
+        name, path = os.path.normcase(name), os.path.normcase(path)
+        return (name in self._names or path in self._paths
+                or any(fnmatch.fnmatch(name, glob) for glob in self._name_globs)
+                or any(fnmatch.fnmatch(path, glob) for glob in self._path_globs))
 
 
 def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
-    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
-    import fnmatch
-
-    def excluded(name: str, patterns: List[str]) -> bool:
-        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
-
+    """Yield every ``.py`` path under ``project_path`` that no exclusion covers."""
+    excluded = _Exclusions(exclusions + ROOT_PARSE_EXCLUSIONS)
     for root, dirs, files in os.walk(project_path):
-        at_root = root == project_path
-        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
-        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+        below = os.path.relpath(root, project_path)
+        prefix = '' if below == os.curdir else below.replace(os.sep, '/') + '/'
+        dirs[:] = [d for d in dirs if not excluded.cover(d, prefix + d)]
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith('.py') and not excluded.cover(file, prefix + file):
                 yield os.path.join(root, file)
 
 
@@ -875,7 +874,7 @@ def _richness(cls) -> int:
 
 def _artifact_files(path: Path) -> List[str]:
     """The package's own .py/.pyi sources, with each stub (.pyi) ordered ahead of
-    its runtime sibling (.py) so the stub wins same-id/same-richness dedup."""
+    its runtime sibling (.py)."""
     files = [f for f in path.rglob('*') if f.suffix in ('.py', '.pyi')]
     files.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
     return [str(f) for f in files]
@@ -909,6 +908,19 @@ def _module_name(fp: str, root: str) -> str:
     return '.'.join(parts)
 
 
+def _module_class_literals(mapping, client, module: str):
+    """The classLiterals of ``module`` a file's mapping sees: those its own response
+    carried, then those earlier files' responses did, in the order ty sent them.
+    Looked up by module rather than scanning the session's whole table per file."""
+    own = mapping._type_registry
+    for tid, descriptor in own.items():
+        if descriptor.get('kind') == 'classLiteral' and (descriptor.get('moduleName') or '') == module:
+            yield tid, descriptor
+    for tid in getattr(client, 'session_classes_by_module', {}).get(module, ()):
+        if tid not in own:
+            yield tid, client.session_types[tid]
+
+
 def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any],
                         processed_ids: Set[int]) -> None:
     """Collect the complete JavaType.Class for every class one package defines,
@@ -939,10 +951,21 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
 
     for fp in files:
         own_module = _module_name(fp, root)
+        # ty resolves a module with a stub to the stub, so the runtime file's
+        # classes are ones no consumer can reference.
+        if fp.endswith('.py') and os.path.exists(fp + 'i'):
+            continue
+        # A distribution's own test suite is no API of it, and inferring its test
+        # bodies is most of what some packages cost: numpy's took 54 of 56 seconds.
+        if 'tests' in own_module.split('.'):
+            continue
         try:
-            with open(fp, 'r', encoding='utf-8') as fh:
+            # Line endings as ty reads them: translated, every line of a CRLF file would put
+            # the module-level bindings below one byte further from ty's nodes.
+            with open(fp, 'r', encoding='utf-8', newline='') as fh:
                 source = fh.read()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
+            # A file in another encoding costs its own types, not the package's.
             continue
         try:
             mapping = PythonTypeMapping(source, file_path=fp, ty_client=client)
@@ -955,16 +978,11 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
         if source.strip() and not mapping._node_index:
             logger.warning("ExportedTypes: ty returned no types for %s", fp)
             continue
-        for tid, descriptor in mapping._type_registry.items():
+        # Keep only classes defined in this file's own module — precise per-file scoping so ty's
+        # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
+        # and a dist sharing a namespace-package dir contributes only its own types.
+        for tid, descriptor in _module_class_literals(mapping, client, own_module):
             if tid in processed_ids:
-                continue
-            if descriptor.get('kind') != 'classLiteral':
-                continue
-            module_name = descriptor.get('moduleName') or ''
-            # Keep only classes defined in this file's own module — precise per-file scoping so ty's
-            # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
-            # and a dist sharing a namespace-package dir contributes only its own types.
-            if module_name != own_module:
                 continue
             processed_ids.add(tid)
             try:
@@ -1126,15 +1144,18 @@ def handle_dependency_types(params: dict) -> List[dict]:
     its pip coordinate (a null version names a standard-library module), streamed back terminated
     by END_OF_OBJECT. Built once, returned in ``_DEPENDENCY_TYPES_BATCH_SIZE`` slices across the
     client's repeated pulls. An optional ``pythonVersion`` ("3.12") picks the stdlib stub surface.
+    An optional ``path`` is a site-packages-shaped directory holding the distribution, used in
+    place of the last parse's dependency environment.
     """
     name = params.get('name')
     version = params.get('version')
+    path = params.get('path')
     # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
     python_version = requested_python_version(params.get('pythonVersion'))
     if not name:
         raise ValueError("DependencyTypes requires a dependency name")
 
-    key = (name, version, python_version)
+    key = (name, version, python_version, path)
     data = _dependency_types_pending.get(key)
     if data is None:
         if version is None:
@@ -1146,6 +1167,9 @@ def handle_dependency_types(params: dict) -> List[dict]:
                     raise ValueError(f"standard-library module {name!r} not found in typeshed at {stdlib}")
             data = _build_exported_types_data([str(artifact)], str(stdlib), None, stdlib,
                                               python_version=python_version)
+        elif path:
+            own_artifacts = _resolve_dist_artifacts(name, version, Path(path))
+            data = _build_exported_types_data(own_artifacts, path, None, None)
         else:
             dependency_path = _last_dependency_path or os.environ.get('VIRTUAL_ENV')
             if not dependency_path:
@@ -1187,32 +1211,29 @@ def handle_get_object(params: dict) -> List[dict]:
             {'state': 'END_OF_OBJECT'}
         ]
 
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    # Get the "before" state - what we previously sent to Java
+    before = remote_objects.get(obj_id)
+
+    saved_refs = local_refs.snapshot()
+    _last_sent[:] = [obj_id, saved_refs]
+    q = RpcSendQueue(source_file_type, local_refs)
     try:
-        from rewrite.rpc.send_queue import RpcSendQueue
-
-        # Get the "before" state - what we previously sent to Java
-        before = remote_objects.get(obj_id)
-
-        saved_refs = local_refs.snapshot()
-        _last_sent[:] = [obj_id, saved_refs]
-        q = RpcSendQueue(source_file_type, local_refs)
-        try:
-            result = q.generate(obj, before)
-        except BaseException:
-            # Java receives nothing of this exchange, so refs assigned during it name
-            # objects it never got; citing them later would fail on its side.
-            local_refs.rollback_to(saved_refs)
-            raise
-
-        # Update remote_objects to track that Java now has this version
-        remote_objects[obj_id] = obj
-
-        return result
-
+        result = q.generate(obj, before)
     except BaseException as e:
+        # Java receives nothing of this exchange, so refs assigned during it name
+        # objects it never got; citing them later would fail on its side.
+        local_refs.rollback_to(saved_refs)
+        remote_objects.pop(obj_id, None)
         source_path = getattr(obj, 'source_path', None)
-        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
-        return [{'state': 'END_OF_OBJECT'}]
+        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
+        raise
+
+    # Update remote_objects to track that Java now has this version
+    remote_objects[obj_id] = obj
+
+    return result
 
 
 def handle_abort_get_object(params: dict) -> bool:
@@ -1312,7 +1333,8 @@ def handle_reset(params: dict) -> bool:
     remote_refs.clear()
     _prepared_recipes.clear()
     _delegating_recipes.clear()
-    _prepared_editor_overrides.clear()
+    _prepared_unwrapped_editors.clear()
+    _prepared_unwrapped_scanners.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _local_object_ids.clear()
@@ -1329,6 +1351,7 @@ def handle_reset(params: dict) -> bool:
     _hub_send_checkpoint.clear()
     _hub_recv_checkpoint.clear()
     _hub_last_served.clear()
+    _hub_deleted.clear()
     # A half-drained page would resume mid-list for a host that expects to start over.
     _dependency_types_pending.clear()
 
@@ -1388,7 +1411,9 @@ def _get_marketplace():
             from rewrite.discovery import discover_root_recipes
             discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
                                   attribution_name=_attribution_name)
-        else:
+        elif not _facade_mode():
+            # A facade's is scoped the same way, to the bundles activate_bundle_in_process
+            # installs into it. Ambient discovery belongs to a plain server.
             from rewrite.discovery import discover_recipes, recipe_name_set
             from rewrite import activate
 
@@ -1748,6 +1773,36 @@ def _collect_marketplace_rows(
     return rows
 
 
+def activate_bundle_in_process(venv_dir: Path, bundle_dist: str,
+                               attribution_name: Optional[str] = None) -> List[dict]:
+    """Activate a recipe bundle in the facade's own process and return its marketplace rows.
+
+    The bundle's venv joins this process's path, which is what ``--child-bundle`` on the venv
+    interpreter buys a child. ``addsitedir`` appends, so the engine keeps the precedence
+    ``_child_env`` gives it in a child, and it processes the venv's ``.pth`` files. The shared
+    recipe-install directory leaves the path, as ``_child_env`` keeps it off a child's.
+    """
+    import importlib
+    import site
+
+    from rewrite.discovery import discover_root_recipes
+    from rewrite.rpc import venv_manager
+
+    if _recipe_install_dir is not None:
+        install_root = os.path.realpath(_recipe_install_dir)
+        sys.path[:] = [p for p in sys.path if not p or os.path.realpath(p) != install_root]
+    packages = venv_manager.site_packages(venv_dir)
+    if packages is not None:
+        site.addsitedir(str(packages))
+        importlib.invalidate_caches()
+
+    marketplace = _get_marketplace()
+    discover_root_recipes(bundle_dist, marketplace=marketplace, attribution=_attribution,
+                          attribution_name=attribution_name)
+    return _collect_marketplace_rows(
+        marketplace, recipe_filter=_attribution.recipes_for(attribution_name or bundle_dist))
+
+
 def _category_descriptor_to_dict(descriptor) -> dict:
     """Convert a CategoryDescriptor to a dict for JSON serialization."""
     return {
@@ -1831,13 +1886,12 @@ _prepared_recipes: Dict[str, Any] = {}
 # resolves it here and answers with a delegatesTo response so the JVM runs the
 # real recipe natively.
 _delegating_recipes: Dict[str, Any] = {}
-# Cached bare-editor visitors keyed by prepared recipe id. Populated at
-# PrepareRecipe time when recipe.editor() returns a Preconditions.check
-# wrapper: we strip the wrapper, register the precondition's wire identity
-# in editPreconditions (so the host evaluates it Java-side), and store the
-# bare editor here. When BatchVisit / Visit dispatches edit:<id> back, we
-# return this bare editor so the precondition does not double-run.
-_prepared_editor_overrides: Dict[str, Any] = {}
+# Prepared recipe ids whose recipe.editor() is a Preconditions.check wrapper
+# with every precondition sent in editPreconditions. The host evaluates those,
+# so dispatching edit:<id> unwraps the editor to keep them from running twice.
+_prepared_unwrapped_editors: Set[str] = set()
+# The same for a scanning recipe's scanner() and its scanPreconditions.
+_prepared_unwrapped_scanners: Set[str] = set()
 # Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
 # time from a Preconditions.check(...) wrapper around recipe.editor().
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
@@ -1914,7 +1968,7 @@ def _get_visitor_registry() -> Dict[str, Any]:
     return _VISITOR_REGISTRY
 
 
-def _prepare_instance(recipe, marketplace) -> dict:
+def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = False) -> dict:
     """Prepare a recipe instance and, recursively, its whole child tree — storing every node in
     _prepared_recipes and returning the response with ``recipeList`` populated, so the host builds
     the tree locally instead of a PrepareRecipe round trip per child.
@@ -1943,11 +1997,8 @@ def _prepare_instance(recipe, marketplace) -> dict:
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
-    # Introspect recipe.editor() once at prepare time. If the recipe wrapped its editor in
-    # Preconditions.check(...), we extract the precondition's wire identity (so the Java host can
-    # evaluate it locally and skip the visit RPC for non-matching files) and cache the bare editor
-    # (so a subsequent dispatch via _instantiate_visitor returns the unwrapped editor — otherwise
-    # the precondition would also run Python-side and double the cost).
+    # A Preconditions.check(...) wrapper around the editor or scanner is sent as editPreconditions
+    # or scanPreconditions, so the host can skip the visit RPC for files that don't match.
     edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
     if not is_scanning:
         try:
@@ -1955,12 +2006,26 @@ def _prepare_instance(recipe, marketplace) -> dict:
         except Exception:
             editor_visitor = None
         if editor_visitor is not None:
-            extracted = _extract_preconditions_from_editor(editor_visitor)
+            extracted = _extract_preconditions(editor_visitor)
             if extracted is not None:
-                bare_editor, wire_entries = extracted
-                _prepared_editor_overrides[prepared_id] = bare_editor
-                edit_preconditions.extend(wire_entries)
+                _prepared_unwrapped_editors.add(prepared_id)
+                edit_preconditions.extend(extracted[1])
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
+
+    scan_preconditions: List[Dict[str, Any]] = []
+    if is_scanning:
+        scan_preconditions.extend(_get_preconditions(recipe, 'scan'))
+        # No run has started, so the scanner gets a fresh accumulator of its own.
+        from rewrite import InMemoryExecutionContext
+        try:
+            scanner = recipe.scanner(recipe.initial_value(InMemoryExecutionContext()))
+        except Exception:
+            scanner = None
+        if scanner is not None:
+            extracted = _extract_preconditions(scanner)
+            if extracted is not None:
+                _prepared_unwrapped_scanners.add(prepared_id)
+                scan_preconditions.extend(extracted[1])
 
     response = {
         'id': prepared_id,
@@ -1968,8 +2033,11 @@ def _prepare_instance(recipe, marketplace) -> dict:
         'editVisitor': f'edit:{prepared_id}',
         'editPreconditions': edit_preconditions,
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
-        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
+        'scanPreconditions': scan_preconditions,
     }
+    # Older Java hosts reject unknown response fields, so this is only sent when asked.
+    if accepts_causes_another_cycle and getattr(recipe, 'causes_another_cycle', False):
+        response['causesAnotherCycle'] = True
 
     if is_delegating:
         response['delegatesTo'] = {
@@ -2003,7 +2071,7 @@ def _prepare_instance(recipe, marketplace) -> dict:
         else:
             if not marketplace.find_recipe(child.name):
                 marketplace.install(type(child), [])
-            child_responses.append(_prepare_instance(child, marketplace))
+            child_responses.append(_prepare_instance(child, marketplace, accepts_causes_another_cycle))
     response['recipeList'] = child_responses
 
     return response
@@ -2083,7 +2151,7 @@ def handle_prepare_recipe(params: dict) -> dict:
     # Instantiate the recipe with options, then prepare it and its whole child tree.
     recipe = recipe_class(**options) if options else recipe_class()
 
-    response = _prepare_instance(recipe, marketplace)
+    response = _prepare_instance(recipe, marketplace, params.get('acceptsCausesAnotherCycle') is True)
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 
@@ -2093,8 +2161,8 @@ def _get_preconditions(recipe, phase: str) -> List[dict]:
 
     Always includes the language gate (only visit Python source files). Recipe-
     declared preconditions from a ``Preconditions.check(...)`` wrapper around
-    ``recipe.editor()`` are added on top by ``handle_prepare_recipe`` — see
-    :func:`_extract_preconditions_from_editor`.
+    ``recipe.editor()`` or ``recipe.scanner()`` are added on top by
+    ``_prepare_instance`` — see :func:`_extract_preconditions`.
     """
     return [{
         'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
@@ -2102,11 +2170,11 @@ def _get_preconditions(recipe, phase: str) -> List[dict]:
     }]
 
 
-def _extract_preconditions_from_editor(editor_visitor):
-    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor result.
+def _extract_preconditions(visitor):
+    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor or scanner.
 
-    If ``editor_visitor`` is a :class:`rewrite.preconditions.Check`, returns a
-    tuple ``(bare_editor, [precondition_wire_entry, ...])`` where ``bare_editor``
+    If ``visitor`` is a :class:`rewrite.preconditions.Check`, returns a
+    tuple ``(bare_visitor, [precondition_wire_entry, ...])`` where ``bare_visitor``
     is the innermost non-Check visitor and the wire entries describe each
     precondition in evaluation order. Returns ``None`` if no Check wrapper
     is present.
@@ -2130,16 +2198,16 @@ def _extract_preconditions_from_editor(editor_visitor):
     """
     from rewrite.preconditions import Check, RecipeCheck
 
-    if not isinstance(editor_visitor, Check):
+    if not isinstance(visitor, Check):
         return None
 
     wire_entries: List[Dict[str, Any]] = []
-    inner: Any = editor_visitor
+    inner: Any = visitor
     while isinstance(inner, Check):
         wire = _check_wire_entry(inner)
         if wire is None:
             # Cannot serialize this check to the wire; abort the optimization
-            # for this editor. Returning None leaves the wrapper intact so
+            # for this visitor. Returning None leaves the wrapper intact so
             # the precondition runs Python-side as a fallback.
             return None
         wire_entries.append(wire)
@@ -2457,14 +2525,14 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             acc = _recipe_accumulators[recipe_id]
             return recipe.editor_with_data(acc)
 
-        # If the recipe wrapped its editor in Preconditions.check(...) and we
-        # captured the bare editor at PrepareRecipe time, return it here so
-        # the precondition does not double-run on the Python side. The host
-        # has already evaluated it via the editPreconditions wire slot.
-        override = _prepared_editor_overrides.get(recipe_id)
-        if override is not None:
-            return override
-        return recipe.editor()
+        # A fresh editor per dispatch, as in Recipe.run, so state an editor
+        # keeps on self does not carry over to the next file.
+        editor = recipe.editor()
+        if recipe_id in _prepared_unwrapped_editors:
+            from rewrite.preconditions import Check
+            while isinstance(editor, Check):
+                editor = editor.wrapped
+        return editor
 
     elif visitor_name.startswith('scan:'):
         recipe_id = visitor_name[5:]
@@ -2486,7 +2554,12 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
         acc = _recipe_accumulators[recipe_id]
 
-        return recipe.scanner(acc)
+        scanner = recipe.scanner(acc)
+        if recipe_id in _prepared_unwrapped_scanners:
+            from rewrite.preconditions import Check
+            while isinstance(scanner, Check):
+                scanner = scanner.wrapped
+        return scanner
 
     else:
         # Look up visitor by fully-qualified name from registry
@@ -2576,16 +2649,18 @@ _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that chil
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
 _hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
 _hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
+_hub_deleted: Set[str] = set()              # obj_ids a visit deleted, which Java holds until their Evict
 
-def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
-    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
-    first time it is needed and owned by the facade from then on."""
+def _hub_acquire(obj_id: str, source_file_type: Optional[str], refresh: bool = False):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) when
+    the facade holds none or ``refresh`` asks for Java's current one. Between fetches the facade's
+    copy is authoritative, as a child's pulled edit puts it ahead of Java."""
     if obj_id is None:
         return None
     # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
     # it sees a file early enough to checkpoint the facade<->Java tables.
     _checkpoint_refs(obj_id)
-    tree = _hub_tree.get(obj_id)
+    tree = None if refresh else _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
         if tree is not None:
@@ -2689,13 +2764,14 @@ def _hub_drop_bundle(bundle: str) -> None:
 
 
 def _hub_forget(obj_id: str) -> None:
-    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
-    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
-    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
+    """Let go of a file a visit deleted while leaving every child's ref numbering where it stands.
+    This is the half of _hub_release that is safe without an Evict: a child that has not been told to
+    roll back still holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
     _hub_tree.pop(obj_id, None)
     local_objects.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
+    _hub_deleted.add(obj_id)
 
 
 def _hub_release(obj_id: str) -> None:
@@ -2704,6 +2780,7 @@ def _hub_release(obj_id: str) -> None:
     holds ("Received reference to unknown object").
     """
     _hub_forget(obj_id)
+    _hub_deleted.discard(obj_id)
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
         checkpoint = _hub_send_checkpoint.pop(key)
         refs = _hub_send_refs.get(key[0])
@@ -2717,14 +2794,18 @@ def _hub_release(obj_id: str) -> None:
                 del refs[ref_id]
 
 
-def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
-    """True for a visitor the server implements itself rather than one a recipe bundle owns."""
-    return bool(visitor_name) and visitor_name in _get_visitor_registry()
+def _hub_is_local_visitor(visitor_name: Optional[str]) -> bool:
+    """True for a built-in visitor, or one of a recipe prepared in this process."""
+    if not visitor_name:
+        return False
+    if visitor_name.startswith(('edit:', 'scan:')):
+        return visitor_name[5:] in _prepared_recipes
+    return visitor_name in _get_visitor_registry()
 
 
 def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
-    """Run the built-in service visitors (no recipe bundle owns them) against the facade's own tree
-    in order, threading each result into the next as a child would sequence a BatchVisit."""
+    """Run visitors that belong to no child against the facade's own tree in order, threading each
+    result into the next as a child would sequence a BatchVisit."""
     tree_id = params.get('treeId')
     source_file_type = params.get('sourceFileType')
     tree = _hub_acquire(tree_id, source_file_type)
@@ -2736,15 +2817,22 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
     cursor = _build_cursor(params.get('cursor'), source_file_type)
 
     results = []
+    known_ids = None  # collected on the first edit, as most visits edit nothing
     for item in visitor_items:
         before = tree
         visitor = _instantiate_visitor(item['visitor'], ctx, item.get('visitorOptions'))
         after = visitor.visit(before, ctx, cursor)
+        search_result_ids = []
+        if after is not None and after is not before:
+            if known_ids is None:
+                known_ids = _collect_search_result_ids(before)
+            search_result_ids = list(_collect_search_result_ids(after) - known_ids)
+            known_ids.update(search_result_ids)
         results.append({
             'modified': after is not before,
             'deleted': after is None,
             'hasNewMessages': False,
-            'searchResultIds': [],
+            'searchResultIds': search_result_ids,
         })
         if after is None:
             _hub_forget(tree_id)
@@ -2797,11 +2885,14 @@ def _get_facade():
                         len(removed), _recipe_install_dir, ", ".join(removed))
         _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
                                         upstream=_serve_child_object,
+                                        activate=activate_bundle_in_process,
                                         on_child_replaced=_hub_drop_bundle),
                          hub_pull=_hub_pull_child_edit,
                          hub_drop=_hub_forget,
                          local_visit=_hub_local_visit,
-                         is_local_visitor=_hub_is_builtin_visitor)
+                         is_local_visitor=_hub_is_local_visitor,
+                         local_prepare=handle_prepare_recipe,
+                         local_generate=handle_generate)
     return _facade
 
 
@@ -2810,38 +2901,46 @@ def handle_request(method: str, params: dict) -> Any:
     if _facade_mode():
         facade = _get_facade()
 
-        if method == 'Evict':
+        # Bundle lifecycle is always the facade's. SetDataTableStore, Evict and Reset also fall
+        # through to the server's own handlers, which serve a bundle hosted in this process.
+        if method == 'InstallRecipes':
+            return facade.install_recipes(params)
+        if method == 'GetMarketplace':
+            return facade.get_marketplace(params)
+        if method == 'SetDataTableStore':
+            facade.set_data_table_store(params)
+        elif method == 'Evict':
             facade.evict(params)
             _hub_release(params.get('id'))
-            return handle_evict(params)
-        if method == 'Reset':
+        elif method == 'Reset':
             facade.reset(params)
-            return handle_reset(params)
-        facade_handlers = {
-            'InstallRecipes': facade.install_recipes,
-            'GetMarketplace': facade.get_marketplace,
-            'PrepareRecipe': facade.prepare_recipe,
-            'SetDataTableStore': facade.set_data_table_store,
-            'Visit': facade.visit,
-            'BatchVisit': facade.batch_visit,
-            'Generate': facade.generate,
-        }
-        facade_handler = facade_handlers.get(method)
-        if facade_handler:
-            # Acquire at the top level, before any child runs — acquiring inside a child's
-            # GetObject callback would deadlock (the child waits on us, Java on this request).
-            if method in ('Visit', 'BatchVisit'):
-                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
-            return facade_handler(params)
-        if method in ('Print', 'GetObject'):
-            obj_id = params.get('treeId') or params.get('id')
-            source_file_type = params.get('sourceFileType')
-            # Java fetches non-tree objects by id as well (the execution context, cursors).
-            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
-            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
-            # that has no codec for them, desynchronizing the queue for every later object.
-            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
-                _hub_acquire(obj_id, source_file_type)
+        elif facade.routes_to_children():
+            facade_handlers = {
+                'PrepareRecipe': facade.prepare_recipe,
+                'Visit': facade.visit,
+                'BatchVisit': facade.batch_visit,
+                'Generate': facade.generate,
+            }
+            facade_handler = facade_handlers.get(method)
+            if facade_handler:
+                # Acquire at the top level, before any child runs — acquiring inside a child's
+                # GetObject callback would deadlock (the child waits on us, Java on this request).
+                # Refreshed on every request, as a Java recipe may have edited the file since the last
+                # one and Java evicts a file only after the cycle has run every recipe on it.
+                if method in ('Visit', 'BatchVisit'):
+                    _hub_acquire(params.get('treeId'), params.get('sourceFileType'), refresh=True)
+                return facade_handler(params)
+            if method in ('Print', 'GetObject'):
+                obj_id = params.get('treeId') or params.get('id')
+                source_file_type = params.get('sourceFileType')
+                # Java fetches non-tree objects by id as well (the execution context, cursors).
+                # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+                # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+                # that has no codec for them, desynchronizing the queue for every later object.
+                # Acquiring a deleted file would hand Java back its own copy and undo the deletion.
+                if (obj_id is not None and source_file_type and obj_id not in _hub_tree
+                        and obj_id not in _hub_deleted):
+                    _hub_acquire(obj_id, source_file_type)
 
     handlers = {
         'Parse': handle_parse,
@@ -2880,11 +2979,9 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    # A response body is read whole, and a page of tree data runs to hundreds of
-    # kilobytes, so each read should take as much as the pipe will give. A pipe
-    # returns at most its own capacity per read, and os.read allocates what it is
-    # asked for before shrinking to what arrived, so an over-large request costs
-    # only the unused difference.
+    # For the reads that cannot say how much is wanted: the header scan, and a body read that
+    # fell through to the loop below. A sized body read instead asks for the whole frame, since
+    # a read returns what it asks for, not what the pipe holds.
     _CHUNK_SIZE = 65536
 
     def __init__(self):
@@ -2914,7 +3011,24 @@ class _StdinBuffer:
                 return None
 
     def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
-        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout.
+
+        The bytes object ``os.read`` allocates for a frame-sized read is already what this
+        returns, so with nothing buffered there is no append, slice or second copy — the general
+        path below costs three. Skipped when a deadline applies, because :meth:`_fill` then reads
+        through ``select`` or a thread.
+        """
+        # Positive n only: os.read(fd, 0) returns b'' and cannot be told from end of stream, and
+        # a negative n raises where the general path below slices silently.
+        if n > 0 and not self._buf and deadline is None:
+            chunk = os.read(self._get_fd(), n)
+            if not chunk:
+                self.at_eof = True
+                return None
+            if len(chunk) == n:
+                return chunk
+            self._buf += chunk
+
         while len(self._buf) < n:
             if not self._fill(deadline):
                 return None
@@ -3005,7 +3119,7 @@ def _read_body(header_line: bytes) -> Optional[dict]:
         raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
     try:
-        return json.loads(content_bytes.decode('utf-8'))
+        return json_codec.loads(content_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise _ProtocolError(f"invalid message body: {e}")
 
@@ -3045,10 +3159,16 @@ def write_message(response: dict):
     Uses unbuffered binary I/O to avoid line-ending translation on Windows
     that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
     used by read_message() which uses os.read() on the read side.
+
+    Header and body go out as separate writes: concatenating copies the whole body to prepend a
+    short header, a cost that scales with the message where the extra syscall does not.
+    ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
-    content_bytes = json.dumps(response).encode('utf-8')
+    content_bytes = json_codec.dumps(response)
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
-    os.write(sys.stdout.fileno(), header + content_bytes)
+    fd = sys.stdout.fileno()
+    os.write(fd, header)
+    os.write(fd, content_bytes)
 
 
 def _error_response(request_id: Any, e: Exception) -> dict:
@@ -3072,7 +3192,7 @@ def _write_response(response: dict) -> None:
     """
     try:
         if _trace_rpc:
-            logger.debug(f"Sending: {json.dumps(response)}")
+            logger.debug(f"Sending: {json_codec.dumps(response).decode()}")
         write_message(response)
     except (TypeError, ValueError) as e:
         request_id = response.get('id')
@@ -3091,7 +3211,7 @@ def _serve(message: dict) -> None:
         return
 
     if _trace_rpc:
-        logger.debug(f"Received: {json.dumps(message)}")
+        logger.debug(f"Received: {json_codec.dumps(message).decode()}")
 
     metric_start = time.monotonic()
     metric_error = ''

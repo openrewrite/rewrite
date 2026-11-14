@@ -19,9 +19,10 @@ import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -59,6 +60,22 @@ public interface JavaParser extends Parser {
      * type attribution from the class in {@link JavaSourceSet} marker.
      */
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
+
+    /**
+     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to list the jars at the end of the
+     * classpath from an index that every parser in the JVM shares. Tests set it, since they build a parser per test.
+     * The index outlives the parsers and holds what it read until memory runs short.
+     */
+    String SHARE_CLASSPATH_JAR_INDEX = "org.openrewrite.java.shareClasspathJarIndex";
+
+    /**
+     * Set to a {@code Collection<javax.tools.Diagnostic<? extends javax.tools.JavaFileObject>>} on an
+     * {@link ExecutionContext} supplied to parsing to have the parser add the errors that javac reports in the
+     * sources it parses. The parser then also runs javac's flow analysis, which reports errors such as an
+     * unreported exception.
+     */
+    @Incubating(since = "8.107.0")
+    String COMPILATION_ERRORS = "org.openrewrite.java.compilationErrors";
 
     static List<Path> runtimeClasspath() {
         return RuntimeClasspathCache.getRuntimeClasspath();
@@ -235,6 +252,7 @@ public interface JavaParser extends Parser {
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -245,7 +263,7 @@ public interface JavaParser extends Parser {
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
         protected boolean typeAttribution = true;
-        protected final List<NamedStyles> styles = new ArrayList<>();
+        protected List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
             super(J.CompilationUnit.class);
@@ -275,10 +293,19 @@ public interface JavaParser extends Parser {
         @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
             this.javaTypeCache = javaTypeCache;
+            this.typeCacheConfigured = true;
             return (B) this;
         }
 
-        public B typeFactory(JavaTypeFactory javaTypeFactory) {
+        /**
+         * @return The cache that the parsers this builder builds keep their types in, when it has no type factory.
+         * Building a parser can replace it with a cache that reads through to it.
+         */
+        public JavaTypeCache getTypeCache() {
+            return javaTypeCache;
+        }
+
+        public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
             this.javaTypeFactory = javaTypeFactory;
             return (B) this;
         }
@@ -351,16 +378,6 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        /**
-         * @deprecated prefer {@link #classpath} and {@link #classpathFromResources(ExecutionContext, String...)}.
-         */
-        @Deprecated
-        @ToBeRemoved(after = "2025-12-31", reason = "Use classpath or classpathFromResources instead.")
-        public B classpath(byte[]... classpath) {
-            this.classBytesClasspath = Arrays.asList(classpath);
-            return (B) this;
-        }
-
         public B styles(Iterable<? extends NamedStyles> styles) {
             for (NamedStyles style : styles) {
                 this.styles.add(style);
@@ -379,11 +396,22 @@ public interface JavaParser extends Parser {
 
         /**
          * Resolve the {@link JavaTypeFactory} to use for this parser. Returns the explicit
-         * factory set via {@link #typeFactory}, or {@code null} when none is configured —
-         * the caller falls back to a default factory.
+         * factory set via {@link #typeFactory}. When neither a factory nor a type cache is configured,
+         * returns the one {@link JdkClassSharingTypeFactory#forParser} gives in tests, or {@code null}
+         * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            return javaTypeFactory;
+            if (javaTypeFactory != null || typeCacheConfigured) {
+                return javaTypeFactory;
+            }
+            return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
+        }
+
+        protected JavaTypeCache resolvedTypeCache() {
+            boolean configured = typeCacheConfigured || javaTypeFactory != null;
+            javaTypeCache = HashMapJavaTypeCache.forParser(
+                    JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
+            return javaTypeCache;
         }
 
         @Override
@@ -398,6 +426,7 @@ public interface JavaParser extends Parser {
         public Builder<P, B> clone() {
             Builder<P, B> clone = (Builder<P, B>) super.clone();
             clone.javaTypeCache = this.javaTypeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }

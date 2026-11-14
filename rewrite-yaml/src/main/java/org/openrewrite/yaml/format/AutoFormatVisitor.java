@@ -17,6 +17,7 @@ package org.openrewrite.yaml.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
@@ -84,6 +85,9 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
     public @Nullable Yaml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Yaml) tree;
+        }
+        if (tree instanceof Yaml.Documents) {
+            FormattingListener.beforeFormat(tree, stopAfter, getCursor());
         }
         return super.visit(tree, p);
     }

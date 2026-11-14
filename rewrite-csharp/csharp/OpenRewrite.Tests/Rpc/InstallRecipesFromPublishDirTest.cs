@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
@@ -136,8 +135,8 @@ public class InstallRecipesFromPublishDirTest : IDisposable
             }
             """);
 
-        RunDotnet($"pack \"{Path.Combine(depDir, "Dep.csproj")}\" -c Release -o \"{feed}\"");
-        RunDotnet($"pack \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release -o \"{feed}\"");
+        DotnetCli.Run($"pack \"{Path.Combine(depDir, "Dep.csproj")}\" -c Release -o \"{feed}\"");
+        DotnetCli.Run($"pack \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release -o \"{feed}\"");
     }
 
     public void Dispose()
@@ -147,14 +146,13 @@ public class InstallRecipesFromPublishDirTest : IDisposable
     }
 
     [Fact]
-    public void NuGetInstallReportsPublishDirThatAFreshServerReloadsWithoutAFeed()
+    public async Task NuGetInstallReportsPublishDirThatAFreshServerReloadsWithoutAFeed()
     {
-        var installed = new RewriteRpcServer(new RecipeMarketplace(), _installDir)
+        var installed = await new RewriteRpcServer(new RecipeMarketplace(), _installDir)
             .InstallRecipes(new InstallRecipesRequest
             {
                 Recipes = JsonSerializer.SerializeToElement(new { packageName = "Primary", version = "1.0.0" })
-            })
-            .GetAwaiter().GetResult();
+            });
 
         Assert.Equal(1, installed.RecipesInstalled);
         Assert.Equal("1.0.0", installed.Version);
@@ -166,8 +164,7 @@ public class InstallRecipesFromPublishDirTest : IDisposable
         // A fresh server with no install dir and no feed: the publish dir is all it gets.
         var marketplace = new RecipeMarketplace();
         var server = new RewriteRpcServer(marketplace);
-        var reloaded = server.InstallRecipes(new InstallRecipesRequest { Recipes = installed.PublishDir })
-            .GetAwaiter().GetResult();
+        var reloaded = await server.InstallRecipes(new InstallRecipesRequest { Recipes = installed.PublishDir });
 
         Assert.Equal(1, reloaded.RecipesInstalled);
         Assert.Equal("1.0.0", reloaded.Version);
@@ -177,47 +174,53 @@ public class InstallRecipesFromPublishDirTest : IDisposable
         Assert.DoesNotContain("Dep.DepRecipe", names);
 
         // The composite's child comes from Dep.dll, resolved through Recipes.deps.json.
-        var prepared = server.PrepareRecipe(new PrepareRecipeRequest { Id = "Primary.PrimaryRecipe" })
-            .GetAwaiter().GetResult();
+        var prepared = await server.PrepareRecipe(new PrepareRecipeRequest { Id = "Primary.PrimaryRecipe" });
         Assert.Single(prepared.RecipeList);
         Assert.Equal("Dependency recipe", prepared.RecipeList[0].Descriptor.DisplayName);
 
-        var row = server.GetMarketplace().GetAwaiter().GetResult()
+        var row = (await server.GetMarketplace())
             .Single(r => r.Descriptor.Name == "Primary.PrimaryRecipe");
         Assert.Equal(installed.PublishDir, row.PackageName);
 
         // The package form is what the Java side sends for a path that exists; a directory works there too.
-        var byPackageForm = new RewriteRpcServer(new RecipeMarketplace())
+        var byPackageForm = await new RewriteRpcServer(new RecipeMarketplace())
             .InstallRecipes(new InstallRecipesRequest
             {
                 Recipes = JsonSerializer.SerializeToElement(new { packageName = installed.PublishDir, version = (string?)null })
-            })
-            .GetAwaiter().GetResult();
+            });
         Assert.Equal(1, byPackageForm.RecipesInstalled);
         Assert.Equal("1.0.0", byPackageForm.Version);
     }
 
-    private static void RunDotnet(string arguments)
+    [Fact]
+    public async Task ReinstallRepublishesAPackageRebuiltUnderTheSameVersion()
     {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var first = await InstallPrimary();
 
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
+        // A local rebuild packs the same version again and clears its extracted copy, which a restore never refreshes.
+        // Its assembly gets the first build's size and timestamp, the case PublishBundle's swap is for.
+        var primaryDir = Path.Combine(_root, "Primary");
+        var primaryCs = Path.Combine(primaryDir, "Primary.cs");
+        File.WriteAllText(primaryCs, File.ReadAllText(primaryCs).Replace("Primary composite recipe", "Rebuilt composite recipe"));
+        DotnetCli.Run($"build \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release");
+        File.SetLastWriteTimeUtc(Path.Combine(primaryDir, "bin", "Release", "net10.0", "Primary.dll"),
+            File.GetLastWriteTimeUtc(Path.Combine(first.PublishDir!, "Primary.dll")));
+        DotnetCli.Run($"pack \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release --no-build -o \"{Path.Combine(_root, "feed")}\"");
+        Directory.Delete(Path.Combine(_root, "packages", "primary", "1.0.0"), true);
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var rebuilt = await InstallPrimary();
+        Assert.False(rebuilt.Unchanged);
+        Assert.Equal(first.PublishDir, rebuilt.PublishDir);
+        // This process already loaded the first build from that path, so only the bytes can show the rebuild.
+        Assert.Equal(File.ReadAllBytes(Path.Combine(_root, "packages", "primary", "1.0.0", "lib", "net10.0", "Primary.dll")),
+            File.ReadAllBytes(Path.Combine(rebuilt.PublishDir!, "Primary.dll")));
 
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
-        }
+        Assert.True((await InstallPrimary()).Unchanged);
     }
+
+    private Task<InstallRecipesResponse> InstallPrimary() =>
+        new RewriteRpcServer(new RecipeMarketplace(), _installDir).InstallRecipes(new InstallRecipesRequest
+        {
+            Recipes = JsonSerializer.SerializeToElement(new { packageName = "Primary", version = "1.0.0" })
+        });
 }

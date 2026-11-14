@@ -112,8 +112,16 @@ export namespace MarkerPrinter {
     }
 }
 
+/** Where printing continued when {@link PrintOutputCapture.mark} was called, and the character printed first from there. */
+export interface PrintMark {
+    readonly offset: number;
+    readonly firstChar: string;
+}
+
 export class PrintOutputCapture {
     private _out: string = "";
+    private _lastChar: string = "";
+    private _unresolvedMarks: { offset: number, firstChar: string }[] = [];
 
     constructor(public readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
@@ -122,10 +130,44 @@ export class PrintOutputCapture {
         return this._out;
     }
 
+    /**
+     * The last character printed so far, a whole surrogate pair where it is one. Reading it back from
+     * {@link out} instead would flatten the whole output each time.
+     */
+    get lastChar(): string {
+        return this._lastChar;
+    }
+
     append(text: string | undefined): PrintOutputCapture {
         if (text && text.length > 0) {
+            if (this._unresolvedMarks.length > 0) {
+                const firstChar = String.fromCodePoint(text.codePointAt(0)!);
+                for (const mark of this._unresolvedMarks) {
+                    mark.firstChar = firstChar;
+                }
+                this._unresolvedMarks.length = 0;
+            }
             this._out += text;
+            const last = text.charCodeAt(text.length - 1);
+            this._lastChar = last >= 0xDC00 && last <= 0xDFFF && text.length > 1 ?
+                text.substring(text.length - 2) : text.charAt(text.length - 1);
         }
+        return this;
+    }
+
+    /** Marks where printing continues, so that what is printed there first can be told without reading {@link out} back. */
+    mark(): PrintMark {
+        const mark = {offset: this._out.length, firstChar: ""};
+        this._unresolvedMarks.push(mark);
+        return mark;
+    }
+
+    /** Inserts `text` at `offset` of what has been printed so far. */
+    insert(offset: number, text: string): PrintOutputCapture {
+        if (offset >= this._out.length) {
+            return this.append(text);
+        }
+        this._out = this._out.substring(0, offset) + text + this._out.substring(offset);
         return this;
     }
 }
@@ -177,8 +219,8 @@ export class TreePrinters {
         return this._registry.get(sourceFileKind)!;
     }
 
-    static async print(sourceFile: SourceFile): Promise<string> {
-        const printed = await this.printer(sourceFile).print(sourceFile);
+    static async print(sourceFile: SourceFile, out?: PrintOutputCapture): Promise<string> {
+        const printed = await this.printer(sourceFile).print(sourceFile, out);
         // The BOM is a property of the file's encoding rather than of its syntax, so it is held on the
         // source file and put back here. Mirrors `org.openrewrite.Tree.print`.
         return sourceFile.charsetBomMarked && printed.charAt(0) !== "\uFEFF" ? "\uFEFF" + printed : printed;

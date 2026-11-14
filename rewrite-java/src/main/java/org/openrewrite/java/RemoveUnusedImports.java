@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -32,6 +33,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
@@ -75,9 +77,7 @@ public class RemoveUnusedImports extends Recipe {
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
 
-            // Collect all identifier simple names from source (excluding imports) to detect
-            // types that only appear in type attribution but not in actual source references
-            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
+            Set<String> sourceIdentifierNames = RemoveImport.namesInSource(cu);
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -97,25 +97,15 @@ public class RemoveUnusedImports extends Recipe {
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.Parameterized) {
                     JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
-                    typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
-                            .add(parameterized.getType());
+                    addByImportTarget(typesByPackage, parameterized.getType());
                     for (JavaType typeParameter : parameterized.getTypeParameters()) {
                         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
                         if (fq != null) {
-                            typesByPackage.computeIfAbsent(
-                                    fq.getOwningClass() == null ?
-                                            fq.getPackageName() :
-                                            toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                                    f -> new HashSet<>()).add(fq);
+                            addByImportTarget(typesByPackage, fq);
                         }
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
-                    JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(
-                            fq.getOwningClass() == null ?
-                                    fq.getPackageName() :
-                                    toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                            f -> new HashSet<>()).add(fq);
+                    addByImportTarget(typesByPackage, (JavaType.FullyQualified) javaType);
                 }
             }
 
@@ -139,7 +129,7 @@ public class RemoveUnusedImports extends Recipe {
                 J.FieldAccess qualid = elem.getQualid();
                 J.Identifier name = qualid.getName();
 
-                if (checkedImports.contains(elem.toString())) {
+                if (checkedImports.contains(importKey(elem))) {
                     anImport.used = false;
                     changed = true;
                 } else if (elem.isStatic()) {
@@ -148,7 +138,7 @@ public class RemoveUnusedImports extends Recipe {
 
                     // some class names are not handled properly by `getTypeName()`
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
-                    String target = qualid.getTarget().toString();
+                    String target = qualifiedName(qualid.getTarget());
                     String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
                             .filter((fqn) -> fullyQualifiedNamesAreEqual(target, fqn))
                             .findFirst()
@@ -157,7 +147,7 @@ public class RemoveUnusedImports extends Recipe {
 
                     Set<JavaType.FullyQualified> staticClasses = null;
                     for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(target, emptySet())) {
-                        if (maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
+                        if (maybeStatic.getOwningClass() != null && toFullyQualifiedName(outerType).startsWith(toFullyQualifiedName(maybeStatic.getOwningClass().getFullyQualifiedName()))) {
                             if (staticClasses == null) {
                                 staticClasses = new HashSet<>();
                             }
@@ -169,18 +159,16 @@ public class RemoveUnusedImports extends Recipe {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
+                        SortedSet<String> unfoldedMethodsAndFields = methodsAndFields != null ? methodsAndFields : targetMethodsAndFields;
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
-                        } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
+                        } else if (((unfoldedMethodsAndFields == null ? 0 : unfoldedMethodsAndFields.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
-                            // replacing the star with a series of unfolded imports
-                            anImport.imports.clear();
-
-                            // add each unfolded import
-                            if (methodsAndFields != null) {
-                                for (String method : methodsAndFields) {
-                                    anImport.imports.add(new JRightPadded<>(elem
+                            List<JRightPadded<J.Import>> unfolded = new ArrayList<>();
+                            if (unfoldedMethodsAndFields != null) {
+                                for (String method : unfoldedMethodsAndFields) {
+                                    unfolded.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(method)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
@@ -189,25 +177,19 @@ public class RemoveUnusedImports extends Recipe {
 
                             if (staticClasses != null) {
                                 for (JavaType.FullyQualified fqn : staticClasses) {
-                                    anImport.imports.add(new JRightPadded<>(elem
+                                    unfolded.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
                             }
 
-                            // move whatever the original prefix of the star import was to the first unfolded import
-                            anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
-                                    .getElement().withPrefix(elem.getPrefix())));
-
-                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
-                            ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
-
+                            replaceWithUnfolded(anImport, unfolded, checkedImports);
                             changed = true;
                         } else {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
-                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
+                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> fullyQualifiedNamesAreEqual(elem.getTypeName(), c.getFullyQualifiedName())) ||
                             (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
                             (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;
@@ -216,7 +198,7 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 } else {
-                    String target = qualid.getTarget().toString();
+                    String target = qualifiedName(qualid.getTarget());
                     Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(target, new HashSet<>());
                     Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(target), new HashSet<>());
                     Set<String> topLevelTypeNames = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
@@ -240,33 +222,21 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.used = true;
                             usedWildcardImports.add(elem.getPackageName());
                         } else if (combinedTypes.size() < layoutStyle.getClassCountToUseStarImport()) {
-                            // replacing the star with a series of unfolded imports
-                            anImport.imports.clear();
-
-                            // add each unfolded import, but only for types that are used unqualified
+                            // unfold only the types that are used unqualified
+                            List<JRightPadded<J.Import>> unfolded = new ArrayList<>();
                             combinedTypes.stream()
                                     .filter(fqType -> unqualifiedTypeNames.contains(fqType.getFullyQualifiedName()))
                                     .map(JavaType.FullyQualified::getClassName)
                                     .sorted()
                                     .distinct()
-                                    .forEach(type -> anImport.imports.add(new JRightPadded<>(elem
+                                    .forEach(type -> unfolded.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(type.substring(type.lastIndexOf('.') + 1))))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                                     );
 
-                            // move whatever the original prefix of the star import was to the first unfolded import
-                            if (!anImport.imports.isEmpty()) {
-                                anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
-                                        .getElement().withPrefix(elem.getPrefix())));
-                                anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
-                                ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
-                                changed = true;
-                            } else {
-                                // No types are used unqualified, so remove the wildcard import entirely
-                                anImport.used = false;
-                                changed = true;
-                            }
+                            replaceWithUnfolded(anImport, unfolded, checkedImports);
+                            changed = true;
                         } else {
                             usedWildcardImports.add(target);
                         }
@@ -284,7 +254,7 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 }
-                checkedImports.add(elem.toString());
+                checkedImports.add(importKey(elem));
             }
 
             // Do not use direct imports that are imported by a wildcard import
@@ -318,25 +288,110 @@ public class RemoveUnusedImports extends Recipe {
                         List<JRightPadded<J.Import>> importGroup = anImportGroup.imports;
                         for (int i = 0; i < importGroup.size(); i++) {
                             JRightPadded<J.Import> anImport = importGroup.get(i);
-                            if (i == 0 && lastUnusedImportSpace != null && anImport.getElement().getPrefix().getLastWhitespace()
-                                    .chars().filter(c -> c == '\n').count() <= 1) {
-                                anImport = anImport.withElement(anImport.getElement().withPrefix(lastUnusedImportSpace));
+                            if (i == 0 && lastUnusedImportSpace != null) {
+                                Space prefix = anImport.getElement().getPrefix();
+                                Space replacement = prefix.getLastWhitespace().chars().filter(c -> c == '\n').count() <= 1 ?
+                                        lastUnusedImportSpace : prefix;
+                                anImport = anImport.withElement(anImport.getElement().withPrefix(replacement.withComments(
+                                        Stream.concat(lastUnusedImportSpace.getComments().stream(),
+                                                prefix.getComments().stream()).collect(toList()))));
                             }
                             imports.add(anImport);
                         }
                         lastUnusedImportSpace = null;
-                    } else if (lastUnusedImportSpace == null && !anImportGroup.imports.isEmpty()) {
-                        lastUnusedImportSpace = anImportGroup.imports.get(0).getElement().getPrefix();
+                    } else if (!anImportGroup.imports.isEmpty()) {
+                        J.Import unused = anImportGroup.imports.get(0).getElement();
+                        List<Comment> comments = new ArrayList<>();
+                        if (lastUnusedImportSpace == null) {
+                            lastUnusedImportSpace = unused.getPrefix();
+                        } else {
+                            comments.addAll(lastUnusedImportSpace.getComments());
+                        }
+                        comments.addAll(unused.getComments());
+                        comments.addAll(internalComments(unused));
+                        lastUnusedImportSpace = lastUnusedImportSpace.withComments(comments);
                     }
                 }
 
                 cu = cu.getPadding().withImports(imports);
+                if (lastUnusedImportSpace != null && !lastUnusedImportSpace.getComments().isEmpty()) {
+                    Space following = cu.getClasses().isEmpty() ? cu.getEof() : cu.getClasses().get(0).getPrefix();
+                    List<Comment> comments = new ArrayList<>(lastUnusedImportSpace.getComments());
+                    comments.addAll(following.getComments());
+                    following = following.withComments(comments);
+                    if (cu.getClasses().isEmpty()) {
+                        cu = cu.withEof(following);
+                    } else {
+                        J.ClassDeclaration firstClass = cu.getClasses().get(0).withPrefix(following);
+                        cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), cd -> firstClass));
+                    }
+                }
                 if (cu.getImports().isEmpty() && !cu.getClasses().isEmpty()) {
                     cu = autoFormat(cu, cu.getClasses().get(0).getName(), ctx, getCursor().getParentOrThrow());
                 }
             }
 
             return cu;
+        }
+
+        /**
+         * Replaces a star import with its unfolded imports, less those repeating an import above them.
+         * When none remain, the star import stays in place as unused, so its prefix passes to the next import.
+         */
+        private void replaceWithUnfolded(ImportUsage starImport, List<JRightPadded<J.Import>> unfolded, Set<String> checkedImports) {
+            unfolded.removeIf(i -> !checkedImports.add(importKey(i.getElement())));
+            if (unfolded.isEmpty()) {
+                starImport.used = false;
+                return;
+            }
+            J.Import star = starImport.imports.get(0).getElement();
+            for (int i = 1; i < unfolded.size(); i++) {
+                JRightPadded<J.Import> anImport = unfolded.get(i);
+                J.Import withoutComments = (J.Import) new JavaIsoVisitor<Void>() {
+                    @Override
+                    public Space visitSpace(Space space, Space.Location loc, Void unused) {
+                        return space.withComments(Collections.emptyList());
+                    }
+                }.visitNonNull(anImport.getElement(), null);
+                unfolded.set(i, anImport.withElement(withoutComments));
+            }
+            unfolded.set(0, unfolded.get(0).withElement(unfolded.get(0).getElement().withPrefix(star.getPrefix())));
+            ImportComments.unfoldComments(getCursor(), star, unfolded);
+            starImport.imports.clear();
+            starImport.imports.addAll(unfolded);
+        }
+
+        private static String qualifiedName(Expression name) {
+            if (name instanceof J.Identifier) {
+                return ((J.Identifier) name).getSimpleName();
+            }
+            J.FieldAccess fieldAccess = (J.FieldAccess) name;
+            return qualifiedName(fieldAccess.getTarget()) + "." + fieldAccess.getSimpleName();
+        }
+
+        private static String importKey(J.Import anImport) {
+            return (anImport.isStatic() ? "static " : "") + qualifiedName(anImport.getQualid()) +
+                    (anImport.getAlias() == null ? "" : " as " + anImport.getAlias().getSimpleName());
+        }
+
+        private static List<Comment> internalComments(J.Import anImport) {
+            List<Comment> comments = new ArrayList<>();
+            new JavaIsoVisitor<List<Comment>>() {
+                @Override
+                public Space visitSpace(Space space, Space.Location loc, List<Comment> collected) {
+                    collected.addAll(space.getComments());
+                    return space;
+                }
+            }.visit(anImport.withPrefix(Space.EMPTY), comments);
+            return comments;
+        }
+
+        private static void addByImportTarget(Map<String, Set<JavaType.FullyQualified>> typesByPackage, JavaType.FullyQualified fq) {
+            typesByPackage.computeIfAbsent(
+                    fq.getOwningClass() == null ?
+                            fq.getPackageName() :
+                            toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                    f -> new HashSet<>()).add(fq);
         }
 
         private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
@@ -490,13 +545,11 @@ public class RemoveUnusedImports extends Recipe {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> unqualifiedTypeNames) {
                     JavaType type = identifier.getType();
-                    // Check for unqualified type references (not field references)
-                    if (type instanceof JavaType.FullyQualified && identifier.getFieldType() == null) {
-                        // Check if this identifier is part of a fully qualified reference
-                        // If it's part of a J.FieldAccess chain, it's qualified
-                        if (!isPartOfQualifiedReference(identifier)) {
-                            unqualifiedTypeNames.add(((JavaType.FullyQualified) type).getFullyQualifiedName());
-                        }
+                    // Check for unqualified type references (not field references), skipping `var`'s inferred type
+                    if (type instanceof JavaType.FullyQualified && identifier.getFieldType() == null &&
+                            !identifier.getMarkers().findFirst(JavaVarKeyword.class).isPresent() &&
+                            !isQualified(identifier)) {
+                        unqualifiedTypeNames.add(((JavaType.FullyQualified) type).getFullyQualifiedName());
                     }
                     return identifier;
                 }
@@ -507,41 +560,9 @@ public class RemoveUnusedImports extends Recipe {
                     return import_;
                 }
 
-                private boolean isPartOfQualifiedReference(J.Identifier identifier) {
-                    // Walk up the cursor to see if this identifier is part of a J.FieldAccess chain
-                    Cursor cursor = getCursor();
-                    while (cursor != null) {
-                        Object value = cursor.getValue();
-                        // This identifier is the name part of a field access
-                        // Check if the target is a package/class reference (not a field)
-                        if (value instanceof J.FieldAccess &&
-                                ((J.FieldAccess) value).getName() == identifier &&
-                                ((J.FieldAccess) value).getTarget() instanceof J.FieldAccess &&
-                                ((J.FieldAccess) value).getTarget().getType() instanceof JavaType.FullyQualified) {
-                            return true; // This is a qualified reference
-                        }
-                        cursor = cursor.getParent();
-                    }
-                    return false;
-                }
-            }.reduce(cu, new HashSet<>());
-        }
-
-        /**
-         * Collect all identifier simple names appearing in source code, excluding import statements.
-         * Used to detect imports whose type name doesn't actually appear in the source.
-         */
-        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
-            return new JavaIsoVisitor<Set<String>>() {
-                @Override
-                public J.Import visitImport(J.Import import_, Set<String> names) {
-                    return import_;
-                }
-
-                @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
-                    names.add(identifier.getSimpleName());
-                    return super.visitIdentifier(identifier, names);
+                private boolean isQualified(J.Identifier identifier) {
+                    Object parent = getCursor().getParentTreeCursor().getValue();
+                    return parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier;
                 }
             }.reduce(cu, new HashSet<>());
         }

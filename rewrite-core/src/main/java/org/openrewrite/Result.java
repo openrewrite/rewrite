@@ -266,6 +266,12 @@ public class Result {
         return diff();
     }
 
+    /**
+     * Whether a diff of {@code before} and {@code after} would be empty: the file keeps its path and prints the
+     * same, markers that print, such as search results, included. An edit that only changes a marker that doesn't
+     * print, such as the version a {@code BuildTool} marker records, has no changes. A {@link Remote} always counts
+     * as changed, since printing one fetches it.
+     */
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         try {
             if (before == after) {
@@ -282,7 +288,7 @@ public class Result {
             if (before instanceof Quark && after instanceof Quark) {
                 return before.getSourcePath().equals(after.getSourcePath());
             }
-            return before.printAll().equals(after.printAll());
+            return before.getSourcePath().equals(after.getSourcePath()) && before.printAll().equals(after.printAll());
         } catch (Exception e) {
             return false;
         }

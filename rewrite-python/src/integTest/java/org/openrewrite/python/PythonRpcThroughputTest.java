@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.rpc.ParseProjectOptions;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 
 import java.lang.management.ManagementFactory;
@@ -131,7 +132,7 @@ class PythonRpcThroughputTest {
         Map<Long, Long> cpu = cpuNanos(), alloc = allocated();
         long nanos = System.nanoTime();
         List<SourceFile> files = PythonRewriteRpc.getOrStart()
-                .parseProject(project, exclusions, new InMemoryExecutionContext(Throwable::printStackTrace))
+                .parseProject(project, ParseProjectOptions.builder().exclusions(exclusions).build(), new InMemoryExecutionContext(Throwable::printStackTrace))
                 .collect(toList());
         report("PARSE", label, files.size(), nanos, cpu, alloc, 0);
         return files;

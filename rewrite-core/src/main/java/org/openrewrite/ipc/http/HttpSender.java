@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.net.Proxy;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,16 @@ import static java.util.Collections.emptyMap;
 @SuppressWarnings("unused")
 public interface HttpSender {
     Response send(Request request);
+
+    /**
+     * A sender using an explicit route, including {@link Proxy#NO_PROXY} for an intentional direct connection.
+     * Implementations must preserve their other settings and must not silently ignore the route. Automatic
+     * redirects must be disabled: a redirect target may require a different route or bypass rule.
+     * The default leaves existing senders unchanged and reports that this capability is unavailable.
+     */
+    default HttpSender withProxy(Proxy proxy) {
+        throw new UnsupportedOperationException("This HttpSender cannot bind an explicit proxy route");
+    }
 
     default Request.Builder post(String uri) {
         return newRequest(uri).withMethod(Method.POST);

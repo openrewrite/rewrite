@@ -89,9 +89,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     }
 
     static class ProjectState {
-        @Nullable SourceFile capturedDepsFile;
+        /**
+         * The edit of the deps file as scanned, used when its lock file is visited first.
+         */
+        PyProjectHelper.@Nullable DepsEdit capturedEdit;
         @Nullable String capturedLockContent;
-        @Nullable SourceFile modifiedDepsFile;
+        boolean computed;
         LockFileRegeneration.@Nullable Result regenResult;
         boolean failureRecorded;
     }
@@ -147,7 +150,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null) {
                     ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
-                    ps.capturedDepsFile = sourceFile;
+                    ps.capturedEdit = matchesTransitive(trait) ?
+                            PyProjectHelper.DepsEdit.of(trait, pin()) : null;
                 }
                 return tree;
             }
@@ -164,6 +168,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return false;
         }
         return true;
+    }
+
+    private Function<PythonDependencyFile, PythonDependencyFile> pin() {
+        String normalizedName = PythonResolutionResult.normalizeName(packageName);
+        Map<String, String> pins = singletonMap(normalizedName, version);
+        return t -> t.withPinnedTransitiveDependencies(pins, null, null);
     }
 
     @Override
@@ -183,17 +193,16 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 ProjectState ps = acc.projects.get(sourcePath);
                 if (ps != null) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                    if (trait != null && matchesTransitive(trait)) {
-                        ensureComputed(ps, trait, ctx);
-                    }
-                    if (ps.modifiedDepsFile != null) {
-                        SourceFile out = ps.modifiedDepsFile;
+                    SourceFile modified = trait != null && (ps.computed || matchesTransitive(trait)) ?
+                            edit(ps, trait, ctx) : null;
+                    if (modified != null) {
+                        SourceFile out = modified;
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, sourcePath);
                             out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
+                        PyProjectHelper.putLiveDeps(ctx, sourcePath, modified.printAll(), ps.regenResult);
                         return out;
                     }
                 }
@@ -206,20 +215,19 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (lockPs == null) {
                     return tree;
                 }
-                if (lockPs.modifiedDepsFile == null) {
+                if (!lockPs.computed) {
+                    PyProjectHelper.DepsEdit depsEdit = lockPs.capturedEdit;
                     SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
-                    if (depsTree == null) {
-                        depsTree = lockPs.capturedDepsFile;
-                    }
                     if (depsTree != null) {
                         Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
                         PythonDependencyFile trait = matcher.get(synth).orElse(null);
-                        if (trait != null && matchesTransitive(trait)) {
-                            ensureComputed(lockPs, trait, ctx);
-                            if (lockPs.modifiedDepsFile != null) {
-                                PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
-                            }
-                        }
+                        depsEdit = trait != null && matchesTransitive(trait) ?
+                                PyProjectHelper.DepsEdit.of(trait, pin()) : null;
+                    }
+                    if (depsEdit != null) {
+                        lockPs.computed = true;
+                        lockPs.regenResult = depsEdit.regenerate(lockPs.capturedLockContent, ctx);
+                        PyProjectHelper.putLiveDeps(ctx, depsPath, depsEdit.getModifiedContent(), lockPs.regenResult);
                     }
                 }
                 if (lockPs.regenResult != null) {
@@ -240,20 +248,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
-                if (ps.modifiedDepsFile != null) {
-                    return;
+            private @Nullable SourceFile edit(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
+                if (ps.computed) {
+                    return PyProjectHelper.edit(trait, pin(), ps.regenResult);
                 }
-                String normalizedName = PythonResolutionResult.normalizeName(packageName);
-                Map<String, String> pins = singletonMap(normalizedName, version);
-                Function<PythonDependencyFile, PythonDependencyFile> editFn =
-                        t -> t.withPinnedTransitiveDependencies(pins, null, null);
                 PyProjectHelper.EditAndRegenerateResult r =
-                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent, ctx);
+                        PyProjectHelper.editAndRegenerate(trait, pin(), ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
-                    ps.modifiedDepsFile = r.getModifiedDepsFile();
+                    ps.computed = true;
                     ps.regenResult = r.getRegenResult();
                 }
+                return r.getModifiedDepsFile();
             }
         };
     }

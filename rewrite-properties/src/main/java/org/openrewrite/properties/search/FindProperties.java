@@ -74,9 +74,7 @@ public class FindProperties extends Recipe {
             }
         };
 
-        Set<Properties.Entry> ps = new HashSet<>();
-        findVisitor.visit(p, ps);
-        return ps;
+        return findVisitor.reduce(p, new HashSet<>());
     }
 
     @Override

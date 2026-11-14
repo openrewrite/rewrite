@@ -104,10 +104,6 @@ func TestResultTypesSurviveRpcRoundTrip(t *testing.T) {
 	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.GoUnaries[0].Type))
 	require.Len(t, c.ParameterizedTypes, 1)
 	assert.Equal(t, "main.Box", matcher.GetFullyQualifiedName(c.ParameterizedTypes[0].Type))
-
-	// The J.ArrayAccess codec every RPC peer shares carries indexed and
-	// dimension only, so the type an index resolves to is Go-side state.
-	// Widening it is a lockstep change across all peers.
 	require.Len(t, c.ArrayAccesses, 1)
-	assert.Nil(t, c.ArrayAccesses[0].Type)
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.ArrayAccesses[0].Type))
 }

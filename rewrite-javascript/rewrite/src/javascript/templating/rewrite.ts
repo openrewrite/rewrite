@@ -44,7 +44,7 @@ class RewriteRuleImpl implements RewriteRule {
 
         for (const pattern of this.before) {
             // Pass cursor to pattern.match() for context-aware capture constraints
-            const match = await pattern.match(node, cursor);
+            const match = await pattern.match(node, cursor, {debug: options?.debug});
             if (match) {
                 // Evaluate postMatch after structural match succeeds
                 if (this.postMatch) {
@@ -122,6 +122,10 @@ class RewriteRuleImpl implements RewriteRule {
 
 /**
  * Creates a replacement rule using a capture context and configuration.
+ *
+ * To see why a rule does not apply where you expected it to, call `tryOn(cursor, node, {debug: true})`,
+ * or set PATTERN_DEBUG=true for every pattern. Each match attempt then prints why it matched or not,
+ * as `PatternOptions.debug` describes.
  *
  * @param builderFn Function that takes a capture context and returns before/after configuration
  * @returns A replacement rule that can be applied to AST nodes

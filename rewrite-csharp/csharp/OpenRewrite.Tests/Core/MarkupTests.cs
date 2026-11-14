@@ -92,6 +92,34 @@ public class MarkupTests : RewriteTest
     }
 
     [Fact]
+    public void MarkingTwiceWithTheSameMarkupKeepsOneMarker()
+    {
+        // given
+        var empty = new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty);
+        var warned = Markup.CreateWarn(empty, "side effect", "detail");
+
+        // when
+        var warnedAgain = Markup.CreateWarn(warned, "side effect", "detail");
+
+        // then
+        Assert.Same(warned, warnedAgain);
+    }
+
+    [Fact]
+    public void MarkingWithADifferentMarkupAddsAnotherMarker()
+    {
+        // given
+        var empty = new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty);
+        var warned = Markup.CreateWarn(empty, "side effect");
+
+        // when
+        var marked = Markup.CreateInfo(Markup.CreateWarn(warned, "other"), "side effect");
+
+        // then
+        Assert.Equal(3, marked.Markers.MarkerList.OfType<Markup>().Count());
+    }
+
+    [Fact]
     public void MarkupThrowsWhenTheNodeHasNoWithMarkers()
     {
         var ex = Assert.Throws<InvalidOperationException>(

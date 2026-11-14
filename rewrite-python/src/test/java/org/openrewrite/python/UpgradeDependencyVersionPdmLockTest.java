@@ -40,7 +40,7 @@ import static org.openrewrite.python.Assertions.pyproject;
 
 /**
  * End-to-end recipe test of native pdm.lock regeneration against recorded pypi.org responses
- * (fixtures under {@code /pdmlock/}); the expected lock is byte-identical to what PDM 2.28.0 wrote
+ * (fixtures under {@code /lock/pdm/}); the expected lock is byte-identical to what PDM 2.28.0 wrote
  * for the same edit.
  */
 class UpgradeDependencyVersionPdmLockTest implements RewriteTest {
@@ -97,7 +97,7 @@ class UpgradeDependencyVersionPdmLockTest implements RewriteTest {
     }
 
     private static String resource(String name) {
-        try (InputStream is = UpgradeDependencyVersionPdmLockTest.class.getResourceAsStream("/pdmlock/" + name)) {
+        try (InputStream is = UpgradeDependencyVersionPdmLockTest.class.getResourceAsStream("/lock/pdm/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

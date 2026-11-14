@@ -1,5 +1,7 @@
 from typing import Type, Optional, TypeVar
 
+import pytest
+
 from rewrite import Tree
 from rewrite.java import Literal, JavaType
 from rewrite.python import PythonVisitor
@@ -48,7 +50,7 @@ def test_int_above_int32_is_long():
 
 def test_byte_string_concatenation():
     # language=python
-    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.String)))
+    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_int_above_int64_has_no_primitive():
@@ -264,6 +266,20 @@ def test_token_types(self, code, types):
     assert actual_types == types + [ENDMARKER]
 '''
     ))
+
+
+def _parenthesized_concatenation(count: int) -> str:
+    return "X = (\n" + "    'a'\n" * count + ")\n"
+
+
+def _backslash_continued_concatenation(count: int) -> str:
+    return "X = \\\n" + "b'00' \\\n" * (count - 1) + "b'00'\n"
+
+
+@pytest.mark.parametrize("count", [200, 1_000, 10_000])
+@pytest.mark.parametrize("source", [_parenthesized_concatenation, _backslash_continued_concatenation])
+def test_long_implicit_concatenation(source, count):
+    RecipeSpec().rewrite_run(python(source(count)))
 
 
 def find_first(tree: Tree, clazz: Type[T]) -> T:

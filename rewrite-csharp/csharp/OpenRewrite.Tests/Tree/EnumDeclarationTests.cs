@@ -190,4 +190,16 @@ public class EnumDeclarationTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void SpaceBeforeTrailingSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum E { A } ;
+                """
+            )
+        );
+    }
 }

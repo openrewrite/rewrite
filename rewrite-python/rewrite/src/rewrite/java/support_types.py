@@ -3,7 +3,7 @@ from __future__ import annotations
 import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntFlag
 from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
@@ -118,14 +118,24 @@ class Space:
 
     @classmethod
     def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
-        """The two comment-free whitespace values that dominate a tree are shared
-        instances; every other Space is built fresh."""
+        """A comment-free Space is the instance `shared` has for its whitespace, when there is one.
+        Every other Space is built fresh."""
         if not comments:
-            if not whitespace:
-                return cls.EMPTY
-            if whitespace == ' ':
-                return cls.SINGLE_SPACE
+            shared = cls.shared(whitespace or '')
+            if shared is not None:
+                return shared
         return cls(comments, whitespace)
+
+    @classmethod
+    def shared(cls, whitespace: str) -> Optional[Space]:
+        """As in Java's Space.shared, the one comment-free Space shared for `whitespace`, or None
+        when it is too long to share."""
+        if not whitespace:
+            return cls.EMPTY
+        if len(whitespace) > 50:
+            return None
+        shared = _SHARED_SPACES.get(whitespace)
+        return shared if shared is not None else _SHARED_SPACES.setdefault(whitespace, cls([], whitespace))
 
     @classmethod
     def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space:
@@ -175,6 +185,7 @@ class Space:
 
 Space.EMPTY = Space([], '')
 Space.SINGLE_SPACE = Space([], ' ')
+_SHARED_SPACES: Dict[str, Space] = {' ': Space.SINGLE_SPACE}
 
 
 class JavaSourceFile(J, SourceFile):
@@ -237,6 +248,10 @@ if not TYPE_CHECKING:
 
 class JavaType:
     __slots__ = ()
+
+    class Flag(IntFlag):
+        """Bits of a type's ``flags_bit_map``, the same as Java's ``org.openrewrite.java.tree.Flag``."""
+        Static = 1 << 3
 
     class FullyQualified(JavaType):
         __slots__ = ()
@@ -732,13 +747,7 @@ class JContainer(Generic[J2]):
             return self._t._elements
 
         def replace(self, **kwargs) -> JContainer[J3]:
-            """Replace fields of the container using keyword arguments."""
-            if 'elements' in kwargs:
-                elements = kwargs['elements']
-                if self._t._elements is elements:
-                    return self._t
-                return JContainer(self._t._before, elements, self._t._markers)
-            return self._t
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = None
 

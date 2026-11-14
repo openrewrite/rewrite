@@ -12,6 +12,11 @@ repositories {
             excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
         }
     }
+    google {
+        content {
+            includeGroup("com.android.tools.build")
+        }
+    }
     maven {
         url = uri("https://plugins.gradle.org/m2/")
         content {
@@ -32,8 +37,12 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-resources:latest.release")
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
-    // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
-    parserClasspath("com.gradle:develocity-gradle-plugin:3.+")
+    // 3.19.2 is the last release with both the `develocity` and the legacy `gradleEnterprise` extension types;
+    // 4.x removed the latter, which settings scripts still awaiting rewrite-migrate-gradle's
+    // `migrate.plugins.MigrateGradleEnterpriseToDevelocity` rely on
+    parserClasspath("com.gradle:develocity-gradle-plugin:3.19.2")
+
+    testParserClasspath("com.android.tools.build:gradle-api:9.4.1")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
@@ -58,8 +67,7 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.apache.groovy:groovy:4.+")
     compileOnly(gradleApi())
-    // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
-    compileOnly("com.gradle:develocity-gradle-plugin:3.+")
+    compileOnly("com.gradle:develocity-gradle-plugin:3.19.2")
 
     // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
     // (mockwebserver 4.x would otherwise pin them to 1.9.10 transitively).
@@ -93,6 +101,7 @@ java {
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
     val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
+    val userHomesDir = temporaryDir.resolve("gradle-user-homes")
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         // Filter out test-manifest.txt which contains absolute paths and is tracked separately as @Internal
@@ -104,10 +113,16 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifest: File = manifestFile
 
+        // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi)
+        @get:Internal
+        val userHomes: File = userHomesDir
+
         override fun asArguments() = listOf(
-            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}",
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${userHomes.absolutePath}"
         )
     })
+    doFirst { userHomesDir.deleteRecursively() }
     maxHeapSize = "2g"
 }
 

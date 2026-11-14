@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 
 import java.lang.annotation.Annotation;
@@ -275,6 +276,16 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         });
     }
 
+    /// Reflection reports varargs as `ACC_VARARGS`, the same bit as [Modifier#TRANSIENT]; map it to
+    /// [Flag#Varargs] as the Java parser does, since both can share one type cache.
+    private static long methodFlags(Executable method) {
+        long flags = method.getModifiers();
+        if (method.isVarArgs()) {
+            flags = (flags & ~Modifier.TRANSIENT) | Flag.Varargs.getBitMask();
+        }
+        return flags;
+    }
+
     public JavaType.Method method(Method method) {
         JavaType.FullyQualified type = (JavaType.FullyQualified) type(method.getDeclaringClass());
         if (type instanceof JavaType.Parameterized) {
@@ -305,7 +316,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         String[] finalParamNames = paramNames;
         return typeFactory.methodFor(signature,
                 () -> new JavaType.Method(
-                        null, method.getModifiers(), null, "<constructor>",
+                        null, methodFlags(method), null, "<constructor>",
                         null, finalParamNames, null, null, null, null, null),
                 mappedMethod -> {
             List<JavaType> thrownExceptions = null;
@@ -400,7 +411,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
         List<String> declaredFormalTypeNames = null;
         for (TypeVariable<?> typeVariable : method.getTypeParameters()) {
-            if (typeVariable.getGenericDeclaration() == method) {
+            if (method.equals(typeVariable.getGenericDeclaration())) {
                 if (declaredFormalTypeNames == null) {
                     declaredFormalTypeNames = new ArrayList<>();
                 }
@@ -413,7 +424,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
         return typeFactory.methodFor(signature,
                 () -> new JavaType.Method(
-                        null, method.getModifiers(), null, method.getName(),
+                        null, methodFlags(method), null, method.getName(),
                         null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
                 mappedMethod -> {
             List<JavaType> thrownExceptions = null;

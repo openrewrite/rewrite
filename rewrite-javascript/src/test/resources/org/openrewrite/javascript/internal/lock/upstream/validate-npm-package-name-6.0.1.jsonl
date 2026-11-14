@@ -1,0 +1,43 @@
+{"header":"validate-npm-package-name 6.0.1: every call its own tests (test/index.js) make, with its answer; generate/upstream-calls.js generate/upstream/validate-npm-package-name.js <checkout> 6.0.1"}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["some-package"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["example.com"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["under_score"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["period.js"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["123numeric"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["crazy!"],"out":{"validForNewPackages":false,"validForOldPackages":true,"warnings":["name can no longer contain special characters (\"~'!()*\")"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["@npm/thingy"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["@npm-zors/money!time.js"],"out":{"validForNewPackages":false,"validForOldPackages":true,"warnings":["name can no longer contain special characters (\"~'!()*\")"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":[null],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot be null"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":[{"$":"undefined"}],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot be undefined"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":[42],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name must be a string"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":[""],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name length must be greater than zero"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":[".start-with-period"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot start with a period"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["@npm/."],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot start with a period"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["@npm/.."],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot start with a period"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["@npm/.package"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot start with a period"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["_start-with-underscore"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot start with an underscore"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["contain:colons"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":[" leading-space"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot contain leading or trailing spaces","name can only contain URL-friendly characters"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["trailing-space "],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot contain leading or trailing spaces","name can only contain URL-friendly characters"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["s/l/a/s/h/e/s"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["node_modules"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["node_modules is a blacklisted name"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["favicon.ico"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["favicon.ico is a blacklisted name"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["http"],"out":{"validForNewPackages":false,"validForOldPackages":true,"warnings":["http is a core module name"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["process"],"out":{"validForNewPackages":false,"validForOldPackages":true,"warnings":["process is a core module name"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["ifyouwanttogetthesumoftwonumberswherethosetwonumbersarechosenbyfindingthelargestoftwooutofthreenumbersandsquaringthemwhichismultiplyingthembyitselfthenyoushouldinputthreenumbersintothisfunctionanditwilldothatforyou-"],"out":{"validForNewPackages":false,"validForOldPackages":true,"warnings":["name can no longer contain more than 214 characters"]}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["ifyouwanttogetthesumoftwonumberswherethosetwonumbersarechosenbyfindingthelargestoftwooutofthreenumbersandsquaringthemwhichismultiplyingthembyitselfthenyoushouldinputthreenumbersintothisfunctionanditwilldothatforyou"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"test/index.js > validate-npm-package-name","fn":"validate","args":["CAPITAL-LETTERS"],"out":{"validForNewPackages":false,"validForOldPackages":true,"warnings":["name can no longer contain capital letters"]}}
+{"test":"differences","fn":"validate","args":["-a"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"differences","fn":"validate","args":["@a/.b"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot start with a period"]}}
+{"test":"differences","fn":"validate","args":["@a/-b"],"out":{"validForNewPackages":true,"validForOldPackages":true}}
+{"test":"differences","fn":"validate","args":["node_modules"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["node_modules is a blacklisted name"]}}
+{"test":"differences","fn":"validate","args":["Favicon.ico"],"out":{"validForNewPackages":false,"validForOldPackages":false,"warnings":["name can no longer contain capital letters"],"errors":["favicon.ico is a blacklisted name"]}}
+{"test":"differences","fn":"validate","args":["@/a"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":["@a/"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":[" a"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot contain leading or trailing spaces","name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":["a "],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot contain leading or trailing spaces","name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":["a﻿"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot contain leading or trailing spaces","name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":[" a"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name cannot contain leading or trailing spaces","name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":["@a/b/c"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":["@a%2fb"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}
+{"test":"differences","fn":"validate","args":["a\nb"],"out":{"validForNewPackages":false,"validForOldPackages":false,"errors":["name can only contain URL-friendly characters"]}}

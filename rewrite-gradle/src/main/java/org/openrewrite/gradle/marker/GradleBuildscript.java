@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.Serializable;
@@ -35,7 +36,7 @@ import static org.openrewrite.Tree.randomId;
 @With
 @Builder
 @AllArgsConstructor
-public class GradleBuildscript implements Serializable {
+public class GradleBuildscript implements Heavyweight, Serializable {
 
     @Builder.Default
     UUID id = randomId();
