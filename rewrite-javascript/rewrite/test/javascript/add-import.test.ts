@@ -611,6 +611,152 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('a comment ending the last import\'s line stays on it, and one on the next line stays with the code', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; // note
+                        a();
+                    `,
+                    `
+                        import {a} from "a"; // note
+                        import {b} from "b";
+                        a();
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; // note
+                        // calls a
+                        a();
+                    `,
+                    `
+                        import {a} from "a"; // note
+                        import {b} from "b";
+                        // calls a
+                        a();
+                    `
+                )
+            );
+        });
+
+        test('a comment ending the line of an import that ends the file stays on it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {a} from "a"; // note
+                    `,
+                    `
+                        import {a} from "a"; // note
+                        import {b} from "b";
+                    `
+                )
+            );
+        });
+
+        test('a block comment and a line comment ending the last import\'s line stay on it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {a} from "a"; /* x */ // note
+                        a();
+                    `,
+                    `
+                        import {a} from "a"; /* x */ // note
+                        import {b} from "b";
+                        a();
+                    `
+                )
+            );
+        });
+
+        test('code on the last import\'s line moves to its own line, with a block comment ahead of it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; /* x */ a();
+                    `,
+                    `
+                        import {a} from "a";
+                        import {b} from "b";
+                        /* x */ a();
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; a();
+                    `,
+                    `
+                        import {a} from "a";
+                        import {b} from "b";
+                        a();
+                    `
+                )
+            );
+        });
+
+        test('a comment ending a directive\'s line stays on it, and one after a shebang stays with the code', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        'use strict'; // note
+
+                        a();
+                    `,
+                    `
+                        'use strict'; // note
+
+                        import {b} from 'b';
+
+                        a();
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                        'use strict'; // note
+                    `,
+                    `
+                        'use strict'; // note
+                        import {b} from 'b';
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        // runs a
+                        a();
+                    `,
+                    `
+                        #!/usr/bin/env node
+
+                        import {b} from 'b';
+
+                        // runs a
+                        a();
+                    `
+                )
+            );
+        });
     });
 
     describe('merging imports from same module', () => {
@@ -1170,6 +1316,34 @@ describe('AddImport visitor', () => {
                     const {readFile} = require('fs');
 
                     module.exports = readFile;
+                    `
+                )
+            );
+        });
+
+        test('a comment ending the line of a require or directive that ends the file stays on it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false, style: ImportStyle.CommonJS}));
+            await spec.rewriteRun(
+                //language=javascript
+                javascript(
+                    `
+                    const {a} = require("a"); // note
+                    `,
+                    `
+                    const {a} = require("a"); // note
+                    const {b} = require("b");
+                    `
+                ),
+                //language=javascript
+                javascript(
+                    `
+                    'use strict'; // note
+                    `,
+                    `
+                    'use strict'; // note
+
+                    const {b} = require('b');
                     `
                 )
             );

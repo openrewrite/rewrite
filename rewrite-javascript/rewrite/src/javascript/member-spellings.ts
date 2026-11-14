@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {create as produce, Draft} from "mutative";
-import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, isStringLiteral, J, singleSpace, Statement} from "../java";
+import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, isStringLiteral, J, singleSpace, splitAtLineEnd, Statement} from "../java";
 import {randomId, UUID} from "../uuid";
 import {Cursor} from "../tree";
 import {isObjectBindingPattern, JS, moduleExportName} from "./tree";
@@ -300,25 +300,6 @@ function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclar
     const source = declaration.moduleSpecifier?.element;
     return isStringLiteral(source) && sameModule(moduleNameOf(source), module) && declaration.exportClause?.kind === JS.Kind.NamedExports
         ? declaration : undefined;
-}
-
-/**
- * The space after a statement, split where its line ends:
- * ` // note\n// next` → `line` ` // note`, `rest` `\n// next`. At the end of the file all of it is `line`.
- * `undefined` where no comment follows on the same line.
- */
-function splitAtLineEnd(space: J.Space, endsFile: boolean): {line: J.Space, rest: J.Space} | undefined {
-    if (space.whitespace.includes("\n") || space.comments.length === 0) {
-        return undefined;
-    }
-    const end = space.comments.findIndex(c => c.suffix.includes("\n"));
-    if (end < 0) {
-        return endsFile ? {line: space, rest: {...space, whitespace: "", comments: []}} : undefined;
-    }
-    return {
-        line: {...space, comments: space.comments.slice(0, end + 1)},
-        rest: {...space, whitespace: space.comments[end].suffix, comments: space.comments.slice(end + 1)}
-    };
 }
 
 function clauseOf(declaration: JS.ExportDeclaration): JS.NamedExports {
