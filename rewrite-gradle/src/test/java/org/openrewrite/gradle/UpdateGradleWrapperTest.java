@@ -689,6 +689,43 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
+    // TNZ-184213: selectors whose minor/patch sorts lower as a string than the current version (8.5 vs 8.14.x)
+    // were a silent no-op
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      8.5,  8.14.x, gradle-8\\.14\\.\\d+-bin\\.zip
+      8.5,  8.x,    gradle-8\\.(1\\d|[6-9])(\\.\\d+)?-bin\\.zip
+      8.5,  8.14,   gradle-8\\.14-bin\\.zip
+      8.13, 8.14.x, gradle-8\\.14\\.\\d+-bin\\.zip
+      """)
+    void selectorWhenCurrentVersionSortsHigherAsString(String current, String selector, String expectedUrlRegex) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper(selector, null, Boolean.FALSE, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, current))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-%s-bin.zip
+              networkTimeout=10000
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """.formatted(current),
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .after(after -> {
+                  assertThat(after).containsPattern(expectedUrlRegex);
+                  Matcher checksumMatcher = Pattern.compile("distributionSha256Sum=(.*)").matcher(after);
+                  assertThat(checksumMatcher.find()).isTrue();
+                  assertThat(checksumMatcher.group(1)).isNotBlank();
+                  return after;
+              })
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
     @Test
     void preferExistingDistributionSourceWhenServicesGradleOrgUnavailable() {
         HttpSender unhelpfulSender = request -> {
