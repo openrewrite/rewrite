@@ -19,13 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ManagedDependencyVersions;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
-import org.openrewrite.gradle.marker.GradleDependencyConstraint;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependencies;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
-import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -129,69 +128,17 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                             gp = maybeGp.get();
 
-                            if (gp.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
-                                String springBootVersion = Optional.ofNullable(getSpringBootVersionFromPlugin()).orElseGet(() ->
-                                        Optional.ofNullable(getSpringBootVersionFromConfiguration("testRuntimeClasspath")).orElseGet(() ->
-                                                gp.getNameToConfiguration().keySet().stream()
-                                                        .map(this::getSpringBootVersionFromConfiguration)
-                                                        .filter(Objects::nonNull)
-                                                        .findFirst()
-                                                        .orElse(null)));
-                                if (springBootVersion != null) {
-                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                    try {
-                                        ResolvedPom platformPom = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootVersion), null, null, gp.getMavenRepositories())
-                                                .resolve(emptyList(), mpd, ctx);
-                                        platformPom.getDependencyManagement().stream()
-                                                .filter(managedVersion -> managedVersion.getVersion() != null)
-                                                .forEach(managedVersion -> springPluginManagedDependencies.put(managedVersion.getGav().asGroupArtifact(), managedVersion.getVersion()));
-                                    } catch (MavenDownloadingException ignored) {
-                                    }
-                                }
-
-                                new JavaIsoVisitor<ExecutionContext>() {
-                                    @Override
-                                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                        new SpringDependencyManagementPluginEntry.Matcher().get(getCursor()).ifPresent(entry -> entry.getArtifacts().forEach(artifact -> {
-                                            if ("mavenBom".equals(method.getSimpleName())) {
-                                                String version = entry.getVersion();
-                                                if (version == null || version.contains("${")) {
-                                                    return;
-                                                }
-                                                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                                try {
-                                                    ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(entry.getGroup(), artifact, version), null, null, gp.getMavenRepositories())
-                                                            .resolve(emptyList(), mpd, ctx);
-                                                    platformPom.getDependencyManagement().stream()
-                                                            .filter(managedVersion -> managedVersion.getVersion() != null)
-                                                            .forEach(managedVersion -> springPluginManagedDependencies.put(managedVersion.getGav().asGroupArtifact(), managedVersion.getVersion()));
-                                                } catch (MavenDownloadingException ignored) {
-                                                }
-                                            } else {
-                                                springPluginManagedDependencies.put(new GroupArtifact(entry.getGroup(), artifact), entry.getVersion());
-                                            }
-                                        }));
-                                        return m;
-                                    }
-                                }.visit(tree, ctx);
+                            ManagedDependencyVersions managed = ManagedDependencyVersions.of((JavaSourceFile) tree, gp, ctx);
+                            if (managed.getPlatformFailure() != null) {
+                                throw new RuntimeException(managed.getPlatformFailure());
                             }
+                            managed.getPlatforms().forEach((configuration, poms) ->
+                                    platforms.computeIfAbsent(configuration, k -> new ArrayList<>()).addAll(poms));
+                            springPluginManagedDependencies.putAll(managed.getSpringPluginManaged());
 
-                            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                             GradleMultiDependency.matcher()
                                     .asVisitor(gmd -> gmd.map(gradleDependency -> {
                                         directDependencies.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>()).add(gradleDependency.getResolvedDependency());
-                                        if (!gradleDependency.isPlatform()) {
-                                            return gradleDependency.getTree();
-                                        }
-                                        GroupArtifactVersion gav = gradleDependency.getGav();
-                                        try {
-                                            ResolvedPom platformPom = mpd.download(gav, null, null, gp.getMavenRepositories())
-                                                    .resolve(emptyList(), mpd, ctx);
-                                            platforms.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>()).add(platformPom);
-                                        } catch (MavenDownloadingException e) {
-                                            throw new RuntimeException(e);
-                                        }
                                         return gradleDependency.getTree();
                                     }))
                                     .visit(tree, ctx, getCursor());
@@ -448,35 +395,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     }
                                     return gradleDependency.getTree();
                                 })).orElse(m);
-                    }
-
-                    private @Nullable String getSpringBootVersionFromPlugin() {
-                        GradleDependencyConfiguration gdc = gp.getBuildscript().getConfiguration("classpath");
-                        if (gdc != null) {
-                            for (ResolvedDependency dependency : gdc.getDirectResolvedShallow()) {
-                                if ("org.springframework.boot.gradle.plugin".equals(dependency.getArtifactId())) {
-                                    return dependency.getVersion();
-                                }
-                            }
-                        }
-                        return null;
-                    }
-
-                    private @Nullable String getSpringBootVersionFromConfiguration(String configuration) {
-                        GradleDependencyConfiguration gdc = gp.getConfiguration(configuration);
-                        if (gdc != null) {
-                            for (GradleDependencyConstraint constraint : gdc.getConstraints()) {
-                                if ("org.springframework.boot".equals(constraint.getGroupId()) && constraint.getStrictVersion() != null) {
-                                    return constraint.getStrictVersion();
-                                }
-                            }
-                            for (ResolvedDependency dependency : gdc.getResolved()) {
-                                if (dependency.getRequested().getVersion() == null && "org.springframework.boot".equals(dependency.getGroupId())) {
-                                    return dependency.getVersion();
-                                }
-                            }
-                        }
-                        return null;
                     }
                 }
         );
