@@ -2205,11 +2205,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
               }
             }
             """,
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 assertThat(findAll(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("x")))
                   .extracting(v -> TypeUtils.toString(v.getVariableType().getType()))
-                  .containsExactly("int", "java.lang.String");
-            })
+                  .containsExactly("int", "java.lang.String"))
           )
         );
     }

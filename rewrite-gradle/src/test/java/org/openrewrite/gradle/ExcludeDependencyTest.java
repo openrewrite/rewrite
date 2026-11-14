@@ -782,9 +782,8 @@ class ExcludeDependencyTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(resolved(cu, "compileClasspath")).doesNotContain("commons-logging:commons-logging");
-            })
+            spec -> spec.afterRecipe(cu ->
+                assertThat(resolved(cu, "compileClasspath")).doesNotContain("commons-logging:commons-logging"))
           )
         );
     }
@@ -822,9 +821,8 @@ class ExcludeDependencyTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(resolved(cu, "compileClasspath")).doesNotContain("commons-logging:commons-logging");
-            })
+            spec -> spec.afterRecipe(cu ->
+                assertThat(resolved(cu, "compileClasspath")).doesNotContain("commons-logging:commons-logging"))
           )
         );
     }
