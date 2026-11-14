@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.table.ParseFailures;
 import org.openrewrite.table.TextMatches;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.Find;
 
 import java.util.List;
@@ -103,7 +103,8 @@ class RecipeRunTest implements RewriteTest {
     @Test
     void delegateRecipeWithOnComplete() {
         ExecutionContext ctx = new InMemoryExecutionContext();
-        rewriteRun(recipeSpec -> recipeSpec.recipe(new DelegatingRecipe()).executionContext(ctx).typeValidationOptions(TypeValidation.none()));
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new DelegatingRecipe()).executionContext(ctx)
+          .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()));
         assertThat(ctx.<String>getMessage("org.openrewrite.recipe.oncomplete")).isEqualTo("with delegate recipe.");
     }
 

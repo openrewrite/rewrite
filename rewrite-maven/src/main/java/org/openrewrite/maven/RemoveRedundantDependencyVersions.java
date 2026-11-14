@@ -312,6 +312,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
                             .resolve(emptyList(), mpd, ctx);
                     return parentPom.getPluginManagement().stream()
+                            .filter(plugin -> !"false".equals(plugin.getInherited()))
                             .filter(plugin -> plugin.getGroupId().equals(p.getGroupId()) && plugin.getArtifactId().equals(p.getArtifactId()))
                             .findFirst()
                             .map(Plugin::getVersion)

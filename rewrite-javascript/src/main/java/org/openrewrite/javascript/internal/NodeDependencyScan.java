@@ -24,7 +24,6 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.marker.NodeRuntime;
-import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -112,9 +111,9 @@ public final class NodeDependencyScan {
         // a parse error holds no text where the host could not read the file either
         if (!(sf instanceof Quark) && !(sf instanceof ParseError && ((ParseError) sf).getText().isEmpty())) {
             if (readAwayFromLock(name.toString())) {
-                acc.packageManagerFiles.put(path, sf.printAll());
+                acc.packageManagerFiles.put(path, PackageJsonHelper.printed(sf));
             } else {
-                acc.besideLock.put(path, sf.printAll());
+                acc.besideLock.put(path, PackageJsonHelper.printed(sf));
             }
         }
         return true;
@@ -190,6 +189,8 @@ public final class NodeDependencyScan {
         @Getter
         private final Map<String, Map<String, String>> declared;
 
+        private final Map<String, String> resolvedVersions;
+
         /** Whether it holds a NodeResolutionResult. */
         @Getter
         private final boolean marked;
@@ -205,10 +206,6 @@ public final class NodeDependencyScan {
 
         private final boolean resolves;
 
-        // the values its parser read string literals as, by how they are written, where that is not the text between
-        // their quotes: the TypeScript parser reads escapes, the Java one, which parses the text again, does not
-        private final Map<String, Object> escaped = new HashMap<>();
-
         private @Nullable List<Path> linkTargets;
 
         private Manifest(SourceFile packageJson, @Nullable String resolved) {
@@ -217,24 +214,12 @@ public final class NodeDependencyScan {
             this.text = PackageJsonHelper.printed(packageJson);
             this.json = packageJson instanceof Json.Document;
             this.declared = PackageJsonHelper.declaredDependencies(packageJson);
+            this.resolvedVersions = resolvedVersions(marker);
             this.marked = marker != null;
             this.packageManager = marker == null ? null : marker.getPackageManager();
             this.npmrcConfigs = marker == null ? null : marker.getNpmrcConfigs();
             this.runtime = packageJson.getMarkers().findFirst(NodeRuntime.class).orElse(null);
             this.resolves = resolved == null || resolves(marker, resolved);
-            if (json) {
-                new JsonIsoVisitor<Map<String, Object>>() {
-                    @Override
-                    public Json.Literal visitLiteral(Json.Literal literal, Map<String, Object> values) {
-                        String source = literal.getSource();
-                        if (literal.getValue() instanceof String && source.length() > 1 &&
-                            !source.substring(1, source.length() - 1).equals(literal.getValue())) {
-                            values.put(source, literal.getValue());
-                        }
-                        return literal;
-                    }
-                }.visit(packageJson, escaped);
-            }
         }
 
         public static Manifest of(SourceFile packageJson) {
@@ -246,6 +231,33 @@ public final class NodeDependencyScan {
          */
         public static Manifest of(SourceFile packageJson, @Nullable String resolved) {
             return new Manifest(packageJson, resolved);
+        }
+
+        private static Map<String, String> resolvedVersions(@Nullable NodeResolutionResult marker) {
+            if (marker == null) {
+                return emptyMap();
+            }
+            Map<String, String> versions = new HashMap<>();
+            for (List<NodeResolutionResult.Dependency> scope : Arrays.asList(marker.getDependencies(),
+                    marker.getDevDependencies(), marker.getOptionalDependencies(), marker.getPeerDependencies())) {
+                if (scope == null) {
+                    continue;
+                }
+                for (NodeResolutionResult.Dependency dependency : scope) {
+                    if (dependency.getResolved() != null) {
+                        versions.putIfAbsent(dependency.getName(), dependency.getResolved().getVersion());
+                    }
+                }
+            }
+            return versions.isEmpty() ? emptyMap() : versions;
+        }
+
+        /**
+         * The version the lock its NodeResolutionResult records resolves for {@code name}, a package it declares;
+         * null when it records none.
+         */
+        public @Nullable String resolvedVersion(String name) {
+            return resolvedVersions.get(name);
         }
 
         // whether the lock the marker records resolves name; true when it records no resolutions at all
@@ -302,21 +314,10 @@ public final class NodeDependencyScan {
         }
 
         /**
-         * {@code text}, another revision of it, parsed with its string literals read as its own parser read them, and
-         * no markers; null when either is no JSON.
+         * {@code text}, another revision of it, parsed without markers. Null when either is no JSON.
          */
         public Json.@Nullable Document parse(String text) {
-            Json.Document document = json ? PackageJsonHelper.parseJson(path, text) : null;
-            if (document == null || escaped.isEmpty()) {
-                return document;
-            }
-            return (Json.Document) new JsonIsoVisitor<Integer>() {
-                @Override
-                public Json.Literal visitLiteral(Json.Literal literal, Integer p) {
-                    Object value = escaped.get(literal.getSource());
-                    return value == null ? literal : literal.withValue(value);
-                }
-            }.visitNonNull(document, 0);
+            return json ? PackageJsonHelper.parseJson(path, text) : null;
         }
 
         // the package.json of each directory in the repository that a dependency of the manifest names, once
@@ -332,7 +333,7 @@ public final class NodeDependencyScan {
     public static void captureLock(Accumulator acc, SourceFile lock) {
         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(lock.getSourcePath());
         acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
-        acc.locks.put(lock.getSourcePath(), lock.printAll());
+        acc.locks.put(lock.getSourcePath(), PackageJsonHelper.printed(lock));
         acc.lockToPackage.put(lock.getSourcePath(), packagePath);
     }
 

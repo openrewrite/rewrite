@@ -25,6 +25,8 @@ import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -94,6 +96,74 @@ class UpgradePluginVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${lombok.version}.0", "${major}.${minor}.${patch}.0", "1.${minor}.${patch}.0"})
+    void replaceCompositeVersionWithoutChangingSharedProperties(String expression) {
+        String before = lombokPluginPom(expression);
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.projectlombok", "lombok-maven-plugin",
+            "1.18.20.0", null, null, null)),
+          pomXml(before, before.replace("<version>" + expression + "</version>", "<version>1.18.20.0</version>"))
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${lombok.version}.0", "${major}.${minor}.${patch}.0", "1.${minor}.${patch}.0"})
+    void compareResolvedCompositeVersionBeforeUpgrading(String expression) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.projectlombok", "lombok-maven-plugin",
+            "1.18.18.0", null, null, null)),
+          pomXml(lombokPluginPom(expression)
+            .replace("<lombok.version>1.18.18</lombok.version>", "<lombok.version>1.18.20</lombok.version>")
+            .replace("<patch>18</patch>", "<patch>20</patch>"))
+        );
+    }
+
+    @Test
+    void retainWholePropertyReferenceWhenUpgradingPlugin() {
+        String before = lombokPluginPom("${plugin.version}");
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.projectlombok", "lombok-maven-plugin",
+            "1.18.20.0", null, null, null)),
+          pomXml(before, before.replace("<plugin.version>1.18.18.0</plugin.version>",
+            "<plugin.version>1.18.20.0</plugin.version>"))
+        );
+    }
+
+    private static String lombokPluginPom(String expression) {
+        return """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.example</groupId>
+              <artifactId>lombok-example</artifactId>
+              <version>1</version>
+              <properties>
+                  <lombok.version>1.18.18</lombok.version>
+                  <plugin.version>1.18.18.0</plugin.version>
+                  <major>1</major>
+                  <minor>18</minor>
+                  <patch>18</patch>
+              </properties>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.projectlombok</groupId>
+                      <artifactId>lombok</artifactId>
+                      <version>${lombok.version}</version>
+                  </dependency>
+              </dependencies>
+              <build>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.projectlombok</groupId>
+                          <artifactId>lombok-maven-plugin</artifactId>
+                          <version>%s</version>
+                      </plugin>
+                  </plugins>
+              </build>
+          </project>
+          """.formatted(expression);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/565")

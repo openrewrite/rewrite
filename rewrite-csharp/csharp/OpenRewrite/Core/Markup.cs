@@ -40,7 +40,10 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
     /// in-tree nodes.
     /// </summary>
     private static T AddMarker<T>(T tree, Markup marker) where T : J
-        => J.SetMarkers(tree, tree.Markers.Add(marker));
+        => tree.Markers.MarkerList.Any(m => m.GetType() == marker.GetType() && m is Markup markup &&
+                                            markup.Message == marker.Message && markup.Detail == marker.Detail)
+            ? tree
+            : J.SetMarkers(tree, tree.Markers.Add(marker));
 
     /// <summary>
     /// Adds an Error markup marker to the given tree node.

@@ -63,6 +63,96 @@ public final class BunRelease implements Comparable<BunRelease> {
         return compareTo(new BunRelease(major, minor, patch)) >= 0;
     }
 
+    /** npm.rs find_best_version (bun#36630, bun#30076, bun#39774), from 1.4.4. */
+    boolean prefersNonDeprecatedRangeMatches() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** bun.lock.rs Stringifier keeps an explicit empty trustedDependencies list (bun#44765). */
+    boolean writesAnEmptyTrustedList() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** bun.lock.rs parse_integrity rejects nonempty unsupported hashes at lockfile version 2 or above. */
+    boolean validatesEveryLockIntegrity() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** bun.lock.rs writes libc and hasInstallScript, and reads both, from 1.4.4 (bun#38797). */
+    boolean carriesPackageInstallMetadata() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** Package::Diff keeps equivalent new literals; peer resolution must satisfy its asker (bun#45898). */
+    boolean rebindsPeersByTheirRange() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** install_with_manager.rs and folder_resolver.rs re-read local folder manifests on install. */
+    boolean refreshesLocalFolders() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** install_with_manager.rs save_lockfile_only honours do.save_lockfile, from 1.4.4. */
+    boolean honoursLockfileSaveOptions() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** Tree.rs PeerProbes prevents hoisting a package away from the peer its owner provides (bun#36300). */
+    boolean probesPeersBeforeHoisting() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** SemverQuery.rs replaceXRange and intersections (bun#32993, bun#43102, bun#43253, bun#43258). */
+    boolean usesNpmRangeBounds() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** Version.rs refuses overflowing numbers and keeps a hyphen inside build metadata (bun#42458). */
+    boolean rejectsOverflowingVersionNumbers() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** package_extensions.rs adds and records missing registry dependencies and optional peer metadata (bun#40053). */
+    boolean readsPackageExtensions() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** Package::Diff counts an equivalent new range literal as a manifest change, from 1.4.4. */
+    boolean keepsChangedRangeLiterals() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** PackageManagerOptions.rs accepts every nonempty BUN_CONFIG_REGISTRY value, from 1.4.4. */
+    boolean readsANonemptyRegistryEnvironmentValue() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** patch_install.rs resolves an absolute patch against the filesystem, rather than the project, from 1.4.4. */
+    boolean readsAnAbsolutePatchOutsideTheProject() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** patch_install.rs's missing-file diagnostic is "patch file not found", from 1.4.4. */
+    boolean reportsAPatchFileNotFound() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** Version.rs Tag::parse keeps a hyphen inside build metadata, from 1.4.4. */
+    boolean keepsAHyphenInBuildMetadata() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** resolution.rs trusted_name matches registry packages by their published name, from 1.4.4. */
+    boolean trustsNpmPackagesByTheirPublishedName() {
+        return atLeast(1, 4, 4);
+    }
+
+    /** bun.lock.rs records failed optional edges when another package of that name was placed, from 1.4.4. */
+    boolean carriesUnresolvedOptionalNames() {
+        return atLeast(1, 4, 4);
+    }
+
     // src/semver: Version.zig, SemverQuery.zig, SemverRange.zig (src/install/semver.zig before 1.2.3)
 
     /**

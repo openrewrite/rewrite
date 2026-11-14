@@ -386,6 +386,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
 
     override visitImportClause(jsImportClause: JS.ImportClause, q: RpcSendQueue): J | undefined {
         q.getAndSend(jsImportClause, el => el.typeOnly);
+        q.getAndSend(jsImportClause, el => el.deferred);
         q.getAndSend(jsImportClause, el => el.name, el => this.visitRightPadded(el, q));
         q.getAndSend(jsImportClause, el => el.namedBindings, el => this.visit(el, q));
         return jsImportClause;
@@ -950,6 +951,7 @@ class JavaScriptReceiver extends JavaScriptRpcVisitor<RpcReceiveQueue> {
     override visitImportClause(jsImportClause: JS.ImportClause, q: RpcReceiveQueue): J | undefined {
         const updates = {
             typeOnly: q.receive(jsImportClause.typeOnly),
+            deferred: q.receive(jsImportClause.deferred),
             name: q.receive(jsImportClause.name, el => this.visitRightPadded(el, q)),
             namedBindings: q.receive(jsImportClause.namedBindings, el => this.visitDefined<Expression>(el, q))
         };

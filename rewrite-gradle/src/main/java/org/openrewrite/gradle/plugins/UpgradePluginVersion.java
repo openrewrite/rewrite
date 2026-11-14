@@ -48,6 +48,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -286,11 +287,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                         .collect(toSet());
                                 try {
                                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootPluginVersion.get()), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootPluginVersion.get()), null, null, gradleProject.getMavenRepositories())
+                                            .resolve(emptyList(), mpd, gradleProject.getMavenRepositories(), ctx).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                                             .filter(requested::contains)
                                             .collect(toList());
-                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", sbVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", sbVersion), null, null, gradleProject.getMavenRepositories())
+                                            .resolve(emptyList(), mpd, gradleProject.getMavenRepositories(), ctx).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifactVersion(md.getGroupId(), md.getArtifactId(), md.getVersion()))
                                             .filter(gav -> requested.stream().anyMatch(r -> r.equals(gav.asGroupArtifact())))
                                             .collect(toList());

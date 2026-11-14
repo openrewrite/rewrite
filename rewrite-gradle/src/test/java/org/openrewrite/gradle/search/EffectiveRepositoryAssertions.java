@@ -15,10 +15,13 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.openrewrite.maven.search.EffectiveMavenRepositoriesTable.Row;
+
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
 
@@ -38,11 +41,20 @@ final class EffectiveRepositoryAssertions {
     }
 
     /**
-     * The Gradle plugin portal's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror
-     * in its place too.
+     * The Gradle plugin portal remains separate from Maven Central and its mirror.
      */
     static String gradlePluginPortal() {
-        return mirrorOr("https://plugins.gradle.org/m2");
+        return "https://plugins.gradle.org/m2";
+    }
+
+    static List<Row> withoutTrailingSlashes(List<Row> rows) {
+        return rows.stream()
+                .map(row -> new Row(row.getPomPath(), withoutTrailingSlash(row.getRepositoryUri())))
+                .collect(toList());
+    }
+
+    private static String withoutTrailingSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     private static String mirrorOr(String url) {

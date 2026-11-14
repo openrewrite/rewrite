@@ -18,12 +18,27 @@ import {J, Type, Expression, Statement, isIdentifier} from '../java';
 import {JS, JSX} from './tree';
 import {Cursor, Tree} from "../tree";
 
+// ============================================================================
+// LST Tree Type Definitions
+// ============================================================================
+
+/**
+ * Union type representing all possible LST tree node types.
+ * All of these types have `markers` and `kind` properties and can appear as values in the LST tree.
+ * The `kind` property is always present on all LST nodes.
+ */
+export type JTree = J | J.Container<any> | J.LeftPadded<any> | J.RightPadded<any>;
+
+// ============================================================================
+// Comparator Visitor
+// ============================================================================
+
 /**
  * A visitor that compares two AST trees in lock step.
- * It takes another `J` instance as context and visits both trees simultaneously.
+ * It takes another LST tree node (JTree) as context and visits both trees simultaneously.
  * The visit operation is aborted when the nodes don't match.
  */
-export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
+export class JavaScriptComparatorVisitor extends JavaScriptVisitor<JTree> {
     /**
      * Flag indicating whether the trees match so far
      */
@@ -85,27 +100,27 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Can be overridden in subclasses to extract values from cursors and provide richer error messages.
      */
 
-    protected kindMismatch() {
-        const pattern = this.cursor?.value as any;
-        return this.abort(pattern, 'kind-mismatch');
+    protected kindMismatch<T extends JTree>(): T {
+        const pattern = this.cursor?.value as T;
+        return this.abort(pattern, 'kind-mismatch') as T;
     }
 
-    protected structuralMismatch(propertyName?: string) {
-        const pattern = this.cursor?.value as any;
-        return this.abort(pattern, 'structural-mismatch', propertyName);
+    protected structuralMismatch<T extends JTree>(propertyName?: string): T {
+        const pattern = this.cursor?.value as T;
+        return this.abort(pattern, 'structural-mismatch', propertyName) as T;
     }
 
-    protected arrayLengthMismatch(propertyName: string) {
-        const pattern = this.cursor?.value as any;
-        return this.abort(pattern, 'array-length-mismatch', propertyName);
+    protected arrayLengthMismatch<T extends JTree>(propertyName: string): T {
+        const pattern = this.cursor?.value as T;
+        return this.abort(pattern, 'array-length-mismatch', propertyName) as T;
     }
 
-    protected valueMismatch(propertyName?: string, expected?: any, actual?: any) {
-        const pattern = this.cursor?.value as any;
+    protected valueMismatch<T extends JTree>(propertyName?: string, expected?: any, actual?: any): T {
+        const pattern = this.cursor?.value as T;
         // If values not provided, try to extract from cursors (only if propertyName is available)
         const expectedVal = expected !== undefined ? expected : (propertyName ? (pattern as any)?.[propertyName] : pattern);
         const actualVal = actual !== undefined ? actual : (propertyName ? (this.targetCursor?.value as any)?.[propertyName] : this.targetCursor?.value);
-        return this.abort(pattern, 'value-mismatch', propertyName, expectedVal, actualVal);
+        return this.abort(pattern, 'value-mismatch', propertyName, expectedVal, actualVal) as T;
     }
 
     protected typeMismatch(propertyName?: string) {
@@ -275,12 +290,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * @param other The corresponding element from the second tree
      * @returns The visited element from the first tree
      */
-    protected async visitElement<T extends J>(j: T, other: T): Promise<T> {
+    protected async visitElement(j: J, other: J): Promise<J> {
         if (!this.match) return j;
 
         // Check if kinds match
         if (j.kind !== other.kind) {
-            return this.kindMismatch();
+            return this.kindMismatch<J>();
         }
 
         // Iterate over all properties
@@ -296,7 +311,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
             // Handle arrays - compare element by element
             if (Array.isArray(jValue)) {
                 if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
-                    return this.arrayLengthMismatch(key);
+                    return this.arrayLengthMismatch<J>(key);
                 }
 
                 for (let i = 0; i < jValue.length; i++) {
@@ -341,12 +356,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Pushes the wrapper onto the cursor stack so captures can access it.
      * Also updates targetCursor in parallel.
      */
-    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J): Promise<J.RightPadded<T>> {
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: JTree): Promise<J.RightPadded<T>> {
         if (!this.match) return right;
 
         // Extract the other element if it's also a RightPadded
-        const isRightPadded = (p as any).kind === J.Kind.RightPadded;
-        const otherWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
+        const isRightPadded = p.kind === J.Kind.RightPadded;
+        const otherWrapper = isRightPadded ? p as J.RightPadded<T> : undefined;
         const otherElement = isRightPadded ? otherWrapper!.element : p;
 
         // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
@@ -372,12 +387,12 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Pushes the wrapper onto the cursor stack so captures can access it.
      * Also updates targetCursor in parallel.
      */
-    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: J): Promise<J.LeftPadded<T>> {
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: JTree): Promise<J.LeftPadded<T>> {
         if (!this.match) return left;
 
         // Extract the other element if it's also a LeftPadded
-        const isLeftPadded = (p as any).kind === J.Kind.LeftPadded;
-        const otherWrapper = isLeftPadded ? (p as unknown) as J.LeftPadded<T> : undefined;
+        const isLeftPadded = p.kind === J.Kind.LeftPadded;
+        const otherWrapper = isLeftPadded ? p as J.LeftPadded<T> : undefined;
         const otherElement = isLeftPadded ? otherWrapper!.element : p;
 
         // Push wrappers onto both cursors, then compare only the elements, not markers or spacing
@@ -403,25 +418,23 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
      * Pushes the wrapper onto the cursor stack so captures can access it.
      * Also updates targetCursor in parallel.
      */
-    public async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
+    public async visitContainer<T extends J>(container: J.Container<T>, p: JTree): Promise<J.Container<T>> {
         if (!this.match) return container;
 
         // Extract the other elements if it's also a Container
-        const isContainer = (p as any).kind === J.Kind.Container;
-        const otherContainer = isContainer ? (p as unknown) as J.Container<T> : undefined;
+        const isContainer = p.kind === J.Kind.Container;
+        const otherContainer = isContainer ? p as J.Container<T> : undefined;
         const otherElements: J.RightPadded<T>[] = isContainer ? otherContainer!.elements : (p as any);
 
-        // Compare elements array length
-        if (container.elements.length !== otherElements.length) {
-            return this.arrayLengthMismatch('elements');
-        }
-
-        // Push wrappers onto both cursors, then compare each element
+        // Push wrappers onto both cursors first, so that a count mismatch is reported on the container
         const savedCursor = this.cursor;
         const savedTargetCursor = this.targetCursor;
         this.cursor = new Cursor(container, this.cursor);
         this.targetCursor = otherContainer ? new Cursor(otherContainer, this.targetCursor) : this.targetCursor;
         try {
+            if (container.elements.length !== otherElements.length) {
+                return this.arrayLengthMismatch<J.Container<T>>('elements');
+            }
             for (let i = 0; i < container.elements.length; i++) {
                 await this.visitProperty(container.elements[i], otherElements[i]);
                 if (!this.match) return container;
@@ -2047,7 +2060,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!this.match) return arrowFunction;
 
         if (other.kind !== JS.Kind.ArrowFunction) {
-            return this.kindMismatch();
+            return this.kindMismatch<J>();
         }
 
         const otherArrow = other as JS.ArrowFunction;
@@ -2064,7 +2077,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             // Handle arrays
             if (Array.isArray(jValue)) {
                 if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
-                    return this.arrayLengthMismatch(key);
+                    return this.arrayLengthMismatch<J>(key);
                 }
                 for (let i = 0; i < jValue.length; i++) {
                     await this.visitProperty(jValue[i], otherValue[i]);
@@ -2080,7 +2093,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         const params1 = arrowFunction.lambda.parameters.parameters;
         const params2 = otherArrow.lambda.parameters.parameters;
         if (params1.length !== params2.length) {
-            return this.arrayLengthMismatch('lambda.parameters.parameters');
+            return this.arrayLengthMismatch<J>('lambda.parameters.parameters');
         }
         for (let i = 0; i < params1.length; i++) {
             await this.visitProperty(params1[i], params2[i]);
@@ -2118,7 +2131,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!this.match) return parameters;
 
         if (other.kind !== J.Kind.LambdaParameters) {
-            return this.kindMismatch();
+            return this.kindMismatch<J>();
         }
 
         const otherParams = other as J.Lambda.Parameters;
@@ -2135,7 +2148,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             // Handle arrays
             if (Array.isArray(jValue)) {
                 if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
-                    return this.arrayLengthMismatch(key);
+                    return this.arrayLengthMismatch<J>(key);
                 }
                 for (let i = 0; i < jValue.length; i++) {
                     await this.visitProperty(jValue[i], otherValue[i]);
@@ -2162,7 +2175,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!this.match) return propertyAssignment;
 
         if (other.kind !== JS.Kind.PropertyAssignment) {
-            return this.kindMismatch();
+            return this.kindMismatch<J>();
         }
 
         const otherProp = other as JS.PropertyAssignment;
@@ -2195,7 +2208,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return propertyAssignment;
         } else {
             // Not equivalent (e.g., { x: y })
-            return this.structuralMismatch('initializer');
+            return this.structuralMismatch<J>('initializer');
         }
     }
 
@@ -2359,7 +2372,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      */
     override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
         if (other.kind !== J.Kind.MethodInvocation) {
-            return this.kindMismatch();
+            return this.kindMismatch<J>();
         }
 
         const otherMethod = other as J.MethodInvocation;
@@ -2385,7 +2398,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // Check names unless we determined we can skip based on type FQN matching
         if (!canSkipNameCheck) {
             if (method.name.simpleName !== otherMethod.name.simpleName) {
-                return this.valueMismatch('name.simpleName', method.name.simpleName, otherMethod.name.simpleName);
+                return this.valueMismatch<J>('name.simpleName', method.name.simpleName, otherMethod.name.simpleName);
             }
 
             // In strict mode, check type attribution requirements
@@ -2407,7 +2420,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 if (Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType) &&
                     !this.sameFullyQualifiedName(methodDeclaringType, otherDeclaringType) &&
                     !this.declaresAnyCallee(methodDeclaringType)) {
-                    return this.valueMismatch('methodType.declaringType');
+                    return this.valueMismatch<J>('methodType.declaringType');
                 }
             }
         }
@@ -2418,7 +2431,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             !!(method.methodType!.flags & otherMethod.methodType!.flags & Type.Flag.Static);
         if (!canSkipNameCheck || method.select && !staticCall) {
             if ((method.select === undefined) !== (otherMethod.select === undefined)) {
-                return this.structuralMismatch('select');
+                return this.structuralMismatch<J>('select');
             }
 
             if (method.select && otherMethod.select) {
@@ -2430,7 +2443,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // A pattern that spells out no type arguments says nothing about them, as with parentheses
         if (method.typeParameters) {
             if (!otherMethod.typeParameters) {
-                return this.structuralMismatch('typeParameters');
+                return this.structuralMismatch<J>('typeParameters');
             }
 
             await this.visitContainerProperty('typeParameters', method.typeParameters, otherMethod.typeParameters);
@@ -2483,6 +2496,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * 1. Type checking for field access
      * 2. Semantic equivalence between `undefined` identifier and void expressions
      * 3. Names that differ but denote one declaration, as an import alias and its export do
+     * 4. An import read through its module, as `os.EOL` is for `EOL`
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
         // Check if this identifier is "undefined" and the other is a void expression
@@ -2491,19 +2505,24 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             return identifier;
         }
 
+        if (other.kind === J.Kind.FieldAccess && this.readsImport(other as J.FieldAccess, identifier)) {
+            return identifier;
+        }
+
         if (other.kind !== J.Kind.Identifier) {
-            return this.kindMismatch();
+            return this.kindMismatch<J>();
         }
 
         const otherIdentifier = other as J.Identifier;
 
         if (identifier.simpleName !== otherIdentifier.simpleName) {
-            return this.denoteOneDeclaration(identifier, otherIdentifier) ? identifier : this.valueMismatch('simpleName');
+            return this.denoteOneDeclaration(identifier, otherIdentifier) ? identifier : this.valueMismatch<J>('simpleName');
         }
 
         // For identifiers with field types, check type attribution
         if (identifier.fieldType && otherIdentifier.fieldType) {
-            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
+            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType) ||
+                !this.lenientTypeMatching && !this.sameOwner(identifier, otherIdentifier)) {
                 return this.typeMismatch('fieldType');
             }
         } else if (identifier.fieldType || otherIdentifier.fieldType) {
@@ -2517,19 +2536,52 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return super.visitIdentifier(identifier, other);
     }
 
+    /** The counterpart of `visitIdentifier`'s case for an import read through its module. */
+    override async visitFieldAccess(fieldAccess: J.FieldAccess, other: J): Promise<J | undefined> {
+        if (other.kind === J.Kind.Identifier && this.readsImport(fieldAccess, other as J.Identifier)) {
+            return fieldAccess;
+        }
+        return super.visitFieldAccess(fieldAccess, other);
+    }
+
+    /** Whether `fieldAccess` reads through its module what `identifier` imports by name, as `os.EOL` does for `EOL`. */
+    private readsImport(fieldAccess: J.FieldAccess, identifier: J.Identifier): boolean {
+        return this.sameVariable(identifier.fieldType, fieldAccess.name.element.fieldType);
+    }
+
+    /**
+     * Whether two variables of one spelling have one owner, which is a module for an import and nothing for a
+     * variable the file declares. Only a reference is asked. A member's owner is whichever class in a
+     * hierarchy declares it, and it is named where it is read from a receiver or declared.
+     */
+    private sameOwner(identifier: J.Identifier, other: J.Identifier): boolean {
+        const parent = this.cursor.parentTree()?.value;
+        if (parent?.kind === J.Kind.FieldAccess && (parent as J.FieldAccess).name.element === identifier ||
+            parent?.kind === J.Kind.NamedVariable && (parent as J.VariableDeclarations.NamedVariable).name === identifier) {
+            return true;
+        }
+        const owner = identifier.fieldType?.owner;
+        const otherOwner = other.fieldType?.owner;
+        return Type.isFullyQualified(owner) || Type.isFullyQualified(otherOwner) ?
+            this.sameFullyQualifiedName(owner, otherOwner) : true;
+    }
+
     /** An import alias and its export denote one declaration, where a variable holding the same value does not. */
     private denoteOneDeclaration(identifier: J.Identifier, other: J.Identifier): boolean {
         if (identifier.fieldType || other.fieldType) {
-            // An unresolved import has the placeholder name `unknown`, which identifies nothing
-            return !!identifier.fieldType && !!other.fieldType &&
-                identifier.fieldType.name === other.fieldType.name && identifier.fieldType.name !== 'unknown' &&
-                this.sameFullyQualifiedName(identifier.fieldType.owner, other.fieldType.owner);
+            return this.sameVariable(identifier.fieldType, other.fieldType);
         }
         // Only a nominal type names a declaration. The function and object type shells are shared,
         // and a parameterized type is named after its base alone.
         return identifier.type?.kind === Type.Kind.Class && other.type?.kind === Type.Kind.Class &&
             !Type.isFunctionType(identifier.type) && !Type.isObjectType(identifier.type) &&
             this.sameFullyQualifiedName(identifier.type, other.type);
+    }
+
+    private sameVariable(variable?: Type.Variable, other?: Type.Variable): boolean {
+        // An unresolved import has the placeholder name `unknown`, which identifies nothing
+        return !!variable && !!other && variable.name === other.name && variable.name !== 'unknown' &&
+            this.sameFullyQualifiedName(variable.owner, other.owner);
     }
 
     private sameFullyQualifiedName(type?: Type, other?: Type): boolean {
@@ -2572,7 +2624,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         // Compare typeExpression - lenient matching allows one to be undefined
         if ((variableDeclarations.typeExpression === undefined) !== (otherVariableDeclarations.typeExpression === undefined)) {
             if (!this.lenientTypeMatching) {
-                return this.structuralMismatch('typeExpression');
+                return this.structuralMismatch<J>('typeExpression');
             }
             // In lenient mode, skip type comparison and continue
         } else if (variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
@@ -2583,7 +2635,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Compare varargs
         if ((variableDeclarations.varargs === undefined) !== (otherVariableDeclarations.varargs === undefined)) {
-            return this.structuralMismatch('varargs');
+            return this.structuralMismatch<J>('varargs');
         }
 
         // Compare variables
@@ -2643,7 +2695,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // Visit type parameters if present
         if (!!methodDeclaration.typeParameters !== !!otherMethodDeclaration.typeParameters) {
-            return this.structuralMismatch('typeParameters');
+            return this.structuralMismatch<J>('typeParameters');
         }
 
         if (methodDeclaration.typeParameters && otherMethodDeclaration.typeParameters) {
@@ -2668,22 +2720,22 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!this.match) return methodDeclaration;
 
         // Compare parameters
-        await this.visitContainer(methodDeclaration.parameters, otherMethodDeclaration.parameters as any);
+        await this.visitContainerProperty('parameters', methodDeclaration.parameters, otherMethodDeclaration.parameters);
         if (!this.match) return methodDeclaration;
 
         // Visit throws if present
         if (!!methodDeclaration.throws !== !!otherMethodDeclaration.throws) {
-            return this.structuralMismatch('throws');
+            return this.structuralMismatch<J>('throws');
         }
 
         if (methodDeclaration.throws && otherMethodDeclaration.throws) {
-            await this.visitContainer(methodDeclaration.throws, otherMethodDeclaration.throws as any);
+            await this.visitContainerProperty('throws', methodDeclaration.throws, otherMethodDeclaration.throws);
             if (!this.match) return methodDeclaration;
         }
 
         // Visit body if present
         if (!!methodDeclaration.body !== !!otherMethodDeclaration.body) {
-            return this.structuralMismatch('body');
+            return this.structuralMismatch<J>('body');
         }
 
         if (methodDeclaration.body && otherMethodDeclaration.body) {
@@ -2815,5 +2867,6 @@ function denotation(literal: J.Literal): string {
         const quoted = source.startsWith("'") || source.startsWith('"');
         return JSON.stringify([primitive, quoted ? source.slice(1, -1) : source, literal.unicodeEscapes]);
     }
-    return JSON.stringify([primitive, literal.value]);
+    const value = typeof literal.value === 'bigint' ? literal.value.toString() : literal.value;
+    return JSON.stringify([primitive, value]);
 }

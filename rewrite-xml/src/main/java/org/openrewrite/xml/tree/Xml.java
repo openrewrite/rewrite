@@ -869,7 +869,7 @@ public interface Xml extends Tree {
         String type;
 
         public JspDirective withType(String type) {
-            if (this.type.equals(type)) {
+            if (type.equals(this.type)) {
                 return this;
             }
             return new JspDirective(id, prefixUnsafe, markers, beforeTypePrefix, type, attributes,

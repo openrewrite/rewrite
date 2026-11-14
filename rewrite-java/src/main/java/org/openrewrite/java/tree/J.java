@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
@@ -302,6 +303,15 @@ public interface J extends Tree {
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
+        @Transient
+        public List<J> getSideEffects() {
+            List<J> sideEffects = new ArrayList<>(2);
+            sideEffects.addAll(indexed.getSideEffects());
+            sideEffects.addAll(dimension.getIndex().getSideEffects());
+            return sideEffects;
         }
 
         @Override
@@ -714,9 +724,13 @@ public interface J extends Tree {
         @Transient
         @Override
         public List<J> getSideEffects() {
+            List<J> rightSideEffects = right.getSideEffects();
+            if ((getOperator() == Type.And || getOperator() == Type.Or) && !rightSideEffects.isEmpty()) {
+                return singletonList(this);
+            }
             List<J> sideEffects = new ArrayList<>(2);
             sideEffects.addAll(left.getSideEffects());
-            sideEffects.addAll(right.getSideEffects());
+            sideEffects.addAll(rightSideEffects);
             return sideEffects;
         }
 
@@ -5013,9 +5027,7 @@ public interface J extends Tree {
 
 
         public String getPackageName() {
-            return expression.withPrefix(Space.EMPTY).print(new Cursor(null,
-                    new J.CompilationUnit(null, null, Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
-                            null, null, false, null, null, null, null, Space.EMPTY)));
+            return PackageNameUtils.getPackageName(this);
         }
 
         @Override
@@ -5565,6 +5577,15 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTernary(this, p);
+        }
+
+        @Override
+        @Transient
+        public List<J> getSideEffects() {
+            if (getTruePart().getSideEffects().isEmpty() && getFalsePart().getSideEffects().isEmpty()) {
+                return condition.getSideEffects();
+            }
+            return singletonList(this);
         }
 
         public Padding getPadding() {
@@ -6244,32 +6265,7 @@ public interface J extends Tree {
         @Getter
         Space varargs;
 
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public List<JLeftPadded<Space>> getDimensionsBeforeName() {
-            return emptyList();
-        }
-
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public VariableDeclarations withDimensionsBeforeName(List<JLeftPadded<Space>> dimensionsBeforeName) {
-            return this;
-        }
-
         List<JRightPadded<NamedVariable>> variables;
-
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public VariableDeclarations(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations, List<Modifier> modifiers, @Nullable TypeTree typeExpression, @Nullable Space varargs, @Nullable List<JLeftPadded<Space>> dimensionsBeforeName, List<JRightPadded<NamedVariable>> variables) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.leadingAnnotations = leadingAnnotations;
-            this.modifiers = modifiers;
-            this.typeExpression = typeExpression;
-            this.varargs = varargs;
-            this.variables = variables;
-        }
 
         public List<NamedVariable> getVariables() {
             return JRightPadded.getElements(variables);

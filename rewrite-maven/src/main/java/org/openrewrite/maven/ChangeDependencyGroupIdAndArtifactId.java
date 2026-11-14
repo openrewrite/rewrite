@@ -206,6 +206,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     String resolvedVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
                     storeParentPomProperty(getResolutionResult().getParent(), propertyName, resolvedVersion, acc);
                 } catch (MavenDownloadingException e) {
+                    if (isGlobPattern()) {
+                        return super.visitTag(tag, ctx);
+                    }
                     return e.warn(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -271,8 +274,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         return new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
+            private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
             private final String effectiveNewGroupId = renamedGroupId(oldGroupId);
             private final String effectiveNewArtifactId = renamedArtifactId(oldArtifactId);
@@ -592,15 +594,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
+                String key = groupId + ':' + artifactId;
+                List<String> versions = availableVersionsByArtifact.get(key);
+                if (versions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
+                    versions = mavenMetadata.getVersioning().getVersions();
+                    availableVersionsByArtifact.put(key, versions);
+                }
+                List<String> availableVersions = new ArrayList<>();
+                for (String v : versions) {
+                    if (versionComparator.isValid(finalCurrentVersion, v)) {
+                        availableVersions.add(v);
                     }
-
                 }
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }

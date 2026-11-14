@@ -129,7 +129,7 @@ describe('JavaScript type mapping', () => {
         test('should map bigint literal', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'string') {
+                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'bigint') {
                     return formatPrimitiveType(type);
                 }
                 return null;
@@ -2096,6 +2096,52 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('should map a variable read through a namespace import with the module as owner', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'ajax') {
+                    const owner = (node as J.Identifier).fieldType?.owner;
+                    return `Variable<owner=${Type.isFullyQualified(owner) ? Type.FullyQualified.getFullyQualifiedName(owner) : 'no-owner'}>`;
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {ajax} from 'rxjs/ajax';
+                                import * as requests from 'rxjs/ajax';
+
+                                const named = ajax;
+                                const qualified = requests.ajax;
+                            `,
+                            `
+                                import {/*~~(Variable<owner=rxjs/ajax>)~~>*/ajax} from 'rxjs/ajax';
+                                import * as requests from 'rxjs/ajax';
+
+                                const named = /*~~(Variable<owner=rxjs/ajax>)~~>*/ajax;
+                                const qualified = requests./*~~(Variable<owner=rxjs/ajax>)~~>*/ajax;
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "rxjs": "^7.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('should map variable used as standalone assignment', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -2929,6 +2975,30 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('a whole module bound from an awaited import.defer() attributes like an awaited import()', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        async function f() {
+                            const fs = await import.defer('node:fs');
+                            fs.truncateSync('p');
+                        }
+                    `,
+                    //@formatter:off
+                    `
+                        async function f() {
+                            const fs = await import.defer('node:fs');
+                            /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
+                        }
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('every spelling of a callable module\'s member attributes to its namespace, as a static', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -3174,7 +3244,7 @@ describe('JavaScript type mapping', () => {
                 //@formatter:off
                 `
                     import * as ns from './local';
-                    ns./*~~(<unknown>#bar)~~>*/bar.length;
+                    ns./*~~(./local#bar)~~>*/bar.length;
                 `
                 //@formatter:on
             );
@@ -3348,8 +3418,12 @@ describe('JavaScript type mapping', () => {
             await spec.rewriteRun(
                 //language=typescript
                 typescript(
-                    'const c = {a: 1};\nconsole.log(c);',
-                    'const /*~~({} a)~~>*/c = {a: 1};\nconsole.log(/*~~({} a)~~>*/c);'
+                    `
+                    const c = {a: 1};
+                    console.log(c);`,
+                    `
+                    const /*~~({} a)~~>*/c = {a: 1};
+                    console.log(/*~~({} a)~~>*/c);`
                 )
             );
 

@@ -112,6 +112,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
     }
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
+        decide(decision, ctx, protocolsSkipped);
+    }
+
+    void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx,
+                NodeDependencyProtocolsSkipped protocolsSkipped) {
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> matches = new ArrayList<>();
         for (Map.Entry<String, Map<String, String>> scope :

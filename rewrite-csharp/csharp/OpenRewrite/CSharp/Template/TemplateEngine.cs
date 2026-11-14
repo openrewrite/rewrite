@@ -22,8 +22,7 @@ namespace OpenRewrite.CSharp.Template;
 /// <summary>
 /// Marker placed on a <see cref="Block"/> that is a synthetic container for multiple statements
 /// produced by a multi-statement template, rather than a real block in the source code.
-/// Used by <see cref="TemplateEngine.AutoFormat"/> to format each statement at the parent level,
-/// and by <see cref="RoslynFormatter.DeferredFormatVisitor{P}"/> to identify blocks to flatten.
+/// Used by <see cref="RoslynFormatter.DeferredFormatVisitor{P}"/> to identify blocks to flatten.
 /// </summary>
 public sealed class SyntheticBlockContainer : Marker
 {
@@ -618,24 +617,6 @@ internal static class TemplateEngine
     }
 
     /// <summary>
-    /// Extract the J element from a JRightPadded or JLeftPadded wrapper via reflection.
-    /// Returns null if the value is not a padding wrapper or doesn't contain a J element.
-    /// </summary>
-    private static J? UnwrapPaddingElement(object? value)
-    {
-        var type = value?.GetType();
-        if (type is { IsGenericType: true })
-        {
-            var genericDef = type.GetGenericTypeDefinition();
-            if (genericDef == typeof(JRightPadded<>) || genericDef == typeof(JLeftPadded<>))
-            {
-                return type.GetProperty("Element")?.GetValue(value) as J;
-            }
-        }
-        return null;
-    }
-
-    /// <summary>
     /// Check if a statement is a preamble field (typed capture declaration with placeholder name).
     /// </summary>
     private static bool IsPreambleField(Statement stmt)
@@ -688,15 +669,37 @@ internal static class TemplateEngine
     {
         var visitor = new SubstitutionVisitor(values);
         visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        tree = visitor.VisitNonNull(tree, 0);
+        return visitor.VisitNonNull(tree, 0);
+    }
 
-        // Auto-parenthesize substituted expressions that may need parens in their
-        // new context within the template (e.g., a || b substituted into && position)
-        var parenthesizer = new CSharpParenthesizeVisitor<int>();
-        parenthesizer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        tree = parenthesizer.VisitNonNull(tree, 0);
+    /// <summary>
+    /// Copy of <paramref name="tree"/> in which an id survives only at the first node carrying it, and only if it
+    /// names a node of <paramref name="replaced"/>, the subtree the result takes the place of. The parsed template
+    /// is shared by every application, and a capture spliced into two slots would put one id in two places.
+    /// </summary>
+    internal static J RetainIds(J tree, J? replaced)
+    {
+        var retainable = new HashSet<Guid>();
+        if (replaced != null)
+            new IdCollector(retainable).Visit(replaced, 0);
+        return new IdRetainer(retainable).VisitNonNull(tree, 0);
+    }
 
-        return tree;
+    private sealed class IdCollector(HashSet<Guid> ids) : CSharpVisitor<int>
+    {
+        public override J? PostVisit(J tree, int p)
+        {
+            ids.Add(tree.Id);
+            return tree;
+        }
+    }
+
+    private sealed class IdRetainer(HashSet<Guid> retainable) : CSharpVisitor<int>
+    {
+        private readonly HashSet<Guid> _seen = [];
+
+        public override J? PostVisit(J tree, int p) =>
+            retainable.Contains(tree.Id) && _seen.Add(tree.Id) ? tree : J.SetId(tree, Tree.RandomId());
     }
 
     /// <summary>
@@ -719,69 +722,6 @@ internal static class TemplateEngine
     private static J PreservePrefix(J replacement, J original)
     {
         return J.SetPrefix(replacement, original.Prefix);
-    }
-
-    /// <summary>
-    /// Auto-format the template result within the enclosing compilation unit.
-    /// Delegates to <see cref="RoslynFormatter.FormatSubtree"/> for the splice→format→extract pipeline.
-    /// The prefix set in the coordinates phase is preserved — the formatter only affects
-    /// internal whitespace (argument spacing, etc.), matching the JS/TS approach.
-    /// </summary>
-    internal static J AutoFormat(J tree, Cursor cursor)
-    {
-        var cu = cursor.FirstEnclosing<CompilationUnit>();
-        if (cu == null)
-            return tree;
-
-        // The cursor's value is the original node being replaced.
-        // Unwrap JRightPadded/JLeftPadded if the cursor points to a padding wrapper.
-        var original = cursor.Value as J ?? UnwrapPaddingElement(cursor.Value);
-        if (original == null)
-            return tree;
-
-        // Synthetic block containers hold multiple statements that will be spliced
-        // into the parent block. Format each statement individually at the parent level
-        // so Roslyn sees them as direct siblings, not block-internal children.
-        if (tree is Block blk && blk.Markers.FindFirst<SyntheticBlockContainer>() != null)
-            return AutoFormatSyntheticBlock(blk, cu, original);
-
-        return AutoFormatSingle(tree, cu, original);
-    }
-
-    private static J AutoFormatSingle(J tree, CompilationUnit cu, J original)
-    {
-        // Save the prefix set by ApplyCoordinates — the formatter may override it
-        var preservedPrefix = tree.Prefix;
-
-        // Assign a fresh ID so FindById targets exactly this instance,
-        // not a stale node from a prior application of the same template
-        tree = J.SetId(tree, Tree.RandomId());
-
-        var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, tree, stopAfter: null);
-
-        // Restore the coordinate-set prefix. The formatter handles internal whitespace;
-        // the prefix (indentation/newlines before the node) comes from the original tree.
-        return J.SetPrefix(formatted, preservedPrefix);
-    }
-
-    /// <summary>
-    /// Format each statement in a synthetic block individually, splicing each one
-    /// into the original node's position so Roslyn formats it at the parent level.
-    /// </summary>
-    private static Block AutoFormatSyntheticBlock(Block blk, CompilationUnit cu, J original)
-    {
-        var preservedBlockPrefix = blk.Prefix;
-        var formattedStmts = new List<JRightPadded<Statement>>(blk.Statements.Count);
-
-        foreach (var s in blk.Statements)
-        {
-            var stmt = (J)s.Element;
-            stmt = J.SetId(stmt, Tree.RandomId());
-            var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, stmt, stopAfter: null);
-            formattedStmts.Add(s.WithElement((Statement)formatted));
-        }
-
-        return blk.WithStatements(formattedStmts).WithPrefix(preservedBlockPrefix);
     }
 
     private static string BuildCacheKey(string code, ScaffoldPreamble preamble,
@@ -862,6 +802,30 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         }
         return base.VisitIdentifier(identifier, p);
     }
+
+    public override J VisitInstanceOf(InstanceOf instanceOf, int p)
+    {
+        var clazzIsPlaceholder = instanceOf.Clazz is Identifier clazzId &&
+                                 Placeholder.FromPlaceholder(clazzId.SimpleName) != null;
+        var result = base.VisitInstanceOf(instanceOf, p);
+
+        // The parser reads `x is <name>` as a type test and `x is "abc"` or `x is int.MaxValue` as a constant pattern
+        if (clazzIsPlaceholder && result is InstanceOf { Pattern: null, Clazz: Expression value } io &&
+            (value is not TypeTree || value is FieldAccess { Target: var target } && IsKeywordQualified(target)))
+        {
+            return new IsPattern(io.Id, io.Prefix, io.Markers, io.Expression.Element,
+                new JLeftPadded<Expression>(io.Expression.After,
+                    new ConstantPattern(Tree.RandomId(), value.Prefix, Markers.Empty,
+                        J.SetPrefix(value, Space.Empty))));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Whether a member access on <paramref name="target"/> starts with a keyword type, as <c>int.MaxValue</c> does.
+    /// </summary>
+    private static bool IsKeywordQualified(Expression target) =>
+        target is Primitive || target is FieldAccess fa && IsKeywordQualified(fa.Target);
 
     public override J VisitAnnotation(Annotation annotation, int p)
     {

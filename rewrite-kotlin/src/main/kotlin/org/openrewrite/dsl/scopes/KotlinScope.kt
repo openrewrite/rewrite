@@ -397,421 +397,421 @@ public class KotlinScope internal constructor() : LanguageScope() {
         override fun visitExpression(node: org.openrewrite.java.tree.Expression, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitExpression:(Lorg/openrewrite/java/tree/Expression;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.Expression else node
-            return super.visitExpression(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitExpression(transformed, ctx)
         }
 
         override fun visitStatement(node: org.openrewrite.java.tree.Statement, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitStatement:(Lorg/openrewrite/java/tree/Statement;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.Statement else node
-            return super.visitStatement(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitStatement(transformed, ctx)
         }
 
         override fun visitAnnotatedType(node: org.openrewrite.java.tree.J.AnnotatedType, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitAnnotatedType:(Lorg/openrewrite/java/tree/J\$AnnotatedType;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.AnnotatedType else node
-            return super.visitAnnotatedType(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitAnnotatedType(transformed, ctx)
         }
 
         override fun visitAnnotation(node: org.openrewrite.java.tree.J.Annotation, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitAnnotation:(Lorg/openrewrite/java/tree/J\$Annotation;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Annotation else node
-            return super.visitAnnotation(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitAnnotation(transformed, ctx)
         }
 
         override fun visitArrayAccess(node: org.openrewrite.java.tree.J.ArrayAccess, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitArrayAccess:(Lorg/openrewrite/java/tree/J\$ArrayAccess;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ArrayAccess else node
-            return super.visitArrayAccess(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitArrayAccess(transformed, ctx)
         }
 
         override fun visitArrayDimension(node: org.openrewrite.java.tree.J.ArrayDimension, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitArrayDimension:(Lorg/openrewrite/java/tree/J\$ArrayDimension;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ArrayDimension else node
-            return super.visitArrayDimension(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitArrayDimension(transformed, ctx)
         }
 
         override fun visitArrayType(node: org.openrewrite.java.tree.J.ArrayType, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitArrayType:(Lorg/openrewrite/java/tree/J\$ArrayType;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ArrayType else node
-            return super.visitArrayType(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitArrayType(transformed, ctx)
         }
 
         override fun visitAssert(node: org.openrewrite.java.tree.J.Assert, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitAssert:(Lorg/openrewrite/java/tree/J\$Assert;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Assert else node
-            return super.visitAssert(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitAssert(transformed, ctx)
         }
 
         override fun visitAssignment(node: org.openrewrite.java.tree.J.Assignment, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitAssignment:(Lorg/openrewrite/java/tree/J\$Assignment;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Assignment else node
-            return super.visitAssignment(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitAssignment(transformed, ctx)
         }
 
         override fun visitAssignmentOperation(node: org.openrewrite.java.tree.J.AssignmentOperation, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitAssignmentOperation:(Lorg/openrewrite/java/tree/J\$AssignmentOperation;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.AssignmentOperation else node
-            return super.visitAssignmentOperation(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitAssignmentOperation(transformed, ctx)
         }
 
         override fun visitBinary(node: org.openrewrite.java.tree.J.Binary, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitBinary:(Lorg/openrewrite/java/tree/J\$Binary;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Binary else node
-            return super.visitBinary(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitBinary(transformed, ctx)
         }
 
         override fun visitBlock(node: org.openrewrite.java.tree.J.Block, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitBlock:(Lorg/openrewrite/java/tree/J\$Block;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Block else node
-            return super.visitBlock(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitBlock(transformed, ctx)
         }
 
         override fun visitBreak(node: org.openrewrite.java.tree.J.Break, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitBreak:(Lorg/openrewrite/java/tree/J\$Break;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Break else node
-            return super.visitBreak(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitBreak(transformed, ctx)
         }
 
         override fun visitCase(node: org.openrewrite.java.tree.J.Case, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitCase:(Lorg/openrewrite/java/tree/J\$Case;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Case else node
-            return super.visitCase(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitCase(transformed, ctx)
         }
 
         override fun visitCatch(node: org.openrewrite.java.tree.J.Try.Catch, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitCatch:(Lorg/openrewrite/java/tree/J\$Try\$Catch;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Try.Catch else node
-            return super.visitCatch(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitCatch(transformed, ctx)
         }
 
         override fun visitClassDeclaration(node: org.openrewrite.java.tree.J.ClassDeclaration, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitClassDeclaration:(Lorg/openrewrite/java/tree/J\$ClassDeclaration;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ClassDeclaration else node
-            return super.visitClassDeclaration(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitClassDeclaration(transformed, ctx)
         }
 
         override fun visitCompilationUnit(node: org.openrewrite.java.tree.J.CompilationUnit, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitCompilationUnit:(Lorg/openrewrite/java/tree/J\$CompilationUnit;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.CompilationUnit else node
-            return super.visitCompilationUnit(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitCompilationUnit(transformed, ctx)
         }
 
         override fun visitContinue(node: org.openrewrite.java.tree.J.Continue, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitContinue:(Lorg/openrewrite/java/tree/J\$Continue;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Continue else node
-            return super.visitContinue(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitContinue(transformed, ctx)
         }
 
         override fun visitDoWhileLoop(node: org.openrewrite.java.tree.J.DoWhileLoop, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitDoWhileLoop:(Lorg/openrewrite/java/tree/J\$DoWhileLoop;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.DoWhileLoop else node
-            return super.visitDoWhileLoop(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitDoWhileLoop(transformed, ctx)
         }
 
         override fun visitEmpty(node: org.openrewrite.java.tree.J.Empty, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitEmpty:(Lorg/openrewrite/java/tree/J\$Empty;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Empty else node
-            return super.visitEmpty(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitEmpty(transformed, ctx)
         }
 
         override fun visitEnumValue(node: org.openrewrite.java.tree.J.EnumValue, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitEnumValue:(Lorg/openrewrite/java/tree/J\$EnumValue;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.EnumValue else node
-            return super.visitEnumValue(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitEnumValue(transformed, ctx)
         }
 
         override fun visitEnumValueSet(node: org.openrewrite.java.tree.J.EnumValueSet, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitEnumValueSet:(Lorg/openrewrite/java/tree/J\$EnumValueSet;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.EnumValueSet else node
-            return super.visitEnumValueSet(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitEnumValueSet(transformed, ctx)
         }
 
         override fun visitFieldAccess(node: org.openrewrite.java.tree.J.FieldAccess, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitFieldAccess:(Lorg/openrewrite/java/tree/J\$FieldAccess;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.FieldAccess else node
-            return super.visitFieldAccess(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitFieldAccess(transformed, ctx)
         }
 
         override fun visitForEachLoop(node: org.openrewrite.java.tree.J.ForEachLoop, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitForEachLoop:(Lorg/openrewrite/java/tree/J\$ForEachLoop;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ForEachLoop else node
-            return super.visitForEachLoop(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitForEachLoop(transformed, ctx)
         }
 
         override fun visitForEachControl(node: org.openrewrite.java.tree.J.ForEachLoop.Control, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitForEachControl:(Lorg/openrewrite/java/tree/J\$ForEachLoop\$Control;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ForEachLoop.Control else node
-            return super.visitForEachControl(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitForEachControl(transformed, ctx)
         }
 
         override fun visitForLoop(node: org.openrewrite.java.tree.J.ForLoop, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitForLoop:(Lorg/openrewrite/java/tree/J\$ForLoop;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ForLoop else node
-            return super.visitForLoop(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitForLoop(transformed, ctx)
         }
 
         override fun visitForControl(node: org.openrewrite.java.tree.J.ForLoop.Control, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitForControl:(Lorg/openrewrite/java/tree/J\$ForLoop\$Control;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ForLoop.Control else node
-            return super.visitForControl(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitForControl(transformed, ctx)
         }
 
         override fun visitParenthesizedTypeTree(node: org.openrewrite.java.tree.J.ParenthesizedTypeTree, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitParenthesizedTypeTree:(Lorg/openrewrite/java/tree/J\$ParenthesizedTypeTree;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ParenthesizedTypeTree else node
-            return super.visitParenthesizedTypeTree(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitParenthesizedTypeTree(transformed, ctx)
         }
 
         override fun visitIdentifier(node: org.openrewrite.java.tree.J.Identifier, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitIdentifier:(Lorg/openrewrite/java/tree/J\$Identifier;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Identifier else node
-            return super.visitIdentifier(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitIdentifier(transformed, ctx)
         }
 
         override fun visitElse(node: org.openrewrite.java.tree.J.If.Else, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitElse:(Lorg/openrewrite/java/tree/J\$If\$Else;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.If.Else else node
-            return super.visitElse(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitElse(transformed, ctx)
         }
 
         override fun visitIf(node: org.openrewrite.java.tree.J.If, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitIf:(Lorg/openrewrite/java/tree/J\$If;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.If else node
-            return super.visitIf(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitIf(transformed, ctx)
         }
 
         override fun visitImport(node: org.openrewrite.java.tree.J.Import, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitImport:(Lorg/openrewrite/java/tree/J\$Import;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Import else node
-            return super.visitImport(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitImport(transformed, ctx)
         }
 
         override fun visitInstanceOf(node: org.openrewrite.java.tree.J.InstanceOf, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitInstanceOf:(Lorg/openrewrite/java/tree/J\$InstanceOf;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.InstanceOf else node
-            return super.visitInstanceOf(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitInstanceOf(transformed, ctx)
         }
 
         override fun visitDeconstructionPattern(node: org.openrewrite.java.tree.J.DeconstructionPattern, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitDeconstructionPattern:(Lorg/openrewrite/java/tree/J\$DeconstructionPattern;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.DeconstructionPattern else node
-            return super.visitDeconstructionPattern(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitDeconstructionPattern(transformed, ctx)
         }
 
         override fun visitIntersectionType(node: org.openrewrite.java.tree.J.IntersectionType, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitIntersectionType:(Lorg/openrewrite/java/tree/J\$IntersectionType;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.IntersectionType else node
-            return super.visitIntersectionType(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitIntersectionType(transformed, ctx)
         }
 
         override fun visitLabel(node: org.openrewrite.java.tree.J.Label, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitLabel:(Lorg/openrewrite/java/tree/J\$Label;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Label else node
-            return super.visitLabel(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitLabel(transformed, ctx)
         }
 
         override fun visitLambda(node: org.openrewrite.java.tree.J.Lambda, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitLambda:(Lorg/openrewrite/java/tree/J\$Lambda;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Lambda else node
-            return super.visitLambda(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitLambda(transformed, ctx)
         }
 
         override fun visitLambdaParameters(node: org.openrewrite.java.tree.J.Lambda.Parameters, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitLambdaParameters:(Lorg/openrewrite/java/tree/J\$Lambda\$Parameters;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Lambda.Parameters else node
-            return super.visitLambdaParameters(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitLambdaParameters(transformed, ctx)
         }
 
         override fun visitLiteral(node: org.openrewrite.java.tree.J.Literal, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitLiteral:(Lorg/openrewrite/java/tree/J\$Literal;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Literal else node
-            return super.visitLiteral(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitLiteral(transformed, ctx)
         }
 
         override fun visitMemberReference(node: org.openrewrite.java.tree.J.MemberReference, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitMemberReference:(Lorg/openrewrite/java/tree/J\$MemberReference;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.MemberReference else node
-            return super.visitMemberReference(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitMemberReference(transformed, ctx)
         }
 
         override fun visitMethodDeclaration(node: org.openrewrite.java.tree.J.MethodDeclaration, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitMethodDeclaration:(Lorg/openrewrite/java/tree/J\$MethodDeclaration;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.MethodDeclaration else node
-            return super.visitMethodDeclaration(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitMethodDeclaration(transformed, ctx)
         }
 
         override fun visitMethodInvocation(node: org.openrewrite.java.tree.J.MethodInvocation, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitMethodInvocation:(Lorg/openrewrite/java/tree/J\$MethodInvocation;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.MethodInvocation else node
-            return super.visitMethodInvocation(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitMethodInvocation(transformed, ctx)
         }
 
         override fun visitModifier(node: org.openrewrite.java.tree.J.Modifier, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitModifier:(Lorg/openrewrite/java/tree/J\$Modifier;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Modifier else node
-            return super.visitModifier(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitModifier(transformed, ctx)
         }
 
         override fun visitMultiCatch(node: org.openrewrite.java.tree.J.MultiCatch, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitMultiCatch:(Lorg/openrewrite/java/tree/J\$MultiCatch;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.MultiCatch else node
-            return super.visitMultiCatch(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitMultiCatch(transformed, ctx)
         }
 
         override fun visitVariableDeclarations(node: org.openrewrite.java.tree.J.VariableDeclarations, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitVariableDeclarations:(Lorg/openrewrite/java/tree/J\$VariableDeclarations;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.VariableDeclarations else node
-            return super.visitVariableDeclarations(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitVariableDeclarations(transformed, ctx)
         }
 
         override fun visitNewArray(node: org.openrewrite.java.tree.J.NewArray, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitNewArray:(Lorg/openrewrite/java/tree/J\$NewArray;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.NewArray else node
-            return super.visitNewArray(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitNewArray(transformed, ctx)
         }
 
         override fun visitNewClass(node: org.openrewrite.java.tree.J.NewClass, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitNewClass:(Lorg/openrewrite/java/tree/J\$NewClass;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.NewClass else node
-            return super.visitNewClass(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitNewClass(transformed, ctx)
         }
 
         override fun visitNullableType(node: org.openrewrite.java.tree.J.NullableType, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitNullableType:(Lorg/openrewrite/java/tree/J\$NullableType;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.NullableType else node
-            return super.visitNullableType(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitNullableType(transformed, ctx)
         }
 
         override fun visitPackage(node: org.openrewrite.java.tree.J.Package, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitPackage:(Lorg/openrewrite/java/tree/J\$Package;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Package else node
-            return super.visitPackage(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitPackage(transformed, ctx)
         }
 
         override fun visitParameterizedType(node: org.openrewrite.java.tree.J.ParameterizedType, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitParameterizedType:(Lorg/openrewrite/java/tree/J\$ParameterizedType;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.ParameterizedType else node
-            return super.visitParameterizedType(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitParameterizedType(transformed, ctx)
         }
 
         override fun visitPrimitive(node: org.openrewrite.java.tree.J.Primitive, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitPrimitive:(Lorg/openrewrite/java/tree/J\$Primitive;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Primitive else node
-            return super.visitPrimitive(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitPrimitive(transformed, ctx)
         }
 
         override fun visitReturn(node: org.openrewrite.java.tree.J.Return, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitReturn:(Lorg/openrewrite/java/tree/J\$Return;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Return else node
-            return super.visitReturn(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitReturn(transformed, ctx)
         }
 
         override fun visitSwitch(node: org.openrewrite.java.tree.J.Switch, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitSwitch:(Lorg/openrewrite/java/tree/J\$Switch;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Switch else node
-            return super.visitSwitch(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitSwitch(transformed, ctx)
         }
 
         override fun visitSwitchExpression(node: org.openrewrite.java.tree.J.SwitchExpression, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitSwitchExpression:(Lorg/openrewrite/java/tree/J\$SwitchExpression;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.SwitchExpression else node
-            return super.visitSwitchExpression(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitSwitchExpression(transformed, ctx)
         }
 
         override fun visitSynchronized(node: org.openrewrite.java.tree.J.Synchronized, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitSynchronized:(Lorg/openrewrite/java/tree/J\$Synchronized;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Synchronized else node
-            return super.visitSynchronized(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitSynchronized(transformed, ctx)
         }
 
         override fun visitTernary(node: org.openrewrite.java.tree.J.Ternary, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitTernary:(Lorg/openrewrite/java/tree/J\$Ternary;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Ternary else node
-            return super.visitTernary(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitTernary(transformed, ctx)
         }
 
         override fun visitThrow(node: org.openrewrite.java.tree.J.Throw, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitThrow:(Lorg/openrewrite/java/tree/J\$Throw;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Throw else node
-            return super.visitThrow(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitThrow(transformed, ctx)
         }
 
         override fun visitTry(node: org.openrewrite.java.tree.J.Try, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitTry:(Lorg/openrewrite/java/tree/J\$Try;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Try else node
-            return super.visitTry(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitTry(transformed, ctx)
         }
 
         override fun visitTryResource(node: org.openrewrite.java.tree.J.Try.Resource, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitTryResource:(Lorg/openrewrite/java/tree/J\$Try\$Resource;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Try.Resource else node
-            return super.visitTryResource(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitTryResource(transformed, ctx)
         }
 
         override fun visitTypeCast(node: org.openrewrite.java.tree.J.TypeCast, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitTypeCast:(Lorg/openrewrite/java/tree/J\$TypeCast;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.TypeCast else node
-            return super.visitTypeCast(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitTypeCast(transformed, ctx)
         }
 
         override fun visitTypeParameter(node: org.openrewrite.java.tree.J.TypeParameter, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitTypeParameter:(Lorg/openrewrite/java/tree/J\$TypeParameter;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.TypeParameter else node
-            return super.visitTypeParameter(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitTypeParameter(transformed, ctx)
         }
 
         override fun visitTypeParameters(node: org.openrewrite.java.tree.J.TypeParameters, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitTypeParameters:(Lorg/openrewrite/java/tree/J\$TypeParameters;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.TypeParameters else node
-            return super.visitTypeParameters(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitTypeParameters(transformed, ctx)
         }
 
         override fun visitUnary(node: org.openrewrite.java.tree.J.Unary, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitUnary:(Lorg/openrewrite/java/tree/J\$Unary;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Unary else node
-            return super.visitUnary(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitUnary(transformed, ctx)
         }
 
         override fun visitUnknown(node: org.openrewrite.java.tree.J.Unknown, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitUnknown:(Lorg/openrewrite/java/tree/J\$Unknown;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Unknown else node
-            return super.visitUnknown(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitUnknown(transformed, ctx)
         }
 
         override fun visitUnknownSource(node: org.openrewrite.java.tree.J.Unknown.Source, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitUnknownSource:(Lorg/openrewrite/java/tree/J\$Unknown\$Source;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Unknown.Source else node
-            return super.visitUnknownSource(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitUnknownSource(transformed, ctx)
         }
 
         override fun visitVariable(node: org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitVariable:(Lorg/openrewrite/java/tree/J\$VariableDeclarations\$NamedVariable;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.VariableDeclarations.NamedVariable else node
-            return super.visitVariable(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitVariable(transformed, ctx)
         }
 
         override fun visitWhileLoop(node: org.openrewrite.java.tree.J.WhileLoop, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitWhileLoop:(Lorg/openrewrite/java/tree/J\$WhileLoop;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.WhileLoop else node
-            return super.visitWhileLoop(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitWhileLoop(transformed, ctx)
         }
 
         override fun visitWildcard(node: org.openrewrite.java.tree.J.Wildcard, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitWildcard:(Lorg/openrewrite/java/tree/J\$Wildcard;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Wildcard else node
-            return super.visitWildcard(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitWildcard(transformed, ctx)
         }
 
         override fun visitYield(node: org.openrewrite.java.tree.J.Yield, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitYield:(Lorg/openrewrite/java/tree/J\$Yield;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Yield else node
-            return super.visitYield(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitYield(transformed, ctx)
         }
 
         override fun visitErroneous(node: org.openrewrite.java.tree.J.Erroneous, ctx: ExecutionContext): org.openrewrite.java.tree.J {
             val action = actions["visitErroneous:(Lorg/openrewrite/java/tree/J\$Erroneous;Ljava/lang/Object;)Lorg/openrewrite/java/tree/J;"] as? ((Any, Any) -> Any)
             val transformed = if (action != null) action(this, node) as org.openrewrite.java.tree.J.Erroneous else node
-            return super.visitErroneous(transformed, ctx) as org.openrewrite.java.tree.J
+            return super.visitErroneous(transformed, ctx)
         }
 
     }

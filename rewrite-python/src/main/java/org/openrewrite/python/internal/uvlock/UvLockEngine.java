@@ -143,6 +143,8 @@ public final class UvLockEngine {
         UvLock lock;
         try {
             lock = UvLockReader.parse(oldLockContent);
+        } catch (UvLockUnsupportedException e) {
+            return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null, null, e.getMessage()));
         } catch (UvLockFormatException e) {
             return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, null,
                     "Existing uv.lock could not be parsed: " + e.getMessage()));
@@ -157,7 +159,12 @@ public final class UvLockEngine {
             return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null, detail));
         }
         try {
-            return new Run(pyproject, lock, ctx).regenerate();
+            Result result = new Run(pyproject, lock, ctx).regenerate();
+            // uv leaves a lock that satisfies the manifest untouched, whatever spellings it reads it in
+            if (result.isSuccess() && UvLockWriter.write(lock).equals(result.getLockFileContent())) {
+                return Result.success(oldLockContent, result.getDetail());
+            }
+            return result;
         } catch (PythonIndexException e) {
             return Result.failure(indexFailure(null, e));
         } catch (UvLockFormatException e) {
@@ -386,6 +393,7 @@ public final class UvLockEngine {
                     newMetadata.getProvidesExtras() == null && newMetadata.getRequiresDev() == null;
             packages.set(rootIndex, root.toBuilder()
                     .version(projectVersion(project, root.getVersion()))
+                    .source(rootSource(root.getSource()))
                     // uv omits [package.metadata] entirely when nothing is declared (s-remove-last-dep fixture)
                     .metadata(metadataEmpty ? null : newMetadata)
                     .build());
@@ -1016,6 +1024,19 @@ public final class UvLockEngine {
                 groups.add(Pep508Requirement.canonicalize(group));
             }
             return groups.equals(Collections.singleton("dev")) ? null : new ArrayList<>(groups);
+        }
+
+        /**
+         * The project is a package, locked as {@code editable = "."}, when {@code [tool.uv] package = true}, or when
+         * {@code package} is unset and the manifest declares a {@code [build-system]}; otherwise it is virtual, as uv's
+         * {@code PyProjectToml::is_package} decides. A lock recording the other kind no longer satisfies the manifest.
+         */
+        private UvLockSource rootSource(UvLockSource recorded) {
+            boolean isPackage = Optional.ofNullable(UvLockToml.findTable(pyproject, "tool.uv"))
+                    .map(uv -> UvLockToml.literalBoolean(uv, "package"))
+                    .orElseGet(() -> UvLockToml.findTable(pyproject, "build-system") != null);
+            UvLockSource.Type type = isPackage ? UvLockSource.Type.EDITABLE : UvLockSource.Type.VIRTUAL;
+            return recorded.getType() == type ? recorded : recorded.withType(type);
         }
 
         private int findRoot() {

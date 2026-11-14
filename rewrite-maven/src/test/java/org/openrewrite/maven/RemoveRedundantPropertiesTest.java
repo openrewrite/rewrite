@@ -1250,6 +1250,125 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepModuleOverrideOfPropertyOnlyLocalPomsDefine() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GT)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <!-- used for com.nimbusds:oauth2-oidc-sdk elsewhere -->
+                    <nimbus.version>11.23.1</nimbus.version>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <nimbus.version>8.23</nimbus.version>
+                    </properties>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.nimbusds</groupId>
+                        <artifactId>nimbus-jose-jwt</artifactId>
+                        <version>${nimbus.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeUsedModulePinOlderThanExternalParent() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GT)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.5.4</version>
+                    <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <h2.version>2.2.224</h2.version>
+                    </properties>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.h2database</groupId>
+                        <artifactId>h2</artifactId>
+                        <version>${h2.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.h2database</groupId>
+                        <artifactId>h2</artifactId>
+                        <version>${h2.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
     @Nested
     class CorporateParentBetweenProjectAndSpringBoot implements RewriteTest {
 
@@ -1287,7 +1406,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE))
-              .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+              .executionContext(MavenCentralMirrorExtension.withMavenCentralMirror(
                 MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
                   .setLocalRepository(MavenRepository.builder()
                     .id("local")

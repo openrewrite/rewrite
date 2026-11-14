@@ -77,6 +77,9 @@ final class WorkspaceManifest {
         if (map.isEmpty()) {
             return map;
         }
+        if (!Js.truthy(map.get("packages")) && !release.readsSettingsFromWorkspaceManifest()) {
+            throw invalid("packages field missing or empty");
+        }
         assertValidWorkspaceManifestPackages(map);
         assertValidWorkspaceManifestCatalog(map);
         assertValidWorkspaceManifestCatalogs(map);

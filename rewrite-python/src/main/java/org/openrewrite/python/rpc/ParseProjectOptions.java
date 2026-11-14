@@ -36,8 +36,10 @@ import java.util.List;
 public class ParseProjectOptions {
 
     /**
-     * Glob patterns matched against directory names, not paths. These extend the parser's built-in
-     * exclusions ({@code __pycache__}, {@code .venv}, etc.) rather than replacing them.
+     * Glob patterns of directories and files to leave out, read as a {@code .gitignore} reads them. A
+     * pattern without a {@code /} matches a name at any depth. One with a {@code /} matches a path below
+     * the project directory, and a leading {@code /} anchors a bare name there. These extend the parser's
+     * built-in exclusions ({@code __pycache__}, {@code .venv}, etc.) rather than replacing them.
      */
     @Nullable
     List<String> exclusions;

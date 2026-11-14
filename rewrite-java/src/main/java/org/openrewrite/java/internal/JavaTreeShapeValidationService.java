@@ -16,21 +16,43 @@
 package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeShapeValidationService;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.TypedTree;
 
+import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 
 public class JavaTreeShapeValidationService implements TreeShapeValidationService {
     private static final Pattern PARSER_VERSION = Pattern.compile("\\.Java(\\d+)Parser\\b");
@@ -85,6 +107,338 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
         JavaVersion version = sourceFile.getMarkers().findFirst(JavaVersion.class).orElse(null);
         return version == null || !parserVersion.find() ||
                version.getMajorVersion() <= Integer.parseInt(parserVersion.group(1));
+    }
+
+    @Override
+    public Parser.Builder untypedParser(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        // the copy's types are incomplete, so they stay out of a type factory the test's builder holds
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .classpath(emptyList())
+                .dependsOn(emptyList())
+                .typeAttribution(false)
+                .typeFactory(null);
+    }
+
+    @Override
+    public Parser.Builder typedParser(Parser.Builder parser, List<SourceFile> sources) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        JavaParser.Builder<?, ?> java = (JavaParser.Builder<?, ?>) parser;
+        // The test's cache holds its classes as they were before the recipe ran, such as with a method it renamed, so
+        // those are typed afresh. Writing to a cache of its own keeps the types of the reparse out of the test's cache.
+        return java.clone().typeFactory(new DefaultJavaTypeFactory(
+                new HashMapJavaTypeCache(new WithoutClassesOf(sources, java.getTypeCache()))));
+    }
+
+    @Override
+    public Parser.Builder typedParser(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        // a cache of its own, of the kind a builder gives its parsers, which reads the JDK classes test parsers share
+        JavaTypeCache cache = HashMapJavaTypeCache.forParser(
+                JdkClassSharingTypeFactory.cacheForParser(new JavaTypeCache(), parser.getClass(), false), false);
+        JavaTypeFactory factory = JdkClassSharingTypeFactory.forParser(cache);
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .typeFactory(factory == null ? new DefaultJavaTypeFactory(cache) : factory);
+    }
+
+    /**
+     * The types of a cache, but for those whose signature names a class that one of the sources declares.
+     */
+    private static class WithoutClassesOf extends JavaTypeCache {
+        private final JavaTypeCache cache;
+        private final @Nullable Pattern classes;
+
+        WithoutClassesOf(List<SourceFile> sources, JavaTypeCache cache) {
+            this.cache = cache;
+            Set<String> names = new TreeSet<>();
+            for (SourceFile source : sources) {
+                if (source instanceof J.CompilationUnit) {
+                    J.CompilationUnit cu = (J.CompilationUnit) source;
+                    String prefix = cu.getPackageDeclaration() == null ? "" :
+                            cu.getPackageDeclaration().getPackageName() + ".";
+                    for (J.ClassDeclaration classDecl : cu.getClasses()) {
+                        names.add(prefix + classDecl.getSimpleName());
+                    }
+                }
+            }
+            // the signature of a nested, local or anonymous class, such as a.A$1, starts with its top-level class's name
+            classes = names.isEmpty() ? null : Pattern.compile("(?<![\\w$.])(?:" +
+                    names.stream().map(Pattern::quote).collect(joining("|")) + ")(?!\\w)");
+        }
+
+        @Override
+        public <T> @Nullable T get(String signature) {
+            return classes != null && classes.matcher(signature).find() ? null : cache.get(signature);
+        }
+    }
+
+    @Override
+    public List<String> typeDifferences(Tree tree, Tree parsed, boolean exact) {
+        Map<String, @Nullable JavaType> parsedTypes = types(parsed);
+        List<String> differences = new ArrayList<>();
+        types(tree).forEach((of, type) -> {
+            JavaType parsedType = parsedTypes.get(of);
+            String written = written(type);
+            String parsedWritten = written(parsedType);
+            // A type the parser can't resolve has nothing to compare with. One the recipe leaves out is
+            // TypeValidation's to report.
+            if (written != null && parsedWritten != null &&
+                !(exact ? same(type, parsedType) : sameErasure(type, parsedType))) {
+                differences.add("the " + of + " " + written + (exact ? unwritten(type, parsedType) : "") +
+                                " where the parser gives " + parsedWritten +
+                                (exact ? unwritten(parsedType, type) : ""));
+            }
+        });
+        return differences;
+    }
+
+    private static Map<String, @Nullable JavaType> types(Tree tree) {
+        Map<String, @Nullable JavaType> types = new LinkedHashMap<>();
+        if (tree instanceof J.VariableDeclarations.NamedVariable) {
+            // its type is its variable's
+            types.put("variable", ((J.VariableDeclarations.NamedVariable) tree).getVariableType());
+            return types;
+        }
+        if (tree instanceof TypedTree) {
+            types.put("type", ((TypedTree) tree).getType());
+        }
+        if (tree instanceof J.Identifier) {
+            types.put("variable", ((J.Identifier) tree).getFieldType());
+        } else if (tree instanceof J.MethodInvocation) {
+            types.put("method", ((J.MethodInvocation) tree).getMethodType());
+        } else if (tree instanceof J.MemberReference) {
+            types.put("method", ((J.MemberReference) tree).getMethodType());
+            types.put("variable", ((J.MemberReference) tree).getVariableType());
+        } else if (tree instanceof J.MethodDeclaration) {
+            types.put("method", ((J.MethodDeclaration) tree).getMethodType());
+        } else if (tree instanceof J.NewClass) {
+            types.put("constructor", ((J.NewClass) tree).getConstructorType());
+        }
+        return types;
+    }
+
+    private static boolean same(@Nullable JavaType type, @Nullable JavaType parsed) {
+        if (type instanceof JavaType.Variable && parsed instanceof JavaType.Variable) {
+            // A variable's owner isn't compared, as a recipe that changes a method's type leaves its parameters and
+            // locals owned by the method's old type.
+            JavaType.Variable variable = (JavaType.Variable) type;
+            JavaType.Variable parsedVariable = (JavaType.Variable) parsed;
+            return variable.getName().equals(parsedVariable.getName()) &&
+                   TypeUtils.isOfType(variable.getType(), parsedVariable.getType());
+        }
+        if (type instanceof JavaType.Method && parsed instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            JavaType.Method parsedMethod = (JavaType.Method) parsed;
+            return TypeUtils.isOfType(method.withThrownExceptions(emptyList()),
+                    parsedMethod.withThrownExceptions(emptyList())) &&
+                   sameThrown(method.getThrownExceptions(), parsedMethod.getThrownExceptions());
+        }
+        return TypeUtils.isOfType(type, parsed);
+    }
+
+    private static boolean sameErasure(@Nullable JavaType type, @Nullable JavaType parsed) {
+        if (type instanceof JavaType.Variable && parsed instanceof JavaType.Variable) {
+            JavaType.Variable variable = (JavaType.Variable) type;
+            JavaType.Variable parsedVariable = (JavaType.Variable) parsed;
+            return variable.getName().equals(parsedVariable.getName()) &&
+                   sameErased(variable.getType(), parsedVariable.getType());
+        }
+        if (type instanceof JavaType.Method && parsed instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            JavaType.Method parsedMethod = (JavaType.Method) parsed;
+            if (!method.getName().equals(parsedMethod.getName()) ||
+                method.getParameterTypes().size() != parsedMethod.getParameterTypes().size() ||
+                !sameErased(method.getDeclaringType(), parsedMethod.getDeclaringType()) ||
+                !sameErased(method.getReturnType(), parsedMethod.getReturnType())) {
+                return false;
+            }
+            for (int i = 0; i < method.getParameterTypes().size(); i++) {
+                if (!sameErased(method.getParameterTypes().get(i), parsedMethod.getParameterTypes().get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return sameErased(type, parsed);
+    }
+
+    private static boolean sameErased(@Nullable JavaType type, @Nullable JavaType parsed) {
+        if (type instanceof JavaType.Array && parsed instanceof JavaType.Array) {
+            return sameErased(((JavaType.Array) type).getElemType(), ((JavaType.Array) parsed).getElemType());
+        } else if (type instanceof JavaType.GenericTypeVariable || parsed instanceof JavaType.GenericTypeVariable) {
+            if (!(type instanceof JavaType.GenericTypeVariable && parsed instanceof JavaType.GenericTypeVariable)) {
+                return false;
+            }
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            JavaType.GenericTypeVariable parsedVariable = (JavaType.GenericTypeVariable) parsed;
+            if (!variable.getName().equals(parsedVariable.getName()) ||
+                variable.getVariance() != parsedVariable.getVariance() ||
+                variable.getBounds().size() != parsedVariable.getBounds().size()) {
+                return false;
+            }
+            for (int i = 0; i < variable.getBounds().size(); i++) {
+                if (!sameErased(variable.getBounds().get(i), parsedVariable.getBounds().get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        String erasure = erasure(type);
+        // a type that erases to no class, such as a multi-catch, is compared whole
+        return erasure == null ? TypeUtils.isOfType(type, parsed) :
+                TypeUtils.fullyQualifiedNamesAreEqual(erasure, erasure(parsed));
+    }
+
+    /**
+     * The class {@code type} erases to, with every bound of an intersection, or null when it erases to none.
+     */
+    private static @Nullable String erasure(@Nullable JavaType type) {
+        if (type instanceof JavaType.Intersection) {
+            StringJoiner bounds = new StringJoiner(" & ");
+            for (JavaType bound : ((JavaType.Intersection) type).getBounds()) {
+                String erased = erasure(bound);
+                if (erased == null) {
+                    return null;
+                }
+                bounds.add(erased);
+            }
+            return bounds.length() == 0 ? null : bounds.toString();
+        } else if (type == JavaType.Primitive.String) {
+            return "java.lang.String";
+        } else if (type instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) type).getKeyword();
+        }
+        JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(type);
+        return fullyQualified == null ? null : fullyQualified.getFullyQualifiedName();
+    }
+
+    /**
+     * An exception that either side doesn't resolve isn't compared, so it doesn't keep the rest of the method from
+     * being compared.
+     */
+    private static boolean sameThrown(List<JavaType> thrown, List<JavaType> parsedThrown) {
+        if (thrown.size() != parsedThrown.size()) {
+            return false;
+        }
+        for (int i = 0; i < thrown.size(); i++) {
+            if (written(thrown.get(i)) != null && written(parsedThrown.get(i)) != null &&
+                !TypeUtils.isOfType(thrown.get(i), parsedThrown.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The flags and thrown exceptions of {@code type}, which {@link #written} leaves out, where they differ from those
+     * of {@code other}.
+     */
+    private static String unwritten(@Nullable JavaType type, @Nullable JavaType other) {
+        if (!(type instanceof JavaType.Method) || !(other instanceof JavaType.Method)) {
+            return "";
+        }
+        JavaType.Method method = (JavaType.Method) type;
+        JavaType.Method otherMethod = (JavaType.Method) other;
+        StringBuilder unwritten = new StringBuilder();
+        if (method.getFlagsBitMap() != otherMethod.getFlagsBitMap()) {
+            unwritten.append(" with the flags ").append(method.getFlags());
+        }
+        if (!sameThrown(method.getThrownExceptions(), otherMethod.getThrownExceptions())) {
+            StringJoiner thrown = new StringJoiner(", ", " throwing ", "").setEmptyValue(" throwing nothing");
+            for (JavaType exception : method.getThrownExceptions()) {
+                String written = written(exception);
+                thrown.add(written == null ? "{undefined}" : written);
+            }
+            unwritten.append(thrown);
+        }
+        return unwritten.toString();
+    }
+
+    /**
+     * {@code type} as text, without a variable's owner or a method's flags and thrown exceptions, and with a {@code .}
+     * before a nested class's name. A type that isn't resolved is null.
+     */
+    private static @Nullable String written(@Nullable JavaType type) {
+        DefaultJavaTypeSignatureBuilder signatures = new DefaultJavaTypeSignatureBuilder();
+        String written;
+        if (type instanceof JavaType.Variable) {
+            JavaType.Variable variable = (JavaType.Variable) type;
+            written = signatures.signature(variable.getType()) + " " + variable.getName();
+        } else if (type instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            StringJoiner parameters = new StringJoiner(", ", "(", ")");
+            for (JavaType parameter : method.getParameterTypes()) {
+                parameters.add(signatures.signature(parameter));
+            }
+            written = signatures.signature(method.getReturnType()) + " " +
+                      signatures.signature(method.getDeclaringType()) + "." + method.getName() + parameters;
+        } else {
+            written = signatures.signature(type);
+        }
+        return written.contains("{undefined}") ? null : written.replace('$', '.');
+    }
+
+    @Override
+    public void collectCompilationErrors(ExecutionContext parseCtx) {
+        parseCtx.putMessage(JavaParser.COMPILATION_ERRORS, new ArrayList<Diagnostic<? extends JavaFileObject>>());
+    }
+
+    @Override
+    public Map<Path, Map<String, List<String>>> compilationErrors(ExecutionContext parseCtx) {
+        Collection<Diagnostic<? extends JavaFileObject>> errors = parseCtx.getMessage(JavaParser.COMPILATION_ERRORS);
+        Map<Path, Map<String, List<String>>> byPath = new LinkedHashMap<>();
+        if (errors == null) {
+            return byPath;
+        }
+        Map<JavaFileObject, String[]> lines = new IdentityHashMap<>();
+        Set<String> reported = new HashSet<>();
+        for (Diagnostic<? extends JavaFileObject> error : errors) {
+            JavaFileObject source = error.getSource();
+            // an error that javac places in no source isn't about the code the sources hold
+            if (source != null) {
+                String[] ofSource = lines.computeIfAbsent(source, JavaTreeShapeValidationService::lines);
+                long number = error.getLineNumber();
+                Path path = Paths.get(source.getName());
+                String message = error.getMessage(Locale.ENGLISH).trim().replaceAll("\\s+", " ");
+                // javac reports some errors more than once, such as an import of a missing package
+                if (reported.add(path + ":" + error.getPosition() + ":" + message)) {
+                    byPath.computeIfAbsent(path, p -> new LinkedHashMap<>())
+                            .computeIfAbsent(message, m -> new ArrayList<>())
+                            .add(number >= 1 && number <= ofSource.length ? ofSource[(int) number - 1].trim() : "");
+                }
+            }
+        }
+        return byPath;
+    }
+
+    private static String[] lines(JavaFileObject source) {
+        try {
+            return source.getCharContent(true).toString().split("\\R", -1);
+        } catch (IOException e) {
+            return new String[0];
+        }
+    }
+
+    @Override
+    public @Nullable String syntaxError(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, AtomicReference<@Nullable String>>() {
+            @Override
+            public Tree preVisit(Tree t, AtomicReference<@Nullable String> text) {
+                if (text.get() != null) {
+                    stopAfterPreVisit();
+                } else if (t instanceof J.Erroneous) {
+                    text.set(((J.Erroneous) t).getText());
+                    stopAfterPreVisit();
+                }
+                return t;
+            }
+        }.reduce(sourceFile, new AtomicReference<>()).get();
     }
 
     @Override

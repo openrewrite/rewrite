@@ -36,6 +36,7 @@ import java.util
 import java.util.{ArrayList, Collections, IdentityHashMap}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
 
 /**
  * What a selector of an import or export imports.
@@ -117,7 +118,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
               }
             }
           } catch {
-            case _: Throwable =>
+            case NonFatal(_) =>
           }
 
           traverseChildren(tree)
@@ -126,7 +127,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       }
       traverser.traverse(typedTree)
     } catch {
-      case _: Throwable => // If traversal fails, maps stay empty; types will be null
+      case NonFatal(_) => // If traversal fails, maps stay empty; types will be null
     }
   }
 
@@ -143,7 +144,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           (sym.isOneOf(Flags.GivenOrImplicit) || sym.name == nme.apply && sym.owner.derivesFrom(ctx.definitions.ConversionClass))
       }
     } catch {
-      case _: Throwable => false
+      case NonFatal(_) => false
     }
 
   /**
@@ -157,7 +158,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case _ => false
       })
     } catch {
-      case _: Throwable => false
+      case NonFatal(_) => false
     }
 
   // --- Node-based lookup ---
@@ -184,7 +185,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
             }
         }.traverse(node.adapted)
       } catch {
-        case _: Throwable =>
+        case NonFatal(_) =>
       }
       if (found != null) found else own
     }
@@ -195,7 +196,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case ref: TermRef => ref.denot.isOverloaded
       case _ => false
     } catch {
-      case _: Throwable => false
+      case NonFatal(_) => false
     }
 
   /**
@@ -207,7 +208,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       if (isIllTypedCall(tree, node)) Some(null)
       else {
         val call = resolved(node)
-        calledSymbol(call).filterNot(isErrorSymbol).map(sym => try invokedMethodType(sym, call) catch { case _: Throwable => null })
+        calledSymbol(call).filterNot(isErrorSymbol).map(sym => try invokedMethodType(sym, call) catch { case NonFatal(_) => null })
       }
     }
 
@@ -251,7 +252,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && takesParameters(d.info))
         case _ => false
       } catch {
-        case _: Throwable => false
+        case NonFatal(_) => false
       }
     }
 
@@ -260,7 +261,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     typedNodes.get(call)
       .flatMap(node => calledSymbol(application(resolved(node))))
       .flatMap(method => method.paramSymss.flatten.find(p => p.isTerm && p.name.toString == name))
-      .flatMap(parameter => Option(try mapVariableType(parameter) catch { case _: Throwable => null }))
+      .flatMap(parameter => Option(try mapVariableType(parameter) catch { case NonFatal(_) => null }))
 
   /** Named arguments passed out of order are lifted into a block that ends with the call itself. */
   private def application(tree: tpd.Tree): tpd.Tree = tree match {
@@ -272,9 +273,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   /** The variable a definition or reference refers to, if it refers to a variable. */
   def variableTypeOf(tree: untpd.Tree): Option[JavaType.Variable] =
     typedNodes.get(tree).flatMap { node =>
-      val sym = try resolved(node).symbol catch { case _: Throwable => null }
+      val sym = try resolved(node).symbol catch { case NonFatal(_) => null }
       if (sym == null || !sym.exists) None
-      else Some(if (isVariable(sym)) try mapVariableType(sym) catch { case _: Throwable => null } else null)
+      else Some(if (isVariable(sym)) try mapVariableType(sym) catch { case NonFatal(_) => null } else null)
     }
 
   /** The implicit conversion the typer applied to the node's value, if any. */
@@ -283,7 +284,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       Option(conversions.get(node.adapted)).orElse(Option(conversions.get(node.own)))
     }.map { conversion =>
       val sym = conversion.fun.symbol
-      (if (isErrorSymbol(sym)) null else try mapMethodType(sym) catch { case _: Throwable => null }, expressionType(conversion))
+      (if (isErrorSymbol(sym)) null else try mapMethodType(sym) catch { case NonFatal(_) => null }, expressionType(conversion))
     }
 
   /** The definitions the typer passed as implicit arguments while typing the node, if any. */
@@ -308,7 +309,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         else if (sym.is(Flags.Method)) Option(mapMethodType(sym))
         else None
       } catch {
-        case _: Throwable => None
+        case NonFatal(_) => None
       }
   }
 
@@ -349,14 +350,14 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         }
       }
     } catch {
-      case _: Throwable => Imported(null, null, null, isImplicit = false)
+      case NonFatal(_) => Imported(null, null, null, isImplicit = false)
     }
 
   /** The method and resulting function type, if the typer eta-expanded the method the node refers to. */
   def etaExpansionOf(tree: untpd.Tree): Option[(JavaType.Method, JavaType)] =
     typedNodes.get(tree).filter(node => (node.adapted ne node.own) && isClosure(node.adapted)).flatMap { node =>
       calledSymbol(resolved(node)).filterNot(isErrorSymbol).map { sym =>
-        (try mapMethodType(sym) catch { case _: Throwable => null }, expressionType(node.adapted))
+        (try mapMethodType(sym) catch { case NonFatal(_) => null }, expressionType(node.adapted))
       }
     }
 
@@ -403,7 +404,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
             TypeOps.boundsViolations(args, poly.paramInfos, _.substParams(poly, _), NoType).nonEmpty
         case _ => false
       } catch {
-        case _: Throwable => false
+        case NonFatal(_) => false
       }
     }
 
@@ -414,7 +415,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   private def isErrorType(tree: tpd.Tree): Boolean =
-    try tree.tpe.isError catch { case _: Throwable => false }
+    try tree.tpe.isError catch { case NonFatal(_) => false }
 
   // --- Public API ---
 
@@ -446,7 +447,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       if (tpe == null || tpe == NoType || isPackage(tree.symbol)) null
       else mapType(tpe)
     } catch {
-      case _: Throwable => null
+      case NonFatal(_) => null
     }
 
   /** Typed nodes whose span covers exactly the given source range, outermost first. */
@@ -481,7 +482,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case info => info.isError
       })
     } catch {
-      case _: Throwable => true
+      case NonFatal(_) => true
     }
 
   /** Look up JavaType by identifier name (fallback for when spans don't match). */
@@ -495,7 +496,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           if (mapped == null || mapped.isInstanceOf[JavaType.Unknown]) typeForPredefAlias(name)
           else mapped
         } catch {
-          case _: Throwable => typeForPredefAlias(name)
+          case NonFatal(_) => typeForPredefAlias(name)
         }
       case None => typeForPredefAlias(name)
     }
@@ -530,7 +531,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       else spanMap.get(span.start).map(_.iterator.filter(_.span.end <= span.end).toList).getOrElse(Nil)
     candidates.iterator.flatMap(call => calledSymbol(call).map(_ -> call)).nextOption() match {
       case Some((sym, call)) if !isErrorSymbol(sym) =>
-        try invokedMethodType(sym, call) catch { case _: Throwable => null }
+        try invokedMethodType(sym, call) catch { case NonFatal(_) => null }
       case _ => null
     }
   }
@@ -546,7 +547,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case _ => None
       }
     } catch {
-      case _: Throwable => None
+      case NonFatal(_) => None
     }
 
   /** Look up JavaType.Method by name (fallback). */
@@ -554,7 +555,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     if (name == null || name.isEmpty) return null
     symbolsByName.get(name) match {
       case Some(sym) if (sym.is(Flags.Method) || sym.isConstructor) && !isErrorSymbol(sym) =>
-        try { mapMethodType(sym) } catch { case _: Throwable => null }
+        try { mapMethodType(sym) } catch { case NonFatal(_) => null }
       case _ => null
     }
   }
@@ -564,10 +565,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     if (!span.exists) return null
     val exact = exactlyAt(span)
     val referenced = exact.filterNot(_.span.isSynthetic) ++ exact.filter(_.span.isSynthetic)
-    referenced.iterator.map(t => try t.symbol catch { case _: Throwable => null })
+    referenced.iterator.map(t => try t.symbol catch { case NonFatal(_) => null })
       .find(sym => sym != null && sym.exists) match {
       case Some(sym) if isVariable(sym) =>
-        try mapVariableType(sym) catch { case _: Throwable => null }
+        try mapVariableType(sym) catch { case NonFatal(_) => null }
       case _ => null
     }
   }
@@ -575,12 +576,18 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   private def isVariable(sym: Symbol): Boolean =
     sym.isTerm && !sym.is(Flags.Method) && !sym.is(Flags.Package) && !isErrorSymbol(sym)
 
-  /** Look up JavaType.Variable by name (fallback). */
-  def variableTypeForName(name: String): JavaType.Variable = {
+  /**
+   * Look up JavaType.Variable by name (fallback), preferring the variable of that name defined where the tree starts:
+   * a pattern binder `v` in `case v: Int` has no typed node of its own span, only the `Bind` that also covers `: Int`.
+   */
+  def variableTypeForName(name: String, span: Spans.Span): JavaType.Variable = {
     if (name == null || name.isEmpty) return null
-    symbolsByName.get(name) match {
+    val definedHere = if (!span.exists) None else spanMap.get(span.start).flatMap(_.iterator
+      .map(t => try t.symbol catch { case NonFatal(_) => null })
+      .find(sym => sym != null && sym.exists && isVariable(sym) && sym.name.toString == name))
+    definedHere.orElse(symbolsByName.get(name)) match {
       case Some(sym) if !sym.isClass && isVariable(sym) =>
-        try { mapVariableType(sym) } catch { case _: Throwable => null }
+        try { mapVariableType(sym) } catch { case NonFatal(_) => null }
       case _ => null
     }
   }
@@ -593,7 +600,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       if (sym.exists) mapType(sym.typeRef)
       else null
     } catch {
-      case _: Throwable => null
+      case NonFatal(_) => null
     }
   }
 
@@ -627,7 +634,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case _ => unknown
       }
     } catch {
-      case _: Throwable => unknown
+      case NonFatal(_) => unknown
     }
   }
 
@@ -775,12 +782,15 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
     val sym = javaClassOfStatics(symbol)
     // Members of library types are not populated to avoid deep recursive type
-    // graphs that cause StackOverflowError in recipes like ChangeType.
+    // graphs that cause StackOverflowError in recipes like ChangeType. A class
+    // loaded from TASTy has a source too, so also check what it was loaded from.
     val isSourceDefined = try {
       val src = sym.source
-      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala")
+      val file = sym.associatedFile
+      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala") &&
+        file != null && !file.ext.isScalaBinary
     } catch {
-      case _: Throwable => false
+      case NonFatal(_) => false
     }
 
     val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
@@ -797,13 +807,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           case _ => Nil
         }
       } catch {
-        case _: Throwable => Nil
+        case NonFatal(_) => Nil
       }
 
       val supertype: JavaType.FullyQualified = try {
         parentTypes.headOption.flatMap(pt => Option(TypeUtils.asFullyQualified(mapType(pt)))).orNull
       } catch {
-        case _: Throwable => null
+        case NonFatal(_) => null
       }
 
       val interfaces: util.List[JavaType.FullyQualified] = try {
@@ -817,7 +827,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           ifaces
         } else null
       } catch {
-        case _: Throwable => null
+        case NonFatal(_) => null
       }
 
       val methods: util.List[JavaType.Method] = if (!isSourceDefined) null else try {
@@ -829,12 +839,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         if (methodSyms.nonEmpty) {
           val ms = new ArrayList[JavaType.Method]()
           methodSyms.foreach { m =>
-            try { ms.add(mapMethodType(m)) } catch { case _: Throwable => }
+            try { ms.add(mapMethodType(m)) } catch { case NonFatal(_) => }
           }
           ms
         } else null
       } catch {
-        case _: Throwable => null
+        case NonFatal(_) => null
       }
 
       val members: util.List[JavaType.Variable] = if (!isSourceDefined) null else try {
@@ -846,12 +856,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         if (fieldSyms.nonEmpty) {
           val fs = new ArrayList[JavaType.Variable]()
           fieldSyms.foreach { f =>
-            try { fs.add(mapVariableType(f)) } catch { case _: Throwable => }
+            try { fs.add(mapVariableType(f)) } catch { case NonFatal(_) => }
           }
           fs
         } else null
       } catch {
-        case _: Throwable => null
+        case NonFatal(_) => null
       }
 
       clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
@@ -894,7 +904,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         val declaringType = try {
           TypeUtils.asFullyQualified(mapType(sym.owner.info))
         } catch {
-          case _: Throwable => null
+          case NonFatal(_) => null
         }
         val returnType = mapType(info.finalResultType)
 
@@ -909,8 +919,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val flagsBits = mapFlags(sym)
     typeFactory.variableFor(sig, () => {
       val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
-      val ownerType = try { variableOwner(sym) } catch { case _: Throwable => unknown }
-      val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case _: Throwable => unknown }
+      val ownerType = try { variableOwner(sym) } catch { case NonFatal(_) => unknown }
+      val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case NonFatal(_) => unknown }
       variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
       variable
     })

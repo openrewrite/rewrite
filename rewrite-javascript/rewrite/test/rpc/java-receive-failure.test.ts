@@ -14,22 +14,24 @@
  * limitations under the License.
  */
 import {afterAll, afterEach, beforeAll, describe, expect, test, vi} from "vitest";
-import {describeJavaRpc} from "../../src/test/java-rpc";
+import {describeJavaRpc} from "../../src/test/java-rpc.mjs";
 import {JavaRpcTestServer} from "../../src/rpc/java-rpc-client";
 import {RpcReceiveQueue} from "../../src/rpc";
 import {ExecutionContext} from "../../src/execution";
 import {J} from "../../src/java";
-import {JavaScriptParser, JavaScriptVisitor, JS} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, sourceFileCache} from "../../src/javascript";
 import {TreePrinters} from "../../src/print";
 
 const simplify = "org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor";
+
+const parser = new JavaScriptParser({sourceFileCache});
 
 async function parse(statements: number): Promise<JS.CompilationUnit> {
     let text = "function f(b: boolean) {\n";
     for (let i = 0; i < statements; i++) {
         text += `    const c${i} = b || false;\n`;
     }
-    return (await new JavaScriptParser().parse({text: text + "}", sourcePath: "f.ts"}).next()).value as JS.CompilationUnit;
+    return (await parser.parse({text: text + "}", sourcePath: "f.ts"}).next()).value as JS.CompilationUnit;
 }
 
 function simplified(statements: number): string {

@@ -58,6 +58,16 @@ public class ResolvedPom implements Heavyweight {
 
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
+    // Defined by every JVM, so unlike a `-D` user property they are no reason to override the pom's own properties
+    private static final Set<String> JVM_PROPERTIES = new HashSet<>(Arrays.asList(
+            "java.version", "java.version.date", "java.vendor", "java.vendor.url", "java.vendor.version", "java.home",
+            "java.vm.specification.version", "java.vm.specification.vendor", "java.vm.specification.name",
+            "java.vm.version", "java.vm.vendor", "java.vm.name",
+            "java.specification.version", "java.specification.vendor", "java.specification.name",
+            "java.class.version", "java.class.path", "java.library.path", "java.io.tmpdir",
+            "os.name", "os.arch", "os.version", "file.separator", "path.separator", "line.separator",
+            "user.name", "user.home", "user.dir", "file.encoding", "native.encoding", "stdout.encoding", "stderr.encoding"));
+
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final ResolvedPom SUPER_POM = ResolvedPom.builder()
             .repositories(singletonList(MavenRepository.MAVEN_CENTRAL))
@@ -321,7 +331,9 @@ public class ResolvedPom implements Heavyweight {
         }
         // Maven allows system properties to override project properties
         // This facilitates the usage of "-D" arguments on the command line to customize builds
-        String propVal = System.getProperty(property, properties.get(property));
+        String propVal = JVM_PROPERTIES.contains(property) ?
+                properties.get(property) :
+                System.getProperty(property, properties.get(property));
         if (propVal != null) {
             // Check if this would create a circular reference
             // e.g., <project.version>${project.version}</project.version>
@@ -541,16 +553,17 @@ public class ResolvedPom implements Heavyweight {
 
         private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
+            boolean fromAncestor = pomAncestry.size() > 1;
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergePluginManagement(profile.getPluginManagement());
-                    mergePlugins(profile.getPlugins());
+                    mergePluginManagement(profile.getPluginManagement(), fromAncestor);
+                    mergePlugins(profile.getPlugins(), fromAncestor);
                 }
             }
 
-            mergePluginManagement(pom.getPluginManagement());
-            mergePlugins(pom.getPlugins());
+            mergePluginManagement(pom.getPluginManagement(), fromAncestor);
+            mergePlugins(pom.getPlugins(), fromAncestor);
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
@@ -800,12 +813,12 @@ public class ResolvedPom implements Heavyweight {
             );
         }
 
-        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins, boolean fromAncestor) {
             Map<PluginKey, Plugin> pluginMap = new HashMap<>();
             plugins.forEach(p -> pluginMap.put(getPluginKey(p), p));
 
             for (Plugin incomingPlugin : incomingPlugins) {
-                if ("false".equals(incomingPlugin.getInherited())) {
+                if (fromAncestor && "false".equals(incomingPlugin.getInherited())) {
                     continue;
                 }
                 Plugin plugin = pluginMap.get(getPluginKey(incomingPlugin));
@@ -818,25 +831,25 @@ public class ResolvedPom implements Heavyweight {
             }
         }
 
-        private void mergePlugins(List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (plugins == null || plugins.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     plugins = new ArrayList<>();
                 }
-                mergePlugins(plugins, incomingPlugins);
+                mergePlugins(plugins, incomingPlugins, fromAncestor);
             }
         }
 
-        private void mergePluginManagement(List<Plugin> incomingPlugins) {
+        private void mergePluginManagement(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (pluginManagement == null || pluginManagement.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     pluginManagement = new ArrayList<>();
                 }
-                mergePlugins(pluginManagement, incomingPlugins);
+                mergePlugins(pluginManagement, incomingPlugins, fromAncestor);
             }
         }
 

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,10 +35,19 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Un
 from ..java import JavaType
 
 
+_BOM = '\ufeff'
+
+# Python ends a line at \r\n, \r or \n only, where str.splitlines also breaks at \f, \v and others.
+_LINE = re.compile(r'[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+')
+
+
 def compute_source_line_data(
         source: str,
 ) -> Tuple[List[str], List[int], Optional[Dict[int, List[int]]]]:
     """Split source into lines and compute byte offsets and byte-to-char mappings in one pass.
+
+    A leading byte order mark is no part of the first line, but its bytes count in every offset,
+    as they do in ty's.
 
     Returns:
         source_lines: Lines with line endings stripped.
@@ -45,10 +55,13 @@ def compute_source_line_data(
         byte_to_char: Per-line byte-offset → char-offset mapping for non-ASCII lines only,
                       or None when the source is pure ASCII.
     """
+    bom = source.startswith(_BOM)
+    if bom:
+        source = source[1:]
     is_ascii = source.isascii()
-    lines_with_endings = source.splitlines(True)
+    lines_with_endings = _LINE.findall(source)
     source_lines: List[str] = []
-    offsets: List[int] = [0]
+    offsets: List[int] = [len(_BOM.encode('utf-8')) if bom else 0]
     byte_to_char: Dict[int, List[int]] = {}
 
     for lineno, line in enumerate(lines_with_endings, start=1):
@@ -102,6 +115,10 @@ PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
+
+# The kind ty gives a declaration statement's own binding.
+# A decorator binds its result instead, which can come from any module.
+_DECLARED_KINDS = {'StmtClassDef': 'classLiteral', 'StmtFunctionDef': 'function', 'StmtAsyncFunctionDef': 'function'}
 
 
 def _is_module_function(descriptor: Dict[str, Any]) -> bool:
@@ -349,7 +366,7 @@ class PythonTypeMapping:
                          together with line_byte_offsets, avoids re-splitting source.
             line_byte_offsets: Pre-computed cumulative byte offsets per line.
         """
-        self._source = source
+        self._source = source.removeprefix(_BOM)
         self._file_path = file_path
         self._temp_file: Optional[Path] = None
 
@@ -361,12 +378,13 @@ class PythonTypeMapping:
         else:
             self._source_lines, self._line_byte_offsets, _ = compute_source_line_data(source)
 
-        # Caches for byte offset and type ID lookups
-        self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
+        # Cache for type ID lookups
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
-        # Lazily populated by _module_ast / _import_bindings
+        # Lazily populated by _module_ast / _import_bindings / _source_module_name
         self._module_ast_parsed = False
+        self._source_module_searched = False
+        self._source_module: Optional[str] = None
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
         self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
@@ -464,22 +482,11 @@ class PythonTypeMapping:
                 return None
 
     def _pos_to_byte_offset(self, lineno: int, col_offset: int) -> int:
-        """Convert AST (lineno, col_offset) to an absolute byte offset.
+        """Convert AST (lineno, col_offset) to the absolute byte offset ty-types uses.
 
-        Python's ast uses 1-based lineno and 0-based character col_offset (Python 3.8+).
-        ty-types uses absolute byte offsets (ruff convention).
-        Results are cached since the same position is often queried multiple times.
+        Python's ast counts lines from 1, and columns in UTF-8 bytes from 0.
         """
-        key = (lineno, col_offset)
-        cached = self._byte_offset_cache.get(key)
-        if cached is not None:
-            return cached
-        line_start = self._line_byte_offsets[lineno - 1]
-        line_text = self._source_lines[lineno - 1] if lineno <= len(self._source_lines) else ""
-        byte_col = len(line_text[:col_offset].encode('utf-8'))
-        result = line_start + byte_col
-        self._byte_offset_cache[key] = result
-        return result
+        return self._line_byte_offsets[lineno - 1] + col_offset
 
     def _build_index(self, result: Dict[str, Any]) -> None:
         """Build the byte-offset lookup index from a getTypes response."""
@@ -1090,8 +1097,17 @@ class PythonTypeMapping:
             if isinstance(candidate, JavaType.Class) and candidate.fully_qualified_name == fqn
         ), None)
         if declared is None:
+            declared = self._class_of_methods(node)
+        if declared is None:
             cache_key = fqn if module_name else f"{self._file_path}#{class_path}"
-            declared = self._create_class_type(fqn, cache_key=cache_key)
+            declared = self._create_class_type(fqn, shallow=False, cache_key=cache_key)
+            if declared.supertype is None:
+                bases = [base_type for base_type in map(self.type, node.bases)
+                         if isinstance(base_type, JavaType.FullyQualified)
+                         and not isinstance(base_type, JavaType.Unknown)]
+                if bases:
+                    declared._supertype = bases[0]
+                    declared._interfaces = bases[1:] or None
 
         annotations = []
         for decorator in decorators:
@@ -1101,16 +1117,38 @@ class PythonTypeMapping:
         declared._annotations = annotations or None
         return declared
 
+    def _class_of_methods(self, node: ast.ClassDef) -> Optional[JavaType.Class]:
+        """The class ty declares the methods of ``node``'s body on.
+        ty sends a class's own type only where something else refers to it, as a method does."""
+        for statement in node.body:
+            if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            type_id = self._lookup_type_id(statement)
+            descriptor = self._type_registry.get(type_id) if type_id is not None else None
+            declaring_id = descriptor.get('declaringClassId') if descriptor else None
+            if declaring_id is not None:
+                declaring = self._resolve_type(declaring_id)
+                if isinstance(declaring, JavaType.Class):
+                    return declaring
+        return None
+
     def _source_module_name(self) -> Optional[str]:
         """The module that owns declarations in this source, when ty exposes one."""
-        for _, (type_id, node_kind) in self._node_index.items():
-            if node_kind not in ('StmtClassDef', 'StmtFunctionDef', 'StmtAsyncFunctionDef'):
+        if self._source_module_searched:
+            return self._source_module
+        self._source_module_searched = True
+        for type_id, node_kind in self._node_index.values():
+            declared_kind = _DECLARED_KINDS.get(node_kind)
+            if declared_kind is None:
                 continue
             descriptor = self._type_registry.get(type_id)
-            module_name = descriptor.get('moduleName') if descriptor else None
+            if descriptor is None or descriptor.get('kind') != declared_kind:
+                continue
+            module_name = descriptor.get('moduleName')
             if module_name and module_name != 'builtins':
-                return _ALIASED_MODULES.get(module_name, module_name)
-        return None
+                self._source_module = _ALIASED_MODULES.get(module_name, module_name)
+                break
+        return self._source_module
 
     def is_field_specifier_call(self, node: ast.expr) -> bool:
         """Whether ty typed ``node`` as a dataclass field-specifier call, which it

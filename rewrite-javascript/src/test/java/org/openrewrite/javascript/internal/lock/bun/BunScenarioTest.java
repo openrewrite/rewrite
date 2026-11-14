@@ -223,7 +223,8 @@ class BunScenarioTest extends LockScenarioTest {
           .files(patchesAbove)
           .paths(scenario.paths(Phase.AFTER, start))
           .host(scenario.host())
-          .release(release == null ? BunRelease.PORTED : BunRelease.of(release))
+          .release(release != null ? BunRelease.of(release) : scenario.recordedRelease() == null ?
+                  BunRelease.PORTED : BunRelease.of(scenario.recordedRelease()))
           .build();
     }
 

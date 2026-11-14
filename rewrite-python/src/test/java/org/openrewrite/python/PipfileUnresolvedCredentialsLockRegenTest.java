@@ -26,8 +26,11 @@ import org.junit.jupiter.api.Timeout;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.python.internal.pipfilelock.PipfileLockHash;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -183,7 +186,7 @@ class PipfileUnresolvedCredentialsLockRegenTest implements RewriteTest {
           {
               "_meta": {
                   "hash": {
-                      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                      "sha256": "%s"
                   },
                   "pipfile-spec": 6,
                   "requires": {},
@@ -215,6 +218,13 @@ class PipfileUnresolvedCredentialsLockRegenTest implements RewriteTest {
               },
               "develop": {}
           }
-          """.formatted(indexUrl(), CERTIFI, WHEEL_2310, SDIST_2310);
+          """.formatted(recorded(pipfileWith(">=2.28.0")), indexUrl(), CERTIFI, WHEEL_2310, SDIST_2310);
+    }
+
+    /** The hash pipenv records for a Pipfile, its {@code [[source]]} hashed as written. */
+    private static String recorded(String pipfile) {
+        Toml.Document parsed = (Toml.Document) new TomlParser().parse(new InMemoryExecutionContext(), pipfile)
+          .findFirst().orElseThrow();
+        return PipfileLockHash.hash(parsed, null, PipfileLockHash.HashVariant.LEGACY);
     }
 }

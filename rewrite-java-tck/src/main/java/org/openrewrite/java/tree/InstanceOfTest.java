@@ -60,7 +60,9 @@ class InstanceOfTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
                 @Override
                 public J visitInstanceOf(J.InstanceOf instanceOf, Integer integer) {
-                    assertThat(instanceOf.getPattern()).isNotNull();
+                    assertThat(instanceOf.getPattern()).isInstanceOfSatisfying(J.Identifier.class, pattern ->
+                      assertThat(TypeUtils.isOfClassType(pattern.getType(),
+                        "l".equals(pattern.getSimpleName()) ? "java.util.List" : "java.util.Set")).isTrue());
                     return instanceOf;
                 }
             }.visit(cu, 0))

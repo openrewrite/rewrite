@@ -40,16 +40,23 @@ export type {Scope, Meaning, Reference} from "./scope";
 // the free functions that have no visitor to reach it through are already in this list.
 export {
     scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesUsedWithin, namesReferencedWithin, bindingNames,
-    deconflict, isReference, isValueReference, isWrite, resolve, referencesOf, declarationsOf, compilationUnitOf, walk
+    deconflict, isReference, isValueReference, isWrite, isAssignmentTarget, resolve, referencesOf, declarationsOf,
+    compilationUnitOf, walk
 } from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";
-export {ImportStyle, moduleNameOf, AddImport} from "./add-import";
+export {
+    ImportStyle, moduleNameOf, AddImport, hasEsmSyntax, isCommonJs, isDirective, prologueLength, withStringValue
+} from "./add-import";
+export {
+    isObjectLiteral, isFunctionOrClassExpression, functionExpressionOf, leftmostExpression, leftmostChild,
+    isLeftmostChild
+} from "./templating/precedence";
 // AMD mechanics `recipes-ui5` builds on directly, beyond the `maybeBind` surface below.
 export type {AmdBlock, AmdCalleeOptions} from "./amd";
 export {
     DEFAULT_AMD_CALLEES, amdBlockOf, enclosingAmdBlock, present, elementsOf, parametersOf, identifierOf,
     dependencyNames, parameterNames, bodyOf, references, namesUsed, lastSegment, derivedBindingName,
-    withDependency, withUnboundDependency, withoutDependencyAt,
+    withDependency, withUnboundDependency, withoutDependencyAt, withFactoryBody,
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
 export type {MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings} from "./binding";

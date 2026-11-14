@@ -127,6 +127,27 @@ class UvLockEngineTest {
         assertThat(http.requests).isEmpty();
     }
 
+    @Test
+    void satisfiedLockIsReturnedAsWrittenWhateverSpellingsItUses() {
+        // uv leaves a lock that satisfies the manifest untouched, so the upload_time alias is not rewritten
+        String lock = resource("a-multi-package/uv.lock").replace("upload-time", "upload_time");
+        Result result = UvLockEngine.regenerate(resource("a-multi-package/pyproject.toml"), lock, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(lock);
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void requirementGatedOnAConflictingExtraDefersToUv() {
+        String lock = resource("a-multi-package/uv.lock").replace("{ name = \"requests\", specifier = \">=2.31\" }",
+          "{ name = \"requests\", specifier = \">=2.31\", conflict = { package = \"fixture-a\", extra = \"cpu\" } }");
+        assertThat(lock).contains("conflict = {");
+        Result result = UvLockEngine.regenerate(resource("a-multi-package/pyproject.toml"), lock, ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("conflicting extra");
+    }
+
     // ---- golden scenario (ii): removal drops the package and its orphaned transitives ----
 
     @Test

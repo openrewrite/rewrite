@@ -39,11 +39,11 @@ public final class BunReleases {
      * gives what that release wrote ({@code BunScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), and every
      * upstream change between them and 1.3.10 that reaches a lock is a question of {@link BunRelease}: the Zig sources
      * from 1.2.0 to 1.3.14, with the Zig standard library and the Highway string search they are built with, and the
-     * Rust translation of 1.4.0 to 1.4.3 (lockfileVersion 2 and 3, scoped overrides, the new JSON and TOML parsers,
+     * Rust translation of 1.4.0 to 1.4.4 (lockfileVersion 2 and 3, scoped overrides, the new JSON and TOML parsers,
      * bunfig over .npmrc, and the rest). The releases before 1.2.0 that write bun.lock (1.1.39 to 1.1.45) write and
      * read its lockfileVersion 0 alone, which no recorded lock is.
      */
-    public static final String PROVEN = "1.2.0 - 1.4.3";
+    public static final String PROVEN = "1.2.0 - 1.4.4";
 
     private static final List<String> ALL = load();
 

@@ -19,15 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 
 import java.util.List;
 import java.util.Objects;
@@ -197,6 +194,16 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
+    public J visitExpressionStatement(K.ExpressionStatement expressionStatement, @Nullable Object ctx) {
+        if (expressionStatement == ctx || !(ctx instanceof K.ExpressionStatement)) {
+            return expressionStatement;
+        }
+
+        K.ExpressionStatement newExpressionStatement = (K.ExpressionStatement) ctx;
+        return expressionStatement.withExpression(visitAndCast(expressionStatement.getExpression(), newExpressionStatement.getExpression()));
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, @Nullable Object ctx) {
         if (functionType == ctx || !(ctx instanceof K.FunctionType)) {
             return functionType;
@@ -347,6 +354,16 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             s = (K.SpreadArgument) temp;
         }
         return s.withExpression(visitAndCast(s.getExpression(), newSpreadArgument.getExpression()));
+    }
+
+    @Override
+    public J visitStatementExpression(K.StatementExpression statementExpression, @Nullable Object ctx) {
+        if (statementExpression == ctx || !(ctx instanceof K.StatementExpression)) {
+            return statementExpression;
+        }
+
+        K.StatementExpression newStatementExpression = (K.StatementExpression) ctx;
+        return statementExpression.withStatement(visitAndCast(statementExpression.getStatement(), newStatementExpression.getStatement()));
     }
 
     @Override
@@ -2226,15 +2243,6 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, newErroneous.getPrefix()));
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return (S) style.applyDefaults();
-        }
-        return null;
     }
 
     private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {

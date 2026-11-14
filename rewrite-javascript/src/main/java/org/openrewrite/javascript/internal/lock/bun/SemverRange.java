@@ -44,7 +44,7 @@ final class SemverRange {
             if (major == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
                 return new Comparator(Op.LTE, SemverVersion.of(SemverVersion.MAX, SemverVersion.MAX, SemverVersion.MAX));
             }
-            return new Comparator(Op.LT, SemverVersion.of(SemverVersion.saturatingIncrement(major, release), 0, 0));
+            return new Comparator(Op.LT, upper(SemverVersion.saturatingIncrement(major, release), 0, 0, release));
         }
 
         /**
@@ -54,7 +54,7 @@ final class SemverRange {
             if (minor == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
                 return new Comparator(Op.LTE, SemverVersion.of(major, SemverVersion.MAX, SemverVersion.MAX));
             }
-            return new Comparator(Op.LT, SemverVersion.of(major, SemverVersion.saturatingIncrement(minor, release), 0));
+            return new Comparator(Op.LT, upper(major, SemverVersion.saturatingIncrement(minor, release), 0, release));
         }
 
         /**
@@ -65,7 +65,15 @@ final class SemverRange {
                 return new Comparator(Op.LTE, SemverVersion.of(major, minor, SemverVersion.MAX));
             }
             return new Comparator(Op.LT,
-                    SemverVersion.of(major, minor, SemverVersion.saturatingIncrement(patch, release)));
+                    upper(major, minor, SemverVersion.saturatingIncrement(patch, release), release));
+        }
+
+        private static SemverVersion upper(long major, long minor, long patch, BunRelease release) {
+            return new SemverVersion(major, minor, patch, release.usesNpmRangeBounds() ? "0" : "", "");
+        }
+
+        static Comparator nullSet() {
+            return new Comparator(Op.LT, new SemverVersion(0, 0, 0, "0", ""));
         }
 
         boolean eql(Comparator rhs) {

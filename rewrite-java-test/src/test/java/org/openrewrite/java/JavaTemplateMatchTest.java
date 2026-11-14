@@ -24,6 +24,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1156,7 +1157,9 @@ class JavaTemplateMatchTest implements RewriteTest {
     @Test
     void matchMemberReferenceWithLiteralReceiver() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template resolves `contains` on its parameter's type, Collection, not on List
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               final JavaTemplate before = JavaTemplate
                 .builder("#{collection:any(java.util.Collection)}.stream().anyMatch(#{value:any(java.lang.Object)}::equals)")
                 .build();

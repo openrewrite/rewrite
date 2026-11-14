@@ -24,6 +24,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class XPathMatcherTest {
 
@@ -109,6 +110,133 @@ class XPathMatcherTest {
         </root>
         """
     ).toList().getFirst();
+
+
+    @Test
+    void numericCoercionRejectsJavaNumberSyntax() {
+        SourceFile doc = new XmlParser().parse(
+          "<root><n>10f</n><n>1e1</n><n>0x1.4p3</n><n>+10</n><n>10</n><n>10.0</n></root>"
+        ).findFirst().orElseThrow();
+        assertThat(matchCount("//n[text() = 10]", doc)).isEqualTo(2);
+        assertThat(matchCount("//n[text() > 9]", doc)).isEqualTo(2);
+    }
+
+    @Test
+    void numericArgumentsUseXPathStringValues() {
+        assertThat(matchCount("//dependency[contains('1', 1)]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[string-length(123) = 3]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[substring-after('v1', 1) = '']", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[starts-with(1.5, '1.5')]", xmlDoc)).isEqualTo(2);
+    }
+
+    @Test
+    void positionInsideFunctionArguments() {
+        assertThat(matchCount("//dependency[not(position() = 1)]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//dependency[contains('2', position())]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//dependency[not(position() = last())]", xmlDoc)).isEqualTo(1);
+    }
+
+    @Test
+    void filterTrailingParentPathsPreserveChildTests() {
+        assertThat(matchCount("(//dependency)[1]/missing/..", xmlDoc)).isZero();
+        assertThat(matchCount("(//dependency)[1]/artifactId/..", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency)[1]/artifactId[@scope='missing']/..", xmlDoc)).isZero();
+    }
+
+    @Test
+    void predicateParentAxisHonorsNameTest() {
+        assertThat(matchCount("//dependency[artifactId/parent::missing]", xmlDoc)).isZero();
+        assertThat(matchCount("//dependency[artifactId/parent::dependency]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[artifactId/parent::node()]", xmlDoc)).isEqualTo(2);
+    }
+
+    @Test
+    void axisNameTestsDistinguishNodeFromNodeType() {
+        assertThat(matchCount("//dependency[self::node]", xmlDoc)).isZero();
+        assertThat(matchCount("//dependency[self::node()]", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("//dependency[self::text()]", xmlDoc)).isZero();
+        assertThat(matchCount("(//artifactId)[1]/@scope/self::missing", xmlDoc)).isZero();
+        assertThat(matchCount("(//artifactId)[1]/@scope/self::node()", xmlDoc)).isEqualTo(1);
+    }
+
+    @Test
+    void rejectTrailingInput() {
+        assertThatThrownBy(() -> XPathCompiler.compile("foo bar")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> XPathCompiler.compile("//dependency]")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void explicitChildAxis() {
+        assertThat(matchCount("/dependencies/child::dependency", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/child::*", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/child::node()", xmlDoc)).isEqualTo(2);
+        assertThat(matchCount("/dependencies/child::dependency[2]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("/dependencies/child::dependency/child::artifactId", xmlDoc)).isEqualTo(2);
+    }
+
+    @Test
+    void nestedPathPredicates() {
+        assertThat(matchCount("//dependency[artifactId[@scope='test']]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//dependency[artifactId[@scope='missing']]", xmlDoc)).isZero();
+    }
+
+    @Test
+    void predicatePathAttributes() {
+        assertThat(matchCount("//dependency[artifactId/@scope='test']", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//dependency[artifactId/@scope]", xmlDoc)).isEqualTo(2);
+    }
+
+    @Test
+    void selfValueInPredicate() {
+        assertThat(matchCount("//artifactId[.='assertj-core']", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("//artifactId[contains(., 'rewrite')]", xmlDoc)).isEqualTo(1);
+    }
+
+    @Test
+    void wildcardPositions() {
+        SourceFile doc = new XmlParser().parse("<root><a/><a/><b/><b/></root>").findFirst().orElseThrow();
+        assertThat(matchCount("/root/*[2]", doc)).isEqualTo(1);
+        assertThat(matchCount("/root/*[2][self::b]", doc)).isZero();
+        assertThat(matchCount("/root/b[2]", doc)).isEqualTo(1);
+        assertThat(matchCount("/root/*[last()]", doc)).isEqualTo(1);
+        assertThat(matchCount("/root/*[position() > 2][1]", doc)).isEqualTo(1);
+        assertThat(matchCount("/root/*[position() > 2][1][self::b]", doc)).isEqualTo(1);
+    }
+
+    @Test
+    void nonNumericRelationalComparison() {
+        SourceFile doc = new XmlParser().parse("<root><n>abc</n><n>10</n><n>9</n></root>").findFirst().orElseThrow();
+        assertThat(matchCount("//n[text() > 9]", doc)).isEqualTo(1);
+        assertThat(matchCount("//n[text() < 'z']", doc)).isZero();
+        assertThat(matchCount("//n[text() = 10.0]", doc)).isEqualTo(1);
+    }
+
+    @Test
+    void keywordNames() {
+        for (String name : new String[]{"text", "comment", "node", "processing-instruction", "and", "or"}) {
+            SourceFile doc = new XmlParser().parse("<root><" + name + " " + name + "='yes'/></root>").findFirst().orElseThrow();
+            assertThat(matchCount("//" + name, doc)).isEqualTo(1);
+            assertThat(matchCount("//@" + name, doc)).isEqualTo(1);
+            assertThat(matchCount("//*[@" + name + "='yes']", doc)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void decimalLiterals() {
+        assertThat(matchCount("//target[text() >= 1.8]", pomXml1)).isEqualTo(1);
+        assertThat(matchCount("//target[text() > 1.8]", pomXml1)).isZero();
+        assertThat(matchCount("//dependency[1.5]", xmlDoc)).isZero();
+    }
+
+    @Test
+    void compiledFilterPaths() {
+        assertThat(matchCount("(//dependency)[1]/artifactId/@scope", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency)[1]//artifactId/@scope", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(/dependencies/dependency[1])[1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency/artifactId[@scope='test'])[1]", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency)[artifactId/@scope='test']/artifactId", xmlDoc)).isEqualTo(1);
+        assertThat(matchCount("(//dependency)[position() > 1][1]/artifactId", xmlDoc)).isEqualTo(1);
+    }
 
     @Test
     void matchAbsolute() {

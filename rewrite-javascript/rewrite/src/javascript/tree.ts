@@ -130,7 +130,7 @@ export namespace JS {
      */
     export interface Alias extends JS, Expression {
         readonly kind: typeof Kind.Alias;
-        readonly propertyName: J.RightPadded<J.Identifier>;
+        readonly propertyName: J.RightPadded<J.Identifier | J.Literal>;
         readonly alias: Expression;
     }
 
@@ -264,6 +264,7 @@ export namespace JS {
     export interface ImportClause extends JS {
         readonly kind: typeof Kind.ImportClause;
         readonly typeOnly: boolean;
+        readonly deferred: boolean;
         readonly name?: J.RightPadded<J.Identifier>;
         readonly namedBindings?: Expression;
     }
@@ -346,7 +347,8 @@ export namespace JS {
             IdentityNotEquals = "IdentityNotEquals",
             In = "In",
             QuestionQuestion = "QuestionQuestion",
-            Comma = "Comma"
+            Comma = "Comma",
+            Exponentiation = "Exponentiation"
         }
     }
 
@@ -580,6 +582,7 @@ export namespace JS {
             QuestionQuestion = "QuestionQuestion",
             And = "And",
             Or = "Or",
+            /** @deprecated `a ** b` is a {@link JS.Binary} of type {@link JS.Binary.Type.Exponentiation}. */
             Power = "Power",
             Exp = "Exp"
         }
@@ -602,7 +605,7 @@ export namespace JS {
          * Represents the index type in an indexed access.
          * @example 'key'
          */
-        export interface IndexType extends JS {
+        export interface IndexType extends JS, Expression, TypeTree {
             readonly kind: typeof Kind.IndexedAccessTypeIndexType;
             readonly element: J.RightPadded<TypeTree>;
             readonly type?: Type;
@@ -633,7 +636,7 @@ export namespace JS {
      * Represents TypeScript computed property name.
      * @example { [key]: value }
      */
-    export interface ComputedPropertyName extends JS, Expression, TypedTree, VariableDeclarator {
+    export interface ComputedPropertyName extends JS, Expression, TypeTree, VariableDeclarator {
         readonly kind: typeof Kind.ComputedPropertyName;
         readonly expression: J.RightPadded<Expression>;
     }
@@ -695,7 +698,7 @@ export namespace JS {
      * @example data["key"](5, 0, 4)
      * @example (() => { return 3 + 5 })()
      */
-    export interface FunctionCall extends JS, MethodCall {
+    export interface FunctionCall extends JS, TypedTree, MethodCall {
         readonly kind: typeof Kind.FunctionCall;
         readonly function?: J.RightPadded<Expression>;
         readonly typeParameters?: J.Container<Expression>;
@@ -706,7 +709,7 @@ export namespace JS {
      * Represents the `void` operator.
      * @example void 0;
      */
-    export interface Void extends JS, Expression {
+    export interface Void extends JS, Expression, Statement {
         readonly kind: typeof Kind.Void;
         readonly expression: Expression;
     }
@@ -737,7 +740,7 @@ export namespace JS {
      * Represents a method declaration in classes or objects.
      * @example class A { [Symbol.asyncIterator]() { ... } }
      */
-    export interface ComputedPropertyMethodDeclaration extends JS, Statement {
+    export interface ComputedPropertyMethodDeclaration extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.ComputedPropertyMethodDeclaration;
         readonly leadingAnnotations: J.Annotation[];
         readonly modifiers: J.Modifier[];
@@ -754,7 +757,7 @@ export namespace JS {
      * @example for (const x of arr) { }
      * @example for await (const x of arr) { }
      */
-    export interface ForOfLoop extends JS {
+    export interface ForOfLoop extends JS, Statement {
         readonly kind: typeof Kind.ForOfLoop;
         readonly await?: J.Space;
         readonly loop: J.ForEachLoop;
@@ -768,7 +771,7 @@ export namespace JS {
      * Represents a for-in loop.
      * @example for (let key in obj) { }
      */
-    export interface ForInLoop extends JS {
+    export interface ForInLoop extends JS, Statement {
         readonly kind: typeof Kind.ForInLoop;
         readonly control: ForInLoop.Control;
         readonly body: J.RightPadded<Statement>;
@@ -802,7 +805,7 @@ export namespace JS {
      * Represents a literal type object in TypeScript.
      * @example type T = { a: number };
      */
-    export interface TypeLiteral extends JS, TypeTree {
+    export interface TypeLiteral extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.TypeLiteral;
         readonly members: J.Block;
         readonly type?: Type;
@@ -812,7 +815,7 @@ export namespace JS {
      * Represents an array destructuring pattern.
      * @example const [a, b] = arr;
      */
-    export interface ArrayBindingPattern extends JS, TypedTree, VariableDeclarator {
+    export interface ArrayBindingPattern extends JS, Expression, TypedTree, VariableDeclarator {
         readonly kind: typeof Kind.ArrayBindingPattern;
         readonly elements: J.Container<Expression>;
         readonly type?: Type;
@@ -822,7 +825,7 @@ export namespace JS {
      * Represents a named element in a binding pattern.
      * @example const { x: alias } = obj;
      */
-    export interface BindingElement extends JS, Statement, TypeTree {
+    export interface BindingElement extends JS, Statement, Expression, TypeTree {
         readonly kind: typeof Kind.BindingElement;
         readonly propertyName?: J.RightPadded<Expression>;
         readonly name: TypedTree;
@@ -858,7 +861,7 @@ export namespace JS {
      * Represents named exports in an export declaration.
      * @example export { a, b };
      */
-    export interface NamedExports extends JS {
+    export interface NamedExports extends JS, Expression {
         readonly kind: typeof Kind.NamedExports;
         readonly elements: J.Container<Expression>;
         readonly type?: Type;
@@ -868,7 +871,7 @@ export namespace JS {
      * Represents a specifier in a named export.
      * @example export { foo as bar };
      */
-    export interface ExportSpecifier extends JS {
+    export interface ExportSpecifier extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.ExportSpecifier;
         readonly typeOnly: J.LeftPadded<boolean>;
         readonly specifier: Expression;
@@ -973,6 +976,13 @@ function javascriptVisitorAdapter<P>(visitor: JavaVisitor<P>): JavaVisitor<P> {
 
 registerJavaExtensionKinds(Object.values(JS.Kind), javascriptVisitorAdapter);
 
+/** Whether a file, or a source path, is TypeScript by its extension: `.ts`, `.tsx`, `.mts` or `.cts`, declaration files included. */
+export function isTypeScript(source: JS.CompilationUnit | string): boolean {
+    return TYPESCRIPT_EXTENSION.test(typeof source === "string" ? source : source.sourcePath);
+}
+
+const TYPESCRIPT_EXTENSION = /\.[cm]?tsx?$/;
+
 export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);
 }
@@ -983,6 +993,11 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
 
 export function isObjectBindingPattern(tree: any): tree is JS.ObjectBindingPattern {
     return tree?.kind === JS.Kind.ObjectBindingPattern;
+}
+
+/** The name a module export is known by, whether spelled as an identifier or as a string literal (`"a-b"`). */
+export function moduleExportName(name: J.Identifier | J.Literal): string {
+    return name.kind === J.Kind.Identifier ? name.simpleName : String(name.value);
 }
 
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));

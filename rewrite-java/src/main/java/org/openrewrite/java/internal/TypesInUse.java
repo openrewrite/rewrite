@@ -350,9 +350,11 @@ public class TypesInUse {
                 String keyword = p.getKeyword();
                 if (keyword != null && visited.add(keyword)) {
                     trie.insert(keyword, explicit);
-                }
-                if (p == JavaType.Primitive.String && visited.add("java.lang.String")) {
-                    trie.insert("java.lang.String", explicit);
+                    // The "java.lang.String" visited key belongs to the String class, which walks its
+                    // supertypes when it claims the key, so the literal leaves it alone
+                    if (p == JavaType.Primitive.String) {
+                        trie.insert("java.lang.String", explicit);
+                    }
                 }
                 if (visited.add("java.lang.Object")) {
                     trie.insert("java.lang.Object", explicit);
@@ -687,7 +689,10 @@ public class TypesInUse {
                         usedMethods.add((JavaType.Method) javaType);
                     }
                 } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
-                        !(cursor.getValue() instanceof J.Lambda)) {
+                        !(cursor.getValue() instanceof J.Lambda) &&
+                        // A source file may carry the type it declares, as a CFML file carries its component or
+                        // template. Like a class declaration's type, that type isn't in use just for being declared.
+                        !(cursor.getValue() instanceof JavaSourceFile)) {
                     if (isFullyQualifiedJavaDocReference(cursor)) {
                         if (javaType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;

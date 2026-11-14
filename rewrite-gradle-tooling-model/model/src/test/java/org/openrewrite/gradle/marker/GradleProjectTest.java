@@ -193,6 +193,11 @@ class GradleProjectTest {
         }
 
         @Test
+        void recordsBuildFilePathRelativeToProjectDirectory() {
+            assertThat(gradleProject.getBuildFilePath()).isEqualTo("build.gradle");
+        }
+
+        @Test
         void resolutionStrategy() {
             GradleDependencyConfiguration runtimeClasspath = requireNonNull(gradleProject.getConfiguration("runtimeClasspath"));
             assertThat(runtimeClasspath.getAllConstraints())
@@ -536,6 +541,50 @@ class GradleProjectTest {
             ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
             GradleProject roundTripped = m.readValue(bais, GradleProject.class);
             assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+    }
+
+    @Nested
+    class RenamedBuildFile {
+        @TempDir
+        static Path dir;
+
+        static OpenRewriteModel model;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins{
+              id 'java'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          rootProject.buildFileName = 'root.gradle'
+          include("api")
+          project(':api').buildFileName = 'api.gradle'
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            Files.write(dir.resolve("root.gradle"), buildGradle.getBytes(StandardCharsets.UTF_8));
+            Files.write(dir.resolve("settings.gradle"), settingsGradle.getBytes(StandardCharsets.UTF_8));
+            Path apiDir = Files.createDirectory(dir.resolve("api"));
+            Files.write(apiDir.resolve("api.gradle"), buildGradle.getBytes(StandardCharsets.UTF_8));
+
+            model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), null);
+        }
+
+        @Test
+        void recordsRenamedRootBuildFile() {
+            assertThat(model.getGradleProject().getBuildFilePath()).isEqualTo("root.gradle");
+        }
+
+        @Test
+        void recordsRenamedSubprojectBuildFileRelativeToItsOwnDirectory() {
+            assertThat(requireNonNull(model.getGradleProjectsByPath().get(":api")).getBuildFilePath())
+              .isEqualTo("api.gradle");
         }
     }
 }

@@ -206,7 +206,7 @@ public class GitProvenance extends Reference implements Marker {
 
     /**
      * The cheap provenance fields (origin, branch, change, autocrlf, eol, remote) are always computed.
-     * Only the optional, expensive commit-history walk that populates {@link #getCommitters()} is
+     * Only the optional, expensive commit-history walk that populates {@link #committers} is
      * configurable, via {@link CommitHistory}.
      *
      * @param projectDir      The project directory.
@@ -216,7 +216,7 @@ public class GitProvenance extends Reference implements Marker {
      *                        or a default with known git hosting services can be used.
      * @param commitHistory   Controls how much of the commit history to walk and how much per-committer
      *                        detail to retain. Use {@link CommitHistory#none()} to skip the walk entirely
-     *                        (in which case {@link #getCommitters()} is {@code null}), {@link CommitHistory#full()}
+     *                        (in which case {@link #committers} is {@code null}), {@link CommitHistory#full()}
      *                        for the entire history, or a bounded preset such as {@link CommitHistory#since(LocalDate)}
      *                        or {@link CommitHistory#lastCommits(int)}.
      * @return A marker containing git provenance information.
@@ -611,7 +611,7 @@ public class GitProvenance extends Reference implements Marker {
 
     /**
      * Controls the optional, expensive commit-history walk that {@link GitProvenance} performs to
-     * populate {@link GitProvenance#getCommitters()}. The cheap provenance fields (origin, branch,
+     * populate {@link GitProvenance#committers}. The cheap provenance fields (origin, branch,
      * change, autocrlf, eol, remote) are always computed and are not affected by this type.
      * <p>
      * Two axes are bounded here, but only through named presets, so the combination space stays small
@@ -639,7 +639,7 @@ public class GitProvenance extends Reference implements Marker {
             this.detail = detail;
         }
 
-        /** Skip the walk entirely. {@link GitProvenance#getCommitters()} will be {@code null}. */
+        /** Skip the walk entirely. {@link GitProvenance#committers} will be {@code null}. */
         public static CommitHistory none() {
             return new CommitHistory(Scope.none(), Detail.COMMITS_BY_DAY);
         }

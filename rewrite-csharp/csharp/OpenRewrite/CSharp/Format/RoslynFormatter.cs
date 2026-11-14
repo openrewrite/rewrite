@@ -21,6 +21,7 @@ using Microsoft.CodeAnalysis.Text;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
+using Syntax = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace OpenRewrite.CSharp.Format;
 
@@ -35,6 +36,7 @@ public static class RoslynFormatter
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu)
     {
+        FormattingListener.BeforeFormat(cu, null, null);
         return Format(cu, targetSubtree: null, stopAfter: null);
     }
 
@@ -74,8 +76,9 @@ public static class RoslynFormatter
             source = printer.Print(mvsCu);
         }
 
-        // 3. Get style from marker (attached during parsing) or fall back to defaults
-        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
+        // 3. Get style from marker (attached during parsing) or fall back to defaults, indented as the file is
+        var formatting = targetSubtree == null ? null : new HashSet<Guid> { targetSubtree.Id };
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? IndentationDetector.DefaultFor(cu, formatting);
 
         // 4. Format with Roslyn (scoped to the target span when available)
         var formattedSource = FormatWithRoslyn(source, style, formatSpan);
@@ -248,8 +251,8 @@ public static class RoslynFormatter
         if (spans.Count == 0)
             return originalCu;
 
-        // 3. Get style from marker (attached during parsing) or fall back to defaults
-        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
+        // 3. Get style from marker (attached during parsing) or fall back to defaults, indented as the file is
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? IndentationDetector.DefaultFor(cu, nodeIds);
 
         // 4. Format with Roslyn, scoped to all target spans
         var formattedSource = FormatWithRoslyn(source, style, spans);
@@ -400,11 +403,18 @@ public static class RoslynFormatter
         private readonly HashSet<Guid> _nodeIds = [];
         private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
 
-        public void Add(J node)
+        /// <summary>
+        /// Registers <paramref name="node"/>. Roslyn formats its prefix as well, unless the node took over the prefix
+        /// of the node at <paramref name="cursor"/>, as a template replacement does, and that prefix doesn't end in a
+        /// line break.
+        /// </summary>
+        public void Add(J node, Cursor? cursor = null)
         {
             var (id, prefix) = PrintableIdAndPrefix(node);
             _nodeIds.Add(id);
-            _preservedPrefixes[id] = prefix;
+            if (cursor?.Value is J replaced && ReferenceEquals(PrintableIdAndPrefix(replaced).prefix, prefix) &&
+                !(prefix.Comments.Count > 0 ? prefix.Comments[^1].Suffix : prefix.Whitespace).EndsWith('\n'))
+                _preservedPrefixes[id] = prefix;
         }
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
@@ -512,6 +522,8 @@ public static class RoslynFormatter
         using var workspace = CreateWorkspace();
         var options = style.GetOrBuildOptionSet(workspace.Options);
 
+        if (FormatFlushNamespace(root, span == null ? null : [span.Value], workspace, options) is { } flush)
+            return flush;
         var formatted = span != null
             ? Formatter.Format(root, span.Value, workspace, options)
             : Formatter.Format(root, workspace, options);
@@ -526,8 +538,82 @@ public static class RoslynFormatter
         using var workspace = CreateWorkspace();
         var options = style.GetOrBuildOptionSet(workspace.Options);
 
-        var formatted = Formatter.Format(root, spans, workspace, options);
+        var spanList = spans.ToList();
+        if (FormatFlushNamespace(root, spanList, workspace, options) is { } flush)
+            return flush;
+        var formatted = Formatter.Format(root, spanList, workspace, options);
         return formatted.ToFullString();
+    }
+
+    /// <summary>
+    /// Roslyn indents the members of a namespace with braces but not those of a file-scoped one, so a file that leaves
+    /// the members of its one namespace flush is formatted as if that namespace were file-scoped, keeping its braces.
+    /// Null for any other file.
+    /// </summary>
+    private static string? FormatFlushNamespace(SyntaxNode root, IReadOnlyList<TextSpan>? spans, Workspace workspace,
+        Microsoft.CodeAnalysis.Options.OptionSet options)
+    {
+        if (root is not Syntax.CompilationUnitSyntax { Members: [Syntax.NamespaceDeclarationSyntax ns] } ||
+            ns.OpenBraceToken.IsMissing || ns.CloseBraceToken.IsMissing || !LeavesMembersFlush(ns, spans))
+            return null;
+        var text = root.SyntaxTree.GetText();
+        var fileScoped = CSharpSyntaxTree.ParseText(text.WithChanges(
+            new TextChange(ns.OpenBraceToken.Span, ";"), new TextChange(ns.CloseBraceToken.Span, " "))).GetRoot();
+        var changes = spans == null
+            ? Formatter.GetFormattedTextChanges(fileScoped, workspace, options)
+            : Formatter.GetFormattedTextChanges(fileScoped, spans, workspace, options);
+        return text.WithChanges(changes
+            .Where(change => !MovesBrace(ns, change))
+            .Select(change => KeepLineBreaksBeforeFirstMember(ns, text, change))).ToString();
+    }
+
+    /// <summary>
+    /// Whether <paramref name="change"/> touches the whitespace before the open brace of <paramref name="ns"/> or on
+    /// either side of its close brace, which a file-scoped namespace has other rules for.
+    /// </summary>
+    private static bool MovesBrace(Syntax.NamespaceDeclarationSyntax ns, TextChange change)
+    {
+        var open = ns.OpenBraceToken;
+        var close = ns.CloseBraceToken;
+        var aroundClose = TextSpan.FromBounds(close.GetPreviousToken().Span.End,
+            close.GetNextToken(includeZeroWidth: true).SpanStart);
+        return change.Span.Start <= open.SpanStart && change.Span.End >= open.GetPreviousToken().Span.End ||
+               aroundClose.IntersectsWith(change.Span);
+    }
+
+    /// <summary>
+    /// <paramref name="change"/> with the line breaks the file has between the open brace and the first member, where
+    /// a file-scoped namespace would put a blank line, and with the indentation Roslyn gives that member.
+    /// </summary>
+    private static TextChange KeepLineBreaksBeforeFirstMember(Syntax.NamespaceDeclarationSyntax ns, SourceText text,
+        TextChange change)
+    {
+        if (change.Span.Start > ns.OpenBraceToken.GetNextToken().SpanStart)
+            return change;
+        var before = text.ToString(change.Span);
+        var after = change.NewText!;
+        return new TextChange(change.Span,
+            before[..(before.LastIndexOf('\n') + 1)] + after[(after.LastIndexOf('\n') + 1)..]);
+    }
+
+    /// <summary>
+    /// Whether the first member of <paramref name="ns"/> that starts a line, of those whose first line Roslyn won't
+    /// reindent, starts in the column of the namespace keyword.
+    /// </summary>
+    private static bool LeavesMembersFlush(Syntax.NamespaceDeclarationSyntax ns, IReadOnlyList<TextSpan>? spans)
+    {
+        var text = ns.SyntaxTree.GetText();
+        var column = text.Lines.GetLinePosition(ns.NamespaceKeyword.SpanStart).Character;
+        foreach (var member in ns.Members)
+        {
+            var start = member.SpanStart;
+            var line = text.Lines.GetLineFromPosition(start);
+            if (spans?.Any(span => span.Contains(start)) == true ||
+                !string.IsNullOrWhiteSpace(text.ToString(TextSpan.FromBounds(line.Start, start))))
+                continue;
+            return start - line.Start == column;
+        }
+        return false;
     }
 
     /// <summary>

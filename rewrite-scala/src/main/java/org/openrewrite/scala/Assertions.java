@@ -37,7 +37,8 @@ public class Assertions {
 
     private static ScalaParser.Builder scalaParser = ScalaParser.builder()
             .classpath(JavaParser.runtimeClasspath())
-            .logCompilationWarningsAndErrors(true);
+            .logCompilationWarningsAndErrors(true)
+            .reuseCompiler(true);
 
     public static SourceSpecs scala(@Language("scala") @Nullable String before) {
         return scala(before, s -> {

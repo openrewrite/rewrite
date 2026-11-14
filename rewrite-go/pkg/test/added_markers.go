@@ -73,7 +73,7 @@ func addedMarkersFailure(parsed []parsedSource, generated []java.Tree) string {
 		}
 		// Code a recipe writes brings along the syntax markers the parser gives it.
 		printed := printTree(after, printer.SanitizedMarkerPrinter)
-		if fresh := reparse(sourcePath, printed); fresh != nil {
+		if fresh := reparse(parser.NewGoParser(), sourcePath, printed); fresh != nil {
 			parsedToo := map[placement]bool{}
 			addPlacements(parsedToo, fresh)
 			kept := unexplained[:0]
@@ -105,7 +105,7 @@ func addedMarkersFailure(parsed []parsedSource, generated []java.Tree) string {
 	}
 	for _, g := range generated {
 		if g != nil {
-			check(generatedSourcePath(g), nil, g)
+			check(sourcePathOf(g), nil, g)
 		}
 	}
 	if found.Len() == 0 {
@@ -115,30 +115,43 @@ func addedMarkersFailure(parsed []parsedSource, generated []java.Tree) string {
 		found.String() + addedMarkersAdvice
 }
 
-// reparse parses source as the harness parses a file at sourcePath, returning nil
-// when it does not parse.
-func reparse(sourcePath, source string) (t java.Tree) {
+// reparse parses source with p as the harness parses a file at sourcePath,
+// returning nil when it does not parse.
+func reparse(p *parser.GoParser, sourcePath, source string) java.Tree {
+	t, _ := parseSource(p, sourcePath, source)
+	return t
+}
+
+// parseSource parses source with p as the harness parses a file at sourcePath,
+// or says why it does not parse.
+func parseSource(p *parser.GoParser, sourcePath, source string) (t java.Tree, err error) {
 	// A parser panic would abort the whole test binary, not just this test.
 	defer func() {
-		if recover() != nil {
-			t = nil
+		if r := recover(); r != nil {
+			t, err = nil, fmt.Errorf("the parser panicked: %v", r)
 		}
 	}()
 	switch {
 	case strings.HasSuffix(sourcePath, ".go"):
-		if cu, err := parser.NewGoParser().Parse(sourcePath, source); err == nil {
-			return cu
+		cu, parseErr := p.Parse(sourcePath, source)
+		if parseErr != nil {
+			return nil, parseErr
 		}
+		return cu, nil
 	case path.Base(sourcePath) == "go.mod":
-		if gm, err := parser.ParseGoModFile(sourcePath, source); err == nil {
-			return gm
+		gm, parseErr := parser.ParseGoModFile(sourcePath, source)
+		if parseErr != nil {
+			return nil, parseErr
 		}
+		return gm, nil
 	case path.Base(sourcePath) == "go.sum":
-		if gs, err := parser.ParseGoSumFile(sourcePath, source); err == nil {
-			return gs
+		gs, parseErr := parser.ParseGoSumFile(sourcePath, source)
+		if parseErr != nil {
+			return nil, parseErr
 		}
+		return gs, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (p placed) String() string {
@@ -253,8 +266,6 @@ func (w *placementWalker) walk(v reflect.Value, root bool) {
 // rewriteRecipeMarkers are markers that rewrite's own Java recipes still leave
 // for themselves, as the Java harness allows.
 var rewriteRecipeMarkers = map[string]bool{
-	"org.openrewrite.marker.AlreadyReplaced":             true,
-	"org.openrewrite.maven.marker.AlreadyIncremented":    true,
 	"org.openrewrite.yaml.MultilineScalarChanged":        true,
 	"org.openrewrite.java.search.UsesMethod$MethodMatch": true,
 }

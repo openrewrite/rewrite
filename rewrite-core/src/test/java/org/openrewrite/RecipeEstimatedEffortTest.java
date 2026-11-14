@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.config.CompositeRecipe;
-import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
 import org.openrewrite.table.RecipeRunStats;
@@ -34,13 +33,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -189,21 +186,17 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         String description = "NoArgRecipe.";
 
         @Override
+        public int maxCycles() {
+            return 1;
+        }
+
+        @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new PlainTextVisitor<>() {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                    for (AlreadyReplaced alreadyReplaced : text.getMarkers().findAll(AlreadyReplaced.class)) {
-                        if (Objects.equals(searchTerm, alreadyReplaced.getFind()) &&
-                            Objects.equals(appendText, alreadyReplaced.getReplace())) {
-                            return text;
-                        }
-                    }
-
                     if (text.getText().contains(searchTerm)) {
-                        return text
-                          .withText(text.getText() + appendText)
-                          .withMarkers(text.getMarkers().add(new AlreadyReplaced(randomId(), searchTerm, appendText)));
+                        return text.withText(text.getText() + appendText);
                     }
                     return super.visitText(text, ctx);
                 }

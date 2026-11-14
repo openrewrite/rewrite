@@ -83,6 +83,7 @@ public final class Lockfile {
     LinkedHashMap<Long, String> patchedDependencies = new LinkedHashMap<>();
     OverrideMap overrides = new OverrideMap();
     CatalogMap catalogs = new CatalogMap();
+    PackageExtensions packageExtensions = new PackageExtensions();
 
     @Nullable Integer savedConfigVersion;
 

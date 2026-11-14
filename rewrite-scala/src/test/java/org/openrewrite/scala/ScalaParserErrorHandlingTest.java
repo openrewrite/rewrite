@@ -20,6 +20,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.tree.ParseError;
 
@@ -44,7 +45,7 @@ class ScalaParserErrorHandlingTest {
     private static final String GOOD_SOURCE = "object Good { val x = 1 }";
 
     @Test
-    void unparseableInputProducesParseErrorAndOtherInputsStillParse() {
+    void unparseableInputProducesParseErrorAndOtherInputsKeepTheirTypes() {
         // Expression nesting deep enough to overflow the stack of dotty's
         // recursive descent parser, making this single input "throw" to parse.
         StringBuilder bad = new StringBuilder("object Bad { val x = ");
@@ -62,8 +63,38 @@ class ScalaParserErrorHandlingTest {
         List<SourceFile> parsed = parser.parse(GOOD_SOURCE, bad.toString()).collect(Collectors.toList());
 
         assertThat(parsed).hasSize(2);
-        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        // If the overflow escaped the batch, every input would fall back to a per-file parse without types.
+        assertGoodIsTyped(parsed.get(0));
         assertThat(parsed.get(1)).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void inputsTooDeepForTheTyperLeaveTheOtherInputsTyped() {
+        // Shallow enough for dotty's parser, too deep for its typer
+        String deep = "1 + ".repeat(3000) + "1";
+        String sum = "object Sum { val x = " + deep + " }";
+        String cons = "object Cons { val x = " + "1 :: ".repeat(3000) + "Nil }";
+        ScalaParser parser = ScalaParser.builder().build();
+
+        assertGoodIsTyped(parser.parse(GOOD_SOURCE, sum).collect(Collectors.toList()).getFirst());
+
+        // Typing the batch without Sum overflows on Cons
+        assertGoodIsTyped(parser.parse(GOOD_SOURCE, sum, cons).collect(Collectors.toList()).getFirst());
+
+        // The run that overflows on Deep.x never reaches Deep.y, which Good refers to
+        List<SourceFile> deepFirst = parser.parse(
+          "object Deep { val x = " + deep + "\n val y = " + deep + " }",
+          "object Good { val x = 1\n val z = Deep.y }"
+        ).collect(Collectors.toList());
+        assertGoodIsTyped(deepFirst.get(1));
+    }
+
+    private static void assertGoodIsTyped(SourceFile parsed) {
+        assertThat(parsed).isInstanceOfSatisfying(S.CompilationUnit.class, good ->
+          assertThat(good.getTypesInUse().getVariables()).anySatisfy(x -> {
+              assertThat(x.getName()).isEqualTo("x");
+              assertThat(x.getType()).isEqualTo(JavaType.Primitive.Int);
+          }));
     }
 
     @Test

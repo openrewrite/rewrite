@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the OpenRewrite Typ
 
 ## Module Overview
 
-TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON and YAML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
+TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON, YAML and XML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
 
 Self-contained Node.js project, separate from the Java monorepo build system.
 
@@ -40,7 +40,7 @@ npm run typecheck
 npm run testhelper -- test/javascript/recipes/order-imports.test.ts
 ```
 
-Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `ci:test`, `start`.
+Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `start`.
 
 ### Java RPC Integration Tests
 
@@ -52,6 +52,10 @@ Tests under `test/rpc/` that exercise real Java recipes spawn `org.openrewrite.m
 ```
 
 This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Alternatively set `REWRITE_JAVASCRIPT_CLASSPATH` to override. Tests in `test/rpc/java-recipe-via-rpc.test.ts` skip cleanly with a one-line warning when neither is configured.
+
+Name such a test `test/rpc/java-*.test.ts`, or add it to `javaTests` in `vitest.config.mts`. That puts it in the `java` vitest project, which Gradle runs as `npmTestJava` and reruns when the Java side changes. Gradle runs the `typescript` project as `npmTestTypeScript`, without the Java classpath.
+
+`./gradlew :rewrite-javascript:npmTest` runs `npmTypecheck`, `npmTestTypeScript` and `npmTestJava` but does no work itself, so `npmTest --rerun` reruns nothing. To force a rerun, pass `--rerun` to `npmTestTypeScript` or `npmTestJava`.
 
 ## Directory Structure
 
@@ -86,6 +90,7 @@ rewrite-javascript/rewrite/
 │   │   └── templating/                  # Template engine
 │   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
 │   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
+│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions, XPathMatcher)
 │   ├── search/                          # Cross-language search utilities
 │   ├── text/                            # Plain text support
 │   ├── rpc/                             # RPC infrastructure
@@ -104,7 +109,7 @@ rewrite-javascript/rewrite/
 │   │   ├── parser/, format/, cleanup/   # Category tests
 │   │   └── search/, templating/, migrate/
 │   ├── java/                            # Java model tests
-│   ├── json/, yaml/                     # JSON/YAML tests
+│   ├── json/, yaml/, xml/               # JSON/YAML/XML tests
 │   └── rpc/                             # RPC integration tests
 ├── tsconfig.json
 ├── vitest.config.mts
@@ -199,14 +204,23 @@ describe('OrderImports', () => {
 
     test('sorts imports', () =>
         spec.rewriteRun(
+            //language=typescript
             typescript(
-                `import {z} from 'zebra';\nimport {a} from 'alpha';`,
-                `import {a} from 'alpha';\nimport {z} from 'zebra';`
+                `
+                import {z} from 'zebra';
+                import {a} from 'alpha';
+                `,
+                `
+                import {a} from 'alpha';
+                import {z} from 'zebra';
+                `
             )
         )
     );
 });
 ```
+
+Prefer writing test sources over real lines rather than with `\n`.
 
 ### Sharing a `RecipeSpec` across tests
 
@@ -264,10 +278,37 @@ A caller that renames references itself defeats this: the name it writes in is t
 wants, so the collision check sees it as taken and the binding keeps an alias instead. Drop such a
 pass rather than run it alongside.
 
+### The member's other spellings
+
+A member is also read through its module rather than an import of it. Those spellings move with it.
+`NS` is a module object: `import * as NS`, `import NS = require`, `const NS = require` or
+`const NS = await import`.
+
+```ts
+// m.Old → m.New
+NS.Old()                     →  NS.New()               // also as a type, `new`, `typeof` or a JSX tag
+NS["Old"]                    →  NS["New"]
+const {Old} = NS             →  const {New: Old} = NS
+import("m").Old              →  import("m").New
+export {Old} from "m"        →  export {New as Old} from "m"
+export {Old as X} from "m"   →  export {New as X} from "m"
+
+// m.Old → m2.New: NS still reads "m", so NS.Old stays
+import("m").Old              →  import("m2").New
+export {Old, X} from "m"     →  export {X} from "m"; export {New as Old} from "m2"
+export {Old} from "m";       →  export {Y, New as Old} from "m2"   // joins a re-export of the same kind
+export {Y} from "m2";
+```
+
+They move even where nothing binds `from`, and `maybeRebind` still returns `undefined`. Where the
+move is refused, none of them move. Left alone: `D.Old` after `import D from "m"`, since the default
+export is the module only with `export =`, and `NS.Old` where the file reassigns a `let` or `var` `NS`.
+
 ### What a rebind's attribution follows
 
 Moving an ES import renames every type in the file that names what moved, following each type's
-signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+signature but not a class's members. So does a move that only renames spellings (`NS.Old` → `NS.New`),
+where it renamed one. An AMD dependency swap rewrites no attribution. Names follow
 the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
 function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
 declared beside a moved member keeps the old name.
@@ -294,6 +335,25 @@ sees what the rebinds before it left: a statement another rebind emptied, or an 
 target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
 renames only the types naming its own member, so a later rebind still finds its own.
 
+Rebinds queued in one visit out of one import statement keep its layout:
+
+```ts
+import {                        import {Button} from '@acme/ui/button';
+    DialogModule,               import {
+    Button,             →           DialogModule,
+    Dialog,                         Dialog,
+} from '@acme/ui';              } from '@acme/ui/dialog';
+```
+
+- An import they create takes the statement's place: right after it while it stands, in its place
+  once it is dropped. The imports split from it sort by module among themselves.
+- A list made of its members keeps the order written there. A merge into any other import is alphabetical.
+- Several members moved to one module keep a multi-line list's line breaks and trailing comma. A member
+  moved out alone, or the last one rewritten where it stands, goes on one line. A member that stays
+  keeps the list as written.
+
+Rebinds from separate visits each lay out their own import, as a lone move would.
+
 ### A rebind of a `require`
 
 Only a top-level `const … = require('m')` declaration binds a module for a rebind, and the file stays
@@ -315,7 +375,8 @@ reads `exports` or `module.exports` anywhere, inside a function too. There `mayb
 `require`, since an `import` would make the file an ES module. A function whose own parameters are
 `require`, `exports` or `module`, as an AMD factory's are, does not count.
 
-A new `require` goes among the file's leading requires, the run after a shebang and `'use strict'`
+A new `require` goes among the file's leading requires, the run after a shebang and any directives
+(`'use strict'`, `'use client'`, `/// <reference … />`, ...)
 that every other top-level statement follows, so nothing at top level reads the binding before it
 is initialised. A member joins a `const` destructuring `require` of its module there that has no
 rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets
@@ -337,7 +398,7 @@ rest element, or else gets `const {m} = require('mod')` at the end of the run. A
 
 The four above that still apply, plus these:
 
-- nothing binds `from`
+- nothing binds `from` (spellings like `NS.Old` still move)
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out

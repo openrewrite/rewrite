@@ -167,8 +167,8 @@ final class PickPackage {
             throw new PnpmError("INVALID_PACKAGE_NAME",
                     "Package name " + name + " is invalid, it should have a @scope");
         }
-        boolean fullMetadata = optional || filterMetadata;
         PnpmRelease release = pickerOpts.getRelease();
+        boolean fullMetadata = optional && release.fetchesFullMetadataForOptionalDependencies() || filterMetadata;
         // from 11.9.0 the packuments the run holds are keyed by registry too, a filtered one apart
         // (PnpmRelease#keysThePackumentCacheByRegistry); the run keeps both keys, the release asked where they differ
         String nameKey = fullMetadata ? name + ":full" : name;

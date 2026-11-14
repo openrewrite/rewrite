@@ -259,6 +259,14 @@ public final class PipenvLockEngine {
         }
 
         Result regenerate() {
+            // a lock whose hash records another Pipfile than the one before the edit was already out of date;
+            // refreshing the hash over that drift would let `pipenv install --deploy` accept a lock missing what the
+            // Pipfile declares
+            if (originalPipfile != null && recordedHash() != null && recordedVariant() == null) {
+                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null, null,
+                        "Pipfile.lock is out of date with the Pipfile before the edit (its _meta.hash records another " +
+                                "Pipfile); pipenv would relock that drift, which the native engine does not reproduce"));
+            }
             Map<String, Map<String, PipfileEntry>> pipfileCategories = readPipfileCategories(pipfile);
             if (pipfileCategories == null) {
                 return Result.failure(new Failure(Reason.UNSUPPORTED_ENTRY_TYPE, null, null,
@@ -1581,19 +1589,27 @@ public final class PipenvLockEngine {
 
         // the recorded hash tells which pipenv wrote the lock, and legacy wins when it matches neither
         private PipfileLockHash.HashVariant hashVariant() {
-            if (originalPipfile == null) {
-                return PipfileLockHash.HashVariant.LEGACY;
-            }
+            PipfileLockHash.HashVariant variant = recordedVariant();
+            return variant == null ? PipfileLockHash.HashVariant.LEGACY : variant;
+        }
+
+        private @Nullable String recordedHash() {
             Object recorded = lockMeta.get("hash") instanceof Map ? ((Map<?, ?>) lockMeta.get("hash")).get("sha256") : null;
-            if (!(recorded instanceof String)) {
-                return PipfileLockHash.HashVariant.LEGACY;
+            return recorded instanceof String ? (String) recorded : null;
+        }
+
+        /** The hashing variant whose hash of the original Pipfile the lock records, or null when neither does. */
+        private PipfileLockHash.@Nullable HashVariant recordedVariant() {
+            String recorded = recordedHash();
+            if (originalPipfile == null || recorded == null) {
+                return null;
             }
             List<Map<String, Object>> fallback = readPipfileSources(originalPipfile).isEmpty() ? lockMetaSources : null;
             if (recorded.equals(PipfileLockHash.hash(originalPipfile, fallback, PipfileLockHash.HashVariant.LEGACY))) {
                 return PipfileLockHash.HashVariant.LEGACY;
             }
             return recorded.equals(PipfileLockHash.hash(originalPipfile, fallback, PipfileLockHash.HashVariant.CANONICAL)) ?
-                    PipfileLockHash.HashVariant.CANONICAL : PipfileLockHash.HashVariant.LEGACY;
+                    PipfileLockHash.HashVariant.CANONICAL : null;
         }
 
         /**

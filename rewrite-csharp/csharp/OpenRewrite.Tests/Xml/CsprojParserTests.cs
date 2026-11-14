@@ -407,4 +407,129 @@ public class CsprojParserTests
         Assert.Empty(mid.ResolvedPackages);
         Assert.Equal(2, Assert.Single(leaf.ResolvedPackages).Depth);
     }
+
+    [Fact]
+    public void VersionPropertiesSetByTheProjectAreRecorded()
+    {
+        var docs = new CsprojParser().ParseAll(
+        [
+            (
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <Version>1.2.0</Version>
+                  </PropertyGroup>
+                </Project>
+                """,
+                "src/App/App.csproj"
+            )
+        ]);
+
+        var properties = docs[0].Markers.FindFirst<MSBuildProject>()!.Properties;
+        Assert.Equal("1.2.0", properties["Version"].Value);
+        Assert.Equal("src/App/App.csproj", properties["Version"].DefinedIn);
+        Assert.Equal("1.2.0", properties["PackageVersion"].Value);
+        Assert.Null(properties["PackageVersion"].DefinedIn);
+    }
+
+    [Fact]
+    public void VersionDerivedFromImportedVersionPrefixIsRecorded()
+    {
+        var docs = new CsprojParser().ParseAll(
+        [
+            (
+                """
+                <Project>
+                  <PropertyGroup>
+                    <VersionPrefix>2.1.0</VersionPrefix>
+                  </PropertyGroup>
+                </Project>
+                """,
+                "Directory.Build.props"
+            ),
+            (
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <VersionSuffix>beta</VersionSuffix>
+                  </PropertyGroup>
+                </Project>
+                """,
+                "src/App/App.csproj"
+            )
+        ]);
+
+        var properties = docs[1].Markers.FindFirst<MSBuildProject>()!.Properties;
+        Assert.Equal("Directory.Build.props", properties["VersionPrefix"].DefinedIn);
+        Assert.Equal("src/App/App.csproj", properties["VersionSuffix"].DefinedIn);
+        Assert.Equal("2.1.0-beta", properties["Version"].Value);
+        Assert.Null(properties["Version"].DefinedIn);
+        Assert.Equal("2.1.0-beta", properties["PackageVersion"].Value);
+    }
+
+    [Fact]
+    public void SdkDefaultsAreNotRecorded()
+    {
+        var doc = new CsprojParser().Parse(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        Assert.Empty(doc.Markers.FindFirst<MSBuildProject>()!.Properties);
+    }
+
+    [Fact]
+    public void PackageIdSetByTheProjectIsRecordedWithoutTheDefaultVersion()
+    {
+        var doc = new CsprojParser().Parse(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <PackageId>Contoso.App</PackageId>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var property = Assert.Single(doc.Markers.FindFirst<MSBuildProject>()!.Properties);
+        Assert.Equal("PackageId", property.Key);
+        Assert.Equal("Contoso.App", property.Value.Value);
+        Assert.Equal("project.csproj", property.Value.DefinedIn);
+    }
+
+    [Fact]
+    public void MarkerFromRestoredLockFileRecordsVersionPropertiesRelativeToRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "openrewrite-version-" + Guid.NewGuid().ToString("N")[..8]);
+        var projectDir = Path.Combine(root, "src", "App");
+        Directory.CreateDirectory(projectDir);
+        try
+        {
+            const string csproj = """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <PackageVersion>3.0.0</PackageVersion>
+                  </PropertyGroup>
+                </Project>
+                """;
+            File.WriteAllText(Path.Combine(projectDir, "App.csproj"), csproj);
+            var doc = new XmlParser().Parse(csproj, "src/App/App.csproj");
+
+            var marker = MSBuildProjectHelper.CreateMarker(doc, new LockFile(), projectDir);
+
+            Assert.Equal("3.0.0", marker.Properties["PackageVersion"].Value);
+            Assert.Equal("src/App/App.csproj", marker.Properties["PackageVersion"].DefinedIn);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
 }

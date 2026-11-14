@@ -162,7 +162,8 @@ public final class Main {
      * project into. The user's .npmrc gives registries, credentials and network settings only, none of which it reads.
      */
     static String installsInto(PnpmLockRegenerator.Inputs inputs, String dir) {
-        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir, inputs.getEnv());
+        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir, inputs.getEnv(),
+                inputs.getRelease() == null ? PnpmRelease.PORTED : inputs.getRelease());
         if (workspaceDir == null || dir.isEmpty()) {
             return dir;
         }
@@ -189,7 +190,7 @@ public final class Main {
      * the install to, which reads the same files into its own config.
      */
     PnpmOptions config(PnpmRelease release) {
-        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir(), inputs.getEnv());
+        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir(), inputs.getEnv(), release);
         if (workspaceDir != null && !workspaceDir.equals(WORKSPACE_DIR)) {
             // the inputs are rooted at the workspace found from the lock up; the environment names another directory
             throw new CannotKnow("the config of the workspace in " + workspaceDir + ", which " +
@@ -469,8 +470,15 @@ public final class Main {
      */
     static String release(PnpmOptions.@Nullable WantedPackageManager wanted,
                                  Supplier<SpecUtils.@Nullable Descriptor> corepack) {
-        startedByCorepack(wanted, corepack);
-        return runDirectly(wanted);
+        String started = startedByCorepack(wanted, corepack);
+        String direct = runDirectly(wanted);
+        if (started != null && PnpmReleases.installs(started).atLeast(11, 0, 0) !=
+                               PnpmReleases.installs(direct).atLeast(11, 0, 0)) {
+            throw new CannotKnow("the pnpm release that installs the project: corepack starts pnpm " + started +
+                                 " and pnpm run directly installs with " + direct +
+                                 "; the host does not say which runs");
+        }
+        return direct;
     }
 
     private static boolean checks(PnpmOptions.@Nullable WantedPackageManager wanted) {

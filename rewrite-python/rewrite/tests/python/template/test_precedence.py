@@ -19,6 +19,8 @@ from rewrite.python.template import capture, pattern, template
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
+from .._parse_shape import parse_shape
+
 
 def _rule(before: str, after: str) -> Recipe:
     """A recipe rewriting `before` to `after`, so one test drives one slot from source to source."""
@@ -131,6 +133,25 @@ def test_a_bare_tuple_survives_a_subscript_but_not_a_call():
     ))
 
 
+def test_a_parenthesized_tuple_or_generator_is_the_one_the_parser_reads():
+    kinds = []
+
+    def first_argument(cu):
+        kinds.append(type(cu.statements[0].assignment.arguments[0]).__name__)
+
+    RecipeSpec(recipe=_rule("d[{x}]", "f({x})")).rewrite_run(python(
+        "a = d[p, q]\n",
+        "a = f((p, q))\n",
+        after_recipe=first_argument,
+    ))
+    RecipeSpec(recipe=_rule("collect({x})", "sorted({x}, reverse=True)")).rewrite_run(python(
+        "a = collect(v for v in vs)\n",
+        "a = sorted((v for v in vs), reverse=True)\n",
+        after_recipe=first_argument,
+    ))
+    assert kinds == ["CollectionLiteral", "ComprehensionExpression"]
+
+
 def test_a_bare_generator_survives_only_as_a_call_s_sole_argument():
     RecipeSpec(recipe=_rule("collect({x})", "list({x})")).rewrite_run(python(
         "a = collect(v for v in vs)\n",
@@ -171,14 +192,21 @@ def test_a_comprehension_result_takes_an_expression():
     ))
 
 
-def test_an_associative_operator_lets_its_right_operand_regroup():
+def test_a_boolean_operator_keeps_its_right_operand_parenthesized():
     RecipeSpec(recipe=_rule("both({x})", "x and {x}")).rewrite_run(python(
         "a = both(not p and not q)\n",
-        "a = x and not p and not q\n",
+        "a = x and (not p and not q)\n",
+        after_recipe=parse_shape("a = x and (not p and not q)\n"),
     ))
     RecipeSpec(recipe=_rule("either({x})", "x or {x}")).rewrite_run(python(
         "a = either(p or q)\n",
-        "a = x or p or q\n",
+        "a = x or (p or q)\n",
+        after_recipe=parse_shape("a = x or (p or q)\n"),
+    ))
+    RecipeSpec(recipe=_rule("both({x})", "{x} and x")).rewrite_run(python(
+        "a = both(not p and not q)\n",
+        "a = not p and not q and x\n",
+        after_recipe=parse_shape("a = not p and not q and x\n"),
     ))
 
 

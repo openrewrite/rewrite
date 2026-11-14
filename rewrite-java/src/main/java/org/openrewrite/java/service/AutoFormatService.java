@@ -61,7 +61,7 @@ public class AutoFormatService {
      * syntax resolve their own style from {@code sourceFile} instead.
      */
     public <P> JavaVisitor<P> spacesVisitor(SourceFile sourceFile, SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
-        return new SpacesVisitor<>(spacesStyle, stopAfter);
+        return new SpacesVisitor<>(spacesStyle, null, null, stopAfter);
     }
 
     /**

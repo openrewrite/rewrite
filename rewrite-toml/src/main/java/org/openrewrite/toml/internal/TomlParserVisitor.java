@@ -124,7 +124,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     prefix,
                     Markers.EMPTY,
                     source,
-                    unquoteSimpleKey(source)
+                    keyName(source)
             );
         });
     }
@@ -149,19 +149,17 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     /**
-     * Strip surrounding quotes from a TOML key's source text. Per the TOML spec
-     * a quoted key (basic-string {@code "foo"} or literal-string {@code 'foo'})
-     * names the same key as the unquoted form when only ASCII-identifier
-     * characters are involved; the quotes are purely syntactic. Interior escape
-     * sequences are kept as written, unlike in {@link Toml.Literal} string values.
+     * The name a simple key stands for. A basic-string key reads its escapes as a string value does, and a
+     * literal-string key reads none.
      */
-    private static String unquoteSimpleKey(String source) {
+    private static String keyName(String source) {
         if (source.length() < 2) {
             return source;
         }
         char first = source.charAt(0);
-        char last = source.charAt(source.length() - 1);
-        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+        if (first == '"' && source.endsWith("\"")) {
+            return TomlString.decodeBasic(source.substring(1, source.length() - 1), false);
+        } else if (first == '\'' && source.endsWith("'")) {
             return source.substring(1, source.length() - 1);
         }
         return source;
@@ -189,7 +187,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                 value = value.substring(value.startsWith("\r\n") ? 2 : 1);
             }
             if (string.startsWith("\"")) {
-                value = decodeBasicStringEscapes(value, multiline);
+                value = TomlString.decodeBasic(value, multiline);
             }
             return new Toml.Literal(
                     randomId(),
@@ -200,71 +198,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     value
             );
         });
-    }
-
-    /**
-     * TOML basic-string escapes. A backslash ending a line of a multi-line basic string
-     * swallows that newline and the following whitespace. Unknown escapes are kept as
-     * written since the grammar has already accepted the text.
-     */
-    private static String decodeBasicStringEscapes(String raw, boolean multiline) {
-        if (raw.indexOf('\\') < 0) {
-            return raw;
-        }
-        StringBuilder out = new StringBuilder(raw.length());
-        int i = 0;
-        while (i < raw.length()) {
-            char c = raw.charAt(i);
-            if (c != '\\' || i + 1 >= raw.length()) {
-                out.append(c);
-                i++;
-                continue;
-            }
-            char e = raw.charAt(i + 1);
-            switch (e) {
-                case 'b': out.append('\b'); i += 2; break;
-                case 't': out.append('\t'); i += 2; break;
-                case 'n': out.append('\n'); i += 2; break;
-                case 'f': out.append('\f'); i += 2; break;
-                case 'r': out.append('\r'); i += 2; break;
-                case 'e': out.append('\u001b'); i += 2; break;
-                case '"': out.append('"'); i += 2; break;
-                case '\\': out.append('\\'); i += 2; break;
-                case 'u':
-                case 'U': {
-                    int digits = e == 'u' ? 4 : 8;
-                    if (i + 2 + digits <= raw.length()) {
-                        try {
-                            out.appendCodePoint(Integer.parseInt(raw.substring(i + 2, i + 2 + digits), 16));
-                            i += 2 + digits;
-                            break;
-                        } catch (IllegalArgumentException ignored) {
-                            // not hex or beyond U+10FFFF, so the text is kept as written
-                        }
-                    }
-                    out.append(c);
-                    i++;
-                    break;
-                }
-                default:
-                    if (multiline && (e == '\n' || e == '\r' || e == ' ' || e == '\t')) {
-                        int j = i + 1;
-                        while (j < raw.length() && (raw.charAt(j) == ' ' || raw.charAt(j) == '\t')) {
-                            j++;
-                        }
-                        if (j < raw.length() && (raw.charAt(j) == '\n' || raw.charAt(j) == '\r')) {
-                            while (j < raw.length() && Character.isWhitespace(raw.charAt(j))) {
-                                j++;
-                            }
-                            i = j;
-                            break;
-                        }
-                    }
-                    out.append(c);
-                    i++;
-            }
-        }
-        return out.toString();
     }
 
     @Override

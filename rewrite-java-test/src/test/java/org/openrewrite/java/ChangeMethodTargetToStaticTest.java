@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -114,17 +115,112 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     }
 
     @Test
-    void targetToStaticWhenMethodHasSameName() {
+    void qualifyCallWhenInheritedMethodShadowsStaticImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
+          spec -> spec.recipes(
+            new ChangeMethodName("a.A equal(Object, Object)", "equals", null, true),
+            new ChangeMethodTargetToStatic("a.A equals(Object, Object)", "java.util.Objects", null, null)
+          ),
           java(
             """
               package a;
               public class A {
-                 public void method() {}
+                 public static boolean equal(Object a, Object b) { return a == b; }
               }
               """
           ),
+          java(
+            """
+              import static a.A.equal;
+
+              class C {
+                 boolean test(Object x, Object y) {
+                     return equal(equal(x, y), y);
+                 }
+              }
+              """,
+            """
+              import java.util.Objects;
+
+              class C {
+                 boolean test(Object x, Object y) {
+                     return Objects.equals(Objects.equals(x, y), y);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyCallToMethodInheritedByAnonymousClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.Logging log(String)", "b.B", null, null)),
+          java(
+            """
+              package a;
+              public interface Logging {
+                 default void log(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static void log(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Logging;
+
+              class C {
+                 Logging logging = new Logging() {
+                     void test() {
+                         log("x");
+                     }
+                 };
+              }
+              """,
+            """
+              import a.Logging;
+              import b.B;
+
+              class C {
+                 Logging logging = new Logging() {
+                     void test() {
+                         B.log("x");
+                     }
+                 };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void targetToStaticWhenMethodHasSameName() {
+        rewriteRun(
+          // the recipe models a library whose method becomes static, so its output needs the newer version
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class A {
+                   public void method() {}
+                }
+                """
+            ))
+            .afterParser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class A {
+                   public static void method() {}
+                }
+                """
+            )),
           java(
             """
               import a.A;
@@ -261,7 +357,9 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void memberReferenceWithReturnTypeChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", "java.lang.CharSequence", null, false)),
+          // the recipe doesn't re-infer the generic call that the member reference is passed to
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", "java.lang.CharSequence", null, false)),
           java(
             """
               package a;

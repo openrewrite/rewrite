@@ -150,6 +150,21 @@ final class UvLockToml {
         return null;
     }
 
+    static @Nullable Boolean literalBoolean(Toml.Table table, String key) {
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue) {
+                Toml.KeyValue kv = (Toml.KeyValue) value;
+                if (key.equals(keyName(kv)) && kv.getValue() instanceof Toml.Literal) {
+                    Object v = ((Toml.Literal) kv.getValue()).getValue();
+                    if (v instanceof Boolean) {
+                        return (Boolean) v;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     static boolean hasKey(Toml.Table table, String key) {
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue && key.equals(keyName((Toml.KeyValue) value))) {

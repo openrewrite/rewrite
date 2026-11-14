@@ -109,30 +109,30 @@ public class AddLiteralMethodArgument extends Recipe {
 
         private MethodCall visitMethodCall(MethodCall methodCall) {
             MethodCall m = methodCall;
-            List<Expression> originalArgs = m.getArguments();
-            if (methodMatcher.matches(m) && (long) originalArgs.size() >= argumentIndex) {
-                List<Expression> args = new ArrayList<>(originalArgs);
-
-                if (args.size() == 1 && args.get(0) instanceof J.Empty) {
-                    args.remove(0);
-                }
-                JavaType.Primitive primitive;
+            List<Expression> args = new ArrayList<>(m.getArguments());
+            if (args.size() == 1 && args.get(0) instanceof J.Empty) {
+                args.remove(0);
+            }
+            if (methodMatcher.matches(m) && (long) args.size() >= argumentIndex) {
+                JavaType parameterType;
                 String valueSource;
                 Object value;
                 JavaType.Primitive literalType;
                 if (StringUtils.isBlank(primitiveType) || "string".equalsIgnoreCase(primitiveType)) {
-                    primitive = Primitive.String;
+                    // a String literal has the type Primitive.String, but a String parameter has the class type
+                    parameterType = JavaType.ShallowClass.build("java.lang.String");
                     valueSource = String.format("\"%s\"", getLiteral());
                     value = String.valueOf(getLiteral());
-                    literalType = primitive;
+                    literalType = Primitive.String;
                 } else if("char".equalsIgnoreCase(primitiveType)){
-                    primitive = Primitive.Char;
+                    parameterType = Primitive.Char;
                     valueSource = String.format("'%s'", getLiteral());
                     String c = String.valueOf(getLiteral());
                     value = c.length() == 1 ? (Object) c.charAt(0) : getLiteral();
-                    literalType = primitive;
+                    literalType = Primitive.Char;
                 }else {
-                    primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
+                    Primitive primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
+                    parameterType = primitive;
                     valueSource = String.valueOf(getLiteral());
                     // the parser gives the literal the value and type its text has, whatever the parameter's type
                     Object[] parsed = parseLiteral(valueSource);
@@ -140,20 +140,34 @@ public class AddLiteralMethodArgument extends Recipe {
                     literalType = parsed == null ? primitive : (JavaType.Primitive) parsed[1];
                 }
 
-                Expression literal = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, value, valueSource, null, literalType);
+                Space prefix = args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE;
+                if (argumentIndex < args.size()) {
+                    prefix = args.get(argumentIndex).getPrefix();
+                    args.set(argumentIndex, args.get(argumentIndex).withPrefix(Space.SINGLE_SPACE));
+                }
+                Expression literal = new J.Literal(randomId(), prefix, Markers.EMPTY, value, valueSource, null, literalType);
                 m = m.withArguments(ListUtils.insert(args, literal, argumentIndex));
 
                 JavaType.Method methodType = m.getMethodType();
-                if (methodType != null) {
+                if (methodType != null && declaresOwnParameter(methodType)) {
                     m = m.withMethodType(methodType
                             .withParameterNames(ListUtils.insert(methodType.getParameterNames(), "arg" + argumentIndex, argumentIndex))
-                            .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), primitive, argumentIndex)));
+                            .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), parameterType, argumentIndex)));
                     if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
                         m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(m.getMethodType()));
                     }
                 }
             }
             return m;
+        }
+
+        /**
+         * Arguments beyond the declared parameters, or passed to a varargs parameter, leave the signature as it is.
+         */
+        private boolean declaresOwnParameter(JavaType.Method methodType) {
+            int parameters = Math.min(methodType.getParameterNames().size(), methodType.getParameterTypes().size());
+            int lastOwn = methodType.hasFlags(Flag.Varargs) ? parameters - 1 : parameters;
+            return argumentIndex <= lastOwn;
         }
 
         /**

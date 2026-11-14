@@ -227,7 +227,7 @@ public class DependencyWorkspace {
     private static Result install(Requirements requirements, Options options) {
         String python = DependencyManifest.pythonVersion(requirements.getRequiresPython());
         if (python == null) {
-            return failed(options, requirements.getManifest(), "No Python from 3.10 up satisfies " +
+            return failed(options, requirements.getManifest(), "No Python from 3.8 up satisfies " +
                                                                String.join(" and ", requirements.getRequiresPython()));
         }
         String hash = hashContent(installedFrom(requirements, python));

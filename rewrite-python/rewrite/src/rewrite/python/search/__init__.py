@@ -298,7 +298,9 @@ class _TypeSearch(_FindFirst):
             return True
         method = getattr(tree, "method_type", None) if self._include_implicit else None
         return isinstance(method, JavaType.Method) and any(
-            self._uses(t) for t in (method.declaring_type, method.return_type, *method.parameter_types))
+            # A method's type may have no parameter types at all, as the constructor of a class with no
+            # `__init__` does.
+            self._uses(t) for t in (method.declaring_type, method.return_type, *(method.parameter_types or ())))
 
     def _uses(self, type_obj: Any) -> bool:
         return type_obj is not None and _type_matches(type_obj, self._pattern, self._supertype_matcher)

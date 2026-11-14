@@ -21,6 +21,9 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     autoFormat,
+    getStyle,
+    StyleKind,
+    TabsAndIndentsStyle,
     AutoformatVisitor,
     JavaScriptParser,
     JavaScriptVisitor,
@@ -61,15 +64,23 @@ describe('AutoformatVisitor with Prettier', () => {
         )
     });
 
-    test('a file Prettier cannot format keeps its own layout', () => {
+    test('a file Prettier cannot format keeps its own layout', async () => {
         // A parser Prettier has no plugin for is what makes it throw over the whole file
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AutoformatVisitor(undefined,
             [prettierStyle(randomId(), {parser: 'no-such-parser'})]));
-        return spec.rewriteRun(
+        await spec.rewriteRun(
             //language=typescript
-            typescript('const x   =   1+2\n\n\n\nconst  y=3')
+            typescript(`
+                const x   =   1+2
+
+
+
+                const  y=3`)
         );
+        expect(warn).toHaveBeenCalledWith('Prettier formatting failed:',
+            expect.objectContaining({message: expect.stringContaining('no-such-parser')}));
     });
 
     test('subtree formatting with Prettier applies Prettier defaults', async () => {
@@ -448,6 +459,103 @@ function trailingCommaOf(cu: JS.CompilationUnit): TrailingComma {
     const statements = object.body!.statements;
     return findMarker(statements[statements.length - 1], J.Markers.TrailingComma) as TrailingComma;
 }
+
+describe('Prettier project opt-in', () => {
+    test.each([
+        {name: 'transitive installation', manifest: {}, configured: false, enabled: false},
+        {name: 'direct dependency', manifest: {dependencies: {prettier: '^3.0.0'}}, configured: false, enabled: true},
+        {name: 'direct dev dependency', manifest: {devDependencies: {prettier: '^3.0.0'}}, configured: false, enabled: true},
+        {name: 'direct optional dependency', manifest: {optionalDependencies: {prettier: '^3.0.0'}}, configured: false, enabled: true},
+        {name: 'empty config', manifest: {}, configured: true, enabled: true},
+        {name: 'package config', manifest: {prettier: {singleQuote: true}}, configured: false, enabled: true},
+        {name: 'parent dependency outside nearest package', manifest: {}, configured: false, enabled: false, nested: true},
+        {name: 'nested direct dependency', manifest: {devDependencies: {prettier: '^3.0.0'}}, configured: false, enabled: true, nested: true},
+        {name: 'parent config with nested package', manifest: {}, configured: true, enabled: true, nested: true}
+    ])('$name', async ({manifest, configured, enabled, nested}) => {
+        // given
+        await withDir(async repo => {
+            await fsp.mkdir(path.join(repo.path, 'node_modules/prettier'), {recursive: true});
+            await fsp.writeFile(path.join(repo.path, 'node_modules/prettier/package.json'),
+                JSON.stringify({name: 'prettier', version: '3.0.0'}));
+            await fsp.writeFile(path.join(repo.path, 'package.json'), JSON.stringify(nested ?
+                {devDependencies: {prettier: '^3.0.0'}} : manifest));
+            if (configured) {
+                await fsp.writeFile(path.join(repo.path, '.prettierrc'), '{}');
+            }
+            const sourceDir = nested ? path.join(repo.path, 'packages/app') : repo.path;
+            await fsp.mkdir(sourceDir, {recursive: true});
+            if (nested) {
+                await fsp.writeFile(path.join(sourceDir, 'package.json'), JSON.stringify(manifest));
+            }
+            const loader = new PrettierConfigLoader(repo.path);
+
+            // when
+            await loader.detectPrettier();
+            const marker = await loader.getConfigMarker(path.join(sourceDir, 'src/test.ts'));
+
+            // then
+            expect(!!marker).toBe(enabled);
+            if (enabled) {
+                expect(marker!.prettierVersion).toBe('3.0.0');
+            }
+        }, {unsafeCleanup: true});
+    });
+
+    test('detects fallback indentation without sampling Prettier files', async () => {
+        await withDir(async repo => {
+            await fsp.mkdir(path.join(repo.path, 'node_modules/prettier'), {recursive: true});
+            await fsp.writeFile(path.join(repo.path, 'node_modules/prettier/package.json'),
+                JSON.stringify({name: 'prettier', version: '3.0.0'}));
+            const spec = new RecipeSpec();
+            await spec.rewriteRun(npm(repo.path,
+                packageJson('{"name":"test-project"}'),
+                {...json('{}'), path: 'formatted/.prettierrc'},
+                {
+                    ...typescript(`function plain() {
+    return 'key';
+}`),
+                    path: 'src/plain.ts',
+                    beforeRecipe: (sourceFile: JS.CompilationUnit) => {
+                        const style = getStyle(StyleKind.TabsAndIndentsStyle, sourceFile) as TabsAndIndentsStyle;
+                        expect(style.indentSize).toBe(4);
+                    }
+                },
+                {
+                    ...typescript(`function formatted() {
+  const a = 1;
+  const b = 2;
+  return a + b;
+}`),
+                    path: 'formatted/app.ts',
+                    beforeRecipe: (sourceFile: JS.CompilationUnit) => {
+                        expect(sourceFile.markers.markers.some(marker => marker.kind === defaultPrettierStyle.kind)).toBe(true);
+                        expect(sourceFile.markers.markers.some(marker => marker.kind === 'org.openrewrite.javascript.style.Autodetect')).toBe(false);
+                    }
+                }
+            ));
+        }, {unsafeCleanup: true});
+    });
+
+    test('uses detected style when Prettier is only installed transitively', async () => {
+        await withDir(async repo => {
+            await fsp.mkdir(path.join(repo.path, 'node_modules/prettier'), {recursive: true});
+            await fsp.writeFile(path.join(repo.path, 'node_modules/prettier/package.json'),
+                JSON.stringify({name: 'prettier', version: '3.0.0'}));
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AutoformatVisitor());
+            await spec.rewriteRun(npm(repo.path,
+                packageJson('{"name":"test-project"}'),
+                {
+                    ...typescript(`const key = 'key';`),
+                    beforeRecipe: (sourceFile: JS.CompilationUnit) => {
+                        expect(sourceFile.markers.markers.some(marker => marker.kind === defaultPrettierStyle.kind)).toBe(false);
+                        expect(sourceFile.markers.markers.some(marker => marker.kind === 'org.openrewrite.javascript.style.Autodetect')).toBe(true);
+                    }
+                }
+            ));
+        }, {unsafeCleanup: true});
+    });
+});
 
 describe('Prettier auto-detection integration', () => {
     // These tests verify that Prettier config is automatically detected from .prettierrc

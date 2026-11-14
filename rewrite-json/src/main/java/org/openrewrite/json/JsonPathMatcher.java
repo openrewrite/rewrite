@@ -25,12 +25,14 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.internal.grammar.JsonPathLexer;
 import org.openrewrite.json.internal.grammar.JsonPathParser;
 import org.openrewrite.json.internal.grammar.JsonPathParserBaseVisitor;
 import org.openrewrite.json.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -74,12 +76,7 @@ public class JsonPathMatcher {
             start = cursorPath.get(0);
         }
         JsonPathParser.JsonPathContext ctx = parse();
-        // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
-        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
-                (JsonPathParser.ExpressionContext) lastChild :
-                null;
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
+        JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, false);
         Object result = v.visit(ctx);
 
         //noinspection unchecked
@@ -127,13 +124,11 @@ public class JsonPathMatcher {
 
         private final List<Tree> cursorPath;
         protected Object scope;
-        private final JsonPathParser.ExpressionContext stop;
         private final boolean isRecursiveDescent;
 
-        public JsonPathParserJsonVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
+        public JsonPathParserJsonVisitor(List<Tree> cursorPath, Object scope, boolean isRecursiveDescent) {
             this.cursorPath = cursorPath;
             this.scope = scope;
-            this.stop = stop;
             this.isRecursiveDescent = isRecursiveDescent;
         }
 
@@ -167,13 +162,6 @@ public class JsonPathMatcher {
             return super.visitJsonPath(ctx);
         }
 
-        private JsonPathParser.ExpressionContext getExpressionContext(ParserRuleContext ctx) {
-            if (ctx == null || ctx instanceof JsonPathParser.ExpressionContext) {
-                return (JsonPathParser.ExpressionContext) ctx;
-            }
-            return getExpressionContext(ctx.getParent());
-        }
-
         @Override
         public @Nullable Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
             if (scope == null) {
@@ -185,21 +173,28 @@ public class JsonPathMatcher {
             // `$..foo` or `$.foo..bar[?($..buz == 'buz')]`
             List<ParseTree> previous = ctx.getParent().getParent().children;
             ParserRuleContext current = ctx.getParent();
+            boolean wildcard = ctx.dotOperator().wildcard() != null;
             if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
-                    JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, path, null, false);
+                    JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, path, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
-                        if (result != null) {
+                        if (wildcard && result instanceof List) {
+                            results.addAll((List<Object>) result);
+                        } else if (result != null) {
                             results.add(result);
                         }
                     }
                 }
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
+            } else if (wildcard) {
+                List<Object> descendants = new ArrayList<>();
+                collectDescendants(scope, descendants);
+                return getResultFromList(descendants);
             } else {
-                JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, scope, null, true);
+                JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, scope, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {
@@ -208,6 +203,30 @@ public class JsonPathMatcher {
                 }
             }
             return result;
+        }
+
+        private void collectDescendants(@Nullable Object node, List<Object> descendants) {
+            if (node instanceof List) {
+                for (Object o : (List<?>) node) {
+                    collectDescendants(o, descendants);
+                }
+                return;
+            }
+            for (Object child : children(node)) {
+                descendants.add(child);
+                collectDescendants(child, descendants);
+            }
+        }
+
+        private List<?> children(@Nullable Object node) {
+            if (node instanceof Json.Member) {
+                return children(((Json.Member) node).getValue());
+            } else if (node instanceof Json.JsonObject) {
+                return ((Json.JsonObject) node).getMembers();
+            } else if (node instanceof Json.Array) {
+                return ((Json.Array) node).getValues();
+            }
+            return Collections.emptyList();
         }
 
         @Override
@@ -380,32 +399,24 @@ public class JsonPathMatcher {
         @Override
         public @Nullable Object visitWildcard(JsonPathParser.WildcardContext ctx) {
             if (scope instanceof Json.Member) {
-                Json.Member member = (Json.Member) scope;
-                return member.getValue();
+                JsonValue value = ((Json.Member) scope).getValue();
+                if (value instanceof Json.JsonObject) {
+                    return getResultFromList(((Json.JsonObject) value).getMembers());
+                } else if (value instanceof Json.Array) {
+                    return getResultFromList(((Json.Array) value).getValues());
+                }
+                return null;
             } else if (scope instanceof List) {
-                List<Object> results = ((List<Object>) scope).stream()
-                        .map(o -> {
-                            scope = o;
-                            return visitWildcard(ctx);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(toList());
-
                 List<Object> matches = new ArrayList<>();
-                if (stop != null && stop == getExpressionContext(ctx)) {
-                    // Return the values of each result when the JsonPath ends with a wildcard.
-                    results.forEach(o -> matches.add(getValue(o)));
-                } else {
-                    // Unwrap lists of results from visitProperty to match the position of the cursor.
-                    for (Object result : results) {
-                        if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
-                        } else {
-                            matches.add(result);
-                        }
+                for (Object o : (List<Object>) scope) {
+                    scope = o;
+                    Object result = visitWildcard(ctx);
+                    if (result instanceof List) {
+                        matches.addAll((List<Object>) result);
+                    } else if (result != null) {
+                        matches.add(result);
                     }
                 }
-
                 return getResultFromList(matches);
             } else if (scope instanceof Json.JsonObject) {
                 Json.JsonObject jsonObject = (Json.JsonObject) scope;
@@ -435,10 +446,7 @@ public class JsonPathMatcher {
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
-            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
-                return s.substring(1, s.length() - 1);
-            }
-            return "null".equals(s) ? null : s;
+            return s == null ? null : unquoteStringLiteral(s);
         }
 
         @Override
@@ -827,31 +835,9 @@ public class JsonPathMatcher {
             return results;
         }
 
-        // Extract the value from a Json object.
-        private @Nullable Object getValue(Object result) {
-            if (result instanceof Json.Member) {
-                return getValue(((Json.Member) result).getValue());
-            } else if (result instanceof Json.JsonObject) {
-                return ((Json.JsonObject) result).getMembers();
-            } else if (result instanceof List) {
-                return ((List<Object>) result).stream()
-                        .map(this::getValue)
-                        .filter(Objects::nonNull)
-                        .collect(toList());
-            } else if (result instanceof Json.Array) {
-                return ((Json.Array) result).getValues();
-            } else if (result instanceof Json.Literal) {
-                return ((Json.Literal) result).getValue();
-            } else if (result instanceof String) {
-                return result;
-            }
-
-            return null;
-        }
-
         private static String unquoteStringLiteral(String literal) {
             if (literal != null && (literal.startsWith("'") || literal.startsWith("\""))) {
-                return literal.substring(1, literal.length() - 1);
+                return JsonString.decode(literal);
             }
             return "null".equals(literal) ? null : literal;
         }

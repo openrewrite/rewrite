@@ -128,6 +128,9 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
+        if (generic instanceof Type.CapturedType && !((Type.CapturedType) generic).lower.hasTag(TypeTag.BOT)) {
+            return "Generic{? super " + signature(((Type.CapturedType) generic).lower) + "}";
+        }
         String name = generic instanceof Type.CapturedType ? "?" : generic.tsym.name.toString();
 
         if (typeVariableNameStack == null) {

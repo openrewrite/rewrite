@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Collections.addAll;
+import static java.util.Collections.emptyList;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
@@ -90,7 +91,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, String bindType, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, @Nullable String bindType, Set<String> imports,
                          Set<String> genericTypes, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this(code, genericTypes, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports, bindType));
     }
@@ -122,9 +123,18 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
 
-        Substitutions substitutions = substitutions(parameters);
+        Substitutions substitutions = substitutions(withoutCommentsOfReplacedTree(coordinates, parameters));
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
+        // A context-sensitive stub doesn't declare the template's type variables, so those in its types are the
+        // code's own.
+        if (!templateParser.isContextSensitive()) {
+            // the replacement takes the replaced expression's place, so its bind type is that expression's type
+            Expression replaced = coordinates.getMode() == JavaCoordinates.Mode.REPLACEMENT &&
+                                  coordinates.getTree() instanceof Expression ?
+                    (Expression) coordinates.getTree() : null;
+            substitutions.bindTypeVariables(templateParser.getBindType(), replaced);
+        }
 
         JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,
                 substitutedTemplate, coordinates, autoFormat);
@@ -139,8 +149,26 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         return result != scope.getValue() && result instanceof Expression ?
-                (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
+                (J2) substitutions.maybeParenthesize((Expression) result, scope) :
                 result;
+    }
+
+    /**
+     * The replacement keeps the prefix of the tree it replaces, comments included, so that tree passed back in as a
+     * parameter must not bring the same comments along a second time.
+     */
+    private static Object[] withoutCommentsOfReplacedTree(JavaCoordinates coordinates, Object[] parameters) {
+        if (coordinates.getMode() != JavaCoordinates.Mode.REPLACEMENT) {
+            return parameters;
+        }
+        Object[] params = parameters.clone();
+        for (int i = 0; i < params.length; i++) {
+            if (params[i] instanceof J && ((J) params[i]).getId().equals(coordinates.getTree().getId())) {
+                J replaced = (J) params[i];
+                params[i] = replaced.withPrefix(replaced.getPrefix().withComments(emptyList()));
+            }
+        }
+        return params;
     }
 
     private static String unmatchedCoordinatesMessage(Cursor scope, JavaCoordinates coordinates) {
@@ -211,7 +239,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
-        private String bindType = "Object";
+        private @Nullable String bindType;
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 

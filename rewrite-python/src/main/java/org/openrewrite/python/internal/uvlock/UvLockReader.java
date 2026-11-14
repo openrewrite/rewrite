@@ -621,7 +621,8 @@ public final class UvLockReader {
                 hash = stringValue(key, v);
             } else if ("size".equals(key)) {
                 size = longValue(key, v);
-            } else if ("upload-time".equals(key)) {
+            } else if ("upload-time".equals(key) || "upload_time".equals(key)) {
+                // uv reads upload_time, which some locks record, as an alias of upload-time, and writes upload-time
                 uploadTime = stringValue(key, v);
             } else {
                 throw new UvLockFormatException("Unrecognized artifact key: " + key);
@@ -676,6 +677,9 @@ public final class UvLockReader {
                 directory = stringValue(key, v);
             } else if ("hashes".equals(key)) {
                 hashes = stringList(key, v);
+            } else if ("conflict".equals(key)) {
+                throw new UvLockUnsupportedException("Requirement " + name + " records the conflicting extra or group " +
+                        "its source is gated on ([tool.uv.sources] with conflicts), which the native engine does not model");
             } else {
                 throw new UvLockFormatException("Unrecognized requirement key: " + key);
             }

@@ -28,6 +28,7 @@ import {newPageBuffers, PageBuffers, PortMessageWriter, StdioRelay, WorkerPageCh
 import "../text";
 import "../json";
 import "../yaml";
+import "../xml";
 import "../java";
 import "../javascript";
 

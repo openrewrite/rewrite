@@ -45,6 +45,7 @@ final class ReadPackageHook {
 
     private static final String COMPAT_DB = "compat-db.json.gz";
     private static @Nullable Map<String, @Nullable Object> compatPackageExtensions;
+    private static @Nullable Map<String, @Nullable Object> compat203PackageExtensions;
     private static @Nullable List<Map.Entry<String, @Nullable Object>> compatPackageExtensionEntries;
 
     private final List<Hook> hooks;
@@ -84,7 +85,7 @@ final class ReadPackageHook {
                 (Map<String, @Nullable Object>) packageExtensions : null;
         List<Hook> extenders = new ArrayList<>();
         if (!ignoreCompatibilityDb) {
-            extenders.add(createPackageExtender(compatPackageExtensions(), release));
+            extenders.add(createPackageExtender(compatPackageExtensions(release), release));
         }
         if (userExtensions != null) {
             extenders.add(createPackageExtender(userExtensions, release));
@@ -118,6 +119,15 @@ final class ReadPackageHook {
     private static Hook mergedPackageExtender(List<Hook> extenders, boolean ignoreCompatibilityDb,
                                               @Nullable Map<String, @Nullable Object> userExtensions,
                                               PnpmRelease release) {
+        if (!release.usesCompatibilityDatabase206()) {
+            return (manifest, dir) -> {
+                Map<String, @Nullable Object> extended = manifest;
+                for (Hook extender : extenders) {
+                    extended = extender.apply(extended, dir);
+                }
+                return extended;
+            };
+        }
         List<Map.Entry<String, @Nullable Object>> entries = new ArrayList<>();
         if (!ignoreCompatibilityDb) {
             entries.addAll(compatPackageExtensionEntries());
@@ -270,6 +280,23 @@ final class ReadPackageHook {
     }
 
     @SuppressWarnings("unchecked")
+    static synchronized Map<String, @Nullable Object> compatPackageExtensions(PnpmRelease release) {
+        if (release.usesCompatibilityDatabase206()) {
+            return compatPackageExtensions();
+        }
+        if (compat203PackageExtensions == null) {
+            Map<String, @Nullable Object> extensions = new LinkedHashMap<>();
+            String resource = "compat-db-2.0.3.json.gz";
+            for (Object entry : (List<Object>) Manifests.parseValue(readResource(resource), resource)) {
+                List<Object> pair = (List<Object>) entry;
+                extensions.put((String) pair.get(0), pair.get(1));
+            }
+            compat203PackageExtensions = extensions;
+        }
+        return compat203PackageExtensions;
+    }
+
+    @SuppressWarnings("unchecked")
     static synchronized Map<String, @Nullable Object> compatPackageExtensions() {
         if (compatPackageExtensions == null) {
             Map<String, @Nullable Object> extensions = new LinkedHashMap<>();
@@ -299,9 +326,13 @@ final class ReadPackageHook {
     }
 
     private static String readResource() {
-        try (InputStream raw = ReadPackageHook.class.getResourceAsStream(COMPAT_DB)) {
+        return readResource(COMPAT_DB);
+    }
+
+    private static String readResource(String resource) {
+        try (InputStream raw = ReadPackageHook.class.getResourceAsStream(resource)) {
             if (raw == null) {
-                throw new IllegalStateException(COMPAT_DB + " is missing from the classpath");
+                throw new IllegalStateException(resource + " is missing from the classpath");
             }
             try (InputStream in = new GZIPInputStream(raw)) {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();

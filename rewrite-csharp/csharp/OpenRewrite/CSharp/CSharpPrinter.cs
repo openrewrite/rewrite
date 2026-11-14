@@ -104,9 +104,17 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(';');
                 break;
 
-            // AnnotatedStatement: delegate to inner statement
+            case IndexerDeclaration { ExpressionBody: not null }:
+            case ConversionOperatorDeclaration { ExpressionBody: not null }:
+                p.Append(';');
+                break;
+
+            // AnnotatedStatement and Label: delegate to inner statement
             case AnnotatedStatement ann:
                 PrintStatementTerminator(ann.Statement, p);
+                break;
+            case Label label:
+                PrintStatementTerminator(label.Statement, p);
                 break;
 
             // FieldAccess used as statement (like event accessor declarations)
@@ -1349,21 +1357,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         // Print class kind (class, struct, record, interface, etc.)
         VisitSpace(classDecl.ClassKind.Prefix, p);
-        var isStruct = classDecl.Markers.FindFirst<Struct>() != null;
-        var isRecordClass = classDecl.Markers.FindFirst<RecordClass>() != null;
+        var structMarker = classDecl.Markers.FindFirst<Struct>();
+        var recordClass = classDecl.Markers.FindFirst<RecordClass>();
         var isRecord = classDecl.ClassKind.Type == ClassDeclaration.KindType.Record;
 
-        if (isRecord && isStruct)
+        if (isRecord && structMarker != null)
         {
-            // record struct
-            p.Append("record struct");
+            p.Append("record");
+            VisitSpace(structMarker.Prefix.IsEmpty ? Space.SingleSpace : structMarker.Prefix, p);
+            p.Append("struct");
         }
-        else if (isRecord && isRecordClass)
+        else if (isRecord && recordClass != null)
         {
-            // record class (explicit class keyword)
-            p.Append("record class");
+            p.Append("record");
+            VisitSpace(recordClass.Prefix.IsEmpty ? Space.SingleSpace : recordClass.Prefix, p);
+            p.Append("class");
         }
-        else if (isStruct)
+        else if (structMarker != null)
         {
             // plain struct
             p.Append("struct");
@@ -1711,7 +1721,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(label.LabelName.After, p);
         p.Append(':');
         Visit(label.Statement, p);
-        PrintStatementTerminator(label.Statement, p);
+        // PrintStatementTerminator prints the statement's ';' after the space that pads the label
         AfterSyntax(label, p);
         return label;
     }
@@ -1751,9 +1761,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             {
                 Visit(paddedInit.Element, p);
             }
+            VisitSpace(paddedInit.After, p);
             if (i < fl.LoopControl.Init.Count - 1)
             {
-                VisitSpace(paddedInit.After, p);
                 p.Append(',');
             }
         }
@@ -3920,7 +3930,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(indexerDeclaration.ExpressionBody.Before, p);
             p.Append("=>");
             Visit(indexerDeclaration.ExpressionBody.Element, p);
-            p.Append(';');
         }
         else if (indexerDeclaration.Accessors != null)
         {
@@ -4069,7 +4078,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(conversion.ExpressionBody.Before, p);
             p.Append("=>");
             Visit(conversion.ExpressionBody.Element, p);
-            p.Append(';');
         }
         else if (conversion.Body != null)
         {

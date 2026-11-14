@@ -740,6 +740,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
         q.getAndSend(conversionOperatorDeclaration, Cs.ConversionOperatorDeclaration::getBody, el -> visit(el, q));
+        q.getAndSend(conversionOperatorDeclaration, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
         return conversionOperatorDeclaration;
     }
 
