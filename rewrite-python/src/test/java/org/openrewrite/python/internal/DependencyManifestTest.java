@@ -281,6 +281,21 @@ class DependencyManifestTest {
     }
 
     @Test
+    void requiresPythonOfSetupPyKeywordsInADict() throws IOException {
+        // python-poetry/poetry's build script and aliyun/tea-util pass the keywords as a dict
+        write("setup.py", """
+          from setuptools import setup
+
+          kwargs = {
+              'name': 'tea_util',
+              'python_requires': '>=3.6',
+          }
+          setup(**kwargs)
+          """);
+        assertThat(requiresPython(dir)).isEqualTo(">=3.6");
+    }
+
+    @Test
     void requiresPythonOfSetupPyBesideToolOnlyPyproject() throws IOException {
         // huggingface/datasets
         write("pyproject.toml", """

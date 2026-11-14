@@ -67,7 +67,7 @@ public enum DependencyManifest {
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{(\\w+)}");
     private static final Pattern INDEX_NAME = Pattern.compile("[A-Za-z0-9_-]+");
     private static final Pattern SETUP_PY_PYTHON_REQUIRES = Pattern.compile(
-            "(?m)^[^#\\n]*\\bpython_requires\\s*=\\s*[rRuU]?(['\"])(?<specifier>[^'\"\\n]+)\\1");
+            "(?m)^[^#\\n]*\\bpython_requires['\"]?\\s*[=:]\\s*[rRuU]?(['\"])(?<specifier>[^'\"\\n]+)\\1");
     private static final List<String> PIPFILE_LOCAL_KEYS = Arrays.asList("path", "file", "git", "hg", "svn", "bzr");
 
     /**
