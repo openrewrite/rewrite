@@ -42,7 +42,7 @@ public class RemoveAnnotation extends Recipe {
         // Only run on source files that reference the annotation type. The visitor is reachable
         // directly (e.g. via `getVisitor().visitNonNull(...)` on a non-source-file node), where the
         // precondition is bypassed, so this only filters whole-file traversals.
-        return Preconditions.check(new UsesType<>(annotationMatcher.getAnnotationName(), true),
+        return Preconditions.check(UsesType.named(annotationMatcher.getAnnotationName()),
                 new RemoveAnnotationVisitor(annotationMatcher));
     }
 }

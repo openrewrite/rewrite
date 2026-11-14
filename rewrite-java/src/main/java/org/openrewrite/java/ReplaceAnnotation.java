@@ -68,7 +68,7 @@ public class ReplaceAnnotation extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         AnnotationMatcher matcher = new AnnotationMatcher(annotationPatternToReplace);
-        return Preconditions.check(new UsesType<>(matcher.getAnnotationName(), true), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(UsesType.named(matcher.getAnnotationName()), new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {

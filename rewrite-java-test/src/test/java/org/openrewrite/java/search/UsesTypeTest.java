@@ -201,6 +201,70 @@ class UsesTypeTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.List", "java.util.*", "java..*", "java.util.L*st"})
+    void namedFindsTheUsedType(String pattern) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> UsesType.named(pattern))),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<Integer> l;
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+
+              class Test {
+                  List<Integer> l;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.Collection", "java.io.*", "java.io..*", "java.io.Serial*"})
+    void namedIgnoresSupertypesOfUsedTypes(String pattern) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> UsesType.named(pattern))),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void assignableToFindsSupertypesOfUsedTypes() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> UsesType.assignableTo("java.util.Collection"))),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+
+              class Test {
+                  List<String> l;
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("ConstantValue")
     @Test
     void findImplicitTypes() {

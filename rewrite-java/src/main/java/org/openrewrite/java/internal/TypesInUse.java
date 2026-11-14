@@ -96,6 +96,14 @@ public class TypesInUse {
     private volatile boolean implicitPopulated;
 
     /**
+     * Same shape as {@link #trie}, but holding only the names of the referenced types themselves. Building it
+     * reads no supertype or interface.
+     */
+    @Nullable
+    private volatile FqnTrie exactTrie;
+    private volatile boolean exactImplicitPopulated;
+
+    /**
      * Per-{@link TypeNameMatcher} memo for {@link #hasTypeMatching}. Lazily allocated; keyed by
      * the matcher's pattern combined with the {@code includeImplicit} dimension.
      */
@@ -172,8 +180,16 @@ public class TypesInUse {
      * {@link TypeUtils#fullyQualifiedNamesAreEqual(String, String)}.
      */
     public boolean hasType(String fullyQualifiedType, boolean includeImplicit) {
+        return hasType(fullyQualifiedType, includeImplicit, true);
+    }
+
+    /**
+     * Like {@link #hasType(String, boolean)}, but when {@code includeSubtypes} is false only a type named
+     * {@code fullyQualifiedType} itself counts, not one assignable to it.
+     */
+    public boolean hasType(String fullyQualifiedType, boolean includeImplicit, boolean includeSubtypes) {
         String canonical = fullyQualifiedType.indexOf('$') < 0 ? fullyQualifiedType : fullyQualifiedType.replace('$', '.');
-        return getOrBuildTrie(includeImplicit).hasFqn(canonical, includeImplicit);
+        return getOrBuildTrie(includeImplicit, includeSubtypes).hasFqn(canonical, includeImplicit);
     }
 
     /**
@@ -184,7 +200,12 @@ public class TypesInUse {
      * register {@code com.foo.Outer} as a package).
      */
     public boolean hasTypeInPackage(String packageName, boolean includeImplicit) {
-        return getOrBuildTrie(includeImplicit).hasLeafAtDepth(packageName, includeImplicit);
+        return hasTypeInPackage(packageName, includeImplicit, true);
+    }
+
+    /** {@link #hasTypeInPackage(String, boolean)}, counting supertypes only when {@code includeSubtypes}. */
+    public boolean hasTypeInPackage(String packageName, boolean includeImplicit, boolean includeSubtypes) {
+        return getOrBuildTrie(includeImplicit, includeSubtypes).hasLeafAtDepth(packageName, includeImplicit);
     }
 
     /**
@@ -194,7 +215,12 @@ public class TypesInUse {
      * trie size.
      */
     public boolean hasTypeInPackageOrSubpackage(String packageName, boolean includeImplicit) {
-        return getOrBuildTrie(includeImplicit).hasAnyLeafBelow(packageName, includeImplicit);
+        return hasTypeInPackageOrSubpackage(packageName, includeImplicit, true);
+    }
+
+    /** {@link #hasTypeInPackageOrSubpackage(String, boolean)}, counting supertypes only when {@code includeSubtypes}. */
+    public boolean hasTypeInPackageOrSubpackage(String packageName, boolean includeImplicit, boolean includeSubtypes) {
+        return getOrBuildTrie(includeImplicit, includeSubtypes).hasAnyLeafBelow(packageName, includeImplicit);
     }
 
     /**
@@ -206,13 +232,18 @@ public class TypesInUse {
      * match through their raw form, mirroring the semantics of {@link #hasTypeInPackage}.
      */
     public boolean hasTypeMatching(TypeNameMatcher matcher, boolean includeImplicit) {
+        return hasTypeMatching(matcher, includeImplicit, true);
+    }
+
+    /** {@link #hasTypeMatching(TypeNameMatcher, boolean)}, counting supertypes only when {@code includeSubtypes}. */
+    public boolean hasTypeMatching(TypeNameMatcher matcher, boolean includeImplicit, boolean includeSubtypes) {
         Map<String, Boolean> cache = typeMatchingCache;
         if (cache == null) {
             cache = new ConcurrentHashMap<>();
             typeMatchingCache = cache;
         }
-        String key = (includeImplicit ? "+" : "-") + matcher;
-        return cache.computeIfAbsent(key, k -> getOrBuildTrie(includeImplicit).anyLeafFqn(matcher, includeImplicit));
+        String key = (includeImplicit ? "+" : "-") + (includeSubtypes ? "<" : "=") + matcher;
+        return cache.computeIfAbsent(key, k -> getOrBuildTrie(includeImplicit, includeSubtypes).anyLeafFqn(matcher, includeImplicit));
     }
 
     /**
@@ -262,50 +293,116 @@ public class TypesInUse {
         return false;
     }
 
-    private FqnTrie getOrBuildTrie(boolean includeImplicit) {
-        FqnTrie t = trie;
-        if (t == null) {
-            t = buildExplicitTrie();
-            trie = t;
+    private FqnTrie getOrBuildTrie(boolean includeImplicit, boolean includeSubtypes) {
+        if (includeSubtypes) {
+            FqnTrie t = trie;
+            if (t == null) {
+                t = buildExplicitTrie(true);
+                trie = t;
+            }
+            if (includeImplicit && !implicitPopulated) {
+                populateImplicitPass(t, true);
+            }
+            return t;
         }
-        if (includeImplicit && !implicitPopulated) {
-            populateImplicitPass(t);
+        FqnTrie t = exactTrie;
+        if (t == null) {
+            t = buildExplicitTrie(false);
+            exactTrie = t;
+        }
+        if (includeImplicit && !exactImplicitPopulated) {
+            populateImplicitPass(t, false);
         }
         return t;
     }
 
     @SuppressWarnings("deprecation")
     private FqnTrie getOrBuildTrie() {
-        return getOrBuildTrie(false);
+        return getOrBuildTrie(false, true);
     }
 
-    private FqnTrie buildExplicitTrie() {
+    private FqnTrie buildExplicitTrie(boolean includeSubtypes) {
         FqnTrie t = new FqnTrie();
         Set<String> visited = new HashSet<>();
         for (JavaType type : typesInUse) {
             JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
-            walkAssignableTo(checkType, t, true, visited);
+            walk(checkType, t, true, visited, includeSubtypes);
         }
         for (J.Import anImport : cu.getImports()) {
             JavaType target = anImport.isStatic()
                     ? anImport.getQualid().getTarget().getType()
                     : anImport.getQualid().getType();
-            walkAssignableTo(TypeUtils.asFullyQualified(target), t, true, visited);
+            walk(TypeUtils.asFullyQualified(target), t, true, visited, includeSubtypes);
         }
         return t;
     }
 
-    private synchronized void populateImplicitPass(FqnTrie t) {
-        if (implicitPopulated) return;
+    private synchronized void populateImplicitPass(FqnTrie t, boolean includeSubtypes) {
+        if (includeSubtypes ? implicitPopulated : exactImplicitPopulated) {
+            return;
+        }
         Set<String> visited = new HashSet<>();
         for (JavaType.Method method : usedMethods) {
-            walkAssignableTo(method.getDeclaringType(), t, false, visited);
-            walkAssignableTo(method.getReturnType(), t, false, visited);
+            walk(method.getDeclaringType(), t, false, visited, includeSubtypes);
+            walk(method.getReturnType(), t, false, visited, includeSubtypes);
             for (JavaType pt : method.getParameterTypes()) {
-                walkAssignableTo(pt, t, false, visited);
+                walk(pt, t, false, visited, includeSubtypes);
             }
         }
-        implicitPopulated = true;
+        if (includeSubtypes) {
+            implicitPopulated = true;
+        } else {
+            exactImplicitPopulated = true;
+        }
+    }
+
+    private static void walk(@Nullable JavaType from, FqnTrie trie, boolean explicit, Set<String> visited, boolean includeSubtypes) {
+        if (includeSubtypes) {
+            walkAssignableTo(from, trie, explicit, visited);
+        } else {
+            walkNamed(from, trie, explicit, visited);
+        }
+    }
+
+    /**
+     * Inserts the names {@code from} stands for, reading no supertype or interface. An array contributes nothing,
+     * as in {@link #walkAssignableTo}, which reaches only {@code java.lang.Object} for it.
+     */
+    private static void walkNamed(@Nullable JavaType from, FqnTrie trie, boolean explicit, Set<String> visited) {
+        if (from instanceof JavaType.FullyQualified) {
+            if (from instanceof JavaType.Parameterized) {
+                String parameterized = from.toString();
+                //noinspection ConstantConditions
+                if (parameterized != null && visited.add(parameterized)) {
+                    trie.insert(parameterized, explicit);
+                }
+            }
+            String fqn = ((JavaType.FullyQualified) from).getFullyQualifiedName();
+            if (visited.add(fqn)) {
+                trie.insert(fqn, explicit);
+            }
+        } else if (from instanceof JavaType.GenericTypeVariable) {
+            for (JavaType bound : ((JavaType.GenericTypeVariable) from).getBounds()) {
+                walkNamed(bound, trie, explicit, visited);
+            }
+        } else if (from instanceof JavaType.Primitive) {
+            JavaType.Primitive p = (JavaType.Primitive) from;
+            String keyword = p.getKeyword();
+            if (keyword != null && visited.add(keyword)) {
+                trie.insert(keyword, explicit);
+                if (p == JavaType.Primitive.String) {
+                    trie.insert("java.lang.String", explicit);
+                }
+            }
+        } else if (from instanceof JavaType.Variable) {
+            walkNamed(((JavaType.Variable) from).getType(), trie, explicit, visited);
+        } else if (from instanceof JavaType.Method) {
+            walkNamed(((JavaType.Method) from).getReturnType(), trie, explicit, visited);
+        } else if (from instanceof JavaType.Intersection) {
+            for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
+                walkNamed(bound, trie, explicit, visited);
+            }
+        }
     }
 
     /**

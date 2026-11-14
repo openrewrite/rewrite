@@ -44,11 +44,18 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
      * the new methods aren't there. Once enough time has passed for older runtimes to fall out of
      * support, the probe and the fallback path can be removed.
      */
-    private static final boolean TYPES_IN_USE_HAS_TRIE_API = probeTypesInUseHasTrieApi();
+    private static final boolean TYPES_IN_USE_HAS_TRIE_API = probeTypesInUse(String.class, boolean.class);
 
-    private static boolean probeTypesInUseHasTrieApi() {
+    /**
+     * Whether {@link TypesInUse} on the current runtime can answer without walking supertypes, probed for the same
+     * reason as {@link #TYPES_IN_USE_HAS_TRIE_API}. Without it, {@link #named} falls back to the legacy iteration with
+     * exact name comparisons.
+     */
+    private static final boolean TYPES_IN_USE_HAS_EXACT_API = probeTypesInUse(String.class, boolean.class, boolean.class);
+
+    private static boolean probeTypesInUse(Class<?>... hasTypeParameters) {
         try {
-            TypesInUse.class.getMethod("hasType", String.class, boolean.class);
+            TypesInUse.class.getMethod("hasType", hasTypeParameters);
             return true;
         } catch (NoSuchMethodException e) {
             return false;
@@ -68,7 +75,38 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     @Nullable
     private final Boolean includeImplicit;
 
+    private final boolean includeSubtypes;
+
+    /**
+     * Matches a compilation unit that uses the type itself: it appears in the unit's type attribution or imports.
+     * A type the unit only reaches through a supertype of a type it uses doesn't count, so neither does
+     * {@code java.util.Collection} for a unit that only uses {@code java.util.List}.
+     *
+     * @param fullyQualifiedType a fully qualified type name, or a pattern such as {@code com.foo.*} or {@code com.foo..*}
+     */
+    public static <P> UsesType<P> named(String fullyQualifiedType) {
+        return new UsesType<>(fullyQualifiedType, false, false);
+    }
+
+    /**
+     * Matches a compilation unit that uses the type or any type assignable to it, such as {@code java.util.Collection}
+     * for a unit that uses {@code java.util.List}. For a visitor that matches by assignability or overrides.
+     *
+     * @param fullyQualifiedType a fully qualified type name, or a pattern such as {@code com.foo.*} or {@code com.foo..*}
+     */
+    public static <P> UsesType<P> assignableTo(String fullyQualifiedType) {
+        return new UsesType<>(fullyQualifiedType, false, true);
+    }
+
+    /**
+     * Matches a compilation unit that uses the type or any type assignable to it, and with {@code includeImplicit}
+     * also one where it appears only in the signature of a method the unit calls.
+     */
     public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
+        this(fullyQualifiedType, includeImplicit, true);
+    }
+
+    private UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit, boolean includeSubtypes) {
         if (fullyQualifiedType.contains("*")) {
             this.fullyQualifiedType = null;
             final int length = fullyQualifiedType.length();
@@ -98,6 +136,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             this.referenceMatcher = new ExactMatch(fullyQualifiedType);
         }
         this.includeImplicit = includeImplicit;
+        this.includeSubtypes = includeSubtypes;
     }
 
     @Override
@@ -161,7 +200,27 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     private Tree visitTypes(JavaSourceFile cu) {
         boolean implicit = Boolean.TRUE.equals(includeImplicit);
 
-        if (TYPES_IN_USE_HAS_TRIE_API) {
+        if (!includeSubtypes && TYPES_IN_USE_HAS_EXACT_API) {
+            TypesInUse typesInUse = cu.getTypesInUse();
+            if (fullyQualifiedType != null) {
+                return typesInUse.hasType(fullyQualifiedType, implicit, false) ? SearchResult.found(cu) : cu;
+            }
+            if (typePattern instanceof PackagePattern) {
+                return typesInUse.hasTypeInPackage(((PackagePattern) typePattern).getName(), implicit, false) ?
+                        SearchResult.found(cu) : cu;
+            }
+            if (typePattern instanceof PackagePrefixPattern) {
+                return typesInUse.hasTypeInPackageOrSubpackage(((PackagePrefixPattern) typePattern).getPrefix(), implicit, false) ?
+                        SearchResult.found(cu) : cu;
+            }
+            if (typePattern instanceof GenericPattern) {
+                return typesInUse.hasTypeMatching(((GenericPattern) typePattern).getMatcher(), implicit, false) ?
+                        SearchResult.found(cu) : cu;
+            }
+            return cu;
+        }
+
+        if (includeSubtypes && TYPES_IN_USE_HAS_TRIE_API) {
             // Exact FQN: O(1) closure lookup on TypesInUse.
             if (fullyQualifiedType != null) {
                 return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu) : cu;
@@ -183,10 +242,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             return cu;
         }
 
-        // Legacy fallback: TypesInUse on the runtime classpath predates the trie API. Iterate
-        // types-in-use, imports, and (when implicit) used-method types directly. Kept verbatim
-        // from the pre-trie implementation so behavior matches whatever older versions of
-        // rewrite-java do.
+        // Legacy fallback: TypesInUse on the runtime classpath predates the query this needs. Iterate
+        // types-in-use, imports, and (when implicit) used-method types directly.
         return legacyVisit(cu);
     }
 
@@ -229,11 +286,33 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         if (type == null) {
             return c;
         }
-        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
-            fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
+        if (includeSubtypes ? isAssignable(type) : isNamed(type)) {
             return SearchResult.found(c);
         }
         return c;
+    }
+
+    private boolean isAssignable(JavaType type) {
+        return typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
+               fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type);
+    }
+
+    private boolean isNamed(JavaType type) {
+        if (type instanceof JavaType.Primitive) {
+            JavaType.Primitive p = (JavaType.Primitive) type;
+            if (p == JavaType.Primitive.String && isNamed(JavaType.ShallowClass.build("java.lang.String"))) {
+                return true;
+            }
+            return typePattern != null ? typePattern.test(p) : fullyQualifiedType != null && fullyQualifiedType.equals(p.getKeyword());
+        }
+        if (!(type instanceof JavaType.FullyQualified)) {
+            return false;
+        }
+        if (typePattern != null) {
+            return typePattern.test(type);
+        }
+        return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedType, ((JavaType.FullyQualified) type).getFullyQualifiedName()) ||
+               type instanceof JavaType.Parameterized && type.toString().equals(fullyQualifiedType);
     }
 
     @Value

@@ -49,7 +49,7 @@ public class RenameTypeAlias extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>(fullyQualifiedAliasedType, true), new KotlinIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(UsesType.named(fullyQualifiedAliasedType), new KotlinIsoVisitor<ExecutionContext>() {
             @Override
             public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, ExecutionContext ctx) {
                 if (!aliasName.equals(typeAlias.getSimpleName()) || !TypeUtils.isOfClassType(typeAlias.getType(), fullyQualifiedAliasedType)) {

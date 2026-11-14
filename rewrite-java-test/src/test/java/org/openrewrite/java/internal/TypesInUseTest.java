@@ -23,9 +23,12 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -151,6 +154,41 @@ class TypesInUseTest implements RewriteTest {
                 assertThat(tiu.declaresMethod(new MethodMatcher("A g()"))).isTrue();
                 assertThat(tiu.declaresMethod(new MethodMatcher("A *(..)"))).isTrue();
                 assertThat(tiu.declaresMethod(new MethodMatcher("A nonexistent()"))).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
+    void exactQueriesDoNotReadSupertypes() {
+        rewriteRun(
+          java(
+            """
+              class Foo {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean supertypesRead = new AtomicBoolean();
+                JavaType.Class used = new JavaType.Class(null, 1, "a.Sub", JavaType.FullyQualified.Kind.Class,
+                  null, JavaType.ShallowClass.build("a.Base"), null, null, null, null, null) {
+                    @Override
+                    public JavaType.FullyQualified getSupertype() {
+                        supertypesRead.set(true);
+                        return super.getSupertype();
+                    }
+
+                    @Override
+                    public List<JavaType.FullyQualified> getInterfaces() {
+                        supertypesRead.set(true);
+                        return super.getInterfaces();
+                    }
+                };
+                TypesInUse tiu = TypesInUse.of(cu, singleton(used), emptySet(), emptySet(), emptySet());
+
+                assertThat(tiu.hasType("a.Sub", false, false)).isTrue();
+                assertThat(tiu.hasType("a.Base", true, false)).isFalse();
+                assertThat(supertypesRead).isFalse();
+
+                assertThat(tiu.hasType("a.Base", false, true)).isTrue();
             })
           )
         );

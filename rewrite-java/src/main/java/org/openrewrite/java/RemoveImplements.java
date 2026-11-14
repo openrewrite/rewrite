@@ -57,7 +57,7 @@ public class RemoveImplements extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         // Also require the interface type to be used so the recipe only runs on source files
         // that reference it.
-        return Preconditions.check(Preconditions.and(new UsesType<>(interfaceType, true), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.and(UsesType.named(interfaceType), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext ctx) {
                 if (!(classDeclaration.getType() instanceof JavaType.Class) || classDeclaration.getImplements() == null) {

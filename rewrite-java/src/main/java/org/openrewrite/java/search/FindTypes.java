@@ -63,7 +63,7 @@ public class FindTypes extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TypeNameMatcher fullyQualifiedType = TypeNameMatcher.fromPattern(fullyQualifiedTypeName);
 
-        return Preconditions.check(new UsesType<>(fullyQualifiedTypeName, false), new TreeVisitor<Tree, ExecutionContext>() {
+        return Preconditions.check(Boolean.TRUE.equals(checkAssignability) ? UsesType.assignableTo(fullyQualifiedTypeName) : UsesType.named(fullyQualifiedTypeName), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile instanceof JavaSourceFile || sourceFile instanceof SourceFileWithReferences;

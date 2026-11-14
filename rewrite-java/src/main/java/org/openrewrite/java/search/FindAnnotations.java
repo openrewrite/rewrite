@@ -75,7 +75,7 @@ public class FindAnnotations extends Recipe {
         // In meta-annotation mode the matched type need not literally appear in a file (it can be
         // reached transitively), so only require the annotation type's use when matching directly.
         if (!Boolean.TRUE.equals(matchMetaAnnotations)) {
-            precondition = Preconditions.and(new UsesType<>(annotationMatcher.getAnnotationName(), true), precondition);
+            precondition = Preconditions.and(UsesType.named(annotationMatcher.getAnnotationName()), precondition);
         }
 
         return Preconditions.check(precondition,

@@ -89,7 +89,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(UsesType.named(annotationType), new JavaIsoVisitor<ExecutionContext>() {
             private JavaType.@Nullable FullyQualified enumType;
 
             @Override
