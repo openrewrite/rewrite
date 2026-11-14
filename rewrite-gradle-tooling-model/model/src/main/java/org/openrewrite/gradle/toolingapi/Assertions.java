@@ -242,7 +242,7 @@ public class Assertions {
     /**
      * A Gradle user home of this test JVM's own under the directory named by the
      * {@code org.openrewrite.gradle.local.gradle-user-homes} system property, or null if unset. Left for the build to
-     * clean up, as the home's daemons are still writing to it after this JVM exits.
+     * delete when the test task next starts, as the home's daemons are still writing to it after this JVM exits.
      */
     private static @Nullable File testGradleUserHome() {
         String homes = System.getProperty("org.openrewrite.gradle.local.gradle-user-homes");

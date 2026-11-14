@@ -100,6 +100,7 @@ java {
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
     val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
+    val userHomesDir = temporaryDir.resolve("gradle-user-homes")
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         // Filter out test-manifest.txt which contains absolute paths and is tracked separately as @Internal
@@ -113,13 +114,14 @@ tasks.withType<Test>().configureEach {
 
         // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi)
         @get:Internal
-        val userHomes: File = temporaryDir.resolve("gradle-user-homes")
+        val userHomes: File = userHomesDir
 
         override fun asArguments() = listOf(
             "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}",
             "-Dorg.openrewrite.gradle.local.gradle-user-homes=${userHomes.absolutePath}"
         )
     })
+    doFirst { userHomesDir.deleteRecursively() }
     maxHeapSize = "2g"
 }
 
