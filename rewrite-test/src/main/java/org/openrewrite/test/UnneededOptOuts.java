@@ -25,6 +25,7 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Arrays.asList;
@@ -823,6 +824,16 @@ final class UnneededOptOuts {
                 keys.add(key);
             }
             super.putMessage(key, value);
+        }
+
+        @Override
+        public <T> T computeMessageIfAbsent(String key, Function<? super String, ? extends T> defaultValue) {
+            return super.computeMessageIfAbsent(key, k -> {
+                if (!isAlwaysMutable(k)) {
+                    keys.add(k);
+                }
+                return defaultValue.apply(k);
+            });
         }
     }
 }

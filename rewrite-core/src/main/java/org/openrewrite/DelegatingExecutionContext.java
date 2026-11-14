@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 @Getter
 public class DelegatingExecutionContext implements ExecutionContext {
@@ -43,6 +44,11 @@ public class DelegatingExecutionContext implements ExecutionContext {
     @Override
     public <T> @Nullable T getMessage(String key) {
         return delegate.getMessage(key);
+    }
+
+    @Override
+    public <T> T computeMessageIfAbsent(String key, Function<? super String, ? extends T> defaultValue) {
+        return delegate.computeMessageIfAbsent(key, defaultValue);
     }
 
     @Override
