@@ -712,13 +712,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
               zipStorePath=wrapper/dists
               """.formatted(current),
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-              .after(after -> {
-                  assertThat(after).containsPattern(expectedUrlRegex);
-                  Matcher checksumMatcher = Pattern.compile("distributionSha256Sum=(.*)").matcher(after);
-                  assertThat(checksumMatcher.find()).isTrue();
-                  assertThat(checksumMatcher.group(1)).isNotBlank();
-                  return after;
-              })
+              .after(after -> assertThat(after)
+                .containsPattern(expectedUrlRegex)
+                .containsPattern("distributionSha256Sum=[0-9a-f]{64}")
+                .actual())
           ),
           gradlew,
           gradlewBat,
