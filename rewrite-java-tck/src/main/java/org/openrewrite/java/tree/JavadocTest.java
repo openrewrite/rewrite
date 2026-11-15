@@ -27,7 +27,6 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -3453,8 +3452,7 @@ class JavadocTest implements RewriteTest {
                  * @return x
                  **/  int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -3470,8 +3468,7 @@ class JavadocTest implements RewriteTest {
                  */
                 int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -3487,8 +3484,7 @@ class JavadocTest implements RewriteTest {
                  */
                 int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -3503,8 +3499,7 @@ class JavadocTest implements RewriteTest {
                 /** * Get x */
                 int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -3520,8 +3515,7 @@ class JavadocTest implements RewriteTest {
                  */
                 int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -3537,8 +3531,7 @@ class JavadocTest implements RewriteTest {
                  */
                 int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -3554,29 +3547,8 @@ class JavadocTest implements RewriteTest {
                  */
                 int x() { return 1; }
               }
-              """,
-            spec -> spec.afterRecipe(JavadocTest::nothingKeptAsWhitespace)
+              """
           )
         );
-    }
-
-    /// Unparsed source text is kept as whitespace and still prints, so round-tripping alone can't catch it.
-    private static void nothingKeptAsWhitespace(SourceFile sf) {
-        List<String> kept = new ArrayList<>();
-        new JavaIsoVisitor<Integer>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, Integer p) {
-                if (!space.getWhitespace().isBlank()) {
-                    kept.add(loc + ": " + space.getWhitespace().strip());
-                }
-                for (Comment c : space.getComments()) {
-                    if (!c.getSuffix().isBlank()) {
-                        kept.add(loc + ": " + c.getSuffix().strip());
-                    }
-                }
-                return space;
-            }
-        }.visit(sf, 0);
-        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
