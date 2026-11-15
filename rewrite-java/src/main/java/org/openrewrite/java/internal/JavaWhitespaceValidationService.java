@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -31,11 +32,14 @@ public class JavaWhitespaceValidationService implements WhitespaceValidationServ
                 // Descend into comments first so that whitespace of J elements embedded in Javadoc
                 // (e.g. the type references inside `{@link ...}`) is validated as well.
                 space = super.visitSpace(space, loc, ctx);
-                if (!StringUtils.isBlank(space.getWhitespace())) {
-                    return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
-                }
-                return space;
+                space = space.withComments(ListUtils.map(space.getComments(), c -> StringUtils.isBlank(c.getSuffix()) ? c :
+                        c.withSuffix(mark(c.getSuffix()))));
+                return StringUtils.isBlank(space.getWhitespace()) ? space : space.withWhitespace(mark(space.getWhitespace()));
             }
         };
+    }
+
+    private static String mark(String text) {
+        return "~~(non-whitespace)~~>" + text + "<~~";
     }
 }
