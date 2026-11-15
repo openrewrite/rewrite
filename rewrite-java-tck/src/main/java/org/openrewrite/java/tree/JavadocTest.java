@@ -3560,10 +3560,7 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    /**
-     * Printing back alone can't tell whether source text was parsed: text the parser never visits is kept as
-     * whitespace and still prints. Each source here must leave none.
-     */
+    /// Unparsed source text is kept as whitespace and still prints, so round-tripping alone can't catch it.
     private static void nothingKeptAsWhitespace(SourceFile sf) {
         List<String> kept = new ArrayList<>();
         new JavaIsoVisitor<Integer>() {
