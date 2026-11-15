@@ -3479,8 +3479,10 @@ public class GroovyParserVisitor {
                     typeName,
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null && !expression.getOriginType().isGenericsPlaceHolder() && sourceStartsWith("<")) {
+                // Use the declared type's arguments; the inferred type's can differ in number
+                // (`Set<Thread> t = ConcurrentHashMap.newKeySet()` infers KeySetView<K, Boolean>)
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
-                        staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
+                        expression.getOriginType().getGenericsTypes()), type);
             }
             return ident.withPrefix(prefix);
         }
@@ -4451,6 +4453,11 @@ public class GroovyParserVisitor {
         for (int i = start; i < end; i++) {
             if (delimiter == null) {
                 delimiter = getDelimiter(node, i);
+                // Only strings and comments can hold unbalanced parentheses; skipping a closure as a span
+                // ended it early at a nested GString's `}`
+                if (delimiter == CLOSURE || delimiter == ARRAY) {
+                    delimiter = null;
+                }
                 if (delimiter == null) {
                     if (source.charAt(i) == '(') {
                         count++;
@@ -4460,7 +4467,10 @@ public class GroovyParserVisitor {
                 } else {
                     i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
                 }
-            } else if (source.startsWith(delimiter.close, i)) {
+            } else if (source.startsWith(delimiter.close, i) &&
+                       // An escaped quote doesn't end a string
+                       (delimiter == SINGLE_LINE_COMMENT || delimiter == MULTILINE_COMMENT ||
+                        delimiter.isDollarSlashyStringDelimiter() || !isEscaped(i))) {
                 i = closingDelimiterIndex(i, delimiter.close);
                 i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
                 delimiter = null;

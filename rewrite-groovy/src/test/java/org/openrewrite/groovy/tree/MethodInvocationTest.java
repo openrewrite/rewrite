@@ -786,6 +786,82 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void aClosureArgumentHoldingAGstringThenTwoCalls() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                p.t({ "${d}" }).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void theSameInsideAReactorStylePipeline() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                run({ ->
+                  p.timeout(d,
+                    Mono.error { new E("after ${d.toMillis()}ms", null) },
+                    S.parallel())
+                    .doOnError(a.&f)
+                    .block()
+                } as Supplier<T>)
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void anEscapedQuoteAndAParenthesisInTheString() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                p.t({ "a \\" ( b" }).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void aListAndAMapHoldingAGstring() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                p.t([a: "${x}", b: [1, 2]]).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void realParenthesesAroundTheCall() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                (p.t({ "${d}" })).f().g()
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/9267")
     @Test
     void aPropertyReadAtTheEndOfACommandChain() {
