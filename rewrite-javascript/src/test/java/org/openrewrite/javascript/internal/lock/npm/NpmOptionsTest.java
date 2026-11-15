@@ -166,7 +166,7 @@ class NpmOptionsTest {
       "'null'|false", "\"undefined\"|false", "\" false\"|false", "\"FALSE\"|true", "\"abc\"|true", "\"|true", "'|true",
       "\"\"|true", "''|true", "\"abc|true", "abc\"|true", "'[false]'|true", "'{}'|true", "\"\\u0066alse\"|false",
       "false ; comment|false", "false # comment|false", "false\\;x|true", "\\false|true", "fal se|true", "false;|false",
-      "\tfalse|false", "false\t|false", ";|true", "#|true", "\\|true"
+      "\tfalse|false", "false\t|false", ";|true", "~#~|true", "\\|true"
     })
     void iniQuotesCommentsAndEscapes(String value, boolean expected) {
         assertThat(fromNpmrc("legacy-peer-deps=" + value + "\n").isLegacyPeerDeps()).isEqualTo(expected);
