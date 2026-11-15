@@ -3452,8 +3452,7 @@ public class GroovyParserVisitor {
             }
 
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
-            // A declared type spelled with space around its dots (`java . util . Map m`) doesn't start
-            // the source as one name, and was kept as whitespace; typeTree reads it, its spacing included.
+            // A declared type with space around its dots (`java . util . Map m`) is not one name token
             if (!expression.isDynamicTyped() && expression.getOriginType().getUnresolvedName().contains(".") &&
                 !source.startsWith(expression.getOriginType().getUnresolvedName(), indexOfNextNonWhitespace(cursor, source)) &&
                 source.startsWith(expression.getOriginType().getUnresolvedName().substring(0,
@@ -4102,9 +4101,8 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         String maybeFullyQualified = name();
-        // A qualified class name may break around a dot (`new Outer.\n  Inner(…)`);
-        // name() stops at the whitespace. Read on across a dot until the name
-        // reaches the class's own simple name, and only then: `List\n  .of(1)` is a call on List, not a longer name.
+        // A qualified name may break around a dot (`new Outer.\n  Inner(…)`); read on only until the
+        // class's simple name, as `List\n  .of(1)` is a call on List
         if (classNode != null) {
             String simple = classNode.getNameWithoutPackage();
             simple = simple.substring(Math.max(simple.lastIndexOf('$'), simple.lastIndexOf('.')) + 1);
@@ -4152,9 +4150,7 @@ public class GroovyParserVisitor {
             if (i == 0) {
                 expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part.trim(), segmentType, null);
             } else {
-                // The space after this dot leads this part; the space before it trails the previous part.
-                // (matches() on "^\\s*" never matched a part with a name in it, and the before-dot space came from the
-                // wrong part, so `A. B` and `A .B` printed as `A.B`.)
+                // The space after this dot leads this part; the space before it trails the previous part
                 Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
                 Space identFmt = whitespacePrefix.lookingAt() ? format(whitespacePrefix.group(0)) : EMPTY;
 
