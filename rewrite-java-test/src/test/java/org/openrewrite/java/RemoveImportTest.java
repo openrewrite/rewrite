@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -1438,6 +1439,232 @@ class RemoveImportTest implements RewriteTest {
 
               class C {
                   Object o = Inner;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void doNotRemoveStaticMethodImportWhenInvocationLacksTypeAttribution() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo"))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import a.Foo;
+
+              import static a.Foo.doReturn;
+
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo")).when(new Object()).hashCode();
+                  }
+              }
+              """,
+            """
+              import static a.Foo.doReturn;
+
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo")).when(new Object()).hashCode();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void doNotRemoveStaticImportDirectlyWhenInvocationLacksTypeAttribution() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo.doReturn"))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import static a.Foo.doReturn;
+
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void forceRemoveStaticImportEvenWhenInvocationLacksTypeAttribution() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo.doReturn", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import static a.Foo.doReturn;
+
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo"));
+                  }
+              }
+              """,
+            """
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void doNotRemoveOrUnfoldStarStaticImportWhenInvocationLacksTypeAttribution() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo"))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              package a;
+
+              public class Foo {
+                  public static Object bar() {
+                      return null;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import a.Foo;
+
+              import static a.Foo.*;
+
+              class MyTest {
+                  void m() {
+                      bar();
+                      unknownStaticCall(new Unknown("foo")).when(new Object()).hashCode();
+                  }
+              }
+              """,
+            """
+              import static a.Foo.*;
+
+              class MyTest {
+                  void m() {
+                      bar();
+                      unknownStaticCall(new Unknown("foo")).when(new Object()).hashCode();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void doNotRemoveStarStaticImportWhenOnlyUnattributedInvocationExists() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo"))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import a.Foo;
+
+              import static a.Foo.*;
+
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo")).when(new Object()).hashCode();
+                  }
+              }
+              """,
+            """
+              import static a.Foo.*;
+
+              class MyTest {
+                  void m() {
+                      doReturn(new Unknown("foo")).when(new Object()).hashCode();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void doNotRemoveStaticFieldImportWhenReferenceLacksTypeAttribution() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo"))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import a.Foo;
+
+              import static a.Foo.CONST;
+
+              class MyTest {
+                  void m() {
+                      System.out.println(CONST);
+                  }
+              }
+              """,
+            """
+              import static a.Foo.CONST;
+
+              class MyTest {
+                  void m() {
+                      System.out.println(CONST);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3111")
+    @Test
+    void removeUnusedStaticImportDespiteUnattributedQualifiedOrDeclaredName() {
+        rewriteRun(
+          spec -> spec
+            .recipe(removeImport("a.Foo"))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import static a.Foo.doReturn;
+
+              class MyTest {
+                  void doReturn() {
+                  }
+
+                  void m() {
+                      Object o = new Unknown("foo").doReturn();
+                      Object f = new Unknown("foo").doReturn;
+                  }
+              }
+              """,
+            """
+              class MyTest {
+                  void doReturn() {
+                  }
+
+                  void m() {
+                      Object o = new Unknown("foo").doReturn();
+                      Object f = new Unknown("foo").doReturn;
+                  }
               }
               """
           )
