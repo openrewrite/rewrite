@@ -710,6 +710,34 @@ def test_multiline_list_inside_function_with_trailing_comma():
     )
 
 
+def test_multiline_call_inside_function_with_trailing_comma():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create_list():
+              g(1, 2,
+              )
+              return f(
+                1,
+                2,
+              )
+            """,
+            """
+            def create_list():
+                g(1, 2,
+                )
+                return f(
+                    1,
+                    2,
+                )
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
 def test_basic_dictionary():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
     rewrite_run(

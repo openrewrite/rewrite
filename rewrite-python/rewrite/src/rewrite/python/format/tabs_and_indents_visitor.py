@@ -285,6 +285,11 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     elem = self.visit_and_cast(elem, J, p)
                     after = self.visit_space(right.after, p)
 
+            if rp_context == "method_invocation_argument" and trailing_comma:
+                # After a trailing comma, the line break before the closing parenthesis is the comma's.
+                comma = trailing_comma.replace(suffix=self._indent_to(trailing_comma.suffix, indent))
+                right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
+
             t = cast(T, elem)
         else:
             after = self.visit_space(right.after, p)
