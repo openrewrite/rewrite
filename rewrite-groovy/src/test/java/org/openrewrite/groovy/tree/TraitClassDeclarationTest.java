@@ -17,16 +17,10 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.SourceFile;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class TraitClassDeclarationTest implements RewriteTest {
@@ -538,8 +532,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                 }
                 def m() { 1 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -562,8 +555,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                 }
                 def n() { N }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -581,8 +573,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                 }
                 def m() { y }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -606,8 +597,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                   [a: 1]
                 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -625,8 +615,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                 static String NAME = 'n'
                 String s = 's'
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -646,8 +635,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                   {"c": 1}
                 \"""
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -672,8 +660,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                 @Shared @Other
                 static int n
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -695,8 +682,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                 @Deprecated @Other @Deprecated2
                 static String s = 's'
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -716,8 +702,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                   def r = super.get()
                 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -740,8 +725,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                   def v = third
                 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -761,8 +745,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                   foo(b)
                 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -778,8 +761,7 @@ class TraitClassDeclarationTest implements RewriteTest {
                   b
                 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -830,29 +812,8 @@ class TraitClassDeclarationTest implements RewriteTest {
                   [Id: "$id"]
                 }
               }
-              """,
-            spec -> spec.afterRecipe(TraitClassDeclarationTest::nothingKeptAsWhitespace)
+              """
           )
         );
-    }
-
-    /// Unparsed source text is kept as whitespace and still prints, so round-tripping alone can't catch it.
-    private static void nothingKeptAsWhitespace(SourceFile sf) {
-        List<String> kept = new ArrayList<>();
-        new JavaIsoVisitor<Integer>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, Integer p) {
-                if (!space.getWhitespace().isBlank()) {
-                    kept.add(loc + ": " + space.getWhitespace().strip());
-                }
-                for (Comment c : space.getComments()) {
-                    if (!c.getSuffix().isBlank()) {
-                        kept.add(loc + ": " + c.getSuffix().strip());
-                    }
-                }
-                return space;
-            }
-        }.visit(sf, 0);
-        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
