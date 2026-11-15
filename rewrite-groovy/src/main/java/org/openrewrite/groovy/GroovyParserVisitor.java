@@ -4441,9 +4441,8 @@ public class GroovyParserVisitor {
         for (int i = start; i < end; i++) {
             if (delimiter == null) {
                 delimiter = getDelimiter(node, i);
-                // A closure or list is code, whose parentheses balance; only strings and comments can
-                // hold unbalanced ones. Skipping `{ "${d}" }` as a span ended it at the GString's `}`, read the closing
-                // quote as a new string, and missed the call's `)`: `p.t({ "${d}" }).f().g()` got a level of 1.
+                // Only strings and comments can hold unbalanced parentheses; skipping a closure as a span
+                // ended it early at a nested GString's `}`
                 if (delimiter == CLOSURE || delimiter == ARRAY) {
                     delimiter = null;
                 }
