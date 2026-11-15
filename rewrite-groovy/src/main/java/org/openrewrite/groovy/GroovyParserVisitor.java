@@ -4443,6 +4443,11 @@ public class GroovyParserVisitor {
         for (int i = start; i < end; i++) {
             if (delimiter == null) {
                 delimiter = getDelimiter(node, i);
+                // Only strings and comments can hold unbalanced parentheses; skipping a closure as a span
+                // ended it early at a nested GString's `}`
+                if (delimiter == CLOSURE || delimiter == ARRAY) {
+                    delimiter = null;
+                }
                 if (delimiter == null) {
                     if (source.charAt(i) == '(') {
                         count++;
@@ -4452,7 +4457,10 @@ public class GroovyParserVisitor {
                 } else {
                     i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
                 }
-            } else if (source.startsWith(delimiter.close, i)) {
+            } else if (source.startsWith(delimiter.close, i) &&
+                       // An escaped quote doesn't end a string
+                       (delimiter == SINGLE_LINE_COMMENT || delimiter == MULTILINE_COMMENT ||
+                        delimiter.isDollarSlashyStringDelimiter() || !isEscaped(i))) {
                 i = closingDelimiterIndex(i, delimiter.close);
                 i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
                 delimiter = null;
