@@ -189,6 +189,19 @@ class DependencyManifestTest {
     }
 
     @Test
+    void pipfileFullVersionGetsAnEnvOfItsMinor() throws IOException {
+        write("Pipfile", """
+          [packages]
+          six = "*"
+
+          [requires]
+          python_full_version = "3.11.4"
+          """);
+        assertThat(pythonVersion(Pipfile.read(dir, null, emptyMap(), NO_SETUP_PY).getRequiresPython()))
+          .isEqualTo("3.11");
+    }
+
+    @Test
     void requirementsFilesFlattenIntoOneSetThatTakesInLocalProjectsDependencies() throws IOException {
         write("constraints.txt", "urllib3<2\n");
         write("requirements/base.txt", "requests==2.31.0\n");
@@ -317,6 +330,20 @@ class DependencyManifestTest {
         // google/distla_core
         write("setup.py", "setup(name='x', python_requires=('>=3.8.0'),)\n");
         assertThat(requiresPython(dir)).isEqualTo(">=3.8.0");
+    }
+
+    @Test
+    void setupPyLiteralThatOnlyStartsAnExpressionIsNotRead() throws IOException {
+        write("setup.py", """
+          setup(
+              name="x",
+              python_requires='>={}'.format('.'.join(str(n) for n in py_min_version)),
+          )
+          """);
+        assertThat(requiresPython(dir)).isNull();
+
+        write("setup.py", "setup(name='x', python_requires=', '.join(['>=3.6', '!=3.7.*']))\n");
+        assertThat(requiresPython(dir)).isNull();
     }
 
     @Test

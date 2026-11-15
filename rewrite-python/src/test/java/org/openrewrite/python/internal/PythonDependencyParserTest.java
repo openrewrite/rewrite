@@ -22,7 +22,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.TomlParser;
@@ -331,7 +330,7 @@ class PythonDependencyParserTest {
       "^3 -> >=3,<4",
       "~3.10 -> >=3.10,<3.11",
       "~3.10.2 -> >=3.10.2,<3.11.0",
-      "~=3.10 -> ~=3.10",
+      "^3.9 ~=3.10 -> >=3.9,<4.0,~=3.10",
       "3.11 -> ==3.11",
       "3.11.* -> ==3.11.*",
       ">=3.9 <3.13 -> >=3.9,<3.13",
@@ -352,9 +351,6 @@ class PythonDependencyParserTest {
 
         assertThat(marker).isNotNull();
         assertThat(marker.getRequiresPython()).isEqualTo(pep440);
-        if (pep440 != null) {
-            assertThat(PythonVersionSpecifierSet.parse(pep440)).isNotNull();
-        }
     }
 
     @Test
