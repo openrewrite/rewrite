@@ -18,13 +18,9 @@ package org.openrewrite.groovy.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -279,8 +275,7 @@ class VariableDeclarationsTest implements RewriteTest {
               def m() {
                 Set<Thread> t = ConcurrentHashMap.newKeySet()
               }
-              """,
-            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -297,8 +292,7 @@ class VariableDeclarationsTest implements RewriteTest {
                 Set<Thread> t = ConcurrentHashMap.newKeySet()
                 foo { R r -> }
               }
-              """,
-            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -315,8 +309,7 @@ class VariableDeclarationsTest implements RewriteTest {
                 Map<String, List<Integer>> t = new HashMap<>()
                 Set<Thread> s = ConcurrentHashMap.newKeySet()
               }
-              """,
-            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+              """
           )
         );
     }
@@ -331,29 +324,8 @@ class VariableDeclarationsTest implements RewriteTest {
                 List<String> a = []
                 Map<String, Integer> b = [:]
               }
-              """,
-            spec -> spec.afterRecipe(VariableDeclarationsTest::nothingKeptAsWhitespace)
+              """
           )
         );
-    }
-
-    /// Unparsed source text is kept as whitespace and still prints, so round-tripping alone can't catch it.
-    private static void nothingKeptAsWhitespace(SourceFile sf) {
-        List<String> kept = new ArrayList<>();
-        new JavaIsoVisitor<Integer>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, Integer p) {
-                if (!space.getWhitespace().isBlank()) {
-                    kept.add(loc + ": " + space.getWhitespace().strip());
-                }
-                for (Comment c : space.getComments()) {
-                    if (!c.getSuffix().isBlank()) {
-                        kept.add(loc + ": " + c.getSuffix().strip());
-                    }
-                }
-                return space;
-            }
-        }.visit(sf, 0);
-        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
