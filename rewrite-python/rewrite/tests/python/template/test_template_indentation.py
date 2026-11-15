@@ -24,8 +24,10 @@ from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.java import J, tree as j
+from rewrite.java.support_types import JRightPadded, Space
+from rewrite.markers import Markers
 from rewrite.python import tree as py_tree
-from rewrite.python.template import template, capture
+from rewrite.python.template import Template, template, capture
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
@@ -293,6 +295,84 @@ def test_a_replacement_keeps_more_blank_lines_than_the_style_asks_for():
             "\n"
             "    def x():\n"
             "        return 1\n",
+        )
+    )
+
+
+def _append_function(function: Template) -> Recipe:
+    """Appends the function ``function`` defines to a module that defines none. The template is applied with
+    the cursor on the module, where nothing formats the result."""
+    class AppendFunction(Recipe):
+        @property
+        def name(self) -> str:
+            return "test.AppendFunction"
+
+        @property
+        def display_name(self) -> str:
+            return "Test append a function"
+
+        @property
+        def description(self) -> str:
+            return "Appends a templated function to a module defining none."
+
+        def editor(self) -> TreeVisitor[Any, ExecutionContext]:
+            class Visitor(PythonVisitor[ExecutionContext]):
+                def visit_compilation_unit(self, cu: py_tree.CompilationUnit, p: ExecutionContext) -> J:
+                    if any(isinstance(s, j.MethodDeclaration) for s in cu.statements):
+                        return cu
+                    added = function.apply(self.cursor)
+                    return cu.padding.replace(_statements=[*cu.padding.statements, JRightPadded(
+                        added.replace(prefix=Space([], "\n\n\n")), Space.EMPTY, Markers.EMPTY)])
+
+            return Visitor()
+
+    return AppendFunction()
+
+
+def test_a_function_applied_where_nothing_formats_it_has_its_body_one_level_deep():
+    spec = RecipeSpec(recipe=_append_function(_function))
+    spec.rewrite_run(
+        python(
+            "import os\n",
+            #
+            "import os\n"
+            "\n"
+            "\n"
+            "def x():\n"
+            "    return 1\n",
+        )
+    )
+
+
+def test_a_parenthesis_closing_after_a_trailing_comma_has_the_indentation_of_its_call():
+    spec = RecipeSpec(recipe=_append_function(template('def x():\n    return f(\n        1,\n    )')))
+    spec.rewrite_run(
+        python(
+            "import os\n",
+            #
+            "import os\n"
+            "\n"
+            "\n"
+            "def x():\n"
+            "    return f(\n"
+            "        1,\n"
+            "    )\n",
+        )
+    )
+
+
+def test_a_string_spanning_lines_in_a_statement_template_keeps_its_text():
+    spec = RecipeSpec(recipe=_append_function(template('def x():\n    return """a\nb"""')))
+    spec.rewrite_run(
+        python(
+            "import os\n",
+            #
+            "import os\n"
+            "\n"
+            "\n"
+            "def x():\n"
+            '    return """a\n'
+            'b"""\n',
         )
     )
 

@@ -17,8 +17,10 @@
 from __future__ import annotations
 
 import ast
+import io
 import os
 import textwrap
+import tokenize
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
@@ -27,7 +29,11 @@ from uuid import UUID
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.java.markers import TrailingComma
+from rewrite.java.support_types import Space
+from rewrite.markers import Marker
 from rewrite.python.visitor import PythonVisitor
+from rewrite.utils import list_map
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
@@ -40,6 +46,8 @@ from .replacement import substitution_marker
 
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
+_WRAPPER_INDENT = "    "
+_STRING_TOKENS = {tokenize.STRING, tokenize.FSTRING_MIDDLE, getattr(tokenize, 'TSTRING_MIDDLE', tokenize.STRING)}
 
 
 _stdlib_venv: Optional[str] = None
@@ -90,6 +98,28 @@ class TemplateOptions:
     context: Tuple[str, ...] = ()
     dependencies: Tuple[Tuple[str, str], ...] = ()
     context_sensitive: bool = False
+
+
+def _indented_outside_strings(code: str) -> str:
+    """``code`` indented to be the wrapper's body, but for the lines a string runs on to, whose leading
+    whitespace is the string's own text."""
+    continued: Set[int] = set()
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(code).readline):
+            if token.type in _STRING_TOKENS:
+                continued.update(range(token.start[0] + 1, token.end[0] + 1))
+    except (tokenize.TokenError, SyntaxError):
+        # Code that does not tokenize does not parse either, and the parse says what is wrong with it.
+        pass
+    return '\n'.join(line if row in continued else _WRAPPER_INDENT + line
+                     for row, line in enumerate(code.split('\n'), 1))
+
+
+def _out_of_wrapper(space: Space) -> Space:
+    return space.replace(
+        whitespace=space.whitespace.replace('\n' + _WRAPPER_INDENT, '\n'),
+        comments=list_map(lambda c: c.replace(suffix=c.suffix.replace('\n' + _WRAPPER_INDENT, '\n')),
+                          space.comments))
 
 
 def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor']) -> bool:
@@ -187,6 +217,10 @@ class TemplateEngine:
 
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
+        if not is_expression:
+            out_of_wrapper = _OutOfWrapper().visit(extracted, None)
+            assert out_of_wrapper is not None
+            extracted = out_of_wrapper
 
         # The template's own code is the last statement, so everything ahead of it is context.
         parsed = (extracted, tuple(compilation_unit.statements[:-1]))
@@ -296,13 +330,11 @@ class TemplateEngine:
         if is_expression:
             # Expression: wrap with return
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
-            lines.append(f"    return {dedented}")
+            lines.append(f"{_WRAPPER_INDENT}return {dedented}")
         else:
             # Statement(s): wrap directly
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
-            # Indent each line of the template
-            for line in dedented.split('\n'):
-                lines.append(f"    {line}")
+            lines.append(_indented_outside_strings(dedented))
 
         return '\n'.join(lines)
 
@@ -588,3 +620,16 @@ class _SubstitutedLayout(PythonVisitor[None]):
             tree = before.replace(prefix=tree.prefix)
         return tree.replace(markers=tree.markers.replace(
             markers=[m for m in tree.markers.markers if m != marker]))
+
+
+class _OutOfWrapper(PythonVisitor[None]):
+    """Takes the indentation `_indented_outside_strings` gave a statement off each of its lines, so that the
+    template's tree is laid out as its code is, whether or not it is formatted where it lands."""
+
+    def visit_space(self, space: Optional[Space], p: None) -> Space:
+        return _out_of_wrapper(super().visit_space(space, p))
+
+    def visit_marker(self, marker: Marker, p: None) -> Marker:
+        if isinstance(marker, TrailingComma):
+            return marker.replace(suffix=_out_of_wrapper(marker.suffix))
+        return marker
