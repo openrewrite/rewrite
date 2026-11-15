@@ -3469,9 +3469,8 @@ public class GroovyParserVisitor {
                     typeName,
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null && !expression.getOriginType().isGenericsPlaceHolder() && sourceStartsWith("<")) {
-                // The source says the declared type's arguments; the inferred type's can differ in
-                // number (`Set<Thread> t = ConcurrentHashMap.newKeySet()` infers KeySetView<K, Boolean>), which printed
-                // `Set<Thread,>`.
+                // Use the declared type's arguments; the inferred type's can differ in number
+                // (`Set<Thread> t = ConcurrentHashMap.newKeySet()` infers KeySetView<K, Boolean>)
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
                         expression.getOriginType().getGenericsTypes()), type);
             }
