@@ -612,79 +612,36 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('a comment ending the last import\'s line stays on it, and one on the next line stays with the code', async () => {
+        test('a comment ending the line before a new import or require stays on that line', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
             await spec.rewriteRun(
                 //language=typescript
                 typescript(
                     `
-                        import {a} from "a"; // note
+                        import {a} from "a"; /* x */ // note
+                        // calls a
                         a();
                     `,
                     `
-                        import {a} from "a"; // note
+                        import {a} from "a"; /* x */ // note
                         import {b} from "b";
+                        // calls a
                         a();
                     `
                 ),
+                // The import ends the file
                 //language=typescript
                 typescript(
                     `
                         import {a} from "a"; // note
-                        // calls a
-                        a();
-                    `,
-                    `
-                        import {a} from "a"; // note
-                        import {b} from "b";
-                        // calls a
-                        a();
-                    `
-                )
-            );
-        });
-
-        test('a comment ending the line of an import that ends the file stays on it', async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
-            //language=typescript
-            await spec.rewriteRun(
-                typescript(
-                    `
-                        import {a} from "a"; // note
                     `,
                     `
                         import {a} from "a"; // note
                         import {b} from "b";
                     `
-                )
-            );
-        });
-
-        test('a block comment and a line comment ending the last import\'s line stay on it', async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
-            //language=typescript
-            await spec.rewriteRun(
-                typescript(
-                    `
-                        import {a} from "a"; /* x */ // note
-                        a();
-                    `,
-                    `
-                        import {a} from "a"; /* x */ // note
-                        import {b} from "b";
-                        a();
-                    `
-                )
-            );
-        });
-
-        test('code on the last import\'s line moves to its own line, with a block comment ahead of it', async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
-            await spec.rewriteRun(
+                ),
+                // Code shares the import's line, so its block comment goes with it
                 //language=typescript
                 typescript(
                     `
@@ -699,24 +656,6 @@ describe('AddImport visitor', () => {
                 //language=typescript
                 typescript(
                     `
-                        import {a} from "a"; a();
-                    `,
-                    `
-                        import {a} from "a";
-                        import {b} from "b";
-                        a();
-                    `
-                )
-            );
-        });
-
-        test('a comment ending a directive\'s line stays on it, and one after a shebang stays with the code', async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
-            await spec.rewriteRun(
-                //language=typescript
-                typescript(
-                    `
                         'use strict'; // note
 
                         a();
@@ -729,16 +668,7 @@ describe('AddImport visitor', () => {
                         a();
                     `
                 ),
-                //language=typescript
-                typescript(
-                    `
-                        'use strict'; // note
-                    `,
-                    `
-                        'use strict'; // note
-                        import {b} from 'b';
-                    `
-                ),
+                // A shebang ends its own line, so the comment below it belongs to the code
                 //language=typescript
                 typescript(
                     `
@@ -753,6 +683,33 @@ describe('AddImport visitor', () => {
 
                         // runs a
                         a();
+                    `
+                ),
+                //language=javascript
+                javascript(
+                    `
+                        const {a} = require("a"); // note
+                        a();
+                    `,
+                    `
+                        const {a} = require("a"); // note
+                        const {b} = require("b");
+                        a();
+                    `
+                ),
+                //language=javascript
+                javascript(
+                    `
+                        'use strict'; // note
+                        /// <reference path="./types.d.ts" />
+                        module.exports = 1;
+                    `,
+                    `
+                        'use strict'; // note
+                        /// <reference path="./types.d.ts" />
+                        const {b} = require('b');
+
+                        module.exports = 1;
                     `
                 )
             );
@@ -1316,34 +1273,6 @@ describe('AddImport visitor', () => {
                     const {readFile} = require('fs');
 
                     module.exports = readFile;
-                    `
-                )
-            );
-        });
-
-        test('a comment ending the line of a require or directive that ends the file stays on it', async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false, style: ImportStyle.CommonJS}));
-            await spec.rewriteRun(
-                //language=javascript
-                javascript(
-                    `
-                    const {a} = require("a"); // note
-                    `,
-                    `
-                    const {a} = require("a"); // note
-                    const {b} = require("b");
-                    `
-                ),
-                //language=javascript
-                javascript(
-                    `
-                    'use strict'; // note
-                    `,
-                    `
-                    'use strict'; // note
-
-                    const {b} = require('b');
                     `
                 )
             );

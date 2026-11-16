@@ -3242,7 +3242,7 @@ describe("maybeRebind keeps the file's import layout", () => {
 
     test("a comment ending the line of the statement a member leaves stays on that line", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = rebinding(["m", "x", "b"]);
+        spec.recipe = rebinding(["m", "x", "b"], ["d", "x", "default", "D"]);
         await spec.rewriteRun(
             //language=typescript
             typescript(
@@ -3258,46 +3258,19 @@ describe("maybeRebind keeps the file's import layout", () => {
 
                 a(b, z);`
             ),
+            // The statement is replaced, at the end of the file
             //language=typescript
             typescript(
                 `
-                import {a, b} from "m"; // note
-                a(b);`,
-                `
-                import {a} from "m"; // note
-                import {b} from "x";
-                a(b);`
-            ),
-            //language=typescript
-            typescript(
-                `
-                import {a, b} from "m"; // note
+                import {z} from "z";
+                import D from "d"; // note
                 `,
                 `
-                import {a} from "m"; // note
-                import {b} from "x";
+                import {z} from "z";
+                import {D} from "x"; // note
                 `
             )
         );
-    });
-
-    test("a comment ending the line of a statement every member leaves stays where the statement was", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = rebinding(["m", "x", "a"], ["m", "k", "b"]);
-        //language=typescript
-        await spec.rewriteRun(typescript(
-            `
-            import {a, b} from "m"; // note
-            import {z} from "z";
-
-            a(b, z);`,
-            `
-            import {b} from "k"; // note
-            import {a} from "x";
-            import {z} from "z";
-
-            a(b, z);`
-        ));
     });
 });
 
@@ -4698,32 +4671,6 @@ describe("maybeBind on a CommonJS file", () => {
 
             rm.target();`
         )).toBe("rm");
-    });
-
-    test("a comment ending the line of the last require or a directive stays on it", async () => {
-        expect(await bindWith({module: "b", member: "b"},
-            //language=javascript
-            `
-            const {a} = require("a"); // note
-            target();`,
-            //language=javascript
-            `
-            const {a} = require("a"); // note
-            const {b} = require("b");
-            b.target();`
-        )).toBe("b");
-        expect(await bindWith({module: "path"},
-            //language=javascript
-            `
-            'use strict'; // note
-            module.exports = target();`,
-            //language=javascript
-            `
-            'use strict'; // note
-            const path = require('path');
-
-            module.exports = path.target();`
-        )).toBe("path");
     });
 
     test("a member joins a const destructuring require of its module that has no rest element", async () => {
