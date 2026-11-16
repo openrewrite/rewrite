@@ -176,6 +176,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
                 JavaType type = fieldAccess.getType();
                 if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null &&
+                    fieldAccess.getSimpleName().equals(((JavaType.Class) type).getClassName()) &&
                     !keepQualified.test(((JavaType.Class) type).getFullyQualifiedName())) {
                     ensureInitialized();
 
