@@ -34,7 +34,8 @@ final class RedundantRecipe {
     }
 
     static void assertNotRepeated(@Nullable Recipe inTest, @Nullable Recipe inDefaults) {
-        if (inTest != null && inDefaults != null && same(inTest, inDefaults)) {
+        // RewriteTest#defaults sets Recipe.noop() when a test class doesn't set a recipe
+        if (inTest != null && inDefaults != null && !Recipe.noop().equals(inDefaults) && same(inTest, inDefaults)) {
             fail("The test sets spec.recipe(..) to " + inTest.getName() + ", which defaults(RecipeSpec) already " +
                  "sets. Remove it from the test, so that a test which sets its own recipe stands out as testing " +
                  "a different one.");
@@ -64,7 +65,18 @@ final class RedundantRecipe {
             }
             return true;
         }
-        return a.equals(b);
+        return overridesEquals(a.getClass()) && a.equals(b);
+    }
+
+    /**
+     * Whether the recipe compares more than its name, as {@link Recipe#equals} does, such as by its options.
+     */
+    private static boolean overridesEquals(Class<?> recipeClass) {
+        try {
+            return recipeClass.getMethod("equals", Object.class).getDeclaringClass() != Recipe.class;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     private static boolean same(RecipeDescriptor a, RecipeDescriptor b) {

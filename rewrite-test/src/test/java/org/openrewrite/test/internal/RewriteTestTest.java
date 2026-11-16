@@ -3320,6 +3320,32 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Nested
+        class ComparedByName implements RewriteTest {
+
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.recipe(new AppendToFirstValue("?")).validateRecipeSerialization(false);
+            }
+
+            @Test
+            void acceptARecipeOfTheSameNameWithOtherState() {
+                rewriteRun(
+                  spec -> spec.recipe(new AppendToFirstValue("!")),
+                  yaml("key: value", "key: value!")
+                );
+            }
+        }
+
+        @Nested
+        class NoRecipeInDefaults implements RewriteTest {
+
+            @Test
+            void acceptNoop() {
+                rewriteRun(spec -> spec.recipe(Recipe.noop()), text("unchanged"));
+            }
+        }
+
+        @Nested
         class Declarative implements RewriteTest {
 
             @Override
@@ -3388,6 +3414,41 @@ class ChangeFirstValue extends Recipe {
                 Yaml.Scalar scalar = (Yaml.Scalar) mapping.getEntries().get(0).getValue();
                 return document.withBlock(mapping.withEntries(ListUtils.mapFirst(mapping.getEntries(),
                   entry -> entry.withValue(scalar.withValue(value)))));
+            }
+        };
+    }
+}
+
+@NullMarked
+class AppendToFirstValue extends Recipe {
+    private final String suffix;
+
+    AppendToFirstValue(String suffix) {
+        this.suffix = suffix;
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Append to the first value";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Appends a suffix to the value of the first entry of each YAML document.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new YamlIsoVisitor<>() {
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                if (!(document.getBlock() instanceof Yaml.Mapping m) || m.getEntries().isEmpty() ||
+                    !(m.getEntries().getFirst().getValue() instanceof Yaml.Scalar scalar) ||
+                    scalar.getValue().endsWith(suffix)) {
+                    return document;
+                }
+                return document.withBlock(m.withEntries(ListUtils.mapFirst(m.getEntries(),
+                  entry -> entry.withValue(scalar.withValue(scalar.getValue() + suffix)))));
             }
         };
     }
