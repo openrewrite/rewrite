@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
@@ -391,25 +393,16 @@ class KotlinTypeMappingTest {
 
     @Test
     void scriptsWithTheSameFileNameKeepTheirOwnFunctions() {
-        List<String> classes = new ArrayList<>();
-        KotlinParser.builder().build().parseInputs(List.of(
+        assertThat(facadesOfTopLevelFunctions(KotlinParser.builder().build().parseInputs(List.of(
             Parser.Input.fromString(Path.of("a/build.gradle.kts"), "fun first() {}"),
             Parser.Input.fromString(Path.of("b/build.gradle.kts"), "fun second() {}")
-          ), null, new InMemoryExecutionContext()
-        ).forEach(script -> new KotlinIsoVisitor<List<String>>() {
-            @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> classes) {
-                classes.add(method.getMethodType().getDeclaringType().getMethods().stream().map(JavaType.Method::getName).toList().toString());
-                return method;
-            }
-        }.reduce(script, classes));
-        assertThat(classes).containsExactly("[first]", "[second]");
+          ), null, new InMemoryExecutionContext())
+        )).containsExactly("a.build.gradleKts [first]", "b.build.gradleKts [second]");
     }
 
     @Test
     void multifileClassFacadeListsFunctionsOfEveryPart() {
-        List<String> facades = new ArrayList<>();
-        KotlinParser.builder().build().parse(new InMemoryExecutionContext(),
+        assertThat(facadesOfTopLevelFunctions(KotlinParser.builder().build().parse(new InMemoryExecutionContext(),
           """
             @file:JvmName("Utils")
             @file:JvmMultifileClass
@@ -424,7 +417,28 @@ class KotlinTypeMappingTest {
 
             fun second() {}
             """
-        ).forEach(part -> new KotlinIsoVisitor<List<String>>() {
+        ))).containsExactly("lib.Utils [first, second]", "lib.Utils [first, second]");
+    }
+
+    @Test
+    void snippetsParsedTogetherGetTheirOwnFacades() {
+        assertThat(facadesOfTopLevelFunctions(KotlinParser.builder().build().parse(new InMemoryExecutionContext(),
+          """
+            package lib
+
+            fun first() {}
+            """,
+          """
+            package lib
+
+            fun second() {}
+            """
+        ))).containsExactly("lib.OpenRewriteFile0Kt [first]", "lib.OpenRewriteFile1Kt [second]");
+    }
+
+    private static List<String> facadesOfTopLevelFunctions(Stream<SourceFile> sourceFiles) {
+        List<String> facades = new ArrayList<>();
+        sourceFiles.forEach(sourceFile -> new KotlinIsoVisitor<List<String>>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> facades) {
                 JavaType.FullyQualified facade = method.getMethodType().getDeclaringType();
@@ -432,8 +446,8 @@ class KotlinTypeMappingTest {
                             facade.getMethods().stream().map(JavaType.Method::getName).sorted().toList());
                 return method;
             }
-        }.reduce(part, facades));
-        assertThat(facades).containsExactly("lib.Utils [first, second]", "lib.Utils [first, second]");
+        }.reduce(sourceFile, facades));
+        return facades;
     }
 
     private static List<String> topLevelMemberOwners(Path root, String relativePath, String source) throws IOException {

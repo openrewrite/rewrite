@@ -564,13 +564,14 @@ public class KotlinParser implements Parser {
     }
 
     private static String buildFilename(Input source, int index) {
-        String pathName = source.getPath().toString();
-        if ("openRewriteFile.kt".equals(pathName)) {
-            return "openRewriteFile" + index + ".kt";
-        } else if ("openRewriteFile.kts".equals(pathName)) {
-            return "openRewriteFile" + index + ".kts";
+        Path path = source.getPath();
+        String fileName = String.valueOf(path.getFileName());
+        if ("openRewriteFile.kt".equals(fileName)) {
+            return path.resolveSibling("openRewriteFile" + index + ".kt").toString();
+        } else if ("openRewriteFile.kts".equals(fileName)) {
+            return path.resolveSibling("openRewriteFile" + index + ".kts").toString();
         } else {
-            return pathName;
+            return path.toString();
         }
     }
 
