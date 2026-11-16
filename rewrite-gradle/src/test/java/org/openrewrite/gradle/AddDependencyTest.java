@@ -23,6 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.JavaParser;
@@ -1453,6 +1454,387 @@ class AddDependencyTest implements RewriteTest {
 
                 dependencies {
                     implementation "com.google.guava:guava:${guavaVersion}"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      29.0-jre | 29.0-jre       | com.google.guava:guava
+      30.0-jre | 29.0-jre       | com.google.guava:guava
+      29.0-jre | latest.release | com.google.guava:guava
+      28.0-jre | 29.0-jre       | com.google.guava:guava:29.0-jre
+      """)
+    void addDependencyOmitsVersionManagedByPlatform(String bomVersion, String requestedVersion, String added) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:" + requestedVersion, "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation platform("com.google.guava:guava-bom:%s")
+                }
+                """.formatted(bomVersion),
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation platform("com.google.guava:guava-bom:%s")
+                    implementation "%s"
+                }
+                """.formatted(bomVersion, added)
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenPlatformOnExtendedConfigurationManagesIt() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api platform("com.google.guava:guava-bom:29.0-jre")
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api platform("com.google.guava:guava-bom:29.0-jre")
+
+                    implementation "com.google.guava:guava"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenPlatformManagesItInKotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradleKts(
+              """
+                plugins {
+                    `java-library`
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation(platform("com.google.guava:guava-bom:29.0-jre"))
+                }
+                """,
+              """
+                plugins {
+                    `java-library`
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation(platform("com.google.guava:guava-bom:29.0-jre"))
+                    implementation("com.google.guava:guava")
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenSpringDependencyManagementManagesIt() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencyManagement {
+                    imports {
+                        mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencyManagement {
+                    imports {
+                        mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenSpringDependencyManagementManagesItOnLstWithoutPluginState() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"))
+            .beforeRecipe(sources -> sources.replaceAll(source -> source.getMarkers().findFirst(GradleProject.class)
+              .<SourceFile>map(gp -> source.withMarkers(source.getMarkers().setByType(gp.withSpringDependencyManagementPlugin(null))))
+              .orElse(source))),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencyManagement {
+                    imports {
+                        mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencyManagement {
+                    imports {
+                        mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenSpringDependencyManagementManagesItThroughAVariable() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                ext {
+                    guavaVersion = '30.0-jre'
+                }
+
+                dependencyManagement {
+                    dependencies {
+                        dependency "com.google.guava:guava:${guavaVersion}"
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                ext {
+                    guavaVersion = '30.0-jre'
+                }
+
+                dependencyManagement {
+                    dependencies {
+                        dependency "com.google.guava:guava:${guavaVersion}"
+                    }
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyUpgradesExistingWhenNoFamilyMemberResolves() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null,
+            null, "com.google.common.math.IntMath", null, null, "org.example*", null)),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:28.0-jre"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyAlignsWithFamilyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.core", "jackson-databind", "latest.release", null,
+            null, "com.fasterxml.jackson.databind.ObjectMapper", null, null, "com.fasterxml.jackson*", null)),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  import com.fasterxml.jackson.databind.ObjectMapper;
+                  public class A {
+                      ObjectMapper mapper = new ObjectMapper();
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.fasterxml.jackson.core:jackson-core:2.12.0"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.fasterxml.jackson.core:jackson-core:2.12.0"
+                    implementation "com.fasterxml.jackson.core:jackson-databind:2.12.0"
                 }
                 """
             )

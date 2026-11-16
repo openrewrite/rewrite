@@ -33,6 +33,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.semver.Semver;
 
 import java.nio.file.Path;
@@ -278,14 +280,16 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return s;
                         }
 
+                        String familyVersion = version != null && version.startsWith("$") ? null : familyVersion(gp);
+                        String versionToAdd = familyVersion != null ? familyVersion : version;
                         Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
                             if (jvmTestSuite != null) {
-                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, classifier, extension, metadataFailures, null, ctx)
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, versionToAdd, versionPattern, classifier, extension, metadataFailures, null, ctx)
                                         .visitNonNull(s, ctx);
                             } else {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, versionToAdd, versionPattern, resolvedConfiguration,
                                         classifier, extension, metadataFailures, this::isTopLevel, null).visitNonNull(s, ctx);
                             }
                         }
@@ -354,6 +358,29 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         return false;
     }
 
+    // The newest version already resolved in the family, so the added dependency aligns with it
+    private @Nullable String familyVersion(GradleProject gp) {
+        if (familyPattern == null) {
+            return null;
+        }
+        Version familyVersion = null;
+        for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+            if (!c.isCanBeResolved()) {
+                continue;
+            }
+            for (ResolvedDependency d : c.getResolved()) {
+                if (StringUtils.matchesGlob(d.getGroupId(), familyPattern) &&
+                        !(groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()))) {
+                    Version v = new Version(d.getVersion());
+                    if (familyVersion == null || v.compareTo(familyVersion) > 0) {
+                        familyVersion = v;
+                    }
+                }
+            }
+        }
+        return familyVersion == null ? null : familyVersion.toString();
+    }
+
     private UpgradeDependencyVersion upgradeDependencyVersion() {
         return new UpgradeDependencyVersion(groupId, artifactId, version, versionPattern);
     }
@@ -378,6 +405,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         }
         for (GradleDependencyConfiguration c : gradleProject.getConfigurations()) {
             if (c.findRequestedDependency(groupId, artifactId) != null) {
+                // Upgrading to the requested version would break alignment with the family
+                if (familyVersion(gradleProject) != null) {
+                    return;
+                }
                 Path dir = sourceFile.getSourcePath().getParent();
                 acc.declaringProjectDirs.put(dir == null ? Paths.get("") : dir,
                         sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null));

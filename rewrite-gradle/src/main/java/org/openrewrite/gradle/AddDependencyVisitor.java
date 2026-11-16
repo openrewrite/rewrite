@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
+import org.openrewrite.gradle.internal.ManagedDependencyVersions;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.StringUtils;
@@ -32,6 +33,9 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.Version;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.function.Predicate;
 
@@ -56,9 +60,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
     @Nullable
     private final MavenMetadataFailures metadataFailures;
-
-    @Nullable
-    private String resolvedVersion;
 
     @Nullable
     private final Predicate<Cursor> insertPredicate;
@@ -91,15 +92,29 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             isKotlinDsl = sourceFile instanceof K.CompilationUnit;
+            String resolvedVersion = null;
+            String managedVersion = null;
             if (version != null) {
                 if (version.startsWith("$")) {
                     resolvedVersion = version;
                 } else {
-                    try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
-                    } catch (MavenDownloadingException e) {
-                        return (J) e.warn(tree);
+                    String managed = dependencyModifier == null ?
+                            ManagedDependencyVersions.of(sourceFile, gradleProject, ctx).getManagedVersion(configuration, groupId, artifactId, classifier) :
+                            null;
+                    VersionComparator versionComparator = Semver.validate(version, versionPattern).getValue();
+                    if (managed == null || versionComparator == null || !versionComparator.isValid(null, managed)) {
+                        try {
+                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                    .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
+                        } catch (MavenDownloadingException e) {
+                            return (J) e.warn(tree);
+                        }
+                    }
+                    // A managed version as new as the selected one makes an explicit version redundant
+                    if (managed != null && (resolvedVersion == null ||
+                            new Version(managed).compareTo(new Version(resolvedVersion)) >= 0)) {
+                        managedVersion = managed;
+                        resolvedVersion = null;
                     }
                 }
             }
@@ -108,7 +123,8 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     .visitNonNull(sourceFile, ctx);
 
             if (sourceFile != tree) {
-                String versionWithPattern = StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
+                String versionWithPattern = managedVersion != null ? managedVersion :
+                        StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
                 sourceFile = org.openrewrite.gradle.internal.AddDependencyVisitor.addDependency(
                         sourceFile,
                         gradleProject.getConfiguration(configuration),
