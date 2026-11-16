@@ -79,7 +79,7 @@ val parserGroovy = configurations.detachedConfiguration(dependencies.create("org
     .apply { isTransitive = false }
 
 // Gradle has published no API modules since 6.1.1, so the API of each major is taken from its distribution
-val addGradleApiToTypeTable by tasks.registering {
+val addGradleApiToTypeTable = tasks.register("addGradleApiToTypeTable") {
     group = "OpenRewrite"
     description = "Adds the public API of each major Gradle version to the type table as org.gradle:gradle-public-api."
     gradleDistributions.forEach { inputs.files(it) }
