@@ -98,6 +98,56 @@ class NpmLockRegeneratorTest {
         assertThat(result.getLockFileContent()).isNull();
     }
 
+    // ngx-bootstrap@19.0.2 against UpgradeToAngular20: the library peers the old @angular/common, which npm installs
+    // for it and which peers the old @angular/core. npm's ERESOLVE names the edge from @angular/common; the package to
+    // upgrade is the direct dependency the upgrade leaves alone.
+    private static final String BLOCKED_THROUGH_A_PEER_REGISTRY =
+      "{\"core\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}," +
+      "\"build\":{\"latest\":\"2.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"core\":\"1\"}}," +
+      "\"2.0.0\":{\"peerDependencies\":{\"core\":\"2\"}}}}," +
+      "\"common\":{\"latest\":\"2.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"core\":\"1.0.0\"}}," +
+      "\"2.0.0\":{\"peerDependencies\":{\"core\":\"2.0.0\"}}}}," +
+      "\"third-party\":{\"latest\":\"1.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"common\":\"^1.0.0\"}}}}}";
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateNamesTheDirectDependencyThatHoldsTheOldPeerThroughAnother(String release) {
+        PackumentSource registry = localRegistry(BLOCKED_THROUGH_A_PEER_REGISTRY);
+        Result original = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(ROOT_ONLY_LOCK).manifest("", blockedThroughAPeerManifest("1.0.0")).now(Instant.EPOCH).build(), registry)
+          .regenerate();
+        assertThat(original.isSuccess()).as(original.getErrorMessage()).isTrue();
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(original.getLockFileContent()).manifest("", blockedThroughAPeerManifest("2.0.0"))
+          .now(Instant.EPOCH).build(), registry).regenerateForUpdate();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.PEER_CONFLICT);
+        assertThat(result.getFailure().getPackageName()).as(result.getErrorMessage()).isEqualTo("third-party");
+        assertThat(result.getLockFileContent()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateNamesTheBlockingDirectDependency(String release) {
+        PackumentSource registry = localRegistry(UPDATE_REGISTRY);
+        Result original = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(ROOT_ONLY_LOCK).manifest("", updateManifest("1.0.0", true)).now(Instant.EPOCH).build(), registry).regenerate();
+        assertThat(original.isSuccess()).as(original.getErrorMessage()).isTrue();
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(original.getLockFileContent()).manifest("", updateManifest("2.0.0", true))
+          .now(Instant.EPOCH).build(), registry).regenerateForUpdate();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getPackageName()).as(result.getErrorMessage()).isEqualTo("legacy-consumer");
+    }
+
+    private static String blockedThroughAPeerManifest(String version) {
+        return "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{" +
+          "\"core\":\"" + version + "\",\"third-party\":\"1.0.0\"},\"devDependencies\":{\"build\":\"" + version + "\"}}";
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"", "not JSON"})
     void coordinatedUpdateDoesNotRetryMissingOrMalformedLocks(String lock) {
