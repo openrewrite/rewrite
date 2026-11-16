@@ -128,7 +128,7 @@ standardTable
 
 inlineTable
     : L_BRACE commentOrNl* R_BRACE
-    | L_BRACE commentOrNl* keyValue (COMMA commentOrNl* keyValue)* COMMA? commentOrNl* R_BRACE
+    | L_BRACE commentOrNl* keyValue (commentOrNl* COMMA commentOrNl* keyValue)* (commentOrNl* COMMA)? commentOrNl* R_BRACE
     ;
 
 arrayTable
