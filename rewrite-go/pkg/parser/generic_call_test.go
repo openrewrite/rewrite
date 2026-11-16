@@ -179,3 +179,21 @@ func TestGenericValueInstantiationTrailingComma(t *testing.T) {
 		})
 	}
 }
+
+func TestGenericValueInstantiationWithoutTrailingComma(t *testing.T) {
+	for _, args := range []string{"int", "int /* , */ ", "*int", "(int)", "func(int, string)", "[]map[string]*int"} {
+		t.Run(args, func(t *testing.T) {
+			// given
+			src := "package main\nfunc F[T any]() {}\nfunc main() {\nf := F[" + args + "]\n_ = f\n}\n"
+
+			// when
+			rhs := firstAssignRHS(t, src)
+
+			// then
+			inst, ok := rhs.(*golang.IndexList)
+			require.Truef(t, ok, "expected IndexList, got %T", rhs)
+			require.Nil(t, java.FindMarker[golang.TrailingComma](inst.Indices.Markers))
+			assertRoundTrip(t, src)
+		})
+	}
+}
