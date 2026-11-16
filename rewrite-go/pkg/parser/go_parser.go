@@ -2313,9 +2313,13 @@ func (ctx *parseContext) mapIdent(ident *ast.Ident) *java.Identifier {
 // mapBasicLit maps a basic literal (string, int, float, etc.)
 func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	prefix := ctx.prefix(lit.Pos())
-	ctx.skip(len(lit.Value))
+	source := lit.Value
+	if lit.Kind == token.STRING && strings.HasPrefix(source, "`") {
+		source = ctx.literalSource(lit.Pos())
+	}
+	ctx.skip(len(source))
 
-	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
+	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: source}
 
 	l.Type = ctx.literalTypeOf(lit)
 
