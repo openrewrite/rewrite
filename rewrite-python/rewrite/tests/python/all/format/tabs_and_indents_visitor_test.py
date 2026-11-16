@@ -733,6 +733,8 @@ def test_bracket_closing_after_trailing_comma_inside_function():
               from os import (
                 path,
               )
+              x = [1, 2,
+              ]
             """,
             """
             def create():
@@ -752,6 +754,8 @@ def test_bracket_closing_after_trailing_comma_inside_function():
                 from os import (
                     path,
                 )
+                x = [1, 2,
+                ]
             """
         ),
         spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))

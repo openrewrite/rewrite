@@ -238,10 +238,6 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     if not trailing_comma and args.padding.elements[-1] is right:
                         self.cursor.parent_or_throw.put_message("indent_type", self.IndentType.ALIGN)
                     after = self.visit_space(right.after, p)
-                    if trailing_comma:
-                        self.cursor.parent_or_throw.put_message("indent_type", self.IndentType.ALIGN)
-                        trailing_comma = trailing_comma.replace(suffix=self.visit_space(trailing_comma.suffix, p))
-                        right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: trailing_comma))
 
                 elif rp_context is not None:
                     elem = self.visit_and_cast(elem, J, p)
@@ -285,7 +281,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     elem = self.visit_and_cast(elem, J, p)
                     after = self.visit_space(right.after, p)
 
-            if trailing_comma and rp_context not in ("collection_literal_element", "dict_literal_element"):
+            if trailing_comma:
                 # After a trailing comma, the line break before the closing bracket is the comma's.
                 comma = trailing_comma.replace(suffix=self._indent_to(trailing_comma.suffix, indent))
                 right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
