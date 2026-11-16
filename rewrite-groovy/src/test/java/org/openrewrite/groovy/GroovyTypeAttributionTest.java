@@ -298,6 +298,28 @@ class GroovyTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void groovyMethodOnArrayDeclaredByItsExtensionClass() {
+        rewriteRun(
+          groovy(
+            """
+              String[] parts = "a,b".split(",")
+              parts.each { println it }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    if ("each".equals(method.getSimpleName())) {
+                        assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName())
+                          .isEqualTo("org.codehaus.groovy.runtime.DefaultGroovyMethods");
+                    }
+                    return super.visitMethodInvocation(method, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
     private Consumer<SourceSpec<G.CompilationUnit>> isAttributed(boolean attributed) {
         return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
             @Override

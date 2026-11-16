@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.transform.stc.ExtensionMethodNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
@@ -231,6 +232,10 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
             JavaType.FullyQualified declaringType = TypeUtils.asFullyQualified(type(node.getDeclaringClass()));
+            if ((declaringType == null || declaringType instanceof JavaType.Unknown) && node instanceof ExtensionMethodNode) {
+                // An array receiver cannot be a declaring type, so the class declaring the extension method is used
+                declaringType = TypeUtils.asFullyQualified(type(((ExtensionMethodNode) node).getExtensionMethodNode().getDeclaringClass()));
+            }
             method.unsafeSet(declaringType,
                     // Groovy gives constructors of classes it compiles from source a void return type
                     node instanceof ConstructorNode ? declaringType : type(node.getReturnType()),
