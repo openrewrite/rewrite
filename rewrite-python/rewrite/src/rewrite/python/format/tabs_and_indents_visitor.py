@@ -762,20 +762,24 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
     def _closing(self, space: Space, last: J, column: int) -> Space:
         """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
-        ``column`` and a comment line at the column of ``last`` when ``last`` starts a line."""
+        ``column``. A comment line takes the column of ``last`` when ``last`` starts a line, and otherwise moves as
+        far as the bracket does."""
         if not space.comments:
             return self._indent_to(space, column)
-        inner = self.find_indent(last.prefix) if '\n' in last.prefix.last_whitespace else None
         final = len(space.comments) - 1
+        closing = space.comments[final].suffix
+        shift = column - self._get_length_of_whitespace(closing) if '\n' in closing else 0
+        element_column = self.find_indent(last.prefix) if '\n' in last.prefix.last_whitespace else None
 
-        def to(whitespace: str, to_column: Optional[int]) -> str:
-            if to_column is None or '\n' not in whitespace:
+        def line(whitespace: str, to_column: Optional[int]) -> str:
+            if '\n' not in whitespace:
                 return whitespace
-            return self._indent(whitespace, to_column - self._get_length_of_whitespace(whitespace))
+            current = self._get_length_of_whitespace(whitespace)
+            return self._indent(whitespace, (current + shift if to_column is None else to_column) - current)
 
         return space.replace(
-            whitespace=to(space.whitespace, inner),
-            comments=list_map(lambda c, i: c.replace(suffix=to(c.suffix, column if i == final else inner)),
+            whitespace=line(space.whitespace, element_column),
+            comments=list_map(lambda c, i: c.replace(suffix=line(c.suffix, column if i == final else element_column)),
                               space.comments))
 
     def _indent_to(self, space: Space, column: int, context: Optional[str] = None) -> Space:

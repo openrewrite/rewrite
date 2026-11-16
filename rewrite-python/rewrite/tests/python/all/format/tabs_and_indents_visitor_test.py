@@ -762,7 +762,7 @@ def test_bracket_closing_after_trailing_comma_inside_function():
     )
 
 
-def test_comment_after_trailing_comma_keeps_the_column_of_the_elements():
+def test_comment_after_trailing_comma_stays_inside_the_brackets():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
     rewrite_run(
         # language=python
@@ -773,12 +773,18 @@ def test_comment_after_trailing_comma_keeps_the_column_of_the_elements():
                 1,
                 # c
               )
+              g(1, 2,
+                # d
+              )
             """,
             """
             def create():
                 f(
                     1,
                     # c
+                )
+                g(1, 2,
+                  # d
                 )
             """
         ),
