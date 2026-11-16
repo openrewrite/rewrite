@@ -44,6 +44,7 @@ import java.io.PipedOutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -145,6 +146,7 @@ class ScmTest {
           "scm:git:git@github.com:example/app.git",
           "https://github.com/example/app",
           "v1"));
+        assertThat(pom.getScm().getInheritedFrom()).isNull();
     }
 
     @Test
@@ -182,7 +184,88 @@ class ScmTest {
             "scm:git:git@git.example.org:group/subgroup/repo.git",
             // declared by the parent, whose placeholder is the child's once inherited
             "https://git.example.org/group/subgroup/child",
-            "v1"));
+            "v1",
+            new GroupArtifactVersion("org.example", "parent", "1")));
+    }
+
+    @Test
+    void declaredScmIsInheritedFromNoPom() {
+        Scm declared = parseReactor("pom.xml").getPom().getScm();
+
+        assertThat(declared).isEqualTo(new Scm(
+          "scm:git:https://git.example.org/group/subgroup/repo.git",
+          "scm:git:git@git.example.org:group/subgroup/repo.git",
+          "https://git.example.org/group/subgroup/grandparent",
+          "HEAD"));
+        assertThat(declared.getInheritedFrom()).isNull();
+    }
+
+    @Test
+    void inheritedScmNamesTheNearestAncestorThatContributed() {
+        MavenResolutionResult child = parseReactor();
+
+        assertThat(child.getPom().getRequested().getScm())
+          .as("what the POM itself declares is inherited from nowhere")
+          .extracting(Scm::getInheritedFrom)
+          .isNull();
+        assertThat(child.getPom().getScm())
+          .as("the parent gives the url and the grandparent the connections: the parent is nearer")
+          .extracting(Scm::getInheritedFrom)
+          .isEqualTo(new GroupArtifactVersion("org.example", "parent", "1"));
+    }
+
+    @Test
+    void ownUrlWithAnInheritedConnectionIsInherited() {
+        Scm mixed = parseReactor("parent/pom.xml").getPom().getScm();
+
+        assertThat(mixed).isEqualTo(new Scm(
+          "scm:git:https://git.example.org/group/subgroup/repo.git",
+          "scm:git:git@git.example.org:group/subgroup/repo.git",
+          "https://git.example.org/group/subgroup/parent",
+          "HEAD",
+          new GroupArtifactVersion("org.example", "grandparent", "1")));
+    }
+
+    @Test
+    void inheritingOnlyTheTagIsNotInheritingTheRepository() {
+        Scm scm = parse("child/pom.xml", Map.of(
+          "pom.xml", """
+            <project>
+              <groupId>org.example</groupId>
+              <artifactId>parent</artifactId>
+              <version>1</version>
+              <packaging>pom</packaging>
+              <scm>
+                <connection>scm:git:https://git.example.org/parent.git</connection>
+                <url>https://git.example.org/parent</url>
+                <tag>HEAD</tag>
+              </scm>
+            </project>
+            """,
+          "child/pom.xml", """
+            <project>
+              <parent>
+                <groupId>org.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1</version>
+              </parent>
+              <artifactId>child</artifactId>
+              <scm>
+                <connection>scm:git:https://git.example.org/child.git</connection>
+                <url>https://git.example.org/child</url>
+              </scm>
+            </project>
+            """
+        )).getPom().getScm();
+
+        assertThat(scm)
+          .as("the parent's connection and url are overridden, and it declares no developerConnection")
+          .isEqualTo(new Scm(
+            "scm:git:https://git.example.org/child.git",
+            null,
+            "https://git.example.org/child",
+            "HEAD"));
+        assertThat(scm.getInheritedFrom()).isNull();
     }
 
     @Test
@@ -195,17 +278,35 @@ class ScmTest {
             "scm:git:git://github.com/junit-team/junit4.git",
             "scm:git:git@github.com:junit-team/junit4.git",
             "https://github.com/junit-team/junit4",
-            "r4.13.2"));
+            "r4.13.2"))
+          .extracting(Scm::getInheritedFrom)
+          .isNull();
         assertThat(compileDependency(child, "guava").getScm())
           .as("declared by guava-parent only, and inherited without '/guava' appended")
           .isEqualTo(new Scm(
             "scm:git:https://github.com/google/guava.git",
             "scm:git:git@github.com:google/guava.git",
             "https://github.com/google/guava",
-            null));
+            null,
+            new GroupArtifactVersion("com.google.guava", "guava-parent", "29.0-jre")));
         assertThat(compileDependency(child, "aopalliance").getScm())
           .as("no POM in its parent chain declares one")
           .isNull();
+    }
+
+    @Test
+    void inheritedFromTellsAParentOfAnotherOrganizationApart() {
+        ResolvedDependency j2objc = compileDependency(parseReactor(), "j2objc-annotations");
+
+        assertThat(j2objc.getGroupId()).isEqualTo("com.google.j2objc");
+        assertThat(j2objc.getScm())
+          .as("its own POM declares no <scm>, so this is the repository of the parent and not its own")
+          .isEqualTo(new Scm(
+            "scm:svn:http://svn.sonatype.org/spice/tags/oss-parent-7",
+            "scm:svn:https://svn.sonatype.org/spice/tags/oss-parent-7",
+            "http://svn.sonatype.org/spice/tags/oss-parent-7",
+            null,
+            new GroupArtifactVersion("org.sonatype.oss", "oss-parent", "7")));
     }
 
     @Test
@@ -229,6 +330,24 @@ class ScmTest {
         MavenResolutionResult read = mapper.readValue(mapper.writeValueAsBytes(child), MavenResolutionResult.class);
 
         assertScmSurvived(read, child);
+    }
+
+    @Test
+    void readsScmSerializedBeforeInheritedFrom() throws IOException {
+        MavenResolutionResult child = parseReactor();
+        ObjectMapper olderWriter = new RecipeSerializer().getMapper()
+          .addMixIn(Scm.class, WithoutInheritedFrom.class);
+        byte[] older = olderWriter.writeValueAsBytes(child);
+        assertThat(olderWriter.readTree(older).findValues("inheritedFrom")).isEmpty();
+
+        MavenResolutionResult read = new RecipeSerializer().getMapper().readValue(older, MavenResolutionResult.class);
+
+        assertThat(read.getPom().getScm())
+          .isEqualTo(child.getPom().getScm().withInheritedFrom(null));
+        assertThat(compileDependency(read, "guava").getScm())
+          .isEqualTo(compileDependency(child, "guava").getScm().withInheritedFrom(null))
+          .extracting(Scm::getUrl)
+          .isEqualTo("https://github.com/google/guava");
     }
 
     @Test
@@ -306,6 +425,10 @@ class ScmTest {
         assertThat(read.getPom().getScm())
           .isNotNull()
           .isEqualTo(written.getPom().getScm());
+        assertThat(read.getPom().getScm().getInheritedFrom())
+          .isEqualTo(new GroupArtifactVersion("org.example", "parent", "1"));
+        assertThat(compileDependency(read, "guava").getScm().getInheritedFrom())
+          .isEqualTo(new GroupArtifactVersion("com.google.guava", "guava-parent", "29.0-jre"));
         for (String artifactId : new String[]{"junit", "guava"}) {
             assertThat(compileDependency(read, artifactId).getScm())
               .isNotNull()
@@ -326,17 +449,27 @@ class ScmTest {
     }
 
     private static MavenResolutionResult parseReactor() {
+        return parseReactor("parent/child/pom.xml");
+    }
+
+    private static MavenResolutionResult parseReactor(String path) {
+        return parse(path, Map.of(
+          "pom.xml", GRANDPARENT,
+          "parent/pom.xml", PARENT,
+          "parent/child/pom.xml", CHILD));
+    }
+
+    private static MavenResolutionResult parse(String path, Map<String, String> pomsByPath) {
         List<SourceFile> poms = MavenParser.builder().build()
-          .parseInputs(List.of(
-            org.openrewrite.Parser.Input.fromString(Path.of("pom.xml"), GRANDPARENT),
-            org.openrewrite.Parser.Input.fromString(Path.of("parent/pom.xml"), PARENT),
-            org.openrewrite.Parser.Input.fromString(Path.of("parent/child/pom.xml"), CHILD)
-          ), null, new InMemoryExecutionContext(t -> {
+          .parseInputs(pomsByPath.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(pom -> org.openrewrite.Parser.Input.fromString(Path.of(pom.getKey()), pom.getValue()))
+            .toList(), null, new InMemoryExecutionContext(t -> {
               throw new AssertionError(t);
           }))
           .toList();
         return poms.stream()
-          .filter(pom -> pom.getSourcePath().equals(Path.of("parent/child/pom.xml")))
+          .filter(pom -> pom.getSourcePath().equals(Path.of(path)))
           .findFirst()
           .flatMap(pom -> pom.getMarkers().findFirst(MavenResolutionResult.class))
           .orElseThrow();
@@ -349,5 +482,9 @@ class ScmTest {
 
     @JsonIgnoreProperties("scm")
     private abstract static class WithoutScm {
+    }
+
+    @JsonIgnoreProperties("inheritedFrom")
+    private abstract static class WithoutInheritedFrom {
     }
 }
