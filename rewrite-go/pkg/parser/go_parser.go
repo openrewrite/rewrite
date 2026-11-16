@@ -4034,6 +4034,13 @@ func (ctx *parseContext) findNext(ch byte) int {
 // backtick or `/` is therefore never found: those open the regions the
 // scan steps over.
 func (ctx *parseContext) findNextBefore(ch byte, before int) int {
+	return ctx.scanCodeBefore(before, func(i int) bool { return ctx.src[i] == ch })
+}
+
+// scanCodeBefore returns the first offset from the cursor, and before the
+// `before` bound as findNextBefore reads it, at which match holds, stepping
+// over rune, string and raw string literals and comments.
+func (ctx *parseContext) scanCodeBefore(before int, match func(i int) bool) int {
 	if before < 0 {
 		return -1
 	}
@@ -4081,7 +4088,7 @@ func (ctx *parseContext) findNextBefore(ch byte, before int) int {
 				i += 2
 			}
 		default:
-			if b == ch {
+			if match(i) {
 				return i
 			}
 			i++
@@ -4091,11 +4098,9 @@ func (ctx *parseContext) findNextBefore(ch byte, before int) int {
 }
 
 func (ctx *parseContext) findNextString(s string) int {
-	idx := strings.Index(string(ctx.src[ctx.cursor:]), s)
-	if idx < 0 {
-		return -1
-	}
-	return ctx.cursor + idx
+	return ctx.scanCodeBefore(0, func(i int) bool {
+		return i+len(s) <= len(ctx.src) && string(ctx.src[i:i+len(s)]) == s
+	})
 }
 
 func (ctx *parseContext) prefixString(pos token.Pos) string {
