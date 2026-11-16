@@ -20,10 +20,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.tree.ParseError;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
@@ -651,6 +653,18 @@ class TomlParserTest implements RewriteTest {
 
         assertThat(parsed).isInstanceOf(Toml.Document.class);
         assertThat(parsed.printAll()).isEqualTo(source);
+    }
+
+    @Test
+    void invalidTomlReportsTheSyntaxError() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "not toml\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage())
+            .startsWith("org.openrewrite.toml.TomlParsingException: Syntax error")
+            .contains("line 1:4"));
     }
 
     @Test

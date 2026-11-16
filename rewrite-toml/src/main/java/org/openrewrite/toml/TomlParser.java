@@ -39,16 +39,17 @@ public class TomlParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
+            ForwardingErrorListener errorListener = new ForwardingErrorListener(input.getPath(), ctx);
             try (EncodingDetectingInputStream sourceStream = input.getSource(ctx)) {
                 // Lex the same decoded text the visitor reads, or a file that is not UTF-8 lexes to different text
                 String source = sourceStream.readFully();
                 TomlLexer lexer = new TomlLexer(CharStreams.fromString(source));
                 lexer.removeErrorListeners();
-                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                lexer.addErrorListener(errorListener);
 
                 org.openrewrite.toml.internal.grammar.TomlParser parser = new org.openrewrite.toml.internal.grammar.TomlParser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                parser.addErrorListener(errorListener);
 
                 Toml.Document document = new TomlParserVisitor(
                         input.getRelativePath(relativeTo),
@@ -60,6 +61,12 @@ public class TomlParser implements Parser {
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
+                // report the syntax error, not the visitor's failure on what recovery left
+                TomlParsingException syntaxError = errorListener.firstError;
+                if (syntaxError != null) {
+                    syntaxError.addSuppressed(t);
+                    t = syntaxError;
+                }
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);
             }
@@ -93,6 +100,9 @@ public class TomlParser implements Parser {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 
+        @Nullable
+        TomlParsingException firstError;
+
         private ForwardingErrorListener(Path sourcePath, ExecutionContext ctx) {
             this.sourcePath = sourcePath;
             this.ctx = ctx;
@@ -101,8 +111,12 @@ public class TomlParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            ctx.getOnError().accept(new TomlParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
+            TomlParsingException error = new TomlParsingException(sourcePath,
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e);
+            if (firstError == null) {
+                firstError = error;
+            }
+            ctx.getOnError().accept(error);
         }
     }
 
