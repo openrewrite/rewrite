@@ -18,11 +18,14 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -684,6 +687,37 @@ class MethodInvocationTest implements RewriteTest {
                             }
                         )
                 ))
+          )
+        );
+    }
+
+    @Test
+    void indexedAssignmentIsTypedAsItsSetCall() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(sb: StringBuilder, m: MutableMap<String, Int>, l: java.util.ArrayList<String>) {
+                  sb[0] = 'c'
+                  m["a"] = 1
+                  l[0] = "x"
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<String> setters = new ArrayList<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        JavaType.Method type = method.getMethodType();
+                        setters.add(type.getDeclaringType().getFullyQualifiedName() + "." + type.getName() + type.getParameterTypes());
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(setters).containsExactly(
+                  "kotlin.text.StringsKt.set[java.lang.StringBuilder, int, char]",
+                  "kotlin.collections.MapsKt.set[kotlin.collections.MutableMap<Generic{K}, Generic{V}>, kotlin.String, int]",
+                  "java.util.ArrayList.set[int, java.lang.String]"
+                );
+            })
           )
         );
     }

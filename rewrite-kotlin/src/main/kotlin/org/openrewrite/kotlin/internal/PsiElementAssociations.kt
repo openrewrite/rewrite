@@ -259,6 +259,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             else -> {
                 when (val fir = primary(psi)) {
                     is FirResolvedNamedReference -> {
+                        // An indexed assignment `a[i] = v` maps only the `set` reference to `a[i]`.
+                        // The `set` call, with its receiver and arguments, maps to the assignment.
+                        val call = elementMap[psi.parent]
+                            ?.firstNotNullOfOrNull { (it.fir as? FirFunctionCall)?.takeIf { c -> c.calleeReference === fir } }
+                        if (call != null) {
+                            return typeMapping.methodInvocationType(call)
+                        }
                         when (val sym = fir.resolvedSymbol) {
                             is FirFunctionSymbol<*> -> typeMapping.methodDeclarationType(sym.fir, null)
                             else -> {
