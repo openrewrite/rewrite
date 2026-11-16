@@ -332,7 +332,8 @@ class TemplateEngine:
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
             lines.append(f"{_WRAPPER_INDENT}return {dedented}")
         else:
-            # Statement(s): wrap directly
+            # In a function, a name the context or a typed capture declares has its declared type, where at the
+            # module's level ty would take it as unbound or narrow it to the value assigned.
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
             lines.append(_indented_outside_strings(dedented))
 
