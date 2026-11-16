@@ -852,7 +852,9 @@ public interface RewriteTest extends SourceSpecs {
             } else {
                 assertThat(description).as("%s description should end with a period.", recipe.getName()).endsWith(".");
             }
-            assertThat(RecipeText.codeOutsideCodeSpans(recipe.getDisplayName()))
+            // a declarative recipe without a display name shows its name instead
+            String displayName = recipe.getDisplayName().equals(recipe.getName()) ? "" : recipe.getDisplayName();
+            assertThat(RecipeText.codeOutsideCodeSpans(displayName))
                     .as("%s display name has code outside backticks. The docs render it as Markdown, so write " +
                         "types, annotations and `Type#method` references as code spans, such as `@Nullable`.",
                             recipe.getName())
@@ -862,7 +864,7 @@ public interface RewriteTest extends SourceSpecs {
                         "types, annotations and `Type#method` references as code spans, such as " +
                         "`org.junit.jupiter.api.Test`.", recipe.getName())
                     .isEmpty();
-            assertThat(RecipeText.titleCaseWords(recipe.getDisplayName()))
+            assertThat(RecipeText.titleCaseWords(displayName))
                     .as("%s display name is in title case. Write it in sentence case, which capitalizes only the " +
                         "first word and proper names, such as \"Migrate to Spring Boot 3.0\".", recipe.getName())
                     .isEmpty();

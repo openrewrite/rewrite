@@ -3303,6 +3303,21 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void acceptDeclarativeRecipeWithoutDisplayName() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml("""
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.test.internal.NoDisplayName
+                description: Finds text files.
+                recipeList:
+                  - org.openrewrite.FindSourceFiles:
+                      filePattern: '**/*.txt'
+                """, "org.openrewrite.test.internal.NoDisplayName"),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
         void rejectTitleCaseDisplayName() {
             assertThatThrownBy(() ->
               rewriteRun(
