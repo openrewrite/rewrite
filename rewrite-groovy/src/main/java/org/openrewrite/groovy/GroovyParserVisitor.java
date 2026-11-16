@@ -3114,7 +3114,19 @@ public class GroovyParserVisitor {
             }
             queue.add(insideParentheses(prop, fmt -> {
                 Expression target = doVisit(prop.getObjectExpression());
-                Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") : sourceBefore(prop.isSafe() ? "?." : ".");
+                // In a command chain, `call(x) name` is Groovy's `call(x).name`, with no dot in the source.
+                int beforeDotCursor = cursor;
+                Space beforeDot = whitespace();
+                while (source.startsWith("\\\n", cursor) || source.startsWith("\\\r\n", cursor)) {
+                    cursor = indexOfNextNonWhitespace(cursor + 2, source);
+                    beforeDot = format(source, beforeDotCursor, cursor);
+                }
+                boolean implicitDot = !source.startsWith(".", cursor) && !source.startsWith("?.", cursor)
+                        && !source.startsWith("*.", cursor);
+                if (!implicitDot) {
+                    cursor = beforeDotCursor;
+                    beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") : sourceBefore(prop.isSafe() ? "?." : ".");
+                }
                 int saveCursor = cursor;
                 J name = doVisit(prop.getProperty());
                 if (name instanceof J.Literal) {
@@ -3130,6 +3142,8 @@ public class GroovyParserVisitor {
                     name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
                 } else if (prop.isSafe()) {
                     name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+                } else if (implicitDot) {
+                    name = name.withMarkers(name.getMarkers().add(new ImplicitDot(randomId())));
                 }
                 return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name),
                         ((J.Identifier) name).getType());

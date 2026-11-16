@@ -861,4 +861,48 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void aPropertyReadAtTheEndOfACommandChain() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib') _
+
+              foo()
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void withALaterDotInTheFile() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib') _
+
+              foo.bar()
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void withTheLibrarySVersion() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib@1.0') _
+
+              pipeline {
+                agent any
+              }
+              """
+          )
+        );
+    }
 }
