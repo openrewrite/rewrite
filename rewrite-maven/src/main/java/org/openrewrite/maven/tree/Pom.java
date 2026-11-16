@@ -60,7 +60,7 @@ public class Pom {
      */
     public static int getModelVersion() {
         //NOTE: This value should be incremented if there are any model changes to Pom (or one of its referenced types)
-        return 4;
+        return 5;
     }
 
     @Nullable
@@ -121,6 +121,14 @@ public class Pom {
     @Builder.Default
     @Nullable
     List<String> subprojects = emptyList();
+
+    /**
+     * The {@code <scm>} this POM itself declares, with its values as written, so that property placeholders are
+     * still in place and nothing is inherited from a parent. {@code null} when this POM declares none, and on
+     * models serialized before this field existed. See {@link ResolvedPom#getScm()} for the effective one.
+     */
+    @Nullable
+    Scm scm;
 
     public String getGroupId() {
         return gav.getGroupId();
