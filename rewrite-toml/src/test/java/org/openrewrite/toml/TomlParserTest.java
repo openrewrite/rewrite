@@ -666,6 +666,64 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void inlineTableSpanningLinesWithComments() {
+        // TOML 1.1
+        rewriteRun(
+          toml(
+            """
+              tbl = {
+                  key      = "a string",
+                  # comments
+                  moar-tbl =  {
+                      key = 1,
+                  }, # trailing comma
+              }
+              ProcessConfigsByRound = [
+                  {
+                      EnableRound = 0,
+                      MaxRoundsWithoutNewBlockReceived = 10
+                  }
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineBasicStringWithQuoteBeforeEscape() {
+        rewriteRun(
+          toml(
+            """
+              query = ""\"(
+              (#match? @ternary_block "\\\\\\\\?[\\\\\\\\n]*nil:")
+              )""\"
+              quotes = ""\"Here are two quotation marks: "". Simple enough.""\"
+              ends-in-quotes = ""\"a "quote\"""\"\"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                "(\n(#match? @ternary_block \"\\\\?[\\\\n]*nil:\")\n)",
+                "Here are two quotation marks: \"\". Simple enough.",
+                "a \"quote\"\""))
+          )
+        );
+    }
+
+    @Test
+    void offsetDateTimeWithLowercaseZ() {
+        rewriteRun(
+          toml(
+            """
+              d = 1979-05-27T07:32:00z
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Literal) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValue())
+              .isEqualTo(OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC)))
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
