@@ -17,6 +17,7 @@ package org.openrewrite.test;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.RecipeDescriptor;
@@ -84,7 +85,9 @@ final class RedundantRecipe {
 
     private static boolean sameFields(Recipe a, Recipe b) {
         try {
-            for (Class<?> c = a.getClass(); c != Recipe.class && c != null; c = c.getSuperclass()) {
+            // ScanningRecipe keeps a key of its own per instance
+            for (Class<?> c = a.getClass(); c != Recipe.class && c != ScanningRecipe.class && c != null;
+                 c = c.getSuperclass()) {
                 for (Field field : c.getDeclaredFields()) {
                     if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
                         continue;

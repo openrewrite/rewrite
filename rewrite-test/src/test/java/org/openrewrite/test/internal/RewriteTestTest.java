@@ -3345,6 +3345,22 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Nested
+        class Scanning implements RewriteTest {
+
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.recipe(new ScansNothing());
+            }
+
+            @Test
+            void rejectAScanningRecipeWithTheSameState() {
+                assertThatThrownBy(() -> rewriteRun(
+                  spec -> spec.recipe(new ScansNothing())
+                )).hasMessageStartingWith("The test sets spec.recipe(..)");
+            }
+        }
+
+        @Nested
         class NoRecipeInDefaults implements RewriteTest {
 
             @Test
@@ -4070,6 +4086,30 @@ class ImproperCursorUsage extends Recipe {
                 }.visit(tree, ctx, new Cursor(getCursor(), tree));
             }
         };
+    }
+}
+
+@NullMarked
+class ScansNothing extends ScanningRecipe<AtomicBoolean> {
+
+    @Override
+    public String getDisplayName() {
+        return "Scan nothing";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Scans no source file.";
+    }
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
     }
 }
 
