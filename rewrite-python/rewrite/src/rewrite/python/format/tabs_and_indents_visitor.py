@@ -11,13 +11,13 @@ from rewrite.java.tree import (
     JRightPadded, JLeftPadded, JContainer, Block, ArrayDimension,
     ClassDeclaration, Empty, MethodDeclaration, MethodInvocation,
     FieldAccess, Identifier, Lambda, NewArray, Annotation, Literal,
-    If, Binary, JavaSourceFile,
+    If, Binary, JavaSourceFile, ParameterizedType, TypeParameters,
 )
-from rewrite.java.markers import TrailingComma
+from rewrite.java.markers import OmitParentheses, TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
-    TrailingElseWrapper, Binary as PyBinary,
+    TrailingElseWrapper, Binary as PyBinary, MultiImport,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -281,7 +281,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     elem = self.visit_and_cast(elem, J, p)
                     after = self.visit_space(right.after, p)
 
-            if trailing_comma:
+            if trailing_comma and self._closes_with_bracket():
                 # After a trailing comma, the line break before the closing bracket is the comma's.
                 comma = trailing_comma.replace(suffix=self._closing(trailing_comma.suffix, elem, indent))
                 right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
@@ -759,6 +759,15 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 grandparent.put_message("last_indent", indent)
                 grandparent.put_message("chained_indent", indent)
         return elem, after
+
+    def _closes_with_bracket(self) -> bool:
+        """Whether a bracket closes the elements the cursor is among. After a trailing comma without one, as at the end
+        of `x = 1,`, the line break is the next statement's, though the comma holds it."""
+        owner = self.cursor.parent_tree_cursor().value
+        if isinstance(owner, CollectionLiteral):
+            return owner.padding.elements.markers.find_first(OmitParentheses) is None
+        return isinstance(owner, (MethodInvocation, Annotation, MethodDeclaration, ClassDeclaration, DictLiteral,
+                                  MultiImport, TypeParameters, ParameterizedType))
 
     def _closing(self, space: Space, last: J, column: int) -> Space:
         """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
