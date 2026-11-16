@@ -710,27 +710,47 @@ def test_multiline_list_inside_function_with_trailing_comma():
     )
 
 
-def test_multiline_call_inside_function_with_trailing_comma():
+def test_bracket_closing_after_trailing_comma_inside_function():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
     rewrite_run(
         # language=python
         python(
             """
-            def create_list():
+            def create():
               g(1, 2,
               )
-              return f(
+              f(
                 1,
-                2,
+              )
+              def h(
+                a,
+              ):
+                pass
+              class A(
+                B,
+              ):
+                pass
+              from os import (
+                path,
               )
             """,
             """
-            def create_list():
+            def create():
                 g(1, 2,
                 )
-                return f(
+                f(
                     1,
-                    2,
+                )
+                def h(
+                        a,
+                ):
+                    pass
+                class A(
+                        B,
+                ):
+                    pass
+                from os import (
+                    path,
                 )
             """
         ),
