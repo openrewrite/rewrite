@@ -20,7 +20,9 @@ import {Cursor} from "../tree";
 import {isObjectBindingPattern, JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve, rootName} from "./scope";
-import {aliasing, moduleNameOf, movedBinding, newIdentifier, respecify, withMovedTypes, withoutStatement} from "./add-import";
+import {
+    aliasing, moduleNameOf, movedBinding, newIdentifier, respecify, sameAttributes, withMovedTypes, withoutStatement
+} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
@@ -182,7 +184,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
      *     export {Old} from "m"       →  export {New as Old} from "m2"
      *     export {Old, X} from "m"    →  export {X} from "m"; export {New as Old} from "m2"
      *     export {Old} from "m";      →  export {Y, New as Old} from "m2"
-     *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not)
+     *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not,
+     *                                      with the same import attributes)
      *
      * A comment ending the line (`export {X} from "m"; // note`) stays on it, before the new statement.
      */
@@ -200,8 +203,11 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
             }
             changed = true;
             const staying = new Set(elements.filter(e => !moving.has(e)));
-            const target = statements.findIndex((s, j) =>
-                j !== i && reExportFrom(s.element, this.to.module)?.typeOnly.element === declaration.typeOnly.element);
+            const target = statements.findIndex((s, j) => {
+                const into = j === i ? undefined : reExportFrom(s.element, this.to.module);
+                return into !== undefined && into.typeOnly.element === declaration.typeOnly.element &&
+                    sameAttributes(into.attributes, declaration.attributes);
+            });
             if (target < 0 && staying.size === 0) {
                 statements[i] = {...statements[i], element: this.respecified(withElements(declaration, elements.map(e => this.renamed(e))))};
                 continue;
