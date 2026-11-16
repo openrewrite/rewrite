@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
@@ -45,24 +47,24 @@ import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
+    /**
+     * The Android Gradle Plugin is only on the classpath when the build supplies it, so its accessor can't be compiled
+     * into the type table with the others.
+     */
     @SuppressWarnings("LanguageMismatch")
     private static final String KTS_BUILD_STUBS =
             "package org.gradle.api\n" +
-            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
-            "import org.gradle.plugin.use.PluginDependencySpec\n" +
-            "fun Project.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
-            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n" +
             "fun Project.android(block: com.android.build.api.dsl.ApplicationExtension.() -> Unit) {}\n";
 
-    @SuppressWarnings("LanguageMismatch")
-    private static final String KTS_SETTINGS_STUBS =
-            "package org.gradle.api.initialization\n" +
-            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
-            "import org.gradle.plugin.use.PluginDependencySpec\n" +
-            "import org.gradle.plugin.management.PluginManagementSpec\n" +
-            "fun Settings.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
-            "fun Settings.pluginManagement(block: PluginManagementSpec.() -> Unit) {}\n" +
-            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
+    private static final String[] KTS_DEFAULT_IMPORTS = Stream.concat(
+            Arrays.stream(DefaultImportsCustomizer.DEFAULT_IMPORTS),
+            Stream.of("org.gradle.kotlin.dsl")
+    ).toArray(String[]::new);
+
+    /**
+     * Gradle compiles its Kotlin scripts so that a lambda passed as an {@code Action} receives its argument as {@code this}.
+     */
+    private static final String HAS_IMPLICIT_RECEIVER = "org.gradle.api.HasImplicitReceiver";
 
     private final GradleParser.Builder base;
 
@@ -94,11 +96,12 @@ public class GradleParser implements Parser {
                 buildscriptClasspath = defaultClasspath(relativeTo, ctx);
             }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
-                    .classpath(buildscriptClasspath)
+                    .classpath(withKotlinDslAccessors(buildscriptClasspath, ctx))
                     .dependsOn(KTS_BUILD_STUBS)
                     .isKotlinScript(true)
                     .scriptImplicitReceivers("org.gradle.api.Project")
-                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
+                    .scriptDefaultImports(KTS_DEFAULT_IMPORTS)
+                    .samWithReceiverAnnotations(HAS_IMPLICIT_RECEIVER)
                     .build();
         }
         if (groovySettingsParser == null) {
@@ -121,11 +124,11 @@ public class GradleParser implements Parser {
                 settingsClasspath = defaultClasspath(relativeTo, ctx);
             }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
-                    .classpath(settingsClasspath)
-                    .dependsOn(KTS_SETTINGS_STUBS)
+                    .classpath(withKotlinDslAccessors(settingsClasspath, ctx))
                     .isKotlinScript(true)
                     .scriptImplicitReceivers("org.gradle.api.initialization.Settings")
-                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
+                    .scriptDefaultImports(KTS_DEFAULT_IMPORTS)
+                    .samWithReceiverAnnotations(HAS_IMPLICIT_RECEIVER)
                     .build();
         }
 
@@ -284,6 +287,16 @@ public class GradleParser implements Parser {
                     "develocity-gradle-plugin");
         }
         return defaultClasspath;
+    }
+
+    /**
+     * Adds the accessors Gradle generates for each build, which {@code addGradleApiToTypeTable} in build.gradle.kts
+     * compiles into the type table.
+     */
+    private static List<Path> withKotlinDslAccessors(Collection<Path> classpath, ExecutionContext ctx) {
+        List<Path> withAccessors = new ArrayList<>(classpath);
+        withAccessors.addAll(JavaParser.dependenciesFromResources(ctx, "gradle-kotlin-dsl-accessors"));
+        return withAccessors;
     }
 
     static @Nullable String wrapperGradleVersion(@Nullable Path projectDir) {

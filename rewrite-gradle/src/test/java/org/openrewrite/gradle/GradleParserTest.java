@@ -231,6 +231,39 @@ class GradleParserTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', textBlock = """
+      plugins { id("org.example") }                                     | org.gradle.plugin.use.PluginDependenciesSpec id(..)
+      dependencies { implementation("g:a:1") }                          | DependencyHandlerSpec implementation(..)
+      dependencies { implementation("g:a:1") { exclude(group = "c") } } | org.gradle.kotlin.dsl.DependencyHandlerExtensionsKt exclude(..)
+      tasks.register("report") { doLast { } }                           | org.gradle.api.Task doLast(..)
+      tasks.test { useJUnitPlatform() }                                 | org.gradle.api.tasks.testing.Test useJUnitPlatform(..)
+      java { toolchain { } }                                            | org.gradle.api.plugins.JavaPluginExtension toolchain(..)
+      """)
+    void kotlinDslIsTypeAttributed(String script, String method) {
+        rewriteRun(
+          buildGradleKts(script, spec -> spec.afterRecipe(cu ->
+            assertThat(FindMethods.find(cu, method)).isNotEmpty()))
+        );
+    }
+
+    @Test
+    void kotlinDslAccessorsOfAnOlderGradle() {
+        rewriteRun(
+          spec -> spec.parser(GradleParser.builder().gradleVersion("6.9")),
+          buildGradleKts(
+            """
+              dependencies { implementation("g:a:1") }
+              tasks.withType<Test> { useJUnitPlatform() }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "DependencyHandlerSpec implementation(..)")).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.api.tasks.testing.Test useJUnitPlatform(..)")).isNotEmpty();
+            })
+          )
+        );
+    }
+
     @Test
     void configurationNotDeclaredByTheStubsIsADependencyDeclaration() {
         rewriteRun(
