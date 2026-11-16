@@ -25,6 +25,7 @@ import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
+import org.codehaus.groovy.transform.stc.TypeCheckingExtension;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -71,6 +72,7 @@ public class GroovyParser implements Parser {
     private final JavaTypeCache typeCache;
     private final JavaTypeFactory typeFactory;
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
+    private final List<Function<StaticTypeCheckingVisitor, TypeCheckingExtension>> typeCheckingExtensions;
 
     @Override
     public Stream<SourceFile> parse(@Language("groovy") String... sources) {
@@ -156,6 +158,9 @@ public class GroovyParser implements Parser {
                             try {
                                 StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
                                 staticTypeCheckingVisitor.setCompilationUnit(compUnit);
+                                for (Function<StaticTypeCheckingVisitor, TypeCheckingExtension> extension : typeCheckingExtensions) {
+                                    staticTypeCheckingVisitor.addTypeCheckingExtension(extension.apply(staticTypeCheckingVisitor));
+                                }
                                 staticTypeCheckingVisitor.visitClass(aClass);
                             } catch (NoClassDefFoundError | NullPointerException ignored) {
                                 // Static type checking is best-effort; skip enrichment when Groovy fails internally
@@ -299,6 +304,7 @@ public class GroovyParser implements Parser {
         private boolean logCompilationWarningsAndErrors = false;
         private List<NamedStyles> styles = new ArrayList<>();
         private List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
+        private List<Function<StaticTypeCheckingVisitor, TypeCheckingExtension>> typeCheckingExtensions = new ArrayList<>();
 
         public Builder() {
             super(G.CompilationUnit.class);
@@ -314,6 +320,7 @@ public class GroovyParser implements Parser {
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.compilerCustomizers.addAll(base.compilerCustomizers);
+            this.typeCheckingExtensions.addAll(base.typeCheckingExtensions);
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -390,6 +397,15 @@ public class GroovyParser implements Parser {
             return this;
         }
 
+        /**
+         * Extensions to the type checker that attributes types, such as one that knows a DSL's closure delegates.
+         */
+        @SafeVarargs
+        public final GroovyParser.Builder typeCheckingExtensions(Function<StaticTypeCheckingVisitor, TypeCheckingExtension>... typeCheckingExtensions) {
+            this.typeCheckingExtensions.addAll(Arrays.asList(typeCheckingExtensions));
+            return this;
+        }
+
         private @Nullable Collection<Path> resolvedClasspath() {
             if (artifactNames != null && !artifactNames.isEmpty()) {
                 classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
@@ -406,7 +422,7 @@ public class GroovyParser implements Parser {
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }
-            return new GroovyParser(cp, logCompilationWarningsAndErrors, typeCache, factory, compilerCustomizers);
+            return new GroovyParser(cp, logCompilationWarningsAndErrors, typeCache, factory, compilerCustomizers, typeCheckingExtensions);
         }
 
         @Override
@@ -420,6 +436,7 @@ public class GroovyParser implements Parser {
             clone.typeCache = this.typeCache.clone();
             clone.styles = new ArrayList<>(this.styles);
             clone.compilerCustomizers = new ArrayList<>(this.compilerCustomizers);
+            clone.typeCheckingExtensions = new ArrayList<>(this.typeCheckingExtensions);
             return clone;
         }
     }
