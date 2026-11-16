@@ -48,15 +48,11 @@ public final class MultilineScalarIndents {
         if (indents.isEmpty()) {
             return autoFormat.get();
         }
-        Object previous = cursor.pollMessage(CURSOR_MESSAGE);
         cursor.putMessage(CURSOR_MESSAGE, this);
         try {
             return autoFormat.get();
         } finally {
             cursor.pollMessage(CURSOR_MESSAGE);
-            if (previous != null) {
-                cursor.putMessage(CURSOR_MESSAGE, previous);
-            }
         }
     }
 

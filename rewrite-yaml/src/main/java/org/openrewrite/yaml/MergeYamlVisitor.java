@@ -105,7 +105,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private MergeYamlVisitor<P> nested(Yaml.Block block, Yaml incoming) {
-        MergeYamlVisitor<P> nested = new MergeYamlVisitor<>(block, incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertMode, insertProperty);
+        MergeYamlVisitor<P> nested = new MergeYamlVisitor<>(block, incoming, acceptTheirs, objectIdentifyingProperty,
+                shouldAutoFormat, insertMode, insertProperty);
         nested.multilineScalarIndents = multilineScalarIndents;
         return nested;
     }
@@ -228,7 +229,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     Yaml.Block value = incomingEntry.getValue();
                     if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) value).getValue())) {
-                        Yaml.Scalar multiline = multilineScalarIndents.add((Yaml.Scalar) value, false, calculateMultilineIndent(incomingEntry));
+                        Yaml.Scalar multiline = multilineScalarIndents.add((Yaml.Scalar) value, false,
+                                calculateMultilineIndent(incomingEntry));
                         value = autoFormatMultiline(multiline, p, getCursor());
                     }
                     Yaml mergedYaml = nested(existingEntry.getValue(), value)
@@ -252,7 +254,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             if (shouldAutoFormat && it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) it.getValue()).getValue())) {
-                it = it.withValue(multilineScalarIndents.add((Yaml.Scalar) it.getValue(), true, calculateMultilineIndent(it)));
+                it = it.withValue(multilineScalarIndents.add((Yaml.Scalar) it.getValue(), true,
+                        calculateMultilineIndent(it)));
             }
             if (!shouldAutoFormat) {
                 return it;
