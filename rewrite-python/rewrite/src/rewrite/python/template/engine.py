@@ -32,7 +32,6 @@ from rewrite.java import tree as j
 from rewrite.java.markers import TrailingComma
 from rewrite.java.support_types import Space
 from rewrite.markers import Marker
-from rewrite.python._parser_visitor import FSTRING_MIDDLE, TSTRING_MIDDLE
 from rewrite.python.visitor import PythonVisitor
 from rewrite.utils import list_map
 
@@ -48,7 +47,6 @@ from .replacement import substitution_marker
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 _WRAPPER_INDENT = "    "
-_STRING_TOKENS = {tokenize.STRING, FSTRING_MIDDLE, TSTRING_MIDDLE}
 
 
 _stdlib_venv: Optional[str] = None
@@ -104,14 +102,15 @@ class TemplateOptions:
 def _indented_outside_strings(code: str) -> str:
     """``code`` indented to be the wrapper's body, but for the lines a string runs on to, whose leading
     whitespace is the string's own text."""
+    from rewrite.python._parser_visitor import FSTRING_MIDDLE, TSTRING_MIDDLE
     continued: Set[int] = set()
     try:
         for token in tokenize.generate_tokens(io.StringIO(code).readline):
-            if token.type in _STRING_TOKENS:
+            if token.type in (tokenize.STRING, FSTRING_MIDDLE, TSTRING_MIDDLE):
                 continued.update(range(token.start[0] + 1, token.end[0] + 1))
     except (tokenize.TokenError, SyntaxError):
-        # The parser tokenizes the same code, so code that does not tokenize does not parse either, and the parse
-        # says what is wrong with it.
+        # The parser tokenizes the wrapper around this code too, so code that does not tokenize fails to parse there,
+        # and the parse says what is wrong with it.
         pass
     return '\n'.join(line if row in continued else _WRAPPER_INDENT + line
                      for row, line in enumerate(code.split('\n'), 1))
