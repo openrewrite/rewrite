@@ -17,6 +17,7 @@ package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -25,12 +26,16 @@ import static org.openrewrite.toml.Assertions.toml;
 
 class VersionCatalogTest implements RewriteTest {
 
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(RewriteTest.toRecipe(() ->
+      new VersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+        catalog.getVersion(new GroupArtifact("com.google.guava", "guava"))))));
+  }
+
     @Test
     void matchesSettingsAndTomlCatalogs() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new VersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
-              catalog.getVersion(new GroupArtifact("com.google.guava", "guava")))))),
           settingsGradle(
             """
               dependencyResolutionManagement {
@@ -76,9 +81,6 @@ class VersionCatalogTest implements RewriteTest {
     @Test
     void readsVersionConstraintsFromBothCatalogs() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new VersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
-              catalog.getVersion(new GroupArtifact("com.google.guava", "guava")))))),
           settingsGradle(
             """
               dependencyResolutionManagement {
