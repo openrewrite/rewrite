@@ -3281,6 +3281,46 @@ class RewriteTestTest implements RewriteTest {
                   """, "org.openrewrite.test.internal.StillValidated")
               ));
         }
+
+        @Test
+        void rejectCodeOutsideBackticksInDescription() {
+            assertThatThrownBy(() ->
+              rewriteRun(
+                spec -> spec.recipeFromYaml("""
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.internal.BareCode
+                  displayName: Find bare code
+                  description: Finds org.junit.Test and @Test.
+                  recipeList:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: '**/*.txt'
+                  """, "org.openrewrite.test.internal.BareCode"),
+                new SourceSpecs[0]
+              ))
+              .hasMessageContaining("description has code outside backticks")
+              .hasMessageContaining("org.junit.Test")
+              .hasMessageContaining("@Test");
+        }
+
+        @Test
+        void rejectTitleCaseDisplayName() {
+            assertThatThrownBy(() ->
+              rewriteRun(
+                spec -> spec.recipeFromYaml("""
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.internal.TitleCase
+                  displayName: Find Text Files In The Repository
+                  description: Finds text files.
+                  recipeList:
+                    - org.openrewrite.FindSourceFiles:
+                        filePattern: '**/*.txt'
+                  """, "org.openrewrite.test.internal.TitleCase"),
+                new SourceSpecs[0]
+              ))
+              .hasMessageContaining("display name is in title case")
+              .hasMessageContaining("In")
+              .hasMessageContaining("The");
+        }
     }
 }
 
