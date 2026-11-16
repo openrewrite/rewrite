@@ -38,6 +38,7 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scm;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -81,11 +82,11 @@ public final class GradleProjectBuilder {
                 GradleProjectBuilder.pluginDescriptors(project.getPluginManager()),
                 mapRepositories(repositories),
                 null,
-                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations()),
+                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations(), DependencyScmResolver.forProject(project)),
                 new GradleBuildscript(
                         randomId(),
                         new ArrayList<>(pluginRepositories),
-                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
+                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations(), DependencyScmResolver.forBuildscript(project))
                 ),
                 springDependencyManagementPlugin(project),
                 buildFilePath(project));
@@ -298,6 +299,15 @@ public final class GradleProjectBuilder {
     }
 
     static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ConfigurationContainer configurationContainer) {
+        return dependencyConfigurations(configurationContainer, null);
+    }
+
+    /**
+     * @param scm Where to ask for the source repository of what the configurations resolve to, or {@code null}
+     *            to leave it out.
+     */
+    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ConfigurationContainer configurationContainer,
+                                                                             DependencyScmResolver.@Nullable Scope scm) {
         Map<String, GradleDependencyConfiguration> results = new HashMap<>();
         List<Configuration> configurations = new ArrayList<>(configurationContainer);
         for (Configuration conf : configurations) {
@@ -327,7 +337,8 @@ public final class GradleProjectBuilder {
                     }
                     Map<GroupArtifact, ResolvedDependency> gaToResolved = resolvedConf.getFirstLevelModuleDependencies().stream()
                             .collect(toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
-                    resolved = resolved(gaToRequested, gaToResolved, detectedCycles);
+                    resolved = resolved(gaToRequested, gaToResolved, detectedCycles,
+                            scm == null ? emptyMap() : scm.scmByGav(conf));
                 } else {
                     resolved = emptyList();
                 }
@@ -519,6 +530,18 @@ public final class GradleProjectBuilder {
             Map<GroupArtifact, org.openrewrite.maven.tree.Dependency> gaToRequested,
             Map<GroupArtifact, ResolvedDependency> gaToResolved,
             List<String> detectedCycles) {
+        return resolved(gaToRequested, gaToResolved, detectedCycles, emptyMap());
+    }
+
+    /**
+     * @param scmByGav The effective {@code <scm>} of each dependency that has one, by
+     *                 {@link DependencyScmResolver#gav(String, String, String)}.
+     */
+    static List<org.openrewrite.maven.tree.ResolvedDependency> resolved(
+            Map<GroupArtifact, org.openrewrite.maven.tree.Dependency> gaToRequested,
+            Map<GroupArtifact, ResolvedDependency> gaToResolved,
+            List<String> detectedCycles,
+            Map<String, Scm> scmByGav) {
         Map<org.openrewrite.maven.tree.ResolvedGroupArtifactVersion, org.openrewrite.maven.tree.ResolvedDependency>
                 resolvedCache = new HashMap<>();
         return gaToResolved.entrySet().stream()
@@ -540,9 +563,10 @@ public final class GradleProjectBuilder {
                                 // the DependencyHandler has the substitution mapping buried inside it, but not exposed publicly
                                 .requested(requested)
                                 .dependencies(resolved.getChildren().stream()
-                                        .map(child -> resolved(child, 1, resolvedCache, detectedCycles, ancestorPath))
+                                        .map(child -> resolved(child, 1, resolvedCache, detectedCycles, ancestorPath, scmByGav))
                                         .collect(toList()))
                                 .licenses(emptyList())
+                                .scm(scm(resolved, scmByGav))
                                 .type(requested.getType())
                                 .depth(0)
                                 .build();
@@ -582,6 +606,20 @@ public final class GradleProjectBuilder {
             List<String> detectedCycles,
             List<GroupArtifactVersion> ancestorPath
     ) {
+        return resolved(dep, depth, resolvedCache, detectedCycles, ancestorPath, emptyMap());
+    }
+
+    private static @Nullable Scm scm(ResolvedDependency dep, Map<String, Scm> scmByGav) {
+        return scmByGav.get(DependencyScmResolver.gav(dep.getModuleGroup(), dep.getModuleName(), dep.getModuleVersion()));
+    }
+
+    static org.openrewrite.maven.tree.ResolvedDependency resolved(
+            ResolvedDependency dep, int depth,
+            Map<org.openrewrite.maven.tree.ResolvedGroupArtifactVersion, org.openrewrite.maven.tree.ResolvedDependency> resolvedCache,
+            List<String> detectedCycles,
+            List<GroupArtifactVersion> ancestorPath,
+            Map<String, Scm> scmByGav
+    ) {
         ResolvedGroupArtifactVersion resolvedGav = resolvedGroupArtifactVersion(dep);
         org.openrewrite.maven.tree.ResolvedDependency resolvedDependency = resolvedCache.get(resolvedGav);
         if (resolvedDependency == null) {
@@ -592,6 +630,7 @@ public final class GradleProjectBuilder {
                     .requested(requested)
                     .dependencies(dependencies)
                     .licenses(emptyList())
+                    .scm(scm(dep, scmByGav))
                     .type(requested.getType())
                     .depth(depth)
                     .build();
@@ -636,7 +675,7 @@ public final class GradleProjectBuilder {
                     // Add current child to the path before recursing
                     ancestorPath.add(childGav);
                     try {
-                        dependencies.add(resolved(child, depth + 1, resolvedCache, detectedCycles, ancestorPath));
+                        dependencies.add(resolved(child, depth + 1, resolvedCache, detectedCycles, ancestorPath, scmByGav));
                     } finally {
                         // Remove from path after processing (backtrack)
                         ancestorPath.remove(ancestorPath.size() - 1);
@@ -653,5 +692,6 @@ public final class GradleProjectBuilder {
         groupArtifactCache.clear();
         groupArtifactVersionCache.clear();
         resolvedGroupArtifactVersionCache.clear();
+        DependencyScmResolver.clearCaches();
     }
 }
