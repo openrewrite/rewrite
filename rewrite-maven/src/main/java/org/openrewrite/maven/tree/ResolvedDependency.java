@@ -38,7 +38,6 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @With
 @Builder
-@AllArgsConstructor(access = AccessLevel.PUBLIC, onConstructor_ = @JsonCreator)
 public class ResolvedDependency implements Heavyweight, Serializable {
 
     /**
@@ -50,6 +49,25 @@ public class ResolvedDependency implements Heavyweight, Serializable {
                               int depth, @Nullable List<GroupArtifact> effectiveExclusions) {
         this(repository, gav, requested, dependencies, licenses, type, classifier, optional, depth,
                 effectiveExclusions, null);
+    }
+
+    // Written out rather than generated, so that it can say which of the two constructors Jackson is to use
+    @JsonCreator
+    public ResolvedDependency(@Nullable MavenRepository repository, ResolvedGroupArtifactVersion gav,
+                              Dependency requested, List<ResolvedDependency> dependencies, List<License> licenses,
+                              @Nullable String type, @Nullable String classifier, @Nullable Boolean optional,
+                              int depth, @Nullable List<GroupArtifact> effectiveExclusions, @Nullable Scm scm) {
+        this.repository = repository;
+        this.gav = gav;
+        this.requested = requested;
+        this.dependencies = dependencies;
+        this.licenses = licenses;
+        this.type = type;
+        this.classifier = classifier;
+        this.optional = optional;
+        this.depth = depth;
+        this.effectiveExclusions = effectiveExclusions;
+        this.scm = scm;
     }
 
     /**
