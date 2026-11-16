@@ -32,6 +32,7 @@ import org.openrewrite.golang.BundledEngine;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.golang.marker.TrailingComma;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.marker.BuildTool;
@@ -182,6 +183,29 @@ class GoRpcTransferTest {
         Map<String, Object> written = new ObjectMapper().convertValue(held, new TypeReference<Map<String, Object>>() {
         });
         assertThat(written).containsAllEntriesOf(fromTheEngine).doesNotContainKey("data");
+    }
+
+    @Test
+    void genericValueInstantiationTrailingComma() {
+        // given
+        String source = "package main\nfunc F[T any]() {}\nfunc G[T, U any]() {}\nvar f = F[int /* before */, /* after */]\nvar g = G[int, string,]\n";
+
+        // when
+        Go.CompilationUnit cu = parse(source);
+
+        // then
+        int[] count = {0};
+        new GolangVisitor<Integer>() {
+            @Override
+            public J visitIndexList(Go.IndexList indexList, Integer p) {
+                count[0]++;
+                assertThat(indexList.getPadding().getIndices().getMarkers()
+                  .findFirst(TrailingComma.class)).isPresent();
+                return super.visitIndexList(indexList, p);
+            }
+        }.visit(cu, 0);
+        assertThat(count[0]).isEqualTo(2);
+        assertThat(cu.printAll()).isEqualTo(source);
     }
 
     private static Go.CompilationUnit parse(String source) {
