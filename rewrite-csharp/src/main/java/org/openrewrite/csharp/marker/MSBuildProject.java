@@ -323,6 +323,32 @@ public class MSBuildProject implements Marker, Heavyweight, Serializable, RpcCod
         @Builder.Default
         Map<String, String> dependencyRanges = emptyMap();
 
+        /**
+         * The {@code url} of the {@code <repository>} element in the package's {@code .nuspec}: the source
+         * repository the package was built from. Null when the nuspec was not in the restored packages
+         * folder or declares none, and in markers built before this was recorded.
+         */
+        @Nullable
+        String repositoryUrl;
+
+        /**
+         * The {@code type} of the nuspec {@code <repository>} element, such as {@code git}.
+         */
+        @Nullable
+        String repositoryType;
+
+        /**
+         * The {@code commit} of the nuspec {@code <repository>} element the package was built from.
+         */
+        @Nullable
+        String repositoryCommit;
+
+        /**
+         * The nuspec {@code <projectUrl>}, a home page that is often but not always the source repository.
+         */
+        @Nullable
+        String projectUrl;
+
         @Override
         public void rpcSend(ResolvedPackage after, RpcSendQueue q) {
             q.getAndSend(after, ResolvedPackage::getName);
@@ -350,6 +376,10 @@ public class MSBuildProject implements Marker, Heavyweight, Serializable, RpcCod
                     new ArrayList<>() : new ArrayList<>(rp.dependencyRanges.keySet()));
             sendStringList(q, after, rp -> rp.dependencyRanges == null ?
                     new ArrayList<>() : new ArrayList<>(rp.dependencyRanges.values()));
+            q.getAndSend(after, ResolvedPackage::getRepositoryUrl);
+            q.getAndSend(after, ResolvedPackage::getRepositoryType);
+            q.getAndSend(after, ResolvedPackage::getRepositoryCommit);
+            q.getAndSend(after, ResolvedPackage::getProjectUrl);
         }
 
         private static void sendStringList(RpcSendQueue q, ResolvedPackage after,
@@ -393,7 +423,11 @@ public class MSBuildProject implements Marker, Heavyweight, Serializable, RpcCod
                     ranges.put(rangeKeys.get(i), rangeValues.get(i));
                 }
             }
-            return result.withDependencyRanges(ranges);
+            return result.withDependencyRanges(ranges)
+                    .withRepositoryUrl(q.receive(before.repositoryUrl))
+                    .withRepositoryType(q.receive(before.repositoryType))
+                    .withRepositoryCommit(q.receive(before.repositoryCommit))
+                    .withProjectUrl(q.receive(before.projectUrl));
         }
     }
 

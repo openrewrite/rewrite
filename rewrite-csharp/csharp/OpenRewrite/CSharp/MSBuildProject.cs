@@ -270,6 +270,22 @@ public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
     /// <summary>Declared dependency version range per child package id, lock file <c>dependencies</c> section.</summary>
     public IDictionary<string, string> DependencyRanges { get; }
 
+    /// <summary>
+    /// The <c>url</c> of the <c>&lt;repository&gt;</c> element in the package's <c>.nuspec</c>: the source
+    /// repository the package was built from. Null when the nuspec is not in the restored packages
+    /// folder or declares none.
+    /// </summary>
+    public string? RepositoryUrl { get; }
+
+    /// <summary>The <c>type</c> of the nuspec <c>&lt;repository&gt;</c> element, such as <c>git</c>.</summary>
+    public string? RepositoryType { get; }
+
+    /// <summary>The <c>commit</c> of the nuspec <c>&lt;repository&gt;</c> element the package was built from.</summary>
+    public string? RepositoryCommit { get; }
+
+    /// <summary>The nuspec <c>&lt;projectUrl&gt;</c>, a home page that is often but not always the source repository.</summary>
+    public string? ProjectUrl { get; }
+
     public ResolvedPackage(
         string name,
         string resolvedVersion,
@@ -288,7 +304,11 @@ public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
         bool hasInstallScripts = false,
         bool hasXdtTransforms = false,
         bool hasLegacyContentFolder = false,
-        IDictionary<string, string>? dependencyRanges = null)
+        IDictionary<string, string>? dependencyRanges = null,
+        string? repositoryUrl = null,
+        string? repositoryType = null,
+        string? repositoryCommit = null,
+        string? projectUrl = null)
     {
         Name = name;
         ResolvedVersion = resolvedVersion;
@@ -308,6 +328,10 @@ public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
         HasXdtTransforms = hasXdtTransforms;
         HasLegacyContentFolder = hasLegacyContentFolder;
         DependencyRanges = dependencyRanges ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        RepositoryUrl = repositoryUrl;
+        RepositoryType = repositoryType;
+        RepositoryCommit = repositoryCommit;
+        ProjectUrl = projectUrl;
     }
 
     public ResolvedPackage WithName(string name) =>
@@ -335,7 +359,8 @@ public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
             depth ?? Depth, Type, CompileAssemblies, RuntimeAssemblies, FrameworkAssemblies,
             BuildFiles, BuildMultiTargetingFiles, ContentFiles, RuntimeTargets, ResourceAssemblies,
             AnalyzerAssemblies, HasInstallScripts, HasXdtTransforms, HasLegacyContentFolder,
-            dependencyRanges ?? DependencyRanges);
+            dependencyRanges ?? DependencyRanges,
+            RepositoryUrl, RepositoryType, RepositoryCommit, ProjectUrl);
 
     public void RpcSend(ResolvedPackage after, RpcSendQueue q)
     {
@@ -366,6 +391,10 @@ public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
         q.GetAndSendList(after, rp => (IList<string>)(rp.DependencyRanges == null ? [] : new List<string>(rp.DependencyRanges.Values)),
             v => v,
             v => q.GetAndSend(v, x => x));
+        q.GetAndSend(after, rp => rp.RepositoryUrl);
+        q.GetAndSend(after, rp => rp.RepositoryType);
+        q.GetAndSend(after, rp => rp.RepositoryCommit);
+        q.GetAndSend(after, rp => rp.ProjectUrl);
     }
 
     private static void SendStringList(RpcSendQueue q, ResolvedPackage after,
@@ -403,10 +432,15 @@ public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
         {
             dependencyRanges[rangeKeys[i]] = rangeValues[i];
         }
+        var repositoryUrl = q.Receive(before.RepositoryUrl);
+        var repositoryType = q.Receive(before.RepositoryType);
+        var repositoryCommit = q.Receive(before.RepositoryCommit);
+        var projectUrl = q.Receive(before.ProjectUrl);
         return new ResolvedPackage(name, resolvedVersion, dependencies, depth, type,
             compile, runtime, frameworkAssemblies, buildFiles, buildMultiTargeting, contentFiles,
             runtimeTargets, resourceAssemblies, analyzerAssemblies,
-            hasInstallScripts, hasXdtTransforms, hasLegacyContentFolder, dependencyRanges);
+            hasInstallScripts, hasXdtTransforms, hasLegacyContentFolder, dependencyRanges,
+            repositoryUrl, repositoryType, repositoryCommit, projectUrl);
     }
 
     private static IList<string> ReceiveStringList(RpcReceiveQueue q, IList<string> before)
