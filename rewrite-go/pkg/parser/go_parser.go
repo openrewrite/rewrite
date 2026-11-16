@@ -17,6 +17,7 @@
 package parser
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -623,6 +624,13 @@ func takeImportComment(ctx *parseContext, rp *java.RightPadded[*java.Import], sp
 		return
 	}
 	end := ctx.file.Offset(spec.Comment.End())
+	last := spec.Comment.List[len(spec.Comment.List)-1]
+	if strings.HasPrefix(last.Text, "/*") {
+		start := ctx.file.Offset(last.Pos())
+		if close := bytes.Index(ctx.src[start:], []byte("*/")); close >= 0 {
+			end = start + close + 2
+		}
+	}
 	if end > ctx.cursor {
 		rp.After = java.ParseSpace(string(ctx.src[ctx.cursor:end]))
 		ctx.cursor = end
