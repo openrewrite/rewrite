@@ -489,7 +489,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         }
 
         Space space = Space.format(source, cursor, delimIndex);
-        advanceCursor(codePointCursor + Character.codePointCount(source, cursor, delimIndex) + untilDelim.length());
+        advanceCursor(codePointCursor + Character.codePointCount(source, cursor, delimIndex) + untilDelim.codePointCount(0, untilDelim.length()));
         return space;
     }
 

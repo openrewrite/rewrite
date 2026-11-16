@@ -652,6 +652,20 @@ class TomlParserTest implements RewriteTest {
         assertThat(parsed.printAll()).isEqualTo(source);
     }
 
+    @Test
+    void dottedKeyWithCharactersOutsideTheBasicMultilingualPlane() {
+        rewriteRun(
+          toml(
+            """
+              ['😀'.sub]
+              a = 1
+              ["𝐭𝐛𝐥".b."😀"]
+              c = 2
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
