@@ -701,6 +701,19 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void recoveredSyntaxErrorIsMarked() {
+        SourceFile recovered = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nkey =\nb = 1\n")
+          .findFirst().orElseThrow();
+        SourceFile valid = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nb = 1\n")
+          .findFirst().orElseThrow();
+
+        assertThat(recovered).isInstanceOf(Toml.Document.class);
+        assertThat(recovered.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 2:"));
+        assertThat(valid.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+    }
+
+    @Test
     void inlineTableSpanningLinesWithComments() {
         // TOML 1.1
         rewriteRun(

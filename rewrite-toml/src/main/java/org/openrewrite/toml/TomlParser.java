@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -58,6 +59,10 @@ public class TomlParser implements Parser {
                         sourceStream.getCharset(),
                         sourceStream.isCharsetBomMarked()
                 ).visitDocument(parser.document());
+                if (errorListener.firstError != null) {
+                    // recovered: prints as written, but the tree may not mean what the file does
+                    document = document.withMarkers(document.getMarkers().add(ParseExceptionResult.build(this, errorListener.firstError)));
+                }
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
