@@ -54,7 +54,8 @@ class PythonDependencyFileTest implements RewriteTest {
           emptyList(), dependencies,
           emptyMap(), emptyMap(),
           emptyList(), emptyList(),
-          resolved, null, null
+          resolved, null, null,
+          null
         );
     }
 

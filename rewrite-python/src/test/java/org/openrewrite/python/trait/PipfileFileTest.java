@@ -42,7 +42,8 @@ class PipfileFileTest implements RewriteTest {
                 emptyList(), dependencies,
                 emptyMap(), emptyMap(),
                 emptyList(), emptyList(),
-                emptyList(), PythonResolutionResult.PackageManager.Pipenv, null
+                emptyList(), PythonResolutionResult.PackageManager.Pipenv, null,
+                null
         );
     }
 

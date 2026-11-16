@@ -267,6 +267,28 @@ public enum DependencyManifest {
     }
 
     /**
+     * The URLs a setup.cfg's {@code [metadata]} declares, label to URL in declaration order: {@code url}
+     * under the label {@code Homepage}, and each {@code label = URL} line of {@code project_urls}.
+     * Null when it declares none.
+     */
+    public static @Nullable Map<String, String> setupCfgProjectUrls(String content) {
+        Map<String, String> urls = new LinkedHashMap<>();
+        for (Map.Entry<String, String> option : readIni(content).getOrDefault("metadata", emptyMap()).entrySet()) {
+            if ("url".equals(option.getKey()) && !option.getValue().isEmpty()) {
+                urls.putIfAbsent("Homepage", option.getValue());
+            } else if ("project_urls".equals(option.getKey())) {
+                for (String line : option.getValue().split("\n")) {
+                    int equals = line.indexOf('=');
+                    if (equals > 0 && !line.substring(equals + 1).trim().isEmpty()) {
+                        urls.putIfAbsent(line.substring(0, equals).trim(), line.substring(equals + 1).trim());
+                    }
+                }
+            }
+        }
+        return urls.isEmpty() ? null : urls;
+    }
+
+    /**
      * The Python versions the project declares it supports, read without running anything: pyproject.toml's
      * {@code requires-python} or Poetry {@code python} first, then setup.cfg's {@code python_requires}, then a
      * {@code python_requires} that setup.py passes as a string literal or a module-level string constant. A

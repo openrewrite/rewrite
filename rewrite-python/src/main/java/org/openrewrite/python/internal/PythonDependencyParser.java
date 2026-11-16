@@ -105,7 +105,8 @@ public class PythonDependencyParser {
                 overrideDependencies,
                 emptyList(),
                 packageManager,
-                getUvIndexes(doc)
+                getUvIndexes(doc),
+                getProjectUrls(tables)
         );
     }
 
@@ -140,6 +141,87 @@ public class PythonDependencyParser {
             }
         }
         return false;
+    }
+
+    /**
+     * {@code [project.urls]} as written, whether a table, an inline table or dotted {@code urls.} keys, then Poetry's {@code homepage}, {@code repository} and
+     * {@code documentation} and its {@code [tool.poetry.urls]}, for the labels not already taken.
+     */
+    private static @Nullable Map<String, String> getProjectUrls(Map<String, Toml.Table> tables) {
+        Map<String, String> urls = new LinkedHashMap<>();
+        addUrls(urls, tables.get("project.urls"));
+        addUrls(urls, getInlineTable(tables.get("project"), "urls"));
+        addDottedUrls(urls, tables.get("project"));
+
+        Toml.Table poetry = tables.get("tool.poetry");
+        if (poetry != null) {
+            for (Toml value : poetry.getValues()) {
+                if (value instanceof Toml.KeyValue) {
+                    String key = PyProjectHelper.extractKeyName((Toml.KeyValue) value);
+                    String label = "homepage".equals(key) ? "Homepage" :
+                            "repository".equals(key) ? "Repository" :
+                                    "documentation".equals(key) ? "Documentation" : null;
+                    String url = label == null ? null : getStringValue(poetry, key);
+                    if (url != null) {
+                        urls.putIfAbsent(label, url);
+                    }
+                }
+            }
+        }
+        addUrls(urls, tables.get("tool.poetry.urls"));
+        addUrls(urls, getInlineTable(poetry, "urls"));
+        addDottedUrls(urls, poetry);
+        return urls.isEmpty() ? null : urls;
+    }
+
+    private static Toml.@Nullable Table getInlineTable(Toml.@Nullable Table table, String key) {
+        if (table != null) {
+            for (Toml value : table.getValues()) {
+                if (value instanceof Toml.KeyValue && key.equals(PyProjectHelper.extractKeyName((Toml.KeyValue) value)) &&
+                    ((Toml.KeyValue) value).getValue() instanceof Toml.Table) {
+                    return (Toml.Table) ((Toml.KeyValue) value).getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    /** {@code urls.Homepage = "..."} in the table itself, where a label with a space in it keeps its quotes. */
+    private static void addDottedUrls(Map<String, String> urls, Toml.@Nullable Table table) {
+        if (table == null) {
+            return;
+        }
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue) {
+                Toml.KeyValue kv = (Toml.KeyValue) value;
+                String key = PyProjectHelper.extractKeyName(kv);
+                if (key != null && key.startsWith("urls.") && kv.getValue() instanceof Toml.Literal &&
+                    ((Toml.Literal) kv.getValue()).getValue() instanceof String) {
+                    String label = key.substring("urls.".length());
+                    if (label.length() >= 2 && (label.charAt(0) == '"' || label.charAt(0) == '\'') &&
+                        label.charAt(label.length() - 1) == label.charAt(0)) {
+                        label = label.substring(1, label.length() - 1);
+                    }
+                    urls.putIfAbsent(label, (String) ((Toml.Literal) kv.getValue()).getValue());
+                }
+            }
+        }
+    }
+
+    private static void addUrls(Map<String, String> urls, Toml.@Nullable Table table) {
+        if (table == null) {
+            return;
+        }
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue) {
+                Toml.KeyValue kv = (Toml.KeyValue) value;
+                String label = PyProjectHelper.extractKeyName(kv);
+                if (label != null && kv.getValue() instanceof Toml.Literal &&
+                    ((Toml.Literal) kv.getValue()).getValue() instanceof String) {
+                    urls.putIfAbsent(label, (String) ((Toml.Literal) kv.getValue()).getValue());
+                }
+            }
+        }
     }
 
     private static Map<String, Toml.Table> indexTables(Toml.Document doc) {

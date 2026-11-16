@@ -153,7 +153,7 @@ class ModuleHasDependencyTest implements RewriteTest {
 
     private static PythonResolutionResult project(Dependency... dependencies) {
         return new PythonResolutionResult(randomId(), "app", "1.0.0", null, null, "pyproject.toml", null, null,
-          emptyList(), List.of(dependencies), emptyMap(), emptyMap(), emptyList(), emptyList(), emptyList(), null, null);
+          emptyList(), List.of(dependencies), emptyMap(), emptyMap(), emptyList(), emptyList(), emptyList(), null, null, null);
     }
 
     private static Dependency direct(String name, String constraint, ResolvedDependency resolved) {

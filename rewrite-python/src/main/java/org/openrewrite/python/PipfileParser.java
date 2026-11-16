@@ -88,6 +88,8 @@ public class PipfileParser implements Parser {
         if (resolvedDeps.isEmpty() && installedEnv != null &&
             PipfileLockParser.findLockFile(pipfileDir, relativeTo) == null) {
             resolvedDeps = InstalledEnvParser.parse(installedEnv);
+        } else if (!resolvedDeps.isEmpty() && installedEnv != null) {
+            resolvedDeps = InstalledEnvParser.withProjectUrls(resolvedDeps, installedEnv);
         }
         if (!resolvedDeps.isEmpty()) {
             return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
@@ -140,7 +142,8 @@ public class PipfileParser implements Parser {
                 emptyList(),
                 emptyList(),
                 PackageManager.Pipenv,
-                parseSourceIndexes(doc)
+                parseSourceIndexes(doc),
+                null
         );
     }
 

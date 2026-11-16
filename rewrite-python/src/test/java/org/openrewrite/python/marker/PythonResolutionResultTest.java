@@ -53,6 +53,7 @@ class PythonResolutionResultTest {
           emptyList(),
           singletonList(requests),
           null,
+          null,
           null
         );
 
@@ -81,6 +82,7 @@ class PythonResolutionResultTest {
           emptyList(),
           emptyList(),
           singletonList(dep),
+          null,
           null,
           null
         );
@@ -132,6 +134,7 @@ class PythonResolutionResultTest {
           emptyList(),
           emptyList(),
           PackageManager.Uv,
+          null,
           null
         );
 

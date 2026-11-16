@@ -74,12 +74,17 @@ _SAMPLES = [
         [PythonResolutionResult.Dependency('requests', '>=2', ['socks'], 'python_version > "3"', None)],
         # the two maps cross as plain JSON, which this side holds as it arrived
         {'dev': [{'name': 'requests', 'versionConstraint': '>=2', 'extras': ['socks'],
-                  'resolved': {'name': 'requests', 'version': '2.31.0', 'dependencies': []}}]},
+                  'resolved': {'name': 'requests', 'version': '2.31.0', 'dependencies': [],
+                               'projectUrls': {'Source': 'https://github.com/psf/requests',
+                                               'Documentation': 'https://requests.readthedocs.io'}}}]},
         {'test': [{'name': 'pytest'}]},
         [], [],
-        [PythonResolutionResult.ResolvedDependency('requests', '2.31.0', None, [])],
+        [PythonResolutionResult.ResolvedDependency(
+            'requests', '2.31.0', None, [],
+            {'Source': 'https://github.com/psf/requests', 'Documentation': 'https://requests.readthedocs.io'})],
         PythonResolutionResult.PackageManager.Uv,
         [PythonResolutionResult.SourceIndex('pypi', 'https://pypi.org/simple', True)],
+        {'Repository': 'https://github.com/example/name', 'Homepage': 'https://example.com'},
     ),
     Quoted(random_id(), Quoted.Style.BACKTICK),
     RaiseTuple(random_id()),
@@ -149,6 +154,15 @@ def test_every_marker_type_is_accounted_for():
 @pytest.mark.parametrize("sample", _SAMPLES, ids=lambda sample: type(sample).__qualname__)
 def test_marker_survives_the_wire(sample):
     assert _content(_round_trip(sample)) == _content(sample)
+
+
+def test_project_urls_keep_their_order_over_the_wire():
+    sample = next(sample for sample in _SAMPLES if isinstance(sample, PythonResolutionResult))
+    received = _round_trip(sample)
+    assert list(received.project_urls.items()) == [
+        ('Repository', 'https://github.com/example/name'), ('Homepage', 'https://example.com')]
+    assert list(received.resolved_dependencies[0].project_urls.items()) == [
+        ('Source', 'https://github.com/psf/requests'), ('Documentation', 'https://requests.readthedocs.io')]
 
 
 def test_marker_without_a_wire_form_is_refused():

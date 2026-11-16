@@ -116,6 +116,13 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
     @Nullable List<SourceIndex> sourceIndexes;
 
     /**
+     * The project's own URLs, label to URL in declaration order: {@code [project.urls]} (PEP 621),
+     * Poetry's {@code homepage}, {@code repository}, {@code documentation} and {@code [tool.poetry.urls]},
+     * or setup.cfg's {@code url} and {@code project_urls}. Null when the manifest declares none.
+     */
+    @Nullable Map<String, String> projectUrls;
+
+    /**
      * Look up a resolved dependency by package name.
      *
      * @param packageName The name of the package to look up (case-insensitive, normalized per PEP 503)
@@ -245,6 +252,7 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
         q.getAndSendList(after, p -> p.getSourceIndexes() != null ? p.getSourceIndexes() : emptyList(),
                 SourceIndex::getName,
                 si -> si.rpcSend(si, q));
+        q.getAndSend(after, PythonResolutionResult::getProjectUrls);
     }
 
     @Override
@@ -272,7 +280,8 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
                         resolved -> resolved.rpcReceive(resolved, q)))
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withSourceIndexes(q.receiveList(before.sourceIndexes,
-                        si -> si.rpcReceive(si, q)));
+                        si -> si.rpcReceive(si, q)))
+                .withProjectUrls(q.receive(before.projectUrls));
         return received
                 .withOptionalDependencies(received.declared(received.optionalDependencies))
                 .withDependencyGroups(received.declared(received.dependencyGroups));
@@ -392,8 +401,20 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
         @ToString.Exclude
         @Nullable List<ResolvedDependency> dependencies;
 
+        /**
+         * The distribution's {@code Project-URL} metadata, label to URL in declaration order, with
+         * {@code Home-page} under the label {@code Homepage} when no entry has that label. Null when
+         * the distribution's metadata was not available, as it is not from a lock file alone.
+         */
+        @Nullable Map<String, String> projectUrls;
+
         @JsonCreator
         private ResolvedDependency() {
+        }
+
+        public ResolvedDependency(String name, String version, @Nullable String source,
+                                  @Nullable List<ResolvedDependency> dependencies) {
+            this(name, version, source, dependencies, null);
         }
 
         @Override
@@ -404,6 +425,7 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
             q.getAndSendListAsRef(after, r -> r.getDependencies() != null ? r.getDependencies() : emptyList(),
                     dep -> dep.getName() + "@" + dep.getVersion(),
                     dep -> dep.rpcSend(dep, q));
+            q.getAndSend(after, ResolvedDependency::getProjectUrls);
         }
 
         @Override
@@ -412,6 +434,7 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
             before.version = q.receive(before.version);
             before.source = q.receive(before.source);
             before.dependencies = q.receiveList(before.dependencies, dep -> dep.rpcReceive(dep, q));
+            before.projectUrls = q.receive(before.projectUrls);
             return before;
         }
     }

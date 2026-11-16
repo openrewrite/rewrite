@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class MetadataParserTest {
 
@@ -158,5 +159,47 @@ class MetadataParserTest {
           "chardet (<6,>=3.0.2) ; extra == 'use_chardet_on_py3'");
         assertThat(metadata.getProvidesExtra()).containsExactly("security", "socks", "use_chardet_on_py3");
         assertThat(metadata.hasStaticRequiresDist()).isFalse();
+    }
+
+    @Test
+    void projectUrlsKeepLabelsAndOrder() {
+        CoreMetadata metadata = MetadataParser.parse("""
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.31.0
+          Home-page: https://requests.readthedocs.io
+          Project-URL: Documentation, https://requests.readthedocs.io
+          Project-URL: Source, https://github.com/psf/requests
+          """.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(metadata.getProjectUrls()).containsExactly(
+          entry("Documentation", "https://requests.readthedocs.io"),
+          entry("Source", "https://github.com/psf/requests"),
+          entry("Homepage", "https://requests.readthedocs.io"));
+    }
+
+    @Test
+    void homePageYieldsToAnEntryLabelledHomepage() {
+        CoreMetadata metadata = MetadataParser.parse("""
+          Metadata-Version: 2.1
+          Name: a
+          Version: 1.0
+          Home-page: https://old.example.com
+          Project-URL: homepage, https://example.com/a
+          """.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(metadata.getProjectUrls()).containsExactly(entry("homepage", "https://example.com/a"));
+    }
+
+    @Test
+    void noProjectUrlsIsAnEmptyMap() {
+        CoreMetadata metadata = MetadataParser.parse("""
+          Metadata-Version: 2.1
+          Name: a
+          Version: 1.0
+          Home-page: UNKNOWN
+          """.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(metadata.getProjectUrls()).isEmpty();
     }
 }
