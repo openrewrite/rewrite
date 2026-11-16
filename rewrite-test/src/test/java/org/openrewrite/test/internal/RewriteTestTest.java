@@ -1641,6 +1641,131 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class NoChangesFromMissingTypes {
+
+        private static final String LIB = """
+          package lib;
+          public class Lib {
+              public static void legacy() {}
+          }
+          """;
+
+        @Test
+        void rejectRecipeThatChangesCodeWhoseTypeIsMissing() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
+                .recipe(new FindCallsNotDeclaredBy("legacy", "lib.Lib")),
+              java(
+                """
+                  import lib.Lib;
+
+                  class A {
+                      void a() {
+                          Lib.legacy();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check types before acting on code")
+              .hasMessageContaining("org.openrewrite.test.internal.FindCallsNotDeclaredBy changes code that it " +
+                                    "leaves unchanged with the types of the test's classpath")
+              .hasMessageContaining("changed A.java:")
+              .hasMessageContaining("/*~~>*/Lib.legacy()");
+        }
+
+        @Test
+        void rejectRecipeThatThrowsWhenTypesAreMissing() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
+                .recipe(new FindCallsByDeclaringTypeName("legacy", "lib.Lib")),
+              java(
+                """
+                  import lib.Lib;
+
+                  class A {
+                      void a() {
+                          Lib.legacy();
+                      }
+                  }
+                  """,
+                """
+                  import lib.Lib;
+
+                  class A {
+                      void a() {
+                          /*~~>*/Lib.legacy();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check for missing types before using them")
+              .hasMessageContaining("java.lang.NullPointerException")
+              .hasMessageContaining("at org.openrewrite.test.internal.FindCallsByDeclaringTypeName$1.visitMethodInvocation(");
+        }
+
+        @Test
+        void acceptRecipeThatMatchesByType() {
+            rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
+                .recipe(new FindCallsByType("lib.Lib other()")),
+              java(
+                """
+                  import lib.Lib;
+
+                  class A {
+                      void a() {
+                          Lib.legacy();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skippedWithoutTypeValidation() {
+            rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
+                .typeValidationOptions(TypeValidation.none())
+                .recipe(new FindCallsNotDeclaredBy("legacy", "lib.Lib")),
+              java(
+                """
+                  import lib.Lib;
+
+                  class A {
+                      void a() {
+                          Lib.legacy();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
+                .recipeQualityValidation(RecipeQualityValidation.builder().noChangesFromMissingTypes(false).build())
+                .recipe(new FindCallsNotDeclaredBy("legacy", "lib.Lib")),
+              java(
+                """
+                  import lib.Lib;
+
+                  class A {
+                      void a() {
+                          Lib.legacy();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class ImportsReferencedTypes {
 
         @Test
@@ -3867,6 +3992,77 @@ class FindCallsByType extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 return matcher.matches(m) ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsNotDeclaredBy extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the calls to find.",
+      example = "legacy")
+    String methodName;
+
+    @Option(displayName = "Declaring type",
+      description = "The type whose calls are left out.",
+      example = "lib.Lib")
+    String declaringType;
+
+    String displayName = "Find calls not declared by a type";
+
+    String description = "Finds calls of a name, but for those the type declares.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (!methodName.equals(m.getSimpleName()) || m.getMethodType() != null &&
+                                                             TypeUtils.isOfClassType(m.getMethodType().getDeclaringType(), declaringType)) {
+                    return m;
+                }
+                return SearchResult.found(m);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsByDeclaringTypeName extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the calls to find.",
+      example = "legacy")
+    String methodName;
+
+    @Option(displayName = "Declaring type",
+      description = "The type that declares the calls to find.",
+      example = "lib.Lib")
+    String declaringType;
+
+    String displayName = "Find calls by declaring type name";
+
+    String description = "Finds calls of a name that the type declares.";
+
+    @SuppressWarnings("DataFlowIssue")
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (methodName.equals(m.getSimpleName()) &&
+                    m.getMethodType().getDeclaringType().getFullyQualifiedName().equals(declaringType)) {
+                    return SearchResult.found(m);
+                }
+                return m;
             }
         };
     }

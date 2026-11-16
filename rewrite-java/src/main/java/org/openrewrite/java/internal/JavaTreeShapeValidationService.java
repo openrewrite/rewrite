@@ -123,6 +123,16 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
+    public Parser.@Nullable Builder parserWithoutClasspath(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return null;
+        }
+        return typedParser(((JavaParser.Builder<?, ?>) parser.clone())
+                .classpath(emptyList())
+                .dependsOn(emptyList()));
+    }
+
+    @Override
     public Parser.Builder typedParser(Parser.Builder parser, List<SourceFile> sources) {
         if (!(parser instanceof JavaParser.Builder)) {
             return parser;

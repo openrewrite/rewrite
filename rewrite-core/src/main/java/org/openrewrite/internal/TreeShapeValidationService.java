@@ -89,6 +89,14 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @return A parser that types text as {@code parser} does but without its classpath and the sources it depends on,
+     * as when a repository's dependencies don't resolve, or null when the language's parser has no classpath.
+     */
+    default Parser.@Nullable Builder parserWithoutClasspath(Parser.Builder parser) {
+        return null;
+    }
+
+    /**
      * @param sources The sources the test parsed and the recipe's output, whose classes the recipe may have changed
      *                since {@code parser} typed them.
      * @return A parser for when the check compares types, which types text as {@code parser} does. Where it can, it

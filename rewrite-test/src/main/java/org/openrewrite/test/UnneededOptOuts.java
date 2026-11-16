@@ -50,7 +50,7 @@ final class UnneededOptOuts {
      * output.
      */
     private static final Set<String> NEED_TYPES = new HashSet<>(asList("matchByTypeNotName", "parserTypedTrees",
-            "compilableOutput"));
+            "compilableOutput", "noChangesFromMissingTypes"));
 
     /**
      * The deprecated option of {@link TypeValidation} that has no effect, so the property can't name it and turning it

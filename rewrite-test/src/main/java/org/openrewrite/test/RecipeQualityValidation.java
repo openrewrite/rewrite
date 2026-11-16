@@ -83,6 +83,15 @@ public class RecipeQualityValidation {
     private boolean matchByTypeNotName = true;
 
     /**
+     * Controls whether the recipe is rerun with the test's sources parsed without the classpath they were parsed with,
+     * as when a repository's dependencies don't resolve, and must neither throw nor change a source file that it
+     * leaves unchanged with the types of that classpath. Skipped when the test doesn't validate the type attribution
+     * of the recipe's input and output.
+     */
+    @Builder.Default
+    private boolean noChangesFromMissingTypes = true;
+
+    /**
      * Controls whether the recipe is validated to import the types and static members the code it writes names, and
      * its templates to declare those they name with imports and staticImports.
      */
@@ -204,6 +213,7 @@ public class RecipeQualityValidation {
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
+                .noChangesFromMissingTypes(quality.noChangesFromMissingTypes())
                 .importReferencedTypes(quality.importReferencedTypes())
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())

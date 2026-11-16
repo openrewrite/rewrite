@@ -501,7 +501,7 @@ final class TreeShapes {
         return sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
-    private static @Nullable TreeShapeValidationService service(SourceFile sourceFile) {
+    static @Nullable TreeShapeValidationService service(SourceFile sourceFile) {
         try {
             return sourceFile.service(TreeShapeValidationService.class);
         } catch (UnsupportedOperationException e) {

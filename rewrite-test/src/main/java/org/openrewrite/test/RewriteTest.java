@@ -481,6 +481,7 @@ public interface RewriteTest extends SourceSpecs {
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
         UnparsedSources unparsedSources = probed ?
                 new UnparsedSources(recipe, recipeRun.getChangeset().getAllResults()) : null;
+        MissingTypes missingTypes = probed ? new MissingTypes(recipe, recipeRun.getChangeset().getAllResults()) : null;
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -768,6 +769,18 @@ public interface RewriteTest extends SourceSpecs {
         }
         if (unparsedSources != null) {
             unparsedSources.assertNoneThrow(runnableSourceFiles, recipeCtx, cycles);
+        }
+        ExecutionContext missingTypesCtx = recipeCtx;
+        Runnable assertNoChangesFromMissingTypes = () -> {
+            if (missingTypes != null) {
+                missingTypes.assertUnchanged(specBySourceFile, parserBySourceSpec::get, runnableSourceFiles,
+                        relativeTo, ctx, missingTypesCtx, cycles);
+            }
+        };
+        if (quality.noChangesFromMissingTypes() && validatesTypes) {
+            assertNoChangesFromMissingTypes.run();
+        } else {
+            unneededOptOuts.checkOnTheSideLater("noChangesFromMissingTypes", assertNoChangesFromMissingTypes);
         }
         unneededOptOuts.assertNoneUnneeded();
     }
