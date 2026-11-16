@@ -855,6 +855,10 @@ def test_comment_before_closing_bracket_keeps_the_column_of_the_elements():
                 1
                 # c
               ]
+              x = y[a,
+                b
+                # c
+              ]
             """,
             """
             def create():
@@ -870,6 +874,50 @@ def test_comment_before_closing_bracket_keeps_the_column_of_the_elements():
                     1
                     # c
                 ]
+                x = y[a,
+                    b
+                    # c
+                ]
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_bracket_after_the_last_element_closes_at_the_line_that_opens_it():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              class A(
+                      B
+                      ):
+                pass
+              x: Dict[
+                str
+                ] = 1
+              with (
+                a,
+                b
+                ):
+                pass
+            """,
+            """
+            def create():
+                class A(
+                        B
+                ):
+                    pass
+                x: Dict[
+                    str
+                ] = 1
+                with (
+                    a,
+                    b
+                ):
+                    pass
             """
         ),
         spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
@@ -897,6 +945,8 @@ def test_subscript_spread_over_lines():
               x = y[
                 1:2
               ]
+              x = y[a,
+                  b]
             """,
             """
             def f():
@@ -914,6 +964,8 @@ def test_subscript_spread_over_lines():
                 x = y[
                     1:2
                 ]
+                x = y[a,
+                    b]
             """
         ),
         spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
