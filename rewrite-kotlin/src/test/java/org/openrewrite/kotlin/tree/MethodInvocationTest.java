@@ -456,20 +456,22 @@ class MethodInvocationTest implements RewriteTest {
                   with(languageVersion) {
                       set(0, 'c')
                   }
+                  languageVersion[0] = 'c'
               }
               """,
             spec -> spec.afterRecipe(cu -> {
                 new KotlinIsoVisitor<Integer>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                        if ("set".equals(method.getSimpleName())) {
+                        // An indexed access is named `<get>` whether it reads or assigns.
+                        if ("set".equals(method.getSimpleName()) || "<get>".equals(method.getSimpleName())) {
                             assertThat(method.getMethodType()).isNull();
                             count.incrementAndGet();
                         }
                         return super.visitMethodInvocation(method, p);
                     }
                 }.visit(cu, 0);
-                assertThat(count).hasValue(3);
+                assertThat(count).hasValue(4);
             })
           )
         );
