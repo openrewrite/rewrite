@@ -440,6 +440,65 @@ public class TypedCaptureTests : RewriteTest
     }
 
     [Fact]
+    public void ArrayTypedCaptureMatchesSameArrayType()
+    {
+        var arr = Capture.Expression("arr", type: "string[]");
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression($"{arr}.Length")),
+            CSharp(
+                "class C { void M(string[] xs) { var n = xs.Length; } }",
+                "class C { void M(string[] xs) { var n = /*~~>*/xs.Length; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ArrayTypedCaptureMatchesCovariantReferenceArrayOnly()
+    {
+        var arr = Capture.Expression("arr", type: "object[]");
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression($"{arr}.Length")),
+            CSharp(
+                "class C { void M(string[] xs, int[] ys) { var a = xs.Length; var b = ys.Length; } }",
+                "class C { void M(string[] xs, int[] ys) { var a = /*~~>*/xs.Length; var b = ys.Length; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ArrayTypedCaptureRequiresMatchingNestedGenericArguments()
+    {
+        var arr = Capture.Expression("arr", type: "System.Collections.Generic.List<System.Collections.Generic.List<int>>[]");
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression($"{arr}.Length")),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class C
+                {
+                    void M(List<List<string>>[] xs, List<List<int>>[] ys)
+                    {
+                        var a = xs.Length;
+                        var b = ys.Length;
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                class C
+                {
+                    void M(List<List<string>>[] xs, List<List<int>>[] ys)
+                    {
+                        var a = xs.Length;
+                        var b = /*~~>*/ys.Length;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void ConcreteNestedGenericCapture_RejectsDifferentInnerArgument()
     {
         var list = Capture.Expression("list", type: "List<List<string>>");
@@ -457,31 +516,6 @@ public class TypedCaptureTests : RewriteTest
                     void M()
                     {
                         var l = new List<List<int>>();
-                        var n = l.Count;
-                    }
-                }
-                """
-            )
-        );
-    }
-
-    [Fact]
-    public void ConcreteArrayGenericCapture_RejectsDifferentArrayRank()
-    {
-        var list = Capture.Expression("list", type: "List<string[]>");
-        var pat = CSharpPattern.Expression($"{list}.Count",
-            usings: ["System.Collections.Generic"]);
-
-        RewriteRun(
-            spec => spec.SetRecipe(FindExpression(pat))
-                .SetReferenceAssemblies(Assemblies.Net90),
-            CSharp(
-                """
-                using System.Collections.Generic;
-                class Test
-                {
-                    void M(List<string[,]> l)
-                    {
                         var n = l.Count;
                     }
                 }

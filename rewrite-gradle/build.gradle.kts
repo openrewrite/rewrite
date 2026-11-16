@@ -38,7 +38,8 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
     // 3.19.2 is the last release with both the `develocity` and the legacy `gradleEnterprise` extension types;
-    // 4.x removed the latter, which settings scripts still awaiting MigrateGradleEnterpriseToDevelocity rely on
+    // 4.x removed the latter, which settings scripts still awaiting rewrite-migrate-gradle's
+    // `migrate.plugins.MigrateGradleEnterpriseToDevelocity` rely on
     parserClasspath("com.gradle:develocity-gradle-plugin:3.19.2")
 
     testParserClasspath("com.android.tools.build:gradle-api:9.4.1")
@@ -100,6 +101,7 @@ java {
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
     val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
+    val userHomesDir = temporaryDir.resolve("gradle-user-homes")
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         // Filter out test-manifest.txt which contains absolute paths and is tracked separately as @Internal
@@ -111,10 +113,16 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifest: File = manifestFile
 
+        // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi)
+        @get:Internal
+        val userHomes: File = userHomesDir
+
         override fun asArguments() = listOf(
-            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}",
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${userHomes.absolutePath}"
         )
     })
+    doFirst { userHomesDir.deleteRecursively() }
     maxHeapSize = "2g"
 }
 

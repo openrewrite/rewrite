@@ -56,6 +56,43 @@ class UnaryTest implements RewriteTest {
     }
 
     @Test
+    void complement() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              --i
+              ~i
+              int j = ~ (i)
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedPatternIsAPatternLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              def p = (~"a+")
+              """,
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Integer>() {
+                @Override
+                public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                    assertThat(literal.getValueSource()).isEqualTo("~\"a+\"");
+                    return literal;
+                }
+
+                @Override
+                public J.Unary visitUnary(J.Unary unary, Integer p) {
+                    throw new AssertionError("pattern parsed as a complement");
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
     void prefix() {
         rewriteRun(
           groovy(

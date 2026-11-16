@@ -25,6 +25,10 @@ import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Set;
+
+import static java.util.Collections.singleton;
+
 public class NoSystemScopeDependencies extends Recipe {
 
     @Getter
@@ -33,6 +37,9 @@ public class NoSystemScopeDependencies extends Recipe {
     @Getter
     final String description = "Replaces `<scope>system</scope>` with the default compile scope and removes " +
             "`<systemPath>` for dependencies that are available in configured repositories.";
+
+    @Getter
+    final Set<String> tags = singleton("RSPEC-S3422");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

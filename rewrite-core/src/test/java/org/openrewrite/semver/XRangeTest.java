@@ -148,6 +148,23 @@ class XRangeTest {
     }
 
     /**
+     * Segments must compare numerically, not lexicographically (TNZ-184213: "8.5" sorted after "8.14.x").
+     */
+    @Test
+    void compareSegmentsNumerically() {
+        XRange xrange = XRange.build("8.14.x", null).getValue();
+
+        assertThat(xrange).isNotNull();
+        assertThat(xrange.compare(null, "8.5", "8.14.x")).isNegative();
+        assertThat(xrange.compare(null, "8.14.x", "8.5")).isPositive();
+        assertThat(xrange.compare(null, "8.5", "8.14")).isNegative();
+        assertThat(xrange.compare(null, "8.14", "8.5")).isPositive();
+        assertThat(xrange.compare(null, "8.5.9", "8.5.10")).isNegative();
+        assertThat(xrange.compare(null, "9.0", "10.x")).isNegative();
+        assertThat(xrange.compare(null, "8.13", "8.14.x")).isNegative();
+    }
+
+    /**
      * Tests Gradle-style dynamic versions using '+' as a wildcard.
      * The '+' wildcard should behave identically to 'x', '*', or 'X'.
      */
