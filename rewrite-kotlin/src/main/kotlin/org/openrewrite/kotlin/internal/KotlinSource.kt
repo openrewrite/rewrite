@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.internal
 
 import lombok.Getter
 import lombok.Setter
+import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.psi.KtFile
@@ -30,6 +31,9 @@ class KotlinSource(
 ) {
     @Setter
     var firFile: FirFile? = null
+
+    @Setter
+    var firSession: FirSession? = null
 
     @Setter
     var irFile: IrFile? = null

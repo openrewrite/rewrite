@@ -16,11 +16,19 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,5 +101,29 @@ class KTSTest implements RewriteTest {
                     assertThat(count.get()).isEqualTo(7);
                 }))
         );
+    }
+
+    @Test
+    void scriptSeesNonScriptSourcesButNotOtherScriptsParsedWithIt() {
+        List<SourceFile> parsed = KotlinParser.builder()
+          .isKotlinScript(true)
+          .dependsOn("fun greet(): String = \"hi\"")
+          .build()
+          .parseInputs(List.of(
+            Parser.Input.fromString(Path.of("a.kts"), "fun version(s: String): String = s"),
+            Parser.Input.fromString(Path.of("b.kts"), "greet()\nversion(\"x\")")
+          ), null, new InMemoryExecutionContext()).toList();
+
+        Map<String, J.MethodInvocation> calls = new HashMap<>();
+        new KotlinIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                calls.put(method.getSimpleName(), method);
+                return method;
+            }
+        }.visit(parsed.get(1), 0);
+        assertThat(calls.get("greet").getMethodType()).isNotNull();
+
+        assertThat(calls.get("version").getMethodType()).isNull();
     }
 }

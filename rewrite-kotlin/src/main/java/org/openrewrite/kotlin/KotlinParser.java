@@ -15,12 +15,12 @@
  */
 package org.openrewrite.kotlin;
 
-import kotlin.Pair;
 import kotlin.annotation.AnnotationTarget;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.cli.common.SessionWithSources;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
@@ -51,7 +51,6 @@ import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
-import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
@@ -194,7 +193,6 @@ public class KotlinParser implements Parser {
         List<SourceFile> parsed;
         try {
             CompiledSource compilerCus = parse(acceptedInputs, disposable, pctx);
-            FirSession firSession = compilerCus.getFirSession();
             parsed = new ArrayList<>(compilerCus.getSources().size());
             for (KotlinSource kotlinSource : compilerCus.getSources()) {
                 try {
@@ -210,7 +208,7 @@ public class KotlinParser implements Parser {
                         continue;
                     }
 
-                    KotlinTypeMapping typeMapping = new KotlinTypeMapping(firSession, kotlinSource.getFirFile(), typeFactory);
+                    KotlinTypeMapping typeMapping = new KotlinTypeMapping(requireNonNull(kotlinSource.getFirSession()), kotlinSource.getFirFile(), typeFactory);
                     PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
                     associations.initialize();
                     KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
@@ -510,29 +508,28 @@ public class KotlinParser implements Parser {
                 compilerConfiguration.get(JVMConfigurationKeys.FRIEND_PATHS, emptyList())
         );
 
-        FirSession firSession = JvmFrontendPipelinePhase.INSTANCE
-                .prepareJvmSessions(
-                        ktFiles,
-                        name,
-                        compilerConfiguration,
-                        projectEnvironment,
-                        libraryScope,
-                        libraryList,
-                        ktFile -> false,
-                        KtFile::isScript,
-                        (ktFile, mn) -> true,
-                        null
-                )
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Unable to create FirSession"))
-                .getSession();
+        List<SessionWithSources<KtFile>> sessions = ScriptSessionsKt.prepareSessionsWithIsolatedScripts(
+                ktFiles,
+                name,
+                compilerConfiguration,
+                projectEnvironment,
+                libraryScope,
+                libraryList
+        );
 
-        List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, ktFiles);
-        Pair<ScopeSession, List<FirFile>> result = AnalyseKt.runResolution(firSession, rawFir);
-        assert kotlinSources.size() == result.getSecond().size();
-        for (int i = 0; i < kotlinSources.size(); i++) {
-            kotlinSources.get(i).setFirFile(result.getSecond().get(i));
+        Map<KtFile, KotlinSource> sourceByKtFile = new IdentityHashMap<>(kotlinSources.size());
+        for (KotlinSource kotlinSource : kotlinSources) {
+            sourceByKtFile.put(kotlinSource.getKtFile(), kotlinSource);
+        }
+        for (SessionWithSources<KtFile> session : sessions) {
+            FirSession firSession = session.getSession();
+            List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, session.getFiles());
+            List<FirFile> resolved = AnalyseKt.runResolution(firSession, rawFir).getSecond();
+            for (int i = 0; i < resolved.size(); i++) {
+                KotlinSource kotlinSource = sourceByKtFile.get(session.getFiles().get(i));
+                kotlinSource.setFirFile(resolved.get(i));
+                kotlinSource.setFirSession(firSession);
+            }
         }
 
         // FIR-to-IR conversion is intentionally omitted here. In Kotlin 2.3.0+ the pipeline
@@ -540,7 +537,7 @@ public class KotlinParser implements Parser {
         // converting to IR, which breaks downstream PSI/FIR association lookups that our parser
         // relies on. Only disabled test classes currently consume the IR form, so we skip it.
 
-        return new CompiledSource(firSession, kotlinSources);
+        return new CompiledSource(sessions.get(0).getSession(), kotlinSources);
 
     }
 
