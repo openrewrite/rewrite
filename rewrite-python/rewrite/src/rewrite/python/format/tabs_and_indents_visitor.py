@@ -283,7 +283,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
             if trailing_comma:
                 # After a trailing comma, the line break before the closing bracket is the comma's.
-                comma = trailing_comma.replace(suffix=self._indent_to(trailing_comma.suffix, indent))
+                comma = trailing_comma.replace(suffix=self._closing(trailing_comma.suffix, elem, indent))
                 right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
 
             t = cast(T, elem)
@@ -759,6 +759,24 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 grandparent.put_message("last_indent", indent)
                 grandparent.put_message("chained_indent", indent)
         return elem, after
+
+    def _closing(self, space: Space, last: J, column: int) -> Space:
+        """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
+        ``column`` and a comment line at the column of ``last`` when ``last`` starts a line."""
+        if not space.comments:
+            return self._indent_to(space, column)
+        inner = self.find_indent(last.prefix) if '\n' in last.prefix.last_whitespace else None
+        final = len(space.comments) - 1
+
+        def to(whitespace: str, to_column: Optional[int]) -> str:
+            if to_column is None or '\n' not in whitespace:
+                return whitespace
+            return self._indent(whitespace, to_column - self._get_length_of_whitespace(whitespace))
+
+        return space.replace(
+            whitespace=to(space.whitespace, inner),
+            comments=list_map(lambda c, i: c.replace(suffix=to(c.suffix, column if i == final else inner)),
+                              space.comments))
 
     def _indent_to(self, space: Space, column: int, context: Optional[str] = None) -> Space:
         s = space

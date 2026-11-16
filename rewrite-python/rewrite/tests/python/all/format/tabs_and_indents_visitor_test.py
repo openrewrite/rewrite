@@ -762,6 +762,30 @@ def test_bracket_closing_after_trailing_comma_inside_function():
     )
 
 
+def test_comment_after_trailing_comma_keeps_the_column_of_the_elements():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              f(
+                1,
+                # c
+              )
+            """,
+            """
+            def create():
+                f(
+                    1,
+                    # c
+                )
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
 def test_basic_dictionary():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
     rewrite_run(
