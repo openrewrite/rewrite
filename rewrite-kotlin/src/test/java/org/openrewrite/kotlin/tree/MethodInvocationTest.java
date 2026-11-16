@@ -24,6 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -435,6 +436,38 @@ class MethodInvocationTest implements RewriteTest {
             """
               val x = some .  qualified   . fooBar ( )
               """
+          )
+        );
+    }
+
+    @Test
+    void callOnUnresolvedReceiverHasNoMethodType() {
+        AtomicInteger count = new AtomicInteger();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
+          kotlin(
+            """
+              fun f() {
+                  languageVersion.set(17)
+                  languageVersion.set(0, 'c')
+                  with(languageVersion) {
+                      set(0, 'c')
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("set".equals(method.getSimpleName())) {
+                            assertThat(method.getMethodType()).isNull();
+                            count.incrementAndGet();
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(count).hasValue(3);
+            })
           )
         );
     }

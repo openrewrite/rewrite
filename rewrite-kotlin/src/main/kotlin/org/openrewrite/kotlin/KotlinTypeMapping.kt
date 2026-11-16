@@ -856,6 +856,13 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
+        // An error type satisfies any receiver type, so FIR binds `unknown.set(0, 'c')` and
+        // `with(unknown) { set(0, 'c') }` to the `StringBuilder.set` extension.
+        // javac leaves calls on an unresolved receiver unattributed.
+        if (function.extensionReceiver?.resolvedType is ConeErrorType ||
+            function.dispatchReceiver?.resolvedType is ConeErrorType) {
+            return null
+        }
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
         if (sym !is FirCallableSymbol<*>) {
             throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
