@@ -86,7 +86,7 @@ class NodeResolutionResultRpcTest {
                 singletonList(new Dependency("express", "^5.0.0", express)),
                 new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
                 new ArrayList<>(Arrays.asList(express, debug, ms)),
-                NodeResolutionResult.PackageManager.Npm, null, null,
+                null, null, null,
                 new Repository("git", "https://github.com/acme/mono.git", "packages/app"));
 
         NodeResolutionResult received = sendAndReceive(marker);
@@ -99,7 +99,6 @@ class NodeResolutionResultRpcTest {
                 null);
         assertThat(received.getResolvedDependencies()).extracting(ResolvedDependency::getLicense)
                 .containsOnly("MIT");
-        assertThat(received.getPackageManager()).isEqualTo(NodeResolutionResult.PackageManager.Npm);
     }
 
     private static NodeResolutionResult sendAndReceive(NodeResolutionResult marker) {

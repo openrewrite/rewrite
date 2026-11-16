@@ -57,6 +57,7 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  */
 @Value
 @With
+@AllArgsConstructor(onConstructor_ = @JsonCreator)
 public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeResolutionResult> {
     UUID id;
 
@@ -94,6 +95,24 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
 
     // npm configuration from various scopes (global, user, project, env)
     @Nullable List<Npmrc> npmrcConfigs;
+
+    // The `repository` of package.json: the source repository this project is built from
+    @Nullable Repository repository;
+
+    /**
+     * A marker with no {@link #getRepository() repository}, as one was made before that was recorded.
+     */
+    public NodeResolutionResult(UUID id, @Nullable String name, @Nullable String version, @Nullable String description,
+                                String path, @Nullable List<String> workspacePackagePaths,
+                                List<Dependency> dependencies, List<Dependency> devDependencies,
+                                List<Dependency> peerDependencies, List<Dependency> optionalDependencies,
+                                List<Dependency> bundledDependencies, List<ResolvedDependency> resolvedDependencies,
+                                @Nullable PackageManager packageManager, @Nullable Map<String, String> engines,
+                                @Nullable List<Npmrc> npmrcConfigs) {
+        this(id, name, version, description, path, workspacePackagePaths, dependencies, devDependencies,
+                peerDependencies, optionalDependencies, bundledDependencies, resolvedDependencies, packageManager,
+                engines, npmrcConfigs, null);
+    }
 
     /**
      * Look up a resolved dependency by package name.
@@ -141,6 +160,7 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
         q.getAndSendList(after, n -> n.getNpmrcConfigs() != null ? n.getNpmrcConfigs() : emptyList(),
                 Npmrc::getScope,
                 npmrc -> npmrc.rpcSend(npmrc, q));
+        q.getAndSend(after, NodeResolutionResult::getRepository);
     }
 
     @Override
@@ -167,7 +187,8 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withEngines(q.receive(before.engines))
                 .withNpmrcConfigs(q.receiveList(before.npmrcConfigs,
-                        npmrc -> npmrc.rpcReceive(npmrc, q)));
+                        npmrc -> npmrc.rpcReceive(npmrc, q)))
+                .withRepository(q.receive(before.repository));
     }
 
     /**
@@ -260,8 +281,24 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
         // SPDX license identifier (e.g., "MIT", "Apache-2.0")
         @Nullable String license;
 
+        // The `repository` of the installed package's own package.json, which no lock file carries:
+        // null when the package was not installed where it was parsed, or declares none
+        @Nullable Repository repository;
+
         @JsonCreator
         private ResolvedDependency() {
+        }
+
+        /**
+         * A resolution with no {@link #getRepository() repository}, as one was made before that was recorded.
+         */
+        public ResolvedDependency(String name, String version, @Nullable List<Dependency> dependencies,
+                                  @Nullable List<Dependency> devDependencies,
+                                  @Nullable List<Dependency> peerDependencies,
+                                  @Nullable List<Dependency> optionalDependencies,
+                                  @Nullable Map<String, String> engines, @Nullable String license) {
+            this(name, version, dependencies, devDependencies, peerDependencies, optionalDependencies, engines,
+                    license, null);
         }
 
         @Override
@@ -282,6 +319,7 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
                     dep -> dep.rpcSend(dep, q));
             q.getAndSend(after, ResolvedDependency::getEngines);
             q.getAndSend(after, ResolvedDependency::getLicense);
+            q.getAndSend(after, ResolvedDependency::getRepository);
         }
 
         @Override
@@ -294,7 +332,43 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
             before.optionalDependencies = q.receiveList(before.optionalDependencies, dep -> dep.rpcReceive(dep, q));
             before.engines = q.receive(before.engines);
             before.license = q.receive(before.license);
+            before.repository = q.receive(before.repository);
             return before;
+        }
+    }
+
+    /**
+     * The {@code repository} of a package.json: where the source of the package lives.
+     * <p>
+     * Kept as the package wrote it. A {@code repository} written as a string, be it a shorthand such as
+     * {@code "github:user/repo"} or {@code "user/repo"} or a URL, is that string as the {@code url}, with no
+     * {@code type}. Nothing here is normalized, so a reader that wants a canonical URL makes one.
+     */
+    @Value
+    @With
+    public static class Repository implements RpcCodec<Repository> {
+        // The version control system (e.g., "git"); null when the package names none
+        @Nullable String type;
+
+        // The repository as written (e.g., "git+https://github.com/expressjs/express.git")
+        String url;
+
+        // The directory of the package within a monorepo (e.g., "packages/react-dom")
+        @Nullable String directory;
+
+        @Override
+        public void rpcSend(Repository after, RpcSendQueue q) {
+            q.getAndSend(after, Repository::getType);
+            q.getAndSend(after, Repository::getUrl);
+            q.getAndSend(after, Repository::getDirectory);
+        }
+
+        @Override
+        public Repository rpcReceive(Repository before, RpcReceiveQueue q) {
+            return before
+                    .withType(q.receive(before.type))
+                    .withUrl(q.receive(before.url))
+                    .withDirectory(q.receive(before.directory));
         }
     }
 

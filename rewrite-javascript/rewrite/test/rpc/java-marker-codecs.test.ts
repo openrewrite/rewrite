@@ -34,6 +34,8 @@ import {Marker, marker, MarkersKind} from "../../src/markers";
 import {randomId} from "../../src/uuid";
 import {omitColon, Yaml} from "../../src/yaml";
 
+const noDependencies = {dependencies: {}, devDependencies: {}, peerDependencies: {}, optionalDependencies: {}};
+
 /**
  * One of each marker that can be attached on this side. A marker type that is added to one of the
  * `Markers` constants needs an entry here, which is what puts it through the trip below.
@@ -100,6 +102,19 @@ const samples: { [kind: string]: () => Marker } = {
         name: "example",
         version: "1.0.0",
         dependencies: {"is-odd": "^3.0.1"}
+    }),
+    [`${NodeResolutionResultKind} with repositories`]: () => createNodeResolutionResultMarker("package.json", {
+        name: "example",
+        version: "1.0.0",
+        repository: {type: "git", url: "https://github.com/acme/mono.git", directory: "packages/example"},
+        dependencies: {"is-odd": "^3.0.1", "is-number": "^6.0.0"}
+    }, {
+        // a resolution's absent dependency lists come back from Java as empty ones, so these have them empty
+        packages: {
+            "": {},
+            "node_modules/is-odd": {version: "3.0.1", repository: "github:i-voted-for-trump/is-odd", ...noDependencies},
+            "node_modules/is-number": {version: "6.0.0", ...noDependencies}
+        }
     }),
     [NodeRuntimeKind]: () => ({
         kind: NodeRuntimeKind,
