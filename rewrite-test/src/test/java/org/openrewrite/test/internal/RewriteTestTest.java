@@ -1652,7 +1652,7 @@ class RewriteTestTest implements RewriteTest {
 
         @Test
         void rejectRecipeThatChangesCodeWhoseTypeIsMissing() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
                 .recipe(new FindCallsNotDeclaredBy("legacy", "lib.Lib")),
               java(
@@ -1666,8 +1666,8 @@ class RewriteTestTest implements RewriteTest {
                   }
                   """
               )
-            ));
-            assertThat(e).hasMessageStartingWith("Check types before acting on code")
+            )).isInstanceOf(AssertionError.class)
+              .hasMessageStartingWith("Check types before acting on code")
               .hasMessageContaining("org.openrewrite.test.internal.FindCallsNotDeclaredBy changes code that it " +
                                     "leaves unchanged with the types of the test's classpath")
               .hasMessageContaining("changed A.java:")
@@ -1676,7 +1676,7 @@ class RewriteTestTest implements RewriteTest {
 
         @Test
         void rejectRecipeThatThrowsWhenTypesAreMissing() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(LIB))
                 .recipe(new FindCallsByDeclaringTypeName("legacy", "lib.Lib")),
               java(
@@ -1699,8 +1699,8 @@ class RewriteTestTest implements RewriteTest {
                   }
                   """
               )
-            ));
-            assertThat(e).hasMessageStartingWith("Check for missing types before using them")
+            )).isInstanceOf(AssertionError.class)
+              .hasMessageStartingWith("Check for missing types before using them")
               .hasMessageContaining("java.lang.NullPointerException")
               .hasMessageContaining("at org.openrewrite.test.internal.FindCallsByDeclaringTypeName$1.visitMethodInvocation(");
         }
