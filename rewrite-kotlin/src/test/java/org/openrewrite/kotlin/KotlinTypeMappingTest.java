@@ -17,6 +17,7 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -31,8 +32,11 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -362,6 +366,97 @@ class KotlinTypeMappingTest {
         var returnType = (JavaType.Parameterized) method.getReturnType();
         // Assert the type of the parameterized type contains the type parameter from the source.
         assertThat(returnType.getType().getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
+    }
+
+    @Test
+    void topLevelMembersOfFileOnDiskBelongToFacadeNamedAfterFile(@TempDir Path root) throws IOException {
+        assertThat(topLevelMemberOwners(root, "src/main/kotlin/lib/functions.kt", """
+          package lib
+
+          fun helper() {}
+          val answer = 42
+          """)).containsExactly("lib.FunctionsKt", "lib.FunctionsKt");
+    }
+
+    @Test
+    void topLevelMembersOfFileOnDiskBelongToFacadeNamedByJvmName(@TempDir Path root) throws IOException {
+        assertThat(topLevelMemberOwners(root, "src/main/kotlin/lib/functions.kt", """
+          @file:JvmName("Helpers")
+          package lib
+
+          fun helper() {}
+          val answer = 42
+          """)).containsExactly("lib.Helpers", "lib.Helpers");
+    }
+
+    @Test
+    void scriptsWithTheSameFileNameKeepTheirOwnFunctions() {
+        List<String> classes = new ArrayList<>();
+        KotlinParser.builder().build().parseInputs(List.of(
+            Parser.Input.fromString(Path.of("a/build.gradle.kts"), "fun first() {}"),
+            Parser.Input.fromString(Path.of("b/build.gradle.kts"), "fun second() {}")
+          ), null, new InMemoryExecutionContext()
+        ).forEach(script -> new KotlinIsoVisitor<List<String>>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> classes) {
+                classes.add(method.getMethodType().getDeclaringType().getMethods().stream().map(JavaType.Method::getName).toList().toString());
+                return method;
+            }
+        }.reduce(script, classes));
+        assertThat(classes).containsExactly("[first]", "[second]");
+    }
+
+    @Test
+    void multifileClassFacadeListsFunctionsOfEveryPart() {
+        List<String> facades = new ArrayList<>();
+        KotlinParser.builder().build().parse(new InMemoryExecutionContext(),
+          """
+            @file:JvmName("Utils")
+            @file:JvmMultifileClass
+            package lib
+
+            fun first() {}
+            """,
+          """
+            @file:JvmName("Utils")
+            @file:JvmMultifileClass
+            package lib
+
+            fun second() {}
+            """
+        ).forEach(part -> new KotlinIsoVisitor<List<String>>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> facades) {
+                JavaType.FullyQualified facade = method.getMethodType().getDeclaringType();
+                facades.add(facade.getFullyQualifiedName() + " " +
+                            facade.getMethods().stream().map(JavaType.Method::getName).sorted().toList());
+                return method;
+            }
+        }.reduce(part, facades));
+        assertThat(facades).containsExactly("lib.Utils [first, second]", "lib.Utils [first, second]");
+    }
+
+    private static List<String> topLevelMemberOwners(Path root, String relativePath, String source) throws IOException {
+        Path file = root.resolve(relativePath);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, source);
+        K.CompilationUnit cu = (K.CompilationUnit) KotlinParser.builder().build()
+          .parse(List.of(file), root, new InMemoryExecutionContext())
+          .findFirst()
+          .orElseThrow();
+        return new KotlinIsoVisitor<List<String>>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> owners) {
+                owners.add(method.getMethodType().getDeclaringType().getFullyQualifiedName());
+                return method;
+            }
+
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, List<String> owners) {
+                owners.add(((JavaType.FullyQualified) variable.getVariableType().getOwner()).getFullyQualifiedName());
+                return variable;
+            }
+        }.reduce(cu, new ArrayList<>());
     }
 
     @Nested
@@ -732,13 +827,13 @@ class KotlinTypeMappingTest {
 
         @CsvSource(value = {
           // Method type on overload with no named arguments.
-          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean]}",
+          "foo(\"\", 1, true)~org.example.OpenRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean]}",
           // Method type on overload with named arguments.
-          "foo(b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[int,boolean]}",
+          "foo(b = 1)~org.example.OpenRewriteFile0Kt{name=foo,return=void,parameters=[int,boolean]}",
           // Method type when named arguments are declared out of order.
-          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}",
+          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.OpenRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}",
           // Method type with trailing lambda
-          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}"
+          "foo(b = 1, noDefault = true) {}~org.example.OpenRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}"
         }, delimiter = '~')
         @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {
@@ -776,7 +871,7 @@ class KotlinTypeMappingTest {
                                     assertThat(m.toString()).isEqualTo(methodType);
                                     assertThat(m.getDeclaringType())
                                       .satisfies(it -> {
-                                          assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile0Kt");
+                                          assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.OpenRewriteFile0Kt");
                                           assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("foo", "foo", "foo", "m");
                                       });
                                 });
@@ -905,9 +1000,9 @@ class KotlinTypeMappingTest {
 
                         @Override
                         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
-                            assertThat(variable.getVariableType().toString()).isEqualTo("openRewriteFile0Kt{name=receivedMember,type=int}");
+                            assertThat(variable.getVariableType().toString()).isEqualTo("OpenRewriteFile0Kt{name=receivedMember,type=int}");
                             assertThat(variable.getName().getType().toString()).isEqualTo("int");
-                            assertThat(variable.getName().getFieldType().toString()).isEqualTo("openRewriteFile0Kt{name=receivedMember,type=int}");
+                            assertThat(variable.getName().getFieldType().toString()).isEqualTo("OpenRewriteFile0Kt{name=receivedMember,type=int}");
                             return super.visitVariable(variable, integer);
                         }
                     }.visit(cu, 0))
@@ -949,23 +1044,23 @@ class KotlinTypeMappingTest {
                                     // The declaration names no variable of its own; it is typed by the synthetic
                                     // receiver the component calls are made on.
                                     assertThat(variable.getVariableType().toString())
-                                            .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=<destruct>,type=kotlin.Triple<int, int, int>}");
+                                            .isEqualTo("OpenRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=<destruct>,type=kotlin.Triple<int, int, int>}");
                                     return super.visitVariable(variable, found);
                                 }
                                 switch (variable.getSimpleName()) {
                                     case "a" -> {
                                         assertThat(variable.getVariableType().toString())
-                                                .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=a,type=int}");
+                                                .isEqualTo("OpenRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=a,type=int}");
                                         assertThat(variable.getInitializer()).isNull();
                                     }
                                     case "b" -> {
                                         assertThat(variable.getVariableType().toString())
-                                                .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=b,type=int}");
+                                                .isEqualTo("OpenRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=b,type=int}");
                                         assertThat(variable.getInitializer()).isNull();
                                     }
                                     case "c" -> {
                                         assertThat(variable.getVariableType().toString())
-                                                .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=c,type=int}");
+                                                .isEqualTo("OpenRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=c,type=int}");
                                         assertThat(variable.getInitializer()).isNull();
                                     }
                                 }
@@ -1035,7 +1130,7 @@ class KotlinTypeMappingTest {
                         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
                             switch (variable.getSimpleName()) {
                                 case "foo1": {
-                                    assertThat(variable.getVariableType().toString()).isEqualTo("openRewriteFile0Kt{name=foo1,type=int}");
+                                    assertThat(variable.getVariableType().toString()).isEqualTo("OpenRewriteFile0Kt{name=foo1,type=int}");
                                     break;
                                 }
                                 case "foo2": {

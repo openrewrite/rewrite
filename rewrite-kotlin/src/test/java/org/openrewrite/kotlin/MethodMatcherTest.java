@@ -36,7 +36,7 @@ class MethodMatcherTest implements RewriteTest {
     void matchesTopLevelFunction() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
-              private static final MethodMatcher methodMatcher = new MethodMatcher("openRewriteFile0Kt function(..)");
+              private static final MethodMatcher methodMatcher = new MethodMatcher("OpenRewriteFile0Kt function(..)");
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (methodMatcher.matches(method.getMethodType())) {

@@ -724,14 +724,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             return convertKotlinFqToJavaFq(classId.toString())
         }
 
-        fun fileSignature(file: FirFile): String {
-            val sig = StringBuilder()
-            if (file.packageFqName.asString().isNotEmpty()) {
-                sig.append("${file.packageFqName.asString()}.")
-            }
-            sig.append(file.name.replace("/", ".").replace("\\", ".").replace(".kt", "Kt"))
-            return sig.toString()
-        }
+        fun fileSignature(file: FirFile): String = file.facadeFqn
 
         fun convertKotlinFqToJavaFq(kotlinFqn: String): String {
             val cleanedFqn = kotlinFqn
