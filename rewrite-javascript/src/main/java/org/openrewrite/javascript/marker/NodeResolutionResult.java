@@ -57,7 +57,6 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  */
 @Value
 @With
-@AllArgsConstructor(onConstructor_ = @JsonCreator)
 public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeResolutionResult> {
     UUID id;
 
@@ -98,6 +97,33 @@ public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeR
 
     // The `repository` of package.json: the source repository this project is built from
     @Nullable Repository repository;
+
+    // Written out so that it can be the one Jackson reads a marker with, now that there are two
+    @JsonCreator
+    public NodeResolutionResult(UUID id, @Nullable String name, @Nullable String version, @Nullable String description,
+                                String path, @Nullable List<String> workspacePackagePaths,
+                                List<Dependency> dependencies, List<Dependency> devDependencies,
+                                List<Dependency> peerDependencies, List<Dependency> optionalDependencies,
+                                List<Dependency> bundledDependencies, List<ResolvedDependency> resolvedDependencies,
+                                @Nullable PackageManager packageManager, @Nullable Map<String, String> engines,
+                                @Nullable List<Npmrc> npmrcConfigs, @Nullable Repository repository) {
+        this.id = id;
+        this.name = name;
+        this.version = version;
+        this.description = description;
+        this.path = path;
+        this.workspacePackagePaths = workspacePackagePaths;
+        this.dependencies = dependencies;
+        this.devDependencies = devDependencies;
+        this.peerDependencies = peerDependencies;
+        this.optionalDependencies = optionalDependencies;
+        this.bundledDependencies = bundledDependencies;
+        this.resolvedDependencies = resolvedDependencies;
+        this.packageManager = packageManager;
+        this.engines = engines;
+        this.npmrcConfigs = npmrcConfigs;
+        this.repository = repository;
+    }
 
     /**
      * A marker with no {@link #getRepository() repository}, as one was made before that was recorded.
