@@ -465,6 +465,39 @@ public class TypedCaptureTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void ArrayTypedCaptureRequiresMatchingNestedGenericArguments()
+    {
+        var arr = Capture.Expression("arr", type: "System.Collections.Generic.List<System.Collections.Generic.List<int>>[]");
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression($"{arr}.Length")),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class C
+                {
+                    void M(List<List<string>>[] xs, List<List<int>>[] ys)
+                    {
+                        var a = xs.Length;
+                        var b = ys.Length;
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                class C
+                {
+                    void M(List<List<string>>[] xs, List<List<int>>[] ys)
+                    {
+                        var a = xs.Length;
+                        var b = /*~~>*/ys.Length;
+                    }
+                }
+                """
+            )
+        );
+    }
+
     // ===============================================================
     // Recipe factories
     // ===============================================================

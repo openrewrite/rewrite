@@ -823,6 +823,47 @@ public class TypeUtilsTests
         Assert.True(assignable);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IsAssignableTo_Array_NestedGenericElementsRequireMatchingArguments(bool matching)
+    {
+        // given
+        var list = MakeClass("System.Collections.Generic.List");
+        var strings = new JavaType.Parameterized(list, [MakeClass("System.String")]);
+        var targetInner = new JavaType.Parameterized(list,
+            [MakeClass(matching ? "System.String" : "System.Int32")]);
+        var source = new JavaType.Array(new JavaType.Parameterized(list, [strings]), null);
+        var target = new JavaType.Array(new JavaType.Parameterized(list, [targetInner]), null);
+
+        // when
+        var assignable = TypeUtils.IsAssignableTo(source, target);
+
+        // then
+        Assert.Equal(matching, assignable);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IsAssignableTo_Array_GenericInterfaceElementsWithArrayArguments(bool matching)
+    {
+        // given
+        var strings = new JavaType.Array(MakeClass("System.String"), null);
+        var enumerable = MakeClass("System.Collections.Generic.IEnumerable");
+        var list = MakeClass("System.Collections.Generic.List",
+            interfaces: [new JavaType.Parameterized(enumerable, [strings])]);
+        var source = new JavaType.Array(new JavaType.Parameterized(list, [strings]), null);
+        var targetArgument = new JavaType.Array(MakeClass(matching ? "System.String" : "System.Int32"), null);
+        var target = new JavaType.Array(new JavaType.Parameterized(enumerable, [targetArgument]), null);
+
+        // when
+        var assignable = TypeUtils.IsAssignableTo(source, target);
+
+        // then
+        Assert.Equal(matching, assignable);
+    }
+
     [Fact]
     public void IsAssignableTo_NonArrayNotAssignableToArray()
     {

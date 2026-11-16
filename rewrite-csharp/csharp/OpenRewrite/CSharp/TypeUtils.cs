@@ -467,7 +467,6 @@ public static class TypeUtils
     /// Compare type parameter lists position-by-position. A <see cref="JavaType.GenericTypeVariable"/>
     /// in the target acts as a wildcard (any concrete type matches). If the variable has bounds,
     /// the candidate's type argument must be assignable to all bounds.
-    /// Concrete type parameters require exact FQN match.
     /// </summary>
     private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams)
     {
@@ -493,15 +492,8 @@ public static class TypeUtils
                         return false;
                 }
             }
-            else
-            {
-                // Concrete type parameter — require exact FQN match
-                var targetFqn = GetFullyQualifiedName(targetParam);
-                var candidateFqn = GetFullyQualifiedName(candidateParam);
-                if (targetFqn == null || candidateFqn == null ||
-                    !string.Equals(targetFqn, candidateFqn, StringComparison.Ordinal))
-                    return false;
-            }
+            else if (!AreEquivalent(candidateParam, targetParam))
+                return false;
         }
         return true;
     }
