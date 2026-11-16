@@ -589,4 +589,66 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multilineHelmCommentAtFileStart() {
+        rewriteRun(
+          yaml(
+            """
+              {{- /*
+              Blah text here
+              Another line here
+              */}}
+              apiVersion: v1
+              kind: Service
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmCommentsInsideMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.metadata.name", "renamed", null)),
+          yaml(
+            """
+              metadata:
+                {{- /*
+                A comment with {{ braces }} and a key: value
+                */ -}}
+                name: original
+                {{/* a second
+                comment */}}
+                labels:
+                  app: test
+              """,
+            """
+              metadata:
+                {{- /*
+                A comment with {{ braces }} and a key: value
+                */ -}}
+                name: renamed
+                {{/* a second
+                comment */}}
+                labels:
+                  app: test
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmAction() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                {{- include "mychart.labels" (dict
+                  "context" .
+                  "extra" .Values.extra) | nindent 2 }}
+                replicas: 1
+              """
+          )
+        );
+    }
 }

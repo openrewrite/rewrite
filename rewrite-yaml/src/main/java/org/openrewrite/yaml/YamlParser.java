@@ -58,6 +58,11 @@ public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
     // Only match single-line Helm templates that don't span multiple lines
     private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
+    // Match a Helm template spanning lines that stands alone, such as a {{- /* ... */}} comment block.
+    // A comment ends at its first */ and may hold braces; any other template ends at its first }}.
+    private static final Pattern STANDALONE_MULTILINE_HELM_TEMPLATE_PATTERN = Pattern.compile(
+            "^[ \\t]*(\\{\\{-?\\s*/\\*(?:(?!\\*/).)*\\*/\\s*-?}}|\\{\\{[^{}]*}})[ \\t]*$",
+            Pattern.MULTILINE | Pattern.DOTALL);
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
@@ -146,8 +151,26 @@ public class YamlParser implements org.openrewrite.Parser {
         Map<String, String> helmTemplateByUuid = new HashMap<>();
         Map<String, String> singleBraceTemplateByUuid = new HashMap<>();
 
-        // First, replace all Helm templates with UUIDs
+        // First, replace standalone Helm templates spanning lines with UUIDs, leaving each on a line of
+        // its own to be commented out below
         String processedSource = yamlSource;
+        Matcher multilineHelmMatcher = STANDALONE_MULTILINE_HELM_TEMPLATE_PATTERN.matcher(processedSource);
+        StringBuilder multilineHelmBuffer = new StringBuilder();
+        int multilineHelmPos = 0;
+        while (multilineHelmMatcher.find()) {
+            String template = multilineHelmMatcher.group(1);
+            if (template.indexOf('\n') < 0 && template.indexOf('\r') < 0) {
+                continue;
+            }
+            String uuid = UUID.randomUUID().toString();
+            helmTemplateByUuid.put(uuid, template);
+            multilineHelmBuffer.append(processedSource, multilineHelmPos, multilineHelmMatcher.start(1)).append(uuid);
+            multilineHelmPos = multilineHelmMatcher.end(1);
+        }
+        multilineHelmBuffer.append(processedSource, multilineHelmPos, processedSource.length());
+        processedSource = multilineHelmBuffer.toString();
+
+        // Then, replace all single-line Helm templates with UUIDs
         Matcher helmMatcher = HELM_TEMPLATE_PATTERN.matcher(processedSource);
         StringBuffer helmBuffer = new StringBuffer();
         while (helmMatcher.find()) {
