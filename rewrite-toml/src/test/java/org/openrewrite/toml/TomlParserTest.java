@@ -23,6 +23,9 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
@@ -572,6 +575,27 @@ class TomlParserTest implements RewriteTest {
     @ValueSource(strings = {"config.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", ".xmake.cfg"})
     void acceptsTomlFiles(String fileName) {
         assertThat(new TomlParser().accept(Paths.get("project", fileName))).isTrue();
+    }
+
+    @Test
+    void localDateTimeWithSpaceOrLowercaseDelimiter() {
+        rewriteRun(
+          toml(
+            """
+              a = 2017-02-25 12:00:01.123456789
+              b = 1979-05-27t07:32:00
+              c = 1979-05-27t07:32:00Z
+              d = 1979-05-27 07:32:00+01:00
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                LocalDateTime.of(2017, 2, 25, 12, 0, 1, 123456789),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(1))))
+          )
+        );
     }
 
     @ParameterizedTest

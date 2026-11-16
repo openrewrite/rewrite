@@ -35,8 +35,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -273,18 +271,12 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         });
     }
 
-    private static final DateTimeFormatter RFC3339_OFFSET_DATE_TIME;
-
-    static {
-        RFC3339_OFFSET_DATE_TIME = new DateTimeFormatterBuilder()
-                .parseCaseInsensitive()
-                .append(DateTimeFormatter.ISO_LOCAL_DATE)
-                .appendLiteral(' ')
-                .append(DateTimeFormatter.ISO_LOCAL_TIME)
-                .parseLenient()
-                .appendOffsetId()
-                .parseStrict()
-                .toFormatter();
+    /**
+     * TOML allows a space or a lowercase {@code t} between date and time, and a lowercase {@code z}
+     * offset, none of which {@code DateTimeFormatter.ISO_LOCAL_DATE_TIME} accepts.
+     */
+    private static String isoDateTime(String dateTime) {
+        return (dateTime.substring(0, 10) + 'T' + dateTime.substring(11)).toUpperCase();
     }
 
     @Override
@@ -298,7 +290,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         Markers.EMPTY,
                         TomlType.Primitive.OffsetDateTime,
                         dateTime,
-                        dateTime.contains("T") ? OffsetDateTime.parse(dateTime) : OffsetDateTime.parse(dateTime, RFC3339_OFFSET_DATE_TIME)
+                        OffsetDateTime.parse(isoDateTime(dateTime))
                 );
             } else if (c.LOCAL_DATE_TIME() != null) {
                 return new Toml.Literal(
@@ -307,7 +299,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         Markers.EMPTY,
                         TomlType.Primitive.LocalDateTime,
                         dateTime,
-                        LocalDateTime.parse(dateTime)
+                        LocalDateTime.parse(isoDateTime(dateTime))
                 );
             } else if (c.LOCAL_DATE() != null) {
                 return new Toml.Literal(
