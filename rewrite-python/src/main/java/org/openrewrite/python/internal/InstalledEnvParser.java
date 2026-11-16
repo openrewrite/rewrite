@@ -156,7 +156,7 @@ public final class InstalledEnvParser {
      * keeps the URLs it has.
      *
      * @param resolved the resolved dependencies of a lock file
-     * @param env      the environment installed from that lock file
+     * @param env      the environment the project's dependencies are installed in
      * @return {@code resolved} when the env has nothing to add, or else the same graph built anew
      */
     public static List<ResolvedDependency> withProjectUrls(List<ResolvedDependency> resolved, Path env) {
