@@ -16,12 +16,12 @@
 
 package org.openrewrite.groovy;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
@@ -34,7 +34,6 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@Disabled
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessaryPublicModifier", "ConstantConditions", "GrMethodMayBeStatic"})
 class GroovyTypeAttributionTest implements RewriteTest {
 
@@ -44,7 +43,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
             .parser(GroovyParser.builder()
-                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
+                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api")),
           groovy(
                 """
             import org.junit.jupiter.api.Test
@@ -109,7 +108,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
         rewriteRun(
           groovy(
                 """
-              public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
+              public <T> T register(String name, Class<T> type, @groovy.transform.stc.ClosureParams(groovy.transform.stc.SecondParam.FirstGenericType) Closure<T> configurationAction) {
                   return null
               }
               register("testTask", String) {
@@ -135,7 +134,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
         rewriteRun(
           groovy(
                 """
-              public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
+              public <T> T register(String name, Class<T> type, @groovy.transform.stc.ClosureParams(groovy.transform.stc.SecondParam.FirstGenericType) Closure<T> configurationAction) {
                   return null
               }
               register("testTask", Integer) {
@@ -161,7 +160,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
         rewriteRun(
           groovy(
                 """
-              public <T> T register(String name, Class<T> type, Closure<T> configurationAction) {
+              public <T> T register(String name, Class<T> type, @groovy.transform.stc.ClosureParams(groovy.transform.stc.SecondParam.FirstGenericType) Closure<T> configurationAction) {
                   return null
               }
               register("testTask", String) { foo ->
@@ -235,6 +234,66 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(substring.getMethodType().getName()).isEqualTo("substring");
                 assertThat(substring.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
+          )
+        );
+    }
+
+    @Test
+    void closureParameterTypedByTypeChecker() {
+        rewriteRun(
+          groovy(
+            """
+              def upper = ["a"].collect { it.toUpperCase() }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    if ("toUpperCase".equals(method.getSimpleName())) {
+                        assertThat(TypeUtils.isOfClassType(method.getSelect().getType(), "java.lang.String")).isTrue();
+                    }
+                    return super.visitMethodInvocation(method, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newClassOfSourceDeclaredClassHasClassType() {
+        rewriteRun(
+          groovy(
+            """
+              class Foo {}
+              def foo = new Foo()
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.NewClass visitNewClass(J.NewClass newClass, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(newClass.getType(), "Foo")).isTrue();
+                    assertThat(TypeUtils.isOfClassType(newClass.getConstructorType().getReturnType(), "Foo")).isTrue();
+                    return newClass;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void noOverloadGuessedWhenTypeCheckerCannotChoose() {
+        rewriteRun(
+          groovy(
+            """
+              def find(String s, def needle) {
+                  s.indexOf(needle)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(method.getMethodType()).isNull();
+                    return method;
+                }
+            }.visit(cu, 0))
           )
         );
     }

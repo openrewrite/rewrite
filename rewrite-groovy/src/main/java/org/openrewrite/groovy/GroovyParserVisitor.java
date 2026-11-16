@@ -2869,34 +2869,9 @@ public class GroovyParserVisitor {
                 if (implicitDot != null) {
                     name = name.withMarkers(name.getMarkers().add(implicitDot));
                 }
-                // Method invocations may have type information that can enrich the type information of its parameters
                 Markers markers = Markers.EMPTY;
                 if (call.getArguments() instanceof ArgumentListExpression) {
-                    ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
-                    if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
-                        for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
-                            if (!(arg instanceof ClosureExpression)) {
-                                continue;
-                            }
-                            ClosureExpression cl = (ClosureExpression) arg;
-                            ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                            Parameter[] clParameters = cl.getParameters();
-                            for (Parameter p : clParameters == null ? Parameter.EMPTY_ARRAY : clParameters) {
-                                if (p.isDynamicTyped()) {
-                                    p.setType(actualParamTypeRaw);
-                                    p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                                }
-                            }
-                            for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
-                                if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
-                                    Parameter p = (Parameter) declaredVariable.getValue();
-                                    p.setType(actualParamTypeRaw);
-                                    p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                                }
-                            }
-                        }
-                    }
-                    markers = handlesCaseWhereEmptyParensAheadOfClosure(args, markers);
+                    markers = handlesCaseWhereEmptyParensAheadOfClosure((ArgumentListExpression) call.getArguments(), markers);
                 }
                 JContainer<Expression> args = doVisit(call.getArguments());
                 if (spaceBeforeArgs != null && !spaceBeforeArgs.getWhitespace().isEmpty()) {
@@ -2904,48 +2879,7 @@ public class GroovyParserVisitor {
                 }
 
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
-                JavaType.Method methodType = null;
-                if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
-                        ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
-                    // Groovy doesn't know what kind of object this method is being invoked on
-                    // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
-                    // Use any such type information to attempt to find a matching method
-                    ClassNode parameterType = staticType(((VariableExpression) call.getObjectExpression()).getAccessedVariable());
-                    if (args.getElements().size() == 1 && args.getElements().get(0) instanceof J.Empty) {
-                        methodType = typeMapping.methodType(parameterType.getMethod(name.getSimpleName(), new Parameter[]{}));
-                    } else if (call.getArguments() instanceof ArgumentListExpression) {
-                        List<org.codehaus.groovy.ast.expr.Expression> rawArgs = ((ArgumentListExpression) call.getArguments()).getExpressions();
-                    /*
-                      Look through the methods returning the closest match on a best-effort basis
-                      Factors which can result in a less accurate match, or no match, include:
-                          * The type of each parameter may or may not be known to us
-                          * Usage of Groovy's "named parameters" syntactic sugaring throwing off argument count and order
-                    */
-                        methodLoop:
-                        for (MethodNode candidateMethod : parameterType.getAllDeclaredMethods()) {
-                            if (!name.getSimpleName().equals(candidateMethod.getName())) {
-                                continue;
-                            }
-                            if (rawArgs.size() != candidateMethod.getParameters().length) {
-                                continue;
-                            }
-                            // Better than nothing
-                            methodType = typeMapping.methodType(candidateMethod);
-
-                            // If all parameter types agree then we have found an exact match
-                            for (int i = 0; i < candidateMethod.getParameters().length; i++) {
-                                JavaType param = typeMapping.type(staticType(candidateMethod.getParameters()[i]));
-                                JavaType arg = typeMapping.type(staticType(rawArgs.get(i)));
-                                if (!TypeUtils.isAssignableTo(param, arg)) {
-                                    continue methodLoop;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                } else {
-                    methodType = typeMapping.methodType(methodNode);
-                }
+                JavaType.Method methodType = typeMapping.methodType(methodNode);
                 return new J.MethodInvocation(randomId(), fmt, markers, select, typeParameters, name, args, methodType);
             }));
         }
@@ -2959,34 +2893,9 @@ public class GroovyParserVisitor {
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
                     emptyList(), call.getMethodAsString(), methodType, null);
 
-            // Method invocations may have type information that can enrich the type information of its parameters
             Markers markers = Markers.EMPTY;
             if (call.getArguments() instanceof ArgumentListExpression) {
-                ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
-                if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
-                    for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
-                        if (!(arg instanceof ClosureExpression)) {
-                            continue;
-                        }
-                        ClosureExpression cl = (ClosureExpression) arg;
-                        ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                        Parameter[] clParameters = cl.getParameters();
-                        for (Parameter p : clParameters == null ? Parameter.EMPTY_ARRAY : clParameters) {
-                            if (p.isDynamicTyped()) {
-                                p.setType(actualParamTypeRaw);
-                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                            }
-                        }
-                        for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
-                            if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
-                                Parameter p = (Parameter) declaredVariable.getValue();
-                                p.setType(actualParamTypeRaw);
-                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                            }
-                        }
-                    }
-                }
-                markers = handlesCaseWhereEmptyParensAheadOfClosure(args, markers);
+                markers = handlesCaseWhereEmptyParensAheadOfClosure((ArgumentListExpression) call.getArguments(), markers);
             }
             JContainer<Expression> args = doVisit(call.getArguments());
 

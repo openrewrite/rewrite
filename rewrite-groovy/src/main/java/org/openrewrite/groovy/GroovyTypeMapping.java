@@ -230,8 +230,10 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
-            method.unsafeSet(TypeUtils.asFullyQualified(type(node.getDeclaringClass())),
-                    type(node.getReturnType()),
+            JavaType.FullyQualified declaringType = TypeUtils.asFullyQualified(type(node.getDeclaringClass()));
+            method.unsafeSet(declaringType,
+                    // Groovy gives constructors of classes it compiles from source a void return type
+                    node instanceof ConstructorNode ? declaringType : type(node.getReturnType()),
                     parameterTypes,
                     thrownExceptions,
                     annotations
