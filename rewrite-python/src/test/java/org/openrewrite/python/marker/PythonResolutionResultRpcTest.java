@@ -67,7 +67,7 @@ class PythonResolutionResultRpcTest {
                 singletonList(new PythonResolutionResult.Dependency("a", "==1.0.0", null, null, a)),
                 emptyMap(), emptyMap(), emptyList(), emptyList(),
                 asList(a, b),
-                null, null, null);
+                null, null);
 
         ResolvedDependency received = sendAndReceive(marker).getDependencies().get(0).getResolved();
         assertThat(received).isNotNull();
@@ -99,7 +99,7 @@ class PythonResolutionResultRpcTest {
                 singletonMap("test", singletonList(declared)),
                 emptyList(), emptyList(),
                 asList(pytest, pluggy),
-                null, null, null);
+                null, null);
         PlainText sent = PlainText.builder().sourcePath(Paths.get("pyproject.toml")).text("").build();
         sent = sent.withMarkers(sent.getMarkers().add(marker));
 

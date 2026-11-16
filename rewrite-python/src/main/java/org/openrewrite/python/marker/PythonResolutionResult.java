@@ -122,6 +122,57 @@ public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<Pyt
      */
     @Nullable Map<String, String> projectUrls;
 
+    // Written out so that it can be the one Jackson reads a marker with, now that there are two
+    @JsonCreator
+    public PythonResolutionResult(UUID id, @Nullable String name, @Nullable String version, @Nullable String description,
+                                  @Nullable String license, String path, @Nullable String requiresPython,
+                                  @Nullable String buildBackend, List<Dependency> buildRequires,
+                                  List<Dependency> dependencies,
+                                  Map<String, List<Dependency>> optionalDependencies,
+                                  Map<String, List<Dependency>> dependencyGroups,
+                                  List<Dependency> constraintDependencies, List<Dependency> overrideDependencies,
+                                  List<ResolvedDependency> resolvedDependencies,
+                                  @Nullable PackageManager packageManager,
+                                  @Nullable List<SourceIndex> sourceIndexes,
+                                  @Nullable Map<String, String> projectUrls) {
+        this.id = id;
+        this.name = name;
+        this.version = version;
+        this.description = description;
+        this.license = license;
+        this.path = path;
+        this.requiresPython = requiresPython;
+        this.buildBackend = buildBackend;
+        this.buildRequires = buildRequires;
+        this.dependencies = dependencies;
+        this.optionalDependencies = optionalDependencies;
+        this.dependencyGroups = dependencyGroups;
+        this.constraintDependencies = constraintDependencies;
+        this.overrideDependencies = overrideDependencies;
+        this.resolvedDependencies = resolvedDependencies;
+        this.packageManager = packageManager;
+        this.sourceIndexes = sourceIndexes;
+        this.projectUrls = projectUrls;
+    }
+
+    /**
+     * A marker with no {@link #getProjectUrls() project URLs}, as one was made before those were recorded.
+     */
+    public PythonResolutionResult(UUID id, @Nullable String name, @Nullable String version, @Nullable String description,
+                                  @Nullable String license, String path, @Nullable String requiresPython,
+                                  @Nullable String buildBackend, List<Dependency> buildRequires,
+                                  List<Dependency> dependencies,
+                                  Map<String, List<Dependency>> optionalDependencies,
+                                  Map<String, List<Dependency>> dependencyGroups,
+                                  List<Dependency> constraintDependencies, List<Dependency> overrideDependencies,
+                                  List<ResolvedDependency> resolvedDependencies,
+                                  @Nullable PackageManager packageManager,
+                                  @Nullable List<SourceIndex> sourceIndexes) {
+        this(id, name, version, description, license, path, requiresPython, buildBackend, buildRequires,
+                dependencies, optionalDependencies, dependencyGroups, constraintDependencies, overrideDependencies,
+                resolvedDependencies, packageManager, sourceIndexes, null);
+    }
+
     /**
      * Look up a resolved dependency by package name.
      *

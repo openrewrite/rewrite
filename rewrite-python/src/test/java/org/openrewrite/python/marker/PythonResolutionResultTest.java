@@ -53,12 +53,42 @@ class PythonResolutionResultTest {
           emptyList(),
           singletonList(requests),
           null,
-          null,
           null
         );
 
         assertThat(marker.getResolvedDependency("requests")).isEqualTo(requests);
         assertThat(marker.getResolvedDependency("nonexistent")).isNull();
+    }
+
+    @Test
+    void constructorWithoutProjectUrls() {
+        // the parameter list the marker had before project URLs were recorded
+        PythonResolutionResult marker = new PythonResolutionResult(
+          randomId(),
+          "test-project",
+          "1.0.0",
+          "A description",
+          "MIT",
+          "pyproject.toml",
+          ">=3.10",
+          "hatchling.build",
+          emptyList(),
+          emptyList(),
+          emptyMap(),
+          emptyMap(),
+          emptyList(),
+          emptyList(),
+          emptyList(),
+          PackageManager.Uv,
+          singletonList(new PythonResolutionResult.SourceIndex("pypi", "https://pypi.org/simple", true))
+        );
+
+        assertThat(marker.getProjectUrls()).isNull();
+        assertThat(marker.getName()).isEqualTo("test-project");
+        assertThat(marker.getPackageManager()).isEqualTo(PackageManager.Uv);
+        assertThat(marker.getSourceIndexes()).hasSize(1);
+        assertThat(marker.withProjectUrls(singletonMap("Source", "https://github.com/example/test-project"))
+          .getProjectUrls()).containsEntry("Source", "https://github.com/example/test-project");
     }
 
     @Test
@@ -82,7 +112,6 @@ class PythonResolutionResultTest {
           emptyList(),
           emptyList(),
           singletonList(dep),
-          null,
           null,
           null
         );
@@ -134,7 +163,6 @@ class PythonResolutionResultTest {
           emptyList(),
           emptyList(),
           PackageManager.Uv,
-          null,
           null
         );
 
