@@ -781,10 +781,17 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                                         MultiImport, TypeParameters, ParameterizedType))
 
     def _closes_bracket(self, right: JRightPadded) -> bool:
-        """Whether the space after ``right`` is the line a subscript's or a type parameter list's bracket closes."""
-        owner = self.cursor.parent_or_throw.value
-        return isinstance(owner, ArrayDimension) or (
-            isinstance(owner, TypeParameters) and owner.padding.type_parameters[-1] is right)
+        """Whether the space after ``right`` is where a bracket closes: after a subscript's index, a type parameter
+        list's last parameter, or the last element of a call's, a function's or a collection literal's brackets."""
+        parent = self.cursor.parent_or_throw
+        owner = parent.value
+        if isinstance(owner, TypeParameters):
+            return owner.padding.type_parameters[-1] is right
+        if isinstance(owner, JContainer):
+            return owner.padding.elements[-1] is right and parent.get_message("rp_context", None) in (
+                "method_invocation_argument", "method_declaration_parameter",
+                "collection_literal_element", "dict_literal_element")
+        return isinstance(owner, ArrayDimension)
 
     def _closing(self, space: Space, last: J, column: int) -> Space:
         """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at

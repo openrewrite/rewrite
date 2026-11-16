@@ -836,6 +836,46 @@ def test_trailing_comma_without_a_bracket_leaves_the_next_statement_in_its_block
     )
 
 
+def test_comment_before_closing_bracket_keeps_the_column_of_the_elements():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              f(
+                1
+                # c
+              )
+              x = [
+                1
+                # c
+              ]
+              x = y[
+                1
+                # c
+              ]
+            """,
+            """
+            def create():
+                f(
+                    1
+                    # c
+                )
+                x = [
+                    1
+                    # c
+                ]
+                x = y[
+                    1
+                    # c
+                ]
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
 def test_subscript_spread_over_lines():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
     rewrite_run(
