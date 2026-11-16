@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
 import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
+import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
@@ -45,11 +46,13 @@ import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.KotlinTypeMapping
+import java.util.IdentityHashMap
 
 class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFile) {
 
     private val elementMap: MutableMap<PsiElement, MutableList<FirInfo>> = HashMap()
     private val typeMap: MutableMap<PsiElement, ConeTypeProjection> = HashMap()
+    private val callsByCallee: MutableMap<FirReference, FirFunctionCall> = IdentityHashMap()
 
     @OptIn(SymbolInternals::class)
     fun initialize() {
@@ -60,6 +63,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     val psiElement = element.source!!.psi!!
                     val firInfo = FirInfo(element, depth)
                     data.computeIfAbsent(psiElement) { ArrayList() } += firInfo
+                }
+                if (element is FirFunctionCall) {
+                    callsByCallee[element.calleeReference] = element
                 }
                 depth++
                 element.acceptChildren(this, data)
@@ -259,6 +265,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             else -> {
                 when (val fir = primary(psi)) {
                     is FirResolvedNamedReference -> {
+                        // In `a[i] = v` or `a[i] += v`, the primary FIR of `a[i]` is the `set` or `get`
+                        // reference, not its call.
+                        callsByCallee[fir]?.let { return typeMapping.methodInvocationType(it) }
                         when (val sym = fir.resolvedSymbol) {
                             is FirFunctionSymbol<*> -> typeMapping.methodDeclarationType(sym.fir, null)
                             else -> {

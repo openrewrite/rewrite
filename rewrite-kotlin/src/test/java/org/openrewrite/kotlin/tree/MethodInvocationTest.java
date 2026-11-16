@@ -18,11 +18,14 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -684,6 +687,52 @@ class MethodInvocationTest implements RewriteTest {
                             }
                         )
                 ))
+          )
+        );
+    }
+
+    @Test
+    void indexedAssignmentIsTypedLikeTheDirectCall() {
+        rewriteRun(
+          kotlin(
+            """
+              package lib
+              class Box
+              operator fun Box.get(i: Int): Int = i
+              operator fun Box.set(i: Int, v: Int) {}
+              """
+          ),
+          kotlin(
+            """
+              import lib.Box
+              import lib.get
+              import lib.set
+
+              fun f(sb: StringBuilder, m: MutableMap<String, Int>, l: java.util.ArrayList<String>, b: Box) {
+                  sb[0] = 'c'
+                  sb.set(0, 'c')
+                  m["a"] = 1
+                  m.set("a", 1)
+                  l[0] = "x"
+                  l.set(0, "x")
+                  b[0] += 1
+                  b.get(0)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Method> types = new ArrayList<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        types.add(method.getMethodType());
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(types).hasSize(8);
+                for (int i = 0; i < types.size(); i += 2) {
+                    assertThat(types.get(i)).isNotNull().isSameAs(types.get(i + 1));
+                }
+            })
           )
         );
     }
