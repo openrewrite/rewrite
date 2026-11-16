@@ -31,7 +31,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
     private static GradleParser.Builder withAndroidGradlePlugin() {
         return GradleParser.builder().buildscriptClasspathFromResources(new InMemoryExecutionContext(),
-          "gradle-base-services", "gradle-core-api", "gradle-api");
+          "gradle-public-api-9.", "gradle-api");
     }
 
     @DocumentExample
