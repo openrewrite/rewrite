@@ -29,6 +29,7 @@ import org.openrewrite.toml.marker.ArrayTable;
 import org.openrewrite.toml.marker.InlineTable;
 import org.openrewrite.toml.tree.*;
 
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -203,10 +204,10 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         return convert(ctx, (c, prefix) -> {
             String rawNumber = c.getText();
             String number = rawNumber.replace("_", "");
-            Long numberValue = rawNumber.startsWith("0x") ? Long.parseLong(number.substring(2), 16) :
-                    rawNumber.startsWith("0o") ? Long.parseLong(number.substring(2), 8) :
-                            rawNumber.startsWith("0b") ? Long.parseLong(number.substring(2), 2) :
-                                Long.parseLong(number);
+            int radix = rawNumber.startsWith("0x") ? 16 : rawNumber.startsWith("0o") ? 8 : rawNumber.startsWith("0b") ? 2 : 10;
+            // TOML integers are 64-bit, but Python's tomllib and others accept larger ones, and so must we
+            BigInteger bigValue = new BigInteger(radix == 10 ? number : number.substring(2), radix);
+            Object numberValue = bigValue.bitLength() < 64 ? (Object) bigValue.longValue() : bigValue;
             return new Toml.Literal(
                     randomId(),
                     prefix,

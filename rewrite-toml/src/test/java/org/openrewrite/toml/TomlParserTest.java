@@ -22,6 +22,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
+import java.math.BigInteger;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -607,6 +608,27 @@ class TomlParserTest implements RewriteTest {
               coverageThreshold = {}
               headers = {  }
               """
+          )
+        );
+    }
+
+    @Test
+    void integerBeyondSixtyFourBits() {
+        rewriteRun(
+          toml(
+            """
+              hex = 0x3D8660C0CB2D57B189C3D7995572A552F75E48B5
+              dec = 228097355113300204138531148905234651262148041026195375645000724271212049151994375092458297304264351187709081232384
+              max = 9223372036854775807
+              min = -9223372036854775808
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                new BigInteger("3D8660C0CB2D57B189C3D7995572A552F75E48B5", 16),
+                new BigInteger("228097355113300204138531148905234651262148041026195375645000724271212049151994375092458297304264351187709081232384"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE))
           )
         );
     }
