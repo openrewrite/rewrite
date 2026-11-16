@@ -4096,10 +4096,6 @@ public class GroovyParserVisitor {
             return (T) arrayType(classNode);
         }
         Space prefix = whitespace();
-        String simple = classNode == null ? null : classNode.getNameWithoutPackage();
-        if (simple != null) {
-            simple = simple.substring(Math.max(simple.lastIndexOf('$'), simple.lastIndexOf('.')) + 1);
-        }
         List<JRightPadded<J.Identifier>> parts = new ArrayList<>();
         Space beforeName = EMPTY;
         while (true) {
@@ -4111,8 +4107,7 @@ public class GroovyParserVisitor {
             J.Identifier identifier = new J.Identifier(randomId(), beforeName, Markers.EMPTY, emptyList(), segment, null, null);
             int afterName = cursor;
             Space beforeDot = whitespace();
-            boolean hasDot = cursor < source.length() && source.charAt(cursor) == '.' && !source.startsWith("..", cursor) &&
-                             (cursor == afterName || simple != null && !segment.equals(simple));
+            boolean hasDot = cursor < source.length() && source.charAt(cursor) == '.' && !source.startsWith("..", cursor);
             int nextName = hasDot ? indexOfNextNonWhitespace(cursor + 1, source) : source.length();
             if (nextName >= source.length() || !(Character.isJavaIdentifierStart(source.charAt(nextName)) || source.charAt(nextName) == '*')) {
                 cursor = afterName;

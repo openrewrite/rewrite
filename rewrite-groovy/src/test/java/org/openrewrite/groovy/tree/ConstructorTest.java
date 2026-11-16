@@ -290,4 +290,26 @@ class ConstructorTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "foo.String.String",
+      "foo.String . String",
+      "foo . String . String",
+      "foo.String /* comment */ . String",
+      "foo.String. /* comment */ String",
+      "foo.String.\n String"
+    })
+    void repeatedSegmentInQualifiedConstructorName(String typeName) {
+        rewriteRun(
+          groovy(
+            """
+              package foo.String
+              class String {}
+              def m() { foo(new %s()) }
+              """.formatted(typeName)
+          )
+        );
+    }
 }
