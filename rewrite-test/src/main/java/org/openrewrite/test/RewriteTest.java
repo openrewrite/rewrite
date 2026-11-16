@@ -196,6 +196,7 @@ public interface RewriteTest extends SourceSpecs {
         Recipe recipe = testMethodSpec.recipe == null ?
                 testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
                 testMethodSpec.recipe;
+        RedundantRecipe.assertNotRepeated(testMethodSpec.recipe, testClassSpec.recipe);
 
         boolean serializable = !(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
                                !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop()));

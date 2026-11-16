@@ -3282,6 +3282,70 @@ class RewriteTestTest implements RewriteTest {
               ));
         }
     }
+
+    @Nested
+    class RedundantRecipe implements RewriteTest {
+
+        private static final String YAML = """
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.test.internal.ChangeFirstValueToDeclared
+          displayName: Change the first value to declared
+          description: Sets the value of the first entry of each YAML document.
+          recipeList:
+            - org.openrewrite.test.internal.ChangeFirstValue:
+                value: %s
+                checked: true
+          """;
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(new ChangeFirstValue("changed", true));
+        }
+
+        @Test
+        void rejectTheRecipeOfDefaults() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("changed", true)),
+              yaml("key: value", "key: changed")
+            )).hasMessageStartingWith("The test sets spec.recipe(..) to org.openrewrite.test.internal.ChangeFirstValue, " +
+                                      "which defaults(RecipeSpec) already sets.");
+        }
+
+        @Test
+        void acceptOtherOptions() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("other", true)),
+              yaml("key: value", "key: other")
+            );
+        }
+
+        @Nested
+        class Declarative implements RewriteTest {
+
+            @Override
+            public void defaults(RecipeSpec spec) {
+                spec.recipeFromYaml(YAML.formatted("declared"), "org.openrewrite.test.internal.ChangeFirstValueToDeclared");
+            }
+
+            @Test
+            void rejectTheSameDeclarativeRecipe() {
+                assertThatThrownBy(() -> rewriteRun(
+                  spec -> spec.recipeFromYaml(YAML.formatted("declared"),
+                    "org.openrewrite.test.internal.ChangeFirstValueToDeclared"),
+                  yaml("key: value", "key: declared")
+                )).hasMessageStartingWith("The test sets spec.recipe(..)");
+            }
+
+            @Test
+            void acceptADeclarativeRecipeOfTheSameNameWithOtherSteps() {
+                rewriteRun(
+                  spec -> spec.recipeFromYaml(YAML.formatted("other"),
+                    "org.openrewrite.test.internal.ChangeFirstValueToDeclared"),
+                  yaml("key: value", "key: other")
+                );
+            }
+        }
+    }
 }
 
 @Value
