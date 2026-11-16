@@ -763,7 +763,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
     def _closing(self, space: Space, last: J, column: int) -> Space:
         """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
         ``column``. A comment line takes the column of ``last`` when ``last`` starts a line, and otherwise moves as
-        far as the bracket does."""
+        far as the bracket does, but no further left than the bracket."""
         if not space.comments:
             return self._indent_to(space, column)
         final = len(space.comments) - 1
@@ -775,7 +775,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             if '\n' not in whitespace:
                 return whitespace
             current = self._get_length_of_whitespace(whitespace)
-            return self._indent(whitespace, (current + shift if to_column is None else to_column) - current)
+            return self._indent(whitespace, (max(current + shift, column) if to_column is None else to_column) - current)
 
         return space.replace(
             whitespace=line(space.whitespace, element_column),

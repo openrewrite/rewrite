@@ -792,6 +792,30 @@ def test_comment_after_trailing_comma_stays_inside_the_brackets():
     )
 
 
+def test_comment_after_trailing_comma_moves_no_further_left_than_its_bracket():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+                    g(1, 2,
+
+              # d
+                    )
+            """,
+            """
+            def create():
+                g(1, 2,
+
+                # d
+                )
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
 def test_basic_dictionary():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
     rewrite_run(
