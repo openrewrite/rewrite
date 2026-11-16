@@ -1143,6 +1143,25 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('should merge only into an import of the module that carries no attributes', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'b', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {c} from 'm';
+                    `,
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {b, c} from 'm';
+                    `
+                )
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {

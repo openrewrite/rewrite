@@ -3194,6 +3194,15 @@ func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Contain
 func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
 	prefix, target := hoistLeftPrefix(target)
+	if ctx.isGenericInstantiation(expr.X) {
+		return &golang.IndexList{
+			ID:      uuid.New(),
+			Prefix:  prefix,
+			Target:  target,
+			Indices: *ctx.mapTypeArgsSingle(expr),
+			Type:    ctx.valueTypeOf(expr),
+		}
+	}
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 	index := ctx.mapExpr(expr.Index)
@@ -3253,31 +3262,11 @@ func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
 func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
 	prefix, target := hoistLeftPrefix(target)
-	lbrackPrefix := ctx.prefix(expr.Lbrack)
-	ctx.skip(1) // "["
-
-	var elements []java.RightPadded[java.Expression]
-	for i, idx := range expr.Indices {
-		mapped := ctx.mapExpr(idx)
-		var after java.Space
-		if i < len(expr.Indices)-1 {
-			commaOffset := ctx.findNext(',')
-			if commaOffset >= 0 {
-				after = ctx.prefix(ctx.file.Pos(commaOffset))
-				ctx.skip(1) // ","
-			}
-		} else {
-			after = ctx.prefix(expr.Rbrack)
-		}
-		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
-	}
-	ctx.skip(1) // "]"
-
 	return &golang.IndexList{
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Target:  target,
-		Indices: java.Container[java.Expression]{Before: lbrackPrefix, Elements: elements},
+		Indices: *ctx.mapTypeArgsMulti(expr),
 		Type:    ctx.valueTypeOf(expr),
 	}
 }
