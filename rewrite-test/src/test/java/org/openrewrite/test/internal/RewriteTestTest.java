@@ -3328,6 +3328,14 @@ class RewriteTestTest implements RewriteTest {
             }
 
             @Test
+            void rejectARecipeWithTheSameState() {
+                assertThatThrownBy(() -> rewriteRun(
+                  spec -> spec.recipe(new AppendToFirstValue("?")),
+                  yaml("key: value", "key: value?")
+                )).hasMessageStartingWith("The test sets spec.recipe(..)");
+            }
+
+            @Test
             void acceptARecipeOfTheSameNameWithOtherState() {
                 rewriteRun(
                   spec -> spec.recipe(new AppendToFirstValue("!")),

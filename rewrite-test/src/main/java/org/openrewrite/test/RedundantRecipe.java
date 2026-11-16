@@ -21,7 +21,10 @@ import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.RecipeDescriptor;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.fail;
 
@@ -65,7 +68,7 @@ final class RedundantRecipe {
             }
             return true;
         }
-        return overridesEquals(a.getClass()) && a.equals(b);
+        return overridesEquals(a.getClass()) ? a.equals(b) : sameFields(a, b);
     }
 
     /**
@@ -75,6 +78,25 @@ final class RedundantRecipe {
         try {
             return recipeClass.getMethod("equals", Object.class).getDeclaringClass() != Recipe.class;
         } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    private static boolean sameFields(Recipe a, Recipe b) {
+        try {
+            for (Class<?> c = a.getClass(); c != Recipe.class && c != null; c = c.getSuperclass()) {
+                for (Field field : c.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
+                        continue;
+                    }
+                    field.setAccessible(true);
+                    if (!Objects.equals(field.get(a), field.get(b))) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException e) {
             return false;
         }
     }
