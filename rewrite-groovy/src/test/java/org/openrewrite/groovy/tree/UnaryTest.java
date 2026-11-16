@@ -56,6 +56,20 @@ class UnaryTest implements RewriteTest {
     }
 
     @Test
+    void complement() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              --i
+              ~i
+              int j = ~ (i)
+              """
+          )
+        );
+    }
+
+    @Test
     void prefix() {
         rewriteRun(
           groovy(

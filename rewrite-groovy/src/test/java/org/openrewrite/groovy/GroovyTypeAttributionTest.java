@@ -25,10 +25,13 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -314,6 +317,166 @@ class GroovyTypeAttributionTest implements RewriteTest {
                           .isEqualTo("org.codehaus.groovy.runtime.DefaultGroovyMethods");
                     }
                     return super.visitMethodInvocation(method, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void parameterReferenceSharesTheParameterVariableType() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  int m(String s) {
+                      s.length()
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.Variable[] declared = new JavaType.Variable[1];
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        declared[0] = variable.getVariableType();
+                        assertThat(variable.getName().getFieldType()).isSameAs(declared[0]);
+                        return variable;
+                    }
+
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        if ("s".equals(identifier.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation) {
+                            assertThat(identifier.getFieldType()).isSameAs(declared[0]);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, 0);
+                assertThat(TypeUtils.isOfClassType(declared[0].getType(), "java.lang.String")).isTrue();
+                assertThat(declared[0].getOwner()).isInstanceOf(JavaType.Method.class);
+                assertThat(((JavaType.Method) declared[0].getOwner()).getName()).isEqualTo("m");
+            })
+          )
+        );
+    }
+
+    @Test
+    void sameNamedLocalsInDifferentMethodsAreDistinctVariables() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  void a() {
+                      def x = 1
+                      x
+                  }
+                  void b() {
+                      String x = ""
+                      x
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> references = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        if ("x".equals(identifier.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof G.ExpressionStatement) {
+                            references.add(identifier.getFieldType());
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, 0);
+                assertThat(references).hasSize(2);
+                assertThat(references.get(0).getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(TypeUtils.isOfClassType(references.get(1).getType(), "java.lang.String")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void everyKindOfLocalDeclarationHasAVariableType() {
+        rewriteRun(
+          groovy(
+            """
+              for (String s in ["a"]) {
+              }
+              try {
+              } catch (IOException e) {
+              }
+              ["a"].each { v -> v }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(variable.getVariableType()).as(variable.getSimpleName()).isNotNull();
+                    assertThat(variable.getVariableType().getType()).as(variable.getSimpleName()).isNotInstanceOf(JavaType.Unknown.class);
+                    return variable;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void propertyAndAttributeAccessHaveTheFieldType() {
+        rewriteRun(
+          groovy(
+            """
+              class Foo {
+                  String name
+              }
+              def f = new Foo()
+              f.name.length()
+              f.@name.length()
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(fieldAccess.getType(), "java.lang.String")).isTrue();
+                    assertThat(TypeUtils.isOfClassType(fieldAccess.getName().getType(), "java.lang.String")).isTrue();
+                    assertThat(fieldAccess.getName().getFieldType().getName()).isEqualTo("name");
+                    assertThat(TypeUtils.isOfClassType(fieldAccess.getName().getFieldType().getOwner(), "Foo")).isTrue();
+                    return fieldAccess;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void importedClassIsTyped() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.FieldAccess qualid = cu.getImports().getFirst().getQualid();
+                assertThat(TypeUtils.isOfClassType(qualid.getType(), "java.util.concurrent.ConcurrentHashMap")).isTrue();
+                assertThat(TypeUtils.isOfClassType(qualid.getName().getType(), "java.util.concurrent.ConcurrentHashMap")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void unaryOperatorsHaveTheirResultType() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              i++
+              --i
+              ~i
+              -i
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.Unary visitUnary(J.Unary unary, Integer p) {
+                    assertThat(unary.getType()).as(unary.getOperator().toString()).isEqualTo(JavaType.Primitive.Int);
+                    return unary;
                 }
             }.visit(cu, 0))
           )

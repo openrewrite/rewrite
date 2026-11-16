@@ -282,6 +282,25 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         });
     }
 
+    /**
+     * A local variable or parameter, owned by the method that declares it.
+     */
+    public JavaType.@Nullable Variable variableType(String name, ClassNode type, @Nullable MethodNode owner, int position) {
+        JavaType variableType = type(type);
+        if (variableType == null) {
+            return null;
+        }
+
+        String signature = signatureBuilder.variableSignature(owner, name, type, position);
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, 0, name, null, null, null);
+            variable.unsafeSet(owner == null ? JavaType.Unknown.getInstance() : methodType(owner), variableType,
+                    (List<JavaType.FullyQualified>) null);
+            return variable;
+        });
+    }
+
     private @Nullable List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
         List<JavaType.FullyQualified> annotations = null;
         for (AnnotationNode a : node.getAnnotations()) {
