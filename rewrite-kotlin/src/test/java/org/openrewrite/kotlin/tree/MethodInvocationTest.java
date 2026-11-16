@@ -692,31 +692,46 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    void indexedAssignmentIsTypedAsItsSetCall() {
+    void indexedAssignmentIsTypedLikeTheDirectCall() {
         rewriteRun(
           kotlin(
             """
-              fun f(sb: StringBuilder, m: MutableMap<String, Int>, l: java.util.ArrayList<String>) {
+              package lib
+              class Box
+              operator fun Box.get(i: Int): Int = i
+              operator fun Box.set(i: Int, v: Int) {}
+              """
+          ),
+          kotlin(
+            """
+              import lib.Box
+              import lib.get
+              import lib.set
+
+              fun f(sb: StringBuilder, m: MutableMap<String, Int>, l: java.util.ArrayList<String>, b: Box) {
                   sb[0] = 'c'
+                  sb.set(0, 'c')
                   m["a"] = 1
+                  m.set("a", 1)
                   l[0] = "x"
+                  l.set(0, "x")
+                  b[0] += 1
+                  b.get(0)
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                List<String> setters = new ArrayList<>();
+                List<JavaType.Method> types = new ArrayList<>();
                 new KotlinIsoVisitor<Integer>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                        JavaType.Method type = method.getMethodType();
-                        setters.add(type.getDeclaringType().getFullyQualifiedName() + "." + type.getName() + type.getParameterTypes());
+                        types.add(method.getMethodType());
                         return method;
                     }
                 }.visit(cu, 0);
-                assertThat(setters).containsExactly(
-                  "kotlin.text.StringsKt.set[java.lang.StringBuilder, int, char]",
-                  "kotlin.collections.MapsKt.set[kotlin.collections.MutableMap<Generic{K}, Generic{V}>, kotlin.String, int]",
-                  "java.util.ArrayList.set[int, java.lang.String]"
-                );
+                assertThat(types).hasSize(8);
+                for (int i = 0; i < types.size(); i += 2) {
+                    assertThat(types.get(i)).isNotNull().isSameAs(types.get(i + 1));
+                }
             })
           )
         );
