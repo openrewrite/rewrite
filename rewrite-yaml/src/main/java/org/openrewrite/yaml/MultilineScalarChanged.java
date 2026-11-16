@@ -23,8 +23,8 @@ import java.util.UUID;
 
 /// Tells `IndentsVisitor` how to indent a multiline scalar that was merged into a document.
 ///
-/// @deprecated `MergeYamlVisitor` no longer leaves this marker on the tree. `IndentsVisitor` still honours it
-/// for code that adds it, but it will be removed in a future release.
+/// @deprecated Neither `MergeYamlVisitor` nor `IndentsVisitor` uses this marker anymore. It will be removed in a
+/// future release.
 @Deprecated
 @Value
 @With

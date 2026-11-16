@@ -20,7 +20,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.ToBeRemoved;
-import org.openrewrite.yaml.MultilineScalarChanged;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.internal.MultilineScalarIndents;
 import org.openrewrite.yaml.style.IndentsStyle;
@@ -130,7 +129,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private Yaml.Scalar indentMultilineScalar(Yaml.Scalar scalar, int indent) {
-        MultilineScalarIndents.Indent multilineIndent = multilineIndent(scalar);
+        MultilineScalarIndents.Indent multilineIndent = MultilineScalarIndents.find(getCursor(), scalar);
         if (multilineIndent == null) {
             return scalar;
         }
@@ -146,17 +145,6 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
                         .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
 
         return scalar.withValue(newValue);
-    }
-
-    @SuppressWarnings("deprecation")
-    private MultilineScalarIndents.@Nullable Indent multilineIndent(Yaml.Scalar scalar) {
-        MultilineScalarIndents.Indent indent = MultilineScalarIndents.find(getCursor(), scalar);
-        if (indent != null) {
-            return indent;
-        }
-        return scalar.getMarkers().findFirst(MultilineScalarChanged.class)
-                .map(marker -> new MultilineScalarIndents.Indent(marker.isAdded(), marker.getIndent()))
-                .orElse(null);
     }
 
     private boolean isUnindentedTopLevel() {
