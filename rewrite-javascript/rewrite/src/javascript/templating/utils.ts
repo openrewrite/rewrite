@@ -19,6 +19,7 @@ import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {ConstraintFunction, VariadicOptions} from './types';
+import ts from 'typescript';
 
 /**
  * Internal storage value type for pattern match captures.
@@ -48,7 +49,9 @@ export const TEMPLATE_MODULE = 'template';
 
 /** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
 export function wrapCode(code: string, expression: boolean): string {
-    return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;
+    // A line comment ending the code would otherwise run on over the closing of the wrapper
+    const end = /\/\/[^\n]*$/.test(code) ? '\n' : ' ';
+    return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code}${end})` : code}${end}}`;
 }
 
 /**
@@ -190,18 +193,63 @@ export function retainIds<T extends J>(tree: T, retainable: ReadonlySet<string>)
 /**
  * Strips the indentation a template carries from the recipe source it was written in. Its first
  * line starts at the opening backtick, so the common indent is the one shared by the lines below.
+ * A line that starts inside a template literal is the literal's text, which keeps its indentation.
  */
 export function dedentTemplate(code: string): string {
     const lines = code.split("\n");
+    const literal = linesStartingInTemplateLiterals(code);
     let indent = Infinity;
-    for (const line of lines.slice(1)) {
-        if (line.trim().length > 0) {
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!literal.has(i) && line.trim().length > 0) {
             indent = Math.min(indent, line.length - line.trimStart().length);
         }
     }
     return indent === Infinity || indent === 0 ?
         code :
-        [lines[0], ...lines.slice(1).map(line => line.slice(indent))].join("\n");
+        lines.map((line, i) => i === 0 || literal.has(i) ? line : line.slice(indent)).join("\n");
+}
+
+/** The indexes of the lines of `code` that begin within the text of a template literal. */
+function linesStartingInTemplateLiterals(code: string): Set<number> {
+    const spans: [number, number][] = [];
+    const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, code);
+    // The brace depth within each `${` of the template literals the scanner is inside of
+    const depths: number[] = [];
+    for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+        if (token === ts.SyntaxKind.CloseBraceToken && depths.length > 0 && depths[depths.length - 1] === 0) {
+            token = scanner.reScanTemplateToken(false);
+            depths.pop();
+        }
+        switch (token) {
+            case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+            case ts.SyntaxKind.TemplateTail:
+                spans.push([scanner.getTokenStart(), scanner.getTokenEnd()]);
+                break;
+            case ts.SyntaxKind.TemplateHead:
+            case ts.SyntaxKind.TemplateMiddle:
+                spans.push([scanner.getTokenStart(), scanner.getTokenEnd()]);
+                depths.push(0);
+                break;
+            case ts.SyntaxKind.OpenBraceToken:
+                depths.length > 0 && depths[depths.length - 1]++;
+                break;
+            case ts.SyntaxKind.CloseBraceToken:
+                depths.length > 0 && depths[depths.length - 1]--;
+                break;
+        }
+    }
+    const lines = new Set<number>();
+    let line = 0;
+    for (let offset = 0; offset < code.length; offset++) {
+        if (code[offset] === "\n") {
+            line++;
+            if (spans.some(([start, end]) => start < offset + 1 && offset + 1 < end)) {
+                lines.add(line);
+            }
+        }
+    }
+    return lines;
 }
 
 /**

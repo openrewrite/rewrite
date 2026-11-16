@@ -109,6 +109,20 @@ interface CaptureAt {
     target: J;
 }
 
+/**
+ * The markers of a node that are syntax changing what the code does: `?.`, a non-null `!`, `function*` and
+ * `yield*`. A pattern without one does not match code with it, since a template writing the pattern's code
+ * out would drop it.
+ */
+function meaningfulMarkers(tree: J | undefined): string {
+    return (tree?.markers?.markers ?? [])
+        .map(marker => marker.kind)
+        .filter(kind => kind === JS.Markers.Optional || kind === JS.Markers.NonNullAssertion ||
+            kind === JS.Markers.Generator || kind === JS.Markers.DelegatedYield)
+        .sort()
+        .join(',');
+}
+
 /** Parentheses that `JavaScriptSemanticComparatorVisitor.unwrap()` sees through. */
 function isParenthesized(j: any): boolean {
     return j?.kind === J.Kind.Parentheses || j?.kind === J.Kind.ControlParentheses;
@@ -226,8 +240,20 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             return j as R;
         }
 
+        // The root's own trailing `?.` or `!` belongs to the slot it is matched in, which a replacement keeps
+        if (j !== this.root && meaningfulMarkers(j as J) !== meaningfulMarkers(p)) {
+            return this.structuralMismatch('markers') as R;
+        }
+
         // Continue with parent's visit which will push targetCursor and traverse
         return await super.visit(j, p, parent);
+    }
+
+    private root?: Tree;
+
+    override async compare(tree1: J, tree2: J, parentCursor1?: Cursor, parentCursor2?: Cursor): Promise<boolean> {
+        this.root = tree1;
+        return super.compare(tree1, tree2, parentCursor1, parentCursor2);
     }
 
     /**

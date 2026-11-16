@@ -14,16 +14,90 @@
  * limitations under the License.
  */
 import {Cursor, isTree, Marker, Markers} from '../..';
-import {Expression, J} from '../../java';
+import {emptySpace, Expression, J, TextComment, Type} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
 import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
-import {enclosingTree, maybeParenthesize} from './precedence';
+import {
+    enclosingTree,
+    hasOptionalChain,
+    isFunctionOrClassExpression,
+    isTrailingMarker,
+    maybeParenthesize,
+    parenthesize,
+    parenthesizeInForInit,
+    precedenceOf,
+    Precedence
+} from './precedence';
 import {Parameter} from './types';
 import {isExpression} from '../parser-utils';
 import {randomId} from '../../uuid';
+import {emptyMarkers} from '../../markers';
+
+/** The literal a parser makes of a number, boolean, bigint or `null` written out, where it makes a literal of it. */
+function primitiveLiteral(value: unknown): J.Literal | undefined {
+    let type: Type.Primitive;
+    if (typeof value === 'number' && Number.isFinite(value) && !Object.is(value, -0) && value >= 0) {
+        type = Type.Primitive.Double;
+    } else if (typeof value === 'bigint' && value >= BigInt(0)) {
+        type = Type.Primitive.BigInt;
+    } else if (typeof value === 'boolean') {
+        type = Type.Primitive.Boolean;
+    } else if (value === null) {
+        type = Type.Primitive.Null;
+    } else {
+        return undefined;
+    }
+    return {
+        kind: J.Kind.Literal,
+        id: randomId(),
+        prefix: emptySpace,
+        markers: emptyMarkers,
+        value,
+        valueSource: typeof value === 'bigint' ? `${value}n` : String(value),
+        type
+    } as J.Literal;
+}
+
+/** Whether `childId` is the name of a shorthand property, which is its key and its value at once. */
+function isShorthandName(parent: J | undefined, childId: string): boolean {
+    return parent?.kind === JS.Kind.PropertyAssignment && (parent as JS.PropertyAssignment).initializer === undefined &&
+        (parent as JS.PropertyAssignment).name.element.id === childId;
+}
+
+/**
+ * `value` in parentheses opening on the line of the keyword before it, where that keyword ends its statement
+ * at a line break and `value` would start past one, as a capture written after a line comment does:
+ * `return // why` followed by `a` on the next line returns nothing.
+ */
+function onKeywordLine(parent: J | undefined, childId: string, value: J): J {
+    const operand = parent?.kind === J.Kind.Return ? (parent as J.Return).expression :
+        parent?.kind === J.Kind.Throw ? (parent as J.Throw).exception :
+            parent?.kind === J.Kind.Yield ? (parent as J.Yield).value : undefined;
+    if (operand?.id !== childId || !breaksLine(value.prefix)) {
+        return value;
+    }
+    const before = value.prefix.whitespace.includes('\n') ? ' ' : value.prefix.whitespace;
+    return {
+        kind: J.Kind.Parentheses,
+        id: randomId(),
+        prefix: {kind: J.Kind.Space, whitespace: before, comments: []},
+        markers: emptyMarkers,
+        tree: {
+            kind: J.Kind.RightPadded,
+            element: {...value, prefix: {...value.prefix, whitespace: before === value.prefix.whitespace ? '' : value.prefix.whitespace}},
+            after: emptySpace,
+            markers: emptyMarkers
+        }
+    } as J.Parentheses<J>;
+}
+
+function breaksLine(space: J.Space): boolean {
+    return space.whitespace.includes('\n') || space.comments.some(comment => comment.suffix.includes('\n') ||
+        (comment.kind === J.Kind.TextComment && (!(comment as TextComment).multiline || (comment as TextComment).text.includes('\n'))));
+}
 
 /**
  * Marks a value the template substituted, whose layout is the source's rather than the template's.
@@ -83,7 +157,14 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             const replacement = this.replacePlaceholder(tree);
             if (replacement !== tree) {
                 // `this.cursor` is still the enclosing template node: `super.visit()` has not pushed this one
-                return maybeParenthesize(enclosingTree(parent ?? this.cursor), tree.id, replacement, tree.markers) as R;
+                const enclosing = enclosingTree(parent ?? this.cursor);
+                if (isShorthandName(enclosing, tree.id) && replacement.kind !== J.Kind.Identifier) {
+                    throw new Error(`Template writes a shorthand property, {${'${'}…}}, whose value would be ` +
+                        `${replacement.kind.substring(replacement.kind.lastIndexOf('.') + 1)} rather than an identifier. ` +
+                        `Write the property out with its key, as in {key: ${'${'}…}}.`);
+                }
+                return onKeywordLine(enclosing, tree.id, parenthesizeInForInit(parent ?? this.cursor, tree.id,
+                    maybeParenthesize(enclosing, tree.id, replacement, tree.markers))) as R;
             }
         }
 
@@ -109,6 +190,49 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
 
         return bindingElement;
+    }
+
+    /**
+     * A callee substituted for the name of `${f}(...)` is the call the parser makes of it: a member access
+     * `a.b` gives `a.b(...)`, an identifier keeps the name, and anything else is called as a `JS.FunctionCall`.
+     */
+    override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+        const visited = await super.visitMethodInvocation(method, p);
+        if (visited?.kind !== J.Kind.MethodInvocation) {
+            return visited;
+        }
+        const invocation = visited as J.MethodInvocation;
+        const callee = invocation.name as J;
+        if (invocation.select || (callee.kind === J.Kind.Identifier && !callee.markers.markers.some(isTrailingMarker))) {
+            return invocation;
+        }
+        if (callee.kind === J.Kind.FieldAccess && !hasOptionalChain(callee) &&
+            !callee.markers.markers.some(isTrailingMarker)) {
+            const fieldAccess = callee as J.FieldAccess;
+            return {
+                ...invocation,
+                select: {
+                    kind: J.Kind.RightPadded,
+                    element: {...fieldAccess.target, prefix: this.concatPrefix(fieldAccess.prefix, fieldAccess.target.prefix)},
+                    after: fieldAccess.name.before,
+                    markers: emptyMarkers
+                },
+                name: {...fieldAccess.name.element, type: invocation.name.type}
+            } as J.MethodInvocation;
+        }
+        const calledAsIs = precedenceOf(callee) >= Precedence.Call && !hasOptionalChain(callee) &&
+            !isFunctionOrClassExpression(callee) && !callee.markers.markers.some(isTrailingMarker);
+        const fn = calledAsIs ? callee : parenthesize(callee);
+        return {
+            kind: JS.Kind.FunctionCall,
+            id: invocation.id,
+            prefix: invocation.prefix,
+            markers: invocation.markers,
+            function: {kind: J.Kind.RightPadded, element: fn as Expression, after: emptySpace, markers: emptyMarkers},
+            typeParameters: invocation.typeParameters,
+            arguments: invocation.arguments,
+            methodType: invocation.methodType
+        } as JS.FunctionCall;
     }
 
     /** A statement substituted into an expression statement's placeholder is the statement itself. */
@@ -538,6 +662,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 }
                 // If it's a primitive value and placeholder is an identifier, update the simpleName
                 if (typeof propertyValue === 'string' && placeholder.kind === J.Kind.Identifier) {
+                    if (!/^#?[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u.test(propertyValue)) {
+                        throw new Error(`Template parameter resolved to the string ${JSON.stringify(propertyValue)}, ` +
+                            `which is not an identifier, so it cannot be spliced in as one. Substitute the node holding it instead.`);
+                    }
                     return produce(placeholder as J.Identifier, draft => {
                         draft.simpleName = propertyValue;
                     });
@@ -546,8 +674,12 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 if (typeof propertyValue === 'string' && placeholder.kind === J.Kind.Literal) {
                     return produce(placeholder as J.Literal, draft => {
                         draft.value = propertyValue;
-                        draft.valueSource = `"${propertyValue}"`;
+                        draft.valueSource = JSON.stringify(propertyValue);
                     });
+                }
+                const literal = primitiveLiteral(propertyValue);
+                if (literal) {
+                    return {...literal, prefix: placeholder.prefix, markers: placeholder.markers};
                 }
             }
 

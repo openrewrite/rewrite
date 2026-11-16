@@ -19,8 +19,6 @@ import {emptyMarkers, Marker, markers, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {JS} from '..';
 
-// Known gap: a bare `in` in a C-style for-head needs parentheses this cannot see ([In] grammar parameter)
-
 /** JavaScript operator precedence, as ordered by the ECMAScript grammar; a higher number binds tighter. */
 export const Precedence = {
     /** `a, b` */
@@ -513,7 +511,7 @@ function isOptional(expression: J): boolean {
 }
 
 /** Whether any link of the member chain is optional (`?.`). */
-function hasOptionalChain(expression: J): boolean {
+export function hasOptionalChain(expression: J): boolean {
     if (isOptional(expression)) {
         return true;
     }
@@ -711,4 +709,79 @@ function signOf(operator: J.Unary.Type): Sign | undefined {
         default:
             return undefined;
     }
+}
+
+/**
+ * `expression` in parentheses where it holds an `in` the initializer of a C-style `for` would read as
+ * a for-in loop, which is where `cursor`, pointing at the tree that holds the slot of `childId`, leads
+ * up to one through nothing that brackets it.
+ */
+export function parenthesizeInForInit(cursor: { value: any, parent?: any } | undefined, childId: string,
+                                      expression: J): J {
+    return hasBareIn(expression) && inForInit(cursor, childId) ? parenthesize(expression) : expression;
+}
+
+/** Whether an `in` operator appears outside any brackets of the expression. */
+function hasBareIn(expression: J | undefined): boolean {
+    switch (expression?.kind) {
+        case JS.Kind.Binary: {
+            const binary = expression as JS.Binary;
+            return binary.operator.element === JS.Binary.Type.In || hasBareIn(binary.left) || hasBareIn(binary.right);
+        }
+        case J.Kind.Binary:
+            return hasBareIn((expression as J.Binary).left) || hasBareIn((expression as J.Binary).right);
+        case J.Kind.Ternary: {
+            const ternary = expression as J.Ternary;
+            return hasBareIn(ternary.condition) || hasBareIn(ternary.truePart.element) || hasBareIn(ternary.falsePart.element);
+        }
+        case J.Kind.Assignment:
+            return hasBareIn((expression as J.Assignment).assignment.element);
+        case J.Kind.AssignmentOperation:
+            return hasBareIn((expression as J.AssignmentOperation).assignment);
+        case JS.Kind.AssignmentOperation:
+            return hasBareIn((expression as JS.AssignmentOperation).assignment);
+        case J.Kind.Unary:
+            return hasBareIn((expression as J.Unary).expression);
+        case JS.Kind.Await:
+        case JS.Kind.TypeOf:
+        case JS.Kind.Void:
+        case JS.Kind.Delete:
+            return hasBareIn((expression as JS.Await).expression);
+        case JS.Kind.As:
+            return hasBareIn((expression as JS.As).left.element);
+        case J.Kind.Lambda: {
+            const body = (expression as J.Lambda).body;
+            return body.kind !== J.Kind.Block && hasBareIn(body);
+        }
+        case JS.Kind.ArrowFunction:
+            return hasBareIn((expression as JS.ArrowFunction).lambda);
+        default:
+            return false;
+    }
+}
+
+/** The trees an `in` passes through on its way up to a `for` initializer without being bracketed. */
+const forInitTransparent = new Set<string>([
+    J.Kind.Binary, JS.Kind.Binary, J.Kind.Ternary, J.Kind.Assignment, J.Kind.AssignmentOperation,
+    JS.Kind.AssignmentOperation, J.Kind.Unary, JS.Kind.Await, JS.Kind.TypeOf, JS.Kind.Void, JS.Kind.Delete,
+    JS.Kind.As, J.Kind.Lambda, JS.Kind.ArrowFunction, J.Kind.NamedVariable, J.Kind.VariableDeclarations,
+    JS.Kind.ScopedVariableDeclarations, JS.Kind.ExpressionStatement
+]);
+
+function inForInit(cursor: { value: any, parent?: any } | undefined, childId: string): boolean {
+    let child = childId;
+    for (let current = cursor; current; current = current.parent) {
+        const tree = current.value;
+        if (!isTree(tree)) {
+            continue;
+        }
+        if (tree.kind === J.Kind.ForLoopControl) {
+            return (tree as J.ForLoop.Control).init.some(init => init.element.id === child);
+        } else if (!forInitTransparent.has(tree.kind) ||
+            (tree.kind === J.Kind.Lambda && (tree as J.Lambda).body.kind === J.Kind.Block)) {
+            return false;
+        }
+        child = (tree as J).id;
+    }
+    return false;
 }

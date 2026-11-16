@@ -22,6 +22,7 @@ import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
 import {Computed, DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional} from "./markers";
+import {leftmostExpression} from "./templating/precedence";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -30,7 +31,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(cu, p);
 
-        await this.visitRightPaddedLocal(cu.statements, "", p);
+        await this.visitStatements(cu.statements, p);
 
         await this.visitSpace(cu.eof, p);
         await this.afterSyntax(cu, p);
@@ -390,6 +391,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append("if");
         await this.visit(iff.ifCondition, p);
         await this.visitStatementLocal(iff.thenPart, p);
+        if (iff.elsePart && unterminatedBefore(iff.thenPart, iff.elsePart.prefix)) {
+            p.append(";");
+        }
         iff.elsePart && await this.visit(iff.elsePart, p);
         await this.afterSyntax(iff, p);
         return iff;
@@ -410,6 +414,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         p.append("do");
         const body = p.mark();
         await this.visitStatementLocal(doWhileLoop.body, p);
+        if (unterminatedBefore(doWhileLoop.body, doWhileLoop.whileCondition.before)) {
+            p.append(";");
+        }
         this.separateFromKeyword(body, p);
         await this.visitLeftPaddedLocal("while", doWhileLoop.whileCondition, p);
         await this.afterSyntax(doWhileLoop, p);
@@ -1026,7 +1033,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.beforeSyntax(withStatement, p);
         p.append("with");
         await this.visit(withStatement.expression, p);
-        await this.visitRightPadded(withStatement.body, p);
+        await this.visitStatementLocal(withStatement.body, p);
         await this.afterSyntax(withStatement, p);
         return withStatement;
     }
@@ -1757,7 +1764,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         this.separateFromKeyword(iterable, p);
         p.append(')');
         await this.afterSyntax(control, p);
-        await this.visitRightPadded(loop.loop.body, p);
+        await this.visitStatementLocal(loop.loop.body, p);
         await this.afterSyntax(loop.loop, p);
         await this.afterSyntax(loop, p);
         return loop;
@@ -1777,7 +1784,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         this.separateFromKeyword(iterable, p);
         p.append(')');
         await this.afterSyntax(control, p);
-        await this.visitRightPadded(loop.body, p);
+        await this.visitStatementLocal(loop.body, p);
         await this.afterSyntax(loop, p);
         return loop;
     }
@@ -1791,6 +1798,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         for (let i = 0; i < statements.length; i++) {
             const paddedStat = statements[i];
+            if (i > 0 && !objectLiteral && continuedBy(statements[i - 1], paddedStat.element)) {
+                p.append(";");
+            }
             await this.visitStatementLocal(paddedStat, p);
             if (i < statements.length - 1 && objectLiteral) {
                 p.append(",");
@@ -1802,7 +1812,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         if (paddedStat) {
             await this.visit(paddedStat.element, p);
             await this.visitSpace(paddedStat.after, p);
-            await this.visitMarkers(paddedStat.markers, p);
+            // A statement put where one ending in `;` stood would otherwise print an empty statement after it
+            await this.visitMarkers(endsTerminated(paddedStat.element) ?
+                {...paddedStat.markers, markers: paddedStat.markers.markers.filter(m => m.kind !== J.Markers.Semicolon)} :
+                paddedStat.markers, p);
         }
     }
 
@@ -2099,4 +2112,153 @@ const WORD_CHAR = /^[\p{ID_Continue}$\u200C\u200D\\]$/u;
 
 function isWordChar(char: string): boolean {
     return WORD_CHAR.test(char);
+}
+
+/**
+ * Whether the statement ends with a `}` or a `;` of its own, after which the parser never gives it a trailing `;`.
+ * One ending in the body of a statement that holds it ends as that body does.
+ */
+function endsTerminated(statement: J): boolean {
+    switch (statement.kind) {
+        case J.Kind.Block:
+        case J.Kind.Switch:
+        case J.Kind.Try:
+        case J.Kind.ClassDeclaration:
+            return true;
+        case J.Kind.MethodDeclaration:
+            return (statement as J.MethodDeclaration).body !== undefined;
+        case JS.Kind.NamespaceDeclaration:
+            return (statement as JS.NamespaceDeclaration).body !== undefined;
+        case J.Kind.If: {
+            const iff = statement as J.If;
+            return paddedTerminated(iff.elsePart ? iff.elsePart.body : iff.thenPart);
+        }
+        case J.Kind.WhileLoop:
+        case J.Kind.ForLoop:
+        case J.Kind.ForEachLoop:
+        case JS.Kind.ForInLoop:
+        case JS.Kind.WithStatement:
+            return paddedTerminated((statement as J.WhileLoop).body);
+        case JS.Kind.ForOfLoop:
+            return paddedTerminated((statement as JS.ForOfLoop).loop.body);
+        case J.Kind.Label:
+            return endsTerminated((statement as J.Label).statement);
+        default:
+            return false;
+    }
+}
+
+function paddedTerminated(paddedStat: J.RightPadded<Statement>): boolean {
+    return paddedStat.markers.markers.some(m => m.kind === J.Markers.Semicolon) || endsTerminated(paddedStat.element);
+}
+
+/**
+ * Whether `paddedStat` needs a `;` to end before the keyword following it after `next`, which it has
+ * where no line break lets the parser insert one. A replaced body can leave it without.
+ */
+function unterminatedBefore(paddedStat: J.RightPadded<Statement>, next: J.Space): boolean {
+    const breaks = (space: J.Space) => space.whitespace.includes("\n") ||
+        space.comments.some(c => c.suffix.includes("\n") || (c.kind === J.Kind.TextComment && (c as TextComment).text.includes("\n")));
+    // A nested `if` is left alone, since a `;` ending it would hand it the `else`
+    return !paddedTerminated(paddedStat) && paddedStat.element.kind !== J.Kind.Empty && paddedStat.element.kind !== J.Kind.If &&
+        !breaks(paddedStat.after) && !breaks(next);
+}
+
+/**
+ * Whether `next` would read as the continuation of the unterminated statement before it, as `(a)()`
+ * does after `const x = b` on the line above: a line break ends a statement only where the next
+ * token cannot go on with it. A statement put after one written without its `;` can start so.
+ */
+function continuedBy(previous: J.RightPadded<Statement>, next: Statement): boolean {
+    return !paddedTerminated(previous) && endsContinuably(previous.element) && startsContinuing(next);
+}
+
+/** Whether a `(`, `[` or template literal after the statement would carry on its last expression. */
+function endsContinuably(tree: J | undefined): boolean {
+    switch (tree?.kind) {
+        case J.Kind.Identifier:
+        case J.Kind.FieldAccess:
+        case J.Kind.ArrayAccess:
+        case J.Kind.MethodInvocation:
+        case J.Kind.NewClass:
+        case J.Kind.NewArray:
+        case J.Kind.Literal:
+        case J.Kind.Parentheses:
+        case JS.Kind.FunctionCall:
+        case JS.Kind.TemplateExpression:
+        case JS.Kind.TaggedTemplateExpression:
+            return true;
+        case JS.Kind.ExpressionStatement:
+            return endsContinuably((tree as JS.ExpressionStatement).expression);
+        case J.Kind.VariableDeclarations: {
+            const variables = (tree as J.VariableDeclarations).variables;
+            return endsContinuably(variables[variables.length - 1]?.element.initializer?.element);
+        }
+        case JS.Kind.ScopedVariableDeclarations: {
+            const variables = (tree as JS.ScopedVariableDeclarations).variables;
+            return endsContinuably(variables[variables.length - 1]?.element);
+        }
+        case J.Kind.Return:
+            return endsContinuably((tree as J.Return).expression);
+        case J.Kind.Throw:
+            return endsContinuably((tree as J.Throw).exception);
+        case J.Kind.Binary:
+            return endsContinuably((tree as J.Binary).right);
+        case JS.Kind.Binary:
+            return endsContinuably((tree as JS.Binary).right);
+        case J.Kind.Assignment:
+            return endsContinuably((tree as J.Assignment).assignment.element);
+        case J.Kind.AssignmentOperation:
+            return endsContinuably((tree as J.AssignmentOperation).assignment);
+        case JS.Kind.AssignmentOperation:
+            return endsContinuably((tree as JS.AssignmentOperation).assignment);
+        case J.Kind.Ternary:
+            return endsContinuably((tree as J.Ternary).falsePart.element);
+        case J.Kind.Unary: {
+            const unary = tree as J.Unary;
+            return !isPostfix(unary.operator.element) && endsContinuably(unary.expression);
+        }
+        case JS.Kind.Await:
+        case JS.Kind.TypeOf:
+        case JS.Kind.Void:
+        case JS.Kind.Delete:
+            return endsContinuably((tree as JS.Await).expression);
+        default:
+            return false;
+    }
+}
+
+function isPostfix(operator: J.Unary.Type): boolean {
+    return operator === J.Unary.Type.PostIncrement || operator === J.Unary.Type.PostDecrement;
+}
+
+/** Whether the statement starts with a `(`, `[`, `` ` ``, `/`, `+`, `-` or `<`, each of which can go on with an expression. */
+function startsContinuing(statement: Statement): boolean {
+    const first = leftmostExpression(statement);
+    switch (first.kind) {
+        case J.Kind.Parentheses:
+        case J.Kind.NewArray:
+        case J.Kind.TypeCast:
+        case JS.Kind.ArrayBindingPattern:
+        case JS.Kind.TemplateExpression:
+        case JS.Kind.JsxTag:
+            return true;
+        case J.Kind.Literal: {
+            const source = (first as J.Literal).valueSource;
+            return source !== undefined && (source.startsWith("`") || source.startsWith("/"));
+        }
+        case J.Kind.Unary: {
+            const operator = (first as J.Unary).operator.element;
+            return operator === J.Unary.Type.Positive || operator === J.Unary.Type.Negative;
+        }
+        case J.Kind.Lambda:
+            return (first as J.Lambda).parameters.parenthesized;
+        case JS.Kind.ArrowFunction: {
+            const arrow = first as JS.ArrowFunction;
+            return arrow.modifiers.length === 0 && arrow.leadingAnnotations.length === 0 &&
+                (arrow.typeParameters !== undefined || arrow.lambda.parameters.parenthesized);
+        }
+        default:
+            return false;
+    }
 }

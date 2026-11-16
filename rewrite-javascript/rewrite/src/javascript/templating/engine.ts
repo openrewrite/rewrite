@@ -20,18 +20,19 @@ import {create as produce} from 'mutative';
 import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, TEMPLATE_MODULE, treeIds, wrapCode} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
-import {isTrailingMarker, maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
+import {isTrailingMarker, maybeParenthesize, parenthesize, parenthesizeInForInit, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
 import {autoIndent, maybeAutoFormat} from '../format';
 import {getPrettierStyle} from '../format/prettier-format';
 import {renameBindings} from './bindings';
+import {renameCapturingDeclarations} from './hygiene';
 import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
 import ts from "typescript";
 import {DependencyWorkspace} from "../dependency-workspace";
 import {ModuleScopeBinding, moduleScopeBindings} from '../add-import';
 import {namesReferencedWithin} from '../scope';
-import {findMarker, MarkersKind, ParseExceptionResult} from '../../markers';
+import {emptyMarkers, findMarker, MarkersKind, ParseExceptionResult} from '../../markers';
 
 import {Parameter} from "./types";
 
@@ -202,6 +203,21 @@ export function clearTemplateCache(): void {
     templateCache.clear();
 }
 
+/** The words that can follow an expression on its line, which a placeholder followed by one may be. */
+const WORD_OPERATORS = ['in', 'instanceof', 'as', 'satisfies', 'of', 'is', 'extends', 'implements', 'from', 'keyof'];
+
+/**
+ * The code with a `;` after each placeholder that a word follows on its line, as in `{ ${s} other(); }`:
+ * a placeholder standing for a statement brings its own `;`, which the code as written leaves out.
+ */
+function separateStatementPlaceholders(code: string): string {
+    const placeholder = `(?:${PlaceholderUtils.PLACEHOLDER_PREFIX}\\d+__|${PlaceholderUtils.CAPTURE_PREFIX}\\w+?__)`;
+    return code.replace(new RegExp(`(${placeholder})(?=[ \\t]+(?!(?:${WORD_OPERATORS.join('|')})\\b)[A-Za-z_$])`, 'g'), '$1;');
+}
+
+/** Stands in for a `raw()` parameter while the template is dedented. */
+const RAW_PREFIX = '__RAW_';
+
 /** Whether a name reads as a TypeScript type reference: a dotted chain of identifiers. */
 function isTypeReference(name: string): boolean {
     return /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(name);
@@ -265,10 +281,17 @@ export class TemplateEngine {
         types: string[] | undefined
     ): Promise<JS.CompilationUnit> {
         const cu = await templateCache.getOrParse(templateString, captures, contextStatements, dependencies, types);
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse ${kind} code (${parseFailureReason(cu)}):\n${templateString}`);
+        if (cu.statements && cu.statements.length > 0) {
+            return cu;
         }
-        return cu;
+        const separated = separateStatementPlaceholders(templateString);
+        if (separated !== templateString) {
+            const retried = await templateCache.getOrParse(separated, captures, contextStatements, dependencies, types);
+            if (retried.statements && retried.statements.length > 0) {
+                return retried;
+            }
+        }
+        throw new Error(`Failed to parse ${kind} code (${parseFailureReason(cu)}):\n${templateString}`);
     }
 
     /**
@@ -369,7 +392,14 @@ export class TemplateEngine {
 
         // Unsubstitute placeholders with actual parameter values and match results
         const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap, patternPrefixes);
-        const unsubstitutedAst = (await visitor.visit(bound, null))!;
+        const unsubstitutedAst = await renameCapturingDeclarations((await visitor.visit(bound, null))!, cursor, coordinates.tree as J | undefined);
+        const unsubstituted = await remainingPlaceholder(unsubstitutedAst);
+        if (unsubstituted !== undefined) {
+            const index = Number(unsubstituted.slice(PlaceholderUtils.PLACEHOLDER_PREFIX.length, -2));
+            throw new Error(`Template parameter ${index} (${describeParameter(parameters[index])}) has no value ` +
+                `that fits where the template puts it, which would leave '${unsubstituted}' in the code. A capture needs ` +
+                `a value from the match or from 'values', and a variadic one a list to expand into.`);
+        }
 
         // An id may only be kept where the node answering to it is leaving the tree, which is the
         // subtree this application replaces. A parameter named twice, or spliced in from somewhere
@@ -467,15 +497,17 @@ export class TemplateEngine {
         parameters: Parameter[],
         expression: boolean
     ): string {
+        // Raw code is spliced in after the template is dedented, so that its lines keep the indentation it has
+        const rawCode: string[] = [];
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
                 const param = parameters[i].value;
 
-                // Check if this is a RawCode instance - splice directly
                 if (param instanceof RawCode || (param && typeof param === 'object' && param[RAW_CODE_SYMBOL])) {
-                    result += (param as RawCode).code;
+                    result += `${RAW_PREFIX}${rawCode.length}__`;
+                    rawCode.push((param as RawCode).code);
                 } else {
                     // All other parameters use placeholders
                     // This ensures templates with the same structure always produce the same AST
@@ -487,7 +519,9 @@ export class TemplateEngine {
 
         // Always wrap in function body - let the parser decide what it is,
         // then we'll extract intelligently based on what was parsed
-        return wrapCode(dedentTemplate(result), expression);
+        const dedented = dedentTemplate(result)
+            .replace(new RegExp(`${RAW_PREFIX}(\\d+)__`, 'g'), (_, index) => rawCode[Number(index)]);
+        return wrapCode(dedented, expression);
     }
 
     /**
@@ -834,6 +868,33 @@ function expectsStatement(parentTree: J, childId: string): boolean {
         parentTree.kind === JS.Kind.WithStatement;
 }
 
+/**
+ * Whether `expression` is a string literal that, standing as the statement of `childId` in `parent`, would be
+ * read as a directive such as `"use strict"`: one of the strings a file or a body starts with.
+ */
+function readsAsDirective(expression: J, parent: J, childId: string): boolean {
+    const isString = (e: J) => e.kind === J.Kind.Literal && /^['"]/.test((e as J.Literal).valueSource ?? '');
+    if (!isString(expression) || (parent.kind !== J.Kind.Block && parent.kind !== JS.Kind.CompilationUnit)) {
+        return false;
+    }
+    for (const statement of (parent as J.Block).statements) {
+        if (statement.element.id === childId) {
+            return true;
+        }
+        const element = statement.element as J;
+        if (!isString(element.kind === JS.Kind.ExpressionStatement ? (element as JS.ExpressionStatement).expression : element)) {
+            return false;
+        }
+    }
+    return false;
+}
+
+/**
+ * The statements the parser holds in a `JS.StatementExpression` where an expression goes. Any other is only
+ * held so as the expression of an expression statement, which takes it as the statement itself.
+ */
+const expressionStatementKinds = new Set<string>([J.Kind.MethodDeclaration, J.Kind.ClassDeclaration, J.Kind.Yield]);
+
 /** Whether the code opens with `{`, which is a block where a statement goes and an object literal elsewhere. */
 export function opensWithBrace(templateParts: TemplateStringsArray): boolean {
     return templateParts[0].trimStart().startsWith('{');
@@ -923,6 +984,7 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
+        const prefix = withLeadingComments(originalTree.prefix, this.ast.prefix);
         const parentTree = await replacedParent(originalTree, this.cursor);
         let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
         // A replaced node spliced back in as a capture carries its own trailing markers
@@ -934,8 +996,10 @@ export class TemplateApplier {
         const slot = this.replacedSlot(originalTree, parentTree);
         // `format` substitutes the target's prefix, so decide against the prefix that will print
         resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
-            {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        const result = await this.format(resultToUse, originalTree);
+            {...resultToUse, prefix}, slotMarkers);
+        resultToUse = parenthesizeInForInit(
+            this.cursor?.value?.id === originalTree.id ? this.cursor.parent : this.cursor, originalTree.id, resultToUse);
+        const result = await this.format(resultToUse, originalTree, prefix);
         templateResults.add(result);
         return result;
     }
@@ -954,13 +1018,13 @@ export class TemplateApplier {
             requiredPrecedence(parentTree, standIn.id) !== undefined ? [parentTree, standIn.id] : undefined;
     }
 
-    private async format(resultToUse: J, originalTree: J) {
+    private async format(resultToUse: J, originalTree: J, prefix: J.Space) {
         // Create a copy of the AST with the prefix from the target
         const result = {
             ...resultToUse,
             // We temporarily set the ID so that the formatter can identify the tree
             id: originalTree.id,
-            prefix: originalTree.prefix
+            prefix
         };
 
         if (!this.shouldFormat) {
@@ -1015,7 +1079,8 @@ export class TemplateApplier {
 
             // Determine context and wrap if needed
             if (parentExpectsStatement && originalIsStatement) {
-                const needsGrouping = resultIsExpression && startsWithDeclarationToken(resultToUse);
+                const needsGrouping = resultIsExpression && (startsWithDeclarationToken(resultToUse) ||
+                    readsAsDirective(resultToUse, parentTree, originalTree.id));
                 // Statement context: wrap in ExpressionStatement if result is not a statement
                 if (needsGrouping || (!resultIsStatement && resultIsExpression)) {
                     const expression = needsGrouping ? parenthesize(resultToUse) : resultToUse;
@@ -1032,6 +1097,22 @@ export class TemplateApplier {
                 // a statement-only node, such as an arrow function's block body, takes one unwrapped.
                 if (resultIsStatement && !resultIsExpression) {
                     const stmt = resultToUse as Statement;
+                    if (parentTree.kind === J.Kind.Lambda && (parentTree as J.Lambda).body.id === originalTree.id) {
+                        // An arrow function's body is an expression or a block, so a statement takes a block
+                        return stmt.kind === J.Kind.Block ? stmt : {
+                            kind: J.Kind.Block,
+                            id: randomId(),
+                            prefix: stmt.prefix,
+                            markers: emptyMarkers,
+                            static: {kind: J.Kind.RightPadded, element: false, after: emptySpace, markers: emptyMarkers},
+                            statements: [{kind: J.Kind.RightPadded, element: {...stmt, prefix: emptySpace}, after: emptySpace, markers: emptyMarkers}],
+                            end: emptySpace
+                        } as J.Block;
+                    } else if (!expressionStatementKinds.has(stmt.kind) && parentTree.kind !== JS.Kind.ExpressionStatement) {
+                        throw new Error(`Template code is a statement (${stmt.kind.substring(stmt.kind.lastIndexOf('.') + 1)}), ` +
+                            `which cannot replace the expression it was applied to. Apply it to the statement holding ` +
+                            `that expression instead.`);
+                    }
                     resultToUse = {
                         kind: JS.Kind.StatementExpression,
                         id: randomId(),
@@ -1044,6 +1125,47 @@ export class TemplateApplier {
         }
         return resultToUse;
     }
+}
+
+/** The first placeholder the substitution left in `tree`, outside the values it substituted. */
+async function remainingPlaceholder(tree: J): Promise<string | undefined> {
+    let found: string | undefined;
+    await new class extends JavaScriptVisitor<undefined> {
+        protected override async preVisit(t: J): Promise<J | undefined> {
+            if (found !== undefined || findMarker(t, SubstitutedValue.KIND)) {
+                this.stopAfterPreVisit();
+                return t;
+            }
+            const text = t.kind === J.Kind.Identifier ? (t as J.Identifier).simpleName :
+                t.kind === J.Kind.Literal ? (t as J.Literal).valueSource : undefined;
+            if (text?.startsWith(PlaceholderUtils.PLACEHOLDER_PREFIX)) {
+                found = text;
+            }
+            return t;
+        }
+    }().visit(tree, undefined);
+    return found;
+}
+
+function describeParameter(parameter: Parameter | undefined): string {
+    const value = parameter?.value;
+    if (value instanceof CaptureValue) {
+        return `a property of capture '${value.rootCapture.getName()}'`;
+    } else if (value instanceof TemplateParamImpl) {
+        return `parameter '${value.name}'`;
+    } else if (value && typeof value === 'object' && value[CAPTURE_NAME_SYMBOL]) {
+        return `capture '${value[CAPTURE_NAME_SYMBOL]}'`;
+    }
+    return `a ${value === null ? 'null' : Array.isArray(value) ? 'list' : typeof value} value`;
+}
+
+/**
+ * The prefix of the node a template replaces, plus the comments the template's code opens with, which print
+ * where the template's code starts: after the replaced node's own prefix.
+ */
+function withLeadingComments(replaced: J.Space, templatePrefix: J.Space): J.Space {
+    const comments = templatePrefix.comments.filter(c => !replaced.comments.includes(c));
+    return comments.length === 0 ? replaced : {...replaced, comments: [...replaced.comments, ...comments]};
 }
 
 /**

@@ -19,6 +19,8 @@ import {PostMatchContext, PreMatchContext, RewriteConfig, RewriteRule, TryOnOpti
 import {MatchResult, Pattern} from './pattern';
 import {Template} from './template';
 import {JavaScriptVisitor} from '../visitor';
+import {JS} from '../tree';
+import {scopeOf, walk} from '../scope';
 
 /**
  * Implementation of a replacement rule.
@@ -276,45 +278,65 @@ export function flattenBlock<P>(
     visitor: TreeVisitor<any, P>,
     block: J.Block
 ): J.Block {
-    // Create a visitor that will flatten this specific block when found in a parent block
+    const isTarget = (statement: J) => statement === block || statement.id === block.id;
     const flattenVisitor = new class extends JavaScriptVisitor<P> {
         protected override async visitBlock(parentBlock: J.Block, p: P): Promise<J | undefined> {
-            let modified = false;
-            const newStatements: typeof parentBlock.statements = [];
+            const statements = await this.flattened(parentBlock.statements, parentBlock, this.cursor.parentTree()?.value);
+            return statements ? {...parentBlock, statements} as J.Block : super.visitBlock(parentBlock, p);
+        }
 
-            for (const stmt of parentBlock.statements) {
-                // Check if this statement is the block we want to flatten
-                if (stmt.element === block || stmt.element.id === block.id) {
-                    // Splice in the inner block's statements
-                    for (let i = 0; i < block.statements.length; i++) {
-                        const innerStmt = block.statements[i];
-                        if (i === 0) {
-                            // First statement inherits the outer statement's padding
-                            newStatements.push({
-                                ...innerStmt,
-                                element: {
-                                    ...innerStmt.element,
-                                    prefix: stmt.element.prefix  // Use the original statement's prefix
-                                } as Statement
-                            });
-                        } else {
-                            newStatements.push(innerStmt);
-                        }
-                    }
-                    modified = true;
-                } else {
-                    newStatements.push(stmt);
+        protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
+            const statements = await this.flattened(cu.statements, cu, undefined);
+            return statements ? {...cu, statements} as JS.CompilationUnit : super.visitJsCompilationUnit(cu, p);
+        }
+
+        protected override async visitCase(aCase: J.Case, p: P): Promise<J | undefined> {
+            // The statements of every case share the scope of the switch's block
+            const cases = this.cursor.parentTree()?.value as J;
+            const elements = await this.flattened(aCase.statements.elements, cases, undefined);
+            return elements ? {...aCase, statements: {...aCase.statements, elements}} as J.Case : super.visitCase(aCase, p);
+        }
+
+        /**
+         * `statements` with the block's spliced in, or undefined where it holds none of them, or where
+         * a name the block binds is spelled anywhere else in `scope` or bound by `owner`: there it would
+         * be declared twice, or a reference to one of that name would come to read it.
+         */
+        private async flattened(statements: J.RightPadded<Statement>[], scope: J, owner: J | undefined): Promise<J.RightPadded<Statement>[] | undefined> {
+            const index = statements.findIndex(stmt => isTarget(stmt.element));
+            if (index < 0) {
+                return undefined;
+            }
+            const bound = scopeOf(new Cursor(block, undefined)).names();
+            const spelled = new Set<string>();
+            walk(scope, node => {
+                if (isTarget(node as J)) {
+                    return false;
+                } else if (node.kind === J.Kind.Identifier) {
+                    spelled.add((node as J.Identifier).simpleName);
                 }
+                return true;
+            });
+            const ownerBinds = owner && ownerScopeKinds.has(owner.kind) ?
+                scopeOf(new Cursor(owner, undefined)).names() : new Set<string>();
+            if ([...bound].some(name => spelled.has(name) || ownerBinds.has(name))) {
+                return undefined;
             }
-
-            if (modified) {
+            const outer = statements[index].element;
+            const dedent = indentationShift(block, outer.prefix);
+            const inner = await Promise.all(block.statements.map(async (innerStmt, i) => {
+                const element = await dedent(innerStmt.element);
+                // The first statement takes the place, and so the prefix, of the block, after the comments it has
                 return {
-                    ...parentBlock,
-                    statements: newStatements
-                } as J.Block;
-            }
-
-            return super.visitBlock(parentBlock, p);
+                    ...innerStmt,
+                    element: i > 0 ? element : {
+                        ...element,
+                        prefix: element.prefix.comments.length === 0 ? outer.prefix :
+                            {...outer.prefix, comments: [...outer.prefix.comments, ...element.prefix.comments]}
+                    } as Statement
+                };
+            }));
+            return [...statements.slice(0, index), ...inner, ...statements.slice(index + 1)];
         }
     }();
 
@@ -322,4 +344,40 @@ export function flattenBlock<P>(
     visitor.afterVisit.push(flattenVisitor);
 
     return block;
+}
+
+/** The owners of a block whose own scope binds names, such as a function's parameters, that the block cannot redeclare. */
+const ownerScopeKinds = new Set<string>([
+    J.Kind.MethodDeclaration, JS.Kind.ComputedPropertyMethodDeclaration, J.Kind.Lambda, JS.Kind.ArrowFunction,
+    J.Kind.TryCatch, J.Kind.ForLoop, J.Kind.ForEachLoop, JS.Kind.ForInLoop
+]);
+
+/**
+ * Takes the indentation the block's statements have beyond the block's own place, at `prefix`, out of
+ * every line they span, so that they line up with the statements around the block.
+ */
+function indentationShift(block: J.Block, prefix: J.Space): (statement: Statement) => Promise<Statement> {
+    const indentOf = (space: J.Space) => {
+        const text = space.comments.length > 0 ? space.comments[space.comments.length - 1].suffix : space.whitespace;
+        const lineBreak = text.lastIndexOf('\n');
+        return lineBreak < 0 ? undefined : text.substring(lineBreak + 1);
+    };
+    const first = block.statements[0]?.element;
+    const outer = indentOf(prefix) ?? '';
+    const inner = first && indentOf(first.prefix);
+    if (inner === undefined || inner.length <= outer.length || !inner.startsWith(outer)) {
+        return async statement => statement;
+    }
+    const extra = '\n' + inner;
+    const shift = (text: string) => text.split(extra).join('\n' + outer);
+    const visitor = new class extends JavaScriptVisitor<undefined> {
+        override async visitSpace(space: J.Space): Promise<J.Space> {
+            return {
+                ...space,
+                whitespace: shift(space.whitespace),
+                comments: space.comments.map(comment => ({...comment, suffix: shift(comment.suffix)}))
+            };
+        }
+    }();
+    return async statement => (await visitor.visit<Statement>(statement, undefined))!;
 }

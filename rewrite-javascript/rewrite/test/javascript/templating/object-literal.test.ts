@@ -266,4 +266,19 @@ describe('object literals in templates and patterns', () => {
 
         expect(await pattern`{ foo(); bar(); }`.match(objectLiteral, undefined!)).toBeUndefined();
     });
+
+    test('a shorthand property refuses a value that is not an identifier', () => {
+        const spec = new RecipeSpec();
+        const x = capture('x');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                const match = await pattern`foo(${x})`.match(method, this.cursor);
+                return match ? template`({${x}})`.apply(method, this.cursor, {values: match}) : method;
+            }
+        });
+        return expect(spec.rewriteRun(
+            //language=typescript
+            typescript(`const o = foo(a.b);`, `const o = ({a.b});`)
+        )).rejects.toThrow(/shorthand property/);
+    });
 });
