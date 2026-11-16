@@ -279,6 +279,7 @@ type KeyValue struct {
 	Markers java.Markers
 	Key     java.Expression
 	Value   java.LeftPadded[java.Expression] // Before = space before `:`
+	Type    java.JavaType
 }
 
 func (*KeyValue) IsTree()       {}
@@ -313,6 +314,7 @@ type Slice struct {
 	High         java.RightPadded[java.Expression] // After = space before second `:` (empty if 2-index)
 	Max          java.Expression                   // nil for 2-index slices
 	CloseBracket java.Space                        // space before `]`
+	Type         java.JavaType
 }
 
 func (*Slice) IsTree()       {}
@@ -1253,6 +1255,7 @@ type Binary struct {
 	Left     java.Expression
 	Operator java.LeftPadded[BinaryOperator] // Before = space before the operator token
 	Right    java.Expression
+	Type     java.JavaType
 }
 
 func (*Binary) IsTree()       {}
