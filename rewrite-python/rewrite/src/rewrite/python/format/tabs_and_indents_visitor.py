@@ -17,7 +17,7 @@ from rewrite.java.markers import OmitParentheses, TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
-    TrailingElseWrapper, Binary as PyBinary, MultiImport,
+    TrailingElseWrapper, Binary as PyBinary, MultiImport, Slice,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -78,10 +78,13 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         return super().visit(tree, p)
 
     def pre_visit(self, tree: T, p: P) -> Optional[T]:
-        if isinstance(tree, (JavaSourceFile, ArrayDimension, ClassDeclaration)):
+        if isinstance(tree, (JavaSourceFile, ClassDeclaration)) or _subscript_tuple(tree, self.cursor):
             self.cursor.put_message("indent_type", self.IndentType.ALIGN)
-        elif isinstance(tree, (Block, If)):
+        elif isinstance(tree, (Block, If, ArrayDimension)):
             self.cursor.put_message("indent_type", self.IndentType.INDENT)
+        elif isinstance(tree, TypeParameters):
+            self.cursor.put_message("indent_type", self.IndentType.CONTINUATION_INDENT
+                if self._other.use_continuation_indent.method_declaration_parameters else self.IndentType.INDENT)
         elif isinstance(tree, (DictLiteral, CollectionLiteral, NewArray, ComprehensionExpression)):
             self.cursor.put_message("indent_type", self.IndentType.CONTINUATION_INDENT
                 if self._other.use_continuation_indent.collections_and_comprehensions else self.IndentType.INDENT)
@@ -189,6 +192,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
         rp_context = self.cursor.parent_or_throw.get_message("rp_context", None)
         indent = cast(int, self.cursor.get_nearest_message("last_indent")) or 0
+        closes_bracket = self._closes_bracket(right)
 
         t = right.element
         after = right.after
@@ -283,8 +287,14 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
 
             if trailing_comma and self._closes_with_bracket():
                 # After a trailing comma, the line break before the closing bracket is the comma's.
-                comma = trailing_comma.replace(suffix=self._closing(trailing_comma.suffix, elem, indent))
+                closing = indent
+                owner = self.cursor.parent_tree_cursor()
+                if _subscript_tuple(owner.value, owner):
+                    closing = cast(int, owner.parent_or_throw.get_nearest_message("last_indent")) or 0
+                comma = trailing_comma.replace(suffix=self._closing(trailing_comma.suffix, elem, closing))
                 right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
+            elif closes_bracket:
+                after = self._closing(right.after, elem, indent)
 
             t = cast(T, elem)
         else:
@@ -763,11 +773,18 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
     def _closes_with_bracket(self) -> bool:
         """Whether a bracket closes the elements the cursor is among. After a trailing comma without one, as at the end
         of `x = 1,`, the line break is the next statement's, though the comma holds it."""
-        owner = self.cursor.parent_tree_cursor().value
-        if isinstance(owner, CollectionLiteral):
-            return owner.padding.elements.markers.find_first(OmitParentheses) is None
-        return isinstance(owner, (MethodInvocation, Annotation, MethodDeclaration, ClassDeclaration, DictLiteral,
-                                  MultiImport, TypeParameters, ParameterizedType))
+        owner = self.cursor.parent_tree_cursor()
+        if isinstance(owner.value, CollectionLiteral):
+            return (owner.value.padding.elements.markers.find_first(OmitParentheses) is None
+                    or _subscript_tuple(owner.value, owner))
+        return isinstance(owner.value, (MethodInvocation, Annotation, MethodDeclaration, ClassDeclaration, DictLiteral,
+                                        MultiImport, TypeParameters, ParameterizedType))
+
+    def _closes_bracket(self, right: JRightPadded) -> bool:
+        """Whether the space after ``right`` is the line a subscript's or a type parameter list's bracket closes."""
+        owner = self.cursor.parent_or_throw.value
+        return isinstance(owner, ArrayDimension) or (
+            isinstance(owner, TypeParameters) and owner.padding.type_parameters[-1] is right)
 
     def _closing(self, space: Space, last: J, column: int) -> Space:
         """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
@@ -891,6 +908,13 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             if c in ('\n', '\r'):
                 length = 0
         return length
+
+
+def _subscript_tuple(tree: Tree, cursor: Cursor) -> bool:
+    """Whether ``tree`` is a tuple without parentheses that a subscript's brackets hold, whose elements line up with
+    its first."""
+    return (isinstance(tree, CollectionLiteral) and tree.padding.elements.markers.find_first(OmitParentheses) is not None
+            and isinstance(cursor.parent_tree_cursor().value, ArrayDimension))
 
 
 def _shifted(source: str, shift: int) -> str:
