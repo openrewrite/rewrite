@@ -165,6 +165,9 @@ public class ResolvedPom implements Heavyweight {
      * parent. What is wanted here is the repository an artifact was built from, and a path appended by inheritance
      * cannot be told apart from one that is part of the repository's address, as on hosts with nested groups.
      * <p>
+     * {@link Scm#getInheritedFrom()} says whether the address of the repository is this POM's own or an ancestor's,
+     * and which ancestor's. An inherited one can be the repository of the parent rather than of this artifact.
+     * <p>
      * {@code null} when no POM in the chain declares an {@code <scm>}, and on models serialized before this
      * field existed.
      */
@@ -246,6 +249,11 @@ public class ResolvedPom implements Heavyweight {
         ).resolver(ctx, downloader).resolve();
 
         if (!getVersion().equals(resolved.getVersion())) {
+            return resolved;
+        }
+
+        // A POM that declares an <scm> and nothing else that is compared below is otherwise taken for unchanged
+        if (!Objects.equals(scm, resolved.getScm())) {
             return resolved;
         }
 
@@ -474,8 +482,13 @@ public class ResolvedPom implements Heavyweight {
             }
             if (scm != null) {
                 // Only once every ancestor's properties are merged can the placeholders be resolved
+                GroupArtifactVersion inheritedFrom = scm.getInheritedFrom();
+                if (inheritedFrom != null) {
+                    inheritedFrom = new GroupArtifactVersion(getValue(inheritedFrom.getGroupId()),
+                            inheritedFrom.getArtifactId(), getValue(inheritedFrom.getVersion()));
+                }
                 scm = new Scm(getValue(scm.getConnection()), getValue(scm.getDeveloperConnection()),
-                        getValue(scm.getUrl()), getValue(scm.getTag()));
+                        getValue(scm.getUrl()), getValue(scm.getTag()), inheritedFrom);
             }
 
             //Once properties have been merged, update any property placeholders in the resolved gav
@@ -512,7 +525,7 @@ public class ResolvedPom implements Heavyweight {
                 mergeRepositories(profile.getRepositories());
             }
             mergeRepositories(pom.getRepositories());
-            mergeScm(pom.getScm());
+            mergeScm(pom, pomAncestry.size() > 1);
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
@@ -929,21 +942,31 @@ public class ResolvedPom implements Heavyweight {
         }
 
         /**
-         * The nearest POM to declare a value wins, so a value already set by a descendant is kept.
+         * The nearest POM to declare a value wins, so a value already set by a descendant is kept. The first
+         * ancestor to provide where the repository is, rather than only its tag, is remembered as
+         * {@link Scm#getInheritedFrom()}.
+         *
+         * @param ancestor Whether the POM is an ancestor of the one being resolved rather than that POM itself.
          */
-        private void mergeScm(@Nullable Scm incoming) {
+        private void mergeScm(Pom pom, boolean ancestor) {
+            Scm incoming = pom.getScm();
             if (incoming == null) {
                 return;
             }
-            if (scm == null) {
-                scm = incoming;
-                return;
+            Scm nearer = scm == null ? new Scm(null, null, null, null) : scm;
+            GroupArtifactVersion inheritedFrom = nearer.getInheritedFrom();
+            if (inheritedFrom == null && ancestor && (
+                    nearer.getConnection() == null && incoming.getConnection() != null ||
+                    nearer.getDeveloperConnection() == null && incoming.getDeveloperConnection() != null ||
+                    nearer.getUrl() == null && incoming.getUrl() != null)) {
+                inheritedFrom = new GroupArtifactVersion(pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
             }
             scm = new Scm(
-                    scm.getConnection() == null ? incoming.getConnection() : scm.getConnection(),
-                    scm.getDeveloperConnection() == null ? incoming.getDeveloperConnection() : scm.getDeveloperConnection(),
-                    scm.getUrl() == null ? incoming.getUrl() : scm.getUrl(),
-                    scm.getTag() == null ? incoming.getTag() : scm.getTag());
+                    nearer.getConnection() == null ? incoming.getConnection() : nearer.getConnection(),
+                    nearer.getDeveloperConnection() == null ? incoming.getDeveloperConnection() : nearer.getDeveloperConnection(),
+                    nearer.getUrl() == null ? incoming.getUrl() : nearer.getUrl(),
+                    nearer.getTag() == null ? incoming.getTag() : nearer.getTag(),
+                    inheritedFrom);
         }
 
         private void mergeProperties(Map<String, String> incomingProperties, Pom pom) {
