@@ -517,6 +517,7 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		is := spec.(*ast.ImportSpec)
 		rp := java.RightPadded[*java.Import]{Element: ctx.mapImportSpec(is)}
 		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, first, i))
+		takeImportComment(ctx, &rp, is)
 		elements = append(elements, rp)
 	}
 
@@ -573,6 +574,7 @@ func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]java
 		}
 		rp := java.RightPadded[*java.Import]{Element: imp}
 		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, decl, j))
+		takeImportComment(ctx, &rp, is)
 		*elements = append(*elements, rp)
 	}
 }
@@ -594,7 +596,7 @@ func importSpecBoundary(ctx *parseContext, decl *ast.GenDecl, i int) int {
 // way closeSpecGroup does for a declaration group.
 func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java.Space) []java.RightPadded[*java.Import] {
 	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
-		elements[n-1].After = closeParen
+		elements[n-1].After = appendImportSpace(elements[n-1].After, closeParen)
 		return elements
 	}
 	if len(elements) == 0 && len(closeParen.Comments()) == 0 && closeParen.Whitespace() == "" {
@@ -604,6 +606,27 @@ func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java
 		Element: &java.Import{ID: uuid.New(), Qualid: importQualid(java.EmptySpace, "", nil)},
 		After:   closeParen,
 	})
+}
+
+func appendImportSpace(before, after java.Space) java.Space {
+	comments := append([]java.Comment(nil), before.Comments()...)
+	if len(comments) == 0 {
+		return after
+	}
+	comments[len(comments)-1].Suffix += after.Whitespace()
+	comments = append(comments, after.Comments()...)
+	return java.MakeSpace(comments, before.Whitespace())
+}
+
+func takeImportComment(ctx *parseContext, rp *java.RightPadded[*java.Import], spec *ast.ImportSpec) {
+	if spec.Comment == nil || java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+		return
+	}
+	end := ctx.file.Offset(spec.Comment.End())
+	if end > ctx.cursor {
+		rp.After = java.ParseSpace(string(ctx.src[ctx.cursor:end]))
+		ctx.cursor = end
+	}
 }
 
 // mapImportSpec maps a single import spec.
