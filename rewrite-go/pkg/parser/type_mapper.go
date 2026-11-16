@@ -265,6 +265,18 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	m.namedCache[named] = cls
 	m.cache[named] = cls
 
+	tparams := named.TypeParams()
+	for i := 0; i < tparams.Len(); i++ {
+		cls.TypeParameters = append(cls.TypeParameters, m.mapType(tparams.At(i)))
+	}
+	for i := 0; i < named.NumMethods(); i++ {
+		sig := named.Method(i).Type().(*types.Signature)
+		recvParams := sig.RecvTypeParams()
+		for j := 0; j < recvParams.Len(); j++ {
+			m.cache[recvParams.At(j)] = cls.TypeParameters[j]
+		}
+	}
+
 	// Map the underlying type to determine kind and populate members/methods
 	underlying := named.Underlying()
 	switch u := underlying.(type) {
@@ -277,14 +289,6 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	default:
 		// Named type wrapping a basic type (e.g., type MyInt int)
 		cls.Kind = "Class"
-	}
-
-	// Map type parameters (generics)
-	tparams := named.TypeParams()
-	if tparams != nil && tparams.Len() > 0 {
-		for i := 0; i < tparams.Len(); i++ {
-			cls.TypeParameters = append(cls.TypeParameters, m.mapType(tparams.At(i)))
-		}
 	}
 
 	// Map methods

@@ -751,3 +751,49 @@ func f(h Handler[int], g Fn[string]) {
 	assert.Equal(t, "main.Handler", matcher.DeclaringTypeFQN(invocationNamed(t, c, "fn")))
 	assert.Equal(t, "main.Fn", matcher.DeclaringTypeFQN(invocationNamed(t, c, "g")))
 }
+
+func TestGenericInterfaceAssignability(t *testing.T) {
+	// given
+	cu := parseAttribution(t, `package main
+
+type Stack[T any] struct{}
+func (Stack[T]) Peek() T { var zero T; return zero }
+
+type Peeker[U any] interface { Peek() U }
+type StringPeeker struct{}
+func (StringPeeker) Peek() string { return "" }
+
+func f(strings Stack[string], ints Stack[int], target Peeker[string], other Peeker[int], concrete StringPeeker) {}
+`)
+
+	// when
+	target := identType(t, cu, "target")
+
+	// then
+	assert.True(t, matcher.IsAssignableToType(identType(t, cu, "strings"), target))
+	assert.True(t, matcher.IsAssignableToType(identType(t, cu, "concrete"), target))
+	assert.False(t, matcher.IsAssignableToType(identType(t, cu, "ints"), target))
+	assert.False(t, matcher.IsAssignableToType(identType(t, cu, "other"), target))
+}
+
+func TestGenericReceiverTypeParametersArePositional(t *testing.T) {
+	// given
+	cu := parseAttribution(t, `package main
+
+type Pair[A comparable, B any] struct{}
+func (Pair[B, A]) Values(value B, convert func(A) []B) (B, map[B]chan A) {
+	var first B
+	return first, nil
+}
+
+type Values interface { Values(string, func(int) []string) (string, map[string]chan int) }
+func f(pair Pair[string, int], other Pair[int, string], target Values) {}
+`)
+
+	// when
+	target := identType(t, cu, "target")
+
+	// then
+	assert.True(t, matcher.IsAssignableToType(identType(t, cu, "pair"), target))
+	assert.False(t, matcher.IsAssignableToType(identType(t, cu, "other"), target))
+}

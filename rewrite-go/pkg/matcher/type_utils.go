@@ -110,7 +110,8 @@ func IsAssignableToType(from, to java.JavaType) bool {
 	// whether by carrying its methods or by a relation a peer model recorded.
 	if iface := AsClass(to); iface != nil && iface.Kind == "Interface" {
 		fqn := GetFullyQualifiedName(to)
-		return hasMethodSet(from, iface.Methods) || (fqn != "" && IsAssignableTo(from, fqn))
+		_, parameterized := to.(*java.JavaTypeParameterized)
+		return hasMethodSet(from, to, iface) || (!parameterized && fqn != "" && IsAssignableTo(from, fqn))
 	}
 	return false
 }
@@ -118,8 +119,8 @@ func IsAssignableToType(from, to java.JavaType) bool {
 // hasMethodSet reports whether from carries every method of an interface. The
 // empty one asks for nothing, which is what makes `any` a target every
 // attributed type reaches.
-func hasMethodSet(from java.JavaType, methods []*java.JavaTypeMethod) bool {
-	if len(methods) == 0 {
+func hasMethodSet(from, to java.JavaType, iface *java.JavaTypeClass) bool {
+	if len(iface.Methods) == 0 {
 		return true
 	}
 	cls := AsClass(from)
@@ -127,8 +128,9 @@ func hasMethodSet(from java.JavaType, methods []*java.JavaTypeMethod) bool {
 		return false
 	}
 	typeArgs := typeArgsOf(from, cls)
-	for _, want := range methods {
-		if !hasMethod(cls, want, typeArgs) {
+	wantArgs := typeArgsOf(to, iface)
+	for _, want := range iface.Methods {
+		if !hasMethod(cls, want, typeArgs, wantArgs) {
 			return false
 		}
 	}
@@ -152,25 +154,25 @@ func typeArgsOf(t java.JavaType, cls *java.JavaTypeClass) map[string]java.JavaTy
 	return bound
 }
 
-func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod, typeArgs map[string]java.JavaType) bool {
+func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod, typeArgs, wantArgs map[string]java.JavaType) bool {
 	for _, have := range cls.Methods {
-		if have.Name == want.Name && sameSignature(have, want, typeArgs) {
+		if have.Name == want.Name && sameSignature(have, want, typeArgs, wantArgs) {
 			return true
 		}
 	}
 	return false
 }
 
-func sameSignature(a, b *java.JavaTypeMethod, typeArgs map[string]java.JavaType) bool {
+func sameSignature(a, b *java.JavaTypeMethod, typeArgs, wantArgs map[string]java.JavaType) bool {
 	if len(a.ParameterTypes) != len(b.ParameterTypes) {
 		return false
 	}
 	for i := range a.ParameterTypes {
-		if !IsSameGoType(substitute(a.ParameterTypes[i], typeArgs), b.ParameterTypes[i]) {
+		if !IsSameGoType(substitute(a.ParameterTypes[i], typeArgs), substitute(b.ParameterTypes[i], wantArgs)) {
 			return false
 		}
 	}
-	return IsSameGoType(substitute(a.ReturnType, typeArgs), b.ReturnType)
+	return IsSameGoType(substitute(a.ReturnType, typeArgs), substitute(b.ReturnType, wantArgs))
 }
 
 func substitute(t java.JavaType, typeArgs map[string]java.JavaType) java.JavaType {
