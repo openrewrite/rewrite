@@ -113,10 +113,6 @@ public class GroovyParserVisitor {
     private final Map<Integer, FieldNode> scriptFields = new HashMap<>();
 
     private static final Pattern MULTILINE_COMMENT_REGEX = Pattern.compile("(?s)/\\*.*?\\*/");
-    private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
-
-    @SuppressWarnings("RegExpSimplifiable")
-    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     /**
      * Elements within GString expressions which omit curly braces have column positions which are incorrect.
@@ -3531,6 +3527,13 @@ public class GroovyParserVisitor {
             }
 
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
+            // A declared type with space around its dots (`java . util . Map m`) is not one name token
+            if (!expression.isDynamicTyped() && expression.getOriginType().getUnresolvedName().contains(".") &&
+                !source.startsWith(expression.getOriginType().getUnresolvedName(), indexOfNextNonWhitespace(cursor, source)) &&
+                source.startsWith(expression.getOriginType().getUnresolvedName().substring(0,
+                        expression.getOriginType().getUnresolvedName().indexOf('.')), indexOfNextNonWhitespace(cursor, source))) {
+                return visitTypeTree(expression.getOriginType());
+            }
             Space prefix = whitespace();
             String typeName = "";
 
@@ -4203,8 +4206,28 @@ public class GroovyParserVisitor {
             return (T) arrayType(classNode);
         }
         Space prefix = whitespace();
-        String maybeFullyQualified = name();
-        String[] parts = maybeFullyQualified.split("\\.");
+        List<JRightPadded<J.Identifier>> parts = new ArrayList<>();
+        Space beforeName = EMPTY;
+        while (true) {
+            int start = cursor;
+            while (cursor < source.length() && (isJavaIdentifierPart(source.charAt(cursor)) || source.charAt(cursor) == '*')) {
+                cursor++;
+            }
+            String segment = source.substring(start, cursor);
+            J.Identifier identifier = new J.Identifier(randomId(), beforeName, Markers.EMPTY, emptyList(), segment, null, null);
+            int afterName = cursor;
+            Space beforeDot = whitespace();
+            boolean hasDot = cursor < source.length() && source.charAt(cursor) == '.' && !source.startsWith("..", cursor);
+            int nextName = hasDot ? indexOfNextNonWhitespace(cursor + 1, source) : source.length();
+            if (nextName >= source.length() || !(Character.isJavaIdentifierStart(source.charAt(nextName)) || source.charAt(nextName) == '*')) {
+                cursor = afterName;
+                parts.add(padRight(identifier, EMPTY));
+                break;
+            }
+            parts.add(padRight(identifier, beforeDot));
+            cursor++;
+            beforeName = whitespace();
+        }
 
         // Walk classNode's outer-class chain (outermost first) and align it
         // with the trailing segments of the source name. The leaf class is
@@ -4214,11 +4237,11 @@ public class GroovyParserVisitor {
         for (ClassNode c = classNode; c != null; c = c.getOuterClass()) {
             classChain.add(0, c);
         }
-        int classChainStart = parts.length - classChain.size();
+        int classChainStart = parts.size() - classChain.size();
 
         Expression expr = null;
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
+        for (int i = 0; i < parts.size(); i++) {
+            J.Identifier part = parts.get(i).getElement();
 
             JavaType segmentType = null;
             int classIdx = i - classChainStart;
@@ -4228,22 +4251,14 @@ public class GroovyParserVisitor {
             }
 
             if (i == 0) {
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, segmentType, null);
+                expr = part.withType(segmentType);
             } else {
-                Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
-                Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : EMPTY;
-
-                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
-                //noinspection ResultOfMethodCallIgnored
-                whitespaceSuffix.matches();
-                Space namePrefix = i == parts.length - 1 ? EMPTY : format(whitespaceSuffix.group(1));
-
                 expr = new J.FieldAccess(
                         randomId(),
                         EMPTY,
                         Markers.EMPTY,
                         expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
+                        padLeft(parts.get(i - 1).getAfter(), part),
                         segmentType
                 );
             }
