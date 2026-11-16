@@ -3086,6 +3086,10 @@ public class GroovyParserVisitor {
                 // In a command chain, `call(x) name` is Groovy's `call(x).name`, with no dot in the source.
                 int beforeDotCursor = cursor;
                 Space beforeDot = whitespace();
+                while (source.startsWith("\\\n", cursor) || source.startsWith("\\\r\n", cursor)) {
+                    cursor = indexOfNextNonWhitespace(cursor + 2, source);
+                    beforeDot = format(source, beforeDotCursor, cursor);
+                }
                 boolean implicitDot = !source.startsWith(".", cursor) && !source.startsWith("?.", cursor)
                         && !source.startsWith("*.", cursor);
                 if (!implicitDot) {
