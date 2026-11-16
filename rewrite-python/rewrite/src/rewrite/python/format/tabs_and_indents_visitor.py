@@ -11,13 +11,13 @@ from rewrite.java.tree import (
     JRightPadded, JLeftPadded, JContainer, Block, ArrayDimension,
     ClassDeclaration, Empty, MethodDeclaration, MethodInvocation,
     FieldAccess, Identifier, Lambda, NewArray, Annotation, Literal,
-    If, Binary, JavaSourceFile,
+    If, Binary, JavaSourceFile, ParameterizedType, TypeParameters,
 )
-from rewrite.java.markers import TrailingComma
+from rewrite.java.markers import OmitParentheses, TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
-    TrailingElseWrapper, Binary as PyBinary,
+    TrailingElseWrapper, Binary as PyBinary, MultiImport,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -238,10 +238,6 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     if not trailing_comma and args.padding.elements[-1] is right:
                         self.cursor.parent_or_throw.put_message("indent_type", self.IndentType.ALIGN)
                     after = self.visit_space(right.after, p)
-                    if trailing_comma:
-                        self.cursor.parent_or_throw.put_message("indent_type", self.IndentType.ALIGN)
-                        trailing_comma = trailing_comma.replace(suffix=self.visit_space(trailing_comma.suffix, p))
-                        right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: trailing_comma))
 
                 elif rp_context is not None:
                     elem = self.visit_and_cast(elem, J, p)
@@ -284,6 +280,11 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 else:
                     elem = self.visit_and_cast(elem, J, p)
                     after = self.visit_space(right.after, p)
+
+            if trailing_comma and self._closes_with_bracket():
+                # After a trailing comma, the line break before the closing bracket is the comma's.
+                comma = trailing_comma.replace(suffix=self._closing(trailing_comma.suffix, elem, indent))
+                right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
 
             t = cast(T, elem)
         else:
@@ -758,6 +759,37 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 grandparent.put_message("last_indent", indent)
                 grandparent.put_message("chained_indent", indent)
         return elem, after
+
+    def _closes_with_bracket(self) -> bool:
+        """Whether a bracket closes the elements the cursor is among. After a trailing comma without one, as at the end
+        of `x = 1,`, the line break is the next statement's, though the comma holds it."""
+        owner = self.cursor.parent_tree_cursor().value
+        if isinstance(owner, CollectionLiteral):
+            return owner.padding.elements.markers.find_first(OmitParentheses) is None
+        return isinstance(owner, (MethodInvocation, Annotation, MethodDeclaration, ClassDeclaration, DictLiteral,
+                                  MultiImport, TypeParameters, ParameterizedType))
+
+    def _closing(self, space: Space, last: J, column: int) -> Space:
+        """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
+        ``column``. A comment line takes the column of ``last`` when ``last`` starts a line, and otherwise moves as
+        far as the bracket does, but no further left than the bracket."""
+        if not space.comments:
+            return self._indent_to(space, column)
+        final = len(space.comments) - 1
+        closing = space.comments[final].suffix
+        shift = column - self._get_length_of_whitespace(closing) if '\n' in closing else 0
+        element_column = self.find_indent(last.prefix) if '\n' in last.prefix.last_whitespace else None
+
+        def line(whitespace: str, to_column: Optional[int]) -> str:
+            if '\n' not in whitespace:
+                return whitespace
+            current = self._get_length_of_whitespace(whitespace)
+            return self._indent(whitespace, (max(current + shift, column) if to_column is None else to_column) - current)
+
+        return space.replace(
+            whitespace=line(space.whitespace, element_column),
+            comments=list_map(lambda c, i: c.replace(suffix=line(c.suffix, column if i == final else element_column)),
+                              space.comments))
 
     def _indent_to(self, space: Space, column: int, context: Optional[str] = None) -> Space:
         s = space
