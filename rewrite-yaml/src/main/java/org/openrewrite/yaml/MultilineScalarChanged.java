@@ -17,15 +17,16 @@ package org.openrewrite.yaml;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 /// Tells `IndentsVisitor` how to indent a multiline scalar that was merged into a document.
 ///
-/// @deprecated Neither `MergeYamlVisitor` nor `IndentsVisitor` uses this marker anymore. It will be removed in a
-/// future release.
+/// @deprecated Neither `MergeYamlVisitor` nor `IndentsVisitor` uses this marker anymore.
 @Deprecated
+@ToBeRemoved(after = "2027-05-16", reason = "No longer added by MergeYamlVisitor nor read by IndentsVisitor")
 @Value
 @With
 public class MultilineScalarChanged implements Marker {
