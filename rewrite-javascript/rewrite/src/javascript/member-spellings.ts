@@ -21,8 +21,7 @@ import {isObjectBindingPattern, JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve, rootName} from "./scope";
 import {
-    aliasing, errorsSuppressed, moduleNameOf, movedBinding, newIdentifier, respecify, sameAttributes, withMovedTypes,
-    withoutStatement
+    aliasing, moduleNameOf, movedBinding, newIdentifier, respecify, sameAttributes, withMovedTypes, withoutStatement
 } from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
@@ -185,9 +184,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
      *     export {Old} from "m"       →  export {New as Old} from "m2"
      *     export {Old, X} from "m"    →  export {X} from "m"; export {New as Old} from "m2"
      *     export {Old} from "m";      →  export {Y, New as Old} from "m2"
-     *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not)
-     *
-     * It joins one with the same import attributes that does not sit under `// @ts-ignore`.
+     *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not,
+     *                                      with the same import attributes)
      *
      * A comment ending the line (`export {X} from "m"; // note`) stays on it, before the new statement.
      */
@@ -205,12 +203,10 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
             }
             changed = true;
             const staying = new Set(elements.filter(e => !moving.has(e)));
-            // A statement under `// @ts-ignore` that only re-exports the member keeps it, and the comment with it.
-            const keepsStatement = staying.size === 0 && errorsSuppressed(cu, declaration);
-            const target = keepsStatement ? -1 : statements.findIndex((s, j) => {
+            const target = statements.findIndex((s, j) => {
                 const into = j === i ? undefined : reExportFrom(s.element, this.to.module);
                 return into !== undefined && into.typeOnly.element === declaration.typeOnly.element &&
-                    sameAttributes(into.attributes, declaration.attributes) && !errorsSuppressed(cu, into);
+                    sameAttributes(into.attributes, declaration.attributes);
             });
             if (target < 0 && staying.size === 0) {
                 statements[i] = {...statements[i], element: this.respecified(withElements(declaration, elements.map(e => this.renamed(e))))};
