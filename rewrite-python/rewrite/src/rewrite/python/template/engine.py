@@ -109,7 +109,8 @@ def _indented_outside_strings(code: str) -> str:
             if token.type in _STRING_TOKENS:
                 continued.update(range(token.start[0] + 1, token.end[0] + 1))
     except (tokenize.TokenError, SyntaxError):
-        # Code that does not tokenize does not parse either, and the parse says what is wrong with it.
+        # The parser tokenizes the same code, so code that does not tokenize does not parse either, and the parse
+        # says what is wrong with it.
         pass
     return '\n'.join(line if row in continued else _WRAPPER_INDENT + line
                      for row, line in enumerate(code.split('\n'), 1))
@@ -632,5 +633,5 @@ class _OutOfWrapper(PythonVisitor[None]):
 
     def visit_marker(self, marker: Marker, p: None) -> Marker:
         if isinstance(marker, TrailingComma):
-            return marker.replace(suffix=_out_of_wrapper(marker.suffix))
+            return marker.replace(suffix=self.visit_space(marker.suffix, p))
         return marker
