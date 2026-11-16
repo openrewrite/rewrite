@@ -2710,9 +2710,9 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string, recv typ
 		// mapType is the depth-bounded, panic-guarded entry; the
 		// mapNamed underneath it is not.
 		if _, ok := obj.Type().(*types.Named); ok {
-			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
+			declaring = classOf(ctx.mapper.mapType(obj.Type()))
 		} else if recv != nil {
-			declaring, _ = ctx.mapper.mapType(recv).(*java.JavaTypeClass)
+			declaring = classOf(ctx.mapper.mapType(recv))
 		}
 		return ctx.mapper.mapSignature(sig, name, declaring)
 	}

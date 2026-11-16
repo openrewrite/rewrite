@@ -663,3 +663,91 @@ func f(b Box[int], p Pair[string, int]) {
 	}
 	assert.Equal(t, []string{"main.Box", "main.Pair"}, types)
 }
+
+func TestGenericInstantiationIsParameterized(t *testing.T) {
+	// given
+	src := `package main
+
+type Stack[T any] struct{ items []T }
+
+func (s *Stack[T]) Push(item T) { s.items = append(s.items, item) }
+
+func (s *Stack[T]) Peek() T { return s.items[len(s.items)-1] }
+
+type Peeker interface{ Peek() string }
+
+func f(strs Stack[string], ints Stack[int]) {
+	strs.Push("x")
+	_ = strs.items
+	var _ Peeker = &strs
+}
+`
+
+	// when
+	cu := parseAttribution(t, src)
+	c := rwtest.CollectTypedNodes(cu)
+
+	// then
+	require.Len(t, c.ParameterizedTypes, 4)
+	pt, ok := c.ParameterizedTypes[2].Type.(*java.JavaTypeParameterized)
+	require.Truef(t, ok, "expected Stack[string] to be parameterized, got %T", c.ParameterizedTypes[2].Type)
+	assert.Equal(t, "main.Stack", pt.GetFullyQualifiedName())
+	require.Len(t, pt.TypeParameters, 1)
+	assert.Equal(t, "string", matcher.GetFullyQualifiedName(pt.TypeParameters[0]))
+	stack := matcher.AsClass(pt)
+	require.NotNil(t, stack)
+	require.Len(t, stack.TypeParameters, 1)
+	assert.IsType(t, &java.JavaTypeGenericTypeVariable{}, stack.TypeParameters[0])
+
+	assert.Equal(t, "main.Stack<string>", java.TypeSignature(identType(t, cu, "strs")))
+	assert.Equal(t, "main.Stack<int>", java.TypeSignature(identType(t, cu, "ints")))
+	assert.False(t, matcher.IsSameGoType(identType(t, cu, "strs"), identType(t, cu, "ints")))
+
+	push := invocationNamed(t, c, "Push")
+	assert.Equal(t, "main.Stack", matcher.DeclaringTypeFQN(push))
+	require.Len(t, push.MethodType.ParameterTypes, 1)
+	assert.Equal(t, "string", matcher.GetFullyQualifiedName(push.MethodType.ParameterTypes[0]))
+
+	var items *java.JavaTypeVariable
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if fa, ok := n.(*java.FieldAccess); ok && fa.Name.Element.Name == "items" {
+			items = fa.Name.Element.FieldType
+		}
+		return items == nil
+	})
+	require.NotNil(t, items)
+	assert.Equal(t, "main.Stack", matcher.GetFullyQualifiedName(items.Owner))
+
+	var peeker java.JavaType
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if id, ok := n.(*java.Identifier); ok && id.Name == "Peeker" && id.Type != nil {
+			peeker = id.Type
+		}
+		return peeker == nil
+	})
+	require.NotNil(t, peeker)
+	assert.True(t, matcher.IsAssignableToType(identType(t, cu, "strs"), peeker))
+	assert.False(t, matcher.IsAssignableToType(identType(t, cu, "ints"), peeker))
+}
+
+func TestFuncValueOfGenericInstantiationKeepsDeclaringType(t *testing.T) {
+	// given
+	src := `package main
+
+type Handler[T any] struct{ fn func(T) }
+
+type Fn[T any] func(T)
+
+func f(h Handler[int], g Fn[string]) {
+	h.fn(1)
+	g("x")
+}
+`
+
+	// when
+	c := collectAttribution(t, src)
+
+	// then
+	assert.Equal(t, "main.Handler", matcher.DeclaringTypeFQN(invocationNamed(t, c, "fn")))
+	assert.Equal(t, "main.Fn", matcher.DeclaringTypeFQN(invocationNamed(t, c, "g")))
+}

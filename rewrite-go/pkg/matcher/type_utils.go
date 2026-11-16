@@ -126,33 +126,80 @@ func hasMethodSet(from java.JavaType, methods []*java.JavaTypeMethod) bool {
 	if cls == nil {
 		return false
 	}
+	typeArgs := typeArgsOf(from, cls)
 	for _, want := range methods {
-		if !hasMethod(cls, want) {
+		if !hasMethod(cls, want, typeArgs) {
 			return false
 		}
 	}
 	return true
 }
 
-func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod) bool {
+// typeArgsOf binds a generic's type parameters to the arguments an
+// instantiation of it supplies, since its methods are declared in terms of
+// the parameters.
+func typeArgsOf(t java.JavaType, cls *java.JavaTypeClass) map[string]java.JavaType {
+	p, ok := t.(*java.JavaTypeParameterized)
+	if !ok || len(p.TypeParameters) != len(cls.TypeParameters) {
+		return nil
+	}
+	bound := make(map[string]java.JavaType, len(p.TypeParameters))
+	for i, tp := range cls.TypeParameters {
+		if v, ok := tp.(*java.JavaTypeGenericTypeVariable); ok {
+			bound[v.Name] = p.TypeParameters[i]
+		}
+	}
+	return bound
+}
+
+func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod, typeArgs map[string]java.JavaType) bool {
 	for _, have := range cls.Methods {
-		if have.Name == want.Name && sameSignature(have, want) {
+		if have.Name == want.Name && sameSignature(have, want, typeArgs) {
 			return true
 		}
 	}
 	return false
 }
 
-func sameSignature(a, b *java.JavaTypeMethod) bool {
+func sameSignature(a, b *java.JavaTypeMethod, typeArgs map[string]java.JavaType) bool {
 	if len(a.ParameterTypes) != len(b.ParameterTypes) {
 		return false
 	}
 	for i := range a.ParameterTypes {
-		if !IsSameGoType(a.ParameterTypes[i], b.ParameterTypes[i]) {
+		if !IsSameGoType(substitute(a.ParameterTypes[i], typeArgs), b.ParameterTypes[i]) {
 			return false
 		}
 	}
-	return IsSameGoType(a.ReturnType, b.ReturnType)
+	return IsSameGoType(substitute(a.ReturnType, typeArgs), b.ReturnType)
+}
+
+func substitute(t java.JavaType, typeArgs map[string]java.JavaType) java.JavaType {
+	if len(typeArgs) == 0 {
+		return t
+	}
+	switch v := t.(type) {
+	case *java.JavaTypeGenericTypeVariable:
+		if arg, ok := typeArgs[v.Name]; ok {
+			return arg
+		}
+	case *java.JavaTypeArray:
+		return &java.JavaTypeArray{ElemType: substitute(v.ElemType, typeArgs), Annotations: v.Annotations}
+	case *java.JavaTypeParameterized:
+		params := make([]java.JavaType, len(v.TypeParameters))
+		for i, tp := range v.TypeParameters {
+			params[i] = substitute(tp, typeArgs)
+		}
+		return &java.JavaTypeParameterized{Type: v.Type, TypeParameters: params}
+	case *java.JavaTypeMethod:
+		sub := *v
+		sub.ParameterTypes = make([]java.JavaType, len(v.ParameterTypes))
+		for i, pt := range v.ParameterTypes {
+			sub.ParameterTypes[i] = substitute(pt, typeArgs)
+		}
+		sub.ReturnType = substitute(v.ReturnType, typeArgs)
+		return &sub
+	}
+	return t
 }
 
 // Implements checks if the type implements the given interface FQN.
