@@ -2241,16 +2241,10 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Short;
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
-                    // an attribute selector is modeled as a String ConstantExpression
-                    if (source.startsWith("@" + value, cursor)) {
-                        value = "@" + value;
-                        text = "@" + text;
-                    } else {
-                        Delimiter delimiter = getDelimiter(expression, cursor);
-                        if (delimiter != null) {
-                            // value is decoded per this delimiter's escaping rules; the source supplies the spelling
-                            text = delimiter.open + sourceSubstring(cursor + delimiter.open.length(), delimiter.close) + delimiter.close;
-                        }
+                    Delimiter delimiter = getDelimiter(expression, cursor);
+                    if (delimiter != null) {
+                        // value is decoded per this delimiter's escaping rules; the source supplies the spelling
+                        text = delimiter.open + sourceSubstring(cursor + delimiter.open.length(), delimiter.close) + delimiter.close;
                     }
                 } else if (expression.isNullExpression()) {
                     if (source.startsWith("null", cursor)) {
@@ -2973,23 +2967,23 @@ public class GroovyParserVisitor {
         public void visitAttributeExpression(AttributeExpression attr) {
             queue.add(insideParentheses(attr, fmt -> {
                 Expression target = doVisit(attr.getObjectExpression());
-                Space beforeDot = attr.isSafe() ? sourceBefore("?.") : sourceBefore(attr.isSpreadSafe() ? "*." : ".");
+                Space beforeDot = sourceBefore(attr.isSpreadSafe() ? "*." : attr.isSafe() ? "?." : ".");
+                Space beforeAt = sourceBefore("@");
                 int saveCursor = cursor;
                 J name = doVisit(attr.getProperty());
                 if (name instanceof J.Literal) {
                     String nameStr = ((J.Literal) name).getValueSource();
                     assert nameStr != null;
-                    JavaType.Variable field = attr.getPropertyAsString() == null ? null :
-                            propertyField(attr, attr.getPropertyAsString(), true);
+                    JavaType.Variable field = propertyField(attr, nameStr, true);
                     name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr,
                             propertyType(attr, field), field);
                 } else if (name instanceof G.GString) {
                     name = gStringAsIdentifier((G.GString) name, saveCursor);
                 }
+                name = name.withMarkers(name.getMarkers().add(new DirectFieldAccess(randomId(), beforeAt)));
                 if (attr.isSpreadSafe()) {
                     name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
-                }
-                if (attr.isSafe()) {
+                } else if (attr.isSafe()) {
                     name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
                 }
                 return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name),
