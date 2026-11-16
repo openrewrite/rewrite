@@ -67,11 +67,16 @@ class GradleApiTypeTableTest {
           .containsExactlyInAnyOrder(Arrays.stream(GradleParser.GRADLE_API_MAJORS).boxed().toArray(Integer[]::new));
         classesByVersion.forEach((version, classes) -> assertThat(classes)
           .as("Groovy classes in the Gradle %s API", version)
-          .doesNotContainAnyElementsOf(groovyCore));
+          .doesNotContainAnyElementsOf(groovyCore)
+          .as("implementation classes in the Gradle %s API", version)
+          .doesNotContain("org/gradle/initialization/DefaultSettings"));
         // writePublicApi in build.gradle.kts says why
+        ClassLoader jdk = ClassLoader.getPlatformClassLoader();
         referencesByVersion.forEach((version, references) -> assertThat(references)
           .as("classes the Gradle %s API refers to", version)
-          .allMatch(name -> name.startsWith("java/") || groovyCore.contains(name) ||
+          // XmlProvider.asElement() returns it, from a JDK module outside java.*
+          .contains("org/w3c/dom/Element")
+          .allMatch(name -> jdk.getResource(name + ".class") != null || groovyCore.contains(name) ||
                             classesByVersion.get(version).contains(name)));
     }
 }

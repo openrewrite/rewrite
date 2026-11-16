@@ -12,6 +12,7 @@ import org.objectweb.asm.signature.SignatureVisitor
 import org.openrewrite.java.internal.parser.TypeTable
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.Properties
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import java.util.zip.GZIPInputStream
@@ -57,17 +58,6 @@ repositories {
 }
 
 recipeDependencies {
-    parserClasspath("org.gradle:gradle-base-services:latest.release")
-    parserClasspath("org.gradle:gradle-core-api:latest.release")
-    parserClasspath("org.gradle:gradle-language-groovy:latest.release")
-    parserClasspath("org.gradle:gradle-language-java:latest.release")
-    parserClasspath("org.gradle:gradle-logging:latest.release")
-    parserClasspath("org.gradle:gradle-messaging:latest.release")
-    parserClasspath("org.gradle:gradle-native:latest.release")
-    parserClasspath("org.gradle:gradle-process-services:latest.release")
-    parserClasspath("org.gradle:gradle-resources:latest.release")
-    parserClasspath("org.gradle:gradle-testing-base:latest.release")
-    parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
     // 3.19.2 is the last release with both the `develocity` and the legacy `gradleEnterprise` extension types;
     // 4.x removed the latter, which settings scripts still awaiting rewrite-migrate-gradle's
     // `migrate.plugins.MigrateGradleEnterpriseToDevelocity` rely on
@@ -122,19 +112,21 @@ tasks.named("createTypeTable") {
 }
 
 /**
- * Writes the public classes of a Gradle distribution to a jar, with the classes their declarations extend, which type
- * attribution needs to find inherited members. A member or annotation that refers to a class outside the jar is left
- * out, since Groovy cannot resolve the members of a class when one of them refers to a missing class. The Kotlin DSL
- * is left out.
+ * Writes the classes of the API a Gradle distribution declares in its gradle-api-metadata jar to a jar, with the classes
+ * their declarations extend, which type attribution needs to find inherited members. A member or annotation that
+ * refers to a class outside the jar is left out, since Groovy cannot resolve the members of a class when one of them
+ * refers to a missing class.
  */
 fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
     val classes = mutableMapOf<String, ByteArray>()
+    val apiDeclaration = Properties()
     ZipInputStream(distribution.inputStream()).use { zip ->
         generateSequence { zip.nextEntry }
             .filter { Regex("gradle-[^/]+/lib/(plugins/)?[^/]+\\.jar").matches(it.name) }
             .forEach {
                 val nested = ZipInputStream(ByteArrayInputStream(zip.readBytes()))
                 generateSequence { nested.nextEntry }
+                    .onEach { e -> if (e.name == "gradle-api-declaration.properties") apiDeclaration.load(nested) }
                     .filter { e -> e.name.endsWith(".class") && !e.name.startsWith("java/") }
                     .forEach { e ->
                         val name = e.name.removeSuffix(".class")
@@ -142,8 +134,15 @@ fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
                     }
             }
     }
-    val pending = ArrayDeque(classes.keys.filter {
-        it.startsWith("org/gradle/") && !it.contains("/internal/") && !it.startsWith("org/gradle/kotlin/")
+    fun antPatterns(key: String) = apiDeclaration.getProperty(key).split(':').map { pattern ->
+        Regex(pattern.split("**").joinToString(".*") { part ->
+            part.split('*').joinToString("[^/]*", transform = Regex::escape)
+        })
+    }
+    val includes = antPatterns("includes")
+    val excludes = antPatterns("excludes")
+    val pending = ArrayDeque(classes.keys.filter { name ->
+        "$name.class".let { path -> includes.any { it.matches(path) } && excludes.none { it.matches(path) } }
     })
     val kept = sortedSetOf<String>()
     while (pending.isNotEmpty()) {
@@ -161,7 +160,8 @@ fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
             }, ClassReader.SKIP_CODE)
         }
     }
-    val resolvable = { name: String -> name in kept || name in groovyCore || name.startsWith("java/") }
+    val jdk = ClassLoader.getPlatformClassLoader()
+    val resolvable = { name: String -> name in kept || name in groovyCore || jdk.getResource("$name.class") != null }
     JarOutputStream(jar.outputStream()).use { out ->
         kept.forEach {
             out.putNextEntry(JarEntry("$it.class"))
