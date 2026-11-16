@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileParser;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Repository;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -26,6 +27,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -70,6 +72,34 @@ class NodeResolutionResultRpcTest {
         assertThat(backEdge.getResolved())
                 .as("the back-reference closing the cycle must resolve to the same instance")
                 .isSameAs(a);
+    }
+
+    @Test
+    void roundTripRepositories() {
+        ResolvedDependency express = new ResolvedDependency("express", "5.1.0", null, null, null, null, null, "MIT",
+                new Repository("git", "git+https://github.com/expressjs/express.git", null));
+        ResolvedDependency debug = new ResolvedDependency("debug", "4.4.3", null, null, null, null, null, "MIT",
+                new Repository(null, "github:debug-js/debug", null));
+        ResolvedDependency ms = new ResolvedDependency("ms", "2.1.3", null, null, null, null, null, "MIT");
+        NodeResolutionResult marker = new NodeResolutionResult(UUID.randomUUID(), "my-app", "1.0.0", null,
+                "package.json", null,
+                singletonList(new Dependency("express", "^5.0.0", express)),
+                new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                new ArrayList<>(Arrays.asList(express, debug, ms)),
+                NodeResolutionResult.PackageManager.Npm, null, null,
+                new Repository("git", "https://github.com/acme/mono.git", "packages/app"));
+
+        NodeResolutionResult received = sendAndReceive(marker);
+
+        assertThat(received.getRepository())
+                .isEqualTo(new Repository("git", "https://github.com/acme/mono.git", "packages/app"));
+        assertThat(received.getResolvedDependencies()).extracting(ResolvedDependency::getRepository).containsExactly(
+                new Repository("git", "git+https://github.com/expressjs/express.git", null),
+                new Repository(null, "github:debug-js/debug", null),
+                null);
+        assertThat(received.getResolvedDependencies()).extracting(ResolvedDependency::getLicense)
+                .containsOnly("MIT");
+        assertThat(received.getPackageManager()).isEqualTo(NodeResolutionResult.PackageManager.Npm);
     }
 
     private static NodeResolutionResult sendAndReceive(NodeResolutionResult marker) {
