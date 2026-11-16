@@ -32,6 +32,7 @@ from rewrite.java import tree as j
 from rewrite.java.markers import TrailingComma
 from rewrite.java.support_types import Space
 from rewrite.markers import Marker
+from rewrite.python._parser_visitor import FSTRING_MIDDLE, TSTRING_MIDDLE
 from rewrite.python.visitor import PythonVisitor
 from rewrite.utils import list_map
 
@@ -47,7 +48,7 @@ from .replacement import substitution_marker
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 _WRAPPER_INDENT = "    "
-_STRING_TOKENS = {tokenize.STRING, tokenize.FSTRING_MIDDLE, getattr(tokenize, 'TSTRING_MIDDLE', tokenize.STRING)}
+_STRING_TOKENS = {tokenize.STRING, FSTRING_MIDDLE, TSTRING_MIDDLE}
 
 
 _stdlib_venv: Optional[str] = None
@@ -114,13 +115,6 @@ def _indented_outside_strings(code: str) -> str:
         pass
     return '\n'.join(line if row in continued else _WRAPPER_INDENT + line
                      for row, line in enumerate(code.split('\n'), 1))
-
-
-def _out_of_wrapper(space: Space) -> Space:
-    return space.replace(
-        whitespace=space.whitespace.replace('\n' + _WRAPPER_INDENT, '\n'),
-        comments=list_map(lambda c: c.replace(suffix=c.suffix.replace('\n' + _WRAPPER_INDENT, '\n')),
-                          space.comments))
 
 
 def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor']) -> bool:
@@ -629,7 +623,11 @@ class _OutOfWrapper(PythonVisitor[None]):
     template's tree is laid out as its code is, whether or not it is formatted where it lands."""
 
     def visit_space(self, space: Optional[Space], p: None) -> Space:
-        return _out_of_wrapper(super().visit_space(space, p))
+        space = super().visit_space(space, p)
+        return space.replace(
+            whitespace=space.whitespace.replace('\n' + _WRAPPER_INDENT, '\n'),
+            comments=list_map(lambda c: c.replace(suffix=c.suffix.replace('\n' + _WRAPPER_INDENT, '\n')),
+                              space.comments))
 
     def visit_marker(self, marker: Marker, p: None) -> Marker:
         if isinstance(marker, TrailingComma):
