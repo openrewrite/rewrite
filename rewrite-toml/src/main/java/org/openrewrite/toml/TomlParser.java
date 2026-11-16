@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.toml.internal.TomlParserVisitor;
 import org.openrewrite.toml.internal.grammar.TomlLexer;
 import org.openrewrite.toml.tree.Toml;
@@ -29,7 +30,6 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
@@ -39,8 +39,10 @@ public class TomlParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
-            try (InputStream sourceStream = input.getSource(ctx)) {
-                TomlLexer lexer = new TomlLexer(CharStreams.fromStream(sourceStream));
+            try (EncodingDetectingInputStream sourceStream = input.getSource(ctx)) {
+                // Lex the same decoded text the visitor reads, or a file that is not UTF-8 lexes to different text
+                String source = sourceStream.readFully();
+                TomlLexer lexer = new TomlLexer(CharStreams.fromString(source));
                 lexer.removeErrorListeners();
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
@@ -51,7 +53,9 @@ public class TomlParser implements Parser {
                 Toml.Document document = new TomlParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
-                        input.getSource(ctx)
+                        source,
+                        sourceStream.getCharset(),
+                        sourceStream.isCharsetBomMarked()
                 ).visitDocument(parser.document());
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);

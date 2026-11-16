@@ -18,16 +18,22 @@ package org.openrewrite.toml;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -631,6 +637,19 @@ class TomlParserTest implements RewriteTest {
                 Long.MIN_VALUE))
           )
         );
+    }
+
+    @Test
+    void fileNotInUtf8() {
+        String source = "[default]\nencoded_variable=\"accents like ç and ã é\"\n";
+        Parser.Input input = new Parser.Input(Paths.get("settings.toml"),
+          () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.ISO_8859_1)));
+
+        SourceFile parsed = new TomlParser().parseInputs(singletonList(input), null, new InMemoryExecutionContext())
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(Toml.Document.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
     }
 
     @ParameterizedTest

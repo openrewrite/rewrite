@@ -56,11 +56,15 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     private int codePointCursor = 0;
 
     public TomlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
+        this(path, fileAttributes, source.readFully(), source.getCharset(), source.isCharsetBomMarked());
+    }
+
+    public TomlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.fileAttributes = fileAttributes;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+        this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     @Override
