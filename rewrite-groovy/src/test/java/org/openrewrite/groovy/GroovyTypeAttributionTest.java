@@ -462,6 +462,153 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void sameNamedCatchParametersAreDistinctVariables() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  void m() {
+                      try { } catch (IOException e) { }
+                      try { } catch (IOException e) { }
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> declared = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        declared.add(variable.getVariableType());
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                assertThat(declared).hasSize(2);
+                assertThat(declared.get(0)).isNotSameAs(declared.get(1));
+            })
+          )
+        );
+    }
+
+    @Test
+    void multiCatchVariableHasTheAlternativesCommonSuperclass() {
+        rewriteRun(
+          groovy(
+            """
+              try { } catch (IOException | IllegalStateException e) { }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(variable.getVariableType().getType(), "java.lang.Exception")).isTrue();
+                    return variable;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void quotedPropertyNameHasTheField() {
+        rewriteRun(
+          groovy(
+            """
+              class Foo {
+                  String name
+              }
+              def f = new Foo()
+              f.'name'.length()
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                    assertThat(fieldAccess.getName().getFieldType().getName()).isEqualTo("name");
+                    return fieldAccess;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void onlyMethodOfMatchingArityIsChosenForAnUntypedArgument() {
+        rewriteRun(
+          groovy(
+            """
+              def first(String s, def i) { s.charAt(i) }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(method.getMethodType()).isNotNull();
+                    assertThat(method.getMethodType().getParameterTypes()).containsExactly(JavaType.Primitive.Int);
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void explicitlyTypedLocalHasItsDeclaredType() {
+        rewriteRun(
+          groovy(
+            """
+              Object o = "a"
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(variable.getVariableType().getType(), "java.lang.Object")).isTrue();
+                    return variable;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void mapPropertyIsAKeyNotAField() {
+        rewriteRun(
+          groovy(
+            """
+              def m = new HashMap()
+              m.threshold
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                    assertThat(fieldAccess.getName().getFieldType()).isNull();
+                    return fieldAccess;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void fieldInitializerInScriptIsNotOwnedByTheScript() {
+        rewriteRun(
+          groovy(
+            """
+              class B {
+                  def c = { String q -> q }
+              }
+              println 1
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("q".equals(variable.getSimpleName())) {
+                        assertThat(variable.getVariableType().getOwner()).isNotInstanceOf(JavaType.Method.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
     void unaryOperatorsHaveTheirResultType() {
         rewriteRun(
           groovy(
