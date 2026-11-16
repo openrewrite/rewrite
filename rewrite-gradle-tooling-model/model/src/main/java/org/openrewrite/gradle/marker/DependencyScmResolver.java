@@ -289,7 +289,8 @@ final class DependencyScmResolver {
 
     /**
      * As {@link ResolvedPom#getScm()}: each value from the nearest POM that declares it, placeholders resolved
-     * against the child, and the child's artifactId not appended to what is inherited.
+     * against the child, and the child's artifactId not appended to what is inherited. The nearest parent to provide
+     * where the repository is, rather than only its tag, is its {@link Scm#getInheritedFrom()}.
      */
     private @Nullable Scm effectiveScm(String gav) {
         Pom requested = poms.get(gav);
@@ -301,6 +302,8 @@ final class DependencyScmResolver {
         Set<String> seen = new HashSet<>();
         Pom pom = requested;
         String pomGav = gav;
+        // null for the requested POM itself
+        GroupArtifactVersion ancestor = null;
         while (pom != null && seen.add(pomGav) && seen.size() <= MAX_PARENTS) {
             for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
                 if (!properties.containsKey(property.getKey())) {
@@ -309,16 +312,26 @@ final class DependencyScmResolver {
             }
             Scm declared = pom.getScm();
             if (declared != null) {
-                scm = scm == null ? declared : new Scm(
-                        scm.getConnection() == null ? declared.getConnection() : scm.getConnection(),
-                        scm.getDeveloperConnection() == null ? declared.getDeveloperConnection() : scm.getDeveloperConnection(),
-                        scm.getUrl() == null ? declared.getUrl() : scm.getUrl(),
-                        scm.getTag() == null ? declared.getTag() : scm.getTag());
+                Scm nearer = scm == null ? new Scm(null, null, null, null) : scm;
+                GroupArtifactVersion inheritedFrom = nearer.getInheritedFrom();
+                if (inheritedFrom == null && ancestor != null && (
+                        nearer.getConnection() == null && declared.getConnection() != null ||
+                        nearer.getDeveloperConnection() == null && declared.getDeveloperConnection() != null ||
+                        nearer.getUrl() == null && declared.getUrl() != null)) {
+                    inheritedFrom = ancestor;
+                }
+                scm = new Scm(
+                        nearer.getConnection() == null ? declared.getConnection() : nearer.getConnection(),
+                        nearer.getDeveloperConnection() == null ? declared.getDeveloperConnection() : nearer.getDeveloperConnection(),
+                        nearer.getUrl() == null ? declared.getUrl() : nearer.getUrl(),
+                        nearer.getTag() == null ? declared.getTag() : nearer.getTag(),
+                        inheritedFrom);
             }
             GroupArtifactVersion parent = parentOf(pom);
             if (parent == null) {
                 break;
             }
+            ancestor = parent;
             pomGav = gav(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
             pom = poms.get(pomGav);
         }
@@ -327,6 +340,6 @@ final class DependencyScmResolver {
         }
         ResolvedPom effective = ResolvedPom.builder().requested(requested).properties(properties).build();
         return new Scm(effective.getValue(scm.getConnection()), effective.getValue(scm.getDeveloperConnection()),
-                effective.getValue(scm.getUrl()), effective.getValue(scm.getTag()));
+                effective.getValue(scm.getUrl()), effective.getValue(scm.getTag()), scm.getInheritedFrom());
     }
 }

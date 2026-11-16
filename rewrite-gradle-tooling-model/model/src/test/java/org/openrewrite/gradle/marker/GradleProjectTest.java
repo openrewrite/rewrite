@@ -359,6 +359,9 @@ class GradleProjectTest {
               ivy {
                   url 'ivy-repo'
               }
+              maven {
+                  url 'maven-repo'
+              }
           }
 
           dependencies {
@@ -367,6 +370,8 @@ class GradleProjectTest {
               implementation 'aopalliance:aopalliance:1.0'
               implementation ':no-pom:1.0'
               implementation 'org.example:ivy-lib:1.0'
+              implementation 'org.example:own-url:1.0'
+              implementation 'org.example:own-address:1.0'
               implementation project(':lib')
           }
           """;
@@ -396,8 +401,99 @@ class GradleProjectTest {
               </ivy-module>
               """.getBytes(StandardCharsets.UTF_8));
 
+            mavenModule("scm-parent", "pom", """
+              <scm>
+                <connection>scm:git:https://git.example.org/parent.git</connection>
+                <tag>HEAD</tag>
+              </scm>
+              """);
+            mavenModule("own-url", "jar", """
+              <parent>
+                <groupId>org.example</groupId>
+                <artifactId>scm-parent</artifactId>
+                <version>1.0</version>
+              </parent>
+              <scm>
+                <url>https://git.example.org/own-url</url>
+              </scm>
+              """);
+            mavenModule("own-address", "jar", """
+              <parent>
+                <groupId>org.example</groupId>
+                <artifactId>scm-parent</artifactId>
+                <version>1.0</version>
+              </parent>
+              <scm>
+                <connection>scm:git:https://git.example.org/own-address.git</connection>
+                <url>https://git.example.org/own-address</url>
+              </scm>
+              """);
+
             OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
             gradleProject = model.getGradleProject();
+        }
+
+        private static void mavenModule(String artifactId, String packaging, String body) throws IOException {
+            Path module = Files.createDirectories(dir.resolve("maven-repo/org/example/" + artifactId + "/1.0"));
+            Files.write(module.resolve(artifactId + "-1.0.pom"), ("""
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>%s</artifactId>
+                <version>1.0</version>
+                <packaging>%s</packaging>
+                %s
+              </project>
+              """.formatted(artifactId, packaging, body)).getBytes(StandardCharsets.UTF_8));
+            if ("jar".equals(packaging)) {
+                emptyJar(module.resolve(artifactId + "-1.0.jar"));
+            }
+        }
+
+        @Test
+        void declaredScmIsInheritedFromNoPom() {
+            assertThat(compileClasspath("junit").getScm())
+              .extracting(Scm::getInheritedFrom)
+              .isNull();
+        }
+
+        @Test
+        void inheritedScmNamesTheNearestParentThatContributed() {
+            assertThat(compileClasspath("guava").getScm())
+              .extracting(Scm::getInheritedFrom)
+              .isEqualTo(new GroupArtifactVersion("com.google.guava", "guava-parent", "29.0-jre"));
+
+            ResolvedDependency j2objc = compileClasspath("guava").findDependency("com.google.j2objc", "j2objc-annotations");
+            assertThat(requireNonNull(j2objc).getScm())
+              .as("its own POM declares no <scm>, so this is the repository of a parent of another organization")
+              .isEqualTo(new Scm(
+                "scm:svn:http://svn.sonatype.org/spice/tags/oss-parent-7",
+                "scm:svn:https://svn.sonatype.org/spice/tags/oss-parent-7",
+                "http://svn.sonatype.org/spice/tags/oss-parent-7",
+                null,
+                new GroupArtifactVersion("org.sonatype.oss", "oss-parent", "7")));
+        }
+
+        @Test
+        void ownUrlWithAnInheritedConnectionIsInherited() {
+            assertThat(compileClasspath("own-url").getScm()).isEqualTo(new Scm(
+              "scm:git:https://git.example.org/parent.git",
+              null,
+              "https://git.example.org/own-url",
+              "HEAD",
+              new GroupArtifactVersion("org.example", "scm-parent", "1.0")));
+        }
+
+        @Test
+        void inheritingOnlyTheTagIsNotInheritingTheRepository() {
+            Scm scm = compileClasspath("own-address").getScm();
+
+            assertThat(scm).isEqualTo(new Scm(
+              "scm:git:https://git.example.org/own-address.git",
+              null,
+              "https://git.example.org/own-address",
+              "HEAD"));
+            assertThat(scm.getInheritedFrom()).isNull();
         }
 
         @Test
@@ -415,7 +511,8 @@ class GradleProjectTest {
               "scm:git:https://github.com/google/guava.git",
               "scm:git:git@github.com:google/guava.git",
               "https://github.com/google/guava",
-              null));
+              null,
+              new GroupArtifactVersion("com.google.guava", "guava-parent", "29.0-jre")));
         }
 
         @Test
@@ -471,8 +568,9 @@ class GradleProjectTest {
               .filteredOn(dependency -> "guava".equals(dependency.getArtifactId()))
               .singleElement()
               .extracting(ResolvedDependency::getScm)
-              .extracting(Scm::getUrl)
-              .isEqualTo("https://github.com/google/guava");
+              .isEqualTo(compileClasspath("guava").getScm())
+              .extracting(Scm::getInheritedFrom)
+              .isEqualTo(new GroupArtifactVersion("com.google.guava", "guava-parent", "29.0-jre"));
         }
 
         private static void emptyJar(Path jar) throws IOException {
