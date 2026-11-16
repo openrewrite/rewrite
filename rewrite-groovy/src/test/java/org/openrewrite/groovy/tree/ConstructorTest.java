@@ -16,12 +16,14 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class ConstructorTest implements RewriteTest {
@@ -257,6 +259,34 @@ class ConstructorTest implements RewriteTest {
                 java . util . Map w = null
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9871")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "Outer. /* comment */ Inner",
+      "Outer /* comment */ .Inner",
+      "Outer. /* a.b */ Inner",
+      "Outer. // a.b\n Inner",
+      "Outer /* a.b */ . /* c.d */ Inner"
+    })
+    void commentsInQualifiedConstructorName(String typeName) {
+        rewriteRun(
+          groovy(
+            "def m() { foo(new " + typeName + "(1)) }",
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Integer>() {
+                @Override
+                public J.NewClass visitNewClass(J.NewClass newClass, Integer p) {
+                    assertThat(newClass.getClazz()).isInstanceOfSatisfying(J.FieldAccess.class, clazz -> {
+                        assertThat(clazz.getSimpleName()).isEqualTo("Inner");
+                        assertThat(clazz.getTarget()).isInstanceOfSatisfying(J.Identifier.class,
+                          target -> assertThat(target.getSimpleName()).isEqualTo("Outer"));
+                    });
+                    return super.visitNewClass(newClass, p);
+                }
+            }.visit(cu, 0))
           )
         );
     }

@@ -101,10 +101,6 @@ public class GroovyParserVisitor {
     private final Map<Integer, FieldNode> scriptFields = new HashMap<>();
 
     private static final Pattern MULTILINE_COMMENT_REGEX = Pattern.compile("(?s)/\\*.*?\\*/");
-    private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
-
-    @SuppressWarnings("RegExpSimplifiable")
-    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     /**
      * Elements within GString expressions which omit curly braces have column positions which are incorrect.
@@ -4100,31 +4096,33 @@ public class GroovyParserVisitor {
             return (T) arrayType(classNode);
         }
         Space prefix = whitespace();
-        String maybeFullyQualified = name();
-        // A qualified name may break around a dot (`new Outer.\n  Inner(…)`); read on only until the
-        // class's simple name, as `List\n  .of(1)` is a call on List
-        if (classNode != null) {
-            String simple = classNode.getNameWithoutPackage();
+        String simple = classNode == null ? null : classNode.getNameWithoutPackage();
+        if (simple != null) {
             simple = simple.substring(Math.max(simple.lastIndexOf('$'), simple.lastIndexOf('.')) + 1);
-            while (!lastNameSegment(maybeFullyQualified).equals(simple)) {
-                int save = cursor;
-                int next = indexOfNextNonWhitespace(cursor, source);
-                if (maybeFullyQualified.endsWith(".") && next < source.length() && Character.isJavaIdentifierStart(source.charAt(next))) {
-                    String gap = source.substring(cursor, next);
-                    cursor = next;
-                    maybeFullyQualified += gap + name();
-                } else if (!maybeFullyQualified.endsWith(".") && next + 1 < source.length() && source.charAt(next) == '.' &&
-                           source.charAt(next + 1) != '.') {
-                    String gap = source.substring(cursor, next + 1);
-                    cursor = next + 1;
-                    maybeFullyQualified += gap + name();
-                } else {
-                    cursor = save;
-                    break;
-                }
-            }
         }
-        String[] parts = maybeFullyQualified.split("\\.");
+        List<JRightPadded<J.Identifier>> parts = new ArrayList<>();
+        Space beforeName = EMPTY;
+        while (true) {
+            int start = cursor;
+            while (cursor < source.length() && (isJavaIdentifierPart(source.charAt(cursor)) || source.charAt(cursor) == '*')) {
+                cursor++;
+            }
+            String segment = source.substring(start, cursor);
+            J.Identifier identifier = new J.Identifier(randomId(), beforeName, Markers.EMPTY, emptyList(), segment, null, null);
+            int afterName = cursor;
+            Space beforeDot = whitespace();
+            boolean hasDot = cursor < source.length() && source.charAt(cursor) == '.' && !source.startsWith("..", cursor) &&
+                             (cursor == afterName || simple != null && !segment.equals(simple));
+            int nextName = hasDot ? indexOfNextNonWhitespace(cursor + 1, source) : source.length();
+            if (nextName >= source.length() || !(Character.isJavaIdentifierStart(source.charAt(nextName)) || source.charAt(nextName) == '*')) {
+                cursor = afterName;
+                parts.add(padRight(identifier, EMPTY));
+                break;
+            }
+            parts.add(padRight(identifier, beforeDot));
+            cursor++;
+            beforeName = whitespace();
+        }
 
         // Walk classNode's outer-class chain (outermost first) and align it
         // with the trailing segments of the source name. The leaf class is
@@ -4134,11 +4132,11 @@ public class GroovyParserVisitor {
         for (ClassNode c = classNode; c != null; c = c.getOuterClass()) {
             classChain.add(0, c);
         }
-        int classChainStart = parts.length - classChain.size();
+        int classChainStart = parts.size() - classChain.size();
 
         Expression expr = null;
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
+        for (int i = 0; i < parts.size(); i++) {
+            J.Identifier part = parts.get(i).getElement();
 
             JavaType segmentType = null;
             int classIdx = i - classChainStart;
@@ -4148,25 +4146,14 @@ public class GroovyParserVisitor {
             }
 
             if (i == 0) {
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part.trim(), segmentType, null);
+                expr = part.withType(segmentType);
             } else {
-                // The space after this dot leads this part; the space before it trails the previous part
-                Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
-                Space identFmt = whitespacePrefix.lookingAt() ? format(whitespacePrefix.group(0)) : EMPTY;
-
-                String previous = parts[i - 1];
-                int end = previous.length();
-                while (end > 0 && Character.isWhitespace(previous.charAt(end - 1))) {
-                    end--;
-                }
-                Space namePrefix = format(previous.substring(end));
-
                 expr = new J.FieldAccess(
                         randomId(),
                         EMPTY,
                         Markers.EMPTY,
                         expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
+                        padLeft(parts.get(i - 1).getAfter(), part),
                         segmentType
                 );
             }
@@ -4187,11 +4174,6 @@ public class GroovyParserVisitor {
             }
         }
         return expr.withPrefix(prefix);
-    }
-
-    private static String lastNameSegment(String dotted) {
-        String trimmed = dotted.trim();
-        return trimmed.substring(trimmed.lastIndexOf('.') + 1).trim();
     }
 
     private TypeTree arrayType(ClassNode classNode) {
