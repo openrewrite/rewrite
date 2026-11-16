@@ -2833,13 +2833,15 @@ class ParserVisitor(ast.NodeVisitor):
         self._token_idx += 1  # consume first ':'
 
         upper_expr = self.__convert(node.upper) if node.upper else None
-        right_padding = self.__whitespace()
+        # The whitespace after the slice's last part is the next token's, as the line break before a subscript's `]`.
+        has_step = self._peek_significant_token()[0].string == ':'
+        right_padding = self.__whitespace() if has_step else Space.EMPTY
         upper = self.__pad_right(upper_expr if node.upper else j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), right_padding)
-        has_step = self.__skip(':')
         if has_step:
+            self.__skip(':')
             step = self.__pad_right(
                 self.__convert(node.step) if node.step else j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
-                self.__whitespace(']')) if node.step or has_step else Space.EMPTY
+                Space.EMPTY)
         else:
             step = None
 

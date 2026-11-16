@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-public interface InterfaceB {
-	void methodB();
+package org.openrewrite.groovy.marker;
+
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
+
+import java.util.UUID;
+
+/**
+ * Marks the name of a field access written with Groovy's direct field access operator {@code .@},
+ * which reads the field without going through a getter.
+ */
+@Value
+@With
+public class DirectFieldAccess implements Marker {
+    UUID id;
+
+    /**
+     * The whitespace between the dot and the {@code @}.
+     */
+    Space beforeAt;
 }

@@ -3239,6 +3239,39 @@ describe("maybeRebind keeps the file's import layout", () => {
             export { a, b };`
         ));
     });
+
+    test("a comment ending the line of the statement a member leaves stays on that line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "x", "b"], ["d", "x", "default", "D"]);
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import {a, b} from "m"; // note
+                import {z} from "z";
+
+                a(b, z);`,
+                `
+                import {a} from "m"; // note
+                import {b} from "x";
+                import {z} from "z";
+
+                a(b, z);`
+            ),
+            // The statement is replaced, at the end of the file
+            //language=typescript
+            typescript(
+                `
+                import {z} from "z";
+                import D from "d"; // note
+                `,
+                `
+                import {z} from "z";
+                import {D} from "x"; // note
+                `
+            )
+        );
+    });
 });
 
 // Why test.fails?

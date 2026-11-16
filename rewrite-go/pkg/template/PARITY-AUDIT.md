@@ -93,8 +93,9 @@ result := tmpl.Apply(cursor, nil)
 ```
 
 `Imports(...)` is parse context only, matching `JavaTemplate.imports(...)`.
-Declarative template recipes that should edit source imports must say so
-explicitly:
+Declarative template recipes that should add source imports must say so
+explicitly; an import that only the replaced code used is removed either way,
+as Go compiles no file with an unused import:
 
 ```go
 template.WithAfter(`strconv.Itoa(#{N})`, template.Imports("strconv"), template.SourceImports("strconv"))

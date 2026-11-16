@@ -312,6 +312,30 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void refreshedMarkerKeepsRequiresPythonFromAnotherManifest() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              dependencies = ["requests>=2.28.0"]
+              """,
+            """
+              [project]
+              name = "myapp"
+              dependencies = ["requests>=2.28.0", "flask>=2.0"]
+              """,
+            // as parseProject leaves it when setup.py declares python_requires
+            s -> s.mapBeforeRecipe(doc -> doc.withMarkers(doc.getMarkers().setByType(doc.getMarkers()
+                    .findFirst(PythonResolutionResult.class).orElseThrow().withRequiresPython(">=3.10"))))
+              .afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(PythonResolutionResult.class)
+                .orElseThrow().getRequiresPython()).isEqualTo(">=3.10"))
+          )
+        );
+    }
+
+    @Test
     void markerRefreshedAndFailureSurfacedWhenAdditionNeedsResolution() {
         // Resolving into a lock that requires wheels for some environments ([tool.uv] required-environments,
         // recorded as required-markers) is deferred by the native engine. The edit still lands, the marker

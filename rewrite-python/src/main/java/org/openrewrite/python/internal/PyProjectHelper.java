@@ -163,6 +163,10 @@ public class PyProjectHelper {
         }
         PythonResolutionResult newMarker = createMarker(depsFile);
         if (newMarker != null) {
+            if (newMarker.getRequiresPython() == null) {
+                // parseProject may have taken it from another of the project's manifests, which the edit leaves alone
+                newMarker = newMarker.withRequiresPython(existing.getRequiresPython());
+            }
             return depsFile.withMarkers(depsFile.getMarkers().setByType(newMarker.withId(existing.getId())));
         }
         return depsFile;

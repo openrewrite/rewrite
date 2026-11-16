@@ -195,6 +195,26 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract void android(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, value=AndroidSpec) Closure cl)
     abstract void test(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteTestSpec) Closure cl)
 
+    // Extensions and tasks of Gradle's core plugins, named as a type so that one missing from a Gradle version leaves
+    // the block untyped
+    abstract void java(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.plugins.JavaPluginExtension") Closure cl)
+    abstract void publishing(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.publish.PublishingExtension") Closure cl)
+    abstract void sourceSets(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.SourceSetContainer") Closure cl)
+    abstract void application(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.plugins.JavaApplication") Closure cl)
+    abstract void base(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.plugins.BasePluginExtension") Closure cl)
+    abstract void signing(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.plugins.signing.SigningExtension") Closure cl)
+    abstract void jacoco(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.testing.jacoco.plugins.JacocoPluginExtension") Closure cl)
+    abstract void checkstyle(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.plugins.quality.CheckstyleExtension") Closure cl)
+    abstract void eclipse(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.plugins.ide.eclipse.model.EclipseModel") Closure cl)
+    abstract void idea(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.plugins.ide.idea.model.IdeaModel") Closure cl)
+    abstract void jar(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.bundling.Jar") Closure cl)
+    abstract void javadoc(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.javadoc.Javadoc") Closure cl)
+    abstract void compileJava(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.compile.JavaCompile") Closure cl)
+    abstract void compileTestJava(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.compile.JavaCompile") Closure cl)
+    abstract void processResources(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.language.jvm.tasks.ProcessResources") Closure cl)
+    abstract void wrapper(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.wrapper.Wrapper") Closure cl)
+    abstract void clean(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="org.gradle.api.tasks.Delete") Closure cl)
+
     // @Deprecated(since="7.1.0", replacedBy="org.gradle.api.plugins.JavaPluginExtension")
     // @see org.gradle.api.plugins.JavaPluginConvention
     abstract JavaVersion getSourceCompatibility();

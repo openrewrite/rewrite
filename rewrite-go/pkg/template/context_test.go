@@ -133,8 +133,15 @@ func TestTopLevelPatternNeedsADeclaration(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestTopLevelPatternTakesTheFirstDeclaration(t *testing.T) {
-	tree, err := template.TopLevel("func F() {}\n\nfunc G() {}").Build().TreeOrError()
+// A pattern of one declaration out of two would match where the other is
+// absent, and a template of them would emit the first alone.
+func TestTopLevelPatternOfTwoDeclarationsIsAnError(t *testing.T) {
+	_, err := template.TopLevel("func F() {}\n\nfunc G() {}").Build().TreeOrError()
+	require.Error(t, err)
+}
+
+func TestTopLevelPatternTakesTheDeclarationBeforeTheContext(t *testing.T) {
+	tree, err := template.TopLevel("func F() {}").Context("func G() {}").Build().TreeOrError()
 	require.NoError(t, err)
 	md, ok := tree.(*java.MethodDeclaration)
 	require.True(t, ok, "got %T", tree)

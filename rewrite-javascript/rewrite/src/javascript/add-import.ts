@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TextComment, TrailingComma, Type} from "../java";
+import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, spaceContainsNewline, splitAtLineEnd, Statement, TextComment, TrailingComma, Type} from "../java";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
@@ -945,31 +945,35 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Find the position to insert the import
         const placement = this.placementInGroup(compilationUnit);
         const insertionIndex = placement?.index ?? this.findImportInsertionIndex(compilationUnit);
-        const created = await this.createImportStatement(compilationUnit, insertionIndex, p);
-        const newImport = placement?.replacing ? {...created, prefix: placement.replacing.prefix} : created;
+        // An import in a dropped statement's place takes that statement's prefix, and what followed keeps its own.
+        const {cu, line} = placement?.replacing
+            ? {cu: compilationUnit, line: undefined}
+            : withLineEndTaken(compilationUnit, insertionIndex);
+        const created = await this.createImportStatement(cu, insertionIndex, p);
+        const newImport = {...created, prefix: placement?.replacing?.prefix ?? afterLine(line, created.prefix)};
         this.group?.created.push(newImport.id);
 
-        const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
+        const withImport = await this.produceJavaScript(cu, p, async draft => {
             // Insert the import at the appropriate position
-            const semicolonMarkers = detectSemi(compilationUnit)
+            const semicolonMarkers = detectSemi(cu)
                 ? markers({kind: J.Markers.Semicolon, id: randomId()})
                 : emptyMarkers;
 
             if (placement?.replacing) {
                 // The import goes before the statement `replacing.next` names, or at the end of the file.
                 const following = placement.replacing.next;
-                const next = compilationUnit.statements[insertionIndex];
+                const next = cu.statements[insertionIndex];
                 draft.statements = [
-                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    ...cu.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
                     ...(following ? [{...next, element: {...next.element!, prefix: following.prefix}}] : []),
-                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                    ...cu.statements.slice(insertionIndex + 1)
                 ];
-            } else if (insertionIndex === prologueLength(compilationUnit)) {
+            } else if (insertionIndex === prologueLength(cu)) {
                 // The `after` space should be empty since any semicolon is printed after it
-                const next = compilationUnit.statements[insertionIndex];
+                const next = cu.statements[insertionIndex];
                 draft.statements = [
-                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    ...cu.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
                     ...(next ? [{
                         ...next,
@@ -977,22 +981,22 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                             ? {...next.element, prefix: splitAtBodyStart(next.element.prefix).behind}
                             : undefined
                     } as J.RightPadded<Statement>] : []),
-                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                    ...cu.statements.slice(insertionIndex + 1)
                 ];
             } else {
                 // Insert after existing imports
-                const before = compilationUnit.statements.slice(0, insertionIndex);
-                const after = compilationUnit.statements.slice(insertionIndex);
+                const before = cu.statements.slice(0, insertionIndex);
+                const after = cu.statements.slice(insertionIndex);
 
                 //The `after` space is empty, spacing comes from next statement's prefix
-                // Ensure the next statement has at least one newline in its prefix
+                // A next statement on the import's line moves to its own, with the comments ahead of it
                 if (after.length > 0 && after[0].element) {
                     const currentPrefix = after[0].element.prefix;
                     const needsNewline = !currentPrefix.whitespace.includes('\n');
 
                     const updatedNextStatement = needsNewline ? {
                         ...after[0],
-                        element: {...after[0].element, prefix: space("\n" + currentPrefix.whitespace)}
+                        element: {...after[0].element, prefix: {...currentPrefix, whitespace: "\n"}}
                     } : after[0];
 
                     draft.statements = [
@@ -1954,34 +1958,70 @@ function isTripleSlashDirective(comment: Comment): boolean {
  * `cu` with `statement` after its last top-level `require`. A file with none takes it first,
  * after a shebang and any directives, which have to open the file to apply.
  */
-function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
+function withRequireStatement(original: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
+    const {start: at, end} = leadingRequires(original);
+    const {cu, line} = withLineEndTaken(original, end);
     const statements = cu.statements;
     const padded = rightPadded(statement, emptySpace,
         detectSemi(cu) ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers);
-    const {start: at, end} = leadingRequires(cu);
+    const placed = (prefix: J.Space) => ({...padded, element: {...statement, prefix: afterLine(line, prefix)}});
     if (end > at) {
         return {
             ...cu,
             statements: [
                 ...statements.slice(0, end),
-                {...padded, element: {...statement, prefix: space("\n")}},
+                placed(space("\n")),
                 ...statements.slice(end)
             ]
         };
     }
     const next = statements[at]?.element;
     if (next === undefined) {
-        return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
+        return {...cu, statements: [...statements, placed(space(at === 0 ? "" : "\n\n"))]};
     }
     const {ahead, behind} = splitAtBodyStart(next.prefix);
     return {
         ...cu,
         statements: [
             ...statements.slice(0, at),
-            {...padded, element: {...statement, prefix: ahead}},
+            placed(ahead),
             {...statements[at], element: {...next, prefix: behind}},
             ...statements.slice(at + 1)
         ]
+    };
+}
+
+/**
+ * `cu` without the comments that end the line of the statement before `at`, and those comments as
+ * `line`: `a(); // note\nb();` → `line` ` // note`, `b()` prefixed by `\n`. A file header at 0 stays,
+ * as does a comment after a shebang, whose own padding ends its line.
+ */
+function withLineEndTaken(cu: JS.CompilationUnit, at: number): {cu: JS.CompilationUnit; line?: J.Space} {
+    const previous = cu.statements[at - 1];
+    const next = cu.statements[at];
+    const split = previous === undefined || spaceContainsNewline(previous.after) ? undefined :
+        splitAtLineEnd(next?.element.prefix ?? cu.eof, next === undefined);
+    if (split === undefined) {
+        return {cu};
+    }
+    return {
+        cu: next === undefined ? {...cu, eof: split.rest} : {
+            ...cu,
+            statements: cu.statements.map((s, i) => i === at ? {...s, element: {...s.element, prefix: split.rest}} : s)
+        },
+        line: split.line
+    };
+}
+
+/** `prefix` behind the comments `line` ends the previous line with: ` // note` and `\n` → ` // note\n`. */
+function afterLine(line: J.Space | undefined, prefix: J.Space): J.Space {
+    if (line === undefined) {
+        return prefix;
+    }
+    const last = line.comments.length - 1;
+    return {
+        ...line,
+        comments: [...line.comments.slice(0, last), {...line.comments[last], suffix: prefix.whitespace}, ...prefix.comments]
     };
 }
 

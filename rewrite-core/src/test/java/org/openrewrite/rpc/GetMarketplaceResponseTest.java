@@ -34,7 +34,7 @@ class GetMarketplaceResponseTest {
 
     private static RecipeDescriptor descriptor(String name) {
         return new RecipeDescriptor(name, name, name, name, emptySet(), null,
-                emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), URI.create("https://example.com"));
+                emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), URI.create("https://example.com"));
     }
 
     @Test

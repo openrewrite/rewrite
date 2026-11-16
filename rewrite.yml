@@ -39,7 +39,7 @@ recipeList:
   - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
   - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
   - org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
-#  - org.openrewrite.java.recipes.RemoveToBeRemoved  # deletes 195 lines of past-due @ToBeRemoved code in 16 files; do that in a reviewed PR, not as a suggestion bot
+  - org.openrewrite.java.recipes.RemoveToBeRemoved
 #  - org.openrewrite.java.recipes.UpgradeTestsToJava21  # 166 files, +2512/-1983; a version bump, not a cleanup
 #  - org.openrewrite.java.recipes.ExamplesExtractor  # deliberately not applied here: too opinionated for this repository
 #  - org.openrewrite.java.OrderImports  # deliberately not applied here: too opinionated for this repository
