@@ -379,6 +379,13 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                 }
             }
 
+            if (values.isEmpty()) {
+                // As for an empty array, keep the space between { and }
+                elements.add(TomlRightPadded.build(
+                        (Toml) new Toml.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+                ).withAfter(sourceBefore("}")));
+            }
+
             return new Toml.Table(
                     randomId(),
                     prefix,

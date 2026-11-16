@@ -598,6 +598,19 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void emptyInlineTableKeepsItsSpace() {
+        rewriteRun(
+          toml(
+            """
+              dev-dependencies = { }
+              coverageThreshold = {}
+              headers = {  }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {

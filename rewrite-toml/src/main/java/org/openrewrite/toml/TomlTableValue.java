@@ -144,8 +144,11 @@ public final class TomlTableValue {
                 TomlType.Primitive.String, "\"" + value + "\"", value);
         Toml.KeyValue keyValue = new Toml.KeyValue(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                 new TomlRightPadded<>(identifier, Space.SINGLE_SPACE, Markers.EMPTY), literal);
+        // Drop the placeholder an empty `{ }` or a trailing comma leaves, so the new property follows a real one
+        List<TomlRightPadded<Toml>> values = ListUtils.filter(table.getPadding().getValues(),
+                padded -> !(padded.getElement() instanceof Toml.Empty));
         return table.getPadding().withValues(ListUtils.concat(
-                ListUtils.mapLast(table.getPadding().getValues(), padded -> padded.withAfter(Space.EMPTY)),
+                ListUtils.mapLast(values, padded -> padded.withAfter(Space.EMPTY)),
                 new TomlRightPadded<>(keyValue, Space.SINGLE_SPACE, Markers.EMPTY)));
     }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
@@ -72,8 +73,8 @@ public class SemanticallyEqual {
                 return null;
             }
 
-            // Compare table values
-            visitList(table.getValues(), otherTable.getValues());
+            // Compare table values, ignoring the placeholders that hold `{ }` or a trailing comma
+            visitList(withoutEmpty(table.getValues()), withoutEmpty(otherTable.getValues()));
             return null;
         }
 
@@ -184,6 +185,10 @@ public class SemanticallyEqual {
                 areEqual = false;
             }
             return null;
+        }
+
+        private List<Toml> withoutEmpty(List<Toml> values) {
+            return ListUtils.filter(values, v -> !(v instanceof Toml.Empty));
         }
 
         private void visitList(@Nullable List<? extends Toml> list1, @Nullable List<? extends Toml> list2) {
