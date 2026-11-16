@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -257,6 +258,29 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                     null, node.getModifiers(), node.getName(), null, null, null);
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
             variable.unsafeSet(type(node.getOwner()), type(node.getType()), annotations);
+            return variable;
+        });
+    }
+
+    /**
+     * A property that Groovy reads or writes through a getter or setter. It has a variable like a field does,
+     * since a typed name without one denotes a type. A same-named private field is a different variable, so the
+     * signature differs from the field's.
+     */
+    public JavaType.@Nullable Variable variableType(String name, MethodNode accessor) {
+        JavaType.Method accessorType = methodType(accessor);
+        if (accessorType == null || accessorType.getDeclaringType() instanceof JavaType.Unknown) {
+            return null;
+        }
+        JavaType.FullyQualified owner = accessorType.getDeclaringType();
+        JavaType type = accessorType.getParameterTypes().isEmpty() ?
+                accessorType.getReturnType() : accessorType.getParameterTypes().get(0);
+        String signature = owner.getFullyQualifiedName() + "{name=" + name + ",property}";
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, accessor.getModifiers() & (Modifier.PUBLIC | Modifier.PROTECTED | Modifier.PRIVATE),
+                    name, null, null, null);
+            variable.unsafeSet(owner, type, (List<JavaType.FullyQualified>) null);
             return variable;
         });
     }
