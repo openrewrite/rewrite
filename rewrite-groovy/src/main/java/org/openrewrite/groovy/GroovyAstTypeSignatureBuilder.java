@@ -174,4 +174,12 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String variableSignature(String name) {
         return "{undefined}{name=" + name + '}';
     }
+
+    /**
+     * The position tells apart same-named variables declared in one method, as in the Java parser.
+     */
+    public String variableSignature(@Nullable MethodNode owner, String name, ClassNode type, int position) {
+        return (owner == null ? "{undefined}" : methodSignature(owner)) +
+               "{name=" + name + ",type=" + signature(type) + ",pos=" + position + '}';
+    }
 }
