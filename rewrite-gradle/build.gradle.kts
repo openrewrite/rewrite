@@ -77,19 +77,24 @@ val gradleDistributions = gradleApiMajors.map {
 // also holds modules such as groovy-ant, so a distribution's own Groovy jars cannot tell which classes the parser has.
 val parserGroovy = configurations.detachedConfiguration(dependencies.create("org.apache.groovy:groovy:4.+"))
     .apply { isTransitive = false }
+// The Kotlin compiler rewrite-kotlin parses with, so that it reads the metadata of the accessors compiled with this one
+val kotlinCompiler = configurations.detachedConfiguration(dependencies.create("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.20"))
 
 // Gradle has published no API modules since 6.1.1, so the API of each major is taken from its distribution
 val addGradleApiToTypeTable = tasks.register("addGradleApiToTypeTable") {
     group = "OpenRewrite"
-    description = "Adds the public API of each major Gradle version to the type table as org.gradle:gradle-public-api."
+    description = "Adds the public API of each major Gradle version to the type table as org.gradle:gradle-public-api, " +
+            "and the accessors Gradle generates for Kotlin scripts as org.openrewrite:gradle-kotlin-dsl-accessors."
     gradleDistributions.forEach { inputs.files(it) }
-    inputs.files(parserGroovy)
+    inputs.files(parserGroovy, kotlinCompiler)
     val table = layout.projectDirectory.file("src/main/resources/META-INF/rewrite/classpath.tsv.gz").asFile
     doLast {
         // Rows are split on '\n' only, as bytes, since annotation values in them hold other control characters
         fun rows(gzipped: ByteArray) = GZIPInputStream(ByteArrayInputStream(gzipped)).readBytes()
             .toString(Charsets.ISO_8859_1).split('\n').filter { it.isNotEmpty() }
-        val rows = rows(table.readBytes()).filter { !it.startsWith("org.gradle\tgradle-public-api\t") }.toMutableList()
+        val rows = rows(table.readBytes()).filter {
+            !it.startsWith("org.gradle\tgradle-public-api\t") && !it.startsWith("org.openrewrite\tgradle-kotlin-dsl-accessors\t")
+        }.toMutableList()
         val groovyCore = ZipInputStream(parserGroovy.singleFile.inputStream()).use { zip ->
             generateSequence { zip.nextEntry }.map { it.name }.filter { it.endsWith(".class") }
                 .map { it.removeSuffix(".class") }.toSet()
@@ -102,6 +107,13 @@ val addGradleApiToTypeTable = tasks.register("addGradleApiToTypeTable") {
             TypeTable.newWriter(written).use { it.jar("org.gradle", "gradle-public-api", version).write(api.toPath()) }
             rows += rows(written.toByteArray()).drop(1)
         }
+        // One compilation, against the newest API, serves every version
+        val newestApi = temporaryDir.resolve("gradle-api-${gradleDistributions.last().resolvedConfiguration.resolvedArtifacts.single().moduleVersion.id.version}.jar")
+        val accessors = temporaryDir.resolve("gradle-kotlin-dsl-accessors.jar")
+        writeKotlinDslAccessors(newestApi, accessors, temporaryDir)
+        val written = ByteArrayOutputStream()
+        TypeTable.newWriter(written).use { it.jar("org.openrewrite", "gradle-kotlin-dsl-accessors", "1").write(accessors.toPath()) }
+        rows += rows(written.toByteArray()).drop(1)
         GZIPOutputStream(table.outputStream()).use { out ->
             rows.forEach { out.write(it.toByteArray(Charsets.ISO_8859_1)); out.write('\n'.code) }
         }
@@ -112,22 +124,172 @@ tasks.named("createTypeTable") {
 }
 
 /**
+ * The configurations, extensions and tasks of Gradle's core plugins and the most common Android and Kotlin ones, for
+ * which Gradle generates Kotlin accessors in each build that applies the plugin.
+ */
+val kotlinDslConfigurations = listOf(
+    "api", "implementation", "compileOnly", "compileOnlyApi", "runtimeOnly", "annotationProcessor",
+    "testImplementation", "testCompileOnly", "testRuntimeOnly", "testAnnotationProcessor",
+    "testFixturesApi", "testFixturesImplementation", "testFixturesCompileOnly", "testFixturesRuntimeOnly",
+    "providedCompile", "providedRuntime", "deploy", "earlib",
+    "classpath", "jacocoAggregation", "testReportAggregation", "checkstyle", "pmd", "antlr",
+    "androidTestImplementation", "androidTestRuntimeOnly", "androidTestAnnotationProcessor",
+    "debugImplementation", "releaseImplementation", "testDebugImplementation", "coreLibraryDesugaring",
+    "kapt", "ksp"
+)
+val kotlinDslExtensions = mapOf(
+    "java" to "org.gradle.api.plugins.JavaPluginExtension",
+    "base" to "org.gradle.api.plugins.BasePluginExtension",
+    "sourceSets" to "org.gradle.api.tasks.SourceSetContainer",
+    "publishing" to "org.gradle.api.publish.PublishingExtension",
+    "application" to "org.gradle.api.plugins.JavaApplication",
+    "javaPlatform" to "org.gradle.api.plugins.JavaPlatformExtension",
+    "distributions" to "org.gradle.api.distribution.DistributionContainer",
+    "signing" to "org.gradle.plugins.signing.SigningExtension",
+    "jacoco" to "org.gradle.testing.jacoco.plugins.JacocoPluginExtension",
+    "checkstyle" to "org.gradle.api.plugins.quality.CheckstyleExtension",
+    "pmd" to "org.gradle.api.plugins.quality.PmdExtension",
+    "eclipse" to "org.gradle.plugins.ide.eclipse.model.EclipseModel",
+    "idea" to "org.gradle.plugins.ide.idea.model.IdeaModel",
+    "testing" to "org.gradle.testing.base.TestingExtension",
+    "reporting" to "org.gradle.api.reporting.ReportingExtension",
+    "gradlePlugin" to "org.gradle.plugin.devel.GradlePluginDevelopmentExtension"
+)
+val kotlinDslTasks = mapOf(
+    "assemble" to "org.gradle.api.DefaultTask",
+    "build" to "org.gradle.api.DefaultTask",
+    "check" to "org.gradle.api.DefaultTask",
+    "clean" to "org.gradle.api.tasks.Delete",
+    "compileJava" to "org.gradle.api.tasks.compile.JavaCompile",
+    "compileTestJava" to "org.gradle.api.tasks.compile.JavaCompile",
+    "processResources" to "org.gradle.language.jvm.tasks.ProcessResources",
+    "processTestResources" to "org.gradle.language.jvm.tasks.ProcessResources",
+    "test" to "org.gradle.api.tasks.testing.Test",
+    "jar" to "org.gradle.api.tasks.bundling.Jar",
+    "javadoc" to "org.gradle.api.tasks.javadoc.Javadoc",
+    "javadocJar" to "org.gradle.api.tasks.bundling.Jar",
+    "sourcesJar" to "org.gradle.api.tasks.bundling.Jar",
+    "run" to "org.gradle.api.tasks.JavaExec",
+    "jacocoTestReport" to "org.gradle.testing.jacoco.tasks.JacocoReport",
+    "jacocoTestCoverageVerification" to "org.gradle.testing.jacoco.tasks.JacocoCoverageVerification",
+    "wrapper" to "org.gradle.api.tasks.wrapper.Wrapper"
+)
+
+/**
+ * Compiles Kotlin declarations of the accessors Gradle generates for each build to a jar, so that the Kotlin parser
+ * reads them from its classpath instead of compiling them with every script.
+ *
+ * They are in the scripts' own package, whose declarations Kotlin prefers over the ones default imports bring in.
+ * Their file facades are named after the types the Groovy DSL declares the same methods on. So
+ * `DependencyHandlerSpec *(..)` matches a dependency in either DSL.
+ */
+fun writeKotlinDslAccessors(gradleApi: File, jar: File, workDir: File) {
+    val sources = workDir.resolve("kotlin-dsl-accessors").apply { deleteRecursively(); mkdirs() }
+    val project = StringBuilder("""
+        @file:JvmName("RewriteGradleProject")
+        import org.gradle.api.Action
+        import org.gradle.api.NamedDomainObjectProvider
+        import org.gradle.api.Project
+        import org.gradle.api.artifacts.Configuration
+        import org.gradle.api.artifacts.ConfigurationContainer
+        import org.gradle.api.artifacts.DependencyConstraint
+        import org.gradle.api.artifacts.dsl.DependencyConstraintHandler
+        import org.gradle.api.tasks.SourceSet
+        import org.gradle.api.tasks.SourceSetContainer
+        import org.gradle.api.tasks.TaskContainer
+        import org.gradle.api.tasks.TaskProvider
+        import org.gradle.kotlin.dsl.ScriptHandlerScope
+        import org.gradle.plugin.use.PluginDependenciesSpec
+        // Gradle declares these on the script, not the project
+        fun Project.plugins(block: PluginDependenciesSpec.() -> Unit): Unit = TODO()
+        fun Project.buildscript(block: ScriptHandlerScope.() -> Unit): Unit = TODO()
+        val SourceSetContainer.main: NamedDomainObjectProvider<SourceSet> get() = TODO()
+        val SourceSetContainer.test: NamedDomainObjectProvider<SourceSet> get() = TODO()
+
+        """.trimIndent())
+    kotlinDslExtensions.forEach { (name, type) ->
+        project.append("val Project.`$name`: $type get() = TODO()\n")
+            .append("fun Project.`$name`(configure: Action<$type>): Unit = TODO()\n")
+    }
+    kotlinDslTasks.forEach { (name, type) ->
+        project.append("val TaskContainer.`$name`: TaskProvider<$type> get() = TODO()\n")
+    }
+    val dependencies = StringBuilder("""
+        @file:JvmName("DependencyHandlerSpec")
+        import org.gradle.api.Action
+        import org.gradle.api.artifacts.Dependency
+        import org.gradle.api.artifacts.ExternalModuleDependency
+        import org.gradle.api.artifacts.ModuleDependency
+        import org.gradle.api.artifacts.dsl.DependencyHandler
+        import org.gradle.api.provider.Provider
+
+        """.trimIndent())
+    for (name in kotlinDslConfigurations) {
+        project.append("val ConfigurationContainer.`$name`: NamedDomainObjectProvider<Configuration> get() = TODO()\n")
+            .append("fun DependencyConstraintHandler.`$name`(constraintNotation: Any): DependencyConstraint? = TODO()\n")
+            .append("fun DependencyConstraintHandler.`$name`(constraintNotation: Any, block: Action<DependencyConstraint>): DependencyConstraint = TODO()\n")
+        val fn = "fun DependencyHandler.`$name`"
+        dependencies.append("$fn(dependencyNotation: Any): Dependency? = TODO()\n")
+            .append("$fn(dependencyNotation: String, dependencyConfiguration: Action<ExternalModuleDependency>): ExternalModuleDependency = TODO()\n")
+            .append("$fn(dependencyNotation: Provider<*>, dependencyConfiguration: Action<ExternalModuleDependency>): Unit = TODO()\n")
+            .append("$fn(group: String, name: String, version: String? = null, configuration: String? = null, classifier: String? = null, ext: String? = null, dependencyConfiguration: Action<ExternalModuleDependency>? = null): ExternalModuleDependency = TODO()\n")
+            .append("fun <T : ModuleDependency> DependencyHandler.`$name`(dependency: T, dependencyConfiguration: T.() -> Unit): T = TODO()\n")
+    }
+    val settings = """
+        @file:JvmName("RewriteSettings")
+        import org.gradle.api.initialization.Settings
+        import org.gradle.plugin.management.PluginManagementSpec
+        import org.gradle.plugin.use.PluginDependenciesSpec
+        fun Settings.plugins(block: PluginDependenciesSpec.() -> Unit): Unit = TODO()
+        fun Settings.pluginManagement(block: PluginManagementSpec.() -> Unit): Unit = TODO()
+        """.trimIndent()
+    sources.resolve("RewriteGradleProject.kt").writeText(project.toString())
+    sources.resolve("DependencyHandlerSpec.kt").writeText(dependencies.toString())
+    sources.resolve("RewriteSettings.kt").writeText(settings)
+
+    val classes = workDir.resolve("kotlin-dsl-accessors-classes").apply { deleteRecursively(); mkdirs() }
+    val stdlib = kotlinCompiler.files.single { it.name.startsWith("kotlin-stdlib-") && !it.name.contains("-common") }
+    providers.javaexec {
+        classpath(kotlinCompiler)
+        mainClass.set("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler")
+        args("-d", classes.path, "-classpath", listOf(gradleApi, stdlib).joinToString(File.pathSeparator),
+            "-no-stdlib", "-no-reflect", "-nowarn", "-module-name", "gradle-kotlin-dsl-accessors")
+        args(sources.listFiles()!!.map { it.path })
+    }.result.get().assertNormalExitValue()
+    JarOutputStream(jar.outputStream()).use { out ->
+        classes.walkTopDown().filter { it.isFile }.forEach {
+            out.putNextEntry(JarEntry(it.relativeTo(classes).invariantSeparatorsPath))
+            out.write(it.readBytes())
+            out.closeEntry()
+        }
+    }
+}
+
+/**
  * Writes the classes of the API a Gradle distribution declares in its gradle-api-metadata jar to a jar, with the classes
  * their declarations extend, which type attribution needs to find inherited members. A member or annotation that
  * refers to a class outside the jar is left out, since Groovy cannot resolve the members of a class when one of them
  * refers to a missing class.
+ *
+ * The declaration leaves out the `org.gradle.kotlin.dsl` package, which Kotlin build scripts import by default, so it is
+ * added with the module files of its jars. The Kotlin compiler reads the members of these classes from their
+ * `kotlin.Metadata` annotation, which is kept.
  */
 fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
     val classes = mutableMapOf<String, ByteArray>()
+    val kotlinModules = mutableMapOf<String, ByteArray>()
     val apiDeclaration = Properties()
     ZipInputStream(distribution.inputStream()).use { zip ->
         generateSequence { zip.nextEntry }
             .filter { Regex("gradle-[^/]+/lib/(plugins/)?[^/]+\\.jar").matches(it.name) }
-            .forEach {
+            .forEach { lib ->
+                val kotlinDslJar = lib.name.substringAfterLast('/').startsWith("gradle-kotlin-dsl")
                 val nested = ZipInputStream(ByteArrayInputStream(zip.readBytes()))
                 generateSequence { nested.nextEntry }
                     .onEach { e -> if (e.name == "gradle-api-declaration.properties") apiDeclaration.load(nested) }
-                    .filter { e -> e.name.endsWith(".class") && !e.name.startsWith("java/") }
+                    .onEach { e -> if (kotlinDslJar && e.name.endsWith(".kotlin_module")) kotlinModules[e.name] = nested.readBytes() }
+                    // The Kotlin parser brings its own Kotlin standard library
+                    .filter { e -> e.name.endsWith(".class") && !e.name.startsWith("java/") && !e.name.startsWith("kotlin/") }
                     .forEach { e ->
                         val name = e.name.removeSuffix(".class")
                         if (name !in groovyCore) classes.putIfAbsent(name, nested.readBytes())
@@ -141,8 +303,10 @@ fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
     }
     val includes = antPatterns("includes")
     val excludes = antPatterns("excludes")
+    val kotlinDsl = Regex("org/gradle/kotlin/dsl/[^/]+")
     val pending = ArrayDeque(classes.keys.filter { name ->
-        "$name.class".let { path -> includes.any { it.matches(path) } && excludes.none { it.matches(path) } }
+        "$name.class".let { path -> includes.any { it.matches(path) } && excludes.none { it.matches(path) } } ||
+                kotlinDsl.matches(name)
     })
     val kept = sortedSetOf<String>()
     while (pending.isNotEmpty()) {
@@ -168,6 +332,11 @@ fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
             out.write(withoutUnresolvableMembers(classes.getValue(it), resolvable))
             out.closeEntry()
         }
+        kotlinModules.forEach { (name, bytes) ->
+            out.putNextEntry(JarEntry(name))
+            out.write(bytes)
+            out.closeEntry()
+        }
     }
 }
 
@@ -186,7 +355,9 @@ fun referencedClasses(signature: String?, isType: Boolean = false): Set<String> 
 
 fun withoutUnresolvableMembers(bytes: ByteArray, resolvable: (String) -> Boolean): ByteArray {
     val writer = ClassWriter(0)
-    val annotationResolvable = { descriptor: String -> resolvable(Type.getType(descriptor).internalName) }
+    val annotationResolvable = { descriptor: String ->
+        descriptor == "Lkotlin/Metadata;" || resolvable(Type.getType(descriptor).internalName)
+    }
     ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM9, writer) {
         override fun visitAnnotation(descriptor: String, visible: Boolean) =
             if (annotationResolvable(descriptor)) super.visitAnnotation(descriptor, visible) else null

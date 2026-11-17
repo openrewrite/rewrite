@@ -69,7 +69,9 @@ class GradleApiTypeTableTest {
           .as("Groovy classes in the Gradle %s API", version)
           .doesNotContainAnyElementsOf(groovyCore)
           .as("implementation classes in the Gradle %s API", version)
-          .doesNotContain("org/gradle/initialization/DefaultSettings"));
+          .doesNotContain("org/gradle/initialization/DefaultSettings")
+          .as("Kotlin DSL in the Gradle %s API", version)
+          .contains("org/gradle/kotlin/dsl/DependencyHandlerScope"));
         // writePublicApi in build.gradle.kts says why
         ClassLoader jdk = ClassLoader.getPlatformClassLoader();
         referencesByVersion.forEach((version, references) -> assertThat(references)

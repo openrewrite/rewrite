@@ -36,7 +36,9 @@ import org.yaml.snakeyaml.parser.ParserException;
 import org.yaml.snakeyaml.parser.ParserImpl;
 import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
+import org.yaml.snakeyaml.scanner.ScannerException;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
+import org.yaml.snakeyaml.tokens.Token;
 
 import org.openrewrite.yaml.marker.OmitColon;
 
@@ -220,7 +222,11 @@ public class YamlParser implements org.openrewrite.Parser {
         String sourceText = yamlSourceWithPlaceholders.toString();
         Queue<List<Yaml.Directive>> documentDirectives = preScanDirectives(sourceText);
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(sourceText)) {
+        // SnakeYAML reads a copy with tab separators swapped for spaces, while the reader keeps the
+        // original text, from which every prefix and scalar value is taken
+        String scannableText = replaceTabSeparators(sourceText);
+
+        try (FormatPreservingReader reader = new FormatPreservingReader(sourceText, scannableText)) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -1271,6 +1277,59 @@ public class YamlParser implements org.openrewrite.Parser {
         }
 
         return currentPrefix.toString();
+    }
+
+    /**
+     * YAML 1.2 allows tabs in the whitespace separating tokens, such as {@code key:\tvalue} or
+     * {@code -\titem}, and forbids them only in indentation. SnakeYAML follows YAML 1.1 and rejects a
+     * tab wherever it looks for the next token. Each such tab is swapped for a space, one rejection at
+     * a time, so only the tabs SnakeYAML trips on change. A tab in indentation is left alone, and the
+     * text comes back unchanged for SnakeYAML to report as before.
+     */
+    private static String replaceTabSeparators(String source) {
+        if (source.indexOf('\t') < 0) {
+            return source;
+        }
+        String scannable = source;
+        while (true) {
+            try {
+                Scanner scanner = new ScannerImpl(new StreamReader(scannable), new LoaderOptions());
+                while (!scanner.checkToken(Token.ID.StreamEnd)) {
+                    scanner.getToken();
+                }
+                return scannable;
+            } catch (ScannerException e) {
+                if (e.getProblemMark() == null || e.getProblem() == null ||
+                    !e.getProblem().contains("cannot start any token")) {
+                    return scannable;
+                }
+                // The mark counts code points, not chars
+                int tab = scannable.offsetByCodePoints(0, e.getProblemMark().getIndex());
+                if (tab >= scannable.length() || scannable.charAt(tab) != '\t' || isIndentation(scannable, tab)) {
+                    return scannable;
+                }
+                char[] chars = scannable.toCharArray();
+                for (int i = tab; i < chars.length && (chars[i] == '\t' || chars[i] == ' '); i++) {
+                    chars[i] = ' ';
+                }
+                scannable = new String(chars);
+            } catch (RuntimeException e) {
+                return scannable;
+            }
+        }
+    }
+
+    private static boolean isIndentation(String source, int index) {
+        for (int i = index - 1; i >= 0; i--) {
+            char c = source.charAt(i);
+            if (c == '\n' || c == '\r') {
+                return true;
+            }
+            if (c != ' ' && c != '\t') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Queue<List<Yaml.Directive>> preScanDirectives(String source) {

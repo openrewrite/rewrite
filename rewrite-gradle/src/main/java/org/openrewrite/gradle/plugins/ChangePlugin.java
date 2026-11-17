@@ -100,6 +100,7 @@ public class ChangePlugin extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher pluginMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
         MethodMatcher versionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
+        MethodMatcher kotlinVersionMatcher = new MethodMatcher("org.gradle.kotlin.dsl.PluginDependenciesSpecScopeKt version(..)");
         MethodMatcher applyMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
         return Preconditions.check(
                 Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
@@ -150,7 +151,7 @@ public class ChangePlugin extends Recipe {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = method;
-                        if (versionMatcher.matches(m) &&
+                        if ((versionMatcher.matches(m) || kotlinVersionMatcher.matches(m)) &&
                             m.getSelect() instanceof J.MethodInvocation &&
                             pluginMatcher.matches(m.getSelect())) {
                             m = maybeUpdateVersion(m, ctx);
