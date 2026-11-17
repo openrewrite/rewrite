@@ -79,6 +79,20 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedStaticallyImportedFieldRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI
+              def x = (PI) * 2
+              def y = -(PI)
+              def z = [(PI): 1]
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotTreatDivisionAsDelimiter() {
         rewriteRun(
                 groovy(
