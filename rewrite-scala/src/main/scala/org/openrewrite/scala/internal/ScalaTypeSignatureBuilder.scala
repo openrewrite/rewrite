@@ -34,9 +34,21 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private var depth = 0
 
+  /** Signatures of the types described outside any type variable's bound, where they depend on the type alone. */
+  private val signatures = new java.util.IdentityHashMap[Type, String]()
+
   def signature(tpe: Type): String = {
     if (tpe == null) return "{undefined}"
+    if (typeVariableNameStack != null && !typeVariableNameStack.isEmpty) return describe(tpe)
+    var sig = signatures.get(tpe)
+    if (sig == null) {
+      sig = describe(tpe)
+      signatures.put(tpe, sig)
+    }
+    sig
+  }
 
+  private def describe(tpe: Type): String = {
     depth += 1
     try {
       tpe.dealias match {
