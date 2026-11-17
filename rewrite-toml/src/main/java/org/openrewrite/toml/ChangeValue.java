@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlType;
@@ -64,147 +65,21 @@ public class ChangeValue extends Recipe {
             }
 
             private Toml parseValue(String value, Space prefix) {
-                value = value.trim();
-
-                if (value.startsWith("[") && value.endsWith("]")) {
-                    // Array - parse as string literal for now
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.String,
-                            value,
-                            value
-                    );
+                // Read the value as TOML does, so a date stays a date, an array an array, and escapes decode
+                Toml parsed = TomlSnippets.value(value.trim());
+                if (parsed != null) {
+                    return parsed.withPrefix(prefix);
                 }
-
-                if (value.startsWith("{") && value.endsWith("}")) {
-                    // Inline table - parse as string literal for now
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.String,
-                            value,
-                            value
-                    );
-                }
-
-                if ((value.startsWith("\"\"\"") && value.endsWith("\"\"\"")) ||
-                    (value.startsWith("'''") && value.endsWith("'''"))) {
-                    String unquoted = value.substring(3, value.length() - 3);
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.String,
-                            value,
-                            unquoted
-                    );
-                }
-
-                if ((value.startsWith("\"") && value.endsWith("\"")) ||
-                    (value.startsWith("'") && value.endsWith("'"))) {
-                    String unquoted = value.substring(1, value.length() - 1);
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.String,
-                            value,
-                            unquoted
-                    );
-                }
-
-                if ("true".equals(value) || "false".equals(value)) {
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.Boolean,
-                            value,
-                            Boolean.parseBoolean(value)
-                    );
-                }
-
-                if ("inf".equals(value) || "+inf".equals(value) || "-inf".equals(value) ||
-                    "nan".equals(value) || "+nan".equals(value) || "-nan".equals(value)) {
-                    Double doubleValue;
-                    switch (value) {
-                        case "inf":
-                        case "+inf":
-                            doubleValue = Double.POSITIVE_INFINITY;
-                            break;
-                        case "-inf":
-                            doubleValue = Double.NEGATIVE_INFINITY;
-                            break;
-                        default:
-                            doubleValue = Double.NaN;
-                    }
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.Float,
-                            value,
-                            doubleValue
-                    );
-                }
-
-                if (value.contains("T") || value.contains(":")) {
-                    // Simplified datetime check
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.OffsetDateTime,
-                            value,
-                            value
-                    );
-                }
-
-                try {
-                    if (value.contains(".") || value.contains("e") || value.contains("E")) {
-                        Double doubleValue = Double.parseDouble(value.replace("_", ""));
-                        return new Toml.Literal(
-                                Tree.randomId(),
-                                prefix,
-                                Markers.EMPTY,
-                                TomlType.Primitive.Float,
-                                value,
-                                doubleValue
-                        );
-                    } else {
-                        Long longValue;
-                        if (value.startsWith("0x") || value.startsWith("0X")) {
-                            longValue = Long.parseLong(value.substring(2).replace("_", ""), 16);
-                        } else if (value.startsWith("0o") || value.startsWith("0O")) {
-                            longValue = Long.parseLong(value.substring(2).replace("_", ""), 8);
-                        } else if (value.startsWith("0b") || value.startsWith("0B")) {
-                            longValue = Long.parseLong(value.substring(2).replace("_", ""), 2);
-                        } else {
-                            longValue = Long.parseLong(value.replace("_", ""));
-                        }
-                        return new Toml.Literal(
-                                Tree.randomId(),
-                                prefix,
-                                Markers.EMPTY,
-                                TomlType.Primitive.Integer,
-                                value,
-                                longValue
-                        );
-                    }
-                } catch (NumberFormatException e) {
-                    // Fallback to string for unparseable values
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.String,
-                            "\"" + value + "\"",
-                            value
-                    );
-                }
+                // What is not a TOML value, such as 2.0.0, is meant as a string
+                String string = value.trim();
+                return new Toml.Literal(
+                        Tree.randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        TomlType.Primitive.String,
+                        "\"" + TomlString.quoteBasic(string) + "\"",
+                        string
+                );
             }
         };
     }
