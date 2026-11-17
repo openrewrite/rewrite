@@ -663,8 +663,21 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   // --- Core type mapping ---
 
+  /** What each type of this file mapped to. Dotty shares one instance among equal types, so most types recur. */
+  private val mappedTypes = new java.util.IdentityHashMap[Type, JavaType]()
+
   def mapType(tpe: Type): JavaType = {
-    if (tpe == null || tpe == NoType || denotesPackage(tpe)) return null
+    if (tpe == null) return null
+    var mapped = mappedTypes.get(tpe)
+    if (mapped == null) {
+      mapped = mapTypeOnce(tpe)
+      if (mapped != null) mappedTypes.put(tpe, mapped)
+    }
+    mapped
+  }
+
+  private def mapTypeOnce(tpe: Type): JavaType = {
+    if (tpe == NoType || denotesPackage(tpe)) return null
 
     val sig = signatureBuilder.signature(tpe)
 
@@ -846,14 +859,15 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
     val sym = javaClassOfStatics(symbol)
-    val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
-    else if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
-    else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
-    else JavaType.FullyQualified.Kind.Class
+    typeFactory.computeClass(fqn, 0L, JavaType.FullyQualified.Kind.Class, (clazz: JavaType.Class) => {
+      // Only a class the cache lacks pays for its flags and kind. They are set before the members,
+      // which may lead back to this class and read its kind.
+      val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
+      else if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
+      else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
+      else JavaType.FullyQualified.Kind.Class
+      clazz.unsafeSet(mapFlags(sym) & Flag.VALID_CLASS_FLAGS, kind, fqn, null, null, null, null, null, null, null)
 
-    val flagsBits = mapFlags(sym)
-
-    typeFactory.computeClass(fqn, flagsBits, kind, (clazz: JavaType.Class) => {
       val parentTypes = if (fqn == "java.lang.Object") Nil else try {
         sym.info match {
           case ci: ClassInfo => ci.parents
