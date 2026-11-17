@@ -4995,7 +4995,7 @@ class ScalaTreeVisitor(
         case null => // Skip null statements (e.g., package declarations)
         case stmt: Statement =>
           // Extract trailing space after this statement.
-          // A procedure-syntax method (ProcedureSyntax marker) has an
+          // A procedure-syntax method with a body (ProcedureSyntax marker) has an
           // unreliable dotty span end — it overshoots the real closing `}` because
           // of the synthetic `???` body the parser substitutes. `reparseProcedureBody`
           // already advanced the cursor to just past the real `}`, so trust the cursor
@@ -6369,14 +6369,12 @@ class ScalaTreeVisitor(
     val isGivenDefDef = dd.mods != null && dd.mods.is(Flags.Given)
     if (dd.nameSpan.exists) {
       val nameEnd = Math.max(0, dd.nameSpan.end - offsetAdjustment)
-      var i = nameEnd
-      while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      var i = indexOfNextNonWhitespace(nameEnd)
       // Skip a `[...]` type parameter list. After the type params, an ordinary
       // def may have `()` (regular method) or `:`/`=` (parameterless method).
       if (i < source.length && source.charAt(i) == '[') {
         val closePos = positionOfMatchingClose('[', ']', i + 1)
-        i = if (closePos >= 0) closePos + 1 else source.length
-        while (i < source.length && source.charAt(i).isWhitespace) i += 1
+        i = indexOfNextNonWhitespace(if (closePos >= 0) closePos + 1 else source.length)
       }
       // Only `(` opens a parameter list. A parameterless def can also continue with a
       // procedure body (`def d { ... }`) or with nothing at all (`def h`).

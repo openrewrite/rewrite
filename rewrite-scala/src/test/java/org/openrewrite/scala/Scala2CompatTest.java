@@ -97,6 +97,24 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void emptyParameterListAfterComment() {
+        rewriteRun(
+            scala(
+                """
+                object T {
+                  def d /* c */ () = 1
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
+                    J.MethodDeclaration d = (J.MethodDeclaration) t.getBody().getStatements().get(0);
+                    assertThat(d.getPadding().getParameters().getMarkers().findFirst(OmitParentheses.class)).isEmpty();
+                })
+            )
+        );
+    }
+
+    @Test
     void procedureSyntaxDeclarationWithoutParameterList() {
         rewriteRun(
             scala(
