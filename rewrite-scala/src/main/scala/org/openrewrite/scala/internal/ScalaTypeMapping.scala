@@ -44,10 +44,9 @@ import scala.util.control.NonFatal
  * @param symbolType the imported definition: the class for a type or an object, the variable
  *                   for a value, the method for a method, unknown when it can't be resolved
  * @param nameType   the type of the imported name, as for a reference to it
- * @param variable   the imported object or value, if any
  * @param isImplicit whether the import brings an implicit or given definition into scope
  */
-final case class Imported(symbolType: JavaType, nameType: JavaType, variable: JavaType.Variable, isImplicit: Boolean)
+final case class Imported(symbolType: JavaType, nameType: JavaType, isImplicit: Boolean)
 
 /**
  * Maps Dotty compiler types to OpenRewrite's JavaType model.
@@ -235,6 +234,37 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _ => None
   }
 
+  /**
+   * The method a reference calls without an argument list, as `xs.reverse`, `"abc".length` or
+   * `xs.sum` do, with its types instantiated as the typer applied it. Doesn't hold for a method
+   * the typer eta-expanded instead. The method type is null when it can't be mapped.
+   */
+  def argumentlessCallOf(tree: untpd.Tree): Option[JavaType.Method] =
+    typedNodes.get(tree).flatMap { node =>
+      val reference = resolved(node)
+      val sym = try reference.symbol catch { case NonFatal(_) => Symbols.NoSymbol }
+      val isCall = try {
+        sym != null && sym.exists && sym.is(Flags.Method) && !sym.isConstructor && !isErrorSymbol(sym) &&
+          !isClosure(node.adapted) && callableWithoutArguments(sym.info)
+      } catch {
+        case NonFatal(_) => false
+      }
+      if (!isCall) None
+      else Some(try {
+        instantiatedInfo(sym, node.adapted).orElse(instantiatedInfo(sym, reference)) match {
+          case Some(info) => mapMethodType(sym, info)
+          case None => mapMethodType(sym)
+        }
+      } catch {
+        case NonFatal(_) => null
+      })
+    }
+
+  private def callableWithoutArguments(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => (mt.paramInfos.isEmpty || mt.isImplicitMethod) && callableWithoutArguments(mt.resultType)
+    case _ => true
+  }
+
   private def isParameterless(sym: Symbol): Boolean =
     sym.is(Flags.Method) && !takesParameters(sym.info)
 
@@ -275,7 +305,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     typedNodes.get(tree).flatMap { node =>
       val sym = try resolved(node).symbol catch { case NonFatal(_) => null }
       if (sym == null || !sym.exists) None
-      else Some(if (isVariable(sym)) try mapVariableType(sym) catch { case NonFatal(_) => null } else null)
+      else Some(if (isField(sym)) try mapVariableType(sym) catch { case NonFatal(_) => null } else null)
     }
 
   /** The implicit conversion the typer applied to the node's value, if any. */
@@ -315,8 +345,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   /**
    * What the selector of an import or export imports. A name that is both a type and an
-   * object, such as a class and its companion, is attributed as the type, with the object
-   * as its variable.
+   * object, such as a class and its companion, is attributed as the type.
    */
   def importedOf(tree: untpd.Tree, name: Name): Option[Imported] =
     typedNodes.get(tree).map(_.own).collect {
@@ -326,31 +355,31 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   private def imported(qualifier: tpd.Tree, name: Name): Imported =
     try {
       val prefix = qualifier.tpe
-      if (prefix == null || prefix.isError) return Imported(unknown, unknown, null, isImplicit = false)
+      if (prefix == null || prefix.isError) return Imported(unknown, unknown, isImplicit = false)
       val typeSym = prefix.member(name.toTypeName).symbol
       val terms = prefix.member(name.toTermName).alternatives.map(_.symbol).filter(sym => sym.exists && !isErrorSymbol(sym))
       val isImplicit = terms.exists(_.isOneOf(Flags.GivenOrImplicit))
       val value = terms.find(isVariable)
-      val variable = value.map(mapVariableType).orNull
       if (typeSym.exists && !isErrorSymbol(typeSym)) {
         val tpe = mapType(typeSym.typeRef)
-        Imported(tpe, tpe, variable, isImplicit)
+        Imported(tpe, tpe, isImplicit)
       } else value match {
         case Some(module) if module.is(Flags.Module) =>
           val tpe = mapType(module.termRef)
-          Imported(tpe, tpe, variable, isImplicit)
-        case Some(_) =>
-          Imported(variable, variable.getType, variable, isImplicit)
+          Imported(tpe, tpe, isImplicit)
+        case Some(field) =>
+          val variable = mapVariableType(field)
+          Imported(variable, variable.getType, isImplicit)
         case None => terms.find(_.is(Flags.Method)) match {
           case Some(method) =>
             val methodType = mapMethodType(method)
-            Imported(methodType, methodType, null, isImplicit)
-          case None if terms.exists(_.is(Flags.Package)) => Imported(null, null, null, isImplicit = false)
-          case None => Imported(unknown, unknown, null, isImplicit = false)
+            Imported(methodType, methodType, isImplicit)
+          case None if terms.exists(_.is(Flags.Package)) => Imported(null, null, isImplicit = false)
+          case None => Imported(unknown, unknown, isImplicit = false)
         }
       }
     } catch {
-      case NonFatal(_) => Imported(null, null, null, isImplicit = false)
+      case NonFatal(_) => Imported(null, null, isImplicit = false)
     }
 
   /** The method and resulting function type, if the typer eta-expanded the method the node refers to. */
@@ -567,7 +596,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val referenced = exact.filterNot(_.span.isSynthetic) ++ exact.filter(_.span.isSynthetic)
     referenced.iterator.map(t => try t.symbol catch { case NonFatal(_) => null })
       .find(sym => sym != null && sym.exists) match {
-      case Some(sym) if isVariable(sym) =>
+      case Some(sym) if isField(sym) =>
         try mapVariableType(sym) catch { case NonFatal(_) => null }
       case _ => null
     }
@@ -575,6 +604,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   private def isVariable(sym: Symbol): Boolean =
     sym.isTerm && !sym.is(Flags.Method) && !sym.is(Flags.Package) && !isErrorSymbol(sym)
+
+  /**
+   * An object is referenced by name like a class, and so is the module holding a Java class's statics.
+   * Like `System` in Java's `System.out`, such a name has no field type.
+   */
+  private def isField(sym: Symbol): Boolean = isVariable(sym) && !sym.is(Flags.Module)
 
   /**
    * Look up JavaType.Variable by name (fallback), preferring the variable of that name defined where the tree starts:
@@ -586,7 +621,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       .map(t => try t.symbol catch { case NonFatal(_) => null })
       .find(sym => sym != null && sym.exists && isVariable(sym) && sym.name.toString == name))
     definedHere.orElse(symbolsByName.get(name)) match {
-      case Some(sym) if !sym.isClass && isVariable(sym) =>
+      case Some(sym) if !sym.isClass && isField(sym) =>
         try { mapVariableType(sym) } catch { case NonFatal(_) => null }
       case _ => null
     }
@@ -607,7 +642,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   // --- Core type mapping ---
 
   def mapType(tpe: Type): JavaType = {
-    if (tpe == null || tpe == NoType) return null
+    if (tpe == null || tpe == NoType || denotesPackage(tpe)) return null
 
     val sig = signatureBuilder.signature(tpe)
 
@@ -631,12 +666,23 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           mapClassType(ci.cls, fqn, fqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
+        // An alias of a type constructor, such as `scala.List` for `[A] =>> immutable.List[A]`, names the
+        // constructor's raw class, which is how Java types the class name of a parameterized type. In
+        // `[F[_], X] =>> F[X]` the constructor is the lambda's own parameter, which names no class.
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => mapType(at.tycon)
+          case _ => unknown
+        }
         case _ => unknown
       }
     } catch {
       case NonFatal(_) => unknown
     }
   }
+
+  /** A package is not a type in the Java type model. */
+  private def denotesPackage(tpe: Type): Boolean =
+    try isPackage(tpe.typeSymbol) || isPackage(tpe.termSymbol) catch { case NonFatal(_) => false }
 
   private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
     case Nil => mapType(ctx.definitions.NothingType)
@@ -929,14 +975,26 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   /**
    * Parameters and locals are owned by their method, as in Java. Lambdas and the
    * right-hand side of a local `val` introduce owners of their own, which are skipped.
+   * A local of a statement in a class or object body is owned by that body's initializer.
    */
   private def variableOwner(sym: Symbol): JavaType = {
     var owner = sym.owner
-    while (owner.exists && (owner.isAnonymousFunction || owner.isLocalDummy ||
-      (owner.isTerm && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
+    while (owner.exists && (owner.isAnonymousFunction ||
+      (owner.isTerm && !owner.isLocalDummy && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
       owner = owner.owner
     }
-    if (owner.is(Flags.Method)) mapMethodType(owner) else mapType(owner.info)
+    if (owner.is(Flags.Method)) mapMethodType(owner)
+    else if (owner.isLocalDummy) mapInitializerType(TypeUtils.asFullyQualified(mapType(owner.owner.info)))
+    else mapType(owner.info)
+  }
+
+  /** Matches the Java parsers' owner for a local of an initializer block: a method with no name, a void return and no parameters. */
+  private def mapInitializerType(fq: JavaType.FullyQualified): JavaType.Method = {
+    val sig = fq.getFullyQualifiedName + "{name=,return=void,parameters=[]}"
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, 0L, fq, "", JavaType.Primitive.Void,
+        null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (_: JavaType.Method) => ())
   }
 
   /** Create a constructor method type for a given class type. */

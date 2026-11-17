@@ -665,16 +665,10 @@ public interface Go extends J {
             return getPadding().withValue(this.value.withElement(value));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -710,7 +704,7 @@ public interface Go extends J {
             }
 
             public Go.KeyValue withValue(JLeftPadded<Expression> value) {
-                return t.value == value ? t : new Go.KeyValue(t.padding, t.id, t.prefix, t.markers, t.keyExpr, value);
+                return t.value == value ? t : new Go.KeyValue(t.padding, t.id, t.prefix, t.markers, t.keyExpr, value, t.type);
             }
         }
     }
@@ -779,16 +773,10 @@ public interface Go extends J {
         @Getter
         Space closeBracket;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -824,7 +812,7 @@ public interface Go extends J {
             }
 
             public Go.SliceExpr withLow(JRightPadded<Expression> low) {
-                return t.low == low ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, low, t.high, t.max, t.closeBracket);
+                return t.low == low ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, low, t.high, t.max, t.closeBracket, t.type);
             }
 
             public JRightPadded<Expression> getHigh() {
@@ -832,7 +820,7 @@ public interface Go extends J {
             }
 
             public Go.SliceExpr withHigh(JRightPadded<Expression> high) {
-                return t.high == high ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, t.low, high, t.max, t.closeBracket);
+                return t.high == high ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, t.low, high, t.max, t.closeBracket, t.type);
             }
         }
     }
@@ -2566,16 +2554,10 @@ public interface Go extends J {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -2615,7 +2597,7 @@ public interface Go extends J {
             }
 
             public Go.Binary withOperator(JLeftPadded<Type> operator) {
-                return t.operator == operator ? t : new Go.Binary(t.padding, t.id, t.prefix, t.markers, t.left, operator, t.right);
+                return t.operator == operator ? t : new Go.Binary(t.padding, t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
             }
         }
     }

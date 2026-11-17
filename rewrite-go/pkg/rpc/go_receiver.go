@@ -183,6 +183,7 @@ func (r *GoReceiver) VisitGoBinary(b *golang.Binary, p any) java.J {
 	b.Left = receiveValue(q, b.Left, func(e java.Expression) any { return r.Visit(e, q) })
 	b.Operator = receiveLeftPaddedEnum(r, q, b.Operator, golang.ParseBinaryOperator)
 	b.Right = receiveValue(q, b.Right, func(e java.Expression) any { return r.Visit(e, q) })
+	b.Type = r.receiveType(b.Type, q)
 	return b
 }
 
@@ -233,6 +234,7 @@ func (r *GoReceiver) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	if result := q.Receive(kv.Value, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		kv.Value = result.(java.LeftPadded[java.Expression])
 	}
+	kv.Type = r.receiveType(kv.Type, q)
 	return kv
 }
 
@@ -262,6 +264,7 @@ func (r *GoReceiver) VisitSlice(sl *golang.Slice, p any) java.J {
 	}
 	sl.Max = receiveValue(q, sl.Max, func(e java.Expression) any { return r.Visit(e, q) })
 	sl.CloseBracket = receiveValue(q, sl.CloseBracket, func(e java.Space) any { return receiveSpace(e, q) })
+	sl.Type = r.receiveType(sl.Type, q)
 	return sl
 }
 

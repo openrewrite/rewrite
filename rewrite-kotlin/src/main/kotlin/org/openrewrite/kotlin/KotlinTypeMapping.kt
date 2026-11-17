@@ -1381,7 +1381,7 @@ class KotlinTypeMapping(
                 }
 
                 isInitializerScope(parent) -> {
-                    declaringType = initializerMethodType(parent as FirDeclaration)
+                    declaringType = initializerType(parent as FirDeclaration)
                 }
 
                 parent is FirClass -> {
@@ -1791,7 +1791,7 @@ class KotlinTypeMapping(
         }
     }
 
-    private fun initializerMethodType(scope: FirDeclaration): Method =
+    private fun initializerType(scope: FirDeclaration): Method =
         typeFactory.methodFor(signatureBuilder.initializerSignature(scope), {
             Method(null, 0, null, "", null, null as MutableList<String>?, null, null, null, null, null)
         }) { method ->
@@ -1909,7 +1909,7 @@ internal fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
 
 /**
  * An init block or a property initializer has no method of its own, so its locals are owned by a nameless `void()`
- * method of the class, as javac 25 does for a local of an initializer block. Owning them by the class would make
+ * method of the class, as the Java parsers do for a local of an initializer block. Owning them by the class would make
  * them indistinguishable from the class's fields.
  */
 internal fun isInitializerScope(parent: Any?): Boolean = parent is FirAnonymousInitializer || parent is FirProperty

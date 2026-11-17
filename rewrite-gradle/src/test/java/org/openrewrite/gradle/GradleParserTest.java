@@ -315,6 +315,23 @@ class GradleParserTest implements RewriteTest {
     }
 
     @Test
+    void gradle6HasTheUtilitiesGradle7DeclaresPublic() {
+        rewriteRun(
+          spec -> spec.parser(GradleParser.builder().gradleVersion("6.9.4")),
+          buildGradle(
+            """
+              if (GradleVersion.current() >= GradleVersion.version('6.0') && VersionNumber.parse('1.2').major > 0) {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "org.gradle.util.GradleVersion current()")).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.util.VersionNumber parse(..)")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
     void gradleVersionOfTheProjectWrapper(@TempDir Path project) throws Exception {
         Path wrapper = Files.createDirectories(project.resolve("gradle/wrapper")).resolve("gradle-wrapper.properties");
         Files.writeString(wrapper, "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-rc-1-bin.zip\n");

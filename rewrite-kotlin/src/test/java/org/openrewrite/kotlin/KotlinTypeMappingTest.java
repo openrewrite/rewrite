@@ -2767,6 +2767,30 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void initializerBlockLocalIsOwnedByTheInitializer() {
+            rewriteRun(
+              kotlin(
+                """
+                  class C {
+                      init { var block = 1; block++ }
+                      companion object {
+                          init { var sblock = 1; sblock++ }
+                      }
+                  }
+                  object O {
+                      init { var oblock = 1; oblock++ }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> assertThat(fieldOwnersByName(cu)).containsAllEntriesOf(Map.of(
+                  "block", Set.of("C{name=,return=void,parameters=[]}"),
+                  "sblock", Set.of("C$Companion{name=,return=void,parameters=[]}"),
+                  "oblock", Set.of("O{name=,return=void,parameters=[]}")
+                )))
+              )
+            );
+        }
+
+        @Test
         void topLevelPropertyOwnerIsDeclaringFileFacade() {
             rewriteRun(
               kotlin(
