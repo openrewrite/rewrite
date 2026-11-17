@@ -286,6 +286,38 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void aliasedStaticImportCall() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.singletonList as one
+              def o = one("a")
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations o = (J.VariableDeclarations) cu.getStatements().get(1);
+                J.MethodInvocation call = (J.MethodInvocation) o.getVariables().get(0).getInitializer();
+                assertThat(call.getSimpleName()).isEqualTo("one");
+                assertThat(call.getMethodType().getName()).isEqualTo("singletonList");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedStaticMethodNameCall() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static 'foo bar'(int i) { i }
+                  static m() { 'foo bar'(1) + '''foo bar'''(2) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldBeAbleToParseClassDeclaration() {
         rewriteRun(
                 groovy(
