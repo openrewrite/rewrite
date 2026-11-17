@@ -666,6 +666,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           mapClassType(ci.cls, fqn, fqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
+        // An alias of a type constructor, such as `scala.List` for `[A] =>> immutable.List[A]`, names the
+        // constructor's raw class, which is how Java types the class name of a parameterized type. In
+        // `[F[_], X] =>> F[X]` the constructor is the lambda's own parameter, which names no class.
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => mapType(at.tycon)
+          case _ => unknown
+        }
         case _ => unknown
       }
     } catch {

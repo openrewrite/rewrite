@@ -27,6 +27,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -2129,6 +2130,64 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(wType).isSameAs(uType);
                 assertThat(unionTrees.getFirst().getType()).isSameAs(uType);
                 assertThat(litType).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterizedTypeNamesAreTypedLikeJava() {
+        rewriteRun(
+          scala(
+            """
+            object A {
+              val l: List[Int] = null
+              val m: Map[String, Seq[Int]] = null
+              val j: java.util.List[String] = null
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.ParameterizedType> types = findAll(cu, J.ParameterizedType.class, t -> true);
+                assertThat(types).extracting(t -> TypeUtils.asFullyQualified(t.getClazz().getType()))
+                  .allSatisfy(c -> assertThat(c).isInstanceOf(JavaType.Class.class))
+                  .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                  .containsExactly("scala.collection.immutable.List", "scala.collection.immutable.Map",
+                    "scala.collection.immutable.Seq", "java.util.List");
+                List<J.Identifier> names = new ArrayList<>();
+                for (J.ParameterizedType t : types) {
+                    assertThat(t.getClazz().getType()).isSameAs(TypeUtils.asParameterized(t.getType()).getType());
+                    names.add(t.getClazz() instanceof J.FieldAccess fa ? fa.getName() : (J.Identifier) t.getClazz());
+                    for (Expression argument : t.getTypeParameters()) {
+                        if (argument instanceof J.Identifier id) {
+                            names.add(id);
+                        }
+                    }
+                }
+                assertThat(names).extracting(J.Identifier::getSimpleName)
+                  .containsExactly("List", "Int", "Map", "String", "Seq", "Int", "List", "String");
+                assertThat(names).allSatisfy(id -> {
+                    assertThat(id.getType()).isNotNull().isNotInstanceOf(JavaType.Unknown.class);
+                    assertThat(id.getFieldType()).isNull();
+                });
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterOfATypeLambdaIsNotTheClassOfAParameterizedType() {
+        rewriteRun(
+          scala(
+            """
+            object A {
+              type Apply[F[_], X] = F[X]
+              val a: Apply[List, Int] = null
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ParameterizedType apply = find(cu, J.ParameterizedType.class,
+                  t -> t.getClazz() instanceof J.Identifier id && "Apply".equals(id.getSimpleName()));
+                assertThat(apply.getClazz().getType()).isNotInstanceOf(JavaType.GenericTypeVariable.class);
             })
           )
         );
