@@ -3010,39 +3010,38 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitStaticMethodCallExpression(StaticMethodCallExpression call) {
-            Space fmt = whitespace();
+            queue.add(insideParentheses(call, fmt -> {
+                MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+                JavaType.Method methodType = typeMapping.methodType(methodNode);
+                // On Groovy 2.5 `StaticImportVisitor` names an aliased static import call after the imported method,
+                // while the source holds the alias
+                String methodName = quotedMethodName();
+                if (methodName == null) {
+                    methodName = name();
+                } else {
+                    skip(methodName);
+                }
+                // On Groovy 2.5 `StaticImportVisitor` turns a statically imported getter read as a property into a call.
+                // A `(` on a later line opens the next statement.
+                int afterName = indexOfNextNonWhitespace(cursor, source);
+                boolean parenthesizedArgs = source.startsWith("(", afterName) && source.lastIndexOf('\n', afterName) < cursor;
+                if (!methodName.equals(call.getMethod()) && call.getArguments() instanceof ArgumentListExpression &&
+                    ((ArgumentListExpression) call.getArguments()).getExpressions().isEmpty() && !parenthesizedArgs) {
+                    return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), methodName,
+                            methodType == null ? typeMapping.type(staticType(call)) : methodType.getReturnType(),
+                            methodNode == null ? null : typeMapping.variableType(methodName, methodNode));
+                }
+                J.Identifier name = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY,
+                        emptyList(), methodName, methodType, null);
 
-            MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
-            JavaType.Method methodType = typeMapping.methodType(methodNode);
-            // On Groovy 2.5 `StaticImportVisitor` names an aliased static import call after the imported method,
-            // while the source holds the alias
-            String methodName = quotedMethodName();
-            if (methodName == null) {
-                methodName = name();
-            } else {
-                skip(methodName);
-            }
-            // On Groovy 2.5 `StaticImportVisitor` turns a statically imported getter read as a property into a call.
-            // A `(` on a later line opens the next statement.
-            int afterName = indexOfNextNonWhitespace(cursor, source);
-            boolean parenthesizedArgs = source.startsWith("(", afterName) && source.lastIndexOf('\n', afterName) < cursor;
-            if (!methodName.equals(call.getMethod()) && call.getArguments() instanceof ArgumentListExpression &&
-                ((ArgumentListExpression) call.getArguments()).getExpressions().isEmpty() && !parenthesizedArgs) {
-                queue.add(new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), methodName,
-                        methodType == null ? typeMapping.type(staticType(call)) : methodType.getReturnType(),
-                        methodNode == null ? null : typeMapping.variableType(methodName, methodNode)));
-                return;
-            }
-            J.Identifier name = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY,
-                    emptyList(), methodName, methodType, null);
+                Markers markers = Markers.EMPTY;
+                if (call.getArguments() instanceof ArgumentListExpression) {
+                    markers = handlesCaseWhereEmptyParensAheadOfClosure((ArgumentListExpression) call.getArguments(), markers);
+                }
+                JContainer<Expression> args = doVisit(call.getArguments());
 
-            Markers markers = Markers.EMPTY;
-            if (call.getArguments() instanceof ArgumentListExpression) {
-                markers = handlesCaseWhereEmptyParensAheadOfClosure((ArgumentListExpression) call.getArguments(), markers);
-            }
-            JContainer<Expression> args = doVisit(call.getArguments());
-
-            queue.add(new J.MethodInvocation(randomId(), fmt, markers, null, null, name, args, methodType));
+                return new J.MethodInvocation(randomId(), fmt, markers, null, null, name, args, methodType);
+            }));
         }
 
         @Override
@@ -3513,54 +3512,56 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitPostfixExpression(PostfixExpression unary) {
-            Space fmt = whitespace();
-            Expression expression = doVisit(unary.getExpression());
+            queue.add(insideParentheses(unary, fmt -> {
+                Expression expression = doVisit(unary.getExpression());
 
-            Space operatorPrefix = whitespace();
-            String typeToken = unary.getOperation().getText();
-            cursor += typeToken.length();
+                Space operatorPrefix = whitespace();
+                String typeToken = unary.getOperation().getText();
+                cursor += typeToken.length();
 
-            J.Unary.Type operator = null;
-            switch (typeToken) {
-                case "++":
-                    operator = J.Unary.Type.PostIncrement;
-                    break;
-                case "--":
-                    operator = J.Unary.Type.PostDecrement;
-                    break;
-            }
-            assert operator != null;
+                J.Unary.Type operator = null;
+                switch (typeToken) {
+                    case "++":
+                        operator = J.Unary.Type.PostIncrement;
+                        break;
+                    case "--":
+                        operator = J.Unary.Type.PostDecrement;
+                        break;
+                }
+                assert operator != null;
 
-            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY,
-                    JLeftPadded.build(operator).withBefore(operatorPrefix),
-                    expression, expression.getType()));
+                return new J.Unary(randomId(), fmt, Markers.EMPTY,
+                        JLeftPadded.build(operator).withBefore(operatorPrefix),
+                        expression, expression.getType());
+            }));
         }
 
         @Override
         public void visitPrefixExpression(PrefixExpression unary) {
-            Space fmt = whitespace();
-            String typeToken = unary.getOperation().getText();
-            skip(typeToken);
+            queue.add(insideParentheses(unary, fmt -> {
+                String typeToken = unary.getOperation().getText();
+                skip(typeToken);
 
-            J.Unary.Type operator = null;
-            switch (typeToken) {
-                case "++":
-                    operator = J.Unary.Type.PreIncrement;
-                    break;
-                case "--":
-                    operator = J.Unary.Type.PreDecrement;
-                    break;
-                case "~":
-                    operator = J.Unary.Type.Complement;
-                    break;
-            }
+                J.Unary.Type operator = null;
+                switch (typeToken) {
+                    case "++":
+                        operator = J.Unary.Type.PreIncrement;
+                        break;
+                    case "--":
+                        operator = J.Unary.Type.PreDecrement;
+                        break;
+                    case "~":
+                        operator = J.Unary.Type.Complement;
+                        break;
+                }
 
-            assert operator != null;
-            Expression operand = doVisit(unary.getExpression());
-            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY,
-                    JLeftPadded.build(operator),
-                    operand,
-                    operand.getType()));
+                assert operator != null;
+                Expression operand = doVisit(unary.getExpression());
+                return new J.Unary(randomId(), fmt, Markers.EMPTY,
+                        JLeftPadded.build(operator),
+                        operand,
+                        operand.getType());
+            }));
         }
 
         @Override
@@ -4600,6 +4601,15 @@ public class GroovyParserVisitor {
                 // As on Groovy 3+, the range of a parenthesized property read starts at its outermost parenthesis
                 PropertyExpression expr = (PropertyExpression) node;
                 return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
+            } else if ((node instanceof CastExpression || node instanceof MethodCallExpression ||
+                        node instanceof StaticMethodCallExpression || node instanceof PostfixExpression ||
+                        node instanceof PrefixExpression || node instanceof TernaryExpression ||
+                        node instanceof NotExpression || node instanceof UnaryMinusExpression ||
+                        node instanceof UnaryPlusExpression || node instanceof BitwiseNegationExpression ||
+                        node instanceof ListExpression || node instanceof MapExpression ||
+                        node instanceof RangeExpression) &&
+                       node.getLineNumber() > 0 && node.getLastLineNumber() > 0) {
+                return wrappingParenthesesLevel(node);
             }
         } else {
             if (node instanceof MethodCallExpression) {
@@ -4624,6 +4634,66 @@ public class GroovyParserVisitor {
         }
 
         return null;
+    }
+
+    /**
+     * On Groovy 2 the range of a parenthesized expression starts at its outermost {@code (} and ends where
+     * the next token starts, so the wrapping parentheses are the leading ones whose {@code )} is the last
+     * token in the range. The range can take in a trailing comment, and a leading {@code (} can belong to
+     * the expression itself, as in {@code (int) y} or {@code (y).toString()}.
+     */
+    private int wrappingParenthesesLevel(ASTNode node) {
+        int end = Math.min(sourceLineNumberOffsets[node.getLastLineNumber() - 1] + node.getLastColumnNumber() - 1, source.length());
+        int level = 0;
+        for (int open = sourceOffset(node); open < end && source.charAt(open) == '('; open = indexOfNextNonWhitespace(open + 1, source)) {
+            int close = matchingClosingParenthesis(node, open, end);
+            if (close < 0 || indexOfNextNonWhitespace(close + 1, source) < end) {
+                break;
+            }
+            level++;
+            end = close;
+        }
+        return level;
+    }
+
+    /**
+     * @return the index of the {@code )} that closes the {@code (} at {@code open}, or -1 if it isn't before {@code end}
+     */
+    private int matchingClosingParenthesis(ASTNode node, int open, int end) {
+        int depth = 0;
+        for (int i = open; i < end; i++) {
+            int stringOrCommentEnd = endOfStringOrComment(node, i);
+            if (stringOrCommentEnd >= 0) {
+                i = stringOrCommentEnd;
+            } else if (source.charAt(i) == '(') {
+                depth++;
+            } else if (source.charAt(i) == ')' && --depth == 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * @return the index of the last character of the string literal or comment that starts at {@code start},
+     * or -1 if none starts there
+     */
+    private int endOfStringOrComment(ASTNode node, int start) {
+        Delimiter delimiter = getDelimiter(node, start);
+        // Only strings and comments can hold unbalanced parentheses. A closure is scanned through,
+        // as its span would end at a nested GString's `}`.
+        if (delimiter == null || delimiter == CLOSURE || delimiter == ARRAY) {
+            return -1;
+        }
+        for (int i = start + delimiter.open.length(); i < source.length(); i++) {
+            if (source.startsWith(delimiter.close, i) &&
+                // An escaped quote doesn't end a string
+                (delimiter == SINGLE_LINE_COMMENT || delimiter == MULTILINE_COMMENT ||
+                 delimiter.isDollarSlashyStringDelimiter() || !isEscaped(i))) {
+                return closingDelimiterIndex(i, delimiter.close) + delimiter.close.length() - 1;
+            }
+        }
+        return source.length();
     }
 
     /**
@@ -4663,32 +4733,15 @@ public class GroovyParserVisitor {
 
         // Determine level of parentheses by going through the source, don't count parentheses in comments, string literals and regexes
         int count = 0;
-        Delimiter delimiter = null;
         for (int i = start; i < end; i++) {
-            if (delimiter == null) {
-                delimiter = getDelimiter(node, i);
-                // Only strings and comments can hold unbalanced parentheses; skipping a closure as a span
-                // ended it early at a nested GString's `}`
-                if (delimiter == CLOSURE || delimiter == ARRAY) {
-                    delimiter = null;
-                }
-                if (delimiter == null) {
-                    if (source.charAt(i) == '(') {
-                        count++;
-                    } else if (source.charAt(i) == ')' && !(node instanceof ConstantExpression || node instanceof GStringExpression ||
-                                                             node instanceof VariableExpression)) {
-                        count--;
-                    }
-                } else {
-                    i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
-                }
-            } else if (source.startsWith(delimiter.close, i) &&
-                       // An escaped quote doesn't end a string
-                       (delimiter == SINGLE_LINE_COMMENT || delimiter == MULTILINE_COMMENT ||
-                        delimiter.isDollarSlashyStringDelimiter() || !isEscaped(i))) {
-                i = closingDelimiterIndex(i, delimiter.close);
-                i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
-                delimiter = null;
+            int stringOrCommentEnd = endOfStringOrComment(node, i);
+            if (stringOrCommentEnd >= 0) {
+                i = stringOrCommentEnd;
+            } else if (source.charAt(i) == '(') {
+                count++;
+            } else if (source.charAt(i) == ')' && !(node instanceof ConstantExpression || node instanceof GStringExpression ||
+                                                     node instanceof VariableExpression)) {
+                count--;
             }
         }
         return Math.max(count, 0);

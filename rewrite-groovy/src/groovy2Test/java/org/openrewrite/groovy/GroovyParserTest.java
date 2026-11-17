@@ -156,6 +156,45 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedCastsCallsAndIncrements() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              import static java.lang.Math.abs
+              def y = 1
+              def a = (1 as String)
+              def b = ((int) y) * 2
+              def c = (int) (y + 1)
+              def d = (y++) /* ) */ * 2
+              def e = (--y)
+              def f = (y.toString()) // )
+              def g = ((y?.toString())).length()
+              def h = (y).toString().length()
+              def i = ((y)).toString()
+              def j = (abs(1)) * 2
+              def k = (runtime)
+              def l = (y > 0 ? 1 : 2) * 2
+              def m = (y > 0) ? 1 : 2
+              def n = (!y)
+              def o = (-y) * 2
+              def p = (+y)
+              def q = (~y)
+              def r = ([1, 2]) + [3]
+              def s = ([a: 1])
+              def t = (1..2)
+              def u = -(y.hashCode())
+              def v = [(y.toString()): 1]
+              def w = -(y).hashCode()
+              def x = (foo(")"))
+              def z = (foo("(${y}"))
+              def foo(x) { x }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotTreatDivisionAsDelimiter() {
         rewriteRun(
                 groovy(
