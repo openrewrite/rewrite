@@ -22,11 +22,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.scala.ScalaPrinter;
 import org.openrewrite.scala.ScalaVisitor;
 import org.openrewrite.scala.service.ScalaAutoFormatService;
+import org.openrewrite.scala.service.ScalaImportService;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
@@ -259,6 +261,10 @@ public interface S extends J {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName());
+                } else if (ScalaImportService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ImportService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaImportService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
