@@ -539,6 +539,11 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 oSig
             }
 
+            isFileFacadeMember(property.symbol) -> when (val source = property.containerSource) {
+                is JvmPackagePartSource -> source.facadeFqn
+                else -> fileSignature(property.symbol.getContainingFile() ?: firFile)
+            }
+
             parent is FirFunction -> methodSignature(parent, null)
             parent is FirFile -> fileSignature(parent)
             parent is FirClass -> classSignature(parent)

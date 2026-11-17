@@ -936,13 +936,7 @@ class KotlinTypeMapping(
                 } else if (declaration.isFromLibrary) {
                     val source = declaration.fir.containerSource
                     if (source is JvmPackagePartSource) {
-                        // JvmPackagePartSource carries only the JVM facade class name
-                        // string — no FIR class to route through. Synthesize a
-                        // canonical Class for the facade so MethodMatcher works;
-                        // we can't enumerate its members from FIR.
-                        declaringType = typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
-                            // Synthetic library facade — body is not enumerable from FIR.
-                        }
+                        declaringType = libraryFacadeType(source)
                     } else if (!declaration.fir.origin.generated &&
                         !declaration.fir.origin.fromSupertypes &&
                         !declaration.fir.origin.fromSource
@@ -1377,6 +1371,15 @@ class KotlinTypeMapping(
                     }
                 }
 
+                isFileFacadeMember(variable.symbol) -> {
+                    val source = variable.containerSource
+                    declaringType = if (source is JvmPackagePartSource) {
+                        libraryFacadeType(source)
+                    } else {
+                        TypeUtils.asFullyQualified(type(variable.symbol.getContainingFile() ?: firFile))
+                    }
+                }
+
                 parent is FirClass -> {
                     declaringType = type(parent)
                 }
@@ -1785,15 +1788,11 @@ class KotlinTypeMapping(
     }
 
     /**
-     * Top-level functions and properties compile to static members of the file's JVM facade class.
+     * A [JvmPackagePartSource] carries only the JVM facade class name, with no FIR class to route through.
+     * The synthesized class lets MethodMatcher and FQN lookups work, though its members can't be enumerated.
      */
-    @OptIn(SymbolInternals::class)
-    private fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
-        (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
-                !symbol.isLocal &&
-                symbol.dispatchReceiverType == null &&
-                symbol.containingClassLookupTag() == null &&
-                symbol.fir.isScriptTopLevelDeclaration != true
+    private fun libraryFacadeType(source: JvmPackagePartSource): FullyQualified =
+        typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {}
 
     private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?, isStatic: Boolean): Long {
         var bitMask: Long = 0
@@ -1875,6 +1874,17 @@ class KotlinTypeMapping(
         }
     }
 }
+
+/**
+ * Top-level functions and properties compile to static members of the file's JVM facade class.
+ */
+@OptIn(SymbolInternals::class)
+internal fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
+    (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
+            !symbol.isLocal &&
+            symbol.dispatchReceiverType == null &&
+            symbol.containingClassLookupTag() == null &&
+            symbol.fir.isScriptTopLevelDeclaration != true
 
 internal fun FirBasedSymbol<*>.getContainingFile() =
     when (this) {

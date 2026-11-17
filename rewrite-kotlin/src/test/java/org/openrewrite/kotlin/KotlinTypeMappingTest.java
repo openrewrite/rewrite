@@ -2775,6 +2775,46 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void topLevelPropertyOwnerIsDeclaringFileFacade() {
+            rewriteRun(
+              kotlin(
+                """
+                  package a.b
+                  val TOP = 1
+                  """
+              ),
+              kotlin(
+                """
+                  package c
+                  import a.b.TOP
+                  import kotlin.math.PI
+                  fun f() = TOP + a.b.TOP + PI
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Set<String>> ownersByName = new KotlinIsoVisitor<Map<String, Set<String>>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
+                            JavaType.Variable fieldType = identifier.getFieldType();
+                            if (fieldType != null) {
+                                acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
+                                  .add(String.valueOf(fieldType.getOwner()));
+                            }
+                            return super.visitIdentifier(identifier, acc);
+                        }
+                    }.reduce(cu, new HashMap<>());
+
+                    // then
+                    assertThat(ownersByName).containsExactlyInAnyOrderEntriesOf(Map.of(
+                      "TOP", Set.of("a.b.OpenRewriteFile0Kt"),
+                      "PI", Set.of("kotlin.math.MathKt")
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
         void scriptDeclarationsAreNotStatic() {
             rewriteRun(
               kotlinScript(
