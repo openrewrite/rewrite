@@ -36,6 +36,7 @@ import static org.openrewrite.Recipe.PANIC;
 
 class RecipeStack {
     private final Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
+    private final Map<Recipe, Recipe> preparedRecipes = new IdentityHashMap<>();
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private Deque<RecipePath> allRecipesStack;
@@ -103,7 +104,7 @@ class RecipeStack {
 
     private void init(Recipe recipe) {
         allRecipesStack = new ArrayDeque<>();
-        allRecipesStack.push(new RecipePath(EditPreconditions.prepare(recipe)));
+        allRecipesStack.push(new RecipePath(preparedRecipes.computeIfAbsent(recipe, EditPreconditions::prepare)));
     }
 
     private void recurseRecipeList(RecipePath recipePath) {

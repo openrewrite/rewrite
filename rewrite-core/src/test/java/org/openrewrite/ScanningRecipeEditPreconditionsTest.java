@@ -84,25 +84,31 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
 
     @Test
     void evaluatesOncePerFilePerCycle() {
+        // given
         Contains go = new Contains("go");
         Guarded recipe = new Guarded(singletonList(go), "own",
           new Tag("a"), new Tag("b"), new Guarded(emptyList(), null, new Tag("c"), new Tag("d")));
 
+        // when
         RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(
           plainText("go", "a.txt"), plainText("stop", "b.txt"), plainText("go", "c.txt"))), new InMemoryExecutionContext(), 2, 2);
 
+        // then
         assertThat(texts(run)).containsExactly("go[own][a][b][c][d]", "go[own][a][b][c][d]");
         assertThat(go.evaluations).hasValue(3 * 2);
     }
 
     @Test
     void sourceFileRejectedByTheOwnEditorDoesNotReuseThePreviousResult() {
+        // given
         Recipe recipe = new Guarded(singletonList(new Contains("go")), "own", new MarkEverySourceFile());
 
+        // when
         RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(
           plainText("go", "a.txt"),
           new Quark(Tree.randomId(), Paths.get("b.bin"), Markers.EMPTY, null, null))), new InMemoryExecutionContext());
 
+        // then
         assertThat(run.getChangeset().getAllResults())
           .extracting(r -> requireNonNull(r.getAfter()).getSourcePath().toString())
           .containsExactly("a.txt");
@@ -232,6 +238,15 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
     }
 
     @Test
+    void recipeListCreatedOnEachCallKeepsItsAccumulators() {
+        rewriteRun(
+          spec -> spec.recipe(new Guarded(singletonList(new Contains("go")), null, new FreshRecipeList())),
+          text("go", "go[go=1]"),
+          text("stop")
+        );
+    }
+
+    @Test
     void scanningConditionNotMet() {
         rewriteRun(
           spec -> spec.recipe(new Guarded(singletonList(new RepositoryContainsFile("z-marker.txt")), "own=%d",
@@ -255,15 +270,18 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
 
     @Test
     void repeatedRunsOfTheSameRecipeDoNotShareConditionState() {
+        // given
         Recipe recipe = new Guarded(singletonList(new RepositoryContainsFile("marker.txt")), null, new Tag("a"));
         ExecutionContext ctx = new InMemoryExecutionContext();
 
+        // when
         RecipeRun withMarker = recipe.run(new InMemoryLargeSourceSet(List.of(
           plainText("t", "t.txt"), plainText("m", "marker.txt"))), ctx);
         RecipeRun withoutMarker = recipe.run(new InMemoryLargeSourceSet(List.of(plainText("t", "t.txt"))), ctx);
         RecipeRun withMarkerAgain = recipe.run(new InMemoryLargeSourceSet(List.of(
           plainText("t", "t.txt"), plainText("m", "marker.txt"))), ctx);
 
+        // then
         assertThat(texts(withMarker)).containsExactly("t[a]", "m[a]");
         assertThat(texts(withoutMarker)).isEmpty();
         assertThat(texts(withMarkerAgain)).containsExactly("t[a]", "m[a]");
@@ -299,12 +317,15 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
 
     @Test
     void conditionIsEvaluatedAgainInEveryCycle() {
+        // given
         Contains a = new Contains("a");
         Recipe recipe = new Guarded(singletonList(a), null, new AnotherCycle());
 
+        // when
         RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(
           plainText("aaa", "a.txt"))), new InMemoryExecutionContext(), 3, 1);
 
+        // then
         assertThat(texts(run)).containsExactly("bbb");
         assertThat(a.evaluations).hasValue(3);
     }
@@ -332,11 +353,14 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
 
     @Test
     void descriptorListsTheConditions() {
+        // given
         Contains go = new Contains("go");
         Guarded recipe = new Guarded(singletonList(go), null, new Tag("a"));
 
+        // when
         RecipeDescriptor descriptor = recipe.getDescriptor();
 
+        // then
         assertThat(descriptor.getPreconditions()).extracting(RecipeDescriptor::getName)
           .containsExactly(Contains.class.getName());
         assertThat(descriptor.getRecipeList()).extracting(RecipeDescriptor::getName)
@@ -346,10 +370,13 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
 
     @Test
     void changesAreAttributedToTheDeclaringRecipeAndItsDescendants() {
+        // given
         Guarded recipe = new Guarded(singletonList(new Contains("go")), null, new Tag("a"));
 
+        // when
         RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(plainText("go", "a.txt"))), new InMemoryExecutionContext());
 
+        // then
         PlainText after = (PlainText) requireNonNull(run.getChangeset().getAllResults().get(0).getAfter());
         assertThat(after.getMarkers().findFirst(RecipesThatMadeChanges.class).orElseThrow().getRecipes())
           .singleElement()
@@ -371,9 +398,14 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
 
     @Test
     void validatesTheConditions() {
+        // given
         Recipe recipe = new Guarded(singletonList(new FindAndReplace(null, "b", null, null, null, null, null, null)), null);
 
-        assertThat(recipe.validateAll()).anyMatch(Validated::isInvalid);
+        // when
+        Collection<Validated<Object>> validated = recipe.validateAll();
+
+        // then
+        assertThat(validated).anyMatch(Validated::isInvalid);
     }
 
     private static Find find(String find) {
@@ -700,6 +732,23 @@ class ScanningRecipeEditPreconditionsTest implements RewriteTest {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(AtomicInteger acc) {
             return new Tag(needle + "=" + acc.get()).getVisitor();
+        }
+    }
+
+    static class FreshRecipeList extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Fresh recipe list";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Creates its recipe list on each call.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return singletonList(new CountScanned("go"));
         }
     }
 
