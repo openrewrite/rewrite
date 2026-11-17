@@ -18,11 +18,15 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -51,6 +55,22 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(source)
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "def a = (println 'x')",
+      "def y = 1\ndef a = [(int) y: 1]"
+    })
+    void syntaxErrorFailsWithTheCompilersErrorRatherThanAMisprint(String source) {
+        SourceFile parsed = GroovyParser.builder().build()
+          .parse(new InMemoryExecutionContext(), source)
+          .findFirst()
+          .orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(((ParseError) parsed).getErroneous()).isNull();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getExceptionType())
+          .isEqualTo("MultipleCompilationErrorsException");
     }
 
     @Test
