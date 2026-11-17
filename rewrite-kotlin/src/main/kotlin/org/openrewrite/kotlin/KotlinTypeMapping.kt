@@ -1380,6 +1380,10 @@ class KotlinTypeMapping(
                     }
                 }
 
+                isInitializerScope(parent) -> {
+                    declaringType = initializerMethodType(parent as FirDeclaration)
+                }
+
                 parent is FirClass -> {
                     declaringType = type(parent)
                 }
@@ -1787,6 +1791,23 @@ class KotlinTypeMapping(
         }
     }
 
+    private fun initializerMethodType(scope: FirDeclaration): Method =
+        typeFactory.methodFor(signatureBuilder.initializerSignature(scope), {
+            Method(null, 0, null, "", null, null as MutableList<String>?, null, null, null, null, null)
+        }) { method ->
+            var declaringType = when (val container = initializerContainer(scope)) {
+                null -> type(firFile)
+                else -> type(container)
+            }
+            if (declaringType is Parameterized) {
+                declaringType = declaringType.type
+            }
+            method.unsafeSet(
+                TypeUtils.asFullyQualified(declaringType)!!, JavaType.Primitive.Void as JavaType,
+                null as MutableList<JavaType>?, null as MutableList<JavaType>?, null as MutableList<FullyQualified>?
+            )
+        }
+
     /**
      * A [JvmPackagePartSource] carries only the JVM facade class name, with no FIR class to route through.
      * The synthesized class lets MethodMatcher and FQN lookups work, though its members can't be enumerated.
@@ -1885,6 +1906,23 @@ internal fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
             symbol.dispatchReceiverType == null &&
             symbol.containingClassLookupTag() == null &&
             symbol.fir.isScriptTopLevelDeclaration != true
+
+/**
+ * An init block or a property initializer has no method of its own, so its locals are owned by a nameless `void()`
+ * method of the class, as javac 25 does for a local of an initializer block. Owning them by the class would make
+ * them indistinguishable from the class's fields.
+ */
+internal fun isInitializerScope(parent: Any?): Boolean = parent is FirAnonymousInitializer || parent is FirProperty
+
+/**
+ * The class declaring an init block or property, or null for a top-level property.
+ */
+@OptIn(SymbolInternals::class)
+internal fun initializerContainer(scope: FirDeclaration): FirClass? = when (scope) {
+    is FirAnonymousInitializer -> (scope.containingDeclarationSymbol as? FirClassSymbol<*>)?.fir
+    is FirProperty -> scope.symbol.getContainingClassSymbol()?.fir as? FirClass
+    else -> null
+}
 
 internal fun FirBasedSymbol<*>.getContainingFile() =
     when (this) {
