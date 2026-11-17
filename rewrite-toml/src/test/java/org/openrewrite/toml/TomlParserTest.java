@@ -724,6 +724,24 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineLiteralStringEndingInQuotes() {
+        // Passes once generateAntlrSources regenerates the lexer
+        rewriteRun(
+          toml(
+            """
+              str = '''That,' she said, 'is still pointless.''''
+              this-str-has-apostrophes='''' there's one already
+              '' two more
+              '''''
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly("That,' she said, 'is still pointless.'", "' there's one already\n'' two more\n''"))
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
