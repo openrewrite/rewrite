@@ -17,6 +17,8 @@ package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.marker.OmitBraces;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
@@ -63,6 +65,48 @@ class Scala2CompatTest implements RewriteTest {
                   }
                 }
                 """
+            )
+        );
+    }
+
+    @Test
+    void procedureSyntaxWithoutParameterList() {
+        rewriteRun(
+            scala(
+                """
+                object T {
+                  def d { println("z") }
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
+                    J.MethodDeclaration d = (J.MethodDeclaration) t.getBody().getStatements().get(0);
+                    assertThat(d.getMarkers().findFirst(OmitBraces.class)).isPresent();
+                    assertThat(d.getPadding().getParameters().getMarkers().findFirst(OmitBraces.class)).isPresent();
+                    assertThat(d.getParameters()).isEmpty();
+                    assertThat(d.getBody()).isNotNull();
+                    assertThat(d.getBody().getStatements()).singleElement().isInstanceOf(J.Return.class);
+                })
+            )
+        );
+    }
+
+    @Test
+    void abstractDeclarationWithoutParameterListOrResultType() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def h
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
+                    J.MethodDeclaration h = (J.MethodDeclaration) t.getBody().getStatements().get(0);
+                    assertThat(h.getPadding().getParameters().getMarkers().findFirst(OmitBraces.class)).isPresent();
+                    assertThat(h.getReturnTypeExpression()).isNull();
+                    assertThat(h.getBody()).isNull();
+                })
             )
         );
     }

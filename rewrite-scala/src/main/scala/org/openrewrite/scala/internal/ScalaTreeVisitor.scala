@@ -6377,12 +6377,9 @@ class ScalaTreeVisitor(
         i = if (closePos >= 0) closePos + 1 else source.length
         while (i < source.length && source.charAt(i).isWhitespace) i += 1
       }
-      if (i < source.length) {
-        val nextCh = source.charAt(i)
-        if (nextCh == ':' || nextCh == '=') {
-          hasParensInSource = false
-        }
-      }
+      // Only `(` opens a parameter list. A parameterless def can also continue with a
+      // procedure body (`def d { ... }`) or with nothing at all (`def h`).
+      hasParensInSource = i < source.length && source.charAt(i) == '('
     } else if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
       val defSource = source.substring(adjustedStart, adjustedEnd)
       val keyword = if (isGivenDefDef) "given" else "def"
