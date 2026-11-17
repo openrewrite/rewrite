@@ -53,6 +53,13 @@ export function addDependency(options: AddDependencyOptions): Promise<Recipe> {
 export interface RemoveDependencyOptions {
     packageName: string;
     scope?: NpmDependencyScope;
+    /**
+     * Keep the dependency in a `package.json` while a source still imports a package matching one of these globs, by
+     * `import`, `export ... from`, `require()` or `import()`: the nearest `package.json` above that source declaring
+     * the dependency. Imports are read before the cycle's edits, so the recipe runs another cycle, in which it removes
+     * the dependency where an earlier recipe removed the last import.
+     */
+    unlessImporting?: string[];
 }
 
 /**
