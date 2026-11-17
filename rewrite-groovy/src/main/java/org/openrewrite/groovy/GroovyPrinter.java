@@ -163,7 +163,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 keyword = "==~";
                 break;
             case Access:
-                keyword = "[";
+                keyword = binary.getMarkers().findFirst(NullSafe.class).isPresent() ? "?[" : "[";
                 break;
             case In:
                 keyword = "in";
