@@ -920,7 +920,18 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
+      val typeParameters: util.List[JavaType] = try {
+        val tparams = sym.typeParams
+        if (tparams.nonEmpty) {
+          val tps = new ArrayList[JavaType](tparams.size)
+          tparams.foreach(tp => tps.add(mapType(tp.typeRef)))
+          tps
+        } else null
+      } catch {
+        case NonFatal(_) => null
+      }
+
+      clazz.unsafeSet(typeParameters, supertype, null, null, interfaces, members, methods)
     })
   }
 

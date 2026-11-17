@@ -1801,6 +1801,23 @@ class ScalaTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void membersOfGenericParentsAreFound() {
+        rewriteRun(
+          scala(
+            """
+            trait G[T] { def g(t: T): Int }
+            trait H extends G[String] { def g(t: String): Int }
+            trait I extends Iterator[Int] { def hasNext: Boolean }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(overridden(cu, "H", "g").getDeclaringType().getFullyQualifiedName()).isEqualTo("G");
+                assertThat(overridden(cu, "I", "hasNext").getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.collection.Iterator");
+            })
+          )
+        );
+    }
+
     private static void assertBoundIsPairOfItself(JavaType type, String name) {
         assertBoundIsPairOf(type, name, name);
     }
