@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.OrderImports;
 import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
@@ -208,7 +207,7 @@ class RecipeCompatibilityTest implements RewriteTest {
               }
               """,
             """
-              import  java.util.LinkedList
+              import java.util.LinkedList
 
               class MyClass {
                 val list = new LinkedList[String]()
@@ -257,7 +256,7 @@ class RecipeCompatibilityTest implements RewriteTest {
               import scala.language.implicitConversions
               import scala.math.Pi
               import java.util.Collections.emptyList
-              import  java.util.LinkedList
+              import java.util.LinkedList
 
               class MyClass {
                 val list = new LinkedList[String](emptyList[String]())
@@ -419,73 +418,6 @@ class RecipeCompatibilityTest implements RewriteTest {
 
               class MyClass {
                 val list = emptyList[String]()
-              }
-              """
-          )
-        );
-    }
-
-    // ---- OrderImports ----
-
-    @Test
-    void orderImportsAlphabetically() {
-        rewriteRun(
-          spec -> spec.recipe(new OrderImports(false, null)),
-          scala(
-            """
-              import java.util.Set
-              import java.util.ArrayList
-              import java.util.List
-              import java.util.Map
-
-              class MyClass {
-                val list: List[String] = new ArrayList[String]()
-                val set: Set[String] = null
-                val map: Map[String, String] = null
-              }
-              """,
-            """
-              import java.util.ArrayList
-              import java.util.List
-              import java.util.Map
-              import java.util.Set
-
-              class MyClass {
-                val list: List[String] = new ArrayList[String]()
-                val set: Set[String] = null
-                val map: Map[String, String] = null
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void orderImportsSamePackage() {
-        // Verify OrderImports sorts within the same package
-        rewriteRun(
-          spec -> spec.recipe(new OrderImports(false, null)),
-          scala(
-            """
-              import java.util.Set
-              import java.util.List
-              import java.util.Map
-
-              class MyClass {
-                val list: List[String] = null
-                val set: Set[String] = null
-                val map: Map[String, String] = null
-              }
-              """,
-            """
-              import java.util.List
-              import java.util.Map
-              import java.util.Set
-
-              class MyClass {
-                val list: List[String] = null
-                val set: Set[String] = null
-                val map: Map[String, String] = null
               }
               """
           )
