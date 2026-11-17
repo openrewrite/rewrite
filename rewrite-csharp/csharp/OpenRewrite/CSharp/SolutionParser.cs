@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
@@ -755,6 +756,7 @@ public class SolutionParser
         var units = userDocs
             .Select(doc => new ParseUnit(
                 doc.FilePath!,
+                Path.GetRelativePath(rootDir, doc.FilePath!),
                 () => doc.GetTextAsync().Result?.ToString(),
                 () =>
                 {
@@ -788,8 +790,8 @@ public class SolutionParser
             languageVersions.All(v => !string.IsNullOrEmpty(v.TargetFramework)) &&
             new HashSet<string>(frameworks, StringComparer.OrdinalIgnoreCase)
                 .SetEquals(languageVersions.Select(v => v.TargetFramework));
-        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput,
-            languageVersions, frameworkCoverageComplete);
+        return ParseUnits(CreateDotNetProjectMarker(projectPath, projectName), rootDir, units, configSymbolSets,
+            requirePrintEqualsInput, languageVersions, frameworkCoverageComplete);
     }
 
     /// <summary>
@@ -821,21 +823,115 @@ public class SolutionParser
             projectName, filePaths.Count);
 
         var units = filePaths
-            .Select(filePath => new ParseUnit(filePath, () => ReadSource(filePath), () => null))
+            .Select(filePath => new ParseUnit(filePath, Path.GetRelativePath(rootDir, filePath),
+                () => ReadSource(filePath), () => null))
             .ToList();
 
-        return ParseUnits(projectPath, rootDir, units, new List<HashSet<string>> { new() },
-            requirePrintEqualsInput);
+        return ParseUnits(CreateDotNetProjectMarker(projectPath, projectName), rootDir, units,
+            new List<HashSet<string>> { new() }, requirePrintEqualsInput);
     }
 
     /// <summary>
-    /// A single file to parse: where it lives, how to read it, and how to obtain its semantic
-    /// model (null when the project could not be evaluated, yielding a syntax-only LST).
+    /// One C# source to parse without a project around it, its text already read and stripped of
+    /// any byte order mark.
+    /// </summary>
+    public sealed record Source(string SourcePath, string Text, bool CharsetBomMarked);
+
+    /// <summary>
+    /// Parses sources as one compilation against the net10.0 reference assemblies, which is what an
+    /// SDK-style <c>net10.0</c> project with no package references compiles against.
+    /// Returns one result per source, in order.
+    /// </summary>
+    /// <param name="rootDir">The directory relative source paths resolve against, and up to which
+    /// .editorconfig files are read.</param>
+    /// <param name="assemblies">Assemblies to compile against besides the reference assemblies.</param>
+    public List<SourceFile> ParseSources(IReadOnlyList<Source> sources, string rootDir,
+        IReadOnlyList<string> assemblies, bool requirePrintEqualsInput = true)
+    {
+        var parseOptions = new CSharpParseOptions(LooseSourceLanguageVersion);
+        var syntaxTrees = sources
+            .Select(source => CSharpSyntaxTree.ParseText(source.Text, parseOptions,
+                Path.GetFullPath(source.SourcePath, rootDir)))
+            .ToList();
+        var compilation = CSharpCompilation.Create("LooseSources", syntaxTrees,
+            LooseSourceReferences.Value.Concat(assemblies.Select(AssemblyReference)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var units = sources
+            .Select((source, i) => new ParseUnit(
+                syntaxTrees[i].FilePath,
+                source.SourcePath,
+                () => source.Text,
+                () => compilation.GetSemanticModel(syntaxTrees[i]),
+                source.CharsetBomMarked))
+            .ToList();
+
+        // CSharpParser's sources have always carried the markers of a net10.0 SDK project named Temp.
+        var dotNetProject = new DotNetProject(Tree.RandomId(), "Temp", [LooseSourceTargetFramework], "Microsoft.NET.Sdk");
+        var languageVersions = new List<CSharpLanguageVersion.TargetFrameworkVersion>
+        {
+            new(LooseSourceTargetFramework, LooseSourceLanguageVersion.ToDisplayString())
+        };
+        return ParseUnits(dotNetProject, rootDir, units, new List<HashSet<string>> { new() },
+            requirePrintEqualsInput, languageVersions, frameworkCoverageComplete: true);
+    }
+
+    internal const string LooseSourceTargetFramework = "net10.0";
+
+    // The SDK's default for net10.0. LanguageVersion.Latest moves with Roslyn.
+    private const LanguageVersion LooseSourceLanguageVersion = LanguageVersion.CSharp14;
+
+    private static readonly ConcurrentDictionary<string, MetadataReference> AssemblyReferences = new();
+
+    private static MetadataReference AssemblyReference(string path) =>
+        AssemblyReferences.GetOrAdd(Path.GetFullPath(path), p => MetadataReference.CreateFromFile(p));
+
+    private static readonly Lazy<IReadOnlyList<MetadataReference>> LooseSourceReferences =
+        new(() => LooseSourceReferencePaths().Select(path => (MetadataReference)MetadataReference.CreateFromFile(path)).ToList());
+
+    /// <summary>
+    /// The net10.0 reference pack of the .NET installation this process runs on, or, when it has
+    /// none (a runtime without an SDK), the runtime's own assemblies.
+    /// </summary>
+    private static IEnumerable<string> LooseSourceReferencePaths()
+    {
+        // <dotnet root>/shared/Microsoft.NETCore.App/<version>/System.Private.CoreLib.dll
+        var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var dotnetRoot = Path.GetFullPath(Path.Combine(runtimeDir, "..", "..", ".."));
+        var refPacks = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
+        if (Directory.Exists(refPacks))
+        {
+            var refDir = Directory.EnumerateDirectories(refPacks)
+                .Select(dir => (Dir: Path.Combine(dir, "ref", LooseSourceTargetFramework),
+                    Version: global::NuGet.Versioning.NuGetVersion.TryParse(Path.GetFileName(dir), out var v) ? v : null))
+                .Where(p => p.Version is { Major: 10 } && Directory.Exists(p.Dir))
+                .OrderByDescending(p => p.Version)
+                .Select(p => p.Dir)
+                .FirstOrDefault();
+            if (refDir != null)
+            {
+                Log.Debug("ParseSources: compiling against {RefDir}", refDir);
+                return Directory.EnumerateFiles(refDir, "*.dll");
+            }
+        }
+        Log.Warning("No {TargetFramework} reference pack under {RefPacks}; loose sources compile against the runtime in {RuntimeDir}",
+            LooseSourceTargetFramework, refPacks, runtimeDir);
+        return Directory.EnumerateFiles(runtimeDir, "*.dll");
+    }
+
+    /// <summary>
+    /// A single file to parse: where it lives, the source path its LST gets, how to read it, and how
+    /// to obtain its semantic model (null when the project could not be evaluated, yielding a
+    /// syntax-only LST). <paramref name="CharsetBomMarked"/> is null for a file read from disk,
+    /// which is sniffed for a byte order mark and skipped when larger than
+    /// <see cref="MaxParseableSizeBytes"/>. A source handed over in memory is always parsed.
     /// </summary>
     private sealed record ParseUnit(
         string FilePath,
+        string SourcePath,
         Func<string?> ReadSource,
-        Func<SemanticModel?> GetSemanticModel);
+        Func<SemanticModel?> GetSemanticModel,
+        bool? CharsetBomMarked = null);
 
     private sealed class LanguageVersionVisitor : CSharpVisitor<CSharpLanguageVersion>
     {
@@ -860,19 +956,17 @@ public class SolutionParser
     }
 
     private List<SourceFile> ParseUnits(
-        string projectPath, string rootDir, IReadOnlyList<ParseUnit> units,
+        DotNetProject dotNetProject, string rootDir, IReadOnlyList<ParseUnit> units,
         List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput,
         IList<CSharpLanguageVersion.TargetFrameworkVersion>? languageVersions = null,
         bool frameworkCoverageComplete = false)
     {
-        var projectName = Path.GetFileNameWithoutExtension(projectPath);
+        var projectName = dotNetProject.ProjectName;
 
         // Create an EditorConfigResolver to detect formatting style from .editorconfig files.
         // The resolver caches results per directory, so files in the same directory share
         // the same CSharpFormatStyle marker instance.
         var editorConfigResolver = new EditorConfigResolver(rootDir);
-
-        var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName);
 
         // One shared symbol→JavaType cache for the whole project. Roslyn interns symbols
         // per Compilation, so every document in this project resolves a given type to the
@@ -889,22 +983,24 @@ public class SolutionParser
 
             // Files too large to parse into a Roslyn tree/LST are recorded as Quarks
             // (path only) by the RPC layer; skip the expensive parse entirely.
-            long docSize;
-            try { docSize = new FileInfo(unit.FilePath).Length; } catch { docSize = 0; }
-            if (docSize > MaxParseableSizeBytes)
+            var relativePath = unit.SourcePath;
+            if (unit.CharsetBomMarked == null)
             {
-                LastOversizePaths.Add(Path.GetRelativePath(rootDir, unit.FilePath));
-                continue;
+                long docSize;
+                try { docSize = new FileInfo(unit.FilePath).Length; } catch { docSize = 0; }
+                if (docSize > MaxParseableSizeBytes)
+                {
+                    LastOversizePaths.Add(relativePath);
+                    continue;
+                }
             }
 
             var source = unit.ReadSource();
             if (source == null) continue;
 
-            var relativePath = Path.GetRelativePath(rootDir, unit.FilePath);
-
             // Detect UTF-8 BOM — Roslyn's SourceText.ToString() strips the BOM character,
             // so we check the raw file bytes to preserve the flag for patch fidelity.
-            var charsetBomMarked = HasUtf8Bom(unit.FilePath);
+            var charsetBomMarked = unit.CharsetBomMarked ?? HasUtf8Bom(unit.FilePath);
 
             var fileSw = Stopwatch.StartNew();
             try
