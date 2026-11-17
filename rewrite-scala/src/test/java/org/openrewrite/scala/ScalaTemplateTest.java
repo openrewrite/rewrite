@@ -24,8 +24,10 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -311,6 +313,94 @@ class ScalaTemplateTest implements RewriteTest {
                 }
               }
               """
+          ));
+    }
+
+    @Test
+    void parameterOfParameterizedType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitSwitch(J.Switch s, ExecutionContext ctx) {
+                  return ScalaTemplate.builder("#{any()}.getOrElse(\"d\")")
+                    .build()
+                    .apply(getCursor(), s.getCoordinates().replace(), s.getSelector().getTree());
+              }
+          })),
+          scala(
+            """
+              class Example {
+                  val opt: Option[String] = Some("hello")
+                  val value = opt match {
+                    case Some(x) => x
+                    case None => "default"
+                  }
+              }
+              """,
+            """
+              class Example {
+                  val opt: Option[String] = Some("hello")
+                  val value = opt.getOrElse("d")
+              }
+              """
+          ));
+    }
+
+    @Test
+    void parameterTypesInScalaSyntax() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"id".equals(method.getSimpleName())) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return ScalaTemplate.builder("#{any()}.toString()")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+              }
+          })),
+          scala(
+            """
+              object T {
+                def id[A](a: A): A = a
+                def f(ints: Array[Int], nested: Array[Array[String]], map: Map[String, Int],
+                      wild: java.util.List[_ <: Number], sup: java.util.List[_ >: Integer],
+                      union: List[String] | Int): Unit = {
+                  val a = id(ints)
+                  val b = id(nested)
+                  val c = id(map)
+                  val d = id(wild)
+                  val e = id(sup)
+                  val f = id(union)
+                }
+              }
+              """,
+            """
+              object T {
+                def id[A](a: A): A = a
+                def f(ints: Array[Int], nested: Array[Array[String]], map: Map[String, Int],
+                      wild: java.util.List[_ <: Number], sup: java.util.List[_ >: Integer],
+                      union: List[String] | Int): Unit = {
+                  val a = ints.toString()
+                  val b = nested.toString()
+                  val c = map.toString()
+                  val d = wild.toString()
+                  val e = sup.toString()
+                  val f = union.toString()
+                }
+              }
+              """,
+            // ScalaVisitor swallows exceptions thrown while visiting a top-level statement, so assert after the visit
+            spec -> spec.afterRecipe(cu -> assertThat(new ScalaIsoVisitor<List<String>>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> unattributed) {
+                    if (method.getMethodType() == null) {
+                        unattributed.add(method.toString());
+                    }
+                    return method;
+                }
+            }.reduce(cu, new ArrayList<>())).isEmpty())
           ));
     }
 }
