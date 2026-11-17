@@ -3083,30 +3083,21 @@ public class GroovyParserVisitor {
                     String simpleName = (String) value;
                     int saveCursor = cursor;
                     Space namePrefix = whitespace();
-                    if (source.startsWith(simpleName, cursor)) {
-                        skip(simpleName);
-                        // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives here
-                        FieldNode field = prop.getObjectExpression() instanceof ClassExpression ?
+                    int nameEnd = cursor;
+                    while (nameEnd < source.length() && isJavaIdentifierPart(source.charAt(nameEnd))) {
+                        nameEnd++;
+                    }
+                    String sourceName = source.substring(cursor, nameEnd);
+                    // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives
+                    // here as a property of the imported class, and the source holds the import's alias if it has one
+                    boolean classReceiver = prop.getObjectExpression() instanceof ClassExpression;
+                    if (sourceName.equals(simpleName) || (classReceiver && !sourceName.isEmpty())) {
+                        skip(sourceName);
+                        FieldNode field = classReceiver ?
                                 ClassNodeUtils.getField(prop.getObjectExpression().getType(), simpleName) : null;
-                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)),
+                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), sourceName, typeMapping.type(staticType(prop)),
                                 field != null && field.isStatic() ? typeMapping.variableType(field) : null));
                         return;
-                    }
-                    // On Groovy 2.5 `StaticImportVisitor` turns a read of an aliased static field into a property
-                    // of the imported class, while the source holds the alias
-                    if (prop.getObjectExpression() instanceof ClassExpression) {
-                        int aliasEnd = cursor;
-                        while (aliasEnd < source.length() && isJavaIdentifierPart(source.charAt(aliasEnd))) {
-                            aliasEnd++;
-                        }
-                        if (aliasEnd > cursor) {
-                            String alias = source.substring(cursor, aliasEnd);
-                            skip(alias);
-                            JavaType.Variable field = propertyField(prop, false);
-                            queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), alias,
-                                    propertyType(prop, field), field));
-                            return;
-                        }
                     }
                     // The trait transform may rewrite `this.X` to `$self.X` even though the source contains
                     // `this` rather than the property name at the cursor. Preserve `this` by keeping the

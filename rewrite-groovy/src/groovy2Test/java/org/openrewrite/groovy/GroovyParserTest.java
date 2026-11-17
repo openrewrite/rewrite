@@ -236,19 +236,20 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-    @Test
-    void aliasedStaticFieldRead() {
+    @ParameterizedTest
+    @ValueSource(strings = {"pi", "PIE"})
+    void aliasedStaticFieldRead(String alias) {
         rewriteRun(
           groovy(
             """
-              import static java.lang.Math.PI as pi
-              def x = pi
-              """,
+              import static java.lang.Math.PI as %1$s
+              def x = %1$s
+              """.formatted(alias),
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations x = (J.VariableDeclarations) cu.getStatements().get(1);
-                J.Identifier pi = (J.Identifier) x.getVariables().get(0).getInitializer();
-                assertThat(pi.getSimpleName()).isEqualTo("pi");
-                assertThat(pi.getFieldType().getName()).isEqualTo("PI");
+                J.Identifier read = (J.Identifier) x.getVariables().get(0).getInitializer();
+                assertThat(read.getSimpleName()).isEqualTo(alias);
+                assertThat(read.getFieldType().getName()).isEqualTo("PI");
             })
           )
         );
