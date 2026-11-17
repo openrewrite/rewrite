@@ -2887,7 +2887,7 @@ class KotlinTypeMappingTest {
                     assertThat(ownersByName.get("t")).containsExactlyInAnyOrder(
                       "OpenRewriteFile0Kt", "OpenRewriteFile0Kt{name=,return=void,parameters=[]}");
                     assertThat(ownersByName.get("x")).containsExactlyInAnyOrder(
-                      "K", "K{name=get,return=int,parameters=[]}", "K{name=<constructor>,return=K,parameters=[int]}",
+                      "K", "K{name=getG,return=int,parameters=[]}", "K{name=<constructor>,return=K,parameters=[int]}",
                       "K{name=,return=void,parameters=[]}", "K{name=,return=void,parameters=[]}", "K{name=,return=void,parameters=[]}");
                 })
               )
