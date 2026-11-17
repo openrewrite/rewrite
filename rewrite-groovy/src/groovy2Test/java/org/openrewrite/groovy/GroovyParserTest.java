@@ -19,6 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +55,27 @@ class GroovyParserTest implements RewriteTest {
         Class<?> groovySystem = Class.forName("groovy.lang.GroovySystem");
         var version = (String) groovySystem.getMethod("getVersion").invoke(null);
         assertThat(version).startsWith("2.");
+    }
+
+    @Test
+    void staticallyImportedFieldReadHasTheFieldType() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.out
+              def o = out
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    J.Identifier read = (J.Identifier) variable.getInitializer();
+                    assertThat(read.getFieldType()).isNotNull();
+                    assertThat(TypeUtils.isOfClassType(read.getFieldType().getOwner(), "java.lang.System")).isTrue();
+                    return variable;
+                }
+            }.visit(cu, 0))
+          )
+        );
     }
 
     @Test

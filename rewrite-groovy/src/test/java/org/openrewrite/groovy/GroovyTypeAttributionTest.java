@@ -31,7 +31,9 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -457,6 +459,63 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(TypeUtils.isOfClassType(qualid.getType(), "java.util.concurrent.ConcurrentHashMap")).isTrue();
                 assertThat(TypeUtils.isOfClassType(qualid.getName().getType(), "java.util.concurrent.ConcurrentHashMap")).isTrue();
             })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedFieldReadHasTheFieldOfAQualifiedRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.out
+              import static java.io.File.*
+              def bare = out
+              def qualified = System.out
+              class U {
+                  def u() {
+                      def bareStar = separator
+                      def qualifiedStar = File.separator
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, J.Identifier> reads = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        J initializer = variable.getInitializer();
+                        reads.put(variable.getSimpleName(), initializer instanceof J.FieldAccess ?
+                          ((J.FieldAccess) initializer).getName() : (J.Identifier) initializer);
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                assertThat(TypeUtils.isOfClassType(reads.get("bare").getType(), "java.io.PrintStream")).isTrue();
+                assertThat(reads.get("bare").getFieldType()).isNotNull().isSameAs(reads.get("qualified").getFieldType());
+                assertThat(TypeUtils.isOfClassType(reads.get("bareStar").getType(), "java.lang.String")).isTrue();
+                assertThat(reads.get("bareStar").getFieldType()).isNotNull().isSameAs(reads.get("qualifiedStar").getFieldType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedGetterReadAsAPropertyHasItsReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.getProperties
+              def p = properties
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    J.Identifier read = (J.Identifier) variable.getInitializer();
+                    assertThat(TypeUtils.isOfClassType(read.getType(), "java.util.Properties")).isTrue();
+                    assertThat(read.getFieldType()).isNull();
+                    return variable;
+                }
+            }.visit(cu, 0))
           )
         );
     }

@@ -24,10 +24,12 @@ import groovy.transform.Immutable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.runtime.MetaClassHelper;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jspecify.annotations.NonNull;
@@ -3084,7 +3086,11 @@ public class GroovyParserVisitor {
                     Space namePrefix = whitespace();
                     if (source.startsWith(simpleName, cursor)) {
                         skip(simpleName);
-                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)), null));
+                        // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives here
+                        FieldNode field = prop.getObjectExpression() instanceof ClassExpression ?
+                                ClassNodeUtils.getField(prop.getObjectExpression().getType(), simpleName) : null;
+                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)),
+                                field != null && field.isStatic() ? typeMapping.variableType(field) : null));
                         return;
                     }
                     // The trait transform may rewrite `this.X` to `$self.X` even though the source contains
@@ -3562,11 +3568,24 @@ public class GroovyParserVisitor {
         @Override
         public void visitVariableExpression(VariableExpression expression) {
             queue.add(insideParentheses(expression, fmt -> {
+                Variable accessed = expression.getAccessedVariable();
+                AnnotatedNode imported = accessed instanceof DynamicVariable ?
+                        staticallyImportedProperty(classVisitor.getSourceUnit().getAST(), accessed.getName()) : null;
                 JavaType type;
-                if (expression.isDynamicTyped() && expression.getAccessedVariable() != null && expression.getAccessedVariable().getType() != expression.getOriginType()) {
-                    type = typeMapping.type(staticType(expression.getAccessedVariable()));
+                JavaType.Variable variable;
+                if (imported instanceof FieldNode) {
+                    type = typeMapping.type(((FieldNode) imported).getType());
+                    variable = typeMapping.variableType((FieldNode) imported);
+                } else if (imported instanceof MethodNode) {
+                    type = typeMapping.type(((MethodNode) imported).getReturnType());
+                    variable = null;
                 } else {
-                    type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
+                    if (expression.isDynamicTyped() && accessed != null && accessed.getType() != expression.getOriginType()) {
+                        type = typeMapping.type(staticType(accessed));
+                    } else {
+                        type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
+                    }
+                    variable = referencedVariableType(accessed == null ? expression : accessed);
                 }
 
                 return new J.Identifier(randomId(),
@@ -3575,7 +3594,7 @@ public class GroovyParserVisitor {
                         emptyList(),
                         expression.getName(),
                         type,
-                        referencedVariableType(expression.getAccessedVariable() == null ? expression : expression.getAccessedVariable()));
+                        variable);
             }));
         }
 
@@ -4025,6 +4044,63 @@ public class GroovyParserVisitor {
             return typeMapping.variableType(((PropertyNode) variable).getField());
         }
         return variable == null ? null : localVariableTypes.get(variable);
+    }
+
+    /**
+     * The static field or static getter read by a name that only a static import declares. On Groovy 3 and later
+     * the parser leaves out {@code StaticImportVisitor}, so the name stays a dynamic variable. This follows that
+     * visitor's lookup order.
+     */
+    private static @Nullable AnnotatedNode staticallyImportedProperty(ModuleNode module, String name) {
+        Map<String, ImportNode> staticImports = module.getStaticImports();
+        String capitalized = MetaClassHelper.capitalize(name);
+        for (String accessor : new String[]{"is" + capitalized, "get" + capitalized}) {
+            ImportNode importNode = staticImports.get(accessor);
+            if (importNode != null) {
+                MethodNode getter = staticGetter(importNode.getType(), importNode.getFieldName());
+                if (getter != null) {
+                    return getter;
+                }
+                // A property of a class compiled from source has no getter until class generation
+                PropertyNode property = ClassNodeUtils.getStaticProperty(importNode.getType(),
+                        ClassNodeUtils.getPropNameForAccessor(importNode.getFieldName()));
+                if (property != null) {
+                    return property.getField();
+                }
+            }
+        }
+        ImportNode importNode = staticImports.get(name);
+        if (importNode != null) {
+            AnnotatedNode member = staticPropertyOrField(importNode.getType(), importNode.getFieldName());
+            if (member != null) {
+                return member;
+            }
+        }
+        for (ImportNode starImport : module.getStaticStarImports().values()) {
+            AnnotatedNode member = staticPropertyOrField(starImport.getType(), name);
+            if (member != null) {
+                return member;
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable AnnotatedNode staticPropertyOrField(ClassNode owner, String name) {
+        String capitalized = MetaClassHelper.capitalize(name);
+        MethodNode getter = staticGetter(owner, "is" + capitalized);
+        if (getter == null) {
+            getter = staticGetter(owner, "get" + capitalized);
+        }
+        if (getter != null) {
+            return getter;
+        }
+        FieldNode field = ClassNodeUtils.getField(owner, name);
+        return field != null && field.isStatic() ? field : null;
+    }
+
+    private static @Nullable MethodNode staticGetter(ClassNode owner, String name) {
+        MethodNode method = owner.getMethod(name, Parameter.EMPTY_ARRAY);
+        return method != null && method.isStatic() ? method : null;
     }
 
     private int sourceOffset(ASTNode node) {
