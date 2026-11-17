@@ -19,9 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -187,6 +189,29 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 val x = "a".shout(1)
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void collapsesUsedSelectorOfAValueToAStaticImport() {
+        rewriteRun(
+          scala(
+            """
+              import scala.util.Properties.{versionString, javaVersion}
+
+              class A {
+                val v = versionString
+              }
+              """,
+            """
+              import scala.util.Properties.versionString
+
+              class A {
+                val v = versionString
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(((J.Import) ((S.CompilationUnit) cu).getStatements().get(0)).isStatic()).isTrue())
           )
         );
     }

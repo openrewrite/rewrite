@@ -2947,7 +2947,9 @@ public interface J extends Tree {
 
                 // the compiler doesn't type attribute static imports of classes
                 Expression target = qualid.getTarget();
-                if (fq == null) {
+                // a member's owner may be typed without its members, as a Scala object is
+                boolean typedAsMember = qualid.getType() instanceof JavaType.Method || qualid.getType() instanceof JavaType.Variable;
+                if (fq == null && !typedAsMember) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
                     if ("*".equals(possibleInnerClassName)) {

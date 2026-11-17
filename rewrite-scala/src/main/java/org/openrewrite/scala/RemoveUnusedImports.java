@@ -179,7 +179,7 @@ public class RemoveUnusedImports extends Recipe {
                     J.Identifier name = Objects.requireNonNull(selector.getName());
                     J.Identifier alias = selector.getAlias();
                     used = !targets(qualifier, name.getSimpleName()) || name.getType() instanceof JavaType.Unknown ||
-                           usages.uses(alias == null ? name.getSimpleName() : alias.getSimpleName(), name.getType());
+                           usages.uses(alias == null ? name.getSimpleName() : alias.getSimpleName(), importedDefinition(name));
                 }
                 if (used) {
                     kept.add(rp);
@@ -264,11 +264,22 @@ public class RemoveUnusedImports extends Recipe {
                     Objects.requireNonNull(only.getName()).withPrefix(Space.EMPTY);
             Expression qualifier = anImport.getQualifier();
             J.FieldAccess qualid = new J.FieldAccess(Tree.randomId(), qualifier.getPrefix(), Markers.EMPTY,
-                    qualifier.withPrefix(Space.EMPTY), JLeftPadded.build(name), name.getType());
+                    qualifier.withPrefix(Space.EMPTY), JLeftPadded.build(name), importedDefinition(name));
             return new J.Import(anImport.getId(), anImport.getPrefix(), anImport.getMarkers(),
-                    JLeftPadded.build(false), qualid, null);
+                    JLeftPadded.build(selectsMembersOfType(qualifier)), qualid, null);
         }
         return anImport.getPadding().withSelectors(anImport.getPadding().getSelectors().getPadding().withElements(selectors));
+    }
+
+    /**
+     * Whether the qualifier is a class or object, so that an import from it is static, as the parser marks it.
+     * A package is untyped, and a value carries its field.
+     */
+    private static boolean selectsMembersOfType(Expression qualifier) {
+        J.Identifier name = qualifier instanceof J.FieldAccess ? ((J.FieldAccess) qualifier).getName() :
+                qualifier instanceof J.Identifier ? (J.Identifier) qualifier : null;
+        JavaType.FullyQualified type = TypeUtils.asFullyQualified(qualifier.getType());
+        return name != null && name.getFieldType() == null && type != null && !(type instanceof JavaType.Unknown);
     }
 
     static boolean isImport(Statement s) {
@@ -365,6 +376,14 @@ public class RemoveUnusedImports extends Recipe {
 
     static @Nullable JavaType referencedType(J.Identifier ident) {
         return ident.getFieldType() != null ? ident.getFieldType() : ident.getType();
+    }
+
+    /**
+     * The definition a selector imports. A selector of a value or a type alias is typed as the value's or the
+     * aliased type, which leaves the definition unknown.
+     */
+    private static @Nullable JavaType importedDefinition(J.Identifier selected) {
+        return isAlias(selected) ? null : selected.getType();
     }
 
     /**

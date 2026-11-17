@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -207,6 +208,30 @@ class AddImportTest implements RewriteTest {
                 val s: Str = null
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void importOfAMemberIsStatic() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  maybeAddImport("java.util.Collections", "emptyList", false);
+                  return super.visitClassDeclaration(classDecl, ctx);
+              }
+          })),
+          scala(
+            """
+              class A
+              """,
+            """
+              import java.util.Collections.emptyList
+
+              class A
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(((J.Import) ((S.CompilationUnit) cu).getStatements().get(0)).isStatic()).isTrue())
           )
         );
     }

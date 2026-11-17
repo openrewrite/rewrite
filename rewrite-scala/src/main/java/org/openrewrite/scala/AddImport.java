@@ -71,6 +71,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
     private final String name;
     private final @Nullable String alias;
     private final boolean onlyIfReferenced;
+    private final boolean ofMember;
 
     public AddImport(@Nullable String packageName, String typeName, @Nullable String member,
                      @Nullable String alias, boolean onlyIfReferenced) {
@@ -80,6 +81,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
         this.name = member == null ? type.substring(dot + 1) : member;
         this.alias = alias;
         this.onlyIfReferenced = onlyIfReferenced;
+        this.ofMember = member != null;
     }
 
     private String fullyQualifiedName() {
@@ -339,7 +341,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
         J.Identifier id = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, type, null);
         J.FieldAccess qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                 qualifier(Space.EMPTY), JLeftPadded.build(id), type);
-        return new J.Import(Tree.randomId(), prefix, Markers.EMPTY, JLeftPadded.build(false), qualid, null);
+        return new J.Import(Tree.randomId(), prefix, Markers.EMPTY, JLeftPadded.build(ofMember), qualid, null);
     }
 
     private Expression qualifier(Space prefix) {

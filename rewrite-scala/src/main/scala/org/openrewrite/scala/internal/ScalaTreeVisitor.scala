@@ -2590,7 +2590,7 @@ class ScalaTreeVisitor(
           Tree.randomId(),
           prefix,
           implicitImportMarkers(imp, Markers.EMPTY),
-          JLeftPadded.build(false),
+          JLeftPadded.build(isStaticImport(imp)),
           qualid,
           null
         )
@@ -2675,7 +2675,7 @@ class ScalaTreeVisitor(
     val markers = Markers.EMPTY.addIfAbsent(new CommaContinuation(Tree.randomId()))
 
     if (keyword == "import") {
-      new J.Import(Tree.randomId(), prefix, implicitImportMarkers(tree, markers), JLeftPadded.build(false), qualid, null)
+      new J.Import(Tree.randomId(), prefix, implicitImportMarkers(tree, markers), JLeftPadded.build(isStaticImport(tree)), qualid, null)
     } else {
       new S.Export(Tree.randomId(), prefix, markers, qualid)
     }
@@ -3110,6 +3110,10 @@ class ScalaTreeVisitor(
       val tpe = lookupSelectorType(tree.expr, selectorName)
       Imported(tpe, tpe, isImplicit = false)
     }
+
+  /** An import of an object's or class's members is static, as Java and Kotlin model one. */
+  private def isStaticImport(tree: Trees.ImportOrExport[?]): java.lang.Boolean =
+    Boolean.box(ofNode(tree)((mapping, node) => Some(mapping.selectsMembersOfType(node))).getOrElse(false))
 
   private def implicitImportMarkers(tree: Trees.ImportOrExport[?], markers: Markers): Markers =
     tree.selectors match {
