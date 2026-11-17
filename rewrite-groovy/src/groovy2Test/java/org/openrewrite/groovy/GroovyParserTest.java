@@ -261,7 +261,7 @@ class GroovyParserTest implements RewriteTest {
             """
               class A {
                   static 'foo bar'(int i) { i }
-                  static m() { 'foo bar'(1) }
+                  static m() { 'foo bar'(1) + '''foo bar'''(2) }
               }
               """
           )

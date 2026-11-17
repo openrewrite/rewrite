@@ -2891,13 +2891,10 @@ public class GroovyParserVisitor {
                 // So the "select" that was just parsed _may_ have actually been the method name
                 J.Identifier name;
 
-                String methodName = call.getMethodAsString();
                 // Check for escaped method name, often used in tests (def 'description'() {}) or to avoid clashing with Groovy keywords
-                if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
-                    // TODO: Methods with string interpolation are parsed as just one method name instead of multiple LST elements
-                    String delim = source.charAt(cursor) + "";
-                    methodName = sourceSubstring(cursor, delim) + delim;
-                }
+                // TODO: Methods with string interpolation are parsed as just one method name instead of multiple LST elements
+                String quotedMethodName = quotedMethodName();
+                String methodName = quotedMethodName != null ? quotedMethodName : call.getMethodAsString();
 
                 Space prefix = whitespace();
                 boolean implicitCall = (methodName != null && cursor < source.length() &&
@@ -3007,16 +3004,13 @@ public class GroovyParserVisitor {
             JavaType.Method methodType = typeMapping.methodType(methodNode);
             // On Groovy 2.5 `StaticImportVisitor` names an aliased static import call after the imported method,
             // while the source holds the alias
-            Space prefix = whitespace();
-            String methodName;
-            if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
-                String delim = String.valueOf(source.charAt(cursor));
-                methodName = sourceSubstring(cursor, delim) + delim;
-                skip(methodName);
-            } else {
+            String methodName = quotedMethodName();
+            if (methodName == null) {
                 methodName = name();
+            } else {
+                skip(methodName);
             }
-            J.Identifier name = new J.Identifier(randomId(), prefix, Markers.EMPTY,
+            J.Identifier name = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY,
                     emptyList(), methodName, methodType, null);
 
             Markers markers = Markers.EMPTY;
@@ -4433,6 +4427,22 @@ public class GroovyParserVisitor {
 
         // Regular strings use backslash escaping
         return isEscaped(index);
+    }
+
+    /**
+     * Returns the quoted method name at the cursor, such as {@code 'foo bar'} or {@code '''foo bar'''}, quotes included,
+     * or null when the cursor is not on a quote. The cursor will not be moved.
+     */
+    private @Nullable String quotedMethodName() {
+        String delim;
+        if (source.startsWith("'''", cursor) || source.startsWith("\"\"\"", cursor)) {
+            delim = source.substring(cursor, cursor + 3);
+        } else if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
+            delim = String.valueOf(source.charAt(cursor));
+        } else {
+            return null;
+        }
+        return sourceSubstring(cursor, delim) + delim;
     }
 
     /**
