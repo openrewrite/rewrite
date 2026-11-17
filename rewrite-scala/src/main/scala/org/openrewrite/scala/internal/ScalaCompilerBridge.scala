@@ -293,7 +293,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
                                      comp: ScalaCompiler,
                                      runId: Periods.RunId): Typing =
     try {
-      typing.run.compileUnits(toScalaList(typing.units))
+      compile(typing, comp)
       typing
     } catch {
       // The overflow's context is that of the unit whose trees were being typed, even when
@@ -311,6 +311,25 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     }
 
   /**
+   * Runs all compiler phases over the units of the typing. A crash once the typer trees of
+   * all units are captured is tolerated, as type attribution reads only those trees.
+   */
+  private def compile(typing: Typing, comp: ScalaCompiler): Unit = {
+    // Dotty prints a crash report to standard output before rethrowing, which a tolerated crash mustn't leave behind
+    val out = new java.io.ByteArrayOutputStream()
+    try {
+      Console.withOut(out)(typing.run.compileUnits(toScalaList(typing.units)))
+      Console.out.write(out.toByteArray)
+    } catch {
+      case NonFatal(_) if typing.units.stream().allMatch(u => typing.typerTrees.containsKey(u)) =>
+        comp.reusable = false
+      case t: Throwable =>
+        Console.out.write(out.toByteArray)
+        throw t
+    }
+  }
+
+  /**
    * Type-check the sources once more in a fresh run, leaving out the given imports, so
    * that names they shadowed resolve again.
    */
@@ -321,7 +340,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
                                    runId: Periods.RunId): Option[Typing] =
     try {
       val typing = newTyping(entries, imports, ctx0, comp, runId)
-      typing.run.compileUnits(toScalaList(typing.units))
+      compile(typing, comp)
       Some(typing)
     } catch {
       case NonFatal(_) =>

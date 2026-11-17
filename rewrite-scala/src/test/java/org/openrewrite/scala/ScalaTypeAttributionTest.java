@@ -1503,6 +1503,31 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void compilerCrashAfterTypingKeepsTypes() {
+        rewriteRun(
+          // Dotty's mixin phase crashes on ScalaTest 3.0.9's Scala 2 `Matchers`
+          spec -> spec.parser(ScalaParser.builder()
+            .classpath(JavaParser.dependenciesFromClasspath("scalatest_2.13", "scalactic_2.13"))),
+          scala(
+            """
+            import org.scalatest.FlatSpec
+            import org.scalatest.Matchers
+
+            class T extends FlatSpec with Matchers
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration t = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("T"));
+                assertThat(TypeUtils.asFullyQualified(t.getExtends().getType()).getFullyQualifiedName())
+                  .isEqualTo("org.scalatest.FlatSpec");
+                assertThat(t.getImplements()).singleElement()
+                  .satisfies(m -> assertThat(TypeUtils.asFullyQualified(m.getType()).getFullyQualifiedName())
+                    .isEqualTo("org.scalatest.Matchers"));
+            })
+          )
+        );
+    }
+
+    @Test
     void classTypeParameterInSupertypeIsTypeVariable() {
         rewriteRun(
           scala(
