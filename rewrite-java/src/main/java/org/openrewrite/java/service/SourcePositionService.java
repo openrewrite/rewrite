@@ -131,10 +131,13 @@ public class SourcePositionService {
             methodCursor = new Cursor(methodCursor, ((J.MethodInvocation) cursorValue).getSelect());
         }
         cursorValue = cursor.getValue();
+        if (cursorValue instanceof JavaSourceFile) {
+            return cursor;
+        }
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded || (it instanceof J && ((J) it).getPrefix().getWhitespace().contains("\n"))))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+            Cursor parent = cursor.dropParentUntil(it -> it instanceof JavaSourceFile || (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded || (it instanceof J && ((J) it).getPrefix().getWhitespace().contains("\n"))))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
             while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
                 parent = parent.getParent();
             }

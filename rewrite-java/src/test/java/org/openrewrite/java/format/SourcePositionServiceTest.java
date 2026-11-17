@@ -341,4 +341,31 @@ class SourcePositionServiceTest implements RewriteTest {
         tree = (T) new MinimumViableSpacingVisitor<>(null).visit(tree, -1);
         return (T) new SpacesVisitor<>(IntelliJ.spaces(), null, null, IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)), null).visit(tree, -1);
     }
+
+    @Test
+    void columnsOfWithRootlessCursorAndBlankLinesBeforePackage() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  J.ClassDeclaration person = cu.getClasses().getFirst();
+                  JContainer<Statement> components = person.getPadding().getPrimaryConstructor();
+                  Cursor componentsCursor = new Cursor(new Cursor(new Cursor(null, cu), person), components);
+                  assertThat(cu.service(SourcePositionService.class).columnsOf(componentsCursor, components.getElements().getFirst()).getStartColumn())
+                    .isEqualTo(15);
+                  return cu;
+              }
+          })),
+          java(
+            """
+
+
+              package com.example;
+
+              record Person(String name, String email) {
+              }
+              """
+          )
+        );
+    }
 }

@@ -206,7 +206,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             JavaSourceFile c = cu;
             cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz -> {
-                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
+                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), c));
                 return clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
             }));
 
