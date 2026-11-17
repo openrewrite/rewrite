@@ -215,6 +215,18 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void arrayClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def a = String[].class
+              def b = int[][].class
+              """
+          )
+        );
+    }
+
+    @Test
     void parenthesizedGStringInterpolations() {
         rewriteRun(
           groovy(

@@ -1596,7 +1596,10 @@ public class GroovyParserVisitor {
                     return classLiteral(fmt, closeParentheses(openingParens, typeTree(type)), type);
                 }
                 if (type.isArray()) {
-                    return typeTree(type).withPrefix(fmt);
+                    Expression arrayType = typeTree(type);
+                    return sourceStartsWith(".class") ?
+                            classLiteral(fmt, arrayType, type) :
+                            arrayType.withPrefix(fmt);
                 }
                 String name = type.getNameWithoutPackage().replace('$', '.');
                 if (!source.startsWith(name, cursor)) {
