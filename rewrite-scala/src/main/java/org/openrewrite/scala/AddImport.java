@@ -67,7 +67,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
         if (owner.isEmpty() || onlyIfReferenced && !isReferenced(c) || isVisible(c)) {
             return c;
         }
-        return c.getPadding().withStatements(insert(c.getPadding().getStatements()));
+        return c.getPadding().withStatements(insert(c.getPadding().getStatements(), c.getPackageDeclaration() != null));
     }
 
     @Override
@@ -146,12 +146,8 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
 
             @Override
             public J.Identifier visitIdentifier(J.Identifier ident, AtomicBoolean found) {
-                Object parent = getCursor().getParentTreeCursor().getValue();
-                boolean qualified = parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == ident ||
-                                    parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == ident &&
-                                    ((J.MethodInvocation) parent).getSelect() != null;
-                if (!qualified && ident.getSimpleName().equals(bound) && fullyQualifiedName.equals(
-                        definitionName(ident.getFieldType() != null ? ident.getFieldType() : ident.getType()))) {
+                if (ident.getSimpleName().equals(bound) && !isSelected(ident, getCursor().getParentTreeCursor().getValue()) &&
+                    fullyQualifiedName.equals(definitionName(referencedType(ident)))) {
                     found.set(true);
                 }
                 return ident;
@@ -168,22 +164,27 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
         for (Statement s : cu.getStatements()) {
             if (s instanceof J.Import) {
                 J.FieldAccess qualid = ((J.Import) s).getQualid();
-                if (owner.equals(path(qualid.getTarget())) && (alias == null && name.equals(qualid.getSimpleName()) ||
-                                                              isWildcard(qualid.getSimpleName()))) {
+                if (alias == null && owner.equals(path(qualid.getTarget())) &&
+                    (name.equals(qualid.getSimpleName()) || isWildcard(qualid.getSimpleName()))) {
                     return true;
                 }
             } else if (s instanceof S.Import && owner.equals(path(((S.Import) s).getQualifier()))) {
                 boolean wildcard = false;
+                // A selector that renames or hides the name also keeps the import's wildcard from binding it.
+                boolean renamed = false;
                 for (S.ImportSelector selector : ((S.Import) s).getSelectors()) {
                     J.Identifier selected = selector.getName();
                     if (selected != null && selected.getSimpleName().equals(name)) {
                         J.Identifier selectorAlias = selector.getAlias();
-                        return alias == null ? selectorAlias == null :
-                                selectorAlias != null && alias.equals(selectorAlias.getSimpleName());
+                        if (alias == null ? selectorAlias == null :
+                                selectorAlias != null && alias.equals(selectorAlias.getSimpleName())) {
+                            return true;
+                        }
+                        renamed = true;
                     }
                     wildcard |= selector.isWildcard();
                 }
-                if (wildcard && alias == null) {
+                if (wildcard && alias == null && !renamed) {
                     return true;
                 }
             }
@@ -195,7 +196,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
      * Inserts the import among the imports that open the file, after the closest one {@link OrderImports} orders
      * before it, or ahead of the file's first statement when there are none.
      */
-    private List<JRightPadded<Statement>> insert(List<JRightPadded<Statement>> statements) {
+    private List<JRightPadded<Statement>> insert(List<JRightPadded<Statement>> statements, boolean afterPackage) {
         int leading = 0;
         while (leading < statements.size() && isImport(statements.get(leading).getElement())) {
             leading++;
@@ -205,7 +206,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
                         Space.EMPTY, JContainer.build(singletonList(JRightPadded.build(renamingSelector()))));
         List<JRightPadded<Statement>> result = new ArrayList<>(statements);
         if (statements.isEmpty()) {
-            result.add(JRightPadded.build(added));
+            result.add(JRightPadded.build(afterPackage ? added.withPrefix(Space.format("\n\n")) : added));
             return result;
         }
         if (leading == 0) {
@@ -219,8 +220,7 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
         for (int i = 0; i < leading; i++) {
             boundNames.addAll(OrderImports.boundNames(statements.get(i).getElement()));
         }
-        Comparator<Statement> order = Comparator.<Statement>comparingInt(s -> OrderImports.group(s, boundNames))
-                .thenComparing(OrderImports::key);
+        Comparator<Statement> order = OrderImports.order(boundNames);
         int previous = -1;
         for (int i = 0; i < leading; i++) {
             Statement s = statements.get(i).getElement();

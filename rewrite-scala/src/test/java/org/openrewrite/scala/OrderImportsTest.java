@@ -124,6 +124,33 @@ class OrderImportsTest implements RewriteTest {
     }
 
     @Test
+    void keepsRelativeImportsInSourceOrder() {
+        rewriteRun(
+          scala(
+            """
+              import java.util.concurrent
+              import concurrent.atomic
+              import atomic.AtomicInteger
+
+              class A {
+                val a: AtomicInteger = null
+              }
+              """,
+            """
+              import java.util.concurrent
+
+              import concurrent.atomic
+              import atomic.AtomicInteger
+
+              class A {
+                val a: AtomicInteger = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void putsWildcardSelectorLast() {
         rewriteRun(
           scala(

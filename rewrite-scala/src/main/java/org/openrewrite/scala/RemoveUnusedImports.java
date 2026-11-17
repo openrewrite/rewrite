@@ -94,7 +94,9 @@ public class RemoveUnusedImports extends Recipe {
                         s instanceof S.Import ? keep((S.Import) s, usages) : s;
                 decided[i] = kept;
                 changed |= kept != s;
-                usages.collect(s);
+                if (kept != null) {
+                    usages.collect(kept);
+                }
             }
             if (!changed) {
                 return statements;
@@ -119,6 +121,7 @@ public class RemoveUnusedImports extends Recipe {
                 if (continuation && clauseHeadRemoved) {
                     s = startClause(s, carried == null ? s.getPrefix() : carried);
                     carried = null;
+                    clauseHeadRemoved = false;
                 } else if (carried != null) {
                     if (isImport(s) || result.isEmpty()) {
                         s = s.withPrefix(inheritPrefix(carried, s.getPrefix()));
@@ -333,6 +336,27 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     /**
+     * Whether the identifier is selected from something else, like {@code b} in {@code a.b} or a name in an import
+     * selector, and so is not a reference an import could provide.
+     */
+    static boolean isSelected(J.Identifier ident, Object parent) {
+        if (parent instanceof J.FieldAccess) {
+            return ((J.FieldAccess) parent).getName() == ident;
+        }
+        if (parent instanceof J.MethodInvocation) {
+            return ((J.MethodInvocation) parent).getName() == ident && ((J.MethodInvocation) parent).getSelect() != null;
+        }
+        if (parent instanceof S.ImportSelector) {
+            return ((S.ImportSelector) parent).getName() == ident || ((S.ImportSelector) parent).getAlias() == ident;
+        }
+        return false;
+    }
+
+    static @Nullable JavaType referencedType(J.Identifier ident) {
+        return ident.getFieldType() != null ? ident.getFieldType() : ident.getType();
+    }
+
+    /**
      * The references a range of statements makes to definitions an import could provide.
      */
     private static class Usages {
@@ -346,11 +370,7 @@ public class RemoveUnusedImports extends Recipe {
             new ScalaIsoVisitor<Usages>() {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, Usages u) {
-                    Object parent = getCursor().getParentTreeCursor().getValue();
-                    boolean qualified = parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == ident ||
-                                        parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == ident &&
-                                        ((J.MethodInvocation) parent).getSelect() != null;
-                    if (!qualified) {
+                    if (!isSelected(ident, getCursor().getParentTreeCursor().getValue())) {
                         u.add(ident);
                     }
                     return ident;
@@ -369,7 +389,7 @@ public class RemoveUnusedImports extends Recipe {
 
         private void add(J.Identifier ident) {
             identifiersByName.computeIfAbsent(ident.getSimpleName(), n -> new ArrayList<>()).add(ident);
-            JavaType type = ident.getFieldType() != null ? ident.getFieldType() : ident.getType();
+            JavaType type = referencedType(ident);
             if (type instanceof JavaType.Unknown) {
                 unresolved = true;
             } else if (type instanceof JavaType.Method || type instanceof JavaType.Variable) {
@@ -413,7 +433,7 @@ public class RemoveUnusedImports extends Recipe {
                 }
             }
             for (J.Identifier ident : identifiersByName.getOrDefault(name, emptyList())) {
-                String referenced = definitionName(ident.getFieldType() != null ? ident.getFieldType() : ident.getType());
+                String referenced = definitionName(referencedType(ident));
                 if (definitionName == null || referenced == null || referenced.equals(definitionName)) {
                     return true;
                 }

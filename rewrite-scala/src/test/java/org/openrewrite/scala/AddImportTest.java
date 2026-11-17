@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
@@ -123,6 +124,21 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void findsNameImportedAfterARenameOfIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> addImport("java.util.List", false))),
+          scala(
+            """
+              import java.util.{List => JList}
+              import java.util.List
+
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotFoldIntoWildcard() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> addImport("java.util.UUID", false))),
@@ -159,6 +175,55 @@ class AddImportTest implements RewriteTest {
               class A {
                 val u = java.util.UUID.randomUUID()
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addsAfterPackageClauseOfFileWithoutStatements() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitCompilationUnit(S.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeAddImport("java.util.UUID", false);
+                  return super.visitCompilationUnit(cu, ctx);
+              }
+          })),
+          scala(
+            """
+              package p
+              """,
+            """
+              package p
+
+              import java.util.UUID
+              """
+          )
+        );
+    }
+
+    @Test
+    void wildcardImportDoesNotProvideARename() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  maybeAddImport("java.util", "List", null, "JList", false);
+                  return super.visitClassDeclaration(classDecl, ctx);
+              }
+          })),
+          scala(
+            """
+              import java.util._
+
+              class A
+              """,
+            """
+              import java.util._
+              import java.util.{List => JList}
+
+              class A
               """
           )
         );

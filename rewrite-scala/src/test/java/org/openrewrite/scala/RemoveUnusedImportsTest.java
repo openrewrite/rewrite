@@ -136,6 +136,29 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void laterSelectorOfTheSameNameIsNoUse() {
+        rewriteRun(
+          scala(
+            """
+              import java.util.UUID
+              import java.util.{UUID => U}
+
+              class A {
+                val u: U = null
+              }
+              """,
+            """
+              import java.util.{UUID => U}
+
+              class A {
+                val u: U = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removesUnusedImportInClassBody() {
         rewriteRun(
           scala(
@@ -159,17 +182,40 @@ class RemoveUnusedImportsTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-              import java.util.UUID, java.util.List
+              import java.util.UUID, java.util.List, java.util.Map
 
               class A {
                 val a: List[String] = null
+                val b: Map[String, String] = null
               }
               """,
             """
-              import java.util.List
+              import java.util.List, java.util.Map
 
               class A {
                 val a: List[String] = null
+                val b: Map[String, String] = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesBaseOfARemovedRelativeImport() {
+        rewriteRun(
+          scala(
+            """
+              import scala.collection.mutable
+              import mutable.ListBuffer
+
+              class A {
+                val a = 1
+              }
+              """,
+            """
+              class A {
+                val a = 1
               }
               """
           )

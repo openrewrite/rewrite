@@ -106,8 +106,7 @@ public class OrderImports extends Recipe {
             }
         }
         List<List<JRightPadded<Statement>>> sorted = new ArrayList<>(clauses);
-        sorted.sort(comparing((List<JRightPadded<Statement>> c) -> group(c.get(0).getElement(), boundNames))
-                .thenComparing(c -> key(c.get(0).getElement())));
+        sorted.sort(comparing(c -> c.get(0).getElement(), order(boundNames)));
 
         Statement originalFirst = clauses.get(0).get(0).getElement();
         Space first = originalFirst.getPrefix();
@@ -149,7 +148,16 @@ public class OrderImports extends Recipe {
         return JAVA_AND_SCALA.matcher(path).find() ? 1 : 0;
     }
 
-    static String key(Statement anImport) {
+    /**
+     * Orders imports by group, then by ASCII, except for relative imports, which stay in source order since one may
+     * be relative to a name another binds, as {@code atomic.AtomicInteger} after {@code concurrent.atomic}.
+     */
+    static Comparator<Statement> order(Set<String> boundNames) {
+        return Comparator.<Statement>comparingInt(s -> group(s, boundNames))
+                .thenComparing((a, b) -> group(a, boundNames) == RELATIVE ? 0 : key(a).compareTo(key(b)));
+    }
+
+    private static String key(Statement anImport) {
         if (anImport instanceof J.Import) {
             return importPath(anImport);
         }
