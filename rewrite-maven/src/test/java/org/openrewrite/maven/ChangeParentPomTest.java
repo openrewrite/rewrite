@@ -92,11 +92,11 @@ class ChangeParentPomTest implements RewriteTest {
     void changeParentShouldResolveDependenciesManagementWithMavenProperties() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
-            "org.jenkins-ci.plugins",
-            "org.jenkins-ci.plugins",
-            "plugin",
-            "plugin",
-            "5.3",
+            "org.apache",
+            "org.apache",
+            "apache",
+            "apache",
+            "32",
             null,
             null,
             null,
@@ -106,90 +106,68 @@ class ChangeParentPomTest implements RewriteTest {
           pomXml(
             """
               <project>
+                  <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.86</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>31</version>
                       <relativePath/>
                   </parent>
-                  <artifactId>example-plugin</artifactId>
-                  <version>0.8-SNAPSHOT</version>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <properties>
-                      <jenkins.baseline>2.462</jenkins.baseline>
-                      <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+                      <bom.suffix>bom</bom.suffix>
                   </properties>
                   <dependencyManagement>
-                     <dependencies>
-                         <dependency>
-                             <groupId>io.jenkins.tools.bom</groupId>
-                             <artifactId>bom-${jenkins.baseline}.x</artifactId>
-                             <version>3722.vcc62e7311580</version>
-                             <type>pom</type>
-                             <scope>import</scope>
-                         </dependency>
-                     </dependencies>
-                 </dependencyManagement>
-                 <dependencies>
-                     <dependency>
-                         <groupId>org.jenkins-ci.plugins</groupId>
-                         <artifactId>scm-api</artifactId>
-                     </dependency>
-                 </dependencies>
-                  <repositories>
-                      <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                      </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-${bom.suffix}</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                      </dependency>
+                  </dependencies>
               </project>
               """,
             """
               <project>
+                  <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>5.3</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>32</version>
                       <relativePath/>
                   </parent>
-                  <artifactId>example-plugin</artifactId>
-                  <version>0.8-SNAPSHOT</version>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <properties>
-                      <jenkins.baseline>2.462</jenkins.baseline>
-                      <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+                      <bom.suffix>bom</bom.suffix>
                   </properties>
                   <dependencyManagement>
-                     <dependencies>
-                         <dependency>
-                             <groupId>io.jenkins.tools.bom</groupId>
-                             <artifactId>bom-${jenkins.baseline}.x</artifactId>
-                             <version>3722.vcc62e7311580</version>
-                             <type>pom</type>
-                             <scope>import</scope>
-                         </dependency>
-                     </dependencies>
-                 </dependencyManagement>
-                 <dependencies>
-                     <dependency>
-                         <groupId>org.jenkins-ci.plugins</groupId>
-                         <artifactId>scm-api</artifactId>
-                     </dependency>
-                 </dependencies>
-                  <repositories>
-                      <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                      </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-${bom.suffix}</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                      </dependency>
+                  </dependencies>
               </project>
               """
           )
@@ -2053,117 +2031,80 @@ class ChangeParentPomTest implements RewriteTest {
     void shouldNotAddToDependencyManagement() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
-            "org.jenkins-ci.plugins",
-            "org.jenkins-ci.plugins",
-            "plugin",
-            "plugin",
-            "4.81",
+            "org.apache",
+            "org.apache",
+            "apache",
+            "apache",
+            "32",
             null,
             null,
             null,
             null,
-            null)),
-          // language=xml
+            null
+          )),
           pomXml(
             """
               <project>
-                  <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.75</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>31</version>
                       <relativePath/>
                   </parent>
-                  <properties>
-                      <jenkins.version>2.387.3</jenkins.version>
-                  </properties>
-                  <repositories>
-                    <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                    </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
-                  <pluginRepositories>
-                      <pluginRepository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </pluginRepository>
-                  </pluginRepositories>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>io.jenkins.tools.bom</groupId>
-                            <artifactId>bom-2.387.x</artifactId>
-                            <version>2516.v113cb_3d00317</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
                   </dependencyManagement>
                   <dependencies>
                       <dependency>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>junit</artifactId>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
                       </dependency>
                   </dependencies>
               </project>
               """,
             """
               <project>
-                  <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.81</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>32</version>
                       <relativePath/>
                   </parent>
-                  <properties>
-                      <jenkins.version>2.387.3</jenkins.version>
-                  </properties>
-                  <repositories>
-                    <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                    </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
-                  <pluginRepositories>
-                      <pluginRepository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </pluginRepository>
-                  </pluginRepositories>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>io.jenkins.tools.bom</groupId>
-                            <artifactId>bom-2.387.x</artifactId>
-                            <version>2516.v113cb_3d00317</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
                   </dependencyManagement>
                   <dependencies>
                       <dependency>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>junit</artifactId>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
                       </dependency>
                   </dependencies>
               </project>
               """
-          ));
+          )
+        );
     }
 
     @Test
