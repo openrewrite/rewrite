@@ -353,7 +353,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
      */
     private fun localVariableOwner(variable: FirVariable): FirElement? {
         val declaration = variable.source?.psi ?: return null
-        val owner = generateSequence(declaration.parent) { it.parent }.firstOrNull {
+        val owner = PsiTreeUtil.findFirstParent(declaration, true) {
             it is KtNamedFunction || it is KtFile || it is KtClass && it !is KtEnumEntry
         }
         return owner?.let { primary(it) }

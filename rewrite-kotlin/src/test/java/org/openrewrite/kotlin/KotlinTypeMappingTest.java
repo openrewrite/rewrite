@@ -2748,21 +2748,11 @@ class KotlinTypeMappingTest {
                   """,
                 spec -> spec.afterRecipe(cu -> {
                     // when
-                    Map<String, Set<String>> ownersByName = new KotlinIsoVisitor<Map<String, Set<String>>>() {
-                        @Override
-                        public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
-                            JavaType.Variable fieldType = identifier.getFieldType();
-                            if (fieldType != null && Set.of("top", "p", "local", "x", "z").contains(identifier.getSimpleName())) {
-                                acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
-                                  .add(String.valueOf(fieldType.getOwner()));
-                            }
-                            return super.visitIdentifier(identifier, acc);
-                        }
-                    }.reduce(cu, new HashMap<>());
+                    Map<String, Set<String>> ownersByName = fieldOwnersByName(cu);
 
                     // then
                     String m = "K2{name=m,return=int,parameters=[int]}";
-                    assertThat(ownersByName).containsExactlyInAnyOrderEntriesOf(Map.of(
+                    assertThat(ownersByName).containsAllEntriesOf(Map.of(
                       "top", Set.of("OpenRewriteFile0Kt"),
                       "p", Set.of(m),
                       "local", Set.of(m),
@@ -2792,17 +2782,7 @@ class KotlinTypeMappingTest {
                   """,
                 spec -> spec.afterRecipe(cu -> {
                     // when
-                    Map<String, Set<String>> ownersByName = new KotlinIsoVisitor<Map<String, Set<String>>>() {
-                        @Override
-                        public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
-                            JavaType.Variable fieldType = identifier.getFieldType();
-                            if (fieldType != null) {
-                                acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
-                                  .add(String.valueOf(fieldType.getOwner()));
-                            }
-                            return super.visitIdentifier(identifier, acc);
-                        }
-                    }.reduce(cu, new HashMap<>());
+                    Map<String, Set<String>> ownersByName = fieldOwnersByName(cu);
 
                     // then
                     assertThat(ownersByName).containsExactlyInAnyOrderEntriesOf(Map.of(
@@ -2839,6 +2819,20 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        private static Map<String, Set<String>> fieldOwnersByName(K.CompilationUnit cu) {
+            return new KotlinIsoVisitor<Map<String, Set<String>>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
+                    JavaType.Variable fieldType = identifier.getFieldType();
+                    if (fieldType != null) {
+                        acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
+                          .add(String.valueOf(fieldType.getOwner()));
+                    }
+                    return super.visitIdentifier(identifier, acc);
+                }
+            }.reduce(cu, new HashMap<>());
         }
 
         private static Map<String, Boolean> staticFlagByElement(K.CompilationUnit cu) {
