@@ -36,6 +36,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
 import org.jetbrains.kotlin.fir.unwrapFakeOverrides
+import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaAnnotation
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
@@ -49,6 +50,7 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.internal.expandedAliasType
 import org.openrewrite.kotlin.internal.facadeFqn
 import org.openrewrite.kotlin.internal.isFromLibrary
+import org.openrewrite.kotlin.internal.jvmName
 import org.openrewrite.kotlin.internal.namedClassSymbol
 import java.util.*
 
@@ -757,11 +759,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
         fun methodName(function: FirFunction): String {
             return when (function) {
-                is FirPropertyAccessor -> when {
-                    function.isGetter -> "get"
-                    function.isSetter -> "set"
-                    else -> function.symbol.name.asString()
-                }
+                is FirPropertyAccessor -> function.jvmName
+                    ?: function.propertySymbol.name.asString().let {
+                        if (function.isGetter) JvmAbi.getterName(it) else JvmAbi.setterName(it)
+                    }
                 else -> function.symbol.name.asString()
             }
         }
