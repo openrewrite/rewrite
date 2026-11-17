@@ -98,7 +98,7 @@ fragment SECOND       : DIGIT DIGIT;
 fragment SECFRAC      : '.' DIGIT+;
 fragment NUMOFFSET    : ('+' | '-') HOUR ':' MINUTE;
 fragment OFFSET       : 'Z' | 'z' | NUMOFFSET;
-fragment PARTIAL_TIME : HOUR ':' MINUTE ':' SECOND SECFRAC?;
+fragment PARTIAL_TIME : HOUR ':' MINUTE (':' SECOND SECFRAC?)?; // seconds are optional in TOML 1.1
 fragment FULL_DATE    : YEAR '-' MONTH '-' DAY;
 fragment FULL_TIME    : PARTIAL_TIME OFFSET;
 OFFSET_DATE_TIME      : FULL_DATE DELIM FULL_TIME    -> popMode;

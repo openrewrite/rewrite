@@ -30,6 +30,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -760,6 +761,28 @@ class TomlParserTest implements RewriteTest {
               .filteredOn(Toml.Literal.class::isInstance)
               .extracting(v -> ((Toml.Literal) v).getValue())
               .containsExactly(1L, 2L, 3L))
+          )
+        );
+    }
+
+    @Test
+    void timesWithoutSeconds() {
+        // TOML 1.1. Passes once generateAntlrSources regenerates the lexer
+        rewriteRun(
+          toml(
+            """
+              odt = 1979-05-27 07:32Z
+              odt-offset = 1979-05-27T07:32-07:00
+              ldt = 1979-05-27T07:32
+              lt = 07:32
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(-7)),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                LocalTime.of(7, 32)))
           )
         );
     }
