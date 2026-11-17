@@ -181,6 +181,13 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     /**
+     * The value type tells apart same-named keys of maps of one class.
+     */
+    public String mapKeySignature(JavaType.FullyQualified owner, String name, ClassNode valueType) {
+        return owner.getFullyQualifiedName() + "{name=" + name + ",key,type=" + signature(valueType) + '}';
+    }
+
+    /**
      * The position tells apart same-named variables declared in one method, as in the Java parser.
      */
     public String variableSignature(@Nullable MethodNode owner, String name, ClassNode type, int position) {

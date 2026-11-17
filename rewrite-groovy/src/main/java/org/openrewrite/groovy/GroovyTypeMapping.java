@@ -289,6 +289,25 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     /**
+     * A key read as a property of a map. Its owner is the map's class, as a field's is its declaring class,
+     * but it is never a field of that class.
+     */
+    public JavaType.@Nullable Variable mapKeyVariableType(String name, ClassNode map, ClassNode valueType) {
+        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(map));
+        JavaType type = type(valueType);
+        if (owner == null || type == null) {
+            return null;
+        }
+        JavaType.FullyQualified ownerClass = owner instanceof JavaType.Parameterized ? ((JavaType.Parameterized) owner).getType() : owner;
+        String signature = signatureBuilder.mapKeySignature(ownerClass, name, valueType);
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(null, Modifier.PUBLIC, name, null, null, null);
+            variable.unsafeSet(ownerClass, type, (List<JavaType.FullyQualified>) null);
+            return variable;
+        });
+    }
+
+    /**
      * With an undefined owner
      */
     public JavaType.@Nullable Variable variableType(String name, @Nullable ASTNode type) {
