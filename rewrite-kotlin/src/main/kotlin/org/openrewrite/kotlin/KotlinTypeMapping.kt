@@ -1380,8 +1380,8 @@ class KotlinTypeMapping(
                     }
                 }
 
-                parent is FirAnonymousInitializer -> {
-                    declaringType = initializerType(parent)
+                initializerScope(parent) != null -> {
+                    declaringType = initializerType(initializerScope(parent)!!)
                 }
 
                 parent is FirClass -> {
@@ -1408,23 +1408,6 @@ class KotlinTypeMapping(
             }
             vt.unsafeSet(declaringType!!, typeRef, annotations)
             vt
-        }
-    }
-
-    /**
-     * Matches the Java parsers' owner for a local of an initializer block: a method with no name,
-     * a void return and no parameters, declared by the class or object holding the `init` block.
-     */
-    @OptIn(SymbolInternals::class)
-    private fun initializerType(initializer: FirAnonymousInitializer): Method {
-        return typeFactory.methodFor(signatureBuilder.initializerSignature(initializer), {
-            Method(null, 0, null, "", null, null as kotlin.Array<String>?, null, null, null, null, null)
-        }) { method ->
-            var declaringType = type(initializer.containingDeclarationSymbol.fir)
-            if (declaringType is Parameterized) {
-                declaringType = declaringType.type
-            }
-            method.unsafeSet(TypeUtils.asFullyQualified(declaringType), Primitive.Void, null as List<JavaType>?, null, null)
         }
     }
 
@@ -1808,6 +1791,17 @@ class KotlinTypeMapping(
         }
     }
 
+    private fun initializerType(scope: FirDeclaration): Method =
+        typeFactory.methodFor(signatureBuilder.initializerSignature(scope), {
+            Method(null, 0, null, "", null, null as kotlin.Array<String>?, null, null, null, null, null)
+        }) { method ->
+            var declaringType = type(initializerContainer(scope) ?: firFile)
+            if (declaringType is Parameterized) {
+                declaringType = declaringType.type
+            }
+            method.unsafeSet(TypeUtils.asFullyQualified(declaringType), Primitive.Void, null as List<JavaType>?, null, null)
+        }
+
     /**
      * A [JvmPackagePartSource] carries only the JVM facade class name, with no FIR class to route through.
      * The synthesized class lets MethodMatcher and FQN lookups work, though its members can't be enumerated.
@@ -1906,6 +1900,24 @@ internal fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
             symbol.dispatchReceiverType == null &&
             symbol.containingClassLookupTag() == null &&
             symbol.fir.isScriptTopLevelDeclaration != true
+
+/**
+ * An init block or a property initializer has no method of its own, so its locals are owned by a nameless `void()`
+ * method of the class, as the Java parsers do for a local of an initializer block. Owning them by the class would make
+ * them indistinguishable from the class's fields.
+ */
+internal fun initializerScope(parent: Any?): FirDeclaration? =
+    parent as? FirAnonymousInitializer ?: parent as? FirProperty
+
+/**
+ * The class declaring an init block or property, or null for a top-level property.
+ */
+@OptIn(SymbolInternals::class)
+internal fun initializerContainer(scope: FirDeclaration): FirClass? = when (scope) {
+    is FirAnonymousInitializer -> (scope.containingDeclarationSymbol as? FirClassSymbol<*>)?.fir
+    is FirProperty -> scope.symbol.getContainingClassSymbol()?.fir as? FirClass
+    else -> null
+}
 
 internal fun FirBasedSymbol<*>.getContainingFile() =
     when (this) {
