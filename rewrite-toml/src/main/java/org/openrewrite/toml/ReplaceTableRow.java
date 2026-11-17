@@ -108,7 +108,7 @@ public class ReplaceTableRow extends Recipe {
                                                 }
                                                 return null; // Remove key-value not in incoming
                                             }),
-                                            incomingKeyValues
+                                            ListUtils.map(incomingKeyValues, kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()))
                                     ), first -> first.withPrefix(firstPrefix)
                             )
                     );

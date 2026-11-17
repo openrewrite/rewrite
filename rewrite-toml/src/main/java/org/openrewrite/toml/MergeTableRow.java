@@ -170,7 +170,8 @@ public class MergeTableRow extends Recipe {
                                         }
                                         return existingKv;
                                     }),
-                                    ListUtils.filter(incomingKeyValues, kv -> kv.getValue() != null)
+                                    ListUtils.map(ListUtils.filter(incomingKeyValues, kv -> kv.getValue() != null),
+                                            kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()))
                             )
                     );
                 }
