@@ -1586,55 +1586,40 @@ public class GroovyParserVisitor {
         public void visitClassExpression(ClassExpression clazz) {
             ClassNode type = clazz.getType();
             queue.add(insideParentheses(clazz, fmt -> {
-                if (source.charAt(cursor) == '(') {
+                Expression target;
+                if (type.isArray() || source.charAt(cursor) == '(') {
                     // A class literal can parenthesize its type, as in `(String).class`
-                    int typeParentheses = 0;
-                    for (int i = cursor; source.charAt(i) == '('; i = indexOfNextNonWhitespace(i + 1, source)) {
-                        typeParentheses++;
+                    Stack<Space> openingParens = new Stack<>();
+                    while (sourceStartsWith("(")) {
+                        openingParens.push(sourceBefore("("));
                     }
-                    Stack<Space> openingParens = openParentheses(typeParentheses);
-                    return classLiteral(fmt, closeParentheses(openingParens, typeTree(type)), type);
-                }
-                if (type.isArray()) {
-                    return typeTree(type).withPrefix(fmt);
-                }
-                String name = type.getNameWithoutPackage().replace('$', '.');
-                if (!source.startsWith(name, cursor)) {
-                    name = type.getUnresolvedName().replace('$', '.');
-                }
-                skip(name);
-                if (type.isUsingGenerics()) {
-                    GenericsType[] generics = type.getGenericsTypes();
+                    target = closeParentheses(openingParens, typeTree(type));
+                } else {
+                    String name = type.getNameWithoutPackage().replace('$', '.');
+                    if (!source.startsWith(name, cursor)) {
+                        name = type.getUnresolvedName().replace('$', '.');
+                    }
+                    skip(name);
+                    GenericsType[] generics = type.isUsingGenerics() ? type.getGenericsTypes() : null;
                     if (generics != null && generics.length > 0) {
-                        J.Identifier ident = new J.Identifier(randomId(),
-                                EMPTY,
-                                Markers.EMPTY,
-                                emptyList(),
-                                name,
-                                typeMapping.type(type), null);
-                        J.ParameterizedType parameterizedType = new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, ident, visitTypeParameterizations(generics), typeMapping.type(type));
-                        if (sourceStartsWith(".class")) {
-                            return classLiteral(EMPTY, parameterizedType, type);
-                        }
-                        return parameterizedType;
+                        J.Identifier ident = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(),
+                                name, typeMapping.type(type), null);
+                        target = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, ident,
+                                visitTypeParameterizations(generics), typeMapping.type(type));
+                    } else {
+                        // TypeTree.build gives the intermediate segments of a dotted name fresh ShallowClasses.
+                        // The leaf takes its type from the resolved ClassNode.
+                        target = TypeTree.build(name, null).withType(typeMapping.type(type));
                     }
                 }
-                if (sourceStartsWith(".class")) {
-                    int afterClass = indexOfNextNonWhitespace(cursor, source) + ".class".length();
-                    if (afterClass >= source.length() || !Character.isJavaIdentifierPart(source.charAt(afterClass))) {
-                        String classSuffix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source)) + ".class";
-                        name += classSuffix;
-                        skip(classSuffix);
-                    }
-                }
-                // Intermediate segments inside the dotted name get fresh
-                // ShallowClasses from TypeTree.build; the outermost type comes from
-                // the resolved ClassNode and overrides what TypeTree.build assigned
-                // for the leaf.
-                return TypeTree.build(name, null)
-                        .withType(typeMapping.type(type))
-                        .withPrefix(fmt);
+                return startsClassLiteral() ? classLiteral(fmt, target, type) : target.withPrefix(fmt);
             }));
+        }
+
+        private boolean startsClassLiteral() {
+            int afterClass = indexOfNextNonWhitespace(cursor, source) + ".class".length();
+            return sourceStartsWith(".class") &&
+                   (afterClass >= source.length() || !Character.isJavaIdentifierPart(source.charAt(afterClass)));
         }
 
         private J.FieldAccess classLiteral(Space prefix, Expression target, ClassNode type) {
