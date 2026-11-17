@@ -992,7 +992,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
               </project>
               """,
             () -> rewriteRun(
-                spec -> spec.recipe(new UpdateMavenProjectPropertyJavaVersion(17)),
                 pomXml(
                     //language=xml
                     """

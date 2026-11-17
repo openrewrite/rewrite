@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
+import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirScript
@@ -30,6 +31,11 @@ import org.jetbrains.kotlin.name.Name
 
 internal val FirBasedSymbol<*>.isFromLibrary: Boolean
     get() = origin == FirDeclarationOrigin.Library || origin == FirDeclarationOrigin.BuiltIns
+
+internal val FirDeclaration.jvmName: String?
+    get() = annotations
+        .getAnnotationByClassId(JvmStandardClassIds.Annotations.JvmName, moduleData.session)
+        ?.getStringArgument(Name.identifier("name"))
 
 internal val JvmPackagePartSource.facadeFqn: String
     get() = (facadeClassName ?: className).fqNameForTopLevelClassMaybeWithDollars.asString()
@@ -49,9 +55,7 @@ internal val FirFile.facadeFqn: String
             return if (packageFqName.isRoot) path else "${packageFqName.asString()}.$path"
         }
         // `name` is the input path the parser was given, directories included.
-        val simpleName = annotations
-            .getAnnotationByClassId(JvmStandardClassIds.Annotations.JvmName, moduleData.session)
-            ?.getStringArgument(Name.identifier("name"))
+        val simpleName = jvmName
             ?: PackagePartClassUtils.getFilePartShortName(name.substringAfterLast('/').substringAfterLast('\\'))
         return packageFqName.child(Name.identifier(simpleName)).asString()
     }

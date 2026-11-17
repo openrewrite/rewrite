@@ -495,8 +495,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @ParameterizedTest
     void preserveExistingDistributionType(String distributionType, String expectedChecksum) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null, null))
-            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();

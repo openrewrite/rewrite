@@ -29,9 +29,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 
-import java.util.Collections;
-import java.util.List;
-
 /**
  * ScalaVisitor extends JavaVisitor to support visiting both Java (J) and Scala (S) AST elements.
  * This allows Scala code to be processed by Java-focused recipes while also supporting
@@ -54,59 +51,24 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
 
-        if (c.getPackageDeclaration() != null) {
-            c = c.withPackageDeclaration(visitAndCast(c.getPackageDeclaration(), p));
-        }
+        c = c.getPadding().withPackageDeclaration(
+                visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, p));
 
-        c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
-            try {
-                return toStatement(visit(s, p));
-            } catch (Exception e) {
-                // Some Java recipes may fail on Scala-specific class structures
-                // (e.g., missing primaryConstructor). Return unchanged rather than crashing.
-                return s;
+        c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), rp -> {
+            if (rp.getElement() instanceof J.Import) {
+                return visitRightPadded(rp, JRightPadded.Location.IMPORT, p);
             }
+            Statement s = toStatement(visit(rp.getElement(), p));
+            return s == null ? null : rp.withElement(s);
         }));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
 
-        // Bridge to Java visitor: create a temporary J.CompilationUnit so that Java recipes
-        // that override visitCompilationUnit(J.CompilationUnit, P) can process imports, classes, etc.
-        J.CompilationUnit tempJcu = new J.CompilationUnit(
-                Tree.randomId(),
-                c.getPrefix(),
-                c.getMarkers(),
-                c.getSourcePath(),
-                c.getFileAttributes(),
-                c.getCharset().name(),
-                c.isCharsetBomMarked(),
-                c.getChecksum(),
-                c.getPadding().getPackageDeclaration(),
-                c.getPadding().getImports(),
-                Collections.emptyList(),
-                c.getEof()
-        );
-
-        // Cast to JavaVisitor to invoke visitCompilationUnit(J.CompilationUnit, P) virtually.
-        // When this visitor is an adapted delegate, the adapter's override will call
-        // the original Java recipe's visitCompilationUnit (e.g., OrderImports).
-        J.CompilationUnit result = (J.CompilationUnit) ((JavaVisitor<P>) this).visitCompilationUnit(tempJcu, p);
-
-        // Sync changes from the J.CompilationUnit back to S.CompilationUnit
-        if (result != tempJcu) {
-            List<JRightPadded<J.Import>> newImports = result.getPadding().getImports();
-            c = (S.CompilationUnit) c.getPadding().withImports(newImports);
-            if (result.getPrefix() != c.getPrefix()) {
-                c = c.withPrefix(result.getPrefix());
-            }
-            if (result.getMarkers() != c.getMarkers()) {
-                c = c.withMarkers(result.getMarkers());
-            }
-            if (result.getEof() != c.getEof()) {
-                c = c.withEof(result.getEof());
-            }
-        }
-
         return c;
+    }
+
+    @Override
+    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
+        throw new UnsupportedOperationException("Scala has a different structure for its compilation unit. See S.CompilationUnit.");
     }
 
     @Override
@@ -520,6 +482,20 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }
         r = r.withRefinements(visitAndCast(r.getRefinements(), p));
         return r;
+    }
+
+    public J visitExistentialType(S.ExistentialType existentialType, P p) {
+        S.ExistentialType e = existentialType;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(e, p);
+        if (!(temp instanceof S.ExistentialType)) {
+            return temp;
+        }
+        e = (S.ExistentialType) temp;
+        e = e.withUnderlying(visitAndCast(e.getUnderlying(), p));
+        e = e.getPadding().withClause(visitLeftPadded(e.getPadding().getClause(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return e;
     }
 
     public J visitMacro(S.Macro macro, P p) {

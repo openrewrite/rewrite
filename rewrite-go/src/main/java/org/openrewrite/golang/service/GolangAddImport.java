@@ -180,12 +180,38 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
                 starts.add(i);
             }
         }
-        int block = starts.size() - 1;
+        int block = -1;
         for (int b = starts.size() - 1; b >= 0; b--) {
-            if (holdsGroup(elements, starts.get(b), blockEnd(starts, b, elements.size()), group, modulePath)) {
+            int end = blockEnd(starts, b, elements.size());
+            boolean cgo = false;
+            for (int i = starts.get(b); i < end; i++) {
+                if ("C".equals(getImportPath(elements.get(i).getElement()))) {
+                    cgo = true;
+                    break;
+                }
+            }
+            if (cgo) {
+                continue;
+            }
+            if (block < 0) {
+                block = b;
+            }
+            if (holdsGroup(elements, starts.get(b), end, group, modulePath)) {
                 block = b;
                 break;
             }
+        }
+        if (block < 0) {
+            ImportBlock lastBlock = importBlock(elements.get(starts.get(starts.size() - 1)));
+            boolean closePrevious = lastBlock == null ?
+                    imports.getMarkers().findFirst(GroupedImport.class).isPresent() : lastBlock.isGrouped();
+            ImportBlock addedBlock = new ImportBlock(Tree.randomId(), closePrevious, Space.format("\n\n"), false, Space.EMPTY);
+            J.Import added = alias == null ?
+                    newImport.withQualid(newImport.getQualid().withPrefix(Space.SINGLE_SPACE)) :
+                    newImport.withPrefix(Space.SINGLE_SPACE);
+            added = added.withMarkers(added.getMarkers().add(addedBlock));
+            elements.add(new JRightPadded<>(added, Space.EMPTY, Markers.EMPTY));
+            return imports.getPadding().withElements(elements);
         }
         int start = starts.get(block);
         int end = blockEnd(starts, block, elements.size());
@@ -225,8 +251,8 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
         if (insertAt == end) {
             // A grouped declaration's last import holds the space before its `)`.
             JRightPadded<J.Import> tail = elements.get(end - 1);
-            added = added.withAfter(tail.getAfter());
-            elements.set(end - 1, tail.withAfter(Space.EMPTY));
+            added = added.withAfter(closingSpace(tail.getAfter()));
+            elements.set(end - 1, tail.withAfter(trailingComments(tail.getAfter())));
         }
         elements.add(insertAt, added);
         return imports.getPadding().withElements(elements);
@@ -249,7 +275,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
         } else {
             imp = imp.withMarkers(imp.getMarkers().setByType(blockMarker.withGrouped(true).withGroupedBefore(Space.SINGLE_SPACE)));
         }
-        elements.set(start, only.withElement(imp).withAfter(Space.format("\n")));
+        elements.set(start, only.withElement(imp).withAfter(withClosingSpace(only.getAfter(), Space.format("\n"))));
 
         if (end < elements.size()) {
             JRightPadded<J.Import> next = elements.get(end);
@@ -261,6 +287,50 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
             }
         }
         return imports;
+    }
+
+    private static int trailingCommentCount(Space space) {
+        if (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r")) {
+            return 0;
+        }
+        List<Comment> comments = space.getComments();
+        for (int i = 0; i < comments.size(); i++) {
+            String suffix = comments.get(i).getSuffix();
+            if (suffix.contains("\n") || suffix.contains("\r")) {
+                return i + 1;
+            }
+        }
+        return comments.size();
+    }
+
+    private static Space closingSpace(Space space) {
+        int count = trailingCommentCount(space);
+        if (count == 0) {
+            return space;
+        }
+        return Space.build(space.getComments().get(count - 1).getSuffix(), space.getComments().subList(count, space.getComments().size()));
+    }
+
+    private static Space trailingComments(Space space) {
+        int count = trailingCommentCount(space);
+        if (count == 0) {
+            return Space.EMPTY;
+        }
+        List<Comment> comments = new ArrayList<>(space.getComments().subList(0, count));
+        comments.set(count - 1, comments.get(count - 1).withSuffix(""));
+        return space.withComments(comments);
+    }
+
+    private static Space withClosingSpace(Space space, Space closing) {
+        Space trailing = trailingComments(space);
+        List<Comment> comments = new ArrayList<>(trailing.getComments());
+        if (comments.isEmpty()) {
+            return closing;
+        }
+        int last = comments.size() - 1;
+        comments.set(last, comments.get(last).withSuffix(closing.getWhitespace()));
+        comments.addAll(closing.getComments());
+        return trailing.withComments(comments);
     }
 
     private static int blockEnd(List<Integer> starts, int block, int size) {

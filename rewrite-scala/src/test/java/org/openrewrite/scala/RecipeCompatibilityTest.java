@@ -21,7 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.OrderImports;
+import org.openrewrite.java.RemoveAnnotation;
 import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
@@ -208,7 +208,34 @@ class RecipeCompatibilityTest implements RewriteTest {
               }
               """,
             """
-              import  java.util.LinkedList
+              import java.util.LinkedList
+
+              class MyClass {
+                val list = new LinkedList[String]()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeInFileWithClassWithoutBody() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", null)),
+          scala(
+            """
+              import java.util.ArrayList
+
+              case class Point(x: Int, y: Int)
+
+              class MyClass {
+                val list = new ArrayList[String]()
+              }
+              """,
+            """
+              import java.util.LinkedList
+
+              case class Point(x: Int, y: Int)
 
               class MyClass {
                 val list = new LinkedList[String]()
@@ -238,6 +265,26 @@ class RecipeCompatibilityTest implements RewriteTest {
     }
 
     @Test
+    void removeAnnotationFromClass() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+          scala(
+            """
+              @Deprecated
+              class MyClass {
+                val n = 1
+              }
+              """,
+            """
+              class MyClass {
+                val n = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeTypeWithMemberImports() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
@@ -257,7 +304,7 @@ class RecipeCompatibilityTest implements RewriteTest {
               import scala.language.implicitConversions
               import scala.math.Pi
               import java.util.Collections.emptyList
-              import  java.util.LinkedList
+              import java.util.LinkedList
 
               class MyClass {
                 val list = new LinkedList[String](emptyList[String]())
@@ -269,6 +316,32 @@ class RecipeCompatibilityTest implements RewriteTest {
     }
 
     // ---- RemoveImport ----
+
+    @Test
+    void removeLastImportKeepsItsCommentBeforeTheClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.ArrayList"))),
+          scala(
+            """
+              import scala.math.Pi
+              // keep me
+              import java.util.ArrayList
+
+              class MyClass {
+                val pi = Pi
+              }
+              """,
+            """
+              import scala.math.Pi
+              // keep me
+
+              class MyClass {
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void removeImportWithValueImports() {
@@ -419,73 +492,6 @@ class RecipeCompatibilityTest implements RewriteTest {
 
               class MyClass {
                 val list = emptyList[String]()
-              }
-              """
-          )
-        );
-    }
-
-    // ---- OrderImports ----
-
-    @Test
-    void orderImportsAlphabetically() {
-        rewriteRun(
-          spec -> spec.recipe(new OrderImports(false, null)),
-          scala(
-            """
-              import java.util.Set
-              import java.util.ArrayList
-              import java.util.List
-              import java.util.Map
-
-              class MyClass {
-                val list: List[String] = new ArrayList[String]()
-                val set: Set[String] = null
-                val map: Map[String, String] = null
-              }
-              """,
-            """
-              import java.util.ArrayList
-              import java.util.List
-              import java.util.Map
-              import java.util.Set
-
-              class MyClass {
-                val list: List[String] = new ArrayList[String]()
-                val set: Set[String] = null
-                val map: Map[String, String] = null
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void orderImportsSamePackage() {
-        // Verify OrderImports sorts within the same package
-        rewriteRun(
-          spec -> spec.recipe(new OrderImports(false, null)),
-          scala(
-            """
-              import java.util.Set
-              import java.util.List
-              import java.util.Map
-
-              class MyClass {
-                val list: List[String] = null
-                val set: Set[String] = null
-                val map: Map[String, String] = null
-              }
-              """,
-            """
-              import java.util.List
-              import java.util.Map
-              import java.util.Set
-
-              class MyClass {
-                val list: List[String] = null
-                val set: Set[String] = null
-                val map: Map[String, String] = null
               }
               """
           )

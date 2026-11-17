@@ -1156,7 +1156,6 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     @Test
     void replacesTestSourceAndTestTargetWithTestRelease() {
         rewriteRun(
-          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11)),
           //language=xml
           pomXml(
             """
@@ -1214,7 +1213,6 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     @Test
     void removesTestSourceTargetWhenSameAsRelease() {
         rewriteRun(
-          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11)),
           //language=xml
           pomXml(
             """
@@ -1271,7 +1269,6 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     @Test
     void preservesCustomPropertyRefInTestRelease() {
         rewriteRun(
-          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11)),
           //language=xml
           pomXml(
             """

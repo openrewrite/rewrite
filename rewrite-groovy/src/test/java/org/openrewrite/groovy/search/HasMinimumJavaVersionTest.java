@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.HasMinimumJavaVersion;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -28,11 +29,15 @@ import static org.openrewrite.java.Assertions.javaVersion;
 @Issue("https://github.com/moderneinc/customer-requests/issues/2389")
 class HasMinimumJavaVersionTest implements RewriteTest {
 
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(new HasMinimumJavaVersion("17", false));
+  }
+
     @DocumentExample
     @Test
     void groovyOnly() {
         rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("17", false)),
           groovy(
             "class A {}",
             "/*~~(Java version 17)~~>*/class A {}",
@@ -44,7 +49,6 @@ class HasMinimumJavaVersionTest implements RewriteTest {
     @Test
     void mixedJavaAndGroovy() {
         rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("17", false)),
           java(
             "class A {}",
             "/*~~(Java version 17)~~>*/class A {}",
@@ -61,7 +65,6 @@ class HasMinimumJavaVersionTest implements RewriteTest {
     @Test
     void groovyBelowMinimumFailsCheck() {
         rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("17", false)),
           java(
             "class A {}",
             spec -> spec.markers(javaVersion(17))

@@ -856,6 +856,13 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
+        // An error type satisfies any receiver type, so FIR binds `unknown.set(0, 'c')` and
+        // `with(unknown) { set(0, 'c') }` to the `StringBuilder.set` extension.
+        // javac leaves calls on an unresolved receiver unattributed.
+        if (function.extensionReceiver?.resolvedType is ConeErrorType ||
+            function.dispatchReceiver?.resolvedType is ConeErrorType) {
+            return null
+        }
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
         if (sym !is FirCallableSymbol<*>) {
             throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
@@ -929,13 +936,7 @@ class KotlinTypeMapping(
                 } else if (declaration.isFromLibrary) {
                     val source = declaration.fir.containerSource
                     if (source is JvmPackagePartSource) {
-                        // JvmPackagePartSource carries only the JVM facade class name
-                        // string — no FIR class to route through. Synthesize a
-                        // canonical Class for the facade so MethodMatcher works;
-                        // we can't enumerate its members from FIR.
-                        declaringType = typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
-                            // Synthetic library facade — body is not enumerable from FIR.
-                        }
+                        declaringType = libraryFacadeType(source)
                     } else if (!declaration.fir.origin.generated &&
                         !declaration.fir.origin.fromSupertypes &&
                         !declaration.fir.origin.fromSource
@@ -1370,6 +1371,19 @@ class KotlinTypeMapping(
                     }
                 }
 
+                isFileFacadeMember(variable.symbol) -> {
+                    val source = variable.containerSource
+                    declaringType = if (source is JvmPackagePartSource) {
+                        libraryFacadeType(source)
+                    } else {
+                        TypeUtils.asFullyQualified(type(variable.symbol.getContainingFile() ?: firFile))
+                    }
+                }
+
+                initializerScope(parent) != null -> {
+                    declaringType = initializerType(initializerScope(parent)!!)
+                }
+
                 parent is FirClass -> {
                     declaringType = type(parent)
                 }
@@ -1777,16 +1791,23 @@ class KotlinTypeMapping(
         }
     }
 
+    private fun initializerType(scope: FirDeclaration): Method =
+        typeFactory.methodFor(signatureBuilder.initializerSignature(scope), {
+            Method(null, 0, null, "", null, null as kotlin.Array<String>?, null, null, null, null, null)
+        }) { method ->
+            var declaringType = type(initializerContainer(scope) ?: firFile)
+            if (declaringType is Parameterized) {
+                declaringType = declaringType.type
+            }
+            method.unsafeSet(TypeUtils.asFullyQualified(declaringType), Primitive.Void, null as List<JavaType>?, null, null)
+        }
+
     /**
-     * Top-level functions and properties compile to static members of the file's JVM facade class.
+     * A [JvmPackagePartSource] carries only the JVM facade class name, with no FIR class to route through.
+     * The synthesized class lets MethodMatcher and FQN lookups work, though its members can't be enumerated.
      */
-    @OptIn(SymbolInternals::class)
-    private fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
-        (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
-                !symbol.isLocal &&
-                symbol.dispatchReceiverType == null &&
-                symbol.containingClassLookupTag() == null &&
-                symbol.fir.isScriptTopLevelDeclaration != true
+    private fun libraryFacadeType(source: JvmPackagePartSource): FullyQualified =
+        typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {}
 
     private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?, isStatic: Boolean): Long {
         var bitMask: Long = 0
@@ -1867,6 +1888,35 @@ class KotlinTypeMapping(
             }
         }
     }
+}
+
+/**
+ * Top-level functions and properties compile to static members of the file's JVM facade class.
+ */
+@OptIn(SymbolInternals::class)
+internal fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
+    (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
+            !symbol.isLocal &&
+            symbol.dispatchReceiverType == null &&
+            symbol.containingClassLookupTag() == null &&
+            symbol.fir.isScriptTopLevelDeclaration != true
+
+/**
+ * An init block or a property initializer has no method of its own, so its locals are owned by a nameless `void()`
+ * method of the class, as the Java parsers do for a local of an initializer block. Owning them by the class would make
+ * them indistinguishable from the class's fields.
+ */
+internal fun initializerScope(parent: Any?): FirDeclaration? =
+    parent as? FirAnonymousInitializer ?: parent as? FirProperty
+
+/**
+ * The class declaring an init block or property, or null for a top-level property.
+ */
+@OptIn(SymbolInternals::class)
+internal fun initializerContainer(scope: FirDeclaration): FirClass? = when (scope) {
+    is FirAnonymousInitializer -> (scope.containingDeclarationSymbol as? FirClassSymbol<*>)?.fir
+    is FirProperty -> scope.symbol.getContainingClassSymbol()?.fir as? FirClass
+    else -> null
 }
 
 internal fun FirBasedSymbol<*>.getContainingFile() =

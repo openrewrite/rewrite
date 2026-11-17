@@ -1911,4 +1911,33 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addImportToRecordWhenBlankLinesPrecedePackage() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+
+              package com.example;
+
+              import java.util.Map;
+
+              record Pair(String key, String value) {
+              }
+              """,
+            """
+
+              package com.example;
+
+              import java.util.List;
+              import java.util.Map;
+
+              record Pair(String key, String value) {
+              }
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
 }

@@ -53,6 +53,7 @@ import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
+import org.openrewrite.scala.marker.ProcedureSyntax
 import org.openrewrite.scala.marker.ContextFunctionArrow
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
@@ -80,6 +81,7 @@ class ScalaTreeVisitor(
   private var isInImportContext = false
   private var currentSyntheticParams: Set[String] = Set.empty
   private var inPattern = false
+  private var assignmentTarget: Trees.Tree[?] = null
   private val namedArgumentCalls = new java.util.IdentityHashMap[Trees.NamedArg[?], Trees.Apply[?]]()
 
   private def patternContext[T](pattern: Boolean)(visit: => T): T = {
@@ -1647,15 +1649,41 @@ class ScalaTreeVisitor(
         Markers.build(Collections.singletonList(new TypeProjection(Tree.randomId())))
       } else Markers.EMPTY
 
-      new J.FieldAccess(
-        Tree.randomId(),
-        prefix,
-        faMarkers,
-        target,
-        new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
-        name.getType
-      )
+      argumentlessCallOf(sel) match {
+        case Some(methodType) if !isTypeProjection =>
+          new J.MethodInvocation(
+            Tree.randomId(),
+            prefix,
+            Markers.EMPTY,
+            new JRightPadded(target, beforeDotSpace, Markers.EMPTY),
+            null,
+            typedMethodName(name, methodType),
+            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+            methodType
+          )
+        case _ =>
+          new J.FieldAccess(
+            Tree.randomId(),
+            prefix,
+            faMarkers,
+            target,
+            new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
+            name.getType
+          )
+      }
     }
+  }
+
+  /** An assignment target names the member being written, even when the write goes through a setter. */
+  private def argumentlessCallOf(sel: Trees.Select[?]): Option[JavaType.Method] =
+    if (sel eq assignmentTarget) None
+    else typeMapping.flatMap(_.argumentlessCallOf(sel.asInstanceOf[untpd.Tree]))
+
+  private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
+    val enclosingTarget = assignmentTarget
+    assignmentTarget = lhs
+    try visitTree(lhs) finally assignmentTarget = enclosingTarget
   }
   
   private def visitInfixOp(infixOp: untpd.InfixOp): J = {
@@ -1680,7 +1708,7 @@ class ScalaTreeVisitor(
       val prefix = extractPrefix(infixOp.span)
       
       // Visit the left side (variable)
-      val variable = visitTree(infixOp.left) match {
+      val variable = visitAssignmentTarget(infixOp.left) match {
         case expr: Expression => expr
         case j: J => new S.StatementExpression(Tree.randomId(), j)
         case null => throw unmappedException(infixOp)
@@ -2563,7 +2591,7 @@ class ScalaTreeVisitor(
           Tree.randomId(),
           prefix,
           implicitImportMarkers(imp, Markers.EMPTY),
-          JLeftPadded.build(false),
+          JLeftPadded.build(isStaticImport(imp)),
           qualid,
           null
         )
@@ -2648,7 +2676,7 @@ class ScalaTreeVisitor(
     val markers = Markers.EMPTY.addIfAbsent(new CommaContinuation(Tree.randomId()))
 
     if (keyword == "import") {
-      new J.Import(Tree.randomId(), prefix, implicitImportMarkers(tree, markers), JLeftPadded.build(false), qualid, null)
+      new J.Import(Tree.randomId(), prefix, implicitImportMarkers(tree, markers), JLeftPadded.build(isStaticImport(tree)), qualid, null)
     } else {
       new S.Export(Tree.randomId(), prefix, markers, qualid)
     }
@@ -2677,7 +2705,7 @@ class ScalaTreeVisitor(
             val selQuoted = cursor < source.length && source.charAt(cursor) == '`'
             val imported = importedBySelector(tree, is, selName)
             new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-              id, JLeftPadded.build(ident(selName, Space.EMPTY, imported.nameType, imported.variable, quoted = selQuoted)), imported.symbolType)
+              id, JLeftPadded.build(ident(selName, Space.EMPTY, imported.nameType, quoted = selQuoted)), imported.symbolType)
           case _ =>
             throw new IllegalStateException("Unexpected non-simple selector in continuation")
         }
@@ -2697,7 +2725,7 @@ class ScalaTreeVisitor(
           val selectorQuoted = cursor < source.length && source.charAt(cursor) == '`'
           val imported = importedBySelector(tree, is, selectorName)
           qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, imported.nameType, imported.variable, quoted = selectorQuoted)), imported.symbolType)
+            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, imported.nameType, quoted = selectorQuoted)), imported.symbolType)
         case _ =>
       }
     }
@@ -2963,8 +2991,8 @@ class ScalaTreeVisitor(
       val nameStartAbs = Math.max(0, sel.imported.span.start - offsetAdjustment)
       val nameEndAbs = Math.max(0, sel.imported.span.end - offsetAdjustment)
       val displayName = source.substring(nameStartAbs, nameEndAbs)
-      val imported = ofNode(tree)(_.importedOf(_, sel.imported.name)).getOrElse(Imported(null, null, null, isImplicit = false))
-      val nameIdent = ident(displayName, Space.EMPTY, imported.nameType, imported.variable)
+      val imported = ofNode(tree)(_.importedOf(_, sel.imported.name)).getOrElse(Imported(null, null, isImplicit = false))
+      val nameIdent = ident(displayName, Space.EMPTY, imported.nameType)
       cursor = nameEndAbs
       val isImplicitImport = imported.isImplicit && keyword == "import"
       val selectorMarkers = if (isImplicitImport) Markers.EMPTY.add(new ImplicitImport(Tree.randomId())) else Markers.EMPTY
@@ -2996,7 +3024,7 @@ class ScalaTreeVisitor(
           val isHidden = renamed.name == nme.WILDCARD
           val aliasIdent =
             if (isHidden) ident(aliasDisplay, aliasPrefix, null)
-            else ident(aliasDisplay, aliasPrefix, imported.nameType, imported.variable)
+            else ident(aliasDisplay, aliasPrefix, imported.nameType)
           val arrowMarkers = unicodeArrowMarkers(useUnicodeArrow)
           S.ImportSelector.build(
             Tree.randomId(), Space.EMPTY,
@@ -3078,11 +3106,15 @@ class ScalaTreeVisitor(
    * import, a selector naming a class is still attributed by its fully qualified name.
    */
   private def importedBySelector(tree: Trees.ImportOrExport[?], is: untpd.ImportSelector, selectorName: String): Imported =
-    if (is.isWildcard) Imported(null, null, null, isImplicit = false)
+    if (is.isWildcard) Imported(null, null, isImplicit = false)
     else ofNode(tree)(_.importedOf(_, is.imported.name)).getOrElse {
       val tpe = lookupSelectorType(tree.expr, selectorName)
-      Imported(tpe, tpe, null, isImplicit = false)
+      Imported(tpe, tpe, isImplicit = false)
     }
+
+  /** An import of an object's or class's term members is static, as Java models one. */
+  private def isStaticImport(tree: Trees.ImportOrExport[?]): java.lang.Boolean =
+    Boolean.box(ofNode(tree)((mapping, node) => Some(mapping.selectsMembersOfType(node))).getOrElse(false))
 
   private def implicitImportMarkers(tree: Trees.ImportOrExport[?], markers: Markers): Markers =
     tree.selectors match {
@@ -3093,7 +3125,7 @@ class ScalaTreeVisitor(
 
   /**
    * Best-effort type lookup for a selector by FQN. Useful for imports
-   * (`scala.collection.mutable` resolves to a known type); for exports the
+   * (`scala.collection.immutable.List` resolves to a known type); for exports the
    * selector usually names a member of a local value, so this typically
    * returns `null` — which is the desired behavior.
    */
@@ -3828,6 +3860,17 @@ class ScalaTreeVisitor(
     )
   }
 
+  /** `J.ClassDeclaration.body` is non-null, so `case class Point(x: Int)` gets an empty block that prints nothing. */
+  private def emptyBody(): J.Block =
+    new J.Block(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+      JRightPadded.build(false),
+      Collections.emptyList(),
+      Space.EMPTY
+    )
+
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
     val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
 
@@ -4174,16 +4217,7 @@ class ScalaTreeVisitor(
           endSpace
         )
 
-      case _ =>
-        // Empty body - object without braces
-        new J.Block(
-          Tree.randomId(),
-          Space.EMPTY,
-          Markers.EMPTY,
-          JRightPadded.build(false),
-          Collections.emptyList(),
-          Space.EMPTY
-        ).withMarkers(Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))))
+      case _ => emptyBody()
     }
     
     // Update cursor to end of module def
@@ -4220,7 +4254,7 @@ class ScalaTreeVisitor(
     
     // Visit the left-hand side. LHS is typically an Identifier/Select but be tolerant
     // of unusual J types by wrapping via StatementExpression.
-    val variable = visitTree(asg.lhs) match {
+    val variable = visitAssignmentTarget(asg.lhs) match {
       case expr: Expression => expr
       case j: J => new S.StatementExpression(Tree.randomId(), j)
       case null => throw unmappedException(asg)
@@ -4963,13 +4997,13 @@ class ScalaTreeVisitor(
         case null => // Skip null statements (e.g., package declarations)
         case stmt: Statement =>
           // Extract trailing space after this statement.
-          // A procedure-syntax method (method-level OmitBraces marker) has an
+          // A procedure-syntax method with a body (ProcedureSyntax marker) has an
           // unreliable dotty span end — it overshoots the real closing `}` because
           // of the synthetic `???` body the parser substitutes. `reparseProcedureBody`
           // already advanced the cursor to just past the real `}`, so trust the cursor
           // here; otherwise the whitespace/comments before the next statement are lost.
           val isProcedureMethod = stmt match {
-            case md: J.MethodDeclaration => md.getMarkers.findFirst(classOf[OmitBraces]).isPresent
+            case md: J.MethodDeclaration => md.getMarkers.findFirst(classOf[ProcedureSyntax]).isPresent
             case _ => false
           }
           val statEnd = if (isProcedureMethod) cursor else Math.max(0, stat.span.end - offsetAdjustment)
@@ -5704,13 +5738,10 @@ class ScalaTreeVisitor(
             statements,
             endSpace
           )
-        case _ =>
-          // Fallback - shouldn't happen if hasExplicitBody is true
-          null
+        case other => throw unmappedException(other)
       }
     } else {
-      // For classes without body (like "class Empty"), return null
-      null
+      emptyBody()
     }
     
     if (td.span.exists) {
@@ -6337,21 +6368,16 @@ class ScalaTreeVisitor(
     val isGivenDefDef = dd.mods != null && dd.mods.is(Flags.Given)
     if (dd.nameSpan.exists) {
       val nameEnd = Math.max(0, dd.nameSpan.end - offsetAdjustment)
-      var i = nameEnd
-      while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      var i = indexOfNextNonWhitespace(nameEnd)
       // Skip a `[...]` type parameter list. After the type params, an ordinary
       // def may have `()` (regular method) or `:`/`=` (parameterless method).
       if (i < source.length && source.charAt(i) == '[') {
         val closePos = positionOfMatchingClose('[', ']', i + 1)
-        i = if (closePos >= 0) closePos + 1 else source.length
-        while (i < source.length && source.charAt(i).isWhitespace) i += 1
+        i = indexOfNextNonWhitespace(if (closePos >= 0) closePos + 1 else source.length)
       }
-      if (i < source.length) {
-        val nextCh = source.charAt(i)
-        if (nextCh == ':' || nextCh == '=') {
-          hasParensInSource = false
-        }
-      }
+      // Only `(` opens a parameter list. A parameterless def can also continue with a
+      // procedure body (`def d { ... }`) or with nothing at all (`def h`).
+      hasParensInSource = i < source.length && source.charAt(i) == '('
     } else if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
       val defSource = source.substring(adjustedStart, adjustedEnd)
       val keyword = if (isGivenDefDef) "given" else "def"
@@ -6759,16 +6785,14 @@ class ScalaTreeVisitor(
       } else if (hasParensInSource) {
         buildEmptyParamList()
       } else {
-        // Parameterless method — mark so printer omits ()
         JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
-          Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+          Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
       }
     } else if (hasParensInSource) {
       buildEmptyParamList()
     } else {
-      // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
-        Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
     }
 
     // Build additional param lists as J.Lambda.Parameters for later wrapping
@@ -6900,8 +6924,10 @@ class ScalaTreeVisitor(
 
     // Build method markers
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
-    if (isProcedureSyntax) {
-      markerList.add(new OmitBraces(Tree.randomId()))
+    // An abstract def without a result type is the declaration form of procedure syntax.
+    val isProcedureDeclaration = !isGivenAlias && dd.rhs == untpd.EmptyTree && returnTypeExpression == null
+    if (isProcedureSyntax || isProcedureDeclaration) {
+      markerList.add(new ProcedureSyntax(Tree.randomId()))
     }
     if (isCurried) {
       markerList.add(new Curried(Tree.randomId()))
@@ -7934,7 +7960,7 @@ class ScalaTreeVisitor(
     new S.SingletonType(Tree.randomId(), prefix, Markers.EMPTY, qualifier, beforeType, typeAt(stt))
   }
 
-  private def visitRefinedTypeTree(rtt: Trees.RefinedTypeTree[?]): S.RefinedType = {
+  private def visitRefinedTypeTree(rtt: Trees.RefinedTypeTree[?]): TypeTree = {
     // Structural type refinement: `Any { def greet(): String }`
     // The rtt's own span may not include leading whitespace cleanly. Instead of
     // relying on extractPrefix(rtt.span), compute the prefix from where the parent
@@ -7961,6 +7987,16 @@ class ScalaTreeVisitor(
     val braceSearchEnd = Math.min(source.length, Math.max(0, rtt.span.end - offsetAdjustment))
     var braceIdx = positionOfNext("{", cursor)
     if (braceIdx < 0 || braceIdx > braceSearchEnd) braceIdx = -1
+    // See ScalaCompilerBridge.hideExistentialKeywords.
+    val forSomeIdx = if (parent != null && braceIdx > cursor) {
+      val i = positionOfNextIn(source.substring(cursor, braceIdx), "forSome", 0)
+      if (i >= 0) cursor + i else -1
+    } else -1
+    val beforeForSome = if (forSomeIdx >= 0) {
+      val before = ScalaSpace.format(source, cursor, forSomeIdx)
+      cursor = forSomeIdx + "forSome".length
+      before
+    } else null
     val blockPrefix = if (braceIdx > cursor) ScalaSpace.format(source, cursor, braceIdx) else Space.EMPTY
     if (braceIdx >= 0) cursor = braceIdx + 1
 
@@ -7996,7 +8032,12 @@ class ScalaTreeVisitor(
     cursor = endPos
     val refinements = new J.Block(Tree.randomId(), blockPrefix, Markers.EMPTY,
       JRightPadded.build(false), stmts, endSpace)
-    new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeAt(rtt))
+    if (beforeForSome != null) {
+      S.ExistentialType.build(Tree.randomId(), prefix, Markers.EMPTY, parent,
+        new JLeftPadded(beforeForSome, refinements, Markers.EMPTY), typeAt(rtt))
+    } else {
+      new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeAt(rtt))
+    }
   }
 
   private def visitAnnotated(ann: Trees.Annotated[?]): J = {
@@ -9349,7 +9390,9 @@ class ScalaTreeVisitor(
         val close = positionOfMatchingClose(c, if (c == '(') ')' else ']', i + 1)
         i = if (close >= 0) close + 1 else end
       } else if (c == '{') return true
-      else if (c == '=') return false
+      // Procedure syntax has no result type, so a `:` here starts one, possibly a
+      // structural type whose `{` is not the body.
+      else if (c == '=' || c == ':') return false
       else i += 1
     }
     false

@@ -73,6 +73,14 @@ val gradleApiMajors = listOf(6, 7, 8, 9)
 val gradleDistributions = gradleApiMajors.map {
     configurations.detachedConfiguration(dependencies.create("gradle-distribution:gradle:$it.+@zip"))
 }
+// Gradle 7 moved part of org.gradle.util to org.gradle.util.internal and declared the classes it left public.
+// Gradle 6 has the same classes, and builds call them, as in GradleVersion.current(), but its declaration leaves
+// out the package.
+val gradle6UtilApi = listOf(
+    "ClosureBackedAction", "CollectionUtils", "Configurable", "ConfigureUtil", "DistributionLocator", "GFileUtils",
+    "GUtil", "GradleVersion", "NameMatcher", "NameValidator", "Path", "RelativePathUtil", "SingleMessageLogger",
+    "TextUtil", "VersionNumber", "WrapUtil"
+).map { "org/gradle/util/$it" }.toSet()
 // The Groovy runtime the Groovy parser runs on, as rewrite-groovy declares it. Gradle 6 ships Groovy as groovy-all, which
 // also holds modules such as groovy-ant, so a distribution's own Groovy jars cannot tell which classes the parser has.
 val parserGroovy = configurations.detachedConfiguration(dependencies.create("org.apache.groovy:groovy:4.+"))
@@ -102,7 +110,8 @@ val addGradleApiToTypeTable = tasks.register("addGradleApiToTypeTable") {
         for (distribution in gradleDistributions) {
             val version = distribution.resolvedConfiguration.resolvedArtifacts.single().moduleVersion.id.version
             val api = temporaryDir.resolve("gradle-api-$version.jar")
-            writePublicApi(distribution.singleFile, api, groovyCore)
+            val undeclaredApi = if (version.startsWith("6.")) gradle6UtilApi else emptySet()
+            writePublicApi(distribution.singleFile, api, groovyCore, undeclaredApi)
             val written = ByteArrayOutputStream()
             TypeTable.newWriter(written).use { it.jar("org.gradle", "gradle-public-api", version).write(api.toPath()) }
             rows += rows(written.toByteArray()).drop(1)
@@ -274,8 +283,10 @@ fun writeKotlinDslAccessors(gradleApi: File, jar: File, workDir: File) {
  * The declaration leaves out the `org.gradle.kotlin.dsl` package, which Kotlin build scripts import by default, so it is
  * added with the module files of its jars. The Kotlin compiler reads the members of these classes from their
  * `kotlin.Metadata` annotation, which is kept.
+ *
+ * The classes in [undeclaredApi] are added as if declared, for API an older declaration leaves out.
  */
-fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
+fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>, undeclaredApi: Set<String>) {
     val classes = mutableMapOf<String, ByteArray>()
     val kotlinModules = mutableMapOf<String, ByteArray>()
     val apiDeclaration = Properties()
@@ -303,10 +314,11 @@ fun writePublicApi(distribution: File, jar: File, groovyCore: Set<String>) {
     }
     val includes = antPatterns("includes")
     val excludes = antPatterns("excludes")
+    check(classes.keys.containsAll(undeclaredApi)) { "Not in the distribution: ${undeclaredApi - classes.keys}" }
     val kotlinDsl = Regex("org/gradle/kotlin/dsl/[^/]+")
     val pending = ArrayDeque(classes.keys.filter { name ->
         "$name.class".let { path -> includes.any { it.matches(path) } && excludes.none { it.matches(path) } } ||
-                kotlinDsl.matches(name)
+                kotlinDsl.matches(name) || name.substringBefore('$') in undeclaredApi
     })
     val kept = sortedSetOf<String>()
     while (pending.isNotEmpty()) {

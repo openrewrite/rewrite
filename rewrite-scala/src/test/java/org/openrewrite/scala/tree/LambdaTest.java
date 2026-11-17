@@ -382,7 +382,10 @@ class LambdaTest implements RewriteTest {
             scala(
                 """
                 object Test {
-                  val f = (x: Int, y: Int,) => x + y
+                  val f = (
+                    x: Int,
+                    y: Int,
+                  ) => x + y
                 }
                 """
             )
