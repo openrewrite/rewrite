@@ -62,6 +62,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
           unionMembers(ot).map(_._1).mkString(" | ")
+        // The fallback `show` would print the whole class.
+        case ci: ClassInfo =>
+          classFqn(ci.cls)
         case NoType =>
           "{undefined}"
         case _ =>
