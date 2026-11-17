@@ -85,6 +85,8 @@ class GroovyParserTest implements RewriteTest {
             """
               import static java.lang.Math.PI
               def x = (PI) * 2
+              def y = -(PI)
+              def z = [(PI): 1]
               """
           )
         );

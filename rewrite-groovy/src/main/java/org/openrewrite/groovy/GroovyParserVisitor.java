@@ -3092,9 +3092,8 @@ public class GroovyParserVisitor {
                     String simpleName = (String) value;
                     int saveCursor = cursor;
                     // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives here.
-                    // The substituted read spans the original name and any parentheses around it.
-                    Integer parenLevel = prop.getObjectExpression() instanceof ClassExpression ?
-                            getInsideParenthesesLevel(nameExpr) : null;
+                    // On Groovy 3+ the receiver's missing position would break the parenthesis scan.
+                    Integer parenLevel = isOlderThanGroovy3() ? getInsideParenthesesLevel(prop) : null;
                     Stack<Space> openingParens = openParentheses(parenLevel == null ? 0 : parenLevel);
                     Space namePrefix = whitespace();
                     if (source.startsWith(simpleName, cursor)) {
@@ -4530,6 +4529,13 @@ public class GroovyParserVisitor {
             } else if (node instanceof BinaryExpression) {
                 BinaryExpression expr = (BinaryExpression) node;
                 return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
+            } else if (node instanceof PropertyExpression &&
+                    ((PropertyExpression) node).getObjectExpression() instanceof ClassExpression &&
+                    ((PropertyExpression) node).getObjectExpression().getLineNumber() < 0 &&
+                    ((PropertyExpression) node).getProperty() instanceof ConstantExpression) {
+                // StaticImportVisitor's substitute for a statically imported field read. Its name carries the
+                // position of the original read, including the parentheses around it.
+                return getInsideParenthesesLevel(((PropertyExpression) node).getProperty());
             }
         } else {
             if (node instanceof MethodCallExpression) {
