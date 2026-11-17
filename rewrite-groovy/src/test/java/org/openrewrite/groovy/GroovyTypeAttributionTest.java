@@ -505,23 +505,28 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @Test
-    void staticallyImportedGetterReadAsAPropertyHasItsReturnType() {
+    void staticallyImportedGetterReadAsAPropertyHasThePropertyOfAQualifiedRead() {
         rewriteRun(
           groovy(
             """
               import static java.lang.Runtime.getRuntime
-              def r = runtime
+              def bare = runtime
+              def qualified = Runtime.runtime
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
-                    J.Identifier read = (J.Identifier) variable.getInitializer();
-                    assertThat(TypeUtils.isOfClassType(read.getType(), "java.lang.Runtime")).isTrue();
-                    assertThat(read.getFieldType()).isNull();
-                    assertThat(TypeUtils.isOfClassType(variable.getVariableType().getType(), "java.lang.Runtime")).isTrue();
-                    return variable;
-                }
-            }.visit(cu, 0))
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, J.VariableDeclarations.NamedVariable> variables = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        variables.put(variable.getSimpleName(), variable);
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                J.Identifier read = (J.Identifier) variables.get("bare").getInitializer();
+                J.FieldAccess qualifiedRead = (J.FieldAccess) variables.get("qualified").getInitializer();
+                assertThat(TypeUtils.isOfClassType(read.getType(), "java.lang.Runtime")).isTrue();
+                assertThat(read.getFieldType()).isNotNull().isSameAs(qualifiedRead.getName().getFieldType());
+            })
           )
         );
     }
@@ -789,20 +794,71 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @Test
-    void mapPropertyIsAKeyNotAField() {
+    void bareAccessorBackedPropertyIsTheVariableOfAQualifiedRead() {
         rewriteRun(
           groovy(
             """
-              def m = new HashMap()
-              m.threshold
+              class Ext {
+                  File getOutDir() { null }
+              }
+              class Sub extends Ext {
+                  def m() {
+                      outDir
+                      this.outDir
+                  }
+              }
+              def ext(@DelegatesTo(Ext) Closure c) {}
+              ext { outDir }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
-                    assertThat(fieldAccess.getName().getFieldType()).isNull();
-                    return fieldAccess;
-                }
-            }.visit(cu, 0))
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> outDirs = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        if ("outDir".equals(identifier.getSimpleName())) {
+                            outDirs.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, 0);
+                assertThat(outDirs).hasSize(3).allSatisfy(outDir -> {
+                    assertThat(TypeUtils.isOfClassType(outDir.getType(), "java.io.File")).isTrue();
+                    assertThat(outDir.getFieldType()).isNotNull().isSameAs(outDirs.getFirst().getFieldType());
+                });
+            })
+          )
+        );
+    }
+
+    @Test
+    void mapPropertyIsAKeyOwnedByTheMapNotItsField() {
+        rewriteRun(
+          groovy(
+            """
+              def m = new HashMap<String, Integer>()
+              def n = new HashMap<String, File>()
+              m.threshold
+              n.threshold
+              m.@threshold
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> reads = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        reads.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(reads).satisfiesExactly(
+                  key -> {
+                      assertThat(TypeUtils.isOfClassType(key.getOwner(), "java.util.HashMap")).isTrue();
+                      assertThat(TypeUtils.isOfClassType(key.getType(), "java.lang.Integer")).isTrue();
+                  },
+                  otherValueType -> assertThat(TypeUtils.isOfClassType(otherValueType.getType(), "java.io.File")).isTrue(),
+                  field -> assertThat(field).isNotNull().isNotSameAs(reads.getFirst())
+                );
+            })
           )
         );
     }

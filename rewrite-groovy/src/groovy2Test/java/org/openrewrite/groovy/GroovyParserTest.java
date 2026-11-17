@@ -24,6 +24,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
@@ -74,6 +77,46 @@ class GroovyParserTest implements RewriteTest {
                     return variable;
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedGetterReadAsAPropertyHasThePropertyOfAQualifiedRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              def bare = runtime
+              def qualified = Runtime.runtime
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, J.VariableDeclarations.NamedVariable> variables = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        variables.put(variable.getSimpleName(), variable);
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                J.Identifier read = (J.Identifier) variables.get("bare").getInitializer();
+                J.FieldAccess qualifiedRead = (J.FieldAccess) variables.get("qualified").getInitializer();
+                assertThat(TypeUtils.isOfClassType(read.getType(), "java.lang.Runtime")).isTrue();
+                assertThat(read.getFieldType()).isNotNull().isSameAs(qualifiedRead.getName().getFieldType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedGetterReadFollowedByAParenthesizedStatement() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              def r = runtime
+              ("a" + "b").toString()
+              """
           )
         );
     }

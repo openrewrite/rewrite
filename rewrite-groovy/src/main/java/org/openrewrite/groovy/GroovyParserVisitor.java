@@ -3022,6 +3022,17 @@ public class GroovyParserVisitor {
             } else {
                 skip(methodName);
             }
+            // On Groovy 2.5 `StaticImportVisitor` turns a statically imported getter read as a property into a call.
+            // A `(` on a later line opens the next statement.
+            int afterName = indexOfNextNonWhitespace(cursor, source);
+            boolean parenthesizedArgs = source.startsWith("(", afterName) && source.lastIndexOf('\n', afterName) < cursor;
+            if (!methodName.equals(call.getMethod()) && call.getArguments() instanceof ArgumentListExpression &&
+                ((ArgumentListExpression) call.getArguments()).getExpressions().isEmpty() && !parenthesizedArgs) {
+                queue.add(new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), methodName,
+                        methodType == null ? typeMapping.type(staticType(call)) : methodType.getReturnType(),
+                        methodNode == null ? null : typeMapping.variableType(methodName, methodNode)));
+                return;
+            }
             J.Identifier name = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY,
                     emptyList(), methodName, methodType, null);
 
@@ -3177,9 +3188,7 @@ public class GroovyParserVisitor {
         }
 
         /**
-         * A private field that does not back a Groovy property is left out, since a getter of the same
-         * name takes precedence over it outside its class. A property without a visible field is the
-         * variable of the accessor the type checker chose. Property access on a map looks up a key.
+         * Property access on a map looks up a key.
          */
         private JavaType.@Nullable Variable propertyField(PropertyExpression prop, boolean attribute) {
             String name = prop.getPropertyAsString();
@@ -3188,13 +3197,24 @@ public class GroovyParserVisitor {
             }
             org.codehaus.groovy.ast.expr.Expression receiver = prop.getObjectExpression();
             ClassNode owner = receiver instanceof ClassExpression ? receiver.getType() : staticType(receiver);
-            if (!attribute && !(receiver instanceof ClassExpression) &&
-                (owner.equals(ClassHelper.MAP_TYPE) || owner.implementsInterface(ClassHelper.MAP_TYPE))) {
-                return null;
+            if (attribute) {
+                return typeMapping.variableType(owner.getField(name));
             }
+            if (!(receiver instanceof ClassExpression) &&
+                (owner.equals(ClassHelper.MAP_TYPE) || owner.implementsInterface(ClassHelper.MAP_TYPE))) {
+                return typeMapping.mapKeyVariableType(name, owner, staticType(prop));
+            }
+            return propertyVariable(owner, name, prop.getNodeMetaData(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET));
+        }
+
+        /**
+         * A private field that does not back a Groovy property is left out, since a getter of the same
+         * name takes precedence over it outside its class. A property without a visible field is the
+         * variable of the accessor the type checker chose.
+         */
+        private JavaType.@Nullable Variable propertyVariable(ClassNode owner, String name, @Nullable MethodNode accessor) {
             FieldNode field = owner.getField(name);
-            if (field == null || (field.isPrivate() && !attribute && field.getOwner().getProperty(name) == null)) {
-                MethodNode accessor = attribute ? null : prop.getNodeMetaData(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+            if (field == null || (field.isPrivate() && field.getOwner().getProperty(name) == null)) {
                 return accessor == null ? null : typeMapping.variableType(name, accessor);
             }
             return typeMapping.variableType(field);
@@ -3597,6 +3617,7 @@ public class GroovyParserVisitor {
                 Variable accessed = expression.getAccessedVariable();
                 AnnotatedNode imported = accessed instanceof DynamicVariable ?
                         StaticImportTypeCheckingExtension.staticallyImportedProperty(classVisitor.getSourceUnit().getAST(), accessed.getName()) : null;
+                MethodNode accessor = expression.getNodeMetaData(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType type;
                 JavaType.Variable variable;
                 if (imported instanceof FieldNode) {
@@ -3604,7 +3625,12 @@ public class GroovyParserVisitor {
                     variable = typeMapping.variableType((FieldNode) imported);
                 } else if (imported instanceof MethodNode) {
                     type = typeMapping.type(((MethodNode) imported).getReturnType());
-                    variable = null;
+                    variable = typeMapping.variableType(expression.getName(), (MethodNode) imported);
+                } else if (accessor != null && (accessed instanceof DynamicVariable || accessed instanceof PropertyNode)) {
+                    // A name the type checker reads through an accessor, such as a superclass's getter or a
+                    // closure delegate's, is the property of that accessor
+                    type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
+                    variable = propertyVariable(accessor.getDeclaringClass(), expression.getName(), accessor);
                 } else {
                     if (expression.isDynamicTyped() && accessed != null && accessed.getType() != expression.getOriginType()) {
                         type = typeMapping.type(staticType(accessed));
