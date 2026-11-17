@@ -351,13 +351,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     /**
      * The parser types a local's declaration with this owner too, so a use gets the same variable type.
-     * An init block or property stands for the nameless method that owns its locals, see [isInitializerScope].
+     * An init block or property stands for the nameless method that owns its locals, see [initializerScope].
      * The parser never makes an enum entry an owner, though `KtEnumEntry` is a `KtClass`.
      */
     fun localVariableOwner(declaration: PsiElement): FirElement? {
         val owner = PsiTreeUtil.findFirstParent(declaration, true) {
             it is KtNamedFunction || it is KtSecondaryConstructor || it is KtPropertyAccessor ||
-                    it is KtAnonymousInitializer ||
+                    it is KtClassInitializer ||
                     it is KtProperty && !it.isLocal && it.initializes(declaration) ||
                     it is KtFile || it is KtClass && it !is KtEnumEntry
         }

@@ -2837,6 +2837,7 @@ class KotlinTypeMappingTest {
                               return x
                           }
                       init {
+                          println(this.x)
                           val x = 1
                           println(x)
                       }

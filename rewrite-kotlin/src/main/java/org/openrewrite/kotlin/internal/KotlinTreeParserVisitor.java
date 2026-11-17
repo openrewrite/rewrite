@@ -2453,7 +2453,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                             .withPrefix(prefix(multiDeclaration.getInitializer())));
         }
 
-        JavaType.Variable vt = variableType(multiDeclaration, psiElementAssociations.localVariableOwner(multiDeclaration));
+        JavaType.Variable vt = variableType(multiDeclaration,
+                psiElementAssociations.localVariableOwner(multiDeclaration));
         J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                 randomId(),
                 Space.EMPTY,
@@ -2996,7 +2997,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         Markers rpMarker = Markers.EMPTY;
-        JavaType.Variable vt = variableType(property, property.isLocal() ? psiElementAssociations.localVariableOwner(property) : owner(property));
+        JavaType.Variable vt = variableType(property,
+                property.isLocal() ? psiElementAssociations.localVariableOwner(property) : owner(property));
         J.VariableDeclarations.NamedVariable namedVariable =
                 new J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -4227,7 +4229,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private J mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {
-        JavaType.Variable vt = variableType(ktDestructuringDeclaration, psiElementAssociations.localVariableOwner(ktDestructuringDeclaration));
+        JavaType.Variable vt = variableType(ktDestructuringDeclaration,
+                psiElementAssociations.localVariableOwner(ktDestructuringDeclaration));
         J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                 randomId(),
                 Space.EMPTY,

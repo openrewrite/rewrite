@@ -544,7 +544,13 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 else -> fileSignature(property.symbol.getContainingFile() ?: firFile)
             }
 
-            isInitializerScope(parent) -> initializerSignature(parent as FirDeclaration)
+            initializerScope(parent) != null -> {
+                // All initializer locals of a class share one owner, so where they are declared tells them apart.
+                return initializerSignature(initializerScope(parent)!!) +
+                        "{name=${variableName(property.name.asString())}" +
+                        ",type=${signature(property.returnTypeRef)},pos=${property.source?.startOffset}}"
+            }
+
             parent is FirFunction -> methodSignature(parent, null)
             parent is FirFile -> fileSignature(parent)
             parent is FirClass -> classSignature(parent)
@@ -552,12 +558,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         }
         sig.append(owner)
         sig.append("{name=${variableName(property.name.asString())}")
-        sig.append(",type=${signature(property.returnTypeRef)}")
-        if (isInitializerScope(parent)) {
-            // All initializer locals of a class share one owner, so where they are declared tells them apart.
-            sig.append(",pos=${property.source?.startOffset}")
-        }
-        sig.append("}")
+        sig.append(",type=${signature(property.returnTypeRef)}}")
         return sig.toString()
     }
 

@@ -1380,8 +1380,8 @@ class KotlinTypeMapping(
                     }
                 }
 
-                isInitializerScope(parent) -> {
-                    declaringType = initializerType(parent as FirDeclaration)
+                initializerScope(parent) != null -> {
+                    declaringType = initializerType(initializerScope(parent)!!)
                 }
 
                 parent is FirClass -> {
@@ -1793,19 +1793,13 @@ class KotlinTypeMapping(
 
     private fun initializerType(scope: FirDeclaration): Method =
         typeFactory.methodFor(signatureBuilder.initializerSignature(scope), {
-            Method(null, 0, null, "", null, null as MutableList<String>?, null, null, null, null, null)
+            Method(null, 0, null, "", null, null as kotlin.Array<String>?, null, null, null, null, null)
         }) { method ->
-            var declaringType = when (val container = initializerContainer(scope)) {
-                null -> type(firFile)
-                else -> type(container)
-            }
+            var declaringType = type(initializerContainer(scope) ?: firFile)
             if (declaringType is Parameterized) {
                 declaringType = declaringType.type
             }
-            method.unsafeSet(
-                TypeUtils.asFullyQualified(declaringType)!!, JavaType.Primitive.Void as JavaType,
-                null as MutableList<JavaType>?, null as MutableList<JavaType>?, null as MutableList<FullyQualified>?
-            )
+            method.unsafeSet(TypeUtils.asFullyQualified(declaringType), Primitive.Void, null as List<JavaType>?, null, null)
         }
 
     /**
@@ -1912,7 +1906,8 @@ internal fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
  * method of the class, as the Java parsers do for a local of an initializer block. Owning them by the class would make
  * them indistinguishable from the class's fields.
  */
-internal fun isInitializerScope(parent: Any?): Boolean = parent is FirAnonymousInitializer || parent is FirProperty
+internal fun initializerScope(parent: Any?): FirDeclaration? =
+    parent as? FirAnonymousInitializer ?: parent as? FirProperty
 
 /**
  * The class declaring an init block or property, or null for a top-level property.
