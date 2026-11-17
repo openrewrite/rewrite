@@ -25,7 +25,7 @@ import dotty.tools.dotc.core.Phases.Phase
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.{NoSymbol, Symbol}
 import dotty.tools.dotc.typer.TyperPhase
-import dotty.tools.dotc.parsing.{Parser, Parsers}
+import dotty.tools.dotc.parsing.{Parser, Parsers, Scanners, Tokens}
 import dotty.tools.dotc.util.SourceFile
 import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
@@ -435,9 +435,11 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
 
     // Each attempt parses under its own reporter so a failed attempt's syntax
     // errors don't surface on the file when a later attempt parses cleanly.
+    val parseable = hideExistentialKeywords(path, content)
+
     def attempt(sourceVersion: Option[String]): (ParsedUnit, List[Diagnostic]) = {
       val reporter = new StoreReporter(null)
-      val source = SourceFile.virtual(path, wrapping.wrap(content))
+      val source = SourceFile.virtual(path, wrapping.wrap(parseable))
       val unit = CompilationUnit(source)
       val pctx = ctx.fresh.setCompilationUnit(unit).setReporter(reporter)
       sourceVersion.foreach(v => pctx.setSetting(pctx.settings.source, v))
@@ -465,6 +467,32 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
 
     if (reportDiagnostics) chosenDiags.foreach(d => ctx.reporter.report(d))
     chosen
+  }
+
+  /**
+   * Replaces each `forSome` keyword token with spaces. Dotty rejects existential types, and its
+   * error recovery discards the code after the clause. Without the keyword it parses the clause as
+   * a refinement at the same offsets, which `ScalaTreeVisitor` turns into an `S.ExistentialType`.
+   */
+  private def hideExistentialKeywords(path: String, content: String)(using ctx: Context): String = {
+    if (!content.contains("forSome")) return content
+    try {
+      val source = SourceFile.virtual(path, content)
+      val scanCtx = ctx.fresh.setCompilationUnit(CompilationUnit(source)).setReporter(new StoreReporter(null))
+      val scanner = new Scanners.Scanner(source)(using scanCtx)
+      val chars = content.toCharArray
+      var hidden = false
+      while (scanner.token != Tokens.EOF) {
+        if (scanner.token == Tokens.FORSOME) {
+          java.util.Arrays.fill(chars, scanner.offset, scanner.offset + "forSome".length, ' ')
+          hidden = true
+        }
+        scanner.nextToken()
+      }
+      if (hidden) new String(chars) else content
+    } catch {
+      case NonFatal(_) => content
+    }
   }
 
   private def buildResult(parsed: ParsedUnit, warnings: JList[ScalaWarning])(using ctx: Context): ScalaParseResult =

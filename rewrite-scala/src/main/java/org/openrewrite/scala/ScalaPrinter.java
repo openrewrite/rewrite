@@ -744,6 +744,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitAnnotatedExpression((S.AnnotatedExpression) tree, p);
         } else if (tree instanceof S.RefinedType) {
             return visitRefinedType((S.RefinedType) tree, p);
+        } else if (tree instanceof S.ExistentialType) {
+            return visitExistentialType((S.ExistentialType) tree, p);
         } else if (tree instanceof S.FunctionType) {
             return visitFunctionType((S.FunctionType) tree, p);
         } else if (tree instanceof S.TupleType) {
@@ -2048,6 +2050,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(refinedType.getRefinements(), p);
         afterSyntax(refinedType, p);
         return refinedType;
+    }
+
+    public J visitExistentialType(S.ExistentialType existentialType, PrintOutputCapture<P> p) {
+        beforeSyntax(existentialType, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(existentialType.getUnderlying(), p);
+        JLeftPadded<J.Block> clause = existentialType.getPadding().getClause();
+        visitSpace(clause.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("forSome");
+        visit(clause.getElement(), p);
+        afterSyntax(existentialType, p);
+        return existentialType;
     }
 
     public J visitMacro(S.Macro macro, PrintOutputCapture<P> p) {

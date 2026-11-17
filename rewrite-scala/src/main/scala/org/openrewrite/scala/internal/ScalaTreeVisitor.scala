@@ -7961,7 +7961,7 @@ class ScalaTreeVisitor(
     new S.SingletonType(Tree.randomId(), prefix, Markers.EMPTY, qualifier, beforeType, typeAt(stt))
   }
 
-  private def visitRefinedTypeTree(rtt: Trees.RefinedTypeTree[?]): S.RefinedType = {
+  private def visitRefinedTypeTree(rtt: Trees.RefinedTypeTree[?]): TypeTree = {
     // Structural type refinement: `Any { def greet(): String }`
     // The rtt's own span may not include leading whitespace cleanly. Instead of
     // relying on extractPrefix(rtt.span), compute the prefix from where the parent
@@ -7988,6 +7988,16 @@ class ScalaTreeVisitor(
     val braceSearchEnd = Math.min(source.length, Math.max(0, rtt.span.end - offsetAdjustment))
     var braceIdx = positionOfNext("{", cursor)
     if (braceIdx < 0 || braceIdx > braceSearchEnd) braceIdx = -1
+    // See ScalaCompilerBridge.hideExistentialKeywords.
+    val forSomeIdx = if (parent != null && braceIdx > cursor) {
+      val i = positionOfNextIn(source.substring(cursor, braceIdx), "forSome", 0)
+      if (i >= 0) cursor + i else -1
+    } else -1
+    val beforeForSome = if (forSomeIdx >= 0) {
+      val before = ScalaSpace.format(source, cursor, forSomeIdx)
+      cursor = forSomeIdx + "forSome".length
+      before
+    } else null
     val blockPrefix = if (braceIdx > cursor) ScalaSpace.format(source, cursor, braceIdx) else Space.EMPTY
     if (braceIdx >= 0) cursor = braceIdx + 1
 
@@ -8023,7 +8033,12 @@ class ScalaTreeVisitor(
     cursor = endPos
     val refinements = new J.Block(Tree.randomId(), blockPrefix, Markers.EMPTY,
       JRightPadded.build(false), stmts, endSpace)
-    new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeAt(rtt))
+    if (beforeForSome != null) {
+      S.ExistentialType.build(Tree.randomId(), prefix, Markers.EMPTY, parent,
+        new JLeftPadded(beforeForSome, refinements, Markers.EMPTY), typeAt(rtt))
+    } else {
+      new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeAt(rtt))
+    }
   }
 
   private def visitAnnotated(ann: Trees.Annotated[?]): J = {
@@ -9376,7 +9391,9 @@ class ScalaTreeVisitor(
         val close = positionOfMatchingClose(c, if (c == '(') ')' else ']', i + 1)
         i = if (close >= 0) close + 1 else end
       } else if (c == '{') return true
-      else if (c == '=') return false
+      // Procedure syntax has no result type, so a `:` here starts one, possibly a
+      // structural type whose `{` is not the body.
+      else if (c == '=' || c == ':') return false
       else i += 1
     }
     false
