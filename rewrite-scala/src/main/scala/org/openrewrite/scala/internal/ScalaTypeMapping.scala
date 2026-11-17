@@ -937,14 +937,26 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   /**
    * Parameters and locals are owned by their method, as in Java. Lambdas and the
    * right-hand side of a local `val` introduce owners of their own, which are skipped.
+   * A local of a statement in a class or object body is owned by that body's initializer.
    */
   private def variableOwner(sym: Symbol): JavaType = {
     var owner = sym.owner
-    while (owner.exists && (owner.isAnonymousFunction || owner.isLocalDummy ||
-      (owner.isTerm && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
+    while (owner.exists && (owner.isAnonymousFunction ||
+      (owner.isTerm && !owner.isLocalDummy && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
       owner = owner.owner
     }
-    if (owner.is(Flags.Method)) mapMethodType(owner) else mapType(owner.info)
+    if (owner.is(Flags.Method)) mapMethodType(owner)
+    else if (owner.isLocalDummy) mapInitializerType(TypeUtils.asFullyQualified(mapType(owner.owner.info)))
+    else mapType(owner.info)
+  }
+
+  /** Matches the Java parsers' owner for a local of an initializer block: a method with no name, a void return and no parameters. */
+  private def mapInitializerType(fq: JavaType.FullyQualified): JavaType.Method = {
+    val sig = fq.getFullyQualifiedName + "{name=,return=void,parameters=[]}"
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, 0L, fq, "", JavaType.Primitive.Void,
+        null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (_: JavaType.Method) => ())
   }
 
   /** Create a constructor method type for a given class type. */

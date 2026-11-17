@@ -42,7 +42,11 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
@@ -1268,6 +1272,46 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(s.getFieldType()).isNotNull();
                 assertThat(s.getFieldType().getName()).isEqualTo("s");
                 assertThat(s.getFieldType().getType()).isEqualTo(s.getType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              {
+                var block = 1
+                block += 1
+              }
+            }
+            object O {
+              {
+                var oblock = 1
+                oblock += 1
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, Set<String>> ownersByName = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
+                        if (ident.getSimpleName().endsWith("block")) {
+                            ownersByName.computeIfAbsent(ident.getSimpleName(), k -> new HashSet<>())
+                              .add(String.valueOf(ident.getFieldType().getOwner()));
+                        }
+                        return ident;
+                    }
+                }.visit(cu, 0);
+
+                assertThat(ownersByName).isEqualTo(Map.of(
+                  "block", Set.of("C{name=,return=void,parameters=[]}"),
+                  "oblock", Set.of("O${name=,return=void,parameters=[]}")
+                ));
             })
           )
         );

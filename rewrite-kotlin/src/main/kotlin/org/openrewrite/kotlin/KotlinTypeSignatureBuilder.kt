@@ -340,6 +340,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     @OptIn(SymbolInternals::class)
+    fun initializerSignature(initializer: FirAnonymousInitializer): String =
+        classSignature(initializer.containingDeclarationSymbol.fir) + "{name=,return=void,parameters=[]}"
+
+    @OptIn(SymbolInternals::class)
     fun methodSignature(
         fir: FirFunction,
         parent: Any?
@@ -545,6 +549,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             parent is FirFunction -> methodSignature(parent, null)
+            parent is FirAnonymousInitializer -> initializerSignature(parent)
             parent is FirFile -> fileSignature(parent)
             parent is FirClass -> classSignature(parent)
             else -> fileSignature(firFile)
