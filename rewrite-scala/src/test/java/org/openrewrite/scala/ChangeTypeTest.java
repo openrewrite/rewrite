@@ -16,10 +16,12 @@
 package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.PathUtils;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class ChangeTypeTest implements RewriteTest {
@@ -208,6 +210,27 @@ class ChangeTypeTest implements RewriteTest {
                 val m: Map[String, String] = null
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void renamingTheDefinitionMovesTheFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "b.Bar", null)),
+          scala(
+            """
+              package a
+
+              class Foo
+              """,
+            """
+              package b
+
+              class Bar
+              """,
+            spec -> spec.path("a/Foo.scala").afterRecipe(cu ->
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("b/Bar.scala"))
           )
         );
     }

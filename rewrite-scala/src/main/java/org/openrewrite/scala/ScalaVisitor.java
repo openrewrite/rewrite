@@ -55,17 +55,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
                 visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, p));
 
         c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), rp -> {
-            try {
-                if (rp.getElement() instanceof J.Import) {
-                    return visitRightPadded(rp, JRightPadded.Location.IMPORT, p);
-                }
-                Statement s = toStatement(visit(rp.getElement(), p));
-                return s == null ? null : rp.withElement(s);
-            } catch (Exception e) {
-                // Some Java recipes may fail on Scala-specific class structures
-                // (e.g., missing primaryConstructor). Return unchanged rather than crashing.
-                return rp;
+            if (rp.getElement() instanceof J.Import) {
+                return visitRightPadded(rp, JRightPadded.Location.IMPORT, p);
             }
+            Statement s = toStatement(visit(rp.getElement(), p));
+            return s == null ? null : rp.withElement(s);
         }));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
 

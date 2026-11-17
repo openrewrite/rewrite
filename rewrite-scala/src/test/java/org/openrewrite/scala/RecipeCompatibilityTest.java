@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.RemoveAnnotation;
 import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
@@ -218,6 +219,33 @@ class RecipeCompatibilityTest implements RewriteTest {
     }
 
     @Test
+    void changeTypeInFileWithClassWithoutBody() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", null)),
+          scala(
+            """
+              import java.util.ArrayList
+
+              case class Point(x: Int, y: Int)
+
+              class MyClass {
+                val list = new ArrayList[String]()
+              }
+              """,
+            """
+              import java.util.LinkedList
+
+              case class Point(x: Int, y: Int)
+
+              class MyClass {
+                val list = new LinkedList[String]()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeJavaLangType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true)),
@@ -230,6 +258,26 @@ class RecipeCompatibilityTest implements RewriteTest {
             """
               class MyClass {
                 val num: Long = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAnnotationFromClass() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+          scala(
+            """
+              @Deprecated
+              class MyClass {
+                val n = 1
+              }
+              """,
+            """
+              class MyClass {
+                val n = 1
               }
               """
           )
@@ -268,6 +316,32 @@ class RecipeCompatibilityTest implements RewriteTest {
     }
 
     // ---- RemoveImport ----
+
+    @Test
+    void removeLastImportKeepsItsCommentBeforeTheClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.ArrayList"))),
+          scala(
+            """
+              import scala.math.Pi
+              // keep me
+              import java.util.ArrayList
+
+              class MyClass {
+                val pi = Pi
+              }
+              """,
+            """
+              import scala.math.Pi
+              // keep me
+
+              class MyClass {
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void removeImportWithValueImports() {

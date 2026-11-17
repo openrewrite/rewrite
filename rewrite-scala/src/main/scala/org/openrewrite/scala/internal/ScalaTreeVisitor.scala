@@ -3859,6 +3859,17 @@ class ScalaTreeVisitor(
     )
   }
 
+  /** `J.ClassDeclaration.body` is non-null, so `case class Point(x: Int)` gets an empty block that prints nothing. */
+  private def emptyBody(): J.Block =
+    new J.Block(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+      JRightPadded.build(false),
+      Collections.emptyList(),
+      Space.EMPTY
+    )
+
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
     val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
 
@@ -4205,16 +4216,7 @@ class ScalaTreeVisitor(
           endSpace
         )
 
-      case _ =>
-        // Empty body - object without braces
-        new J.Block(
-          Tree.randomId(),
-          Space.EMPTY,
-          Markers.EMPTY,
-          JRightPadded.build(false),
-          Collections.emptyList(),
-          Space.EMPTY
-        ).withMarkers(Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))))
+      case _ => emptyBody()
     }
     
     // Update cursor to end of module def
@@ -5735,13 +5737,10 @@ class ScalaTreeVisitor(
             statements,
             endSpace
           )
-        case _ =>
-          // Fallback - shouldn't happen if hasExplicitBody is true
-          null
+        case other => throw unmappedException(other)
       }
     } else {
-      // For classes without body (like "class Empty"), return null
-      null
+      emptyBody()
     }
     
     if (td.span.exists) {

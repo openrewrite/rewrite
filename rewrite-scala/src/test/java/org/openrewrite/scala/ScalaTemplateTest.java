@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -391,16 +390,13 @@ class ScalaTemplateTest implements RewriteTest {
                 }
               }
               """,
-            // ScalaVisitor swallows exceptions thrown while visiting a top-level statement, so assert after the visit
-            spec -> spec.afterRecipe(cu -> assertThat(new ScalaIsoVisitor<List<String>>() {
+            spec -> spec.afterRecipe(cu -> new ScalaIsoVisitor<Integer>() {
                 @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> unattributed) {
-                    if (method.getMethodType() == null) {
-                        unattributed.add(method.toString());
-                    }
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(method.getMethodType()).as(method.toString()).isNotNull();
                     return method;
                 }
-            }.reduce(cu, new ArrayList<>())).isEmpty())
+            }.visit(cu, 0))
           ));
     }
 }
