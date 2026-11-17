@@ -535,6 +535,20 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return r;
     }
 
+    public J visitExistentialType(S.ExistentialType existentialType, P p) {
+        S.ExistentialType e = existentialType;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(e, p);
+        if (!(temp instanceof S.ExistentialType)) {
+            return temp;
+        }
+        e = (S.ExistentialType) temp;
+        e = e.withUnderlying(visitAndCast(e.getUnderlying(), p));
+        e = e.getPadding().withClause(visitLeftPadded(e.getPadding().getClause(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return e;
+    }
+
     public J visitMacro(S.Macro macro, P p) {
         S.Macro m = macro;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
