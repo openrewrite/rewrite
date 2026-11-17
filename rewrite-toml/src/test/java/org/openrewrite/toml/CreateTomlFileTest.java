@@ -324,4 +324,26 @@ class CreateTomlFileTest implements RewriteTest {
         ));
         assertThat(e).hasMessageContaining("the table `package.source` appears twice, which TOML doesn't allow");
     }
+
+    @Test
+    void doNotOverwriteAFileThatAlreadyHoldsTheContents() {
+        rewriteRun(
+          spec -> spec.recipe(new CreateTomlFile(
+            "config.toml",
+            """
+              [new]
+              value = "replacement"
+              """,
+            null,
+            true
+          )),
+          toml(
+            """
+              [new]
+              value = "replacement"
+              """,
+            spec -> spec.path("config.toml")
+          )
+        );
+    }
 }

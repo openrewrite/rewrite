@@ -105,7 +105,7 @@ public class CreateTomlFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(tomlContents)) {
                         return document.withValues(emptyList());
                     }
-                    if (document.printAll().equals(tomlContents.trim())) {
+                    if (document.printAll().trim().equals(tomlContents.trim())) {
                         return document;
                     }
                     Optional<SourceFile> sourceFiles = TomlParser.builder().build()
