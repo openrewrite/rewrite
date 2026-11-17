@@ -860,7 +860,13 @@ public class GroovyParserVisitor {
                                 } else if (ast instanceof ClassNode) {
                                     visitClass((ClassNode) ast);
                                 } else if (ast instanceof BlockStatement) {
-                                    visitBlockStatement((BlockStatement) ast);
+                                    BlockStatement block = (BlockStatement) ast;
+                                    enclosingMethods.push(initializer(clazz, block, sourceStartsWith("static")));
+                                    try {
+                                        visitBlockStatement(block);
+                                    } finally {
+                                        enclosingMethods.pop();
+                                    }
                                 }
                                 Statement stat = pollQueue();
                                 return maybeSemicolon(stat);
@@ -4068,6 +4074,17 @@ public class GroovyParserVisitor {
 
     private static LineColumn pos(ASTNode node) {
         return new LineColumn(node.getLineNumber(), node.getColumnNumber());
+    }
+
+    /**
+     * The owner of an initializer block's locals, matching the Java parsers' owner for them:
+     * a method with no name, a void return and no parameters.
+     */
+    private static MethodNode initializer(ClassNode clazz, BlockStatement block, boolean isStatic) {
+        MethodNode initializer = new MethodNode("", isStatic ? Modifier.STATIC : 0, ClassHelper.VOID_TYPE,
+                Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, block);
+        initializer.setDeclaringClass(clazz);
+        return initializer;
     }
 
     /**
