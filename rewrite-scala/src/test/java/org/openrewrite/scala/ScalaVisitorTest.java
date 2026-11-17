@@ -15,15 +15,19 @@
  */
 package org.openrewrite.scala;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.scala.tree.S;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -64,5 +68,47 @@ class ScalaVisitorTest {
         assertThat(sawSplat[0])
           .as("visitSplatExpression must dispatch through visitExpression")
           .isTrue();
+    }
+
+    @Test
+    void javaVisitorVisitsEachNodeOnceInSourceOrder() {
+        // given
+        ScalaParser parser = ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build();
+        SourceFile cu = parser.parse(
+          """
+            package p
+            import java.lang.System.out
+            class S
+            """
+        ).toList().getFirst();
+
+        List<String> visited = new ArrayList<>();
+        JavaIsoVisitor<ExecutionContext> visitor = new JavaIsoVisitor<>() {
+            @Override
+            public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, ExecutionContext ctx) {
+                if (loc == JRightPadded.Location.PACKAGE || loc == JRightPadded.Location.IMPORT) {
+                    visited.add(loc.name());
+                }
+                return super.visitRightPadded(right, loc, ctx);
+            }
+
+            @Override
+            public J.Import visitImport(J.Import import_, ExecutionContext ctx) {
+                visited.add("import");
+                return super.visitImport(import_, ctx);
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                visited.add(identifier.getSimpleName());
+                return super.visitIdentifier(identifier, ctx);
+            }
+        };
+
+        // when
+        visitor.visit(cu, new InMemoryExecutionContext());
+
+        // then
+        assertThat(visited).containsExactly("PACKAGE", "p", "IMPORT", "import", "java", "lang", "System", "out", "S");
     }
 }

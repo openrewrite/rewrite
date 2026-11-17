@@ -2466,6 +2466,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 			Left:     left,
 			Operator: java.LeftPadded[golang.BinaryOperator]{Before: opPrefix, Element: golang.BinAndNot},
 			Right:    right,
+			Type:     ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -3402,6 +3403,7 @@ func (ctx *parseContext) mapKeyValueExpr(expr *ast.KeyValueExpr) java.Expression
 		Prefix: prefix,
 		Key:    key,
 		Value:  java.LeftPadded[java.Expression]{Before: colonPrefix, Element: value},
+		Type:   ctx.valueTypeOf(expr.Value),
 	}
 }
 
@@ -3460,6 +3462,7 @@ func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) java.Expression {
 		High:         java.RightPadded[java.Expression]{Element: high, After: colon2Prefix},
 		Max:          max,
 		CloseBracket: rbrackPrefix,
+		Type:         ctx.valueTypeOf(expr),
 	}
 }
 

@@ -18,11 +18,15 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -51,6 +55,22 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(source)
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "def a = (println 'x')",
+      "def y = 1\ndef a = [(int) y: 1]"
+    })
+    void syntaxErrorFailsWithTheCompilersErrorRatherThanAMisprint(String source) {
+        SourceFile parsed = GroovyParser.builder().build()
+          .parse(new InMemoryExecutionContext(), source)
+          .findFirst()
+          .orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(((ParseError) parsed).getErroneous()).isNull();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getExceptionType())
+          .isEqualTo("MultipleCompilationErrorsException");
     }
 
     @Test
@@ -150,6 +170,90 @@ class GroovyParserTest implements RewriteTest {
               def d = ((y)) * 2
               def e = (o.name) * 2
               def f = -(o.name)
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedCastsCallsAndIncrements() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              import static java.lang.Math.abs
+              def y = 1
+              def a = (1 as String)
+              def b = ((int) y) * 2
+              def c = (int) (y + 1)
+              def d = (y++) /* ) */ * 2
+              def e = (--y)
+              def f = (y.toString()) // )
+              def g = ((y?.toString())).length()
+              def h = (y).toString().length()
+              def i = ((y)).toString()
+              def j = (abs(1)) * 2
+              def k = (runtime)
+              def l = (y > 0 ? 1 : 2) * 2
+              def m = (y > 0) ? 1 : 2
+              def n = (!y)
+              def o = (-y) * 2
+              def p = (+y)
+              def q = (~y)
+              def r = ([1, 2]) + [3]
+              def s = ([a: 1])
+              def t = (1..2)
+              def u = -(y.hashCode())
+              def v = [(y.toString()): 1]
+              def w = -(y).hashCode()
+              def x = (foo(")"))
+              def z = (foo("(${y}"))
+              def foo(x) { x }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedClosuresMethodPointersArraysAndClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = ({ it }) * 2
+              def b = (({ it }))(1)
+              def c = -({ 1 })
+              def d = (y.&toString)()
+              def e = [(y.&toString): 1]
+              def f = (new int[2]).length
+              def g = (String).name
+              def h = ((String[])).class
+              def i = (String[]) == null
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def a = String[].class
+              def b = int[][].class
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedGStringInterpolations() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = "a ${((y.toString()))} b"
+              def b = ("${y.toString(")")}".length())
               """
           )
         );
