@@ -332,4 +332,46 @@ class MergeTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void rowThatIsNotTomlChangesNothing() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "package.contributors",
+            "name = \"Alice\"\nrole = \"maintainer\"\nurl = https://example.com",
+            "name"
+          )),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice"
+              """
+          )
+        );
+    }
+
+    @Test
+    void newRowLeavesOutAPropertyWithNullValue() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "plugins",
+            "name = \"plugin-c\"\nenabled = null\nversion = \"1.0.0\"",
+            "name"
+          )),
+          toml(
+            """
+              [[plugins]]
+              name = "plugin-a"
+              """,
+            """
+              [[plugins]]
+              name = "plugin-a"
+
+              [[plugins]]
+              name = "plugin-c"
+              version = "1.0.0"
+              """
+          )
+        );
+    }
 }
