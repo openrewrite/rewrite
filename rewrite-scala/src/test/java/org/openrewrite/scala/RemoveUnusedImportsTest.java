@@ -73,6 +73,44 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void keepsLanguageFeatureImport() {
+        rewriteRun(
+          scala(
+            """
+              import scala.language.postfixOps
+
+              object A {
+                val xs = List(1, 2) toList
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsGivenImportUsedBySummon() {
+        rewriteRun(
+          scala(
+            """
+              package example
+              object Defaults {
+                given Int = 5
+              }
+              """
+          ),
+          scala(
+            """
+              package example
+              import example.Defaults.given
+              object A {
+                val x = summon[Int]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepsWildcardUsedOnlyByExtensionMethod() {
         rewriteRun(
           scala(

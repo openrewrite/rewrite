@@ -141,7 +141,7 @@ public class RemoveUnusedImports extends Recipe {
             String name = qualid.getSimpleName();
             String qualifier = path(qualid.getTarget());
             boolean wildcard = isWildcard(name);
-            if (!targets(qualifier, wildcard ? null : name)) {
+            if (isLanguageFeature(qualifier) || !targets(qualifier, wildcard ? null : name)) {
                 return anImport;
             }
             boolean used;
@@ -157,6 +157,9 @@ public class RemoveUnusedImports extends Recipe {
 
         private @Nullable Statement keep(S.Import anImport, Usages usages) {
             String qualifier = path(anImport.getQualifier());
+            if (isLanguageFeature(qualifier)) {
+                return anImport;
+            }
             JavaType qualifierType = anImport.getQualifier().getType();
             List<JRightPadded<S.ImportSelector>> selectors = anImport.getPadding().getSelectors().getPadding().getElements();
             List<JRightPadded<S.ImportSelector>> kept = new ArrayList<>(selectors.size());
@@ -284,6 +287,14 @@ public class RemoveUnusedImports extends Recipe {
     /**
      * The dotted path of an import qualifier, without a leading {@code _root_}.
      */
+    /**
+     * Whether imports from the qualifier enable compiler features, which no reference in the source shows a use of.
+     */
+    private static boolean isLanguageFeature(String qualifier) {
+        String path = qualifier.startsWith("scala.") ? qualifier.substring("scala.".length()) : qualifier;
+        return path.equals("language") || path.startsWith("language.");
+    }
+
     static String path(Expression e) {
         String path;
         if (e instanceof J.FieldAccess) {

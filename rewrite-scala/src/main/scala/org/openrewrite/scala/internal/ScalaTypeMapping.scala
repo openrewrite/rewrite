@@ -104,6 +104,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           tree match {
             case Trees.Apply(fn, args) if owner != null && isInsertedImplicitApplication(fn, args) =>
               implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
+            // The traversal skips the call of an inline method like `summon`, which holds its implicit arguments
+            case Trees.Inlined(Trees.Apply(fn, args), _, _) if owner != null && isInsertedImplicitApplication(fn, args) =>
+              implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
             case _ =>
           }
 
