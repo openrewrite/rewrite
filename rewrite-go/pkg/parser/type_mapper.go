@@ -41,17 +41,12 @@ type typeMapper struct {
 	// The RPC ref table interns by identity, so a type rebuilt at every use is resent at every use.
 	packages  map[string]*java.JavaTypeClass
 	methods   map[*types.Func]*java.JavaTypeMethod
-	variables map[variableKey]*java.JavaTypeVariable
+	variables map[*types.Var]*java.JavaTypeVariable
 	// visible, while a package's files are mapped, holds the interfaces that package can see,
 	// for mapNamed to record which of them each of the package's own types satisfies.
 	visible *visibleInterfaces
 	// declaredInterfaces keeps each imported package's interfaces for the next package that imports it.
 	declaredInterfaces map[*types.Package][]*types.Named
-}
-
-type variableKey struct {
-	v         *types.Var
-	enclosing java.JavaType
 }
 
 // maxTypeDepth bounds how deep type attribution follows a type into its
@@ -66,7 +61,7 @@ func newTypeMapper() *typeMapper {
 		fieldOwner: make(map[*types.Var]java.JavaType),
 		packages:   make(map[string]*java.JavaTypeClass),
 		methods:    make(map[*types.Func]*java.JavaTypeMethod),
-		variables:  make(map[variableKey]*java.JavaTypeVariable),
+		variables:  make(map[*types.Var]*java.JavaTypeVariable),
 
 		declaredInterfaces: make(map[*types.Package][]*types.Named),
 	}
@@ -543,8 +538,7 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 	}
 	switch o := obj.(type) {
 	case *types.Var:
-		key := variableKey{o, enclosing}
-		if v, ok := m.variables[key]; ok {
+		if v, ok := m.variables[o]; ok {
 			return v
 		}
 		v := &java.JavaTypeVariable{
@@ -553,7 +547,7 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 			Owner:       m.ownerType(o, enclosing),
 			Type:        m.mapType(o.Type()),
 		}
-		m.variables[key] = v
+		m.variables[o] = v
 		return v
 	default:
 		return nil
