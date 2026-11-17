@@ -337,4 +337,56 @@ class FindKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findTables() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("bin")),
+          toml(
+            """
+              [package]
+              name = "app"
+
+              [[bin]]
+              name = "cli"
+
+              [[bin]]
+              name = "server"
+              """,
+            """
+              [package]
+              name = "app"
+
+              ~~>[[bin]]
+              name = "cli"
+
+              ~~>[[bin]]
+              name = "server"
+              """
+          )
+        );
+    }
+
+    @Test
+    void findASubtableByItsPath() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("dependencies.serde")),
+          toml(
+            """
+              [dependencies]
+              log = "0.4"
+
+              [dependencies.serde]
+              version = "1"
+              """,
+            """
+              [dependencies]
+              log = "0.4"
+
+              ~~>[dependencies.serde]
+              version = "1"
+              """
+          )
+        );
+    }
 }
