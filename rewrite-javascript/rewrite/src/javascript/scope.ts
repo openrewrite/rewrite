@@ -1111,6 +1111,19 @@ export function isFree(cursor: Cursor, identifier: J.Identifier): boolean {
 }
 
 /**
+ * What the slot holding the cursor's node reads it as, so a recipe can tell a type from a value of
+ * the same spelling: `X` in `let a: X` is a `'type'`, in `f(X)` and `typeof X` a `'value'`, and `NS`
+ * in `let a: NS.X` a `'namespace'`. Undefined where the node names rather than reads, as a
+ * declaration, an import specifier or a property does, and where the slot takes any meaning.
+ */
+export function meaningAt(cursor: Cursor): Meaning | undefined {
+    const path = treePath(cursor);
+    const node = path.pop();
+    const reading = node === undefined || path.length === 0 ? undefined : position(path, node)[1];
+    return reading === undefined ? undefined : meaningRead(reading);
+}
+
+/**
  * Whether the identifier is assigned to where it stands. An assignment's target, plain or compound,
  * is, and so are the operand of `++` or `--`, the head of a for-in or for-of declaring nothing, and
  * a name in such a target's destructuring pattern. A write resolves as a value read, since

@@ -126,6 +126,28 @@ describe("change-method-target-to-import", () => {
         });
     });
 
+    test("moves calls through import X = require, removing the old import", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new ChangeMethodTargetToImport({
+            methodPattern: "util format(..)",
+            targetModule: "string-format",
+            targetMember: "formatter"
+        });
+        // Before: unchanged, since `moduleScopeBindings` gave `util` no module, so it read as a local of the file
+        await withTypes(spec, `"@types/node": "^20"`, typescript(
+            `
+                import util = require('util');
+
+                util.format('a');
+            `,
+            `
+                import {formatter} from 'string-format';
+
+                formatter.format('a');
+            `
+        ));
+    });
+
     test("leaves calls whose receiver is not the old target's name", async () => {
         const spec = new RecipeSpec();
         spec.recipe = jestToVi();

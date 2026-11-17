@@ -5,11 +5,12 @@ import * as path from "path";
 import {
     JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
     maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, MaybeRebindOptions, maybeRemoveImport,
-    removeNewlyUnusedAmdBindings, ImportStyle
+    removeNewlyUnusedAmdBindings, ImportStyle, ImportedAtOptions, ImportedMember, JavaScriptParser, sourceFileCache
 } from "../../src/javascript";
-import {emptySpace, J, rightPadded, Type} from "../../src/java";
+import {emptySpace, J, rightPadded, TextComment, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
+import {Cursor} from "../../src/tree";
 import {ExecutionContext} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
@@ -201,6 +202,283 @@ describe("moduleBindings", () => {
         //language=typescript
         await spec.rewriteRun(typescript(`import Elem = require("sap/ui/core/Element");`));
         expect(seen).toEqual({module: "sap/ui/core/Element", binding: "Elem"});
+    });
+});
+
+const parser = new JavaScriptParser({sourceFileCache});
+
+async function parse(source: string, sourcePath = "test.ts"): Promise<JS.CompilationUnit> {
+    return (await parser.parse({text: source, sourcePath}).next()).value as JS.CompilationUnit;
+}
+
+/** The nodes `importedAt` reads. */
+const READS = new Set<string>([
+    J.Kind.Identifier, J.Kind.FieldAccess, J.Kind.MethodInvocation, J.Kind.ArrayAccess, JS.Kind.FunctionCall,
+    JS.Kind.ImportType
+]);
+
+// What `importedAt` answers at each /*mark*/ in `source`, keyed by the mark:
+// `let a: /*inType*/ NS.Old;` → `{inType: {module: "m", member: "Old", ...}}`.
+// The parser puts a comment in the prefix of the outermost node after it, which can be one `importedAt` doesn't read,
+// such as a statement or a type annotation, so the mark goes to the first node inside it that `importedAt` reads:
+// `/*call*/ f()` asks about the call. Put a mark right before what it asks about, not before a declaration
+// holding it, where the first such node is the declared name.
+async function importedAtMarks(source: string, options?: ImportedAtOptions, sourcePath = "test.ts"):
+    Promise<Record<string, ImportedMember | undefined>> {
+    const cu = await parse(source, sourcePath);
+    const answers: Record<string, ImportedMember | undefined> = {};
+    await new class extends JavaScriptVisitor<undefined> {
+        private pending?: string;
+
+        protected override async preVisit(tree: J, p: undefined): Promise<J | undefined> {
+            this.pending = markOf(tree) ?? this.pending;
+            if (this.pending !== undefined && READS.has(tree.kind)) {
+                answers[this.pending] = moduleBindings(this).importedAt(tree, options);
+                this.pending = undefined;
+            }
+            return tree;
+        }
+    }().visit(cu, undefined);
+    // Every mark found a node, so a mark in the wrong place fails here rather than as a missing key
+    expect(Object.keys(answers).sort()).toEqual([...source.matchAll(/\/\*(\w+)\*\//g)].map(m => m[1]).sort());
+    return answers;
+}
+
+// `name` for a node whose prefix holds /*name*/
+function markOf(tree: J): string | undefined {
+    return tree.prefix?.comments
+        .map(comment => (comment as TextComment).text?.trim())
+        .find(text => text !== undefined && /^\w+$/.test(text));
+}
+
+describe("importedAt", () => {
+    test("each binding shape reaches the member it names", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            import {a} from "m";
+            import {b as B} from "m";
+            import * as NS from "m";
+            import X = require("m");
+            import {"*" as star} from "m";
+            const R = require("m");
+            const {d: D} = require("m");
+            let L = require("m");
+            let W = require("m");
+            W = other;
+
+            /*named*/ a();
+            /*aliased*/ B();
+            /*namespace*/ NS.c();
+            /*importEquals*/ X.e();
+            /*literalName*/ star();
+            /*require*/ R.f();
+            /*requireMember*/ D();
+            /*letRequire*/ L.g();
+            /*reassignedRequire*/ W.g();
+            export {/*exportClause*/ a};
+        `);
+
+        expect(answers).toEqual({
+            named:             {module: "m", member: "a", via: {kind: "named", name: "a", typeOnly: false}},
+            aliased:           {module: "m", member: "b", via: {kind: "named", name: "B", typeOnly: false}},
+            namespace:         {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            importEquals:      {module: "m", member: "e", via: {kind: "require", name: "X", typeOnly: false}},
+            literalName:       {module: "m", member: "*", via: {kind: "named", name: "star", typeOnly: false}},
+            require:           {module: "m", member: "f", via: {kind: "require", name: "R", typeOnly: false}},
+            requireMember:     {module: "m", member: "d", via: {kind: "named", name: "D", typeOnly: false}},
+            letRequire:        {module: "m", member: "g", via: {kind: "require", name: "L", typeOnly: false}},
+            reassignedRequire: undefined,   // W may no longer be the module
+            exportClause:      {module: "m", member: "a", via: {kind: "named", name: "a", typeOnly: false}},
+        });
+    });
+
+    test("a member read through a module object, however it is spelled", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            import * as NS from "m";
+            const {h: H} = NS;
+
+            let t: /*inType*/ NS.T;
+            /*parentheses*/ (NS).c();
+            const c = /*brackets*/ NS["c"];
+            /*bracketsCalled*/ NS["c"]();
+            /*destructured*/ H();
+            export {/*reExport*/ k} from "m";
+        `);
+
+        expect(answers).toEqual({
+            inType:         {module: "m", member: "T", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            parentheses:    {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            brackets:       {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            bracketsCalled: {module: "m", member: "c", via: {kind: "namespace", name: "NS", typeOnly: false}},
+            destructured:   {module: "m", member: "h", via: {kind: "destructured", name: "H", typeOnly: false}},
+            reExport:       {module: "m", member: "k", via: {kind: "re-export", typeOnly: false}},
+        });
+    });
+
+    test("a nearer binding hides the import, where it binds the meaning the position reads", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            import {f, Props, X} from "m";
+
+            function param(f: number) {
+                return /*parameter*/ f;
+            }
+            function local() {
+                const Props = 1;
+                let p: /*typeOverLocalValue*/ Props;
+                return /*localValue*/ Props;
+            }
+            function generic<X>(x: /*typeParameter*/ X) {
+                return /*valueUnderTypeParameter*/ X();
+            }
+            const closure = () => /*closure*/ f();
+        `);
+
+        expect(answers).toEqual({
+            parameter:               undefined,
+            typeOverLocalValue:
+                {module: "m", member: "Props", via: {kind: "named", name: "Props", typeOnly: false}},
+            localValue:              undefined,
+            typeParameter:           undefined,
+            valueUnderTypeParameter: {module: "m", member: "X", via: {kind: "named", name: "X", typeOnly: false}},
+            closure:                 {module: "m", member: "f", via: {kind: "named", name: "f", typeOnly: false}},
+        });
+    });
+
+    test("type-only bindings and import() types stand for no value", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            import type {A} from "m";
+            import {type B} from "m";
+            import type * as T from "m";
+
+            let a: /*typeOnlyImport*/ A;
+            let b: /*inlineType*/ B;
+            let c: /*typeOnlyNamespace*/ T.D;
+            let d: /*importType*/ import("m").E<{}>;
+            export type {/*typeOnlyReExport*/ F} from "m";
+        `);
+
+        expect(answers).toEqual({
+            typeOnlyImport:    {module: "m", member: "A", via: {kind: "named", name: "A", typeOnly: true}},
+            inlineType:        {module: "m", member: "B", via: {kind: "named", name: "B", typeOnly: true}},
+            typeOnlyNamespace: {module: "m", member: "D", via: {kind: "namespace", name: "T", typeOnly: true}},
+            importType:        {module: "m", member: "E", via: {kind: "import-type", typeOnly: true}},
+            typeOnlyReExport:  {module: "m", member: "F", via: {kind: "re-export", typeOnly: true}},
+        });
+    });
+
+    test("a default import is its default export, or the module where the caller says so", async () => {
+        //language=typescript
+        const source = `
+            import React from "react";
+            const {useState} = React;
+
+            let a: /*member*/ React.FC;
+            const r = /*ownName*/ React;
+            const s = /*destructured*/ useState(0);
+        `;
+
+        expect(await importedAtMarks(source)).toEqual({
+            member:       undefined,   // reads a property of the default export
+            ownName:      {module: "react", member: "default", via: {kind: "default", name: "React", typeOnly: false}},
+            destructured: undefined,
+        });
+        expect(await importedAtMarks(source, {defaultIsModule: ["react"]})).toEqual({
+            member:       {module: "react", member: "FC", via: {kind: "default", name: "React", typeOnly: false}},
+            ownName:      undefined,   // the module itself, which no one export is
+            destructured:
+                {module: "react", member: "useState", via: {kind: "destructured", name: "useState", typeOnly: false}},
+        });
+    });
+
+    test("a global stands for a module where the caller maps it and nothing in the file binds it", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            const Vue = {};
+            namespace Lib { export type T = number; }
+
+            let a: /*valueDoesNotHideType*/ Vue.Component;
+            function f(Vue: any) { return /*parameter*/ Vue.version; }
+            let b: /*declaredNamespace*/ Lib.T;
+            let c: /*unmapped*/ Other.T;
+        `, {globals: {Vue: "vue", Lib: "lib"}});
+
+        expect(answers).toEqual({
+            valueDoesNotHideType:
+                {module: "vue", member: "Component", via: {kind: "global", name: "Vue", typeOnly: false}},
+            parameter:            undefined,
+            declaredNamespace:    undefined,
+            unmapped:             undefined,
+        });
+    });
+
+    test("a name that declares, or reads past an export, names none", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            import {/*importedName*/ f} from "m";
+            import * as NS from "m";
+            type Local = number;
+
+            const x = /*namespaceItself*/ NS;
+            const y = /*memberOfMember*/ NS.a.b;
+            const z = /*property*/ o.f;
+            let l: /*declaredType*/ Local;
+            export {g as /*publishedName*/ G} from "m";
+        `);
+
+        expect(answers).toEqual({
+            importedName:    undefined,
+            namespaceItself: undefined,
+            memberOfMember:  undefined,
+            property:        undefined,
+            declaredType:    undefined,
+            publishedName:   undefined,
+        });
+    });
+
+    // maybeRebind moves this one. importedAt reads only the top level's bindings, since `resolve` names the
+    // function binding `useState`, not the declaration that would say it comes from React.
+    test.fails("a name a function destructures from a module object", async () => {
+        //language=typescript
+        const answers = await importedAtMarks(`
+            import * as React from "react";
+            function useToggle() {
+                const {useState} = React;
+                return /*destructuredInFunction*/ useState(false);
+            }
+        `);
+
+        expect(answers).toEqual({
+            destructuredInFunction:
+                {module: "react", member: "useState", via: {kind: "destructured", name: "useState", typeOnly: false}},
+        });
+    });
+
+    test("a member read through an AMD factory parameter", async () => {
+        //language=javascript
+        const answers = await importedAtMarks(`
+            sap.ui.define(["sap/m/Button"], function (Button) {
+                return /*amd*/ Button.extend("my.Button", {});
+            });
+        `, undefined, "test.js");
+
+        expect(answers).toEqual({
+            amd: {module: "sap/m/Button", member: "extend", via: {kind: "amd", name: "Button", typeOnly: false}},
+        });
+    });
+
+    test("a cursor in place of the visitor, for a node the visitor's node holds", async () => {
+        const seen: (ImportedMember | undefined)[] = [];
+        await new class extends JavaScriptVisitor<undefined> {
+            override async visitParameterizedType(type: J.ParameterizedType, p: undefined): Promise<J | undefined> {
+                seen.push(moduleBindings(new Cursor(type.class, this.cursor)).importedAt(type.class));
+                return type;
+            }
+        }().visit(await parse(`import {SFC} from "m"; let a: SFC<{}>;`), undefined);
+
+        expect(seen).toEqual([{module: "m", member: "SFC", via: {kind: "named", name: "SFC", typeOnly: false}}]);
     });
 });
 

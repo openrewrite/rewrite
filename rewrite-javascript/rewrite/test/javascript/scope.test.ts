@@ -20,6 +20,7 @@ import {
     JS,
     isReference,
     isWrite,
+    meaningAt,
     namesDeclaredIn,
     namesDeclaredWithin,
     namesReferencedWithin,
@@ -684,6 +685,29 @@ describe('isReference', () => {
 
     test('a computed key and a default value read from within a naming slot', async () => {
         expect(await targetsReference('const {[target]: a, b = target} = o;')).toEqual([true, true]);
+    });
+});
+
+describe('meaningAt', () => {
+    const meaningsOf = (source: string, sourcePath?: string) => answersAt(source, 'target', cursor => meaningAt(cursor), sourcePath);
+
+    test('a type position, a value position and the qualifier of a qualified type', async () => {
+        expect(await meaningsOf('let a: target; f(target); let b: typeof target; let c: target.X;'))
+            .toEqual(['type', 'value', 'value', 'namespace']);
+    });
+
+    test('a type in an expression: a cast, a satisfies, a type argument and an implements clause', async () => {
+        expect(await meaningsOf('x as target; x satisfies target; f<target>(); class C implements target {}'))
+            .toEqual(['type', 'type', 'type', 'type']);
+    });
+
+    test('a JSX tag and the object of a member read are values', async () => {
+        expect(await meaningsOf('<target/>; target.p;', 'test.tsx')).toEqual(['value', 'value']);
+    });
+
+    test('a name that declares, a property and an import specifier read nothing', async () => {
+        expect(await meaningsOf("const target = 1; o.target; import {target as t} from 'm';"))
+            .toEqual([undefined, undefined, undefined]);
     });
 });
 
