@@ -232,6 +232,20 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void quotedStaticMethodNameCall() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static 'foo bar'(int i) { i }
+                  static m() { 'foo bar'(1) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldBeAbleToParseClassDeclaration() {
         rewriteRun(
                 groovy(

@@ -3006,8 +3006,17 @@ public class GroovyParserVisitor {
             JavaType.Method methodType = typeMapping.methodType(methodNode);
             // On Groovy 2.5 `StaticImportVisitor` names an aliased static import call after the imported method,
             // while the source holds the alias
-            J.Identifier name = new J.Identifier(randomId(), whitespace(), Markers.EMPTY,
-                    emptyList(), name(), methodType, null);
+            Space prefix = whitespace();
+            String methodName;
+            if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
+                String delim = String.valueOf(source.charAt(cursor));
+                methodName = sourceSubstring(cursor, delim) + delim;
+                skip(methodName);
+            } else {
+                methodName = name();
+            }
+            J.Identifier name = new J.Identifier(randomId(), prefix, Markers.EMPTY,
+                    emptyList(), methodName, methodType, null);
 
             Markers markers = Markers.EMPTY;
             if (call.getArguments() instanceof ArgumentListExpression) {
