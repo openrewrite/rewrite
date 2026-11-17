@@ -324,9 +324,6 @@ A name another binding in the file shares stays as it is:
 
 - a module object, on a whole-module move, while the file binds that module some other way too
 - a class name, while another subpath of the same package exports a class of that name
-- a member read through a module object the move leaves in place, on a move of that member to another
-  module: `NS.Old()` beside a moved `import {Old} from "m"` or `export {Old} from "m"` still reads `m`,
-  as its spelling does
 
 A type that reaches the moved name through another import follows the move too. Where the result
 differs from a fresh parse:
