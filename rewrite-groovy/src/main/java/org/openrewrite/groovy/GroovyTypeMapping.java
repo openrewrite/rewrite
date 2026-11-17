@@ -263,9 +263,9 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     /**
-     * A property that Groovy reads or writes through a getter or setter. It has a variable like a field does,
-     * since a typed name without one denotes a type. A same-named private field is a different variable, so the
-     * signature differs from the field's.
+     * A property that Groovy reads or writes through a getter or setter. Its name needs a variable like a field's,
+     * because an identifier with a type but no variable reads as a type name. A same-named private field is a
+     * different variable, so the signature differs from the field's.
      */
     public JavaType.@Nullable Variable variableType(String name, MethodNode accessor) {
         JavaType.Method accessorType = methodType(accessor);
@@ -275,11 +275,14 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         JavaType.FullyQualified owner = accessorType.getDeclaringType();
         JavaType type = accessorType.getParameterTypes().isEmpty() ?
                 accessorType.getReturnType() : accessorType.getParameterTypes().get(0);
-        String signature = owner.getFullyQualifiedName() + "{name=" + name + ",property}";
+        String signature = signatureBuilder.propertySignature(owner, name);
+        // An extension method is declared static whether it extends instances or the class
+        boolean isStatic = accessor instanceof ExtensionMethodNode ?
+                ((ExtensionMethodNode) accessor).isStaticExtension() : accessor.isStatic();
+        long flags = (accessor.getModifiers() & (Modifier.PUBLIC | Modifier.PROTECTED | Modifier.PRIVATE)) |
+                (isStatic ? Modifier.STATIC : 0);
         return typeFactory.variableFor(signature, () -> {
-            JavaType.Variable variable = new JavaType.Variable(
-                    null, accessor.getModifiers() & (Modifier.PUBLIC | Modifier.PROTECTED | Modifier.PRIVATE),
-                    name, null, null, null);
+            JavaType.Variable variable = new JavaType.Variable(null, flags, name, null, null, null);
             variable.unsafeSet(owner, type, (List<JavaType.FullyQualified>) null);
             return variable;
         });

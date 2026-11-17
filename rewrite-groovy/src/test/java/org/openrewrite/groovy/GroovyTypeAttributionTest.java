@@ -726,10 +726,13 @@ class GroovyTypeAttributionTest implements RewriteTest {
                   private File root
                   File getRoot() { root }
                   void setLabel(String label) {}
+                  static String getKind() { "dir" }
               }
               def f = new Folder()
               f.root
               f.label = "a"
+              Folder.kind
+              new File("a").text
               """,
             spec -> spec.afterRecipe(cu -> {
                 List<JavaType.Variable> properties = new ArrayList<>();
@@ -750,8 +753,36 @@ class GroovyTypeAttributionTest implements RewriteTest {
                   label -> {
                       assertThat(label.getName()).isEqualTo("label");
                       assertThat(TypeUtils.isOfClassType(label.getType(), "java.lang.String")).isTrue();
-                  }
+                  },
+                  kind -> assertThat(kind.hasFlags(Flag.Static)).isTrue(),
+                  text -> assertThat(text.hasFlags(Flag.Static)).isFalse()
                 );
+            })
+          )
+        );
+    }
+
+    @Test
+    void propertyReadThroughASubclassIsTheSuperclassField() {
+        rewriteRun(
+          groovy(
+            """
+              class Base { File root }
+              class Sub extends Base {}
+              new Base().root
+              new Sub().root
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> roots = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        roots.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(roots).hasSize(2);
+                assertThat(roots.get(1)).isSameAs(roots.get(0));
             })
           )
         );

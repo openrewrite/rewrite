@@ -3168,7 +3168,7 @@ public class GroovyParserVisitor {
                 return null;
             }
             FieldNode field = owner.getField(name);
-            if (field == null || (field.isPrivate() && !attribute && owner.getProperty(name) == null)) {
+            if (field == null || (field.isPrivate() && !attribute && field.getOwner().getProperty(name) == null)) {
                 MethodNode accessor = attribute ? null : prop.getNodeMetaData(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 return accessor == null ? null : typeMapping.variableType(name, accessor);
             }
