@@ -310,4 +310,26 @@ class MergeTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keyNewToTheRowGoesOnItsOwnLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "package.contributors",
+            "email = \"alice@example.com\"\nname = \"Alice\"",
+            "name"
+          )),
+          toml(
+            """
+              [[package.contributors]]
+                name = "Alice"
+              """,
+            """
+              [[package.contributors]]
+                name = "Alice"
+                email = "alice@example.com"
+              """
+          )
+        );
+    }
 }

@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 
 import java.util.List;
@@ -66,5 +67,23 @@ public class TableRowMatcher {
     public static boolean hasMatchingKeyValue(Toml.Table table, String key, String value, @Nullable Boolean useRegex) {
         String keyValue = getKeyValue(table.getValues(), key);
         return keyValue != null && (Boolean.TRUE.equals(useRegex) ? keyValue.matches(value) : keyValue.equals(value));
+    }
+
+    /**
+     * Puts a key-value appended to a table row on a line of its own. A key-value parsed from the start of the
+     * row's text has no newline before it, so it would print on the line of the key-value it follows.
+     */
+    static Toml.KeyValue onItsOwnLine(Toml.KeyValue appended, List<? extends Toml> existing) {
+        if (appended.getPrefix().getWhitespace().contains("\n")) {
+            return appended;
+        }
+        for (int i = existing.size() - 1; i >= 0; i--) {
+            Toml e = existing.get(i);
+            if (e instanceof Toml.KeyValue && e.getPrefix().getWhitespace().contains("\n")) {
+                String ws = e.getPrefix().getWhitespace();
+                return appended.withPrefix(Space.format(ws.substring(ws.lastIndexOf('\n'))));
+            }
+        }
+        return appended.withPrefix(Space.format("\n"));
     }
 }
