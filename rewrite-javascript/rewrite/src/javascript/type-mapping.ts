@@ -1169,9 +1169,12 @@ export class JavaScriptTypeMapping {
                 // A namespace import of an ES module is typed as its anonymous namespace object, so the
                 // module is what declares its members, and its `default` is the default export. One
                 // declared as a TypeScript namespace (`export = React`) keeps that namespace's name.
+                // An installed module's object is named after its package, so where the receiver is an
+                // import's alias, which resolves to the module its specifier names, the specifier wins.
                 const receiverBinding = this.bindingOf(node.expression.expression);
                 const anonymous = !mappedType || mappedType.kind !== Type.Kind.Class ||
-                    (mappedType as Type.Class).fullyQualifiedName.startsWith('{');
+                    (mappedType as Type.Class).fullyQualifiedName.startsWith('{') ||
+                    (isImport && this.isInstalledModuleObject(exprType));
 
                 const declaringClass = this.declaringClassOf(symbol);
                 if (declaringClass) {
@@ -1534,6 +1537,10 @@ export class JavaScriptTypeMapping {
         const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
         return isModule && !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName) ?
             this.sourceModuleName(sourceFile) : undefined;
+    }
+
+    private isInstalledModuleObject(type: ts.Type): boolean {
+        return !!type.getSymbol()?.declarations?.some(d => ts.isSourceFile(d) && this.isInstalled(d.fileName));
     }
 
     /** Whether a path is in a package installed under the source, where a package's own files are not. */
