@@ -1763,32 +1763,39 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
-    void libraryMethodsHaveAbstractAndDefaultFlags() {
+    void membersOfLibraryParentsAreFound() {
         rewriteRun(
           scala(
             """
+            trait P extends Product {
+              def productArity: Int
+              def productPrefix: String
+            }
+            abstract class N extends scala.xml.Node {
+              def label: String
+              def prefix: String
+            }
+            trait C extends CharSequence {
+              def length(): Int
+              def isEmpty(): Boolean
+            }
             object Use {
-              val it: Iterator[Int] = Iterator(1)
-              it.hasNext
-              it.map(_ + 1)
-              val equality: org.scalactic.Equality[Int] = null
-              equality.areEqual(1, 2)
-              equality.areEquivalent(1, 2)
-              val cmp: java.util.Comparator[Int] = null
-              cmp.compare(1, 2)
-              cmp.reversed()
+              val random = new scala.util.Random()
             }
             """,
             spec -> spec.afterRecipe(cu -> {
                 // Scala 3 TASTy
-                assertThat(method(cu, "hasNext").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
-                assertThat(method(cu, "map").getMethodType().getFlags()).contains(Flag.Abstract, Flag.Default);
+                assertThat(overridden(cu, "P", "productArity").getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(overridden(cu, "P", "productPrefix").getFlags()).contains(Flag.Abstract, Flag.Default);
                 // Scala 2 pickles
-                assertThat(method(cu, "areEqual").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
-                assertThat(method(cu, "areEquivalent").getMethodType().getFlags()).contains(Flag.Abstract, Flag.Default);
+                assertThat(overridden(cu, "N", "label").getFlags()).contains(Flag.Abstract);
+                assertThat(overridden(cu, "N", "prefix").getFlags()).doesNotContain(Flag.Abstract);
                 // Java class files
-                assertThat(method(cu, "compare").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
-                assertThat(method(cu, "reversed").getMethodType().getFlags()).contains(Flag.Abstract, Flag.Default);
+                assertThat(overridden(cu, "C", "length").getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(overridden(cu, "C", "isEmpty").getFlags()).contains(Flag.Abstract, Flag.Default);
+
+                JavaType.FullyQualified random = TypeUtils.asFullyQualified(variable(cu, "random").getType());
+                assertThat(random.getMembers()).extracting(JavaType.Variable::getName).contains("self");
             })
           )
         );
@@ -1993,27 +2000,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
         J.VariableDeclarations.NamedVariable xs = find((J) parsed.get(1), J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
         assertThat(TypeUtils.isAssignableTo("scala.collection.mutable.Buffer", xs.getType())).isTrue();
         assertThat(TypeUtils.isAssignableTo("scala.collection.Seq", xs.getType())).isTrue();
-    }
-
-    @Test
-    void membersOfScalaLibraryClassesAreNotPopulated() {
-        rewriteRun(
-          scala(
-            """
-            class Names {
-              val xs: List[String] = Nil
-            }
-            """,
-            spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
-                JavaType.FullyQualified list = TypeUtils.asFullyQualified(xs.getType());
-                assertThat(list.getFullyQualifiedName()).isEqualTo("scala.collection.immutable.List");
-                assertThat(list.getMethods()).isEmpty();
-                J.ClassDeclaration names = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Names"));
-                assertThat(names.getType().getMembers()).extracting(JavaType.Variable::getName).contains("xs");
-            })
-          )
-        );
     }
 
     @Test
@@ -2601,6 +2587,12 @@ class ScalaTypeAttributionTest implements RewriteTest {
 
     private static J.MethodInvocation method(J cu, String name) {
         return find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals(name));
+    }
+
+    private static JavaType.Method overridden(J cu, String owner, String name) {
+        JavaType.Method method = declared(cu, owner, name);
+        return TypeUtils.findOverriddenMethod(method)
+          .orElseThrow(() -> new AssertionError(owner + "." + name + " overrides nothing in " + method.getDeclaringType()));
     }
 
     private static JavaType.Method declared(J cu, String owner, String name) {

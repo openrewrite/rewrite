@@ -849,18 +849,6 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
     val sym = javaClassOfStatics(symbol)
-    // Members of library types are not populated to avoid deep recursive type
-    // graphs that cause StackOverflowError in recipes like ChangeType. A class
-    // loaded from TASTy has a source too, so also check what it was loaded from.
-    val isSourceDefined = try {
-      val src = sym.source
-      val file = sym.associatedFile
-      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala") &&
-        file != null && !file.ext.isScalaBinary
-    } catch {
-      case NonFatal(_) => false
-    }
-
     val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
     else if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
     else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
@@ -898,7 +886,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      val methods: util.List[JavaType.Method] = if (!isSourceDefined) null else try {
+      val methods: util.List[JavaType.Method] = try {
         val decls = sym.info match {
           case ci: ClassInfo => ci.decls.toList
           case _ => Nil
@@ -915,7 +903,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      val members: util.List[JavaType.Variable] = if (!isSourceDefined) null else try {
+      val members: util.List[JavaType.Variable] = try {
         val decls = sym.info match {
           case ci: ClassInfo => ci.decls.toList
           case _ => Nil
