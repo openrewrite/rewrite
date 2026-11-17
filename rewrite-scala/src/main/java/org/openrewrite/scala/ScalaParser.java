@@ -22,8 +22,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.scala.internal.ScalaCompilerCache;
 import org.openrewrite.scala.internal.ScalaCompilerContext;
 import org.openrewrite.scala.internal.ScalaWarning;
@@ -212,6 +214,8 @@ public class ScalaParser implements Parser {
 
         private JavaTypeCache typeCache = new JavaTypeCache();
 
+        private boolean typeCacheConfigured;
+
         @Nullable
         private JavaTypeFactory typeFactory;
 
@@ -229,6 +233,7 @@ public class ScalaParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeCacheConfigured = base.typeCacheConfigured;
             this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
@@ -290,6 +295,7 @@ public class ScalaParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            this.typeCacheConfigured = true;
             return this;
         }
 
@@ -317,7 +323,13 @@ public class ScalaParser implements Parser {
         @Override
         public ScalaParser build() {
             Collection<Path> cp = resolvedClasspath();
+            boolean configured = typeCacheConfigured || typeFactory != null;
+            typeCache = HashMapJavaTypeCache.forParser(
+                    JdkClassSharingTypeFactory.cacheForParser(typeCache, getClass(), configured), configured);
             JavaTypeFactory factory = typeFactory;
+            if (factory == null && !configured) {
+                factory = JdkClassSharingTypeFactory.forParser(typeCache);
+            }
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }
