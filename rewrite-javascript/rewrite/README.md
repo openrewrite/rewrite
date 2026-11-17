@@ -112,3 +112,37 @@ npm run build
 ```
 
 Alternatively, `./gradlew npmBuild`.
+
+## Composite edit preconditions
+
+Use `guard(condition, recipe)` to gate an existing recipe and all its descendants:
+
+```typescript
+import {guard} from "@openrewrite/rewrite";
+import {hasSourcePath} from "@openrewrite/rewrite/javascript";
+
+async recipeList(): Promise<Recipe[]> {
+    return [upgradeDependencies, guard(hasSourcePath("src/**"), codeChanges)];
+}
+```
+
+A recipe can also override `async editPrecondition()` to declare its own subtree condition.
+The condition runs once per source file at subtree entrance during each editing cycle,
+so it sees earlier sibling edits. Descendants reuse that result even if they change the
+matching content. Nested conditions add gates. Scanning and generation still run, and
+condition search markers are discarded.
+
+Java authors can use `Preconditions.guard(conditionVisitor, recipe)` or
+`Preconditions.guard(conditionRecipe, recipe)`. Visitor conditions can use
+`Preconditions.and`, `or`, and `not`; recipe conditions must be non-scanning leaves.
+TypeScript conditions accept visitors, non-scanning leaf recipes, `RecipeRef`, and
+`and`/`or`/`not` expressions. These APIs do not run condition scanners. A `RecipeRef`
+needs a local visitor for native TypeScript evaluation; named Java conditions are
+resolved by the Java host during RPC execution.
+
+RPC execution requires a host that advertises `acceptsSubtreeEditPreconditions`.
+Preparation fails on older hosts instead of running an unguarded subtree. Serializable
+conditions run on the host; other conditions are evaluated by a dedicated visitor on
+the TypeScript peer. The host gates TypeScript editors and delegated Java subtrees.
+Guarded RPC descendants use ordinary visits through the shared Java decorators;
+batches outside the guarded subtree still run normally.

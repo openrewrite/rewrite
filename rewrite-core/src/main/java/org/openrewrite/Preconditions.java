@@ -18,10 +18,25 @@ package org.openrewrite;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.internal.PreconditionBellwether;
 
 import java.util.function.Supplier;
 
+import static java.util.Collections.singletonList;
+
 public class Preconditions {
+
+    public static Recipe guard(TreeVisitor<?, ExecutionContext> condition, Recipe recipe) {
+        return new CompositeRecipe(PreconditionBellwether.guard(singletonList(recipe), (cursor, ctx) -> condition));
+    }
+
+    public static Recipe guard(Recipe condition, Recipe recipe) {
+        if (condition instanceof ScanningRecipe || !condition.getRecipeList().isEmpty()) {
+            throw new IllegalArgumentException("Use a non-scanning leaf recipe or an aggregate condition visitor as a guard");
+        }
+        return new CompositeRecipe(PreconditionBellwether.guard(singletonList(recipe), (cursor, ctx) -> condition.getVisitor()));
+    }
 
     public static TreeVisitor<?, ExecutionContext> check(Recipe check, TreeVisitor<?, ExecutionContext> v) {
         if (check instanceof ScanningRecipe) {

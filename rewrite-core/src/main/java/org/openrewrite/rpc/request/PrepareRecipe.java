@@ -18,7 +18,9 @@ package org.openrewrite.rpc.request;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
@@ -31,7 +33,13 @@ import java.util.Map;
 import static java.util.Collections.emptyList;
 
 @Value
+@RequiredArgsConstructor
 public class PrepareRecipe implements RpcRequest {
+    @NonFinal
+    @Setter
+    @Nullable
+    Boolean acceptsSubtreeEditPreconditions;
+
     String id;
     Map<String, Object> options;
 

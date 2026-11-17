@@ -13,11 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScript, Recipe, RecipeMarketplace} from "@openrewrite/rewrite";
+import {and, ExecutionContext, foundSearchResult, guard, JavaScript, Option, Recipe, RecipeMarketplace, RecipeRef} from "@openrewrite/rewrite";
+import {hasSourcePath} from "@openrewrite/rewrite/javascript";
+import {PlainText, PlainTextVisitor} from "@openrewrite/rewrite/text";
+import {ChangeText} from "./change-text";
 import {prepareJavaRecipe} from "@openrewrite/rewrite/rpc";
 
 export async function activate(marketplace: RecipeMarketplace) {
     await marketplace.install(CompositeWithJavaDelegate, JavaScript);
+    await marketplace.install(GuardedCompositeWithJavaDelegate, JavaScript);
 }
 
 /**
@@ -36,5 +40,28 @@ class CompositeWithJavaDelegate extends Recipe {
             await prepareJavaRecipe("org.openrewrite.example.host.replace-hello"),
             await prepareJavaRecipe("org.openrewrite.text.FindAndReplace", {find: "goodbye", replace: "farewell"})
         ];
+    }
+}
+
+class GuardedCompositeWithJavaDelegate extends Recipe {
+    name = "org.openrewrite.example.npm.guarded-composite-with-java-delegate";
+    displayName = "Guarded composite with Java delegates";
+    description = "Guards TypeScript and nested Java editors together.";
+
+    @Option({displayName: "Local condition", description: "Evaluate the condition on the TypeScript peer.", required: false})
+    localCondition = false;
+
+    async recipeList(): Promise<Recipe[]> {
+        const content = this.localCondition ? new class extends PlainTextVisitor<ExecutionContext> {
+            async visitText(t: PlainText): Promise<PlainText> {
+                return t.text === "start" ? foundSearchResult(t) : t;
+            }
+        } : new RecipeRef("org.openrewrite.text.Find", {find: "start"});
+        const children = new class extends CompositeWithJavaDelegate {
+            async recipeList(): Promise<Recipe[]> {
+                return [new ChangeText({text: "hello"}), ...await super.recipeList()];
+            }
+        };
+        return [guard(and(hasSourcePath("match.txt"), content), children)];
     }
 }

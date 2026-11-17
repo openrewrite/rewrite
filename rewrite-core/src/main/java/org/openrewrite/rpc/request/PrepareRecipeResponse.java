@@ -15,7 +15,10 @@
  */
 package org.openrewrite.rpc.request;
 
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 
@@ -23,7 +26,13 @@ import java.util.List;
 import java.util.Map;
 
 @Value
+@RequiredArgsConstructor
 public class PrepareRecipeResponse {
+    @NonFinal
+    @Setter
+    @Nullable
+    List<Precondition> subtreeEditPreconditions;
+
     /**
      * The ID that the remote is using to refer to a
      * specific instance of the recipe.
