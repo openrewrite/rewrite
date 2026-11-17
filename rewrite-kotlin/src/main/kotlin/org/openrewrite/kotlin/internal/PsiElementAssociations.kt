@@ -348,13 +348,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     /**
      * Mirrors `KotlinTreeParserVisitor.owner`, so a use gets the same variable type as its declaration.
-     * That owner is the nearest enclosing named function, class or file.
+     * That owner is the nearest enclosing named function, `init` block, class or file.
      * The parser never makes an enum entry an owner, though `KtEnumEntry` is a `KtClass`.
      */
     private fun localVariableOwner(variable: FirVariable): FirElement? {
         val declaration = variable.source?.psi ?: return null
         val owner = PsiTreeUtil.findFirstParent(declaration, true) {
-            it is KtNamedFunction || it is KtFile || it is KtClass && it !is KtEnumEntry
+            it is KtNamedFunction || it is KtClassInitializer || it is KtFile || it is KtClass && it !is KtEnumEntry
         }
         return owner?.let { primary(it) }
     }
