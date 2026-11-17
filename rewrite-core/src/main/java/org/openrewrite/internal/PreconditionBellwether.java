@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.Recipe.DelegatingRecipe;
 import org.openrewrite.config.*;
 
 import java.time.Duration;
@@ -26,49 +27,54 @@ import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
 
-@RequiredArgsConstructor
-@EqualsAndHashCode(callSuper = false)
-public class PreconditionBellwether extends Recipe {
-    private final BiFunction<Cursor, ExecutionContext, TreeVisitor<?, ExecutionContext>> condition;
-
-    @Getter
-    private transient boolean preconditionApplicable;
-
-    @Override
-    public String getDisplayName() {
-        return "Precondition bellwether";
+public final class PreconditionBellwether {
+    private PreconditionBellwether() {
     }
 
-    @Override
-    public String getDescription() {
-        return "Evaluates an edit precondition for a recipe subtree.";
-    }
+    @RequiredArgsConstructor
+    @EqualsAndHashCode(callSuper = false)
+    private static class Bellwether extends Recipe {
+        private final BiFunction<Cursor, ExecutionContext, TreeVisitor<?, ExecutionContext>> condition;
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                preconditionApplicable = false;
-                TreeVisitor<?, ExecutionContext> visitor = condition.apply(getCursor().getRoot(), ctx);
-                TreeVisitor<?, ExecutionContext> gated = Preconditions.check(visitor, new TreeVisitor<Tree, ExecutionContext>() {
-                    @Override
-                    public @Nullable Tree visit(@Nullable Tree source, ExecutionContext executionContext) {
-                        preconditionApplicable = true;
-                        return source;
+        @Getter
+        private transient boolean preconditionApplicable;
+
+        @Override
+        public String getDisplayName() {
+            return "Precondition bellwether";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Evaluates an edit precondition for a recipe subtree.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    preconditionApplicable = false;
+                    TreeVisitor<?, ExecutionContext> visitor = condition.apply(getCursor().getRoot(), ctx);
+                    TreeVisitor<?, ExecutionContext> gated = Preconditions.check(visitor, new TreeVisitor<Tree, ExecutionContext>() {
+                        @Override
+                        public @Nullable Tree visit(@Nullable Tree source, ExecutionContext executionContext) {
+                            preconditionApplicable = true;
+                            return source;
+                        }
+                    });
+                    if (tree instanceof SourceFile && gated.isAcceptable((SourceFile) tree, ctx)) {
+                        gated.visit(tree, ctx);
                     }
-                });
-                if (tree instanceof SourceFile && gated.isAcceptable((SourceFile) tree, ctx)) {
-                    gated.visit(tree, ctx);
+                    return tree;
                 }
-                return tree;
-            }
-        };
+            };
+        }
     }
 
     public static List<Recipe> guard(List<Recipe> recipes,
                                     BiFunction<Cursor, ExecutionContext, TreeVisitor<?, ExecutionContext>> condition) {
-        PreconditionBellwether bellwether = new PreconditionBellwether(condition);
+        Bellwether bellwether = new Bellwether(condition);
         List<Recipe> guarded = new ArrayList<>(recipes.size() + 1);
         guarded.add(bellwether);
         guarded.addAll(decorateWithPreconditionBellwether(bellwether, recipes));
@@ -79,7 +85,7 @@ public class PreconditionBellwether extends Recipe {
     @Value
     static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe, RecipePreconditions {
 
-        PreconditionBellwether bellwether;
+        Bellwether bellwether;
         Recipe delegate;
 
         @Override
@@ -190,7 +196,7 @@ public class PreconditionBellwether extends Recipe {
     @EqualsAndHashCode(callSuper = false)
     static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe, RecipePreconditions {
 
-        PreconditionBellwether bellwether;
+        Bellwether bellwether;
         ScanningRecipe<T> delegate;
 
         @Override
@@ -322,7 +328,7 @@ public class PreconditionBellwether extends Recipe {
         }
     }
 
-    private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
+    private static List<Recipe> decorateWithPreconditionBellwether(Bellwether bellwether, List<Recipe> recipeList) {
         List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
         for (Recipe recipe : recipeList) {
             if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
