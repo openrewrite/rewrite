@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -208,6 +209,24 @@ class GroovyParserTest implements RewriteTest {
               def x = true
               def s = "${if (x) { return 'a' }; return ''}"
               """
+          )
+        );
+    }
+
+    @Test
+    void aliasedStaticImportCall() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.singletonList as one
+              def o = one("a")
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations o = (J.VariableDeclarations) cu.getStatements().get(1);
+                J.MethodInvocation call = (J.MethodInvocation) o.getVariables().get(0).getInitializer();
+                assertThat(call.getSimpleName()).isEqualTo("one");
+                assertThat(call.getMethodType().getName()).isEqualTo("singletonList");
+            })
           )
         );
     }
