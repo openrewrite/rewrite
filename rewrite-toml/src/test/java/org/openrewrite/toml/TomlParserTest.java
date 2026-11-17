@@ -746,7 +746,6 @@ class TomlParserTest implements RewriteTest {
 
     @Test
     void multilineLiteralStringEndingInQuotes() {
-        // Passes once generateAntlrSources regenerates the lexer
         rewriteRun(
           toml(
             """
@@ -764,7 +763,6 @@ class TomlParserTest implements RewriteTest {
 
     @Test
     void arrayWithCommaAfterNewlineOrComment() {
-        // Passes once generateAntlrSources regenerates the parser
         rewriteRun(
           toml(
             """
@@ -786,7 +784,7 @@ class TomlParserTest implements RewriteTest {
 
     @Test
     void timesWithoutSeconds() {
-        // TOML 1.1. Passes once generateAntlrSources regenerates the lexer
+        // TOML 1.1
         rewriteRun(
           toml(
             """
@@ -808,7 +806,6 @@ class TomlParserTest implements RewriteTest {
 
     @Test
     void escapesOfToml11() {
-        // Passes once generateAntlrSources regenerates the lexer
         rewriteRun(
           toml(
             """
