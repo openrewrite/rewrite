@@ -112,6 +112,8 @@ public class GroovyParserVisitor {
     private final Map<String, ClassNode> traitFieldHelpers = new HashMap<>();
     /** Maps the source offset of a {@code @Field} declaration to the script field Groovy generates for it. */
     private final Map<Integer, FieldNode> scriptFields = new HashMap<>();
+    /** The module's non-star static imports, keyed by the name the source uses, which is the alias if there is one. */
+    private Map<String, ImportNode> staticImports = emptyMap();
 
     private static final Pattern MULTILINE_COMMENT_REGEX = Pattern.compile("(?s)/\\*.*?\\*/");
 
@@ -199,7 +201,8 @@ public class GroovyParserVisitor {
         for (ImportNode anImport : ast.getStarImports()) {
             sortedByPosition.put(pos(anImport), anImport);
         }
-        for (ImportNode anImport : ast.getStaticImports().values()) {
+        staticImports = ast.getStaticImports();
+        for (ImportNode anImport : staticImports.values()) {
             sortedByPosition.put(pos(anImport), anImport);
         }
         for (ImportNode anImport : getStaticStarImports(ast)) {
@@ -3101,12 +3104,17 @@ public class GroovyParserVisitor {
                     Integer parenLevel = isOlderThanGroovy3() ? getInsideParenthesesLevel(prop) : null;
                     Stack<Space> openingParens = openParentheses(parenLevel == null ? 0 : parenLevel);
                     Space namePrefix = whitespace();
-                    if (source.startsWith(simpleName, cursor)) {
-                        skip(simpleName);
-                        FieldNode field = prop.getObjectExpression() instanceof ClassExpression ?
+                    boolean classReceiver = prop.getObjectExpression() instanceof ClassExpression;
+                    // The source holds a static import's alias, if it has one, in place of the field name
+                    String sourceName = classReceiver ?
+                            staticFieldNameAt(prop.getObjectExpression().getType(), simpleName) :
+                            source.startsWith(simpleName, cursor) ? simpleName : null;
+                    if (sourceName != null) {
+                        skip(sourceName);
+                        FieldNode field = classReceiver ?
                                 ClassNodeUtils.getField(prop.getObjectExpression().getType(), simpleName) : null;
                         queue.add(closeParentheses(openingParens, new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(),
-                                simpleName, typeMapping.type(staticType(prop)), field != null && field.isStatic() ? typeMapping.variableType(field) : null)));
+                                sourceName, typeMapping.type(staticType(prop)), field != null && field.isStatic() ? typeMapping.variableType(field) : null)));
                         return;
                     }
                     // The trait transform may rewrite `this.X` to `$self.X` even though the source contains
@@ -5024,6 +5032,24 @@ public class GroovyParserVisitor {
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
+    }
+
+    /**
+     * The longest name at the cursor that reads static field {@code fieldName} of {@code owner}, either its own name
+     * or an alias it is statically imported under. Scanning an identifier would overrun the name in a GString such
+     * as {@code "$PI$x"}, where it runs straight into the next interpolation.
+     */
+    private @Nullable String staticFieldNameAt(ClassNode owner, String fieldName) {
+        String name = source.startsWith(fieldName, cursor) ? fieldName : null;
+        for (Map.Entry<String, ImportNode> staticImport : staticImports.entrySet()) {
+            String alias = staticImport.getKey();
+            ImportNode anImport = staticImport.getValue();
+            if (fieldName.equals(anImport.getFieldName()) && owner.getName().equals(anImport.getType().getName()) &&
+                    source.startsWith(alias, cursor) && (name == null || alias.length() > name.length())) {
+                name = alias;
+            }
+        }
+        return name;
     }
 
     /**

@@ -84,9 +84,11 @@ class GroovyParserTest implements RewriteTest {
           groovy(
             """
               import static java.lang.Math.PI
+              import static java.lang.Math.PI as pi
               def x = (PI) * 2
               def y = -(PI)
               def z = [(PI): 1]
+              def w = (pi) * 2
               """
           )
         );
@@ -245,6 +247,39 @@ class GroovyParserTest implements RewriteTest {
             """
               def x = true
               def s = "${if (x) { return 'a' }; return ''}"
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pi", "PIE"})
+    void aliasedStaticFieldRead(String alias) {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI as %1$s
+              def x = %1$s
+              """.formatted(alias),
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations x = (J.VariableDeclarations) cu.getStatements().get(1);
+                J.Identifier read = (J.Identifier) x.getVariables().get(0).getInitializer();
+                assertThat(read.getSimpleName()).isEqualTo(alias);
+                assertThat(read.getFieldType().getName()).isEqualTo("PI");
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticFieldReadFollowedByGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI
+              import static java.lang.Math.E as e
+              def x = 1
+              def s = "$PI$x$e$x"
               """
           )
         );
