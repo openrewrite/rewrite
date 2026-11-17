@@ -357,6 +357,22 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     /**
+     * Whether the identifier names a type by another name than the type's own, as a type alias does, so that the
+     * definition it refers to is not known.
+     */
+    private static boolean isAlias(J.Identifier ident) {
+        if (ident.getFieldType() != null) {
+            return false;
+        }
+        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(ident.getType());
+        if (fq == null || fq instanceof JavaType.Unknown) {
+            return false;
+        }
+        String className = normalize(fq.getClassName());
+        return !className.substring(className.lastIndexOf('.') + 1).equals(ident.getSimpleName());
+    }
+
+    /**
      * The references a range of statements makes to definitions an import could provide.
      */
     private static class Usages {
@@ -390,13 +406,13 @@ public class RemoveUnusedImports extends Recipe {
         private void add(J.Identifier ident) {
             identifiersByName.computeIfAbsent(ident.getSimpleName(), n -> new ArrayList<>()).add(ident);
             JavaType type = referencedType(ident);
-            if (type instanceof JavaType.Unknown) {
+            if (type instanceof JavaType.Unknown || isAlias(ident)) {
                 unresolved = true;
             } else if (type instanceof JavaType.Method || type instanceof JavaType.Variable) {
                 addMember(type);
             } else {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
-                if (fq != null && normalize(fq.getClassName()).endsWith(ident.getSimpleName())) {
+                if (fq != null) {
                     owners.add(normalize(fq.getPackageName()));
                     if (fq.getOwningClass() != null) {
                         memberOwners.add(fq.getOwningClass());
@@ -433,7 +449,7 @@ public class RemoveUnusedImports extends Recipe {
                 }
             }
             for (J.Identifier ident : identifiersByName.getOrDefault(name, emptyList())) {
-                String referenced = definitionName(referencedType(ident));
+                String referenced = isAlias(ident) ? null : definitionName(referencedType(ident));
                 if (definitionName == null || referenced == null || referenced.equals(definitionName)) {
                     return true;
                 }

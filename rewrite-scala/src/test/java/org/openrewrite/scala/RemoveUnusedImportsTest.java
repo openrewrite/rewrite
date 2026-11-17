@@ -103,6 +103,38 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void keepsImportOfATypeAlias() {
+        rewriteRun(
+          scala(
+            """
+              package t
+              object T {
+                type Str = String
+              }
+              """
+          ),
+          scala(
+            """
+              package u
+              import t.T._
+              class A {
+                val s: Str = null
+              }
+              """
+          ),
+          scala(
+            """
+              package v
+              import t.T.Str
+              class B {
+                val s: Str = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void importIsInScopeOnlyAfterItsPosition() {
         rewriteRun(
           scala(
