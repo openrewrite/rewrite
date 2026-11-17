@@ -2,6 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, spaceContainsNewline, splitAtLineEnd, Statement, TextComment, TrailingComma, Type} from "../java";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {randomId, UUID} from "../uuid";
+import {Cursor} from "../tree";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
 import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name";
@@ -2624,6 +2625,21 @@ function withRunSorted(cu: JS.CompilationUnit, ids: ReadonlySet<UUID>): JS.Compi
 }
 
 /**
+ * Whether `qualifier` is one of the file's top-level `moduleObjects`: `NS` in `NS.Old` or `(NS).Old`.
+ * `holder` is the cursor of the node holding `qualifier`; for `(NS)` it steps inside, since `resolve`
+ * wants the cursor of the node holding `NS`.
+ */
+export function readsModuleObject(qualifier: J | undefined, holder: Cursor, moduleObjects: ReadonlySet<string>): boolean {
+    let object = qualifier, cursor = holder;
+    while (object?.kind === J.Kind.Parentheses) {
+        cursor = new Cursor(object, cursor);
+        object = (object as J.Parentheses<J>).tree.element;
+    }
+    return object !== undefined && isIdentifier(object) && moduleObjects.has(object.simpleName) &&
+        resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
+}
+
+/**
  * Moves the binding `from` names to `to`, binding it under `boundName`, and the file's references
  * follow a `boundName` of its own. Whether the statement is rewritten in place or replaced is decided
  * when this visitor runs, because a sibling rebind may empty the statement first.
@@ -2637,7 +2653,9 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly to: {module: string; member?: string},
         readonly localName: string,
         readonly boundName: string,
-        readonly group?: RebindGroup
+        readonly group?: RebindGroup,
+        /** The module objects that still read `from`'s module after the move, whose reads keep their attribution. */
+        readonly keptModuleObjects: ReadonlySet<string> = new Set()
     ) {
         super();
     }
@@ -2794,6 +2812,46 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     /** Any type in the file can name what moved, whether or not it references the binding. */
     protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
         return this.movedTypes.visit(javaType, undefined);
+    }
+
+    /** `NS.Old()` beside a moved `import {Old} from "m"` keeps its attribution, as `NS` still reads `m`. */
+    override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const visited = await super.visitMethodInvocation(method, p);
+        if (visited?.kind !== J.Kind.MethodInvocation ||
+            !readsModuleObject(method.select?.element, this.cursor, this.keptModuleObjects)) {
+            return visited;
+        }
+        const call = visited as J.MethodInvocation;
+        return {
+            ...call,
+            methodType: method.methodType,
+            name: {...call.name, type: method.name.type, fieldType: method.name.fieldType}
+        } as J.MethodInvocation;
+    }
+
+    override async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
+        const visited = await super.visitFieldAccess(fieldAccess, p);
+        if (visited?.kind !== J.Kind.FieldAccess ||
+            !readsModuleObject(fieldAccess.target, this.cursor, this.keptModuleObjects)) {
+            return visited;
+        }
+        const access = visited as J.FieldAccess;
+        const name = fieldAccess.name.element;
+        return {
+            ...access,
+            type: fieldAccess.type,
+            name: {...access.name, element: {...access.name.element, type: name.type, fieldType: name.fieldType}}
+        } as J.FieldAccess;
+    }
+
+    override async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
+        const visited = await super.visitNewClass(newClass, p);
+        const clazz = newClass.class;
+        if (visited?.kind !== J.Kind.NewClass || clazz?.kind !== J.Kind.FieldAccess ||
+            !readsModuleObject((clazz as J.FieldAccess).target, new Cursor(clazz, this.cursor), this.keptModuleObjects)) {
+            return visited;
+        }
+        return {...visited, constructorType: newClass.constructorType} as J.NewClass;
     }
 
     /**

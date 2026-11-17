@@ -3658,6 +3658,72 @@ describe("maybeRebind and the member's other spellings", () => {
         expect(rebound).toEqual(parsed);
     }, 60000);
 
+    describe("a member moved to another module, beside a module object that stays on the old one", () => {
+        // \`compat\` still reads the old module, so \`compat.request()\` keeps its spelling, and its attribution
+        // stays with it rather than following the moved \`request\`.
+        test("a call through the module object of a subpath is typed as a fresh parse of the result types it", async () => {
+            const {rebound, parsed} = await attributionsAfter(
+                {from: {module: "legacy-http/compat", member: "request"}, to: {module: "@acme/common/http", member: "request"}},
+                installHttpPackages,
+                `
+                    import {request} from 'legacy-http/compat';
+                    import * as compat from 'legacy-http/compat';
+                    request('a');
+                    compat.request('b');
+                `,
+                `
+                    import {request} from '@acme/common/http';
+                    import * as compat from 'legacy-http/compat';
+                    request('a');
+                    compat.request('b');
+                `
+            );
+            expect(rebound).toEqual(parsed);
+        }, 60000);
+
+        test("a construction through the module object of a subpath is typed as a fresh parse of the result types it", async () => {
+            const {rebound, parsed} = await attributionsAfter(
+                {from: {module: "legacy-http/compat", member: "Http"}, to: {module: "@acme/common/http", member: "HttpClient"}},
+                installHttpPackages,
+                `
+                    import {Http} from 'legacy-http/compat';
+                    import * as compat from 'legacy-http/compat';
+                    new Http();
+                    new compat.Http();
+                `,
+                `
+                    import {HttpClient} from '@acme/common/http';
+                    import * as compat from 'legacy-http/compat';
+                    new HttpClient();
+                    new compat.Http();
+                `
+            );
+            expect(rebound).toEqual(parsed);
+        }, 60000);
+
+        test("a call through the module object of a package root is typed as a fresh parse of the result types it", async () => {
+            const {rebound, parsed} = await attributionsAfter(
+                {from: {module: "legacy-http", member: "request"}, to: {module: "@acme/common/http", member: "request"}},
+                installHttpPackages,
+                `
+                    import {request} from 'legacy-http';
+                    import * as http from 'legacy-http';
+                    request('a');
+                    http.request('b');
+                    (http).request('c');
+                `,
+                `
+                    import {request} from '@acme/common/http';
+                    import * as http from 'legacy-http';
+                    request('a');
+                    http.request('b');
+                    (http).request('c');
+                `
+            );
+            expect(rebound).toEqual(parsed);
+        }, 60000);
+    });
+
     test("a member read through its module object by a string-literal index moves too", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});

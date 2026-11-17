@@ -427,15 +427,30 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
                 new RebindGroup(statement.id, statement as JS.Import);
             group.add(existing.localName, boundName, options.to, existing.typeOnly);
         }
-        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, group));
+        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, group,
+            keptModuleObjects(cu, options)));
     }
     queueRenameMemberSpellings(visitor, cu, options);
     return boundName;
 }
 
 /**
+ * The module objects that still read `from`'s module after a move of one of its named members to another
+ * module: `NS` in `import * as NS from "m"` beside a moved `import {Old} from "m"`. `NS.Old` keeps its
+ * spelling there, so it keeps its attribution too.
+ */
+function keptModuleObjects(cu: JS.CompilationUnit, options: MaybeRebindOptions): ReadonlySet<string> {
+    return bindingShape(options.from.member) !== "named" || sameModule(options.from.module, options.to.module) ?
+        new Set() : new Set(moduleObjectsOf(cu, options.from.module).map(b => b.name));
+}
+
+/** Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`. */
+function moduleObjectsOf(cu: JS.CompilationUnit, module: string): ModuleObjectBinding[] {
+    return moduleObjectBindings(cu).filter(b => b.shape !== "default" && sameModule(b.module, module));
+}
+
+/**
  * Queues one {@link RenameMemberSpellings} per move of a named member, after any `RebindImport` of the move.
- * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
  * Skips a `let` or `var` `NS` of the module that the file assigns to: after `NS = other`, `NS.Old` may not
  * read the module. Only those are looked for, since finding an assignment reads the whole file.
  */
@@ -452,9 +467,8 @@ function queueRenameMemberSpellings(
         return;
     }
     const root = new Cursor(cu);
-    const moduleObjects = new Set(moduleObjectBindings(cu)
-        .filter(b => b.shape !== "default" && sameModule(b.module, options.from.module) &&
-            !(b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
+    const moduleObjects = new Set(moduleObjectsOf(cu, options.from.module)
+        .filter(b => !(b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
         .map(b => b.name));
     visitor.afterVisit.push(new RenameMemberSpellings(
         {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));

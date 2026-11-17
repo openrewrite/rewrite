@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 import {RecipeSpec, SourceSpec} from "../../../src/test";
-import {ChangeMethodTargetToImport, javascript, JS, MethodMatcher, npm, packageJson, typescript} from "../../../src/javascript";
+import {ChangeImport, ChangeMethodTargetToImport, javascript, JS, MethodMatcher, npm, packageJson, typescript} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
-import {activate, RecipeMarketplace} from "../../../src";
+import {activate, Recipe, RecipeMarketplace} from "../../../src";
 import {withDir} from "tmp-promise";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 describe("change-method-target-to-import", () => {
     const jestToVi = () => new ChangeMethodTargetToImport({
@@ -204,5 +206,61 @@ describe("change-method-target-to-import", () => {
         await activate(marketplace);
         expect(marketplace.findRecipe("org.openrewrite.javascript.change-method-target-to-import")?.[1])
             .toBe(ChangeMethodTargetToImport);
+    });
+
+    test.each(["", "/sub"])("leaves a call through a module object that still imports the module an earlier recipe moved the member from (pkg%s)", async sub => {
+        // `ChangeImport` moves `f` to `other`, but `h` still imports `pkg`, so `h.f()` calls no `other g`.
+        const spec = new RecipeSpec();
+        spec.recipe = new class extends Recipe {
+            readonly name = "org.openrewrite.javascript.test.MoveThenRetarget";
+            readonly displayName = "Move a member, then retarget its calls";
+            readonly description = "Moves a member to another module, then moves the calls of it onto an imported object.";
+
+            override async recipeList(): Promise<Recipe[]> {
+                return [
+                    new ChangeImport({oldModule: `pkg${sub}`, oldMember: "f", newModule: `other${sub}`, newMember: "g"}),
+                    new ChangeMethodTargetToImport({
+                        methodPattern: `other${sub} g(..)`,
+                        targetModule: "final",
+                        targetMember: "api",
+                        targetType: "final.Api"
+                    })
+                ];
+            }
+        }();
+        await withDir(async repo => {
+            const installed: Record<string, string> = {
+                "node_modules/pkg/package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                "node_modules/pkg/index.d.ts": "export declare function f(): string;",
+                "node_modules/pkg/sub.d.ts": "export declare function f(): string;",
+                "node_modules/other/package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                "node_modules/other/index.d.ts": "export declare function g(): string;",
+                "node_modules/other/sub.d.ts": "export declare function g(): string;",
+                "node_modules/final/package.json": `{"name": "final", "version": "1.0.0", "types": "index.d.ts"}`,
+                "node_modules/final/index.d.ts": "export interface Api { g(): string; } export declare const api: Api;"
+            };
+            for (const [file, text] of Object.entries(installed)) {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), text);
+            }
+            await spec.rewriteRun(npm(
+                repo.path,
+                typescript(
+                    `
+                        import {f} from 'pkg${sub}';
+                        import * as h from 'pkg${sub}';
+                        f();
+                        h.f();
+                    `,
+                    `
+                        import * as h from 'pkg${sub}';
+                        import {api} from 'final';
+                        api.g();
+                        h.f();
+                    `
+                ),
+                packageJson(`{"name": "test", "version": "1.0.0"}`)
+            ));
+        }, {unsafeCleanup: true});
     });
 });
