@@ -32,6 +32,7 @@ import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
 import scala.annotation.nowarn
+import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.ListBuffer
 import scala.util.control.NonFatal
 import java.io.File
@@ -435,7 +436,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
 
     // Each attempt parses under its own reporter so a failed attempt's syntax
     // errors don't surface on the file when a later attempt parses cleanly.
-    def attempt(sourceVersion: Option[String]): (ParsedUnit, List[Diagnostic]) = {
+    def attempt(wrapping: Wrapping, sourceVersion: Option[String]): (ParsedUnit, List[Diagnostic]) = {
       val reporter = new StoreReporter(null)
       val source = SourceFile.virtual(path, wrapping.wrap(content))
       val unit = CompilationUnit(source)
@@ -449,6 +450,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
       }
       (ParsedUnit(rawTree, finalTree, unit, wrapping), reporter.removeBufferedMessages(using pctx))
     }
+    def syntaxErrors(diags: List[Diagnostic]): List[Diagnostic] = diags.filter(_.level >= 2)
     def hasSyntaxErrors(diags: List[Diagnostic]): Boolean = diags.exists(_.level >= 2)
 
     // Parse under the configured source version first. On syntax errors, retry
@@ -456,15 +458,26 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     // `enum`, `given` and `erased` as plain identifiers — Scala 2 sources
     // legitimately use them as names. Keep the first attempt when the retry
     // doesn't parse cleanly either.
-    val (first, firstDiags) = attempt(None)
-    val (chosen, chosenDiags) =
+    def parseWrapped(wrapping: Wrapping): (ParsedUnit, List[Diagnostic]) = {
+      val (first, firstDiags) = attempt(wrapping, None)
       if (hasSyntaxErrors(firstDiags)) {
-        val (second, secondDiags) = attempt(Some("3.0-migration"))
+        val (second, secondDiags) = attempt(wrapping, Some("3.0-migration"))
         if (hasSyntaxErrors(secondDiags)) (first, firstDiags) else (second, secondDiags)
       } else (first, firstDiags)
+    }
+
+    // `isSimpleExpression` only guesses: a one-line definition it doesn't recognize,
+    // such as `sealed trait A`, is not an expression and parses unwrapped.
+    val (chosen, chosenDiags) = {
+      val wrapped @ (_, wrappedDiags) = parseWrapped(wrapping)
+      if (wrapping == Wrapping.Expression && hasSyntaxErrors(wrappedDiags)) {
+        val unwrapped @ (_, unwrappedDiags) = parseWrapped(Wrapping.None)
+        if (hasSyntaxErrors(unwrappedDiags)) wrapped else unwrapped
+      } else wrapped
+    }
 
     if (reportDiagnostics) chosenDiags.foreach(d => ctx.reporter.report(d))
-    chosen
+    chosen.copy(syntaxErrors = syntaxErrors(chosenDiags))
   }
 
   private def buildResult(parsed: ParsedUnit, warnings: JList[ScalaWarning])(using ctx: Context): ScalaParseResult =
@@ -472,7 +485,8 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
       parsed.finalTree, None, warnings,
       wasWrapped = parsed.wrapping == Wrapping.Expression,
       wasObjectWrapped = parsed.wrapping == Wrapping.ObjectScript,
-      context = ctx
+      context = ctx,
+      syntaxErrors = parsed.syntaxErrors.map(toScalaWarning).asJava
     )
 
   private def extractExpression(tree: untpd.Tree)(using Context): Option[untpd.Tree] = tree match {
@@ -823,13 +837,15 @@ case class SourceEntry(path: String, content: String)
  * Output of the bridge's shared parsing path: the raw parsed tree (what Dotty
  * produced — keeps the wrapper if there was one, needed by the typer), the
  * unwrapped tree visible to downstream consumers, the underlying Dotty
- * `CompilationUnit`, and the wrapping strategy that was applied.
+ * `CompilationUnit`, the wrapping strategy that was applied, and the
+ * error-level diagnostics of the parse attempt that was kept.
  */
 private[internal] case class ParsedUnit(
   rawTree: untpd.Tree,
   finalTree: untpd.Tree,
   unit: dotty.tools.dotc.CompilationUnit,
-  wrapping: Wrapping
+  wrapping: Wrapping,
+  syntaxErrors: List[Diagnostic] = Nil
 )
 
 /**
@@ -860,6 +876,9 @@ private[internal] enum Wrapping:
  *                         (e.g. a `.sbt` file) as `object __SbtScript__ { ... }`.
  *                         The wrapper is still present in `tree`; the
  *                         converter is responsible for lifting its body.
+ * @param syntaxErrors     the parser's error-level diagnostics, which `warnings`
+ *                         also holds. Dotty recovers from them with a tree that
+ *                         need not reflect the source.
  */
 case class ScalaParseResult(
   tree: untpd.Tree,
@@ -868,7 +887,8 @@ case class ScalaParseResult(
   wasWrapped: Boolean = false,
   wasObjectWrapped: Boolean = false,
   context: Context,
-  typedNodes: TypedNodes = TypedNodes.empty
+  typedNodes: TypedNodes = TypedNodes.empty,
+  syntaxErrors: JList[ScalaWarning] = Collections.emptyList()
 )
 
 private[internal] object ScalaParseResultConstants:

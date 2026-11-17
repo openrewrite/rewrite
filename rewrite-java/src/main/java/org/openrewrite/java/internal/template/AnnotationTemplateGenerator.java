@@ -117,6 +117,13 @@ public class AnnotationTemplateGenerator {
         after.append("\n@interface $Placeholder {}");
     }
 
+    /**
+     * The text between a method's printed header and the statements of its body.
+     */
+    protected String openMethodBody() {
+        return "{";
+    }
+
     public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
         List<J.Annotation> annotations = new ArrayList<>();
 
@@ -191,7 +198,7 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, m.withBody(null)
                         .withLeadingAnnotations(emptyList())
                         .withPrefix(Space.EMPTY)
-                        .printTrimmed(cursor).trim() + '{');
+                        .printTrimmed(cursor).trim() + openMethodBody());
                 after.append('}');
             } else if (parent instanceof J.NewClass) {
                 // Anonymous class body

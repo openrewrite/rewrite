@@ -18,6 +18,7 @@ package org.openrewrite.scala;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
@@ -170,22 +171,26 @@ class ScalaTemplateTest implements RewriteTest {
           ));
     }
 
+    private static Recipe replaceDeprecatedArgument() {
+        return toRecipe(() -> new ScalaVisitor<>() {
+            @Override
+            public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                if ("deprecated".equals(annotation.getSimpleName()) &&
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
+                    return ScalaTemplate.builder("\"new\"")
+                      .build()
+                      .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                }
+                return annotation;
+            }
+        });
+    }
+
     @Test
     void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
-              @Override
-              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                  if ("deprecated".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
-                      return ScalaTemplate.builder("\"new\"")
-                        .build()
-                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
-                  }
-                  return annotation;
-              }
-          })),
+          spec -> spec.recipe(replaceDeprecatedArgument()),
           scala(
             """
               class Test {
@@ -203,6 +208,54 @@ class ScalaTemplateTest implements RewriteTest {
 
                   @deprecated("new")
                   def foo(): Unit = {}
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnVal() {
+        rewriteRun(
+          spec -> spec.recipe(replaceDeprecatedArgument()),
+          scala(
+            """
+              class Test {
+                  @deprecated("old")
+                  val x: Int = 1
+              }
+              """,
+            """
+              class Test {
+                  @deprecated("new")
+                  val x: Int = 1
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnLocalDef() {
+        rewriteRun(
+          spec -> spec.recipe(replaceDeprecatedArgument()),
+          scala(
+            """
+              class Test {
+                  def outer(): Unit = {
+                      val a, b: Int = 1
+                      val c = 2
+                      @deprecated("old")
+                      def foo(): Unit = {}
+                  }
+              }
+              """,
+            """
+              class Test {
+                  def outer(): Unit = {
+                      val a, b: Int = 1
+                      val c = 2
+                      @deprecated("new")
+                      def foo(): Unit = {}
+                  }
               }
               """
           ));
