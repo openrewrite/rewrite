@@ -2640,6 +2640,39 @@ export function readsModuleObject(qualifier: J | undefined, holder: Cursor, modu
 }
 
 /**
+ * Whether the type `visitType` visits at `cursor`, which is on the node holding it, is that of a read through
+ * one of `moduleObjects`: `NS.Old()`, `NS.Old`, `new NS.Old()`, or the `Old` they name. A move to another
+ * module leaves `NS.Old` spelled as it is, beside a moved `import {Old} from "m"` or `export {Old} from "m"`,
+ * so it keeps its type too.
+ */
+export function isModuleObjectRead(cursor: Cursor, moduleObjects: ReadonlySet<string>): boolean {
+    if (moduleObjects.size === 0) {
+        return false;
+    }
+    const node = cursor.value as J;
+    switch (node.kind) {
+        case J.Kind.MethodInvocation:
+            return readsModuleObject((node as J.MethodInvocation).select?.element, cursor, moduleObjects);
+        case J.Kind.FieldAccess:
+            return readsModuleObject((node as J.FieldAccess).target, cursor, moduleObjects);
+        case J.Kind.NewClass: {
+            const clazz = (node as J.NewClass).class;
+            return clazz?.kind === J.Kind.FieldAccess && isModuleObjectRead(new Cursor(clazz, cursor), moduleObjects);
+        }
+        case J.Kind.Identifier: {
+            const holder = cursor.parentTree();
+            const read = holder?.value as J | undefined;
+            return holder !== undefined &&
+                (read?.kind === J.Kind.MethodInvocation && (read as J.MethodInvocation).name === node ||
+                    read?.kind === J.Kind.FieldAccess && (read as J.FieldAccess).name.element === node) &&
+                isModuleObjectRead(holder, moduleObjects);
+        }
+        default:
+            return false;
+    }
+}
+
+/**
  * Moves the binding `from` names to `to`, binding it under `boundName`, and the file's references
  * follow a `boundName` of its own. Whether the statement is rewritten in place or replaced is decided
  * when this visitor runs, because a sibling rebind may empty the statement first.
@@ -2654,7 +2687,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly localName: string,
         readonly boundName: string,
         readonly group?: RebindGroup,
-        /** The module objects that still read `from`'s module after the move, whose reads keep their attribution. */
+        /** The module objects that still read `from`'s module after the move, whose reads keep their types. */
         readonly keptModuleObjects: ReadonlySet<string> = new Set()
     ) {
         super();
@@ -2811,47 +2844,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     /** Any type in the file can name what moved, whether or not it references the binding. */
     protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
-        return this.movedTypes.visit(javaType, undefined);
-    }
-
-    /** `NS.Old()` beside a moved `import {Old} from "m"` keeps its attribution, as `NS` still reads `m`. */
-    override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
-        const visited = await super.visitMethodInvocation(method, p);
-        if (visited?.kind !== J.Kind.MethodInvocation ||
-            !readsModuleObject(method.select?.element, this.cursor, this.keptModuleObjects)) {
-            return visited;
-        }
-        const call = visited as J.MethodInvocation;
-        return {
-            ...call,
-            methodType: method.methodType,
-            name: {...call.name, type: method.name.type, fieldType: method.name.fieldType}
-        } as J.MethodInvocation;
-    }
-
-    override async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
-        const visited = await super.visitFieldAccess(fieldAccess, p);
-        if (visited?.kind !== J.Kind.FieldAccess ||
-            !readsModuleObject(fieldAccess.target, this.cursor, this.keptModuleObjects)) {
-            return visited;
-        }
-        const access = visited as J.FieldAccess;
-        const name = fieldAccess.name.element;
-        return {
-            ...access,
-            type: fieldAccess.type,
-            name: {...access.name, element: {...access.name.element, type: name.type, fieldType: name.fieldType}}
-        } as J.FieldAccess;
-    }
-
-    override async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
-        const visited = await super.visitNewClass(newClass, p);
-        const clazz = newClass.class;
-        if (visited?.kind !== J.Kind.NewClass || clazz?.kind !== J.Kind.FieldAccess ||
-            !readsModuleObject((clazz as J.FieldAccess).target, new Cursor(clazz, this.cursor), this.keptModuleObjects)) {
-            return visited;
-        }
-        return {...visited, constructorType: newClass.constructorType} as J.NewClass;
+        return isModuleObjectRead(this.cursor, this.keptModuleObjects) ? javaType :
+            this.movedTypes.visit(javaType, undefined);
     }
 
     /**
@@ -3183,16 +3177,20 @@ function movedTypesIn(
     });
 }
 
-/** `cu` with its types renamed from `from` to `to`, for a move only spellings made (`NS.Old` → `NS.New`). */
+/**
+ * `cu` with its types renamed from `from` to `to`, for a move only spellings made (`NS.Old` → `NS.New`,
+ * `export {Old} from "m"`), but for reads through `keptModuleObjects`; see {@link isModuleObjectRead}.
+ */
 export async function withMovedTypes(
     cu: JS.CompilationUnit,
     from: {module: string; member?: string},
-    to: {module: string; member?: string}
+    to: {module: string; member?: string},
+    keptModuleObjects: ReadonlySet<string> = new Set()
 ): Promise<JS.CompilationUnit> {
     const movedTypes = movedTypesIn(cu, from, to, false);
     return await new class extends JavaScriptVisitor<undefined> {
         protected override async visitType(javaType: Type | undefined): Promise<Type | undefined> {
-            return movedTypes.visit(javaType, undefined);
+            return isModuleObjectRead(this.cursor, keptModuleObjects) ? javaType : movedTypes.visit(javaType, undefined);
         }
     }().visit(cu, undefined) as JS.CompilationUnit;
 }

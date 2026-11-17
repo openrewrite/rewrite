@@ -441,18 +441,27 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
  */
 function keptModuleObjects(cu: JS.CompilationUnit, options: MaybeRebindOptions): ReadonlySet<string> {
     return bindingShape(options.from.member) !== "named" || sameModule(options.from.module, options.to.module) ?
-        new Set() : new Set(moduleObjectsOf(cu, options.from.module).map(b => b.name));
+        new Set() : moduleObjectsOf(cu, options.from.module, false);
 }
 
-/** Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`. */
-function moduleObjectsOf(cu: JS.CompilationUnit, module: string): ModuleObjectBinding[] {
-    return moduleObjectBindings(cu).filter(b => b.shape !== "default" && sameModule(b.module, module));
+/**
+ * The module objects of `module`, like `NS` in `import * as NS from "m"`.
+ * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
+ * With `neverAssigned`, which a rename of `NS.Old` wants, skips a `let` or `var` `NS` the file assigns to:
+ * after `NS = other`, `NS.Old` may not read the module. Keeping a type wants no such filter: whatever `NS`
+ * holds, the move leaves `NS.Old` as it is. Only those are looked for, since finding an assignment reads
+ * the whole file.
+ */
+function moduleObjectsOf(cu: JS.CompilationUnit, module: string, neverAssigned: boolean): Set<string> {
+    const root = new Cursor(cu);
+    return new Set(moduleObjectBindings(cu)
+        .filter(b => b.shape !== "default" && sameModule(b.module, module) &&
+            !(neverAssigned && b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
+        .map(b => b.name));
 }
 
 /**
  * Queues one {@link RenameMemberSpellings} per move of a named member, after any `RebindImport` of the move.
- * Skips a `let` or `var` `NS` of the module that the file assigns to: after `NS = other`, `NS.Old` may not
- * read the module. Only those are looked for, since finding an assignment reads the whole file.
  */
 function queueRenameMemberSpellings(
     visitor: JavaScriptVisitor<any>,
@@ -466,12 +475,9 @@ function queueRenameMemberSpellings(
             sameModule(v.from.module, options.from.module) && v.to.member === to && sameModule(v.to.module, options.to.module))) {
         return;
     }
-    const root = new Cursor(cu);
-    const moduleObjects = new Set(moduleObjectsOf(cu, options.from.module)
-        .filter(b => !(b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
-        .map(b => b.name));
-    visitor.afterVisit.push(new RenameMemberSpellings(
-        {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));
+    visitor.afterVisit.push(new RenameMemberSpellings({module: options.from.module, member: from},
+        {module: options.to.module, member: to},
+        moduleObjectsOf(cu, options.from.module, sameModule(options.from.module, options.to.module))));
 }
 
 /**

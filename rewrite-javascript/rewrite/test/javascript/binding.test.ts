@@ -3722,6 +3722,48 @@ describe("maybeRebind and the member's other spellings", () => {
             );
             expect(rebound).toEqual(parsed);
         }, 60000);
+
+        test("a call through a reassigned module object is typed as a fresh parse of the result types it", async () => {
+            // \`http\` may hold another module after \`http = ...\`, so its spelling is never renamed, but the move
+            // leaves it as it is either way, so its type stays too.
+            const {rebound, parsed} = await attributionsAfter(
+                {from: {module: "legacy-http", member: "request"}, to: {module: "@acme/common/http", member: "request"}},
+                installHttpPackages,
+                `
+                    import {request} from 'legacy-http';
+                    let http = await import('legacy-http');
+                    http = http;
+                    request('a');
+                    http.request('b');
+                `,
+                `
+                    import {request} from '@acme/common/http';
+                    let http = await import('legacy-http');
+                    http = http;
+                    request('a');
+                    http.request('b');
+                `
+            );
+            expect(rebound).toEqual(parsed);
+        }, 60000);
+
+        test.each(["legacy-http", "legacy-http/compat"])("a call through the module object of %s, beside a moved re-export, is typed as a fresh parse of the result types it", async module => {
+            const {rebound, parsed} = await attributionsAfter(
+                {from: {module, member: "request"}, to: {module: "@acme/common/http", member: "request"}},
+                installHttpPackages,
+                `
+                    import * as http from '${module}';
+                    export {request} from '${module}';
+                    http.request('b');
+                `,
+                `
+                    import * as http from '${module}';
+                    export {request} from '@acme/common/http';
+                    http.request('b');
+                `
+            );
+            expect(rebound).toEqual(parsed);
+        }, 60000);
     });
 
     test("a member read through its module object by a string-literal index moves too", async () => {
