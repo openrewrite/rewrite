@@ -326,6 +326,27 @@ class ScalaParserTest {
         assertThat(java).isNotSameAs(first);
     }
 
+    @Test
+    void scalaParsersOfOneClasspathShareTheClassesOfTheScalaLibrary() {
+        JavaType first = typeOfS(ScalaParser.builder().build().parse("class A { val s: scala.util.Random = null }"));
+        JavaType second = typeOfS(ScalaParser.builder().build().parse("class B { val s: scala.util.Random = null }"));
+        assertThat(second).isSameAs(first);
+
+        JavaType otherClasspath = typeOfS(ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build()
+          .parse("class C { val s: scala.util.Random = null }"));
+        assertThat(otherClasspath).isNotSameAs(first);
+    }
+
+    @Test
+    void aSourceClassInAScalaPackageIsNotShared() {
+        ScalaParser.builder().build().parse("package scala.foo\nclass Bar\nclass A { val s: Bar = null }").findFirst();
+        JavaType bar = typeOfS(ScalaParser.builder().build()
+          .parse("package scala.foo\nclass Bar { val x = 1 }\nclass B { val s: Bar = null }"));
+        assertThat(((JavaType.FullyQualified) bar).getMembers())
+          .extracting(JavaType.Variable::getName)
+          .containsExactly("x");
+    }
+
     private static JavaType typeOfS(Stream<SourceFile> parsed) {
         J cu = (J) parsed.findFirst().orElseThrow();
         return new JavaIsoVisitor<List<JavaType>>() {

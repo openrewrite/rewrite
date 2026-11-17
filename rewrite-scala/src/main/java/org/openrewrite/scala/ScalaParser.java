@@ -198,6 +198,14 @@ public class ScalaParser implements Parser {
         return prefix.resolve(derivedRelativePath(sourceCode));
     }
 
+    /**
+     * A source can declare a class in a {@code scala.*} package, so the class must also be one the Scala library has.
+     */
+    private static boolean isScalaLibraryClass(String fqn) {
+        return fqn.startsWith("scala.") &&
+               ScalaParser.class.getClassLoader().getResource(fqn.replace('.', '/') + ".class") != null;
+    }
+
     public static ScalaParser.Builder builder() {
         return new Builder();
     }
@@ -324,8 +332,11 @@ public class ScalaParser implements Parser {
         public ScalaParser build() {
             Collection<Path> cp = resolvedClasspath();
             boolean configured = typeCacheConfigured || typeFactory != null;
-            typeCache = HashMapJavaTypeCache.forParser(
-                    JdkClassSharingTypeFactory.cacheForParser(typeCache, getClass(), configured), configured);
+            // The classpath decides which Scala library a parse maps, as the caller's jars come before the bridge's
+            List<Object> parserKind = Arrays.asList(getClass(),
+                    cp == null ? Collections.emptyList() : new ArrayList<>(cp));
+            typeCache = HashMapJavaTypeCache.forParser(JdkClassSharingTypeFactory.cacheForParser(
+                    typeCache, parserKind, configured, ScalaParser::isScalaLibraryClass), configured);
             JavaTypeFactory factory = typeFactory;
             if (factory == null && !configured) {
                 factory = JdkClassSharingTypeFactory.forParser(typeCache);
