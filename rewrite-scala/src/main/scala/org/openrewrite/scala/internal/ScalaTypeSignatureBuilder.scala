@@ -37,6 +37,8 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   /** Signatures of the types described outside any type variable's bound, where they depend on the type alone. */
   private val signatures = new java.util.IdentityHashMap[Type, String]()
 
+  private val binaryNames = new java.util.IdentityHashMap[Symbols.Symbol, String]()
+
   def signature(tpe: Type): String = {
     if (tpe == null) return "{undefined}"
     if (typeVariableNameStack != null && !typeVariableNameStack.isEmpty) return describe(tpe)
@@ -220,10 +222,6 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case other => List(other)
   }
 
-  /**
-   * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
-   * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
-   */
   /** Most bounds are `Any` or `Nothing` themselves, which needs no subtype check. */
   def isAny(tp: Type): Boolean = tp match {
     case tr: TypeRef if tr.symbol eq ctx.definitions.AnyClass => true
@@ -241,6 +239,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case other => other
   }
 
+  /**
+   * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
+   * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
+   */
   def classFqn(sym: Symbols.Symbol): String = methodOwnerFqn(sym) match {
     case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
     case other => other
@@ -269,8 +271,6 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     }
     name
   }
-
-  private val binaryNames = new java.util.HashMap[Symbols.Symbol, String]()
 
   def variableSignature(name: String): String = {
     "{undefined}{name=" + name + "}"

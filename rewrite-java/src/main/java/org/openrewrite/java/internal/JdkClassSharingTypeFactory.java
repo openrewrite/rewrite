@@ -71,7 +71,8 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
 
     /**
      * @param libraryClass Which classes other than the JDK's map the same way in every parse of this kind, and so are
-     *                     shared too, such as those of a language's standard library.
+     *                     shared too, such as those of a language's standard library. A parser kind keeps the
+     *                     predicate of its first parser.
      * @see #cacheForParser(JavaTypeCache, Object, boolean)
      */
     public static JavaTypeCache cacheForParser(JavaTypeCache cache, Object parserKind, boolean configured,

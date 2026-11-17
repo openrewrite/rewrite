@@ -1775,6 +1775,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
               def label: String
               def prefix: String
             }
+            trait E extends scala.xml.Equality {
+              def strict_==(other: scala.xml.Equality): Boolean
+              def strict_!=(other: scala.xml.Equality): Boolean
+            }
             trait C extends CharSequence {
               def length(): Int
               def isEmpty(): Boolean
@@ -1790,6 +1794,8 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 // Scala 2 pickles
                 assertThat(overridden(cu, "N", "label").getFlags()).contains(Flag.Abstract);
                 assertThat(overridden(cu, "N", "prefix").getFlags()).doesNotContain(Flag.Abstract);
+                assertThat(overridden(cu, "E", "strict_==").getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(overridden(cu, "E", "strict_!=").getFlags()).contains(Flag.Abstract, Flag.Default);
                 // Java class files
                 assertThat(overridden(cu, "C", "length").getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
                 assertThat(overridden(cu, "C", "isEmpty").getFlags()).contains(Flag.Abstract, Flag.Default);

@@ -348,7 +348,10 @@ class ScalaParserTest {
     }
 
     private static JavaType typeOfS(Stream<SourceFile> parsed) {
-        J cu = (J) parsed.findFirst().orElseThrow();
+        SourceFile sourceFile = parsed.findFirst().orElseThrow();
+        if (!(sourceFile instanceof J cu)) {
+            throw new AssertionError("Not parsed: " + sourceFile);
+        }
         return new JavaIsoVisitor<List<JavaType>>() {
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, List<JavaType> types) {
