@@ -195,6 +195,39 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedClosuresMethodPointersArraysAndClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = ({ it }) * 2
+              def b = (({ it }))(1)
+              def c = -({ 1 })
+              def d = (y.&toString)()
+              def e = [(y.&toString): 1]
+              def f = (new int[2]).length
+              def g = (String).name
+              def h = ((String[])).class
+              def i = (String[]) == null
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedGStringInterpolations() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = "a ${((y.toString()))} b"
+              def b = ("${y.toString(")")}".length())
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotTreatDivisionAsDelimiter() {
         rewriteRun(
                 groovy(
