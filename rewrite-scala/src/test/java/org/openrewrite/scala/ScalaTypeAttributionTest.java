@@ -27,6 +27,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -42,7 +43,11 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
@@ -529,16 +534,84 @@ class ScalaTypeAttributionTest implements RewriteTest {
           scala(
             """
             class Foo {
-              val xs = List(1)
-              val it = xs.toIterator
+              val size = 1
+            }
+            object Bar {
+              val foo = new Foo
+              val s = foo.size
+              val n = scala.math.Pi
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                J.FieldAccess toIterator = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toIterator"));
-                assertThat(TypeUtils.asFullyQualified(toIterator.getType()).getFullyQualifiedName())
-                  .isEqualTo("scala.collection.Iterator");
-                assertThat(toIterator.getName().getType()).isEqualTo(toIterator.getType());
-                assertThat(toIterator.getName().getFieldType()).isNull();
+                J.FieldAccess size = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("size"));
+                assertThat(size.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(size.getName().getFieldType()).isNotNull();
+                assertThat(size.getName().getFieldType().getName()).isEqualTo("size");
+                J.FieldAccess pi = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("Pi"));
+                assertThat(pi.getType()).isEqualTo(JavaType.Primitive.Double);
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterlessMethodCallIsAMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+            class A {
+              val xs = List(1, 2)
+              val r = xs.reverse
+              val l = "abc".length
+              val t = xs.sum
+              val h = xs.reverse.headOption
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(collect(cu, J.FieldAccess.class, f -> true)).isEmpty();
+
+                J.MethodInvocation reverse = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("reverse"));
+                assertThat(reverse.getArguments()).isEmpty();
+                assertThat(reverse.getMethodType()).isNotNull();
+                assertThat(reverse.getName().getType()).isSameAs(reverse.getMethodType());
+                assertThat(TypeUtils.asFullyQualified(reverse.getType()).getFullyQualifiedName())
+                  .isEqualTo("scala.collection.immutable.List");
+
+                assertThat(new MethodMatcher("java.lang.String length()").matches(
+                  find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("length")))).isTrue();
+                assertThat(new MethodMatcher("scala.collection.immutable.List reverse()").matches(reverse)).isTrue();
+
+                J.MethodInvocation sum = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("sum"));
+                assertThat(sum.getType()).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterlessMethodCallKeepsItsShapeWhereItIsNotACall() {
+        rewriteRun(
+          scala(
+            """
+            class Counter {
+              private var n = 0
+              def count: Int = n
+              def count_=(v: Int): Unit = n = v
+            }
+            class B {
+              val c = new Counter
+              c.count = 5
+              val f: () => String = "abc".toUpperCase
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Assignment assignment = find(cu, J.Assignment.class, a -> !(a.getVariable() instanceof J.Identifier));
+                // Pending https://github.com/openrewrite/rewrite/issues/9918
+                assertThat(assignment.getVariable()).isInstanceOf(J.FieldAccess.class);
+                J.FieldAccess toUpperCase = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toUpperCase"));
+                EtaExpansion eta = toUpperCase.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
+                assertThat(eta.getMethod().getName()).isEqualTo("toUpperCase");
+                assertThat(TypeUtils.asFullyQualified(eta.getType()).getFullyQualifiedName()).isEqualTo("scala.Function0");
             })
           )
         );
@@ -864,7 +937,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
                 assertThat(explicit.getMarkers().findFirst(ImplicitArguments.class)).isEmpty();
 
-                J.FieldAccess sorted = find(cu, J.FieldAccess.class, fa -> fa.getSimpleName().equals("sorted"));
+                J.MethodInvocation sorted = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("sorted"));
                 assertThat(sorted.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments())
                   .extracting(arg -> arg instanceof JavaType.Method m ? m.getName() : ((JavaType.Variable) arg).getName())
                   .containsExactly("Tuple2", "Int", "String");
@@ -1268,6 +1341,46 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(s.getFieldType()).isNotNull();
                 assertThat(s.getFieldType().getName()).isEqualTo("s");
                 assertThat(s.getFieldType().getType()).isEqualTo(s.getType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              {
+                var block = 1
+                block += 1
+              }
+            }
+            object O {
+              {
+                var oblock = 1
+                oblock += 1
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, Set<String>> ownersByName = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
+                        if (ident.getSimpleName().endsWith("block")) {
+                            ownersByName.computeIfAbsent(ident.getSimpleName(), k -> new HashSet<>())
+                              .add(String.valueOf(ident.getFieldType().getOwner()));
+                        }
+                        return ident;
+                    }
+                }.visit(cu, 0);
+
+                assertThat(ownersByName).isEqualTo(Map.of(
+                  "block", Set.of("C{name=,return=void,parameters=[]}"),
+                  "oblock", Set.of("O${name=,return=void,parameters=[]}")
+                ));
             })
           )
         );
@@ -2023,6 +2136,64 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void parameterizedTypeNamesAreTypedLikeJava() {
+        rewriteRun(
+          scala(
+            """
+            object A {
+              val l: List[Int] = null
+              val m: Map[String, Seq[Int]] = null
+              val j: java.util.List[String] = null
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.ParameterizedType> types = findAll(cu, J.ParameterizedType.class, t -> true);
+                assertThat(types).extracting(t -> TypeUtils.asFullyQualified(t.getClazz().getType()))
+                  .allSatisfy(c -> assertThat(c).isInstanceOf(JavaType.Class.class))
+                  .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                  .containsExactly("scala.collection.immutable.List", "scala.collection.immutable.Map",
+                    "scala.collection.immutable.Seq", "java.util.List");
+                List<J.Identifier> names = new ArrayList<>();
+                for (J.ParameterizedType t : types) {
+                    assertThat(t.getClazz().getType()).isSameAs(TypeUtils.asParameterized(t.getType()).getType());
+                    names.add(t.getClazz() instanceof J.FieldAccess fa ? fa.getName() : (J.Identifier) t.getClazz());
+                    for (Expression argument : t.getTypeParameters()) {
+                        if (argument instanceof J.Identifier id) {
+                            names.add(id);
+                        }
+                    }
+                }
+                assertThat(names).extracting(J.Identifier::getSimpleName)
+                  .containsExactly("List", "Int", "Map", "String", "Seq", "Int", "List", "String");
+                assertThat(names).allSatisfy(id -> {
+                    assertThat(id.getType()).isNotNull().isNotInstanceOf(JavaType.Unknown.class);
+                    assertThat(id.getFieldType()).isNull();
+                });
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterOfATypeLambdaIsNotTheClassOfAParameterizedType() {
+        rewriteRun(
+          scala(
+            """
+            object A {
+              type Apply[F[_], X] = F[X]
+              val a: Apply[List, Int] = null
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ParameterizedType apply = find(cu, J.ParameterizedType.class,
+                  t -> t.getClazz() instanceof J.Identifier id && "Apply".equals(id.getSimpleName()));
+                assertThat(apply.getClazz().getType()).isNotInstanceOf(JavaType.GenericTypeVariable.class);
+            })
+          )
+        );
+    }
+
+    @Test
     void nullTypeIsPrimitiveNull() {
         rewriteRun(
           scala(
@@ -2324,7 +2495,14 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     private static <T extends J> List<T> findAll(J cu, Class<T> type, Predicate<T> matching) {
-        List<T> found = new ScalaIsoVisitor<List<T>>() {
+        return List.copyOf(assertThat(collect(cu, type, matching))
+          .as("%s matching in %s", type.getSimpleName(), cu.printTrimmed())
+          .isNotEmpty()
+          .actual());
+    }
+
+    private static <T extends J> List<T> collect(J cu, Class<T> type, Predicate<T> matching) {
+        return new ScalaIsoVisitor<List<T>>() {
             @Override
             public @Nullable J preVisit(J tree, List<T> acc) {
                 if (type.isInstance(tree) && matching.test(type.cast(tree))) {
@@ -2333,7 +2511,5 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 return tree;
             }
         }.reduce(cu, new ArrayList<>());
-        assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
-        return found;
     }
 }

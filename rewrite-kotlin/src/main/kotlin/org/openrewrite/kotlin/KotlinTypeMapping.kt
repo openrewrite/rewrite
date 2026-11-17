@@ -1380,6 +1380,10 @@ class KotlinTypeMapping(
                     }
                 }
 
+                parent is FirAnonymousInitializer -> {
+                    declaringType = initializerType(parent)
+                }
+
                 parent is FirClass -> {
                     declaringType = type(parent)
                 }
@@ -1404,6 +1408,23 @@ class KotlinTypeMapping(
             }
             vt.unsafeSet(declaringType!!, typeRef, annotations)
             vt
+        }
+    }
+
+    /**
+     * Matches the Java parsers' owner for a local of an initializer block: a method with no name,
+     * a void return and no parameters, declared by the class or object holding the `init` block.
+     */
+    @OptIn(SymbolInternals::class)
+    private fun initializerType(initializer: FirAnonymousInitializer): Method {
+        return typeFactory.methodFor(signatureBuilder.initializerSignature(initializer), {
+            Method(null, 0, null, "", null, null as kotlin.Array<String>?, null, null, null, null, null)
+        }) { method ->
+            var declaringType = type(initializer.containingDeclarationSymbol.fir)
+            if (declaringType is Parameterized) {
+                declaringType = declaringType.type
+            }
+            method.unsafeSet(TypeUtils.asFullyQualified(declaringType), Primitive.Void, null as List<JavaType>?, null, null)
         }
     }
 

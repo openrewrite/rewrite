@@ -234,6 +234,37 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _ => None
   }
 
+  /**
+   * The method a reference calls without an argument list, as `xs.reverse`, `"abc".length` or
+   * `xs.sum` do, with its types instantiated as the typer applied it. Doesn't hold for a method
+   * the typer eta-expanded instead. The method type is null when it can't be mapped.
+   */
+  def argumentlessCallOf(tree: untpd.Tree): Option[JavaType.Method] =
+    typedNodes.get(tree).flatMap { node =>
+      val reference = resolved(node)
+      val sym = try reference.symbol catch { case NonFatal(_) => Symbols.NoSymbol }
+      val isCall = try {
+        sym != null && sym.exists && sym.is(Flags.Method) && !sym.isConstructor && !isErrorSymbol(sym) &&
+          !isClosure(node.adapted) && callableWithoutArguments(sym.info)
+      } catch {
+        case NonFatal(_) => false
+      }
+      if (!isCall) None
+      else Some(try {
+        instantiatedInfo(sym, node.adapted).orElse(instantiatedInfo(sym, reference)) match {
+          case Some(info) => mapMethodType(sym, info)
+          case None => mapMethodType(sym)
+        }
+      } catch {
+        case NonFatal(_) => null
+      })
+    }
+
+  private def callableWithoutArguments(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => (mt.paramInfos.isEmpty || mt.isImplicitMethod) && callableWithoutArguments(mt.resultType)
+    case _ => true
+  }
+
   private def isParameterless(sym: Symbol): Boolean =
     sym.is(Flags.Method) && !takesParameters(sym.info)
 
@@ -635,6 +666,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           mapClassType(ci.cls, fqn, fqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
+        // An alias of a type constructor, such as `scala.List` for `[A] =>> immutable.List[A]`, names the
+        // constructor's raw class, which is how Java types the class name of a parameterized type. In
+        // `[F[_], X] =>> F[X]` the constructor is the lambda's own parameter, which names no class.
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => mapType(at.tycon)
+          case _ => unknown
+        }
         case _ => unknown
       }
     } catch {
@@ -937,14 +975,26 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   /**
    * Parameters and locals are owned by their method, as in Java. Lambdas and the
    * right-hand side of a local `val` introduce owners of their own, which are skipped.
+   * A local of a statement in a class or object body is owned by that body's initializer.
    */
   private def variableOwner(sym: Symbol): JavaType = {
     var owner = sym.owner
-    while (owner.exists && (owner.isAnonymousFunction || owner.isLocalDummy ||
-      (owner.isTerm && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
+    while (owner.exists && (owner.isAnonymousFunction ||
+      (owner.isTerm && !owner.isLocalDummy && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
       owner = owner.owner
     }
-    if (owner.is(Flags.Method)) mapMethodType(owner) else mapType(owner.info)
+    if (owner.is(Flags.Method)) mapMethodType(owner)
+    else if (owner.isLocalDummy) mapInitializerType(TypeUtils.asFullyQualified(mapType(owner.owner.info)))
+    else mapType(owner.info)
+  }
+
+  /** Matches the Java parsers' owner for a local of an initializer block: a method with no name, a void return and no parameters. */
+  private def mapInitializerType(fq: JavaType.FullyQualified): JavaType.Method = {
+    val sig = fq.getFullyQualifiedName + "{name=,return=void,parameters=[]}"
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, 0L, fq, "", JavaType.Primitive.Void,
+        null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (_: JavaType.Method) => ())
   }
 
   /** Create a constructor method type for a given class type. */

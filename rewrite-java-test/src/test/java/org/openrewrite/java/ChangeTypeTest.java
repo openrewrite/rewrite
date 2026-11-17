@@ -4762,4 +4762,42 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeAnnotationOnRecordComponentWhenBlankLinesPrecedePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.springframework.lang.Nullable", "org.jspecify.annotations.Nullable", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package org.springframework.lang;
+                public @interface Nullable {}
+                """,
+              """
+                package org.jspecify.annotations;
+                public @interface Nullable {}
+                """
+            )),
+          java(
+            """
+
+              package com.example;
+
+              import org.springframework.lang.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            """
+
+              package com.example;
+
+              import org.jspecify.annotations.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
 }
