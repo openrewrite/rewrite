@@ -17,7 +17,6 @@ package org.openrewrite.toml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -25,7 +24,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlValue;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -92,39 +90,14 @@ public class ChangeTableRowValue extends Recipe {
                         if (newValue == null) {
                             return null; // Remove the key-value pair
                         }
-                        // Parse the complete key-value pair with the new value
-                        Toml.KeyValue newKv = parseKeyValue(propertyKey, newValue);
-
-                        // Check if the key-value is actually different
-                        if (newKv != null && !SemanticallyEqual.areEqual(kv, newKv)) {
-                            return newKv.withPrefix(kv.getPrefix());
+                        // Replace only the value, so the key keeps how it is written and aligned
+                        Toml newValueNode = TomlSnippets.value(newValue.trim());
+                        if (newValueNode != null && !SemanticallyEqual.areEqual(kv.getValue(), newValueNode)) {
+                            return kv.withValue(newValueNode.withPrefix(kv.getValue().getPrefix()));
                         }
                     }
                     return value;
                 }));
-            }
-
-            // Parse a complete TOML key-value pair using TomlParser.
-            private Toml.@Nullable KeyValue parseKeyValue(String key, String value) {
-                try {
-                    // Create a minimal TOML document with the key-value pair
-                    @Language("toml") String tomlDoc = key + " = " + value.trim();
-                    Toml.Document doc = new TomlParser().parse(tomlDoc)
-                            .findFirst()
-                            .map(Toml.Document.class::cast)
-                            .orElse(null);
-
-                    if (doc != null && !doc.getValues().isEmpty()) {
-                        TomlValue firstValue = doc.getValues().get(0);
-                        if (firstValue instanceof Toml.KeyValue) {
-                            return (Toml.KeyValue) firstValue;
-                        }
-                    }
-                } catch (Exception e) {
-                    // If parsing fails, return null
-                }
-
-                return null;
             }
         };
     }
