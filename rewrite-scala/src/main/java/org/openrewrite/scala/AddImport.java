@@ -41,6 +41,32 @@ import static org.openrewrite.scala.RemoveUnusedImports.*;
 public class AddImport<P> extends ScalaIsoVisitor<P> {
     private static final Set<String> DEFAULT_IMPORTS = new HashSet<>(Arrays.asList("java.lang", "scala", "scala.Predef"));
 
+    /**
+     * The aliases the {@code scala} package and {@code Predef} declare for types that live elsewhere, by the path
+     * they are imported by. Only aliases naming the same type in Scala 2.12, 2.13 and 3 are listed, which leaves
+     * out {@code Seq} and {@code IndexedSeq}.
+     */
+    private static final Map<String, String> SCALA_ALIASES = new HashMap<>();
+
+    static {
+        for (String n : Arrays.asList("List", "Vector", "Range")) {
+            SCALA_ALIASES.put("scala." + n, "scala.collection.immutable." + n);
+        }
+        for (String n : Arrays.asList("Iterable", "Iterator", "BufferedIterator")) {
+            SCALA_ALIASES.put("scala." + n, "scala.collection." + n);
+        }
+        SCALA_ALIASES.put("scala.StringBuilder", "scala.collection.mutable.StringBuilder");
+        for (String n : Arrays.asList("Either", "Left", "Right")) {
+            SCALA_ALIASES.put("scala." + n, "scala.util." + n);
+        }
+        for (String n : Arrays.asList("BigInt", "BigDecimal", "Equiv", "Fractional", "Integral", "Numeric", "Ordered", "Ordering")) {
+            SCALA_ALIASES.put("scala." + n, "scala.math." + n);
+        }
+        for (String n : Arrays.asList("Map", "Set")) {
+            SCALA_ALIASES.put("scala.Predef." + n, "scala.collection.immutable." + n);
+        }
+    }
+
     private final String owner;
     private final String name;
     private final @Nullable String alias;
@@ -77,26 +103,33 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
     }
 
     private List<JRightPadded<Statement>> moveStaleSelectors(List<JRightPadded<Statement>> statements) {
-        List<JRightPadded<Statement>> result = null;
-        for (int i = 0; i < statements.size(); i++) {
-            JRightPadded<Statement> rp = statements.get(i);
+        List<JRightPadded<Statement>> result = new ArrayList<>(statements.size());
+        boolean changed = false;
+        Space carried = null;
+        for (JRightPadded<Statement> rp : statements) {
             List<Statement> replacement = rp.getElement() instanceof S.Import ?
                     moveStaleSelectors((S.Import) rp.getElement()) : null;
             if (replacement == null) {
-                if (result != null) {
-                    result.add(rp);
-                }
+                replacement = singletonList(rp.getElement());
+            } else if (replacement.isEmpty()) {
+                carried = carried == null ? rp.getElement().getPrefix() : carried;
+                changed = true;
                 continue;
+            } else {
+                changed = true;
             }
-            if (result == null) {
-                result = new ArrayList<>(statements.subList(0, i));
+            Statement first = replacement.get(0);
+            if (carried != null && (isImport(first) || result.isEmpty())) {
+                first = first.withPrefix(inheritPrefix(carried, first.getPrefix()));
+                changed = true;
             }
-            result.add(rp.withElement(replacement.get(0)));
+            carried = null;
+            result.add(rp.withElement(first));
             for (Statement s : replacement.subList(1, replacement.size())) {
                 result.add(JRightPadded.build(s));
             }
         }
-        return result == null ? statements : result;
+        return changed ? result : statements;
     }
 
     private @Nullable List<Statement> moveStaleSelectors(S.Import anImport) {
@@ -108,14 +141,21 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
             J.Identifier selected = rp.getElement().getName();
             if (selected != null && !isHiding(rp.getElement()) &&
                 fullyQualifiedName.equals(definitionName(selected.getType())) &&
-                !(qualifier + "." + selected.getSimpleName()).equals(fullyQualifiedName)) {
+                !importsThis(qualifier, selected.getSimpleName())) {
+                // Scala imports the type under this name by default, so the selector is dropped
+                if (rp.getElement().getAlias() == null && isImportedByDefault()) {
+                    continue;
+                }
                 stale.add(rp.getElement());
             } else {
                 kept.add(rp);
             }
         }
-        if (stale.isEmpty()) {
+        if (kept.size() == anImport.getSelectors().size()) {
             return null;
+        }
+        if (kept.isEmpty() && stale.isEmpty()) {
+            return emptyList();
         }
         String indent = anImport.getPrefix().getWhitespace().substring(anImport.getPrefix().getWhitespace().lastIndexOf('\n') + 1);
         List<Statement> result = new ArrayList<>();
@@ -157,24 +197,26 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
     }
 
     private boolean isVisible(S.CompilationUnit cu) {
-        if (alias == null && (DEFAULT_IMPORTS.contains(owner) ||
-                              cu.getPackageDeclaration() != null && owner.equals(path(cu.getPackageDeclaration().getExpression())))) {
+        if (alias == null && cu.getPackageDeclaration() != null &&
+            owner.equals(path(cu.getPackageDeclaration().getExpression()))) {
             return true;
         }
         for (Statement s : cu.getStatements()) {
             if (s instanceof J.Import) {
                 J.FieldAccess qualid = ((J.Import) s).getQualid();
-                if (alias == null && owner.equals(path(qualid.getTarget())) &&
-                    (name.equals(qualid.getSimpleName()) || isWildcard(qualid.getSimpleName()))) {
+                String qualifier = path(qualid.getTarget());
+                if (alias == null && (importsThis(qualifier, qualid.getSimpleName()) ||
+                                      isWildcard(qualid.getSimpleName()) && owner.equals(qualifier))) {
                     return true;
                 }
-            } else if (s instanceof S.Import && owner.equals(path(((S.Import) s).getQualifier()))) {
+            } else if (s instanceof S.Import) {
+                String qualifier = path(((S.Import) s).getQualifier());
                 boolean wildcard = false;
                 // A selector that renames or hides the name also keeps the import's wildcard from binding it.
                 boolean renamed = false;
                 for (S.ImportSelector selector : ((S.Import) s).getSelectors()) {
                     J.Identifier selected = selector.getName();
-                    if (selected != null && selected.getSimpleName().equals(name)) {
+                    if (selected != null && selected.getSimpleName().equals(name) && importsThis(qualifier, name)) {
                         J.Identifier selectorAlias = selector.getAlias();
                         if (alias == null ? selectorAlias == null :
                                 selectorAlias != null && alias.equals(selectorAlias.getSimpleName())) {
@@ -184,8 +226,45 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
                     }
                     wildcard |= selector.isWildcard();
                 }
-                if (wildcard && alias == null && !renamed) {
+                if (wildcard && alias == null && !renamed && owner.equals(qualifier)) {
                     return true;
+                }
+            }
+        }
+        return alias == null && isImportedByDefault() && !mayShadowDefaultImport(cu);
+    }
+
+    /**
+     * Whether {@code qualifier.selected} imports the type or member this visitor adds, directly or through an alias.
+     */
+    private boolean importsThis(String qualifier, String selected) {
+        String imported = qualifier + "." + selected;
+        return imported.equals(fullyQualifiedName()) || fullyQualifiedName().equals(SCALA_ALIASES.get(imported));
+    }
+
+    private boolean isImportedByDefault() {
+        return DEFAULT_IMPORTS.contains(owner) ||
+               fullyQualifiedName().equals(SCALA_ALIASES.get("scala." + name)) ||
+               fullyQualifiedName().equals(SCALA_ALIASES.get("scala.Predef." + name));
+    }
+
+    /**
+     * Whether a top-level import binds the name, or is a wildcard that may, and so takes precedence over what Scala
+     * imports by default.
+     */
+    private boolean mayShadowDefaultImport(S.CompilationUnit cu) {
+        for (Statement s : cu.getStatements()) {
+            if (s instanceof J.Import) {
+                String imported = ((J.Import) s).getQualid().getSimpleName();
+                if (imported.equals(name) || isWildcard(imported)) {
+                    return true;
+                }
+            } else if (s instanceof S.Import) {
+                for (S.ImportSelector selector : ((S.Import) s).getSelectors()) {
+                    J.Identifier bound = selector.getAlias() != null ? selector.getAlias() : selector.getName();
+                    if (selector.isWildcard() || bound != null && bound.getSimpleName().equals(name)) {
+                        return true;
+                    }
                 }
             }
         }

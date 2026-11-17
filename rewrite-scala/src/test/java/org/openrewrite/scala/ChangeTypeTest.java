@@ -202,7 +202,6 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.util.Map
-              import scala.collection.immutable.List
 
               class A {
                 val a: List[String] = null

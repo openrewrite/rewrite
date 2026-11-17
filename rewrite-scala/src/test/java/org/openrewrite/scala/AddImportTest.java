@@ -108,7 +108,6 @@ class AddImportTest implements RewriteTest {
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                   maybeAddImport("java.util.UUID", false);
                   maybeAddImport("java.time.Instant", false);
-                  maybeAddImport("scala.Option", false);
                   return super.visitClassDeclaration(classDecl, ctx);
               }
           })),
@@ -131,6 +130,56 @@ class AddImportTest implements RewriteTest {
             """
               import java.util.{List => JList}
               import java.util.List
+
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void defaultImportIsVisibleUnlessAWildcardImportMayShadowIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  maybeAddImport("scala.collection.immutable.List", false);
+                  maybeAddImport("scala.collection.immutable.Map", false);
+                  maybeAddImport("scala.Option", false);
+                  return super.visitClassDeclaration(classDecl, ctx);
+              }
+          })),
+          scala(
+            """
+              class A
+              """
+          ),
+
+          scala(
+            """
+              import java.util._
+
+              class B
+              """,
+            """
+              import java.util._
+              import scala.Option
+              import scala.collection.immutable.List
+              import scala.collection.immutable.Map
+
+              class B
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsSelectorOfAScalaAlias() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> addImport("scala.collection.immutable.List", false))),
+          scala(
+            """
+              import scala.{List, Seq}
 
               class A
               """
