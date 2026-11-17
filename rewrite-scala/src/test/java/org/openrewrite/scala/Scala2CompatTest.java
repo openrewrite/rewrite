@@ -17,8 +17,13 @@ package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.marker.OmitBraces;
+import org.openrewrite.scala.marker.ProcedureSyntax;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
@@ -81,8 +86,8 @@ class Scala2CompatTest implements RewriteTest {
                 spec -> spec.afterRecipe(cu -> {
                     J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
                     J.MethodDeclaration d = (J.MethodDeclaration) t.getBody().getStatements().get(0);
-                    assertThat(d.getMarkers().findFirst(OmitBraces.class)).isPresent();
-                    assertThat(d.getPadding().getParameters().getMarkers().findFirst(OmitBraces.class)).isPresent();
+                    assertThat(d.getMarkers().findFirst(ProcedureSyntax.class)).isPresent();
+                    assertThat(d.getPadding().getParameters().getMarkers().findFirst(OmitParentheses.class)).isPresent();
                     assertThat(d.getParameters()).isEmpty();
                     assertThat(d.getBody()).isNotNull();
                     assertThat(d.getBody().getStatements()).singleElement().isInstanceOf(J.Return.class);
@@ -92,23 +97,49 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
-    void abstractDeclarationWithoutParameterListOrResultType() {
+    void procedureSyntaxDeclarationWithoutParameterList() {
         rewriteRun(
             scala(
                 """
                 trait T {
                   def h
+                  def g: Int
                 }
                 """,
                 spec -> spec.afterRecipe(cu -> {
                     J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
                     J.MethodDeclaration h = (J.MethodDeclaration) t.getBody().getStatements().get(0);
-                    assertThat(h.getPadding().getParameters().getMarkers().findFirst(OmitBraces.class)).isPresent();
+                    assertThat(h.getMarkers().findFirst(ProcedureSyntax.class)).isPresent();
+                    assertThat(h.getPadding().getParameters().getMarkers().findFirst(OmitParentheses.class)).isPresent();
                     assertThat(h.getReturnTypeExpression()).isNull();
                     assertThat(h.getBody()).isNull();
+
+                    J.MethodDeclaration g = (J.MethodDeclaration) t.getBody().getStatements().get(1);
+                    assertThat(g.getMarkers().findFirst(ProcedureSyntax.class)).isEmpty();
                 })
             )
         );
+    }
+
+    @Test
+    void printsProcedureSyntaxMarkedByEarlierParserVersions() {
+        String source = """
+          object T {
+            def d { println("z") }
+          }
+          """;
+        SourceFile cu = ScalaParser.builder().build().parse(source).findFirst().orElseThrow();
+        SourceFile withOldMarkers = (SourceFile) new ScalaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+                m = m.withMarkers(m.getMarkers().removeByType(ProcedureSyntax.class).add(new OmitBraces(Tree.randomId())));
+                JContainer<Statement> params = m.getPadding().getParameters();
+                return m.getPadding().withParameters(params.withMarkers(
+                  params.getMarkers().removeByType(OmitParentheses.class).add(new OmitBraces(Tree.randomId()))));
+            }
+        }.visitNonNull(cu, 0);
+        assertThat(withOldMarkers.printAll()).isEqualTo(source);
     }
 
     @Test

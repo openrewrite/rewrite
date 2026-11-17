@@ -53,6 +53,7 @@ import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
+import org.openrewrite.scala.marker.ProcedureSyntax
 import org.openrewrite.scala.marker.ContextFunctionArrow
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
@@ -4994,13 +4995,13 @@ class ScalaTreeVisitor(
         case null => // Skip null statements (e.g., package declarations)
         case stmt: Statement =>
           // Extract trailing space after this statement.
-          // A procedure-syntax method (method-level OmitBraces marker) has an
+          // A procedure-syntax method (ProcedureSyntax marker) has an
           // unreliable dotty span end — it overshoots the real closing `}` because
           // of the synthetic `???` body the parser substitutes. `reparseProcedureBody`
           // already advanced the cursor to just past the real `}`, so trust the cursor
           // here; otherwise the whitespace/comments before the next statement are lost.
           val isProcedureMethod = stmt match {
-            case md: J.MethodDeclaration => md.getMarkers.findFirst(classOf[OmitBraces]).isPresent
+            case md: J.MethodDeclaration => md.getMarkers.findFirst(classOf[ProcedureSyntax]).isPresent
             case _ => false
           }
           val statEnd = if (isProcedureMethod) cursor else Math.max(0, stat.span.end - offsetAdjustment)
@@ -6787,16 +6788,14 @@ class ScalaTreeVisitor(
       } else if (hasParensInSource) {
         buildEmptyParamList()
       } else {
-        // Parameterless method — mark so printer omits ()
         JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
-          Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+          Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
       }
     } else if (hasParensInSource) {
       buildEmptyParamList()
     } else {
-      // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
-        Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
     }
 
     // Build additional param lists as J.Lambda.Parameters for later wrapping
@@ -6928,8 +6927,10 @@ class ScalaTreeVisitor(
 
     // Build method markers
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
-    if (isProcedureSyntax) {
-      markerList.add(new OmitBraces(Tree.randomId()))
+    // An abstract def without a result type is the declaration form of procedure syntax.
+    val isProcedureDeclaration = !isGivenAlias && dd.rhs == untpd.EmptyTree && returnTypeExpression == null
+    if (isProcedureSyntax || isProcedureDeclaration) {
+      markerList.add(new ProcedureSyntax(Tree.randomId()))
     }
     if (isCurried) {
       markerList.add(new Curried(Tree.randomId()))
