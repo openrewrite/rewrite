@@ -1695,6 +1695,106 @@ class ScalaTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void membersWithoutBodyAreAbstract() {
+        rewriteRun(
+          scala(
+            """
+            trait A { def bar(x: Int): Int }
+            trait B extends A { def bar(x: Int): Int }
+            abstract class D {
+              def foo: Int
+              def baz: Int = 1
+              val v: Int
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.Method barOfB = declared(cu, "B", "bar");
+                assertThat(barOfB.getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(TypeUtils.findOverriddenMethod(barOfB)).hasValueSatisfying(barOfA -> {
+                    assertThat(barOfA.getDeclaringType().getFullyQualifiedName()).isEqualTo("A");
+                    assertThat(barOfA.getFlags()).contains(Flag.Abstract);
+                });
+                assertThat(declared(cu, "D", "foo").getFlags()).contains(Flag.Abstract);
+                assertThat(declared(cu, "D", "baz").getFlags()).doesNotContain(Flag.Abstract);
+                assertThat(variable(cu, "v").getVariableType().getFlags()).contains(Flag.Abstract);
+            })
+          )
+        );
+    }
+
+    @Test
+    void concreteTraitMethodsAreDefault() {
+        rewriteRun(
+          scala(
+            """
+            trait C {
+              def bar(x: Int): Int = x + 3
+              private def p: Int = 1
+            }
+            trait B extends C { def bar(x: Int): Int }
+            abstract class D { def baz: Int = 1 }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(TypeUtils.findOverriddenMethod(declared(cu, "B", "bar"))).hasValueSatisfying(barOfC ->
+                  assertThat(barOfC.getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract));
+                assertThat(declared(cu, "C", "p").getFlags()).doesNotContain(Flag.Default);
+                assertThat(declared(cu, "D", "baz").getFlags()).doesNotContain(Flag.Default);
+            })
+          )
+        );
+    }
+
+    @Test
+    void traitIsAnAbstractInterface() {
+        rewriteRun(
+          scala(
+            """
+            trait T
+            abstract class D
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("T")).getType().getFlags())
+                  .contains(Flag.Interface, Flag.Abstract);
+                assertThat(find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("D")).getType().getFlags())
+                  .contains(Flag.Abstract).doesNotContain(Flag.Interface);
+            })
+          )
+        );
+    }
+
+    @Test
+    void libraryMethodsAreAbstractOrDefault() {
+        rewriteRun(
+          scala(
+            """
+            object Use {
+              val it: Iterator[Int] = Iterator(1)
+              it.hasNext
+              it.map(_ + 1)
+              val equality: org.scalactic.Equality[Int] = null
+              equality.areEqual(1, 2)
+              equality.areEquivalent(1, 2)
+              val cmp: java.util.Comparator[Int] = null
+              cmp.compare(1, 2)
+              cmp.reversed()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // Scala 3 TASTy
+                assertThat(method(cu, "hasNext").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(method(cu, "map").getMethodType().getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract);
+                // Scala 2 pickles
+                assertThat(method(cu, "areEqual").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(method(cu, "areEquivalent").getMethodType().getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract);
+                // Java class files
+                assertThat(method(cu, "compare").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
+                assertThat(method(cu, "reversed").getMethodType().getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract);
+            })
+          )
+        );
+    }
+
     private static void assertBoundIsPairOfItself(JavaType type, String name) {
         assertBoundIsPairOf(type, name, name);
     }
@@ -2502,6 +2602,11 @@ class ScalaTypeAttributionTest implements RewriteTest {
 
     private static J.MethodInvocation method(J cu, String name) {
         return find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals(name));
+    }
+
+    private static JavaType.Method declared(J cu, String owner, String name) {
+        return find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals(name) &&
+          TypeUtils.isOfClassType(m.getMethodType().getDeclaringType(), owner)).getMethodType();
     }
 
     private static J.MethodInvocation javaMethod(J.CompilationUnit cu, String name) {
