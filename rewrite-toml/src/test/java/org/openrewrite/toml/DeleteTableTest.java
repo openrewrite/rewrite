@@ -221,4 +221,24 @@ class DeleteTableTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tableNamedWithAQuotedPart() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteTable("tool.my-pkg")),
+          toml(
+            """
+              [tool."my-pkg"]
+              a = 1
+
+              [other]
+              b = 2
+              """,
+            """
+              [other]
+              b = 2
+              """
+          )
+        );
+    }
 }

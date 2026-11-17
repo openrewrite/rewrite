@@ -83,7 +83,7 @@ public class MergeTableRow extends Recipe {
                         continue;
                     }
                     Toml.Table table = (Toml.Table) value;
-                    if (table.getName() != null && tableName.equals(table.getName().getName())) {
+                    if (TableRowMatcher.isNamed(table, tableName)) {
                         String tableIdentifyingValue = TableRowMatcher.getKeyValue(table, identifyingKey);
                         if (identifyingValue.equals(tableIdentifyingValue)) {
                             return doc;
@@ -124,7 +124,7 @@ public class MergeTableRow extends Recipe {
 
             @Override
             public Toml visitTable(Toml.Table table, ExecutionContext ctx) {
-                if (table.getName() == null || !tableName.equals(table.getName().getName())) {
+                if (!TableRowMatcher.isNamed(table, tableName)) {
                     return super.visitTable(table, ctx);
                 }
 

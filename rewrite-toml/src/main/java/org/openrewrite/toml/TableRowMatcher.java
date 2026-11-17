@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 
@@ -85,5 +86,14 @@ public class TableRowMatcher {
             }
         }
         return appended.withPrefix(Space.format("\n"));
+    }
+
+    /**
+     * Whether {@code table} is the table {@code tableName} names, part by part, so {@code tool.my-pkg} names
+     * {@code [tool."my-pkg"]} and {@code [ tool . my-pkg ]} too.
+     */
+    static boolean isNamed(Toml.Table table, String tableName) {
+        Toml.Identifier name = table.getName();
+        return name != null && TomlKeyParts.of(name).equals(TomlKeyParts.split(tableName));
     }
 }
