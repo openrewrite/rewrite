@@ -118,26 +118,18 @@ public class ReplaceTableRow extends Recipe {
             }
 
             private List<Toml.KeyValue> parseTomlRow(@Language("toml") String tomlContent) {
-                try {
-                    Toml.Document doc = new TomlParser().parse(tomlContent)
-                            .findFirst()
-                            .map(Toml.Document.class::cast)
-                            .orElse(null);
-
-                    if (doc != null && !doc.getValues().isEmpty()) {
-                        List<Toml.KeyValue> result = new ArrayList<>();
-                        for (TomlValue value : doc.getValues()) {
-                            if (value instanceof Toml.KeyValue) {
-                                result.add((Toml.KeyValue) value);
-                            }
-                        }
-                        return result;
-                    }
-
-                } catch (Exception e) {
-                    // Failed to parse, return empty list
+                // A row that is not TOML changes nothing, rather than what error recovery made of part of it
+                Toml.Document doc = TomlSnippets.parse(tomlContent);
+                if (doc == null) {
+                    return emptyList();
                 }
-                return emptyList();
+                List<Toml.KeyValue> result = new ArrayList<>();
+                for (TomlValue value : doc.getValues()) {
+                    if (value instanceof Toml.KeyValue) {
+                        result.add((Toml.KeyValue) value);
+                    }
+                }
+                return result;
             }
         };
     }
