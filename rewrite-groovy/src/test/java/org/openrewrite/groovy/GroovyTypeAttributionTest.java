@@ -25,6 +25,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -712,6 +713,77 @@ class GroovyTypeAttributionTest implements RewriteTest {
                     return variable;
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void accessorBackedPropertyIsAVariableDistinctFromASameNamedPrivateField() {
+        rewriteRun(
+          groovy(
+            """
+              class Folder {
+                  private File root
+                  File getRoot() { root }
+                  void setLabel(String label) {}
+                  static String getKind() { "dir" }
+              }
+              def f = new Folder()
+              f.root
+              f.label = "a"
+              Folder.kind
+              new File("a").text
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> properties = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        properties.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(properties).satisfiesExactly(
+                  root -> {
+                      assertThat(root.getName()).isEqualTo("root");
+                      assertThat(TypeUtils.isOfClassType(root.getOwner(), "Folder")).isTrue();
+                      assertThat(TypeUtils.isOfClassType(root.getType(), "java.io.File")).isTrue();
+                      assertThat(root.hasFlags(Flag.Private)).isFalse();
+                  },
+                  label -> {
+                      assertThat(label.getName()).isEqualTo("label");
+                      assertThat(TypeUtils.isOfClassType(label.getType(), "java.lang.String")).isTrue();
+                  },
+                  kind -> assertThat(kind.hasFlags(Flag.Static)).isTrue(),
+                  text -> assertThat(text.hasFlags(Flag.Static)).isFalse()
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void propertyReadThroughASubclassIsTheSuperclassField() {
+        rewriteRun(
+          groovy(
+            """
+              class Base { File root }
+              class Sub extends Base {}
+              new Base().root
+              new Sub().root
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> roots = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        roots.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(roots).hasSize(2);
+                assertThat(roots.get(1)).isSameAs(roots.get(0));
+            })
           )
         );
     }

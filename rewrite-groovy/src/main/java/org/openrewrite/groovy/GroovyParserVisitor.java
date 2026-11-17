@@ -1354,18 +1354,27 @@ public class GroovyParserVisitor {
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
             if (insideParenthesesLevel != null) {
-                Stack<Space> openingParens = new Stack<>();
-                for (int i = 0; i < insideParenthesesLevel; i++) {
-                    openingParens.push(sourceBefore("("));
-                }
-                Expression parenthesized = parenthesizedTree.apply(whitespace());
-                for (int i = 0; i < insideParenthesesLevel; i++) {
-                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
-                            padRight(parenthesized, sourceBefore(")")));
-                }
-                return parenthesized;
+                Stack<Space> openingParens = openParentheses(insideParenthesesLevel);
+                return closeParentheses(openingParens, parenthesizedTree.apply(whitespace()));
             }
             return parenthesizedTree.apply(whitespace());
+        }
+
+        private Stack<Space> openParentheses(int level) {
+            Stack<Space> openingParens = new Stack<>();
+            for (int i = 0; i < level; i++) {
+                openingParens.push(sourceBefore("("));
+            }
+            return openingParens;
+        }
+
+        private Expression closeParentheses(Stack<Space> openingParens, Expression tree) {
+            Expression parenthesized = tree;
+            while (!openingParens.isEmpty()) {
+                parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
+                        padRight(parenthesized, sourceBefore(")")));
+            }
+            return parenthesized;
         }
 
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
@@ -3087,14 +3096,17 @@ public class GroovyParserVisitor {
                 if (value instanceof String) {
                     String simpleName = (String) value;
                     int saveCursor = cursor;
+                    // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives here.
+                    // On Groovy 3+ the receiver's missing position would break the parenthesis scan.
+                    Integer parenLevel = isOlderThanGroovy3() ? getInsideParenthesesLevel(prop) : null;
+                    Stack<Space> openingParens = openParentheses(parenLevel == null ? 0 : parenLevel);
                     Space namePrefix = whitespace();
                     if (source.startsWith(simpleName, cursor)) {
                         skip(simpleName);
-                        // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives here
                         FieldNode field = prop.getObjectExpression() instanceof ClassExpression ?
                                 ClassNodeUtils.getField(prop.getObjectExpression().getType(), simpleName) : null;
-                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)),
-                                field != null && field.isStatic() ? typeMapping.variableType(field) : null));
+                        queue.add(closeParentheses(openingParens, new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(),
+                                simpleName, typeMapping.type(staticType(prop)), field != null && field.isStatic() ? typeMapping.variableType(field) : null)));
                         return;
                     }
                     // The trait transform may rewrite `this.X` to `$self.X` even though the source contains
@@ -3158,7 +3170,8 @@ public class GroovyParserVisitor {
 
         /**
          * A private field that does not back a Groovy property is left out, since a getter of the same
-         * name takes precedence over it outside its class. Property access on a map looks up a key.
+         * name takes precedence over it outside its class. A property without a visible field is the
+         * variable of the accessor the type checker chose. Property access on a map looks up a key.
          */
         private JavaType.@Nullable Variable propertyField(PropertyExpression prop, boolean attribute) {
             String name = prop.getPropertyAsString();
@@ -3172,8 +3185,9 @@ public class GroovyParserVisitor {
                 return null;
             }
             FieldNode field = owner.getField(name);
-            if (field == null || (field.isPrivate() && !attribute && owner.getProperty(name) == null)) {
-                return null;
+            if (field == null || (field.isPrivate() && !attribute && field.getOwner().getProperty(name) == null)) {
+                MethodNode accessor = attribute ? null : prop.getNodeMetaData(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+                return accessor == null ? null : typeMapping.variableType(name, accessor);
             }
             return typeMapping.variableType(field);
         }
@@ -4538,6 +4552,13 @@ public class GroovyParserVisitor {
             } else if (node instanceof BinaryExpression) {
                 BinaryExpression expr = (BinaryExpression) node;
                 return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
+            } else if (node instanceof PropertyExpression &&
+                    ((PropertyExpression) node).getObjectExpression() instanceof ClassExpression &&
+                    ((PropertyExpression) node).getObjectExpression().getLineNumber() < 0 &&
+                    ((PropertyExpression) node).getProperty() instanceof ConstantExpression) {
+                // StaticImportVisitor's substitute for a statically imported field read. Its name carries the
+                // position of the original read, including the parentheses around it.
+                return getInsideParenthesesLevel(((PropertyExpression) node).getProperty());
             }
         } else {
             if (node instanceof MethodCallExpression) {
