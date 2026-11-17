@@ -21,7 +21,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.toml.marker.InlineTable;
 import org.openrewrite.toml.tree.Comment;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
@@ -77,6 +80,16 @@ public class DeleteKey extends Recipe {
                     TomlRightPadded<Toml> newRp = visited == rp.getElement() ? rp : rp.withElement(visited);
                     if (newRp != rp) changed = true;
                     result.add(newRp);
+                }
+                if (changed && t.getMarkers().findFirst(InlineTable.class).isPresent() && !original.isEmpty() &&
+                    (result.isEmpty() || result.get(result.size() - 1).getElement() != original.get(original.size() - 1).getElement())) {
+                    // The deleted last entry held the space before `}`, so keep it on what is last now
+                    Space beforeBrace = original.get(original.size() - 1).getAfter();
+                    if (result.isEmpty()) {
+                        result.add(new TomlRightPadded<>(new Toml.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY), beforeBrace, Markers.EMPTY));
+                    } else {
+                        result.set(result.size() - 1, result.get(result.size() - 1).withAfter(beforeBrace));
+                    }
                 }
                 return changed ? t.getPadding().withValues(result) : t;
             }
