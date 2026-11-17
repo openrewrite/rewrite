@@ -256,6 +256,20 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void staticFieldReadFollowedByGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI
+              import static java.lang.Math.E as e
+              def x = 1
+              def s = "$PI$x$e$x"
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldBeAbleToParseClassDeclaration() {
         rewriteRun(
                 groovy(
