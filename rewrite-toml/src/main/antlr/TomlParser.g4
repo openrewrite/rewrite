@@ -114,7 +114,7 @@ commentOrNl
 
 array
     : L_BRACKET commentOrNl* R_BRACKET
-    | L_BRACKET commentOrNl* value (COMMA commentOrNl* value)* COMMA? commentOrNl* R_BRACKET
+    | L_BRACKET commentOrNl* value (commentOrNl* COMMA commentOrNl* value)* (commentOrNl* COMMA)? commentOrNl* R_BRACKET
     ;
 
 table

@@ -742,6 +742,28 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void arrayWithCommaAfterNewlineOrComment() {
+        // Passes once generateAntlrSources regenerates the parser
+        rewriteRun(
+          toml(
+            """
+              arr = [
+                1 # one
+                , 2
+                ,#3
+                3
+                , # trailing
+              ]
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Array) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValues())
+              .filteredOn(Toml.Literal.class::isInstance)
+              .extracting(v -> ((Toml.Literal) v).getValue())
+              .containsExactly(1L, 2L, 3L))
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
