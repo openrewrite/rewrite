@@ -151,6 +151,13 @@ public class GroovyParser implements Parser {
                         pctx.getParsingListener().startedParsing(input);
                         CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, transformLoader);
                         compUnit.addSource(unit);
+                        compUnit.compile(Phases.CONVERSION);
+                        // An error collected by CONVERSION is a syntax error. Groovy 4's parser throws on it, but
+                        // Groovy 2.5's leaves a truncated AST. Errors from later phases, such as an unresolved
+                        // class, stay ParseWarnings.
+                        if (errorCollector.hasErrors()) {
+                            throw new MultipleCompilationErrorsException(errorCollector);
+                        }
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
 
