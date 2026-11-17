@@ -3153,7 +3153,8 @@ public class GroovyParserVisitor {
 
         /**
          * A private field that does not back a Groovy property is left out, since a getter of the same
-         * name takes precedence over it outside its class. Property access on a map looks up a key.
+         * name takes precedence over it outside its class. A property without a visible field is the
+         * variable of the accessor the type checker chose. Property access on a map looks up a key.
          */
         private JavaType.@Nullable Variable propertyField(PropertyExpression prop, boolean attribute) {
             String name = prop.getPropertyAsString();
@@ -3167,8 +3168,9 @@ public class GroovyParserVisitor {
                 return null;
             }
             FieldNode field = owner.getField(name);
-            if (field == null || (field.isPrivate() && !attribute && owner.getProperty(name) == null)) {
-                return null;
+            if (field == null || (field.isPrivate() && !attribute && field.getOwner().getProperty(name) == null)) {
+                MethodNode accessor = attribute ? null : prop.getNodeMetaData(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+                return accessor == null ? null : typeMapping.variableType(name, accessor);
             }
             return typeMapping.variableType(field);
         }
