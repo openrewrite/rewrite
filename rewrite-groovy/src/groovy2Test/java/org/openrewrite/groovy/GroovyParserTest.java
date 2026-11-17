@@ -156,6 +156,78 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedCastsCallsAndIncrements() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              import static java.lang.Math.abs
+              def y = 1
+              def a = (1 as String)
+              def b = ((int) y) * 2
+              def c = (int) (y + 1)
+              def d = (y++) /* ) */ * 2
+              def e = (--y)
+              def f = (y.toString()) // )
+              def g = ((y?.toString())).length()
+              def h = (y).toString().length()
+              def i = ((y)).toString()
+              def j = (abs(1)) * 2
+              def k = (runtime)
+              def l = (y > 0 ? 1 : 2) * 2
+              def m = (y > 0) ? 1 : 2
+              def n = (!y)
+              def o = (-y) * 2
+              def p = (+y)
+              def q = (~y)
+              def r = ([1, 2]) + [3]
+              def s = ([a: 1])
+              def t = (1..2)
+              def u = -(y.hashCode())
+              def v = [(y.toString()): 1]
+              def w = -(y).hashCode()
+              def x = (foo(")"))
+              def z = (foo("(${y}"))
+              def foo(x) { x }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedClosuresMethodPointersArraysAndClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = ({ it }) * 2
+              def b = (({ it }))(1)
+              def c = -({ 1 })
+              def d = (y.&toString)()
+              def e = [(y.&toString): 1]
+              def f = (new int[2]).length
+              def g = (String).name
+              def h = ((String[])).class
+              def i = (String[]) == null
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedGStringInterpolations() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = "a ${((y.toString()))} b"
+              def b = ("${y.toString(")")}".length())
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotTreatDivisionAsDelimiter() {
         rewriteRun(
                 groovy(
