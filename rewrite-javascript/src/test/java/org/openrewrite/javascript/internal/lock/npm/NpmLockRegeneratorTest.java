@@ -143,6 +143,70 @@ class NpmLockRegeneratorTest {
         assertThat(result.getFailure().getPackageName()).as(result.getErrorMessage()).isEqualTo("legacy-consumer");
     }
 
+    private static final String BLOCKED_TRANSITIVELY_REGISTRY = UPDATE_REGISTRY.substring(0, UPDATE_REGISTRY.length() - 1) +
+      ",\"internal-lib\":{\"latest\":\"1.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"legacy-consumer\":\"1.0.0\"}}}}" +
+      ",\"other-consumer\":{\"latest\":\"1.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"compiler\":\"1\"}}}}}";
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateNamesTheDirectDependencyThatPullsInTheBlocker(String release) {
+        Result result = blockedUpdate(release, BLOCKED_TRANSITIVELY_REGISTRY,
+          Map.of("", updateManifest("1.0.0", "\"internal-lib\":\"1.0.0\"")),
+          Map.of("", updateManifest("2.0.0", "\"internal-lib\":\"1.0.0\"")));
+        assertThat(result.getFailure().getPackageName()).as(result.getErrorMessage()).isEqualTo("internal-lib");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateNamesTheBlockingDependencyOfAWorkspace(String release) {
+        Result result = blockedUpdate(release, UPDATE_REGISTRY,
+          Map.of("", workspaceRoot("1.0.0"), "packages/app", workspaceManifest("1.0.0")),
+          Map.of("", workspaceRoot("2.0.0"), "packages/app", workspaceManifest("2.0.0")));
+        assertThat(result.getFailure().getPackageName()).as(result.getErrorMessage()).isEqualTo("legacy-consumer");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateWithTwoBlockersNamesOneOfThem(String release) {
+        String blockers = "\"legacy-consumer\":\"1.0.0\",\"other-consumer\":\"1.0.0\"";
+        Result result = blockedUpdate(release, BLOCKED_TRANSITIVELY_REGISTRY,
+          Map.of("", updateManifest("1.0.0", blockers)), Map.of("", updateManifest("2.0.0", blockers)));
+        assertThat(result.getFailure().getPackageName()).as(result.getErrorMessage())
+          .isIn("legacy-consumer", "other-consumer");
+    }
+
+    private static Result blockedUpdate(String release, String registryJson, Map<String, String> before,
+                                        Map<String, String> after) {
+        PackumentSource registry = localRegistry(registryJson);
+        Result original = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(ROOT_ONLY_LOCK).manifests(before).now(Instant.EPOCH).build(), registry).regenerate();
+        assertThat(original.isSuccess()).as(original.getErrorMessage()).isTrue();
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(original.getLockFileContent()).manifests(after).now(Instant.EPOCH).build(), registry)
+          .regenerateForUpdate();
+        assertThat(result.getFailure()).as(result.getLockFileContent()).isNotNull();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.PEER_CONFLICT);
+        assertThat(result.getLockFileContent()).isNull();
+        return result;
+    }
+
+    private static String updateManifest(String version, String extraDependencies) {
+        return "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{" +
+          "\"builder\":\"" + version + "\",\"compiler\":\"" + version + "\"," + extraDependencies + "}}";
+    }
+
+    private static String workspaceRoot(String version) {
+        return "{\"name\":\"root\",\"version\":\"1.0.0\",\"workspaces\":[\"packages/app\"]," +
+          "\"devDependencies\":{\"compiler\":\"" + version + "\"}}";
+    }
+
+    private static String workspaceManifest(String version) {
+        return "{\"name\":\"app\",\"version\":\"1.0.0\",\"dependencies\":{" +
+          "\"builder\":\"" + version + "\",\"compiler\":\"" + version + "\",\"legacy-consumer\":\"1.0.0\"}}";
+    }
+
     private static String blockedThroughAPeerManifest(String version) {
         return "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{" +
           "\"core\":\"" + version + "\",\"third-party\":\"1.0.0\"},\"devDependencies\":{\"build\":\"" + version + "\"}}";
