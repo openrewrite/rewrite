@@ -931,11 +931,7 @@ export class JavaScriptTypeMapping {
     }
 
     private moduleType(module: string): Type.FullyQualified {
-        return {
-            kind: Type.Kind.Class,
-            flags: 0, // TODO - determine flags
-            fullyQualifiedName: module
-        } as Type.FullyQualified;
+        return moduleClass(module);
     }
 
     /**
@@ -1145,11 +1141,7 @@ export class JavaScriptTypeMapping {
                     const moduleName = this.moduleOfExpression(node.expression.expression);
 
                     // Use the inferred type or fall back to unknown
-                    declaringType = moduleName ? {
-                        kind: Type.Kind.Class,
-                        flags: 0, // TODO - determine flags
-                        fullyQualifiedName: moduleName
-                    } as Type.FullyQualified : Type.unknownType as Type.FullyQualified;
+                    declaringType = moduleName ? this.moduleType(moduleName) : Type.unknownType as Type.FullyQualified;
 
                     // Create the method type using the helper
                     return this.createMethodType(signature, node, declaringType, methodName);
@@ -1213,11 +1205,7 @@ export class JavaScriptTypeMapping {
                 // A `require()` result, and an import of a package without type declarations, is typed
                 // `any`, so nothing above identifies the module; the specifier in the call or import does.
                 if (declaringType === Type.unknownType && receiverBinding && receiverBinding.kind !== 'named') {
-                    declaringType = {
-                        kind: Type.Kind.Class,
-                        flags: 0, // TODO - determine flags
-                        fullyQualifiedName: receiverBinding.module
-                    } as Type.FullyQualified;
+                    declaringType = this.moduleType(receiverBinding.module);
                 }
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
@@ -1272,11 +1260,7 @@ export class JavaScriptTypeMapping {
                     methodName = declared.name ? declared.name.text : "<anonymous>";
                 } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
-                    declaringType = {
-                        kind: Type.Kind.Class,
-                        flags: 0, // TODO - determine flags
-                        fullyQualifiedName: moduleSpecifier
-                    } as Type.FullyQualified;
+                    declaringType = this.moduleType(moduleSpecifier);
                     // Calling a default export or a whole module calls the default export, whose aliased symbol
                     // carries its internal name (e.g. `e` for express), so represent it as `<default>`. Named
                     // bindings keep the exported name.
@@ -1305,11 +1289,7 @@ export class JavaScriptTypeMapping {
 
                         if (lastDot > 0) {
                             // For functions from modules, use the module part as declaring type
-                            declaringType = {
-                                kind: Type.Kind.Class,
-                                flags: 0, // TODO - determine flags
-                                fullyQualifiedName: fqn.substring(0, lastDot)
-                            } as Type.FullyQualified;
+                            declaringType = this.moduleType(fqn.substring(0, lastDot));
                         } else {
                             // No dots in the name - the type IS the module itself
                             declaringType = funcType as Type.FullyQualified;
