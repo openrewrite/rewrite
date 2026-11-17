@@ -31,11 +31,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Tells the type checker what a name or call that only a static import declares refers to. On Groovy 3 and later
  * the parser leaves out {@code StaticImportVisitor}, so such a name stays a dynamic variable and such a call has
- * no target. A name resolves in that visitor's order. A call resolves only to a static method of the imported class.
+ * no target. A name resolves in the order of Groovy 4's visitor. A call resolves only to a static method of the
+ * imported class.
  */
 class StaticImportTypeCheckingExtension extends TypeCheckingExtension {
     StaticImportTypeCheckingExtension(StaticTypeCheckingVisitor typeCheckingVisitor) {
@@ -83,13 +85,16 @@ class StaticImportTypeCheckingExtension extends TypeCheckingExtension {
     }
 
     private static List<MethodNode> bestStaticMethod(ClassNode owner, String name, ClassNode[] argumentTypes) {
-        List<MethodNode> candidates = new ArrayList<>();
-        for (MethodNode method : owner.getMethods(name)) {
-            if (method.isStatic()) {
-                candidates.add(method);
+        List<MethodNode> chosen = loadingMembers(() -> {
+            List<MethodNode> candidates = new ArrayList<>();
+            for (MethodNode method : owner.getMethods(name)) {
+                if (method.isStatic()) {
+                    candidates.add(method);
+                }
             }
-        }
-        return candidates.isEmpty() ? candidates : StaticTypeCheckingSupport.chooseBestMethod(owner, candidates, argumentTypes);
+            return candidates.isEmpty() ? candidates : StaticTypeCheckingSupport.chooseBestMethod(owner, candidates, argumentTypes);
+        });
+        return chosen == null ? Collections.emptyList() : chosen;
     }
 
     /**
@@ -97,20 +102,15 @@ class StaticImportTypeCheckingExtension extends TypeCheckingExtension {
      */
     static @Nullable AnnotatedNode staticallyImportedProperty(ModuleNode module, String name) {
         Map<String, ImportNode> staticImports = module.getStaticImports();
+        if (staticImports.isEmpty() && module.getStaticStarImports().isEmpty()) {
+            return null;
+        }
         String capitalized = MetaClassHelper.capitalize(name);
         for (String accessor : new String[]{"is" + capitalized, "get" + capitalized}) {
             ImportNode importNode = staticImports.get(accessor);
-            if (importNode != null) {
-                MethodNode getter = staticGetter(importNode.getType(), importNode.getFieldName());
-                if (getter != null) {
-                    return getter;
-                }
-                // A property of a class compiled from source has no getter until class generation
-                PropertyNode property = ClassNodeUtils.getStaticProperty(importNode.getType(),
-                        ClassNodeUtils.getPropNameForAccessor(importNode.getFieldName()));
-                if (property != null) {
-                    return property.getField();
-                }
+            AnnotatedNode member = importNode == null ? null : loadingMembers(() -> importedAccessor(importNode));
+            if (member != null) {
+                return member;
             }
         }
         ImportNode importNode = staticImports.get(name);
@@ -129,21 +129,46 @@ class StaticImportTypeCheckingExtension extends TypeCheckingExtension {
         return null;
     }
 
-    private static @Nullable AnnotatedNode staticPropertyOrField(ClassNode owner, String name) {
-        String capitalized = MetaClassHelper.capitalize(name);
-        MethodNode getter = staticGetter(owner, "is" + capitalized);
-        if (getter == null) {
-            getter = staticGetter(owner, "get" + capitalized);
-        }
+    private static @Nullable AnnotatedNode importedAccessor(ImportNode importNode) {
+        MethodNode getter = staticGetter(importNode.getType(), importNode.getFieldName());
         if (getter != null) {
             return getter;
         }
-        FieldNode field = ClassNodeUtils.getField(owner, name);
-        return field != null && field.isStatic() ? field : null;
+        // A property of a class compiled from source has no getter until class generation
+        PropertyNode property = ClassNodeUtils.getStaticProperty(importNode.getType(),
+                ClassNodeUtils.getPropNameForAccessor(importNode.getFieldName()));
+        return property == null ? null : property.getField();
+    }
+
+    private static @Nullable AnnotatedNode staticPropertyOrField(ClassNode owner, String name) {
+        return loadingMembers(() -> {
+            String capitalized = MetaClassHelper.capitalize(name);
+            MethodNode getter = staticGetter(owner, "is" + capitalized);
+            if (getter == null) {
+                getter = staticGetter(owner, "get" + capitalized);
+            }
+            if (getter != null) {
+                return getter;
+            }
+            FieldNode field = ClassNodeUtils.getField(owner, name);
+            return field != null && field.isStatic() ? field : null;
+        });
     }
 
     private static @Nullable MethodNode staticGetter(ClassNode owner, String name) {
         MethodNode method = owner.getMethod(name, Parameter.EMPTY_ARRAY);
         return method != null && method.isStatic() ? method : null;
+    }
+
+    /**
+     * A class whose member signatures name a type missing from the classpath cannot load its members, so a static
+     * import of it resolves nothing.
+     */
+    private static <T> @Nullable T loadingMembers(Supplier<@Nullable T> lookup) {
+        try {
+            return lookup.get();
+        } catch (NoClassDefFoundError e) {
+            return null;
+        }
     }
 }

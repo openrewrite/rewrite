@@ -17,6 +17,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
@@ -30,6 +31,9 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import javax.tools.ToolProvider;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -573,6 +577,36 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(TypeUtils.isOfClassType(calls.get("max").getDeclaringType(), "java.lang.Math")).isTrue();
                 assertThat(calls.get("max").getParameterTypes()).containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int);
             })
+          )
+        );
+    }
+
+    @Test
+    void staticImportOfAClassMissingADependencyLeavesTheRestTyped(@TempDir Path classpath) throws Exception {
+        Path sources = Files.createDirectories(classpath.resolve("src/lib"));
+        Files.writeString(sources.resolve("Lib.java"), "package lib; public class Lib { public static Missing make() { return null; } }");
+        Files.writeString(sources.resolve("Missing.java"), "package lib; public class Missing {}");
+        assertThat(ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classpath.toString(),
+          sources.resolve("Lib.java").toString(), sources.resolve("Missing.java").toString())).isZero();
+        Files.delete(classpath.resolve("lib/Missing.class"));
+        rewriteRun(
+          spec -> spec.parser(GroovyParser.builder().classpath(List.of(classpath))),
+          groovy(
+            """
+              import static lib.Lib.*
+              def v = version
+              make()
+              def n = "s".length()
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("n".equals(variable.getSimpleName())) {
+                        assertThat(variable.getVariableType().getType()).isEqualTo(JavaType.Primitive.Int);
+                    }
+                    return variable;
+                }
+            }.visit(cu, 0))
           )
         );
     }
