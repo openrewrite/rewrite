@@ -350,8 +350,12 @@ class SourcePositionServiceTest implements RewriteTest {
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                   J.ClassDeclaration person = cu.getClasses().getFirst();
                   JContainer<Statement> components = person.getPadding().getPrimaryConstructor();
+                  SourcePositionService service = cu.service(SourcePositionService.class);
                   Cursor componentsCursor = new Cursor(new Cursor(new Cursor(null, cu), person), components);
-                  assertThat(cu.service(SourcePositionService.class).columnsOf(componentsCursor, components.getElements().getFirst()).getStartColumn())
+                  assertThat(service.columnsOf(componentsCursor, components.getElements().getFirst()).getStartColumn())
+                    .isEqualTo(15);
+                  Cursor detachedComponentsCursor = new Cursor(new Cursor(null, person), components);
+                  assertThat(service.columnsOf(detachedComponentsCursor, components.getElements().getFirst()).getStartColumn())
                     .isEqualTo(15);
                   return cu;
               }

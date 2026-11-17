@@ -131,13 +131,16 @@ public class SourcePositionService {
             methodCursor = new Cursor(methodCursor, ((J.MethodInvocation) cursorValue).getSelect());
         }
         cursorValue = cursor.getValue();
-        if (cursorValue instanceof JavaSourceFile) {
-            return cursor;
-        }
         if (cursorValue instanceof J) {
+            Cursor parent = cursor.getParent();
+            if (parent == null) {
+                return cursor;
+            }
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.dropParentUntil(it -> it instanceof JavaSourceFile || (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded || (it instanceof J && ((J) it).getPrefix().getWhitespace().contains("\n"))))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+            while (parent.getParent() != null && !isNewLineSearchAncestor(parent.getValue())) {
+                parent = parent.getParent();
+            }
             while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
                 parent = parent.getParent();
             }
@@ -150,6 +153,15 @@ public class SourcePositionService {
         }
 
         return cursor;
+    }
+
+    private static boolean isNewLineSearchAncestor(Object value) {
+        if (value instanceof JavaSourceFile) {
+            return true;
+        }
+        // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+        return !(value instanceof J.MethodInvocation || value instanceof JRightPadded || value instanceof JLeftPadded ||
+                 (value instanceof J && ((J) value).getPrefix().getWhitespace().contains("\n")));
     }
 
     /**
