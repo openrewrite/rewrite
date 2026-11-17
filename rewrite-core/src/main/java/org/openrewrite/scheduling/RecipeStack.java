@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.EditPreconditions;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -102,7 +103,7 @@ class RecipeStack {
 
     private void init(Recipe recipe) {
         allRecipesStack = new ArrayDeque<>();
-        allRecipesStack.push(new RecipePath(recipe));
+        allRecipesStack.push(new RecipePath(EditPreconditions.prepare(recipe)));
     }
 
     private void recurseRecipeList(RecipePath recipePath) {
@@ -123,6 +124,6 @@ class RecipeStack {
     }
 
     private List<Recipe> getRecipeList(Recipe recipe) {
-        return recipeLists.computeIfAbsent(recipe, Recipe::getRecipeList);
+        return recipeLists.computeIfAbsent(recipe, EditPreconditions::recipeList);
     }
 }
