@@ -16,8 +16,12 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.marker.DirectFieldAccess;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class AttributeTest implements RewriteTest {
@@ -25,7 +29,45 @@ class AttributeTest implements RewriteTest {
     @Test
     void attribute() {
         rewriteRun(
-          groovy("new User('Bob').@name")
+          groovy(
+            "new User('Bob').@name",
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                    assertThat(fieldAccess.getSimpleName()).isEqualTo("name");
+                    assertThat(fieldAccess.getName().getMarkers().findFirst(DirectFieldAccess.class)).isPresent();
+                    return fieldAccess;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void safeAndSpreadAttribute() {
+        rewriteRun(
+          groovy(
+            """
+              def u = new User('Bob')
+              u?.@name
+              [u]*.@name
+              """
+          )
+        );
+    }
+
+    @Test
+    void whitespaceAroundAtSign() {
+        rewriteRun(
+          groovy(
+            """
+              def u = new User('Bob')
+              u. @name
+              u.@ name
+              u.
+                @name
+              """
+          )
         );
     }
 

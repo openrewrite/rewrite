@@ -37,7 +37,15 @@ class RecipeQualityValidationTest {
     @Test
     void parserTypedTreesOnlyWhenItsSystemPropertyTurnsThemOn() {
         assertOnOnlyWhenItsSystemPropertyTurnsItOn("org.openrewrite.test.parserTypedTrees",
-          RecipeQualityValidation::parserTypedTrees);
+          quality -> quality.parserTypedTrees() == RecipeQualityValidation.ParserTypes.Exact);
+    }
+
+    @Test
+    void parserTypedTreesOnOrOff() {
+        assertThat(RecipeQualityValidation.builder().parserTypedTrees(true).build().parserTypedTrees())
+          .isEqualTo(RecipeQualityValidation.ParserTypes.Exact);
+        assertThat(RecipeQualityValidation.builder().parserTypedTrees(false).build().parserTypedTrees())
+          .isEqualTo(RecipeQualityValidation.ParserTypes.Off);
     }
 
     @Test

@@ -113,7 +113,7 @@ class RewriteRpcTest implements RewriteTest {
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        var clientJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut));
+        var clientJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), new JsonMessageFormatter());
         client = new RewriteRpc(clientJsonRpc, marketplace) {
             @Override
             protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
@@ -122,7 +122,7 @@ class RewriteRpcTest implements RewriteTest {
             }
         }.batchSize(1);
 
-        serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut));
+        serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), new JsonMessageFormatter());
         server = new RewriteRpc(serverJsonRpc, marketplace, List.of(new TestRecipeBundleResolver()))
           .batchSize(1);
     }

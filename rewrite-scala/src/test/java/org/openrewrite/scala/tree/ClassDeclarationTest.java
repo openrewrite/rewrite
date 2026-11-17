@@ -550,17 +550,6 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void classWithTrailingCommaSingleLine() {
-        rewriteRun(
-            scala(
-                """
-                class Foo(x: Int,)
-                """
-            )
-        );
-    }
-
-    @Test
     void classWithoutTrailingCommaDoesNotFail() {
         rewriteRun(
             scala(
@@ -572,11 +561,24 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void singleLineSealedTrait() {
+        rewriteRun(
+            scala(
+                """
+                sealed trait Foo
+                """
+            )
+        );
+    }
+
+    @Test
     void classWithTrailingCommaAndWhitespaceBeforeComma() {
         rewriteRun(
             scala(
                 """
-                class Foo(x: Int ,)
+                class Foo(
+                    x: Int ,
+                )
                 """
             )
         );
@@ -591,17 +593,6 @@ class ClassDeclarationTest implements RewriteTest {
                     A,
                     B,
                 ](x: A)
-                """
-            )
-        );
-    }
-
-    @Test
-    void classWithTrailingCommaInTypeParametersSingleLine() {
-        rewriteRun(
-            scala(
-                """
-                class Foo[A,](x: A)
                 """
             )
         );

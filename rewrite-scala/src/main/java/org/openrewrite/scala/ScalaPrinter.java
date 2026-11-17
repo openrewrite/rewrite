@@ -52,6 +52,7 @@ import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.marker.UnicodeArrow;
 import org.openrewrite.scala.marker.ValVarKeyword;
 import org.openrewrite.scala.marker.PackageSemicolon;
+import org.openrewrite.scala.marker.ProcedureSyntax;
 import org.openrewrite.scala.tree.S;
 
 import java.util.List;
@@ -452,6 +453,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return case_;
     }
 
+    // Earlier parser versions marked both of these with OmitBraces, and their LSTs still reach this printer.
+    private static boolean isProcedureSyntax(J.MethodDeclaration method) {
+        return method.getMarkers().findFirst(ProcedureSyntax.class).isPresent() ||
+               method.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+    }
+
+    private static boolean omitsParentheses(JContainer<Statement> params) {
+        return params.getMarkers().findFirst(OmitParentheses.class).isPresent() ||
+               params.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+    }
+
     @Override
     public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
@@ -477,10 +489,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(method.getPadding().getTypeParameters(), p);
         }
 
-        // Print parameters — skip parens for parameterless methods (marked with OmitBraces)
         JContainer<Statement> params = method.getPadding().getParameters();
-        boolean hasParens = !params.getMarkers().findFirst(
-                org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+        boolean hasParens = !omitsParentheses(params);
         if (hasParens) {
             visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
             p.append('(');
@@ -569,9 +579,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     ((J.Block) actualBody).getMarkers().findFirst(
                             org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             if (!isAbstract) {
-                boolean procedureSyntax = method.getMarkers().findFirst(
-                        org.openrewrite.scala.marker.OmitBraces.class).isPresent();
-                if (!procedureSyntax) {
+                if (!isProcedureSyntax(method)) {
                     final J finalActualBody = actualBody;
                     Space beforeEquals = method.getMarkers()
                             .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
@@ -597,12 +605,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
         } else if (method.getBody() != null) {
             // Normal method body
-            boolean procedureSyntax = method.getMarkers().findFirst(
-                    org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             J.Block body = method.getBody();
             boolean omitBodyBraces = body.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
-            if (!procedureSyntax) {
+            if (!isProcedureSyntax(method)) {
                 Space beforeEquals = method.getMarkers()
                         .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
                         .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
@@ -744,6 +750,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitAnnotatedExpression((S.AnnotatedExpression) tree, p);
         } else if (tree instanceof S.RefinedType) {
             return visitRefinedType((S.RefinedType) tree, p);
+        } else if (tree instanceof S.ExistentialType) {
+            return visitExistentialType((S.ExistentialType) tree, p);
         } else if (tree instanceof S.FunctionType) {
             return visitFunctionType((S.FunctionType) tree, p);
         } else if (tree instanceof S.TupleType) {
@@ -2048,6 +2056,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(refinedType.getRefinements(), p);
         afterSyntax(refinedType, p);
         return refinedType;
+    }
+
+    public J visitExistentialType(S.ExistentialType existentialType, PrintOutputCapture<P> p) {
+        beforeSyntax(existentialType, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(existentialType.getUnderlying(), p);
+        JLeftPadded<J.Block> clause = existentialType.getPadding().getClause();
+        visitSpace(clause.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("forSome");
+        visit(clause.getElement(), p);
+        afterSyntax(existentialType, p);
+        return existentialType;
     }
 
     public J visitMacro(S.Macro macro, PrintOutputCapture<P> p) {

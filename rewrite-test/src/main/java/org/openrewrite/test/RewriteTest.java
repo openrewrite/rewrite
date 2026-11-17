@@ -732,17 +732,22 @@ public interface RewriteTest extends SourceSpecs {
         RewriteTestUtils.assertAfterParsersParse(testMethodSpec.afterParsers, afterParsersFor,
                 recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         boolean validatesTypes = TypeValidation.validatesTypes(testMethodSpec, testClassSpec);
-        new TreeShapes(quality.parserShapedTrees(), quality.parserTypedTrees() && validatesTypes,
+        new TreeShapes(quality.parserShapedTrees(),
+                validatesTypes ? quality.parserTypedTrees() : RecipeQualityValidation.ParserTypes.Off,
                 quality.compilableOutput() && validatesTypes, afterParsersFor, specAfterParsers, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         unneededOptOuts.checkOnTheSideLater("parserShapedTrees", () ->
-                new TreeShapes(true, false, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                new TreeShapes(true, RecipeQualityValidation.ParserTypes.Off, false, afterParsersFor,
+                        specAfterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
-        unneededOptOuts.checkOnTheSideLater("parserTypedTrees", () ->
-                new TreeShapes(false, true, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
-                        .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        for (RecipeQualityValidation.ParserTypes level : RecipeQualityValidation.ParserTypes.values()) {
+            unneededOptOuts.checkOnTheSideLater("parserTypedTrees", level, () ->
+                    new TreeShapes(false, level, false, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                            .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
+        }
         unneededOptOuts.checkOnTheSideLater("compilableOutput", () ->
-                new TreeShapes(false, false, true, afterParsersFor, specAfterParsers, relativeTo, ctx)
+                new TreeShapes(false, RecipeQualityValidation.ParserTypes.Off, true, afterParsersFor,
+                        specAfterParsers, relativeTo, ctx)
                         .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles));
         unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
                 CompositeOrder.assertOrdered(recipe));

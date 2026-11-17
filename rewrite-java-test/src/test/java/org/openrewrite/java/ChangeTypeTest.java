@@ -1531,6 +1531,51 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void staticImportOfAConstantOfANestedTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old$Typing", "b.New$Typing", true)),
+          java("package a; public class Old { public enum Typing { STATIC } }", SourceSpec::skip),
+          java("package b; public class New { public enum Typing { STATIC } }", SourceSpec::skip),
+          java(
+            """
+              import static a.Old.Typing.STATIC;
+
+              class Test {
+                  Object typing = STATIC;
+              }
+              """,
+            """
+              import static b.New.Typing.STATIC;
+
+              class Test {
+                  Object typing = STATIC;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old.Typing;
+
+              import static a.Old.Typing.STATIC;
+
+              class AlsoImportsTheType {
+                  Typing typing = STATIC;
+              }
+              """,
+            """
+              import b.New;
+
+              import static b.New.Typing.STATIC;
+
+              class AlsoImportsTheType {
+                  New.Typing typing = STATIC;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void staticStarImportNextToImportOfTheType() {
         rewriteRun(
           java(a1),
@@ -2104,7 +2149,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocLink() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -2135,7 +2179,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocSee() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -2166,7 +2209,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocMemberLink() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -3041,7 +3083,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void noChangeToVariableNameWithoutChangeToType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -4718,6 +4759,44 @@ class ChangeTypeTest implements RewriteTest {
                   Outer.New o;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void changeAnnotationOnRecordComponentWhenBlankLinesPrecedePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.springframework.lang.Nullable", "org.jspecify.annotations.Nullable", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package org.springframework.lang;
+                public @interface Nullable {}
+                """,
+              """
+                package org.jspecify.annotations;
+                public @interface Nullable {}
+                """
+            )),
+          java(
+            """
+
+              package com.example;
+
+              import org.springframework.lang.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            """
+
+              package com.example;
+
+              import org.jspecify.annotations.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            SourceSpec::noTrim
           )
         );
     }

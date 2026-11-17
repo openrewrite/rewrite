@@ -108,11 +108,13 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @param exact Whether to compare type arguments, flags and thrown exceptions too, or only names, numbers of
+     *              parameters and erased classes.
      * @return How the types of {@code tree} differ from those of {@code parsed}, the same node in a parse of the text
      * it prints, each such as "the variable int x where the parser gives long x". A type either of them doesn't
      * resolve isn't compared.
      */
-    default List<String> typeDifferences(Tree tree, Tree parsed) {
+    default List<String> typeDifferences(Tree tree, Tree parsed, boolean exact) {
         return emptyList();
     }
 

@@ -29,8 +29,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class OpenRewriteModelBuilderTest {
 
@@ -87,5 +91,21 @@ class OpenRewriteModelBuilderTest {
           new RuntimeException("Could not compile build file 'build.gradle'."));
         assertThat(OpenRewriteModelBuilder.explainMissingPlugin(brokenBuildScript, "8.98.0-SNAPSHOT"))
           .isSameAs(brokenBuildScript);
+    }
+
+    @Test
+    void buildsInTheGivenGradleUserHome(@TempDir Path tmp) throws IOException {
+        // The home's daemon holds files in it, so the home can't be a @TempDir. The build cleans up the homes directory.
+        String homes = System.getProperty("org.openrewrite.gradle.local.gradle-user-homes");
+        assumeTrue(homes != null, "Run by a build that names a directory for Gradle user homes");
+        Path gradleUserHome = Paths.get(homes).resolve("OpenRewriteModelBuilderTest-" + UUID.randomUUID());
+        Path project = Files.createDirectories(tmp.resolve("project"));
+        Files.write(project.resolve("settings.gradle"), "rootProject.name = 'sample'\n".getBytes(UTF_8));
+        Files.write(project.resolve("build.gradle"), new byte[0]);
+
+        OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(project.toFile(), null, null, gradleUserHome.toFile());
+
+        assertThat(model.getGradleProject().getName()).isEqualTo("sample");
+        assertThat(gradleUserHome.resolve("caches")).isDirectory();
     }
 }

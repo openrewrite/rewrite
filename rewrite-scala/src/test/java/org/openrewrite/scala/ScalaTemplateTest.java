@@ -18,6 +18,7 @@ package org.openrewrite.scala;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
@@ -25,6 +26,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -170,22 +172,26 @@ class ScalaTemplateTest implements RewriteTest {
           ));
     }
 
+    private static Recipe replaceDeprecatedArgument() {
+        return toRecipe(() -> new ScalaVisitor<>() {
+            @Override
+            public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                if ("deprecated".equals(annotation.getSimpleName()) &&
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
+                    return ScalaTemplate.builder("\"new\"")
+                      .build()
+                      .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                }
+                return annotation;
+            }
+        });
+    }
+
     @Test
     void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
-              @Override
-              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                  if ("deprecated".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
-                      return ScalaTemplate.builder("\"new\"")
-                        .build()
-                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
-                  }
-                  return annotation;
-              }
-          })),
+          spec -> spec.recipe(replaceDeprecatedArgument()),
           scala(
             """
               class Test {
@@ -203,6 +209,54 @@ class ScalaTemplateTest implements RewriteTest {
 
                   @deprecated("new")
                   def foo(): Unit = {}
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnVal() {
+        rewriteRun(
+          spec -> spec.recipe(replaceDeprecatedArgument()),
+          scala(
+            """
+              class Test {
+                  @deprecated("old")
+                  val x: Int = 1
+              }
+              """,
+            """
+              class Test {
+                  @deprecated("new")
+                  val x: Int = 1
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnLocalDef() {
+        rewriteRun(
+          spec -> spec.recipe(replaceDeprecatedArgument()),
+          scala(
+            """
+              class Test {
+                  def outer(): Unit = {
+                      val a, b: Int = 1
+                      val c = 2
+                      @deprecated("old")
+                      def foo(): Unit = {}
+                  }
+              }
+              """,
+            """
+              class Test {
+                  def outer(): Unit = {
+                      val a, b: Int = 1
+                      val c = 2
+                      @deprecated("new")
+                      def foo(): Unit = {}
+                  }
               }
               """
           ));
@@ -258,6 +312,91 @@ class ScalaTemplateTest implements RewriteTest {
                 }
               }
               """
+          ));
+    }
+
+    @Test
+    void parameterOfParameterizedType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitSwitch(J.Switch s, ExecutionContext ctx) {
+                  return ScalaTemplate.builder("#{any()}.getOrElse(\"d\")")
+                    .build()
+                    .apply(getCursor(), s.getCoordinates().replace(), s.getSelector().getTree());
+              }
+          })),
+          scala(
+            """
+              class Example {
+                  val opt: Option[String] = Some("hello")
+                  val value = opt match {
+                    case Some(x) => x
+                    case None => "default"
+                  }
+              }
+              """,
+            """
+              class Example {
+                  val opt: Option[String] = Some("hello")
+                  val value = opt.getOrElse("d")
+              }
+              """
+          ));
+    }
+
+    @Test
+    void parameterTypesInScalaSyntax() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"id".equals(method.getSimpleName())) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return ScalaTemplate.builder("#{any()}.toString()")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+              }
+          })),
+          scala(
+            """
+              object T {
+                def id[A](a: A): A = a
+                def f(ints: Array[Int], nested: Array[Array[String]], map: Map[String, Int],
+                      wild: java.util.List[_ <: Number], sup: java.util.List[_ >: Integer],
+                      union: List[String] | Int): Unit = {
+                  val a = id(ints)
+                  val b = id(nested)
+                  val c = id(map)
+                  val d = id(wild)
+                  val e = id(sup)
+                  val f = id(union)
+                }
+              }
+              """,
+            """
+              object T {
+                def id[A](a: A): A = a
+                def f(ints: Array[Int], nested: Array[Array[String]], map: Map[String, Int],
+                      wild: java.util.List[_ <: Number], sup: java.util.List[_ >: Integer],
+                      union: List[String] | Int): Unit = {
+                  val a = ints.toString()
+                  val b = nested.toString()
+                  val c = map.toString()
+                  val d = wild.toString()
+                  val e = sup.toString()
+                  val f = union.toString()
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new ScalaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(method.getMethodType()).as(method.toString()).isNotNull();
+                    return method;
+                }
+            }.visit(cu, 0))
           ));
     }
 }

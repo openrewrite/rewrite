@@ -69,6 +69,11 @@ public class AppendToSequence extends Recipe {
     }
 
     @Override
+    public int maxCycles() {
+        return 1;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(sequencePath);
         return new AppendToSequenceVisitor(matcher, value, existingSequenceValues,

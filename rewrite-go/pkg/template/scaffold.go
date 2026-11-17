@@ -160,6 +160,10 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preceding int)
 			if targetIdx >= len(bodyStmts) {
 				return nil, fmt.Errorf("statement scaffold: expected body statement at index %d, got %d", targetIdx, len(bodyStmts))
 			}
+			if n := len(bodyStmts) - targetIdx; n > 1 {
+				return nil, fmt.Errorf("statement scaffold: the template code holds %d statements where one "+
+					"replaces one node; enclose them in a block", n)
+			}
 			return bodyStmts[targetIdx].Element, nil
 		}
 		return nil, fmt.Errorf("statement scaffold: could not find __f__ function")
@@ -167,6 +171,10 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preceding int)
 	case ScaffoldTopLevel:
 		if len(stmts) == 0 || declaresScaffoldEnd(stmts[0].Element) {
 			return nil, fmt.Errorf("top-level scaffold: no declaration in the template code")
+		}
+		if len(stmts) > 1 && !declaresScaffoldEnd(stmts[1].Element) {
+			return nil, fmt.Errorf("top-level scaffold: the template code holds more than one declaration " +
+				"where one replaces one node; group them in a declaration block or use one template each")
 		}
 		return stmts[0].Element, nil
 

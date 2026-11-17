@@ -88,4 +88,16 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
           )
         );
     }
+
+    @Test
+    void propertyReadOfClassType() {
+        rewriteRun(
+          groovy(
+            """
+              def file = new File("build.gradle")
+              def parent = file.parentFile
+              """
+          )
+        );
+    }
 }

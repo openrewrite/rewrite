@@ -21,10 +21,9 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
-/**
- * Ensure that the same replacement is not applied to the same file more than once per recipe run.
- * Used to avoid the situation where replacing "a" with "ab" results in something like "abb".
- */
+/// Kept only so that older recipes and LSTs still load. A recipe whose edit must not be applied
+/// twice in one run should return `1` from [org.openrewrite.Recipe#maxCycles()] instead.
+@Deprecated
 @Value
 @With
 public class AlreadyReplaced implements Marker {

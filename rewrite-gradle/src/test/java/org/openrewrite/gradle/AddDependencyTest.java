@@ -1460,6 +1460,377 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @CsvSource(value = {"null,com.google.common.math.IntMath", "testImplementation,null", "testImplementation,com.google.common.math.IntMath"}, nullValues = "null")
+    void addDependencyLeavesUnrelatedConfigurationAlone(@Nullable String configuration, @Nullable String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing, configuration)),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:28.0-jre"
+                    compileOnly "com.google.guava:guava:28.0-jre"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                    compileOnly "com.google.guava:guava:28.0-jre"
+                }
+                """,
+              spec -> spec.afterRecipe(cu -> {
+                  GradleProject gp = cu.getMarkers().findFirst(GradleProject.class).orElseThrow();
+                  assertThat(gp.getConfiguration("compileOnly").findRequestedDependency("com.google.guava", "guava").getVersion())
+                    .isEqualTo("28.0-jre");
+                  assertThat(gp.getConfiguration("testImplementation").findRequestedDependency("com.google.guava", "guava").getVersion())
+                    .isEqualTo("29.0-jre");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyLeavesUnrelatedConfigurationAloneKotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradleKts(
+              """
+                plugins {
+                    `java-library`
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation(group = "com.google.guava", name = "guava", version = "28.0-jre")
+                    compileOnly("com.google.guava:guava:28.0-jre")
+                }
+                """,
+              """
+                plugins {
+                    `java-library`
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
+                    compileOnly("com.google.guava:guava:28.0-jre")
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyLeavesPropertyOnlyBackingUnrelatedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          settingsGradle(
+            """
+              include "project1"
+              """
+          ),
+          properties(
+            "guavaVersion=28.0-jre",
+            spec -> spec.path("gradle.properties")
+          ),
+          mavenProject("project1",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    compileOnly "com.google.guava:guava:${guavaVersion}"
+                    testImplementation "com.google.guava:guava:28.0-jre"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    compileOnly "com.google.guava:guava:${guavaVersion}"
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyUpgradesVariableSharedWithUnrelatedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                ext {
+                    guavaVersion = '28.0-jre'
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:${guavaVersion}"
+                    compileOnly "com.google.guava:guava:${guavaVersion}"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                ext {
+                    guavaVersion = '29.0-jre'
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:${guavaVersion}"
+                    compileOnly "com.google.guava:guava:${guavaVersion}"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyLeavesVersionCatalogEntryOnlyBackingUnrelatedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          settingsGradle(
+            """
+              include "project1"
+              """
+          ),
+          toml(
+            """
+              [versions]
+              guava = "28.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          mavenProject("project1",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:28.0-jre"
+                    compileOnly libs.guava
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                    compileOnly libs.guava
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyUpgradesVersionCatalogEntrySharedWithUnrelatedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          settingsGradle(
+            """
+              include "project1"
+              """
+          ),
+          toml(
+            """
+              [versions]
+              guava = "28.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          mavenProject("project1",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation libs.guava
+                    compileOnly libs.guava
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyLeavesProjectThatDoesNotNeedIt() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("root",
+            buildGradle(
+              """
+                subprojects {
+                    apply plugin: 'java-library'
+
+                    repositories {
+                        mavenCentral()
+                    }
+
+                    dependencies {
+                        testImplementation "com.google.guava:guava:28.0-jre"
+                        compileOnly "com.google.guava:guava:28.0-jre"
+                    }
+                }
+                """,
+              """
+                subprojects {
+                    apply plugin: 'java-library'
+
+                    repositories {
+                        mavenCentral()
+                    }
+
+                    dependencies {
+                        testImplementation "com.google.guava:guava:29.0-jre"
+                        compileOnly "com.google.guava:guava:28.0-jre"
+                    }
+                }
+                """
+            ),
+            settingsGradle(
+              """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              srcTestJava(
+                java(usingGuavaIntMath)
+              ),
+              buildGradle(
+                """
+                  dependencies {
+                      testImplementation "com.google.guava:guava:28.0-jre"
+                  }
+                  """,
+                """
+                  dependencies {
+                      testImplementation "com.google.guava:guava:29.0-jre"
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              buildGradle(
+                """
+                  dependencies {
+                      testImplementation "com.google.guava:guava:28.0-jre"
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
     @Test
     void addDependencyToProjectWithOtherSourceTypes() {
         rewriteRun(

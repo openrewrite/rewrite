@@ -445,6 +445,25 @@ public class TypeTable implements JavaParserClasspathLoader {
             }
         }
 
+        /// scalac pairs a `@ScalaSignature` pickle with a `ScalaSig` class attribute, and the Scala
+        /// compiler only reads the pickle when that attribute is present. The attribute's own bytes
+        /// are never read, so restoring a fixed marker is enough for the compiler to read Scala 2 stubs.
+        private static boolean hasScalaSignature(String annotations) {
+            return annotations.contains("@Lscala/reflect/ScalaSignature;") ||
+                   annotations.contains("@Lscala/reflect/ScalaLongSignature;");
+        }
+
+        private static class ScalaSigAttribute extends Attribute {
+            ScalaSigAttribute() {
+                super("ScalaSig");
+            }
+
+            @Override
+            protected ByteVector write(ClassWriter classWriter, byte[] code, int codeLength, int maxStack, int maxLocals) {
+                return new ByteVector().putByte(5).putByte(0).putByte(0);
+            }
+        }
+
         /**
          * Process a single class definition by feeding it to a ClassVisitor.
          * This contains the core logic for converting TypeTable data to ASM visitor calls.
@@ -462,6 +481,9 @@ public class TypeTable implements JavaParserClasspathLoader {
             // Apply annotations to the class
             if (classDef.getAnnotations() != null) {
                 AnnotationApplier.applyAnnotations(classDef.getAnnotations(), classVisitor::visitAnnotation);
+                if (hasScalaSignature(classDef.getAnnotations())) {
+                    classVisitor.visitAttribute(new ScalaSigAttribute());
+                }
             }
 
             if (classDef.getInnerClasses() != null) {
@@ -561,7 +583,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                         Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
                         // Only primitive types and strings can be ConstantValue attributes
                         if (isValidConstantValueType(parsedValue)) {
-                            constantValue = parsedValue;
+                            constantValue = toConstantPoolValue(parsedValue);
                         }
                     }
 
@@ -662,6 +684,18 @@ public class TypeTable implements JavaParserClasspathLoader {
                 value instanceof Float || value instanceof Double ||
                 value instanceof Boolean || value instanceof Character ||
                 value instanceof Byte || value instanceof Short;
+    }
+
+    /// The `ConstantValue` attribute stores `boolean`, `char`, `byte` and `short` constants as `int`.
+    private static Object toConstantPoolValue(Object value) {
+        if (value instanceof Boolean) {
+            return (Boolean) value ? 1 : 0;
+        } else if (value instanceof Character) {
+            return (int) (Character) value;
+        } else if (value instanceof Byte || value instanceof Short) {
+            return ((Number) value).intValue();
+        }
+        return value;
     }
 
 

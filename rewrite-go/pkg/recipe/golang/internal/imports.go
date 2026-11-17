@@ -430,6 +430,13 @@ func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string)
 	// its first import. imp joins the last declaration holding its group.
 	elements := append([]java.RightPadded[*java.Import](nil), imps.Elements...)
 	start, end := targetDeclaration(elements, GroupOf(ImportPath(imp), modulePath), modulePath)
+	if start < 0 {
+		imp = copyImportForDeclaration(imp)
+		imp.Markers = withImportBlock(imp.Markers, &golang.ImportBlock{Ident: uuid.New(), ClosePrevious: isGroupedDeclaration(imps, elements[len(elements)-1]), Before: java.MakeSpace(nil, "\n\n")})
+		imps.Elements = append(elements, java.RightPadded[*java.Import]{Element: imp})
+		c.Imports = &imps
+		return &c
+	}
 
 	// Adding a second import to an ungrouped declaration promotes it to
 	// the grouped `import (...)` form — that's the only legal Go syntax
@@ -466,15 +473,40 @@ func targetDeclaration(elements []java.RightPadded[*java.Import], group ImportGr
 		}
 		return len(elements)
 	}
+	fallback := -1
 	for d := len(starts) - 1; d >= 0; d-- {
+		hasC := false
 		for i := starts[d]; i < endOf(d); i++ {
-			if elements[i].Element != nil && GroupOf(ImportPath(elements[i].Element), modulePath) == group {
+			if ImportPath(elements[i].Element) == "C" {
+				hasC = true
+			}
+		}
+		if hasC {
+			continue
+		}
+		if fallback < 0 {
+			fallback = d
+		}
+		for i := starts[d]; i < endOf(d); i++ {
+			if GroupOf(ImportPath(elements[i].Element), modulePath) == group {
 				return starts[d], endOf(d)
 			}
 		}
 	}
-	last := len(starts) - 1
-	return starts[last], endOf(last)
+	if fallback < 0 {
+		return -1, -1
+	}
+	return starts[fallback], endOf(fallback)
+}
+
+func copyImportForDeclaration(imp *java.Import) *java.Import {
+	c := *imp
+	if c.Alias != nil {
+		c.Prefix = java.SingleSpace
+	} else {
+		c.Qualid = withPrefix(c.Qualid, java.SingleSpace)
+	}
+	return &c
 }
 
 func isGroupedDeclaration(imps java.Container[*java.Import], first java.RightPadded[*java.Import]) bool {
@@ -516,7 +548,7 @@ func promoteToGrouped(imps *java.Container[*java.Import], elements []java.RightP
 		})
 	}
 	rp.Element = &imp
-	rp.After = java.MakeSpace(nil, "\n") // newline before `)`
+	rp.After = withClosingWhitespace(rp.After, java.MakeSpace(nil, "\n"))
 
 	if end < len(elements) && elements[end].Element != nil {
 		next := *elements[end].Element
@@ -575,38 +607,106 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	}
 	c := *cu
 	imps := *c.Imports
-	removedLastAfter := java.EmptySpace
-	removedWasLast := false
-	removedWasFirst := false
-	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
-	for i, rp := range imps.Elements {
-		if rp.Element != nil && rp.Element.ID == imp.ID {
-			if i == 0 {
-				removedWasFirst = true
-			}
-			if i == len(imps.Elements)-1 {
-				removedLastAfter = rp.After
-				removedWasLast = true
-			}
-			continue
+	elements := append([]java.RightPadded[*java.Import](nil), imps.Elements...)
+	index := -1
+	for i, rp := range elements {
+		if rp.Element.ID == imp.ID {
+			index = i
+			break
 		}
-		out = append(out, rp)
 	}
-	if removedWasLast && len(out) > 0 {
-		// Donate the closing-paren-on-own-line whitespace to the new
-		// last element so the block keeps its tidy shape.
-		out[len(out)-1].After = removedLastAfter
+	if index < 0 {
+		return cu
 	}
-	if removedWasFirst && len(out) > 0 {
-		out[0].Element = withoutLeadingBlankLines(out[0].Element)
+	start, end := index, index+1
+	for start > 0 && java.FindMarker[golang.ImportBlock](elements[start].Element.Markers) == nil {
+		start--
 	}
-	imps.Elements = out
-	if len(out) == 0 {
+	for end < len(elements) && java.FindMarker[golang.ImportBlock](elements[end].Element.Markers) == nil {
+		end++
+	}
+	block := java.FindMarker[golang.ImportBlock](elements[start].Element.Markers)
+	if end-start > 1 {
+		if index == start {
+			head := *elements[index+1].Element
+			head.Markers = withImportBlock(head.Markers, block)
+			elements[index+1].Element = withoutLeadingBlankLines(&head)
+		}
+		if index == end-1 {
+			elements[index-1].After = withClosingWhitespace(elements[index-1].After, elements[index].After)
+		}
+	} else if start == 0 && end < len(elements) {
+		head := *elements[end].Element
+		next := java.FindMarker[golang.ImportBlock](head.Markers)
+		imps.Before = java.MakeSpace(next.Before.Comments(), imps.Before.Whitespace())
+		imps.Markers = withoutGroupedImport(imps.Markers)
+		if next.Grouped {
+			imps.Markers = java.AddMarker(imps.Markers, golang.GroupedImport{Ident: uuid.New(), Before: next.GroupedBefore})
+		}
+		head.Markers = withImportBlock(head.Markers, nil)
+		elements[end].Element = &head
+	} else if end < len(elements) {
+		head := *elements[end].Element
+		next := java.FindMarker[golang.ImportBlock](head.Markers)
+		next.ClosePrevious = block.ClosePrevious
+		head.Markers = withImportBlock(head.Markers, next)
+		elements[end].Element = &head
+	}
+	imps.Elements = append(elements[:index], elements[index+1:]...)
+	if len(imps.Elements) == 0 {
 		c.Imports = nil
 	} else {
 		c.Imports = &imps
 	}
+
 	return &c
+}
+
+func withoutGroupedImport(markers java.Markers) java.Markers {
+	entries := make([]java.Marker, 0, len(markers.Entries()))
+	for _, m := range markers.Entries() {
+		if _, ok := m.(golang.GroupedImport); !ok {
+			entries = append(entries, m)
+		}
+	}
+	return java.MakeMarkers(markers.GetID(), entries)
+}
+
+func splitImportAfter(space java.Space) (java.Space, java.Space) {
+	if strings.ContainsAny(space.Whitespace(), "\r\n") {
+		return java.EmptySpace, space
+	}
+	comments := space.Comments()
+	for i, comment := range comments {
+		if strings.ContainsAny(comment.Suffix, "\r\n") {
+			trailing := append([]java.Comment(nil), comments[:i+1]...)
+			trailing[i].Suffix = ""
+			return java.MakeSpace(trailing, space.Whitespace()), java.MakeSpace(comments[i+1:], comment.Suffix)
+		}
+	}
+	return space, java.EmptySpace
+}
+
+func trailingComments(space java.Space) java.Space {
+	trailing, _ := splitImportAfter(space)
+	return trailing
+}
+
+func closingSpace(space java.Space) java.Space {
+	_, closing := splitImportAfter(space)
+	return closing
+}
+
+func withClosingWhitespace(space, closing java.Space) java.Space {
+	trailing := trailingComments(space)
+	closing = closingSpace(closing)
+	comments := append([]java.Comment(nil), trailing.Comments()...)
+	if len(comments) == 0 {
+		return closing
+	}
+	comments[len(comments)-1].Suffix = closing.Whitespace()
+	comments = append(comments, closing.Comments()...)
+	return java.MakeSpace(comments, trailing.Whitespace())
 }
 
 // withGroupSeparator prefixes imp with the blank line gofmt puts in front of
@@ -701,8 +801,8 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 	if insertAt == len(elements) && len(out) >= 2 {
 		prev := &out[len(out)-2]
 		newTail := &out[len(out)-1]
-		newTail.After = prev.After
-		prev.After = java.EmptySpace
+		newTail.After = closingSpace(prev.After)
+		prev.After = trailingComments(prev.After)
 	}
 	return out
 }
@@ -758,7 +858,6 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	if len(elements) <= 1 {
 		return elements
 	}
-	betweenAfter := elements[0].After
 	closingAfter := elements[len(elements)-1].After
 
 	indentPrefix := canonicalIndent(elements)
@@ -803,9 +902,9 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	}
 	for i := range out {
 		if i == len(out)-1 {
-			out[i].After = closingAfter
+			out[i].After = withClosingWhitespace(out[i].After, closingAfter)
 		} else {
-			out[i].After = betweenAfter
+			out[i].After = trailingComments(out[i].After)
 		}
 	}
 	return out

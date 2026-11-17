@@ -246,6 +246,10 @@ shadows it, `maybeBind` binds the module again under a name that reaches — a s
 second AMD dependency — because a caller mid-rewrite needs a name it can emit. `maybeRebind` answers
 with the name its binding carries after the move, whether or not the cursor reaches it.
 
+A member joins an import, or a moved re-export an `export {…} from`, only where both carry the same
+import attributes (`with {type: "json"}`); `with` and the legacy `assert` count as different. A moved
+binding keeps the attributes of the import it leaves, and a `maybeBind` request carries none.
+
 ### The binding table
 
 `bindingTable(cu)` (`src/javascript/binding-table.ts`) lists every name the file's top level binds to a
@@ -288,7 +292,7 @@ else, since a rename onto a name already in use would capture its references or 
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
 
 A name the file spells is still not taken when it is a value import of `to`'s named member, and the
-moved binding is a value too. Outside the imports and `export {…}` clauses the file may spell it only
+moved binding is a value too, loaded with the same import attributes. Outside the imports and `export {…}` clauses the file may spell it only
 as a reference, and no queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
 alias or not, and `RebindImport` merges into that import. A `type` import on either side, or a
 default or namespace target, would get a second declaration of the name instead, so the name stays
