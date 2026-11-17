@@ -144,7 +144,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
       val sb = new StringBuilder("Generic{" + name)
 
       bounds match {
-        case tb: TypeBounds if !(upperBoundOfKind(tb.hi) =:= ctx.definitions.AnyType) =>
+        case tb: TypeBounds if !isAny(upperBoundOfKind(tb.hi)) =>
           sb.append(" extends ")
           sb.append(signature(upperBoundOfKind(tb.hi)))
         case _ =>
@@ -157,9 +157,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   }
 
   private def boundsSignature(tb: TypeBounds): String = {
-    if (!(tb.hi =:= ctx.definitions.AnyType)) {
+    if (!isAny(tb.hi)) {
       "? extends " + signature(tb.hi)
-    } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
+    } else if (!isNothing(tb.lo)) {
       "? super " + signature(tb.lo)
     } else {
       "?"
@@ -212,6 +212,17 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
    * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
    * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
    */
+  /** Most bounds are `Any` or `Nothing` themselves, which needs no subtype check. */
+  def isAny(tp: Type): Boolean = tp match {
+    case tr: TypeRef if tr.symbol eq ctx.definitions.AnyClass => true
+    case _ => tp =:= ctx.definitions.AnyType
+  }
+
+  def isNothing(tp: Type): Boolean = tp match {
+    case tr: TypeRef if tr.symbol eq ctx.definitions.NothingClass => true
+    case _ => tp =:= ctx.definitions.NothingType
+  }
+
   /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
   def upperBoundOfKind(hi: Type): Type = hi match {
     case lambda: HKTypeLambda => lambda.resType
@@ -238,10 +249,16 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   /** `flatName` leaves out the package, and joins a nested class to a module class owner without a doubled `$`. */
   private def binaryName(sym: Symbols.Symbol): String = {
-    val pkg = sym.enclosingPackageClass
-    if (pkg.isEffectiveRoot) sym.flatName.toString
-    else pkg.fullName.toString + "." + sym.flatName
+    var name = binaryNames.get(sym)
+    if (name == null) {
+      val pkg = sym.enclosingPackageClass
+      name = if (pkg.isEffectiveRoot) sym.flatName.toString else pkg.fullName.toString + "." + sym.flatName
+      binaryNames.put(sym, name)
+    }
+    name
   }
+
+  private val binaryNames = new java.util.HashMap[Symbols.Symbol, String]()
 
   def variableSignature(name: String): String = {
     "{undefined}{name=" + name + "}"

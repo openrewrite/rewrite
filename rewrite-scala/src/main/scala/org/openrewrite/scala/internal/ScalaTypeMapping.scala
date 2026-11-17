@@ -703,8 +703,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   /** A package is not a type in the Java type model. */
-  private def denotesPackage(tpe: Type): Boolean =
-    try isPackage(tpe.typeSymbol) || isPackage(tpe.termSymbol) catch { case NonFatal(_) => false }
+  private def denotesPackage(tpe: Type): Boolean = tpe match {
+    case _: NamedType | _: ThisType =>
+      try isPackage(tpe.typeSymbol) || isPackage(tpe.termSymbol) catch { case NonFatal(_) => false }
+    case _ => false
+  }
 
   private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
     case Nil => mapType(ctx.definitions.NothingType)
@@ -808,7 +811,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         underlying match {
           case tb: TypeBounds =>
             val hi = signatureBuilder.upperBoundOfKind(tb.hi)
-            if (!(hi =:= ctx.definitions.AnyType)) {
+            if (!signatureBuilder.isAny(hi)) {
               bounds = new ArrayList[JavaType]()
               val mapped = mapType(hi)
               if (mapped != null) bounds.add(mapped)
@@ -827,11 +830,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         var bounds: ArrayList[JavaType] = null
         var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
 
-        if (!(tb.hi =:= ctx.definitions.AnyType)) {
+        if (!signatureBuilder.isAny(tb.hi)) {
           bounds = new ArrayList[JavaType]()
           bounds.add(mapType(tb.hi))
           variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-        } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
+        } else if (!signatureBuilder.isNothing(tb.lo)) {
           bounds = new ArrayList[JavaType]()
           bounds.add(mapType(tb.lo))
           variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
@@ -880,12 +883,17 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      val methods: util.List[JavaType.Method] = try {
-        val decls = sym.info match {
-          case ci: ClassInfo => ci.decls.toList
+      val decls = try {
+        sym.info match {
+          case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
           case _ => Nil
         }
-        val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor && !s.name.toString.startsWith("$"))
+      } catch {
+        case NonFatal(_) => Nil
+      }
+
+      val methods: util.List[JavaType.Method] = try {
+        val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor)
         if (methodSyms.nonEmpty) {
           val ms = new ArrayList[JavaType.Method]()
           methodSyms.foreach { m =>
@@ -898,11 +906,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       }
 
       val members: util.List[JavaType.Variable] = try {
-        val decls = sym.info match {
-          case ci: ClassInfo => ci.decls.toList
-          case _ => Nil
-        }
-        val fieldSyms = decls.filter(s => s.isTerm && !s.is(Flags.Method) && !s.name.toString.startsWith("$"))
+        val fieldSyms = decls.filter(s => s.isTerm && !s.is(Flags.Method))
         if (fieldSyms.nonEmpty) {
           val fs = new ArrayList[JavaType.Variable]()
           fieldSyms.foreach { f =>
@@ -942,17 +946,15 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   /** Map the method with the given parameter and result types, as instantiated at a call. */
   private def mapMethodType(sym: Symbol, info: Type): JavaType.Method = {
     val sig = signatureBuilder.methodSignature(sym, info)
-    val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
-    val flagsBits = mapFlags(sym)
-
-    val paramNamesArr: Array[String] = info.stripPoly match {
-      case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
-      case _ => null
-    }
-
-    val finalParamNames = paramNamesArr
     typeFactory.methodFor(sig,
-      () => new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null),
+      () => {
+        val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
+        val paramNames: Array[String] = info.stripPoly match {
+          case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
+          case _ => null
+        }
+        new JavaType.Method(null, mapFlags(sym), null, name, null, paramNames, null, null, null, null, null)
+      },
       (method: JavaType.Method) => {
         val paramTypes: util.List[JavaType] = info.stripPoly match {
           case mt: MethodType =>
