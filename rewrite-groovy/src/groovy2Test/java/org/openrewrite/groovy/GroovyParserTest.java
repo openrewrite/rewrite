@@ -95,6 +95,24 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedVariableAndPropertyReads() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def o = [name: 1]
+              def a = (y) * 2
+              def b = -(y)
+              def c = [(y): 1]
+              def d = ((y)) * 2
+              def e = (o.name) * 2
+              def f = -(o.name)
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotTreatDivisionAsDelimiter() {
         rewriteRun(
                 groovy(
