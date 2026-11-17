@@ -155,12 +155,12 @@ class OrderImportsTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-              import java.util.{_, Map => M, List => _}
+              import scala.math.{min, max, _}
 
               class A
               """,
             """
-              import java.util.{List => _, Map => M, _}
+              import scala.math.{max, min, _}
 
               class A
               """

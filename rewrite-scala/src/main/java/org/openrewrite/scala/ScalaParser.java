@@ -26,6 +26,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.scala.internal.ScalaCompilerCache;
 import org.openrewrite.scala.internal.ScalaCompilerContext;
+import org.openrewrite.scala.internal.ScalaWarning;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -130,6 +131,13 @@ public class ScalaParser implements Parser {
                         // Fall back to single-file parse if batch didn't include this file
                         if (parseResult == null) {
                             parseResult = compilerContext.parse(input);
+                        }
+
+                        List<ScalaWarning> syntaxErrors = parseResult.getParseResult().syntaxErrors();
+                        if (!syntaxErrors.isEmpty()) {
+                            throw new IllegalArgumentException(syntaxErrors.stream()
+                                    .map(e -> "Syntax error at line " + e.line() + ":" + e.column() + " " + e.message())
+                                    .collect(Collectors.joining("\n")));
                         }
 
                         // Convert the Scala AST to OpenRewrite's LST
