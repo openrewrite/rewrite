@@ -359,4 +359,55 @@ class ChangeTableRowValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPropertyTheRowDoesNotHaveWhenAsked() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("package.contributors", "name", "Alice", null, "email", "\"alice@example.com\"", true)),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice"
+
+              [[package.contributors]]
+              name = "Bob"
+              """,
+            """
+              [[package.contributors]]
+              name = "Alice"
+              email = "alice@example.com"
+
+              [[package.contributors]]
+              name = "Bob"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddAMissingPropertyByDefault() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("package.contributors", "name", "Alice", null, "email", "\"alice@example.com\"", null)),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddAPropertyTheRowHasAsAnArray() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("package.contributors", "name", "Alice", null, "roles", "[\"dev\"]", true)),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice"
+              roles = ["dev"]
+              """
+          )
+        );
+    }
 }
