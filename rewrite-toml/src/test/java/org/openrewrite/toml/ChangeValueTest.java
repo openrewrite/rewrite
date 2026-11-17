@@ -343,4 +343,19 @@ class ChangeValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeValueOfDottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("package.version", "\"2.0.0\"")),
+          toml(
+            """
+              package.version = "1.0.0"
+              """,
+            """
+              package.version = "2.0.0"
+              """
+          )
+        );
+    }
 }

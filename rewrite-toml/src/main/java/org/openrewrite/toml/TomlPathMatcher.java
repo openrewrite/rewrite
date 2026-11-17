@@ -17,6 +17,7 @@ package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
@@ -98,17 +99,14 @@ public class TomlPathMatcher {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
                 TomlKey key = kv.getKey();
                 if (key instanceof Toml.Identifier) {
-                    path.add(0, ((Toml.Identifier) key).getName());
+                    // a dotted key such as `serde.workspace` is a path of its own
+                    path.addAll(0, TomlKeyParts.of((Toml.Identifier) key));
                 }
             } else if (value instanceof Toml.Table) {
                 Toml.Table table = (Toml.Table) value;
                 Toml.Identifier tableName = table.getName();
                 if (tableName != null) {
-                    String name = tableName.getName();
-                    String[] parts = name.split("\\.");
-                    for (int i = parts.length - 1; i >= 0; i--) {
-                        path.add(0, parts[i].trim());
-                    }
+                    path.addAll(0, TomlKeyParts.of(tableName));
                 }
             }
 
