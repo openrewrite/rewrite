@@ -66,7 +66,8 @@ VALUE_BASIC_STRING   : BASIC_STRING                    -> type(BASIC_STRING), po
 // Up to two quotes may sit right before the closing delimiter, as in """a "quote""""".
 ML_BASIC_STRING      : '"""' ( ML_ESC | ~["\\] | '"' )*? '"""' ('"' '"'?)? -> popMode;
 VALUE_LITERAL_STRING : LITERAL_STRING                  -> type(LITERAL_STRING), popMode;
-ML_LITERAL_STRING    : '\'\'\'' ( ~['] | '\'' ~['] | '\'\'' ~['] )*? '\'\'\'' -> popMode;
+// As for a basic string, up to two quotes may sit right before the closing delimiter
+ML_LITERAL_STRING    : '\'\'\'' ( ~['] | '\'' )*? '\'\'\'' ('\'' '\''?)? -> popMode;
 
 // floating point numbers
 fragment EXP                 : ('e' | 'E') [+-]? ZERO_PREFIXABLE_INT;
