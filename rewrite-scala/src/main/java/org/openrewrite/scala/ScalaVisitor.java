@@ -54,17 +54,20 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
 
-        if (c.getPackageDeclaration() != null) {
-            c = c.withPackageDeclaration(visitAndCast(c.getPackageDeclaration(), p));
-        }
+        c = c.getPadding().withPackageDeclaration(
+                visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, p));
 
-        c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
+        c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), rp -> {
             try {
-                return toStatement(visit(s, p));
+                if (rp.getElement() instanceof J.Import) {
+                    return visitRightPadded(rp, JRightPadded.Location.IMPORT, p);
+                }
+                Statement s = toStatement(visit(rp.getElement(), p));
+                return s == null ? null : rp.withElement(s);
             } catch (Exception e) {
                 // Some Java recipes may fail on Scala-specific class structures
                 // (e.g., missing primaryConstructor). Return unchanged rather than crashing.
-                return s;
+                return rp;
             }
         }));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
@@ -107,6 +110,16 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }
 
         return c;
+    }
+
+    /**
+     * A ScalaVisitor only sees the {@link J.CompilationUnit} that {@link #visitCompilationUnit(S.CompilationUnit, Object)}
+     * builds for Java visitors overriding this method. Its prefix, markers, package, imports and end of file
+     * are already visited.
+     */
+    @Override
+    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
+        return cu;
     }
 
     @Override
