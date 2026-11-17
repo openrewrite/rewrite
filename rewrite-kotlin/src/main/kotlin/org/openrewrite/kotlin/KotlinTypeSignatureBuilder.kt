@@ -342,10 +342,6 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     @OptIn(SymbolInternals::class)
-    fun initializerSignature(initializer: FirAnonymousInitializer): String =
-        classSignature(initializer.containingDeclarationSymbol.fir) + "{name=,return=void,parameters=[]}"
-
-    @OptIn(SymbolInternals::class)
     fun methodSignature(
         fir: FirFunction,
         parent: Any?
@@ -550,8 +546,14 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 else -> fileSignature(property.symbol.getContainingFile() ?: firFile)
             }
 
+            initializerScope(parent) != null -> {
+                // All initializer locals of a class share one owner, so where they are declared tells them apart.
+                return initializerSignature(initializerScope(parent)!!) +
+                        "{name=${variableName(property.name.asString())}" +
+                        ",type=${signature(property.returnTypeRef)},pos=${property.source?.startOffset}}"
+            }
+
             parent is FirFunction -> methodSignature(parent, null)
-            parent is FirAnonymousInitializer -> initializerSignature(parent)
             parent is FirFile -> fileSignature(parent)
             parent is FirClass -> classSignature(parent)
             else -> fileSignature(firFile)
@@ -560,6 +562,15 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         sig.append("{name=${variableName(property.name.asString())}")
         sig.append(",type=${signature(property.returnTypeRef)}}")
         return sig.toString()
+    }
+
+    fun initializerSignature(scope: FirDeclaration): String {
+        val container = when (val c = initializerContainer(scope)) {
+            null -> fileSignature(firFile)
+            is FirAnonymousObject -> signature(c)
+            else -> classSignature(c)
+        }
+        return "$container{name=,return=void,parameters=[]}"
     }
 
     @OptIn(SymbolInternals::class)

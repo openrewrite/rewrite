@@ -22,11 +22,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.scala.ScalaPrinter;
 import org.openrewrite.scala.ScalaVisitor;
 import org.openrewrite.scala.service.ScalaAutoFormatService;
+import org.openrewrite.scala.service.ScalaImportService;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
@@ -259,6 +261,10 @@ public interface S extends J {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName());
+                } else if (ScalaImportService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ImportService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaImportService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
@@ -2212,6 +2218,96 @@ public interface S extends J {
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * A Scala 2 existential type such as {@code List[T] forSome { type T }}. Its clause declares
+     * names the underlying type uses, such as {@code type T <: Number} or {@code val x: String}.
+     * It adds no members to the underlying type, which is what sets it apart from a {@link RefinedType}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ExistentialType implements S, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        TypeTree underlying;
+
+        /**
+         * The declarations between the braces. The padding's before-space precedes {@code forSome}.
+         * The block's prefix is the space between {@code forSome} and the opening brace.
+         */
+        JLeftPadded<J.Block> clause;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static ExistentialType build(UUID id, Space prefix, Markers markers, TypeTree underlying,
+                                            JLeftPadded<J.Block> clause, @Nullable JavaType type) {
+            return new ExistentialType(null, id, prefix, markers, underlying, clause, type);
+        }
+
+        public J.Block getClause() {
+            return clause.getElement();
+        }
+
+        public ExistentialType withClause(J.Block clause) {
+            return getPadding().withClause(JLeftPadded.withElement(this.clause, clause));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitExistentialType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExistentialType t;
+
+            public JLeftPadded<J.Block> getClause() {
+                return t.clause;
+            }
+
+            public ExistentialType withClause(JLeftPadded<J.Block> clause) {
+                return t.clause == clause ? t :
+                        new ExistentialType(null, t.id, t.prefix, t.markers, t.underlying, clause, t.type);
+            }
         }
     }
 

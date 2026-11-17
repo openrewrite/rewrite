@@ -38,8 +38,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -2851,6 +2853,48 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void localOutsideNamedFunctionIsNotOwnedByClass() {
+            rewriteRun(
+              kotlin(
+                """
+                  val t = 0
+                  val tp = run { val t = 1; t }
+                  class K {
+                      val x: Int = 0
+                      val p = run { val x = 2; x }
+                      val f = { x: Int -> x }
+                      val g: Int
+                          get() {
+                              val x = 3
+                              return x
+                          }
+                      init {
+                          println(this.x)
+                          val x = 1
+                          println(x)
+                      }
+                      constructor(a: Int) {
+                          val x = a
+                          println(x)
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, List<String>> ownersByName = variableOwnersByName(cu);
+
+                    // then
+                    assertThat(ownersByName.get("t")).containsExactlyInAnyOrder(
+                      "OpenRewriteFile0Kt", "OpenRewriteFile0Kt{name=,return=void,parameters=[]}");
+                    assertThat(ownersByName.get("x")).containsExactlyInAnyOrder(
+                      "K", "K{name=get,return=int,parameters=[]}", "K{name=<constructor>,return=K,parameters=[int]}",
+                      "K{name=,return=void,parameters=[]}", "K{name=,return=void,parameters=[]}", "K{name=,return=void,parameters=[]}");
+                })
+              )
+            );
+        }
+
+        @Test
         void scriptDeclarationsAreNotStatic() {
             rewriteRun(
               kotlinScript(
@@ -2884,6 +2928,24 @@ class KotlinTypeMappingTest {
                     JavaType.Variable fieldType = identifier.getFieldType();
                     if (fieldType != null) {
                         acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
+                          .add(String.valueOf(fieldType.getOwner()));
+                    }
+                    return super.visitIdentifier(identifier, acc);
+                }
+            }.reduce(cu, new HashMap<>());
+        }
+
+        /**
+         * One owner per distinct variable type, so a declaration and its use sharing a variable type count once.
+         */
+        private static Map<String, List<String>> variableOwnersByName(K.CompilationUnit cu) {
+            Set<JavaType.Variable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+            return new KotlinIsoVisitor<Map<String, List<String>>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, List<String>> acc) {
+                    JavaType.Variable fieldType = identifier.getFieldType();
+                    if (fieldType != null && seen.add(fieldType)) {
+                        acc.computeIfAbsent(identifier.getSimpleName(), k -> new ArrayList<>())
                           .add(String.valueOf(fieldType.getOwner()));
                     }
                     return super.visitIdentifier(identifier, acc);
