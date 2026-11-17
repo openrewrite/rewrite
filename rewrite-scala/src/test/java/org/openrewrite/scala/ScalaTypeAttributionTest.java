@@ -1736,10 +1736,11 @@ class ScalaTypeAttributionTest implements RewriteTest {
             abstract class D { def baz: Int = 1 }
             """,
             spec -> spec.afterRecipe(cu -> {
+                // As javac marks a default method of an interface
                 assertThat(TypeUtils.findOverriddenMethod(declared(cu, "B", "bar"))).hasValueSatisfying(barOfC ->
-                  assertThat(barOfC.getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract));
-                assertThat(declared(cu, "C", "p").getFlags()).doesNotContain(Flag.Default);
-                assertThat(declared(cu, "D", "baz").getFlags()).doesNotContain(Flag.Default);
+                  assertThat(barOfC.getFlags()).contains(Flag.Abstract, Flag.Default));
+                assertThat(declared(cu, "C", "p").getFlags()).doesNotContain(Flag.Abstract, Flag.Default);
+                assertThat(declared(cu, "D", "baz").getFlags()).doesNotContain(Flag.Abstract, Flag.Default);
             })
           )
         );
@@ -1764,7 +1765,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
-    void libraryMethodsAreAbstractOrDefault() {
+    void libraryMethodsHaveAbstractAndDefaultFlags() {
         rewriteRun(
           scala(
             """
@@ -1783,13 +1784,13 @@ class ScalaTypeAttributionTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 // Scala 3 TASTy
                 assertThat(method(cu, "hasNext").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
-                assertThat(method(cu, "map").getMethodType().getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract);
+                assertThat(method(cu, "map").getMethodType().getFlags()).contains(Flag.Abstract, Flag.Default);
                 // Scala 2 pickles
                 assertThat(method(cu, "areEqual").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
-                assertThat(method(cu, "areEquivalent").getMethodType().getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract);
+                assertThat(method(cu, "areEquivalent").getMethodType().getFlags()).contains(Flag.Abstract, Flag.Default);
                 // Java class files
                 assertThat(method(cu, "compare").getMethodType().getFlags()).contains(Flag.Abstract).doesNotContain(Flag.Default);
-                assertThat(method(cu, "reversed").getMethodType().getFlags()).contains(Flag.Default).doesNotContain(Flag.Abstract);
+                assertThat(method(cu, "reversed").getMethodType().getFlags()).contains(Flag.Abstract, Flag.Default);
             })
           )
         );

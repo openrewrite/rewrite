@@ -1041,16 +1041,22 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     // javac marks every interface abstract. Dotty marks an abstract class `Abstract` and an abstract member `Deferred`.
     if (sym.is(Flags.Trait)) bits |= Flag.Interface.getBitMask | Flag.Abstract.getBitMask
     if (sym.is(Flags.Abstract) || sym.isTerm && sym.is(Flags.Deferred)) bits |= Flag.Abstract.getBitMask
-    if (isDefaultMethod(sym)) bits |= Flag.Default.getBitMask
+    if (isInterfaceMethod(sym)) {
+      bits |= Flag.Abstract.getBitMask
+      if (!sym.is(Flags.Deferred)) bits |= Flag.Default.getBitMask
+    }
     if (sym.is(Flags.Final) || sym.is(Flags.Module)) bits |= Flag.Final.getBitMask
     if (sym.isStatic) bits |= Flag.Static.getBitMask
     if (sym.isTerm && isVarargs(sym.info)) bits |= Flag.Varargs.getBitMask
     bits
   }
 
-  /** A concrete, non-private trait method compiles to a JVM default method. */
-  private def isDefaultMethod(sym: Symbol): Boolean =
-    sym.is(Flags.Method) && sym.owner.is(Flags.Trait) && !sym.isOneOf(Flags.Deferred | Flags.Private)
+  /**
+   * Scala compiles a non-private trait method to a JVM interface method.
+   * javac marks one abstract, and default too if it has a body.
+   */
+  private def isInterfaceMethod(sym: Symbol): Boolean =
+    sym.is(Flags.Method) && sym.owner.is(Flags.Trait) && !sym.is(Flags.Private)
 
   /**
    * Whether this is the type of a method whose last parameter is repeated, or of a repeated parameter.
