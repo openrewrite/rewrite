@@ -807,7 +807,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         underlying match {
           case tb: TypeBounds =>
-            val hi = upperBoundOfKind(tb.hi)
+            val hi = signatureBuilder.upperBoundOfKind(tb.hi)
             if (!(hi =:= ctx.definitions.AnyType)) {
               bounds = new ArrayList[JavaType]()
               val mapped = mapType(hi)
@@ -819,12 +819,6 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         gtv.unsafeSet(name, resolvedVariance, bounds)
       })
-  }
-
-  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
-  private def upperBoundOfKind(hi: Type): Type = hi match {
-    case lambda: HKTypeLambda => lambda.resType
-    case other => other
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {

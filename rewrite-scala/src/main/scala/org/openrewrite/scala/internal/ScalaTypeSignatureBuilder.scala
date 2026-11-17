@@ -62,13 +62,19 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
           unionMembers(ot).map(_._1).mkString(" | ")
-        // The fallback `show` would print the whole class.
         case ci: ClassInfo =>
           classFqn(ci.cls)
-        case NoType =>
-          "{undefined}"
+        case tt: ThisType =>
+          signature(tt.tref)
+        case et: ExprType =>
+          signature(et.resultType)
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => signature(at.tycon)
+          case _ => "{undefined}"
+        }
+        // What `ScalaTypeMapping.mapType` maps to `JavaType.Unknown`
         case _ =>
-          tpe.show
+          "{undefined}"
       }
     } catch {
       // A type too deep to describe is undefined as a whole. Answering at the level that ran out
@@ -138,9 +144,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
       val sb = new StringBuilder("Generic{" + name)
 
       bounds match {
-        case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
+        case tb: TypeBounds if !(upperBoundOfKind(tb.hi) =:= ctx.definitions.AnyType) =>
           sb.append(" extends ")
-          sb.append(signature(tb.hi))
+          sb.append(signature(upperBoundOfKind(tb.hi)))
         case _ =>
       }
 
@@ -206,6 +212,12 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
    * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
    * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
    */
+  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
+  def upperBoundOfKind(hi: Type): Type = hi match {
+    case lambda: HKTypeLambda => lambda.resType
+    case other => other
+  }
+
   def classFqn(sym: Symbols.Symbol): String = methodOwnerFqn(sym) match {
     case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
     case other => other
