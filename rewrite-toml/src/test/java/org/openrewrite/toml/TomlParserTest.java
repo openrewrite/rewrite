@@ -806,6 +806,23 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void escapesOfToml11() {
+        // Passes once generateAntlrSources regenerates the lexer
+        rewriteRun(
+          toml(
+            """
+              esc = "\\e[0m"
+              hex = "tab\\x09 e-acute\\xE9"
+              ml = ""\"\\e and \\x41""\"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly("\u001b[0m", "tab\t e-acute\u00e9", "\u001b and A"))
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
