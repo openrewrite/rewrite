@@ -160,6 +160,38 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void keepsImportsUsedOnlyByScala3ExtensionMethod() {
+        rewriteRun(
+          scala(
+            """
+              package s
+              object Syntax {
+                extension (s: String) def shout(n: Int): String = s.toUpperCase
+              }
+              """
+          ),
+          scala(
+            """
+              package u
+              import s.Syntax._
+              class A {
+                val x = "a".shout(1)
+              }
+              """
+          ),
+          scala(
+            """
+              package v
+              import s.Syntax.shout
+              class B {
+                val x = "a".shout(1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepsPackageImportUsedAsQualifier() {
         rewriteRun(
           scala(

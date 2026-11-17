@@ -285,9 +285,6 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     /**
-     * The dotted path of an import qualifier, without a leading {@code _root_}.
-     */
-    /**
      * Whether imports from the qualifier enable compiler features, which no reference in the source shows a use of.
      */
     private static boolean isLanguageFeature(String qualifier) {
@@ -295,6 +292,9 @@ public class RemoveUnusedImports extends Recipe {
         return path.equals("language") || path.startsWith("language.");
     }
 
+    /**
+     * The dotted path of an import qualifier, without a leading {@code _root_}.
+     */
     static String path(Expression e) {
         String path;
         if (e instanceof J.FieldAccess) {
@@ -397,7 +397,10 @@ public class RemoveUnusedImports extends Recipe {
             new ScalaIsoVisitor<Usages>() {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, Usages u) {
-                    if (!isSelected(ident, getCursor().getParentTreeCursor().getValue())) {
+                    Object parent = getCursor().getParentTreeCursor().getValue();
+                    // A call on a receiver may be to an extension method, which an import provides
+                    if (!isSelected(ident, parent) ||
+                        parent instanceof J.MethodInvocation && ident.getType() instanceof JavaType.Method) {
                         u.add(ident);
                     }
                     return ident;

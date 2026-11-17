@@ -29,7 +29,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 
-
 /**
  * ScalaVisitor extends JavaVisitor to support visiting both Java (J) and Scala (S) AST elements.
  * This allows Scala code to be processed by Java-focused recipes while also supporting

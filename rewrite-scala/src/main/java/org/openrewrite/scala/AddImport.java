@@ -139,7 +139,8 @@ public class AddImport<P> extends ScalaIsoVisitor<P> {
         List<S.ImportSelector> stale = new ArrayList<>();
         for (JRightPadded<S.ImportSelector> rp : anImport.getPadding().getSelectors().getPadding().getElements()) {
             J.Identifier selected = rp.getElement().getName();
-            if (selected != null && !isHiding(rp.getElement()) &&
+            // A selector of another name, such as a type alias, is not one a type change left behind
+            if (selected != null && !isHiding(rp.getElement()) && selected.getSimpleName().equals(name) &&
                 fullyQualifiedName.equals(definitionName(selected.getType())) &&
                 !importsThis(qualifier, selected.getSimpleName())) {
                 // Scala imports the type under this name by default, so the selector is dropped

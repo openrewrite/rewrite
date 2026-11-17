@@ -188,6 +188,30 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void keepsSelectorOfATypeAlias() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> addImport("java.lang.String", true))),
+          scala(
+            """
+              package t
+              object T {
+                type Str = String
+              }
+              """
+          ),
+          scala(
+            """
+              package u
+              import t.T.{Str}
+              class A {
+                val s: Str = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotFoldIntoWildcard() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> addImport("java.util.UUID", false))),
