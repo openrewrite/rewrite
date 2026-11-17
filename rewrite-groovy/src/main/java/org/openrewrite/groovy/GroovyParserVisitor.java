@@ -4577,7 +4577,9 @@ public class GroovyParserVisitor {
         }
 
         if (isOlderThanGroovy3()) {
-            if (node instanceof ConstantExpression || node instanceof GStringExpression) {
+            if (node instanceof ConstantExpression || node instanceof GStringExpression ||
+                    (node instanceof VariableExpression && node.getLineNumber() > 0 && node.getLastLineNumber() > 0)) {
+                // The range of a parenthesized literal or variable spans its parentheses, so its opening ones give the level
                 org.codehaus.groovy.ast.expr.Expression expr = (org.codehaus.groovy.ast.expr.Expression) node;
                 return determineParenthesisLevel(expr, expr.getLineNumber(), expr.getLastLineNumber(), expr.getColumnNumber(), expr.getLastColumnNumber());
             } else if (node instanceof ConstructorCallExpression) {
@@ -4593,6 +4595,11 @@ public class GroovyParserVisitor {
                 // StaticImportVisitor's substitute for a statically imported field read. Its name carries the
                 // position of the original read, including the parentheses around it.
                 return getInsideParenthesesLevel(((PropertyExpression) node).getProperty());
+            } else if (node instanceof PropertyExpression && node.getLineNumber() > 0 &&
+                    ((PropertyExpression) node).getObjectExpression().getLineNumber() > 0) {
+                // As on Groovy 3+, the range of a parenthesized property read starts at its outermost parenthesis
+                PropertyExpression expr = (PropertyExpression) node;
+                return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
             }
         } else {
             if (node instanceof MethodCallExpression) {
@@ -4668,7 +4675,8 @@ public class GroovyParserVisitor {
                 if (delimiter == null) {
                     if (source.charAt(i) == '(') {
                         count++;
-                    } else if (source.charAt(i) == ')' && !(node instanceof ConstantExpression || node instanceof GStringExpression)) {
+                    } else if (source.charAt(i) == ')' && !(node instanceof ConstantExpression || node instanceof GStringExpression ||
+                                                             node instanceof VariableExpression)) {
                         count--;
                     }
                 } else {
