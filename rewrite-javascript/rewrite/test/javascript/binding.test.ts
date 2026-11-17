@@ -10,7 +10,7 @@ import {
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
-import {ExecutionContext} from "../../src";
+import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
@@ -1221,6 +1221,39 @@ function rebindEach(moves: MaybeRebindOptions[]) {
             return super.visitJsCompilationUnit(cu, p);
         }
     });
+}
+
+/**
+ * Moves `move`, then marks each call or construction of the moved member, under either name, with
+ * the module and name its type declares it on: `pkg#f`.
+ */
+function rebindThenMarkMoved(move: MaybeRebindOptions): Recipe {
+    const names = [move.from.member, move.to.member];
+    const declaredOn = (method: Type.Method | undefined) => method === undefined ? "no type" :
+        `${Type.FullyQualified.getFullyQualifiedName(method.declaringType)}#${method.name}`;
+    const mark = fromVisitor(new class extends JavaScriptVisitor<any> {
+        override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+            return names.includes(method.name.simpleName) ? foundSearchResult(visited, declaredOn(method.methodType)) : visited;
+        }
+
+        override async visitNewClass(newClass: J.NewClass, p: any): Promise<J | undefined> {
+            const visited = await super.visitNewClass(newClass, p) as J.NewClass;
+            const clazz = newClass.class;
+            const name = clazz?.kind === J.Kind.FieldAccess ? (clazz as J.FieldAccess).name.element.simpleName :
+                clazz?.kind === J.Kind.Identifier ? (clazz as J.Identifier).simpleName : undefined;
+            return names.includes(name) ? foundSearchResult(visited, declaredOn(newClass.constructorType)) : visited;
+        }
+    });
+    return new class extends Recipe {
+        readonly name = "org.openrewrite.javascript.test.RebindThenMarkMoved";
+        readonly displayName = "Rebind, then mark the moved member";
+        readonly description = "Moves a member, then marks each call or construction of it with its declaring type.";
+
+        override async recipeList(): Promise<Recipe[]> {
+            return [rebindEach([move]), mark];
+        }
+    }();
 }
 
 describe("maybeBind and type-only imports", () => {
@@ -3659,110 +3692,147 @@ describe("maybeRebind and the member's other spellings", () => {
     }, 60000);
 
     describe("a member moved to another module, beside a module object that stays on the old one", () => {
-        // \`compat\` still reads the old module, so \`compat.request()\` keeps its spelling, and its attribution
-        // stays with it rather than following the moved \`request\`.
-        test("a call through the module object of a subpath is typed as a fresh parse of the result types it", async () => {
-            const {rebound, parsed} = await attributionsAfter(
-                {from: {module: "legacy-http/compat", member: "request"}, to: {module: "@acme/common/http", member: "request"}},
-                installHttpPackages,
-                `
-                    import {request} from 'legacy-http/compat';
-                    import * as compat from 'legacy-http/compat';
-                    request('a');
-                    compat.request('b');
-                `,
-                `
-                    import {request} from '@acme/common/http';
-                    import * as compat from 'legacy-http/compat';
-                    request('a');
-                    compat.request('b');
-                `
-            );
-            expect(rebound).toEqual(parsed);
+        // The module object still reads the old module, so a read through it keeps its spelling and its type.
+        test("a call through a namespace import keeps its type", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "f"}, to: {module: "other", member: "g"}});
+            await withDir(async repo => {
+            installPackage(repo.path, "pkg", {
+                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare function f(): string;`
+            });
+            installPackage(repo.path, "other", {
+                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare function g(): string;`
+            });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {f} from 'pkg';
+                            import * as h from 'pkg';
+                            f();
+                            h.f();
+                            (h).f();
+                        `,
+                        `
+                            import {g} from 'other';
+                            import * as h from 'pkg';
+                            /*~~(other#g)~~>*/g();
+                            /*~~(pkg#f)~~>*/h.f();
+                            /*~~(pkg#f)~~>*/(h).f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
         }, 60000);
 
-        test("a construction through the module object of a subpath is typed as a fresh parse of the result types it", async () => {
-            const {rebound, parsed} = await attributionsAfter(
-                {from: {module: "legacy-http/compat", member: "Http"}, to: {module: "@acme/common/http", member: "HttpClient"}},
-                installHttpPackages,
-                `
-                    import {Http} from 'legacy-http/compat';
-                    import * as compat from 'legacy-http/compat';
-                    new Http();
-                    new compat.Http();
-                `,
-                `
-                    import {HttpClient} from '@acme/common/http';
-                    import * as compat from 'legacy-http/compat';
-                    new HttpClient();
-                    new compat.Http();
-                `
-            );
-            expect(rebound).toEqual(parsed);
+        test("a call through any other module object keeps its type, a reassigned one too", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "f"}, to: {module: "other", member: "g"}});
+            await withDir(async repo => {
+            installPackage(repo.path, "pkg", {
+                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare function f(): string;`
+            });
+            installPackage(repo.path, "other", {
+                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare function g(): string;`
+            });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {f} from 'pkg';
+                            import h1 = require('pkg');
+                            const h2 = require('pkg');
+                            const h3 = await import('pkg');
+                            let h4 = await import('pkg');
+                            h4 = h4;
+                            f();
+                            h1.f();
+                            h2.f();
+                            h3.f();
+                            h4.f();
+                        `,
+                        `
+                            import {g} from 'other';
+                            import h1 = require('pkg');
+                            const h2 = require('pkg');
+                            const h3 = await import('pkg');
+                            let h4 = await import('pkg');
+                            h4 = h4;
+                            /*~~(other#g)~~>*/g();
+                            /*~~(pkg#f)~~>*/h1.f();
+                            /*~~(pkg#f)~~>*/h2.f();
+                            /*~~(pkg#f)~~>*/h3.f();
+                            /*~~(pkg#f)~~>*/h4.f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
         }, 60000);
 
-        test("a call through the module object of a package root is typed as a fresh parse of the result types it", async () => {
-            const {rebound, parsed} = await attributionsAfter(
-                {from: {module: "legacy-http", member: "request"}, to: {module: "@acme/common/http", member: "request"}},
-                installHttpPackages,
-                `
-                    import {request} from 'legacy-http';
-                    import * as http from 'legacy-http';
-                    request('a');
-                    http.request('b');
-                    (http).request('c');
-                `,
-                `
-                    import {request} from '@acme/common/http';
-                    import * as http from 'legacy-http';
-                    request('a');
-                    http.request('b');
-                    (http).request('c');
-                `
-            );
-            expect(rebound).toEqual(parsed);
+        test("a construction through a namespace import keeps its constructor", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "K"}, to: {module: "other", member: "L"}});
+            await withDir(async repo => {
+            installPackage(repo.path, "pkg", {
+                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare class K {}`
+            });
+            installPackage(repo.path, "other", {
+                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare class L {}`
+            });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {K} from 'pkg';
+                            import * as h from 'pkg';
+                            new K();
+                            new h.K();
+                        `,
+                        `
+                            import {L} from 'other';
+                            import * as h from 'pkg';
+                            /*~~(other#L)~~>*/new L();
+                            /*~~(pkg#K)~~>*/new h.K();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
         }, 60000);
 
-        test("a call through a reassigned module object is typed as a fresh parse of the result types it", async () => {
-            // \`http\` may hold another module after \`http = ...\`, so its spelling is never renamed, but the move
-            // leaves it as it is either way, so its type stays too.
-            const {rebound, parsed} = await attributionsAfter(
-                {from: {module: "legacy-http", member: "request"}, to: {module: "@acme/common/http", member: "request"}},
-                installHttpPackages,
-                `
-                    import {request} from 'legacy-http';
-                    let http = await import('legacy-http');
-                    http = http;
-                    request('a');
-                    http.request('b');
-                `,
-                `
-                    import {request} from '@acme/common/http';
-                    let http = await import('legacy-http');
-                    http = http;
-                    request('a');
-                    http.request('b');
-                `
-            );
-            expect(rebound).toEqual(parsed);
-        }, 60000);
-
-        test.each(["legacy-http", "legacy-http/compat"])("a call through the module object of %s, beside a moved re-export, is typed as a fresh parse of the result types it", async module => {
-            const {rebound, parsed} = await attributionsAfter(
-                {from: {module, member: "request"}, to: {module: "@acme/common/http", member: "request"}},
-                installHttpPackages,
-                `
-                    import * as http from '${module}';
-                    export {request} from '${module}';
-                    http.request('b');
-                `,
-                `
-                    import * as http from '${module}';
-                    export {request} from '@acme/common/http';
-                    http.request('b');
-                `
-            );
-            expect(rebound).toEqual(parsed);
+        test("a call through a namespace import keeps its type beside a moved re-export", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "f"}, to: {module: "other", member: "g"}});
+            await withDir(async repo => {
+            installPackage(repo.path, "pkg", {
+                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare function f(): string;`
+            });
+            installPackage(repo.path, "other", {
+                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                "index.d.ts": `export declare function g(): string;`
+            });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import * as h from 'pkg';
+                            export {f} from 'pkg';
+                            h.f();
+                        `,
+                        `
+                            import * as h from 'pkg';
+                            export {g as f} from 'other';
+                            /*~~(pkg#f)~~>*/h.f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
         }, 60000);
     });
 
