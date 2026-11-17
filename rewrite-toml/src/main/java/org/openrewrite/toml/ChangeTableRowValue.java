@@ -71,7 +71,7 @@ public class ChangeTableRowValue extends Recipe {
             @Override
             public Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 // Check if this is the correct table
-                if (table.getName() == null || !tableName.equals(table.getName().getName())) {
+                if (!TableRowMatcher.isNamed(table, tableName)) {
                     return super.visitTable(table, ctx);
                 }
 
