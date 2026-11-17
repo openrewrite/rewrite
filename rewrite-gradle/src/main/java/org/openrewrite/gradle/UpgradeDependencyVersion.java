@@ -194,6 +194,45 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         String resolvedVersion;
     }
 
+    /**
+     * Narrows what the visitor upgrades, so a recipe bundling this one (like {@link AddDependency}) leaves declarations
+     * unrelated to its own target alone.
+     */
+    interface UpgradeScope {
+        UpgradeScope ALL = new UpgradeScope() {
+            @Override
+            public boolean includes(GradleDependency declaration) {
+                return true;
+            }
+
+            @Override
+            public boolean includesConfiguration(SourceFile buildFile, GradleDependencyConfiguration configuration) {
+                return true;
+            }
+
+            @Override
+            public boolean includesVersionVariable(String name) {
+                return true;
+            }
+
+            @Override
+            public boolean includesCatalogLibrary(GroupArtifact ga) {
+                return true;
+            }
+        };
+
+        boolean includes(GradleDependency declaration);
+
+        /**
+         * Whether the dependency model of this configuration follows the upgrade.
+         */
+        boolean includesConfiguration(SourceFile buildFile, GradleDependencyConfiguration configuration);
+
+        boolean includesVersionVariable(String name);
+
+        boolean includesCatalogLibrary(GroupArtifact ga);
+    }
+
     @Override
     public DependencyVersionState getInitialValue(ExecutionContext ctx) {
         return new DependencyVersionState();
@@ -436,9 +475,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
+        return getVisitor(acc, UpgradeScope.ALL);
+    }
+
+    TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc, UpgradeScope scope) {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            private final UpdateGradle updateGradle = new UpdateGradle(acc);
-            private final UpdateProperties updateProperties = new UpdateProperties(acc);
+            private final UpdateGradle updateGradle = new UpdateGradle(acc, scope);
+            private final UpdateProperties updateProperties = new UpdateProperties(acc, scope);
             private final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
             private final TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
                 // A catalog file has no marker and a settings script no GradleProject, so fall back to a scanned project's repositories
@@ -448,7 +491,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .map(gradleProject -> new DependencyVersionSelector(metadataFailures, gradleProject, null))
                         .orElseGet(() -> repositories == null ? new DependencyVersionSelector(metadataFailures, null, null) :
                                 repositories.selector(metadataFailures));
-                return upgradeCatalog(catalog, dependencyMatcher, selector, ctx);
+                return upgradeCatalog(catalog, dependencyMatcher, scope, selector, ctx);
             });
 
             @Override
@@ -499,7 +542,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
                             }
 
-                            gradleProject = constrainBomGoverned(gradleProject.upgradeDirectDependencyVersions(upgrades, ctx)
+                            List<MavenRepository> repositories = gradleProject.getMavenRepositories();
+                            gradleProject = constrainBomGoverned(gradleProject.mapConfigurations(conf -> scope.includesConfiguration(sf, conf) ?
+                                            conf.upgradeDirectDependencies(upgrades, repositories, ctx) : conf, ctx)
                                     .upgradeBuildscriptDirectDependencyVersions(upgrades, ctx), ctx);
                             if (projectMarker.get() != gradleProject) {
                                 t = t.withMarkers(t.getMarkers().setByType(gradleProject));
@@ -554,7 +599,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
      * them is declared. A library whose metadata can't be downloaded is left alone and warned about
      * on the catalog, the exception naming the library.
      */
-    private Tree upgradeCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
+    private Tree upgradeCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher, UpgradeScope scope,
                                 DependencyVersionSelector versionSelector, ExecutionContext ctx) {
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<GroupArtifact, String> selected = new LinkedHashMap<>();
@@ -562,7 +607,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         for (Map.Entry<GroupArtifact, VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
             GroupArtifact ga = library.getKey();
             String currentVersion = library.getValue().getResolvedVersion(declarations);
-            if (currentVersion == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+            if (currentVersion == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()) ||
+                    !scope.includesCatalogLibrary(ga)) {
                 continue;
             }
             try {
@@ -588,6 +634,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @RequiredArgsConstructor
     private class UpdateProperties extends PropertiesVisitor<ExecutionContext> {
         final DependencyVersionState acc;
+        final UpgradeScope scope;
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
         @Override
@@ -600,7 +647,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         @Override
         public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-            if (acc.versionPropNameToGA.containsKey(entry.getKey())) {
+            if (acc.versionPropNameToGA.containsKey(entry.getKey()) && scope.includesVersionVariable(entry.getKey())) {
                 String agreedVersion = safeUpdatedVersion(entry.getKey(), dependencyMatcher, acc, null, entry.getValue().getText(), ctx);
                 if (agreedVersion == null) {
                     return entry;
@@ -788,6 +835,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @RequiredArgsConstructor
     private class UpdateGradle extends JavaVisitor<ExecutionContext> {
         final DependencyVersionState acc;
+        final UpgradeScope scope;
 
         @Nullable
         GradleProject gradleProject;
@@ -837,7 +885,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
 
             for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
-                if (!configuration.isCanBeResolved()) {
+                if (!configuration.isCanBeResolved() || !scope.includesConfiguration(sourceFile, configuration)) {
                     continue;
                 }
 
@@ -985,7 +1033,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             .matchVariableDeclarations(true)
                             .<ExecutionContext>asVisitor((prop, execCtx) -> {
                                 String variableName = prop.getName();
-                                if (!acc.variableNames.containsKey(variableName)) {
+                                if (!acc.variableNames.containsKey(variableName) || !scope.includesVersionVariable(variableName)) {
                                     return prop.getTree();
                                 }
                                 String selectedVersion = safeUpdatedVersion(variableName, dependencyMatcher, acc, gradleProject, prop.getValue(), execCtx);
@@ -1020,6 +1068,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     .orElse(null);
             if (multiDependency != null) {
                 m = multiDependency.map(dep -> {
+                    if (!scope.includes(dep)) {
+                        return dep.getTree();
+                    }
                     Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                     if (scanResult instanceof Exception) {
                         return Markup.warn(dep.getTree(), (Exception) scanResult);
@@ -1049,7 +1100,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
                         String varName = "gradle." + a.getVariable();
                         // Guard to ensure that an unsupported notation doesn't throw an exception
-                        if (!acc.versionPropNameToGA.containsKey(varName)) {
+                        if (!acc.versionPropNameToGA.containsKey(varName) || !scope.includesVersionVariable(varName)) {
                             return a;
                         }
                         String selectedVersion = safeUpdatedVersion(varName, dependencyMatcher, acc, gradleProject, executionContext);
