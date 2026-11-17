@@ -406,6 +406,116 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotDowngradeNewerConstraintInPyproject() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = [
+                  "requests>=3.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerCompatibleRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("click", ">=8.1.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["click~=8.2"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerPinnedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", "==2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["requests==3.1.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerConstraintInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          requirementsTxt("requests>=2.32.0\nclick>=8.0")
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerConstraintInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = ">=3.0"
+              click = ">=8.0"
+
+              [dev-packages]
+              requests = {version = "==3.1.0", extras = ["socks"]}
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesOnlyTheDeclarationBelowTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["requests>=3.0"]
+
+              [dependency-groups]
+              dev = ["requests>=2.0"]
+              """,
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["requests>=3.0"]
+
+              [dependency-groups]
+              dev = ["requests>=2.31.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesConstraintWithoutLowerBound() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          requirementsTxt(
+            "requests<3",
+            "requests>=2.31.0"
+          )
+        );
+    }
+
+    @Test
     void upgradeQuotedKeyInPipfile() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("urllib3", ">=2.0", null, null)),

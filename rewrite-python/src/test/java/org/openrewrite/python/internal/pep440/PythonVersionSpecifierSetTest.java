@@ -105,6 +105,29 @@ class PythonVersionSpecifierSetTest {
           .isNotEqualTo(PythonVersionSpecifierSet.parse(">=1.0.0"));
     }
 
+    private static boolean startsAtOrAbove(String set, String other) {
+        return Objects.requireNonNull(PythonVersionSpecifierSet.parse(set))
+          .startsAtOrAbove(Objects.requireNonNull(PythonVersionSpecifierSet.parse(other)));
+    }
+
+    @Test
+    void startsAtOrAboveComparesLowerBounds() {
+        assertThat(startsAtOrAbove(">=3.0", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove("==3.1.0", "==2.31.0")).isTrue();
+        assertThat(startsAtOrAbove("~=3.0", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove("==3.*", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove(">=3.0,<3.1", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove(">=3.0.0rc1", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove(">=2.31", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove(">2.31.0", ">=2.31.0")).isTrue();
+        assertThat(startsAtOrAbove(">=2.31.0", ">2.31.0")).isFalse();
+        assertThat(startsAtOrAbove(">=2.0", ">=2.31.0")).isFalse();
+        assertThat(startsAtOrAbove(">=2.0,!=2.5", ">=2.31.0")).isFalse();
+        assertThat(startsAtOrAbove("<3", ">=2.31.0")).isFalse();
+        assertThat(startsAtOrAbove("", ">=2.31.0")).isFalse();
+        assertThat(startsAtOrAbove(">=1.0", "<3")).isTrue();
+    }
+
     @Test
     void arbitraryEqualityClause() {
         assertThat(contains("===1.0", "1.0")).isTrue();

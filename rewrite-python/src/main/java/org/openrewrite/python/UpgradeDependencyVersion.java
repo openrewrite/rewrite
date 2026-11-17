@@ -98,6 +98,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public String getDescription() {
         return "Upgrade the version constraint for a dependency. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
+                "A constraint whose lowest admitted version is already at or above the new one is left unchanged. " +
                 "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
                 "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
                 "package index over the network. " +
