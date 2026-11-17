@@ -1665,6 +1665,7 @@ public class GroovyParserVisitor {
                 J.AssignmentOperation.Type assignOp = null;
                 J.Binary.Type binaryOp = null;
                 G.Binary.Type gBinaryOp = null;
+                boolean nullSafe = false;
 
                 switch (binary.getOperation().getText()) {
                     case "+":
@@ -1772,6 +1773,10 @@ public class GroovyParserVisitor {
                     case "[":
                         gBinaryOp = G.Binary.Type.Access;
                         break;
+                    case "?[":
+                        gBinaryOp = G.Binary.Type.Access;
+                        nullSafe = true;
+                        break;
                     case "in":
                         gBinaryOp = G.Binary.Type.In;
                         break;
@@ -1849,7 +1854,11 @@ public class GroovyParserVisitor {
                     if (gBinaryOp == G.Binary.Type.Access) {
                         after = sourceBefore("]");
                     }
-                    return new G.Binary(randomId(), fmt, multiIndex ? Markers.EMPTY.add(new MultiIndexAccess(randomId())) : Markers.EMPTY,
+                    Markers markers = multiIndex ? Markers.EMPTY.add(new MultiIndexAccess(randomId())) : Markers.EMPTY;
+                    if (nullSafe) {
+                        markers = markers.add(new NullSafe(randomId()));
+                    }
+                    return new G.Binary(randomId(), fmt, markers,
                             left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
                             right, after, typeMapping.type(binary.getType()));
                 }
