@@ -39,6 +39,7 @@ class ImportTest implements RewriteTest {
               import java.util.UUID
               import scala.collection.mutable
               import scala.math.max
+              import java.util.Map.Entry
               import java.util.UUID, scala.util.Properties.versionString
               object A {
                 val config = new Object
@@ -59,6 +60,7 @@ class ImportTest implements RewriteTest {
                 "UUID",
                 "mutable",
                 "max",
+                "Entry",
                 "UUID",
                 "versionString static scala.util.Properties",
                 "_"

@@ -150,7 +150,8 @@ public class RemoveUnusedImports extends Recipe {
             } else if ("given".equals(name)) {
                 used = usages.usesImplicitMemberOf(qualifier, qualid.getTarget().getType());
             } else {
-                used = qualid.getType() instanceof JavaType.Unknown || usages.uses(name, qualid.getType());
+                used = qualid.getType() instanceof JavaType.Unknown ||
+                       usages.uses(name, importedDefinition(qualid.getType(), name));
             }
             return used ? anImport : null;
         }
@@ -179,7 +180,8 @@ public class RemoveUnusedImports extends Recipe {
                     J.Identifier name = Objects.requireNonNull(selector.getName());
                     J.Identifier alias = selector.getAlias();
                     used = !targets(qualifier, name.getSimpleName()) || name.getType() instanceof JavaType.Unknown ||
-                           usages.uses(alias == null ? name.getSimpleName() : alias.getSimpleName(), importedDefinition(name));
+                           usages.uses(alias == null ? name.getSimpleName() : alias.getSimpleName(),
+                                   importedDefinition(name.getType(), name.getSimpleName()));
                 }
                 if (used) {
                     kept.add(rp);
@@ -264,16 +266,17 @@ public class RemoveUnusedImports extends Recipe {
                     Objects.requireNonNull(only.getName()).withPrefix(Space.EMPTY);
             Expression qualifier = anImport.getQualifier();
             J.FieldAccess qualid = new J.FieldAccess(Tree.randomId(), qualifier.getPrefix(), Markers.EMPTY,
-                    qualifier.withPrefix(Space.EMPTY), JLeftPadded.build(name), importedDefinition(name));
+                    qualifier.withPrefix(Space.EMPTY), JLeftPadded.build(name), name.getType());
+            boolean ofMember = selectsMembersOfType(qualifier) && !namesType(name.getType(), name.getSimpleName());
             return new J.Import(anImport.getId(), anImport.getPrefix(), anImport.getMarkers(),
-                    JLeftPadded.build(selectsMembersOfType(qualifier)), qualid, null);
+                    JLeftPadded.build(ofMember), qualid, null);
         }
         return anImport.getPadding().withSelectors(anImport.getPadding().getSelectors().getPadding().withElements(selectors));
     }
 
     /**
-     * Whether the qualifier is a class or object, so that an import from it is static, as the parser marks it.
-     * A package is untyped, and a value carries its field.
+     * Whether the qualifier is a class or object, so that an import of a member from it is static, as the parser
+     * marks it. A package is untyped, and a value carries its field.
      */
     private static boolean selectsMembersOfType(Expression qualifier) {
         J.Identifier name = qualifier instanceof J.FieldAccess ? ((J.FieldAccess) qualifier).getName() :
@@ -379,11 +382,24 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     /**
-     * The definition a selector imports. A selector of a value or a type alias is typed as the value's or the
-     * aliased type, which leaves the definition unknown.
+     * The definition an import of {@code name} imports. An import of a value or a type alias can be typed as the
+     * value's or the aliased type, which leaves the definition unknown.
      */
-    private static @Nullable JavaType importedDefinition(J.Identifier selected) {
-        return isAlias(selected) ? null : selected.getType();
+    private static @Nullable JavaType importedDefinition(@Nullable JavaType type, String name) {
+        if (type == null || type instanceof JavaType.Unknown || type instanceof JavaType.Method ||
+            type instanceof JavaType.Variable || namesType(type, name)) {
+            return type;
+        }
+        return null;
+    }
+
+    private static boolean namesType(@Nullable JavaType type, String name) {
+        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+        if (fq == null || fq instanceof JavaType.Unknown) {
+            return false;
+        }
+        String className = normalize(fq.getClassName());
+        return className.substring(className.lastIndexOf('.') + 1).equals(name);
     }
 
     /**
@@ -410,6 +426,8 @@ public class RemoveUnusedImports extends Recipe {
         private final List<JavaType> implicitReferences = new ArrayList<>();
         private final Set<String> owners = new HashSet<>();
         private final List<JavaType.FullyQualified> memberOwners = new ArrayList<>();
+        private final Map<String, List<J.Identifier>> receiverCalls = new HashMap<>();
+        private final Set<String> receiverCallOwners = new HashSet<>();
         private boolean unresolved;
 
         void collect(Statement statement) {
@@ -417,10 +435,10 @@ public class RemoveUnusedImports extends Recipe {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, Usages u) {
                     Object parent = getCursor().getParentTreeCursor().getValue();
-                    // A call on a receiver may be to an extension method, which an import provides
-                    if (!isSelected(ident, parent) ||
-                        parent instanceof J.MethodInvocation && ident.getType() instanceof JavaType.Method) {
+                    if (!isSelected(ident, parent)) {
                         u.add(ident);
+                    } else if (parent instanceof J.MethodInvocation && ident.getType() instanceof JavaType.Method) {
+                        u.addReceiverCall(ident, (JavaType.Method) ident.getType());
                     }
                     return ident;
                 }
@@ -451,6 +469,17 @@ public class RemoveUnusedImports extends Recipe {
                         memberOwners.add(fq.getOwningClass());
                     }
                 }
+            }
+        }
+
+        /**
+         * A call on a receiver uses an import only as an extension method, which its declaring object provides,
+         * and not through the supertypes that declare the receiver's own methods.
+         */
+        private void addReceiverCall(J.Identifier name, JavaType.Method method) {
+            receiverCalls.computeIfAbsent(name.getSimpleName(), n -> new ArrayList<>()).add(name);
+            if (method.getDeclaringType() != null) {
+                receiverCallOwners.add(owner(method.getDeclaringType()));
             }
         }
 
@@ -487,11 +516,17 @@ public class RemoveUnusedImports extends Recipe {
                     return true;
                 }
             }
+            for (J.Identifier call : receiverCalls.getOrDefault(name, emptyList())) {
+                if (definitionName != null && definitionName.equals(definitionName(call.getType()))) {
+                    return true;
+                }
+            }
             return false;
         }
 
         boolean usesMemberOf(String qualifier, @Nullable JavaType qualifierType) {
             return unresolved || qualifierType instanceof JavaType.Unknown || owners.contains(qualifier) ||
+                   receiverCallOwners.contains(qualifier) ||
                    memberOwners.stream().anyMatch(owner -> isMemberOf(owner, qualifier, qualifierType));
         }
 

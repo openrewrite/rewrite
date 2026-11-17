@@ -3111,7 +3111,7 @@ class ScalaTreeVisitor(
       Imported(tpe, tpe, isImplicit = false)
     }
 
-  /** An import of an object's or class's members is static, as Java and Kotlin model one. */
+  /** An import of an object's or class's term members is static, as Java models one. */
   private def isStaticImport(tree: Trees.ImportOrExport[?]): java.lang.Boolean =
     Boolean.box(ofNode(tree)((mapping, node) => Some(mapping.selectsMembersOfType(node))).getOrElse(false))
 

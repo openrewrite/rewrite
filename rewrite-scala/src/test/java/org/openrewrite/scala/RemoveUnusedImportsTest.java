@@ -162,7 +162,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
-    void keepsImportsUsedOnlyByScala3ExtensionMethod() {
+    void extensionMethodCallKeepsOnlyTheImportOfItsObject() {
         rewriteRun(
           scala(
             """
@@ -189,6 +189,23 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 val x = "a".shout(1)
               }
               """
+          ),
+          scala(
+            """
+              package w
+              import s.Syntax._
+              class C {
+                val o = new Object
+                val x = o.equals(o)
+              }
+              """,
+            """
+              package w
+              class C {
+                val o = new Object
+                val x = o.equals(o)
+              }
+              """
           )
         );
     }
@@ -211,7 +228,11 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 val v = versionString
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(((J.Import) ((S.CompilationUnit) cu).getStatements().get(0)).isStatic()).isTrue())
+            spec -> spec.afterRecipe(cu -> {
+                J.Import collapsed = (J.Import) ((S.CompilationUnit) cu).getStatements().get(0);
+                assertThat(collapsed.isStatic()).isTrue();
+                assertThat(collapsed.getTypeName()).isEqualTo("scala.util.Properties");
+            })
           )
         );
     }

@@ -355,14 +355,19 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case imp: Trees.ImportOrExport[?] => imported(imp.expr.asInstanceOf[tpd.Tree], name)
     }
 
-  /** Whether an import or export selects members of a class or object, rather than of a package or a value. */
+  /**
+   * Whether an import or export selects term members of a class or object, rather than members of a package
+   * or a value, or a type nested in the class or object.
+   */
   def selectsMembersOfType(tree: untpd.Tree): Boolean =
     typedNodes.get(tree).map(_.own).exists {
       case imp: Trees.ImportOrExport[?] =>
         try {
-          val sym = imp.expr.asInstanceOf[tpd.Tree].symbol
+          val qualifier = imp.expr.asInstanceOf[tpd.Tree]
+          val sym = qualifier.symbol
           sym != null && sym.exists && !isErrorSymbol(sym) && !sym.is(Flags.Package) &&
-            (sym.is(Flags.Module) || sym.isClass)
+            (sym.is(Flags.Module) || sym.isClass) &&
+            imp.selectors.forall(sel => sel.isWildcard || !qualifier.tpe.member(sel.imported.name.toTypeName).exists)
         } catch {
           case NonFatal(_) => false
         }
