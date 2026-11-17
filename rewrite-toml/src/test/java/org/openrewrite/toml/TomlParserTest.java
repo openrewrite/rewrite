@@ -784,6 +784,28 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void timesWithoutSeconds() {
+        // TOML 1.1. Passes once generateAntlrSources regenerates the lexer
+        rewriteRun(
+          toml(
+            """
+              odt = 1979-05-27 07:32Z
+              odt-offset = 1979-05-27T07:32-07:00
+              ldt = 1979-05-27T07:32
+              lt = 07:32
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(-7)),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                LocalTime.of(7, 32)))
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
