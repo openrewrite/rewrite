@@ -10,7 +10,7 @@ import {
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
-import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
+import {ExecutionContext, foundSearchResult} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
@@ -1211,12 +1211,18 @@ function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: Ma
     });
 }
 
-/** Calls `maybeRebind` once per move, as a recipe moving several members does. */
-function rebindEach(moves: MaybeRebindOptions[]) {
+/**
+ * Calls `maybeRebind` once per move, as a recipe moving several members does, then runs `then`, if any,
+ * on the rebound file: it is queued after the rewrites the moves queue.
+ */
+function rebindEach(moves: MaybeRebindOptions[], then?: JavaScriptVisitor<any>) {
     return fromVisitor(new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
             for (const move of moves) {
                 maybeRebind(this, move);
+            }
+            if (then !== undefined) {
+                this.afterVisit.push(then);
             }
             return super.visitJsCompilationUnit(cu, p);
         }
@@ -1224,14 +1230,13 @@ function rebindEach(moves: MaybeRebindOptions[]) {
 }
 
 /**
- * Moves `move`, then marks each call or construction of the moved member, under either name, with
- * the module and name its type declares it on: `pkg#f`.
+ * Marks each call or construction of one of `names` with its declaring type and name, as `pkg#f`:
+ * the module its type declares it on.
  */
-function rebindThenMarkMoved(move: MaybeRebindOptions): Recipe {
-    const names = [move.from.member, move.to.member];
+function markDeclaringType(...names: string[]): JavaScriptVisitor<any> {
     const declaredOn = (method: Type.Method | undefined) => method === undefined ? "no type" :
         `${Type.FullyQualified.getFullyQualifiedName(method.declaringType)}#${method.name}`;
-    const mark = fromVisitor(new class extends JavaScriptVisitor<any> {
+    return new class extends JavaScriptVisitor<any> {
         override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
             const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
             return names.includes(method.name.simpleName) ? foundSearchResult(visited, declaredOn(method.methodType)) : visited;
@@ -1242,18 +1247,9 @@ function rebindThenMarkMoved(move: MaybeRebindOptions): Recipe {
             const clazz = newClass.class;
             const name = clazz?.kind === J.Kind.FieldAccess ? (clazz as J.FieldAccess).name.element.simpleName :
                 clazz?.kind === J.Kind.Identifier ? (clazz as J.Identifier).simpleName : undefined;
-            return names.includes(name) ? foundSearchResult(visited, declaredOn(newClass.constructorType)) : visited;
+            return name !== undefined && names.includes(name) ? foundSearchResult(visited, declaredOn(newClass.constructorType)) : visited;
         }
-    });
-    return new class extends Recipe {
-        readonly name = "org.openrewrite.javascript.test.RebindThenMarkMoved";
-        readonly displayName = "Rebind, then mark the moved member";
-        readonly description = "Moves a member, then marks each call or construction of it with its declaring type.";
-
-        override async recipeList(): Promise<Recipe[]> {
-            return [rebindEach([move]), mark];
-        }
-    }();
+    };
 }
 
 describe("maybeBind and type-only imports", () => {
@@ -3693,18 +3689,23 @@ describe("maybeRebind and the member's other spellings", () => {
 
     describe("a member moved to another module, beside a module object that stays on the old one", () => {
         // The module object still reads the old module, so a read through it keeps its spelling and its type.
+        // The markers show the declaring type and name of each call of the moved member.
         test("a call through a namespace import keeps its type", async () => {
+            const move = {
+                from: {module: "pkg", member: "f"},
+                to: {module: "other", member: "g"}
+            };
             const spec = new RecipeSpec();
-            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "f"}, to: {module: "other", member: "g"}});
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
             await withDir(async repo => {
-            installPackage(repo.path, "pkg", {
-                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare function f(): string;`
-            });
-            installPackage(repo.path, "other", {
-                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare function g(): string;`
-            });
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function g(): string;`
+                });
                 await spec.rewriteRun(npm(repo.path,
                     typescript(
                         `
@@ -3728,17 +3729,21 @@ describe("maybeRebind and the member's other spellings", () => {
         }, 60000);
 
         test("a call through any other module object keeps its type, a reassigned one too", async () => {
+            const move = {
+                from: {module: "pkg", member: "f"},
+                to: {module: "other", member: "g"}
+            };
             const spec = new RecipeSpec();
-            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "f"}, to: {module: "other", member: "g"}});
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
             await withDir(async repo => {
-            installPackage(repo.path, "pkg", {
-                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare function f(): string;`
-            });
-            installPackage(repo.path, "other", {
-                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare function g(): string;`
-            });
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function g(): string;`
+                });
                 await spec.rewriteRun(npm(repo.path,
                     typescript(
                         `
@@ -3774,17 +3779,21 @@ describe("maybeRebind and the member's other spellings", () => {
         }, 60000);
 
         test("a construction through a namespace import keeps its constructor", async () => {
+            const move = {
+                from: {module: "pkg", member: "K"},
+                to: {module: "other", member: "L"}
+            };
             const spec = new RecipeSpec();
-            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "K"}, to: {module: "other", member: "L"}});
+            spec.recipe = rebindEach([move], markDeclaringType("K", "L"));
             await withDir(async repo => {
-            installPackage(repo.path, "pkg", {
-                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare class K {}`
-            });
-            installPackage(repo.path, "other", {
-                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare class L {}`
-            });
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare class K {}`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare class L {}`
+                });
                 await spec.rewriteRun(npm(repo.path,
                     typescript(
                         `
@@ -3806,17 +3815,21 @@ describe("maybeRebind and the member's other spellings", () => {
         }, 60000);
 
         test("a call through a namespace import keeps its type beside a moved re-export", async () => {
+            const move = {
+                from: {module: "pkg", member: "f"},
+                to: {module: "other", member: "g"}
+            };
             const spec = new RecipeSpec();
-            spec.recipe = rebindThenMarkMoved({from: {module: "pkg", member: "f"}, to: {module: "other", member: "g"}});
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
             await withDir(async repo => {
-            installPackage(repo.path, "pkg", {
-                "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare function f(): string;`
-            });
-            installPackage(repo.path, "other", {
-                "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
-                "index.d.ts": `export declare function g(): string;`
-            });
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function g(): string;`
+                });
                 await spec.rewriteRun(npm(repo.path,
                     typescript(
                         `
