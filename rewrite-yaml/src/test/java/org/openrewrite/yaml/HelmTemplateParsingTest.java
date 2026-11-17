@@ -651,4 +651,99 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multilineHelmActionWithBracesInStrings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.spec.replicas", "2", null)),
+          yaml(
+            """
+              spec:
+                {{- include "mychart.labels" (dict
+                  "open" "{"
+                  "close" "}}") | nindent 2 }}
+                replicas: 1
+              """,
+            """
+              spec:
+                {{- include "mychart.labels" (dict
+                  "open" "{"
+                  "close" "}}") | nindent 2 }}
+                replicas: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionSharingALineWithYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.metadata.namespace", "prod", null)),
+          yaml(
+            """
+              metadata:
+                name: {{ include "mychart.fullname"
+                         . }}-config
+                namespace: default
+              """,
+            """
+              metadata:
+                name: {{ include "mychart.fullname"
+                         . }}-config
+                namespace: prod
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionWithRawString() {
+        rewriteRun(
+          yaml(
+            """
+              data:
+                {{- `first: line
+              }} second line` | nindent 2 }}
+                key: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineGitHubActionsExpression() {
+        rewriteRun(
+          yaml(
+            """
+              steps:
+                - uses: actions/setup-java@v4
+                  with:
+                    java-version: ${{ matrix.java-version }}
+                    url: ${{ format('{0}/{1}',
+                           matrix.base-url, inputs.path) }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void strayOpeningDelimiterDoesNotHideYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.port", "8080", null)),
+          yaml(
+            """
+              note: see {{ the docs
+              name: web
+              port: 80
+              desc: done }}
+              """,
+            """
+              note: see {{ the docs
+              name: web
+              port: 8080
+              desc: done }}
+              """
+          )
+        );
+    }
 }
