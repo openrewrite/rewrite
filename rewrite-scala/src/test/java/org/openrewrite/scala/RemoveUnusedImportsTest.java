@@ -110,6 +110,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               package t
               object T {
                 type Str = String
+                type MyList[A] = List[A]
               }
               """
           ),
@@ -119,6 +120,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import t.T._
               class A {
                 val s: Str = null
+                val l: MyList[Int] = null
               }
               """
           ),
@@ -126,8 +128,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               package v
               import t.T.Str
+              import t.T.MyList
               class B {
                 val s: Str = null
+                val l: MyList[Int] = null
               }
               """
           )
