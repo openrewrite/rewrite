@@ -29,9 +29,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 
-import java.util.Collections;
-import java.util.List;
-
 /**
  * ScalaVisitor extends JavaVisitor to support visiting both Java (J) and Scala (S) AST elements.
  * This allows Scala code to be processed by Java-focused recipes while also supporting
@@ -72,54 +69,12 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
 
-        // Bridge to Java visitor: create a temporary J.CompilationUnit so that Java recipes
-        // that override visitCompilationUnit(J.CompilationUnit, P) can process imports, classes, etc.
-        J.CompilationUnit tempJcu = new J.CompilationUnit(
-                Tree.randomId(),
-                c.getPrefix(),
-                c.getMarkers(),
-                c.getSourcePath(),
-                c.getFileAttributes(),
-                c.getCharset().name(),
-                c.isCharsetBomMarked(),
-                c.getChecksum(),
-                c.getPadding().getPackageDeclaration(),
-                c.getPadding().getImports(),
-                Collections.emptyList(),
-                c.getEof()
-        );
-
-        // Cast to JavaVisitor to invoke visitCompilationUnit(J.CompilationUnit, P) virtually.
-        // When this visitor is an adapted delegate, the adapter's override will call
-        // the original Java recipe's visitCompilationUnit (e.g., OrderImports).
-        J.CompilationUnit result = (J.CompilationUnit) ((JavaVisitor<P>) this).visitCompilationUnit(tempJcu, p);
-
-        // Sync changes from the J.CompilationUnit back to S.CompilationUnit
-        if (result != tempJcu) {
-            List<JRightPadded<J.Import>> newImports = result.getPadding().getImports();
-            c = (S.CompilationUnit) c.getPadding().withImports(newImports);
-            if (result.getPrefix() != c.getPrefix()) {
-                c = c.withPrefix(result.getPrefix());
-            }
-            if (result.getMarkers() != c.getMarkers()) {
-                c = c.withMarkers(result.getMarkers());
-            }
-            if (result.getEof() != c.getEof()) {
-                c = c.withEof(result.getEof());
-            }
-        }
-
         return c;
     }
 
-    /**
-     * A ScalaVisitor only sees the {@link J.CompilationUnit} that {@link #visitCompilationUnit(S.CompilationUnit, Object)}
-     * builds for Java visitors overriding this method. Its prefix, markers, package, imports and end of file
-     * are already visited.
-     */
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
-        return cu;
+        throw new UnsupportedOperationException("Scala has a different structure for its compilation unit. See S.CompilationUnit.");
     }
 
     @Override

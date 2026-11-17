@@ -104,6 +104,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           tree match {
             case Trees.Apply(fn, args) if owner != null && isInsertedImplicitApplication(fn, args) =>
               implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
+            // The traversal skips the call of an inline method like `summon`, which holds its implicit arguments
+            case Trees.Inlined(Trees.Apply(fn, args), _, _) if owner != null && isInsertedImplicitApplication(fn, args) =>
+              implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
             case _ =>
           }
 
@@ -350,6 +353,25 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   def importedOf(tree: untpd.Tree, name: Name): Option[Imported] =
     typedNodes.get(tree).map(_.own).collect {
       case imp: Trees.ImportOrExport[?] => imported(imp.expr.asInstanceOf[tpd.Tree], name)
+    }
+
+  /**
+   * Whether an import or export selects term members of a class or object, rather than members of a package
+   * or a value, or a type nested in the class or object.
+   */
+  def selectsMembersOfType(tree: untpd.Tree): Boolean =
+    typedNodes.get(tree).map(_.own).exists {
+      case imp: Trees.ImportOrExport[?] =>
+        try {
+          val qualifier = imp.expr.asInstanceOf[tpd.Tree]
+          val sym = qualifier.symbol
+          sym != null && sym.exists && !isErrorSymbol(sym) && !sym.is(Flags.Package) &&
+            (sym.is(Flags.Module) || sym.isClass) &&
+            imp.selectors.forall(sel => sel.isWildcard || !qualifier.tpe.member(sel.imported.name.toTypeName).exists)
+        } catch {
+          case NonFatal(_) => false
+        }
+      case _ => false
     }
 
   private def imported(qualifier: tpd.Tree, name: Name): Imported =
