@@ -449,7 +449,9 @@ public final class Assertions {
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
-            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName())) {
+            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName()) &&
+                       // An accessor is declared by its `get`/`set` keyword but typed by its JVM name, such as `getName`.
+                       !(getCursor().getParentTreeCursor().getValue() instanceof K.Property)) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
             if (md.getName().getType() != null && type != md.getName().getType()) {

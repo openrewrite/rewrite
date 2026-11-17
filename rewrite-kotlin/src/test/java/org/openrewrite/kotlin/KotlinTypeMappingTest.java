@@ -126,17 +126,17 @@ class KotlinTypeMappingTest {
         J.MethodDeclaration getter = property.getAccessors().getElements().stream().filter(x -> "get".equals(x.getName().getSimpleName())).findFirst().orElse(null);
         JavaType.FullyQualified declaringType = getter.getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(getter.getMethodType().getName()).isEqualTo("get");
+        assertThat(getter.getMethodType().getName()).isEqualTo("getField");
         assertThat(getter.getMethodType().getReturnType()).isEqualTo(id.getType());
         assertThat(getter.getName().getType()).isEqualTo(getter.getMethodType());
-        assertThat(getter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=get,return=int,parameters=[]}");
+        assertThat(getter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=getField,return=int,parameters=[]}");
 
         J.MethodDeclaration setter = property.getAccessors().getElements().stream().filter(x -> "set".equals(x.getName().getSimpleName())).findFirst().orElse(null);
         declaringType = setter.getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(setter.getMethodType().getName()).isEqualTo("set");
+        assertThat(setter.getMethodType().getName()).isEqualTo("setField");
         assertThat(setter.getMethodType()).isEqualTo(setter.getName().getType());
-        assertThat(setter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=set,return=void,parameters=[int]}");
+        assertThat(setter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=setField,return=void,parameters=[int]}");
     }
 
     @Test
@@ -476,6 +476,38 @@ class KotlinTypeMappingTest {
     @Nested
     @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     class ParsingTest implements RewriteTest {
+
+        @Test
+        void accessorMethodTypesUseJvmNames() {
+            rewriteRun(
+              kotlin(
+                """
+                  class K {
+                      var isOpen: Boolean = false
+                          get() = field
+                          set(value) { field = value }
+
+                      @get:JvmName("named")
+                      @set:JvmName("assign")
+                      var j: Int = 0
+                          get() = field
+                          set(value) { field = value }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    List<String> names = new ArrayList<>();
+                    new KotlinIsoVisitor<List<String>>() {
+                        @Override
+                        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> names) {
+                            names.add(method.getMethodType().getName());
+                            return method;
+                        }
+                    }.visit(cu, names);
+                    assertThat(names).containsExactly("isOpen", "setOpen", "named", "assign");
+                })
+              )
+            );
+        }
 
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
         @Test
@@ -1376,10 +1408,10 @@ class KotlinTypeMappingTest {
                   }
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    var getMatcher = new MethodMatcher("Test get(..)");
+                    var getMatcher = new MethodMatcher("Test getStringRepresentation()");
                     var foundGet = new AtomicBoolean(false);
 
-                    var setMatcher = new MethodMatcher("Test set(..)");
+                    var setMatcher = new MethodMatcher("Test setStringRepresentation(..)");
                     var foundSet = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
