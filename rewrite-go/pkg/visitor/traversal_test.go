@@ -238,3 +238,49 @@ func TestEmptyMarkersAreVisited(t *testing.T) {
 	// then
 	require.Equal(t, []uuid.UUID{found}, ids)
 }
+
+func TestGenericValueTrailingCommaSpacesAreVisited(t *testing.T) {
+	for _, args := range []string{"int   ,    ", "int, string   ,    "} {
+		t.Run(args, func(t *testing.T) {
+			// given
+			params := "T any"
+			if strings.Contains(args, "string") {
+				params = "T, U any"
+			}
+			src := "package main\nfunc F[" + params + "]() {}\nvar f = F[" + args + "]\n"
+
+			// when
+			spaces := visitedSpaces(t, src)
+
+			// then
+			require.Contains(t, spaces, "   ")
+			require.Contains(t, spaces, "    ")
+		})
+	}
+}
+
+type trailingCommaSpaceRewriter struct {
+	visitor.GoVisitor
+}
+
+func (v *trailingCommaSpaceRewriter) VisitSpace(space java.Space, p any) java.Space {
+	if space.Whitespace() == "   " || space.Whitespace() == "    " {
+		return java.SingleSpace
+	}
+	return space
+}
+
+func TestGenericValueTrailingCommaSpacesCanBeRewritten(t *testing.T) {
+	// given
+	src := "package main\nfunc F[T any]() {}\nvar f = F[int   ,    ]\n"
+	cu, err := parser.NewGoParser().Parse("spaces.go", src)
+	require.NoError(t, err)
+	v := visitor.Init(&trailingCommaSpaceRewriter{})
+
+	// when
+	result := v.Visit(cu, nil)
+
+	// then
+	require.Equal(t, "package main\nfunc F[T any]() {}\nvar f = F[int , ]\n", printer.Print(result))
+	require.Equal(t, src, printer.Print(cu))
+}

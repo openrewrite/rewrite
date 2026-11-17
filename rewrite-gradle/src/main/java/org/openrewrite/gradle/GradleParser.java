@@ -21,6 +21,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
+import org.openrewrite.gradle.internal.GradleDelegateTypeCheckingExtension;
+import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
@@ -28,9 +30,15 @@ import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.tree.ParseError;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -39,24 +47,24 @@ import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
+    /**
+     * The Android Gradle Plugin is only on the classpath when the build supplies it, so its accessor can't be compiled
+     * into the type table with the others.
+     */
     @SuppressWarnings("LanguageMismatch")
     private static final String KTS_BUILD_STUBS =
             "package org.gradle.api\n" +
-            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
-            "import org.gradle.plugin.use.PluginDependencySpec\n" +
-            "fun Project.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
-            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n" +
             "fun Project.android(block: com.android.build.api.dsl.ApplicationExtension.() -> Unit) {}\n";
 
-    @SuppressWarnings("LanguageMismatch")
-    private static final String KTS_SETTINGS_STUBS =
-            "package org.gradle.api.initialization\n" +
-            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
-            "import org.gradle.plugin.use.PluginDependencySpec\n" +
-            "import org.gradle.plugin.management.PluginManagementSpec\n" +
-            "fun Settings.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
-            "fun Settings.pluginManagement(block: PluginManagementSpec.() -> Unit) {}\n" +
-            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
+    private static final String[] KTS_DEFAULT_IMPORTS = Stream.concat(
+            Arrays.stream(DefaultImportsCustomizer.DEFAULT_IMPORTS),
+            Stream.of("org.gradle.kotlin.dsl")
+    ).toArray(String[]::new);
+
+    /**
+     * Gradle compiles its Kotlin scripts so that a lambda passed as an {@code Action} receives its argument as {@code this}.
+     */
+    private static final String HAS_IMPLICIT_RECEIVER = "org.gradle.api.HasImplicitReceiver";
 
     private final GradleParser.Builder base;
 
@@ -71,7 +79,7 @@ public class GradleParser implements Parser {
         if (groovyBuildParser == null) {
             Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
             if (buildscriptClasspath == null) {
-                buildscriptClasspath = defaultClasspath(ctx);
+                buildscriptClasspath = defaultClasspath(relativeTo, ctx);
             }
             groovyBuildParser = GroovyParser.builder(base.groovyParser)
                     .classpath(buildscriptClasspath)
@@ -79,25 +87,27 @@ public class GradleParser implements Parser {
                             new DefaultImportsCustomizer(),
                             config -> config.setScriptBaseClass("RewriteGradleProject")
                     )
+                    .typeCheckingExtensions(GradleDelegateTypeCheckingExtension::new)
                     .build();
         }
         if (kotlinBuildParser == null) {
             Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
             if (buildscriptClasspath == null) {
-                buildscriptClasspath = defaultClasspath(ctx);
+                buildscriptClasspath = defaultClasspath(relativeTo, ctx);
             }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
-                    .classpath(buildscriptClasspath)
+                    .classpath(withKotlinDslAccessors(buildscriptClasspath, ctx))
                     .dependsOn(KTS_BUILD_STUBS)
                     .isKotlinScript(true)
                     .scriptImplicitReceivers("org.gradle.api.Project")
-                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
+                    .scriptDefaultImports(KTS_DEFAULT_IMPORTS)
+                    .samWithReceiverAnnotations(HAS_IMPLICIT_RECEIVER)
                     .build();
         }
         if (groovySettingsParser == null) {
             Collection<Path> settingsClasspath = base.settingsClasspath;
             if (settingsClasspath == null) {
-                settingsClasspath = defaultClasspath(ctx);
+                settingsClasspath = defaultClasspath(relativeTo, ctx);
             }
             groovySettingsParser = GroovyParser.builder(base.groovyParser)
                     .classpath(settingsClasspath)
@@ -105,19 +115,20 @@ public class GradleParser implements Parser {
                             new DefaultImportsCustomizer(),
                             config -> config.setScriptBaseClass("RewriteSettings")
                     )
+                    .typeCheckingExtensions(GradleDelegateTypeCheckingExtension::new)
                     .build();
         }
         if (kotlinSettingsParser == null) {
             Collection<Path> settingsClasspath = base.settingsClasspath;
             if (settingsClasspath == null) {
-                settingsClasspath = defaultClasspath(ctx);
+                settingsClasspath = defaultClasspath(relativeTo, ctx);
             }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
-                    .classpath(settingsClasspath)
-                    .dependsOn(KTS_SETTINGS_STUBS)
+                    .classpath(withKotlinDslAccessors(settingsClasspath, ctx))
                     .isKotlinScript(true)
                     .scriptImplicitReceivers("org.gradle.api.initialization.Settings")
-                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
+                    .scriptDefaultImports(KTS_DEFAULT_IMPORTS)
+                    .samWithReceiverAnnotations(HAS_IMPLICIT_RECEIVER)
                     .build();
         }
 
@@ -182,6 +193,9 @@ public class GradleParser implements Parser {
         @Nullable
         private Collection<Path> settingsClasspath;
 
+        @Nullable
+        private String gradleVersion;
+
         public Builder() {
             super(G.CompilationUnit.class);
         }
@@ -203,6 +217,16 @@ public class GradleParser implements Parser {
         public Builder typeFactory(JavaTypeFactory typeFactory) {
             this.groovyParser.typeFactory(typeFactory);
             this.kotlinParser.typeFactory(typeFactory);
+            return this;
+        }
+
+        /**
+         * The Gradle version whose API types the scripts are attributed with, when no classpath is given.
+         * Only the major version matters. Without one, the version of the Gradle wrapper in the directory the sources
+         * are parsed relative to is used, else the newest major version.
+         */
+        public Builder gradleVersion(@Nullable String gradleVersion) {
+            this.gradleVersion = gradleVersion;
             return this;
         }
 
@@ -255,22 +279,60 @@ public class GradleParser implements Parser {
         }
     }
 
-    private List<Path> defaultClasspath(ExecutionContext ctx) {
+    private List<Path> defaultClasspath(@Nullable Path relativeTo, ExecutionContext ctx) {
         if (defaultClasspath == null) {
+            String gradleVersion = base.gradleVersion != null ? base.gradleVersion : wrapperGradleVersion(relativeTo);
             defaultClasspath = JavaParser.dependenciesFromResources(ctx,
-                    "gradle-base-services",
-                    "gradle-core-api",
-                    "gradle-language-groovy",
-                    "gradle-language-java",
-                    "gradle-logging",
-                    "gradle-messaging",
-                    "gradle-native",
-                    "gradle-process-services",
-                    "gradle-resources",
-                    "gradle-testing-base",
-                    "gradle-testing-jvm",
+                    "gradle-public-api-" + gradleApiMajor(gradleVersion) + ".",
                     "develocity-gradle-plugin");
         }
         return defaultClasspath;
+    }
+
+    /**
+     * Adds the accessors Gradle generates for each build, which {@code addGradleApiToTypeTable} in build.gradle.kts
+     * compiles into the type table.
+     */
+    private static List<Path> withKotlinDslAccessors(Collection<Path> classpath, ExecutionContext ctx) {
+        List<Path> withAccessors = new ArrayList<>(classpath);
+        withAccessors.addAll(JavaParser.dependenciesFromResources(ctx, "gradle-kotlin-dsl-accessors"));
+        return withAccessors;
+    }
+
+    static @Nullable String wrapperGradleVersion(@Nullable Path projectDir) {
+        if (projectDir == null) {
+            return null;
+        }
+        Path wrapper = projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH);
+        if (!Files.isRegularFile(wrapper)) {
+            return null;
+        }
+        Properties properties = new Properties();
+        try (InputStream in = Files.newInputStream(wrapper)) {
+            properties.load(in);
+        } catch (IOException | IllegalArgumentException e) {
+            // Properties.load throws IllegalArgumentException on a malformed unicode escape
+            return null;
+        }
+        return GradleWrapper.versionFromDistributionUrl(properties.getProperty("distributionUrl", ""));
+    }
+
+    /**
+     * The majors of {@code gradleApiMajors} in build.gradle.kts, whose API the type table holds.
+     */
+    static final int[] GRADLE_API_MAJORS = {6, 7, 8, 9};
+
+    static int gradleApiMajor(@Nullable String gradleVersion) {
+        int newest = GRADLE_API_MAJORS[GRADLE_API_MAJORS.length - 1];
+        if (gradleVersion == null) {
+            return newest;
+        }
+        int major;
+        try {
+            major = Integer.parseInt(gradleVersion.split("\\.", 2)[0]);
+        } catch (NumberFormatException e) {
+            return newest;
+        }
+        return Math.max(GRADLE_API_MAJORS[0], Math.min(newest, major));
     }
 }

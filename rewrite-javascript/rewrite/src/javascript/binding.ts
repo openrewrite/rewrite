@@ -24,7 +24,7 @@ import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
     isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindGroup, RebindImport, requireBinds,
-    requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
+    requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget, sameAttributes
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {RenameMemberSpellings} from "./member-spellings";
@@ -498,7 +498,10 @@ function sharesNameWithValue(cu: JS.CompilationUnit, existing: ExistingImportBin
 
 const noNames: ReadonlySet<string> = new Set();
 
-/** Whether the moved binding can merge into a value import of `to`'s named member that `name` binds. */
+/**
+ * Whether the moved binding can merge into a value import of `to`'s named member that `name` binds,
+ * loaded with the same attributes.
+ */
 function reusesTargetImport(
     cu: JS.CompilationUnit,
     name: string,
@@ -512,7 +515,13 @@ function reusesTargetImport(
     const joined = !moved.viaRequire || (!moved.reassignable && joinTarget !== undefined &&
         requireBinds(joinTarget, to.module, to.member) === name);
     return target?.localName === name && target.viaRequire === moved.viaRequire && joined &&
-        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
+        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly &&
+        sameAttributes(attributesOf(target), attributesOf(moved)) && onlyReferences(cu, name);
+}
+
+/** The `with {…}` clause of the import that binds it. A `require` has none. */
+function attributesOf(binding: ExistingImportBinding): JS.ImportAttributes | undefined {
+    return binding.statement.kind === JS.Kind.Import ? binding.statement.attributes : undefined;
 }
 
 /**

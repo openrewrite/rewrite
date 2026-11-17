@@ -1608,10 +1608,11 @@ func (v *GoVisitor) VisitIndexList(il *golang.IndexList, p any) java.J {
 	if target != nil {
 		target = visitExpression(v, target, p)
 	}
+	indicesMarkers := v.visitMarkers(il.Indices.Markers, p)
 	indicesBefore := v.self().VisitSpace(il.Indices.Before, p)
 	indicesElems := visitRightPaddedList(v, il.Indices.Elements, p)
 	if java.SpaceEqual(prefix, il.Prefix) && java.MarkersEqual(markers, il.Markers) &&
-		target == il.Target &&
+		target == il.Target && java.MarkersEqual(indicesMarkers, il.Indices.Markers) &&
 		java.SpaceEqual(indicesBefore, il.Indices.Before) && java.SameSlice(indicesElems, il.Indices.Elements) {
 		return il
 	}
@@ -1619,6 +1620,7 @@ func (v *GoVisitor) VisitIndexList(il *golang.IndexList, p any) java.J {
 	c.Prefix = prefix
 	c.Markers = markers
 	c.Target = target
+	c.Indices.Markers = indicesMarkers
 	c.Indices.Before = indicesBefore
 	c.Indices.Elements = indicesElems
 	return &c
@@ -2025,8 +2027,13 @@ func (v *GoVisitor) VisitType(javaType java.JavaType, p any) java.JavaType {
 // the Python, JS, and C# ports). Every Visit* method routes its node's
 // markers through visitMarkers, which invokes VisitMarker on each entry via
 // virtual dispatch, so subclasses collect or rewrite markers without
-// touching individual node types. The default returns the marker unchanged.
+// touching individual node types.
 func (v *GoVisitor) VisitMarker(marker java.Marker, p any) java.Marker {
+	if tc, ok := marker.(golang.TrailingComma); ok {
+		tc.Before = v.self().VisitSpace(tc.Before, p)
+		tc.After = v.self().VisitSpace(tc.After, p)
+		return tc
+	}
 	return marker
 }
 

@@ -2313,9 +2313,13 @@ func (ctx *parseContext) mapIdent(ident *ast.Ident) *java.Identifier {
 // mapBasicLit maps a basic literal (string, int, float, etc.)
 func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	prefix := ctx.prefix(lit.Pos())
-	ctx.skip(len(lit.Value))
+	source := lit.Value
+	if lit.Kind == token.STRING && strings.HasPrefix(source, "`") {
+		source = ctx.literalSource(lit.Pos())
+	}
+	ctx.skip(len(source))
 
-	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
+	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: source}
 
 	l.Type = ctx.literalTypeOf(lit)
 
@@ -2710,9 +2714,9 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string, recv typ
 		// mapType is the depth-bounded, panic-guarded entry; the
 		// mapNamed underneath it is not.
 		if _, ok := obj.Type().(*types.Named); ok {
-			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
+			declaring = classOf(ctx.mapper.mapType(obj.Type()))
 		} else if recv != nil {
-			declaring, _ = ctx.mapper.mapType(recv).(*java.JavaTypeClass)
+			declaring = classOf(ctx.mapper.mapType(recv))
 		}
 		return ctx.mapper.mapSignature(sig, name, declaring)
 	}
@@ -3190,6 +3194,15 @@ func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Contain
 func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
 	prefix, target := hoistLeftPrefix(target)
+	if ctx.isGenericInstantiation(expr.X) {
+		return &golang.IndexList{
+			ID:      uuid.New(),
+			Prefix:  prefix,
+			Target:  target,
+			Indices: *ctx.mapTypeArgsSingle(expr),
+			Type:    ctx.valueTypeOf(expr),
+		}
+	}
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 	index := ctx.mapExpr(expr.Index)
@@ -3249,31 +3262,11 @@ func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
 func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
 	prefix, target := hoistLeftPrefix(target)
-	lbrackPrefix := ctx.prefix(expr.Lbrack)
-	ctx.skip(1) // "["
-
-	var elements []java.RightPadded[java.Expression]
-	for i, idx := range expr.Indices {
-		mapped := ctx.mapExpr(idx)
-		var after java.Space
-		if i < len(expr.Indices)-1 {
-			commaOffset := ctx.findNext(',')
-			if commaOffset >= 0 {
-				after = ctx.prefix(ctx.file.Pos(commaOffset))
-				ctx.skip(1) // ","
-			}
-		} else {
-			after = ctx.prefix(expr.Rbrack)
-		}
-		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
-	}
-	ctx.skip(1) // "]"
-
 	return &golang.IndexList{
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Target:  target,
-		Indices: java.Container[java.Expression]{Before: lbrackPrefix, Elements: elements},
+		Indices: *ctx.mapTypeArgsMulti(expr),
 		Type:    ctx.valueTypeOf(expr),
 	}
 }
@@ -4034,6 +4027,13 @@ func (ctx *parseContext) findNext(ch byte) int {
 // backtick or `/` is therefore never found: those open the regions the
 // scan steps over.
 func (ctx *parseContext) findNextBefore(ch byte, before int) int {
+	return ctx.scanCodeBefore(before, func(i int) bool { return ctx.src[i] == ch })
+}
+
+// scanCodeBefore returns the first offset from the cursor, and before the
+// `before` bound as findNextBefore reads it, at which match holds, stepping
+// over rune, string and raw string literals and comments.
+func (ctx *parseContext) scanCodeBefore(before int, match func(i int) bool) int {
 	if before < 0 {
 		return -1
 	}
@@ -4081,7 +4081,7 @@ func (ctx *parseContext) findNextBefore(ch byte, before int) int {
 				i += 2
 			}
 		default:
-			if b == ch {
+			if match(i) {
 				return i
 			}
 			i++
@@ -4091,11 +4091,9 @@ func (ctx *parseContext) findNextBefore(ch byte, before int) int {
 }
 
 func (ctx *parseContext) findNextString(s string) int {
-	idx := strings.Index(string(ctx.src[ctx.cursor:]), s)
-	if idx < 0 {
-		return -1
-	}
-	return ctx.cursor + idx
+	return ctx.scanCodeBefore(0, func(i int) bool {
+		return i+len(s) <= len(ctx.src) && string(ctx.src[i:i+len(s)]) == s
+	})
 }
 
 func (ctx *parseContext) prefixString(pos token.Pos) string {

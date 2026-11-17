@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.transform.stc.ExtensionMethodNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
@@ -230,8 +231,14 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
-            method.unsafeSet(TypeUtils.asFullyQualified(type(node.getDeclaringClass())),
-                    type(node.getReturnType()),
+            JavaType.FullyQualified declaringType = TypeUtils.asFullyQualified(type(node.getDeclaringClass()));
+            if ((declaringType == null || declaringType instanceof JavaType.Unknown) && node instanceof ExtensionMethodNode) {
+                // An array receiver cannot be a declaring type, so the class declaring the extension method is used
+                declaringType = TypeUtils.asFullyQualified(type(((ExtensionMethodNode) node).getExtensionMethodNode().getDeclaringClass()));
+            }
+            method.unsafeSet(declaringType,
+                    // Groovy gives constructors of classes it compiles from source a void return type
+                    node instanceof ConstructorNode ? declaringType : type(node.getReturnType()),
                     parameterTypes,
                     thrownExceptions,
                     annotations
@@ -271,6 +278,25 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             JavaType.Variable variable = new JavaType.Variable(
                     null, 0, name, null, null, null);
             variable.unsafeSet(JavaType.Unknown.getInstance(), type, (List<JavaType.FullyQualified>) null);
+            return variable;
+        });
+    }
+
+    /**
+     * A local variable or parameter, owned by the method that declares it.
+     */
+    public JavaType.@Nullable Variable variableType(String name, ClassNode type, @Nullable MethodNode owner, int position) {
+        JavaType variableType = type(type);
+        if (variableType == null) {
+            return null;
+        }
+
+        String signature = signatureBuilder.variableSignature(owner, name, type, position);
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, 0, name, null, null, null);
+            variable.unsafeSet(owner == null ? JavaType.Unknown.getInstance() : methodType(owner), variableType,
+                    (List<JavaType.FullyQualified>) null);
             return variable;
         });
     }

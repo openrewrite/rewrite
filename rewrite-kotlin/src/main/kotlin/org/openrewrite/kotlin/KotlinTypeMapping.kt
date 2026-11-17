@@ -57,6 +57,7 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.*
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqNameUnsafe
+import org.jetbrains.kotlin.name.JvmStandardClassIds
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.name.isOneSegmentFQN
 import org.jetbrains.kotlin.resolve.jvm.JvmPrimitiveType
@@ -286,18 +287,26 @@ class KotlinTypeMapping(
     @OptIn(DirectDeclarationsAccess::class)
     private fun fileType(file: FirFile, signature: String): JavaType {
         // The file's JVM facade class (e.g. FooKt) is synthesized at codegen
-        // and has no FirClass. But we DO have the file's top-level functions,
-        // which are exactly the methods on the facade. Populate them into a
-        // canonical Class so MethodMatcher and FQN-based lookups work.
+        // and has no FirClass. Its methods are the top-level functions of the
+        // file, or of every part of a `@file:JvmMultifileClass`. Populate them
+        // into a canonical Class so MethodMatcher and FQN-based lookups work.
         return typeFactory.computeClass(signature, Flag.Public.getBitMask(), FullyQualified.Kind.Class) { stub ->
+            val session = file.moduleData.session
+            val parts = if (file.annotations.getAnnotationByClassId(JvmStandardClassIds.JVM_MULTIFILE_CLASS_ID, session) != null) {
+                session.firProvider.getFirFilesByPackage(file.packageFqName).filter { it.facadeFqn == signature }
+            } else {
+                listOf(file)
+            }
             val functions = buildList {
-                file.declarations.forEach {
-                    when (it) {
-                        is FirNamedFunction -> add(it)
-                        is FirScript -> it.declarations.filterIsInstance<FirNamedFunction>().forEach(::add)
-                        else -> {}
+                parts
+                    .flatMap { it.declarations }
+                    .forEach {
+                        when (it) {
+                            is FirNamedFunction -> add(it)
+                            is FirScript -> it.declarations.filterIsInstance<FirNamedFunction>().forEach(::add)
+                            else -> {}
+                        }
                     }
-                }
             }
             stub.unsafeSet(null, null, null, null, null, null,
                 functions.map { methodDeclarationType(it, null) })
@@ -847,6 +856,13 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
+        // An error type satisfies any receiver type, so FIR binds `unknown.set(0, 'c')` and
+        // `with(unknown) { set(0, 'c') }` to the `StringBuilder.set` extension.
+        // javac leaves calls on an unresolved receiver unattributed.
+        if (function.extensionReceiver?.resolvedType is ConeErrorType ||
+            function.dispatchReceiver?.resolvedType is ConeErrorType) {
+            return null
+        }
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
         if (sym !is FirCallableSymbol<*>) {
             throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")

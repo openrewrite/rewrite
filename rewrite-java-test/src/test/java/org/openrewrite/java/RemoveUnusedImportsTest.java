@@ -1767,7 +1767,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotUnfoldWildCardImport() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedImports()),
           java(
             """
               package com.Source.mine;
@@ -1860,7 +1859,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeImportUsedAsImpliedLambdaParameter() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedImports()),
           java(
             """              
               import java.awt.KeyEventDispatcher;
@@ -1889,7 +1887,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void retainImportUsedAsExplicitLambdaParameter() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedImports()),
           java(
             """              
               import java.awt.KeyEventDispatcher;

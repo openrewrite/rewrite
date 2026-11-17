@@ -1146,16 +1146,7 @@ func (p *GoPrinter) VisitIndexList(il *golang.IndexList, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(il.Prefix, il.Markers, out)
 	p.Visit(il.Target, out)
-	p.visitSpace(il.Indices.Before, out)
-	out.Append("[")
-	for i, rp := range il.Indices.Elements {
-		p.Visit(rp.Element, out)
-		p.visitSpace(rp.After, out)
-		if i < len(il.Indices.Elements)-1 {
-			out.Append(",")
-		}
-	}
-	out.Append("]")
+	p.printTypeArgs(&il.Indices, out)
 	p.afterSyntax(il.Markers, out)
 	return il
 }

@@ -18,6 +18,7 @@ package template
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -66,6 +67,28 @@ func (c *patternComparator) allowsDeclaredType(name string, candidate java.J) bo
 		return c.mode == TypeMatchingLenient
 	}
 	return matcher.IsAssignableToType(actual, want)
+}
+
+// allowsKind holds a capture to the kind of node it was declared for: a name
+// capture binds an identifier, and a type capture nothing that only an
+// expression can be.
+func (c *patternComparator) allowsKind(name string, candidate java.J) bool {
+	capture, ok := c.captures[name]
+	if !ok {
+		return true
+	}
+	switch capture.Kind() {
+	case CaptureName:
+		_, ok := candidate.(*java.Identifier)
+		return ok
+	case CaptureType:
+		switch candidate.(type) {
+		case *java.Literal, *java.Binary, *golang.Binary, *java.Unary, *java.MethodInvocation,
+			*golang.Composite, *golang.StatementExpression, *java.TypeCast, *golang.TypeAssertion:
+			return false
+		}
+	}
+	return true
 }
 
 func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool {
@@ -132,6 +155,10 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 		return sameLiteralValue(p, q) && c.matchTypeSlot(p.Type, q.Type)
 	case *java.Empty:
 		return true
+	case *java.Identifier:
+		if namesAnotherSymbolKind(p, candidate.(*java.Identifier)) {
+			return false
+		}
 	case *java.MethodInvocation:
 		if result, handled := c.matchByDeclaringType(p, candidate.(*java.MethodInvocation)); handled {
 			return result
@@ -148,7 +175,7 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 // bindCapture binds a captured value, checking for repeated captures
 // (which enforce structural equality).
 func (c *patternComparator) bindCapture(name string, candidate java.J) bool {
-	if !c.allowsDeclaredType(name, candidate) {
+	if !c.allowsKind(name, candidate) || !c.allowsDeclaredType(name, candidate) {
 		return false
 	}
 	if c.result.Has(name) {
@@ -185,7 +212,7 @@ func (c *patternComparator) isVariadic(name string) bool {
 // equality with a prior binding the way bindCapture does for a single node.
 func (c *patternComparator) bindRun(name string, values []java.J) bool {
 	for _, value := range values {
-		if !c.allowsDeclaredType(name, value) {
+		if !c.allowsKind(name, value) || !c.allowsDeclaredType(name, value) {
 			return false
 		}
 	}
@@ -211,6 +238,43 @@ func structurallyEqual(a, b java.J) bool {
 	// A comparator with no captures meets no placeholder, so a match is
 	// equality.
 	return (&patternComparator{mode: TypeMatchingOff}).matchNode(a, b)
+}
+
+// namesAnotherSymbolKind reports a pattern identifier attributed as the
+// package it imports that the candidate's attribution reads as a variable or as
+// another package: a parameter named strings, or the qualifier of an import
+// with the same name and another path. The two spell the same name for
+// different things whatever the mode, which governs only how types compare.
+func namesAnotherSymbolKind(pattern, candidate *java.Identifier) bool {
+	pkg, ok := packageOf(pattern)
+	if !ok {
+		return false
+	}
+	if candidate.FieldType != nil {
+		return true
+	}
+	other, ok := packageOf(candidate)
+	return ok && other != pkg
+}
+
+// packageOf returns the import path an identifier names, where attribution
+// says it is a package qualifier: the type mapper gives one a class carrying
+// the path and nothing else, and a qualifier reads no variable.
+func packageOf(ident *java.Identifier) (string, bool) {
+	if ident.FieldType != nil {
+		return "", false
+	}
+	class, ok := ident.Type.(*java.JavaTypeClass)
+	if !ok || class == nil || class.Kind != "Class" || class.Supertype != nil ||
+		len(class.Members) > 0 || len(class.Methods) > 0 {
+		return "", false
+	}
+	path := class.FullyQualifiedName
+	last := path[strings.LastIndex(path, "/")+1:]
+	if dot := strings.Index(last, "."); dot >= 0 && !isMajorVersion(last[dot+1:]) {
+		return "", false
+	}
+	return path, path != ""
 }
 
 // unparenthesize reads through the parentheses around a node.
