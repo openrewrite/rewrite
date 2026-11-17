@@ -1211,10 +1211,7 @@ function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: Ma
     });
 }
 
-/**
- * Calls `maybeRebind` once per move, as a recipe moving several members does, then runs `then`, if any,
- * on the rebound file: it is queued after the rewrites the moves queue.
- */
+/** Calls `maybeRebind` once per move, as a recipe moving several members does. */
 function rebindEach(moves: MaybeRebindOptions[], then?: JavaScriptVisitor<any>) {
     return fromVisitor(new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
@@ -1229,10 +1226,6 @@ function rebindEach(moves: MaybeRebindOptions[], then?: JavaScriptVisitor<any>) 
     });
 }
 
-/**
- * Marks each call or construction of one of `names` with its declaring type and name, as `pkg#f`:
- * the module its type declares it on.
- */
 function markDeclaringType(...names: string[]): JavaScriptVisitor<any> {
     const declaredOn = (method: Type.Method | undefined) => method === undefined ? "no type" :
         `${Type.FullyQualified.getFullyQualifiedName(method.declaringType)}#${method.name}`;
@@ -3688,8 +3681,6 @@ describe("maybeRebind and the member's other spellings", () => {
     }, 60000);
 
     describe("a member moved to another module, beside a module object that stays on the old one", () => {
-        // The module object still reads the old module, so a read through it keeps its spelling and its type.
-        // The markers show the declaring type and name of each call of the moved member.
         test("a call through a namespace import keeps its type", async () => {
             const move = {
                 from: {module: "pkg", member: "f"},

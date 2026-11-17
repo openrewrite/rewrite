@@ -434,24 +434,11 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     return boundName;
 }
 
-/**
- * The module objects that still read `from`'s module after a move of one of its named members to another
- * module: `NS` in `import * as NS from "m"` beside a moved `import {Old} from "m"`. `NS.Old` keeps its
- * spelling there, so it keeps its attribution too.
- */
 function keptModuleObjects(cu: JS.CompilationUnit, options: MaybeRebindOptions): ReadonlySet<string> {
     return bindingShape(options.from.member) !== "named" || sameModule(options.from.module, options.to.module) ?
         new Set() : moduleObjectsOf(cu, options.from.module, false);
 }
 
-/**
- * The module objects of `module`, like `NS` in `import * as NS from "m"`.
- * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
- * With `neverAssigned`, which a rename of `NS.Old` wants, skips a `let` or `var` `NS` the file assigns to:
- * after `NS = other`, `NS.Old` may not read the module. Keeping a type wants no such filter: whatever `NS`
- * holds, the move leaves `NS.Old` as it is. Only those are looked for, since finding an assignment reads
- * the whole file.
- */
 function moduleObjectsOf(cu: JS.CompilationUnit, module: string, neverAssigned: boolean): Set<string> {
     const root = new Cursor(cu);
     return new Set(moduleObjectBindings(cu)
@@ -462,6 +449,9 @@ function moduleObjectsOf(cu: JS.CompilationUnit, module: string, neverAssigned: 
 
 /**
  * Queues one {@link RenameMemberSpellings} per move of a named member, after any `RebindImport` of the move.
+ * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
+ * Within one module, skips a `let` or `var` `NS` of the module that the file assigns to: after `NS = other`,
+ * `NS.Old` may not read the module. Only those are looked for, since finding an assignment reads the whole file.
  */
 function queueRenameMemberSpellings(
     visitor: JavaScriptVisitor<any>,

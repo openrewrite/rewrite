@@ -2624,11 +2624,7 @@ function withRunSorted(cu: JS.CompilationUnit, ids: ReadonlySet<UUID>): JS.Compi
     return {...cu, statements};
 }
 
-/**
- * Whether `qualifier` is one of the file's top-level `moduleObjects`: `NS` in `NS.Old` or `(NS).Old`.
- * `holder` is the cursor of the node holding `qualifier`; for `(NS)` it steps inside, since `resolve`
- * wants the cursor of the node holding `NS`.
- */
+/** For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`. */
 export function readsModuleObject(qualifier: J | undefined, holder: Cursor, moduleObjects: ReadonlySet<string>): boolean {
     let object = qualifier, cursor = holder;
     while (object?.kind === J.Kind.Parentheses) {
@@ -2639,12 +2635,6 @@ export function readsModuleObject(qualifier: J | undefined, holder: Cursor, modu
         resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
 }
 
-/**
- * Whether the type `visitType` visits at `cursor`, which is on the node holding it, is that of a read through
- * one of `moduleObjects`: `NS.Old()`, `NS.Old`, `new NS.Old()`, or the `Old` they name. A move to another
- * module leaves `NS.Old` spelled as it is, beside a moved `import {Old} from "m"` or `export {Old} from "m"`,
- * so it keeps its type too.
- */
 export function isModuleObjectRead(cursor: Cursor, moduleObjects: ReadonlySet<string>): boolean {
     if (moduleObjects.size === 0) {
         return false;
@@ -2687,7 +2677,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly localName: string,
         readonly boundName: string,
         readonly group?: RebindGroup,
-        /** The module objects that still read `from`'s module after the move, whose reads keep their types. */
         readonly keptModuleObjects: ReadonlySet<string> = new Set()
     ) {
         super();
@@ -3177,10 +3166,7 @@ function movedTypesIn(
     });
 }
 
-/**
- * `cu` with its types renamed from `from` to `to`, for a move only spellings made (`NS.Old` → `NS.New`,
- * `export {Old} from "m"`), but for reads through `keptModuleObjects`; see {@link isModuleObjectRead}.
- */
+/** `cu` with its types renamed from `from` to `to`, for a move only spellings made (`NS.Old` → `NS.New`). */
 export async function withMovedTypes(
     cu: JS.CompilationUnit,
     from: {module: string; member?: string},
