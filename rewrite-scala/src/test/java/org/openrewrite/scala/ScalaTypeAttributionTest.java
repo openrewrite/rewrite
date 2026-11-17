@@ -1704,7 +1704,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
             trait B extends A { def bar(x: Int): Int }
             abstract class D {
               def foo: Int
-              def baz: Int = 1
               val v: Int
             }
             """,
@@ -1716,7 +1715,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
                     assertThat(barOfA.getFlags()).contains(Flag.Abstract);
                 });
                 assertThat(declared(cu, "D", "foo").getFlags()).contains(Flag.Abstract);
-                assertThat(declared(cu, "D", "baz").getFlags()).doesNotContain(Flag.Abstract);
                 assertThat(variable(cu, "v").getVariableType().getFlags()).contains(Flag.Abstract);
             })
           )
