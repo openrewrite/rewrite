@@ -22,6 +22,8 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
+import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -39,6 +41,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 
 @Value
@@ -143,9 +146,37 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
         Map<Path, @Nullable JavaProject> declaringProjectDirs = new HashMap<>();
+        Map<String, BuildProject> buildProjects = new HashMap<>();
+        List<Declaration> declarations = new ArrayList<>();
 
         // Null leaves existing declarations alone instead of upgrading them
         UpgradeDependencyVersion.@Nullable DependencyVersionState upgradeState;
+    }
+
+    // The classpaths each configuration feeds, rather than the GradleProject, which is too heavy to keep
+    @Value
+    static class BuildProject {
+        @Nullable
+        JavaProject java;
+
+        Map<String, Set<String>> classpathsByConfiguration;
+
+        // Configurations requesting the dependency, including through a catalog reference no Declaration captures
+        Set<String> requestingConfigurations;
+    }
+
+    @Value
+    static class Declaration {
+        @Nullable
+        String projectPath;
+
+        String configuration;
+
+        @Nullable
+        String versionVariable;
+
+        boolean versionless;
+        boolean inProjectsBlock;
     }
 
     @Override
@@ -189,6 +220,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         upgradeScanner.visit(sourceFile, ctx);
                     }
                     recordDeclaringProject(sourceFile, acc);
+                    recordDeclarations(sourceFile, acc, ctx);
                 }
                 if (sourceFile instanceof JavaSourceFile &&
                         configuration != null && onlyIfUsing != null &&
@@ -248,12 +280,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         JavaProject jp = maybeJp.orElse(null);
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = hasExplicitConfiguration ?
-                                new HashSet<>(singletonList(configuration)) :
-                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>());
-                        if (resolvedConfigurations.isEmpty()) {
-                            resolvedConfigurations.add("implementation");
-                        }
+                        Set<String> resolvedConfigurations = targetConfigurations(jp, acc);
 
                         // Only apply filtering when the configuration is known to the GradleProject
                         // (which requires Java sources to have been scanned with the tooling API)
@@ -314,7 +341,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             return addDependency;
         }
 
-        TreeVisitor<?, ExecutionContext> upgrade = upgradeDependencyVersion().getVisitor(acc.upgradeState);
+        TreeVisitor<?, ExecutionContext> upgrade = upgradeDependencyVersion().getVisitor(acc.upgradeState, upgradeScope(acc));
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -336,6 +363,176 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 return s;
             }
         };
+    }
+
+    private Set<String> targetConfigurations(@Nullable JavaProject javaProject, Scanned acc) {
+        Set<String> targets = StringUtils.isBlank(configuration) ?
+                new HashSet<>(acc.configurationsByProject.getOrDefault(javaProject, emptySet())) :
+                new HashSet<>(singletonList(configuration));
+        if (targets.isEmpty()) {
+            targets.add("implementation");
+        }
+        return targets;
+    }
+
+    /**
+     * Only declarations on a configuration the dependency is added to, or sharing a resolvable classpath with one, are
+     * upgraded. A version variable or catalog entry follows when it backs at least one of those.
+     */
+    private UpgradeDependencyVersion.UpgradeScope upgradeScope(Scanned acc) {
+        Map<String, Boolean> cache = new HashMap<>();
+        Set<String> variables = new HashSet<>();
+        boolean catalog = false;
+        for (Declaration declaration : acc.declarations) {
+            if (inScope(declaration.getProjectPath(), declaration.getConfiguration(), declaration.isInProjectsBlock(), acc, cache)) {
+                if (declaration.getVersionVariable() != null) {
+                    variables.add(declaration.getVersionVariable());
+                }
+                catalog |= declaration.isVersionless();
+            }
+        }
+        // An in-scope request with no declaration stating its version is assumed to come from the catalog
+        for (Map.Entry<String, BuildProject> project : acc.buildProjects.entrySet()) {
+            for (String requesting : project.getValue().getRequestingConfigurations()) {
+                if (!catalog && inScope(project.getKey(), requesting, false, acc, cache) &&
+                        acc.declarations.stream().noneMatch(d -> !d.isVersionless() && requesting.equals(d.getConfiguration()) &&
+                                (d.isInProjectsBlock() || project.getKey().equals(d.getProjectPath())))) {
+                    catalog = true;
+                }
+            }
+        }
+        boolean catalogInScope = catalog;
+        return new UpgradeDependencyVersion.UpgradeScope() {
+            @Override
+            public boolean includes(GradleDependency declaration) {
+                SourceFile buildFile = declaration.getCursor().firstEnclosingOrThrow(SourceFile.class);
+                return inScope(projectPath(buildFile), declaration.getConfigurationName(),
+                        inProjectsBlock(declaration.getCursor()), acc, cache);
+            }
+
+            @Override
+            public boolean includesConfiguration(SourceFile buildFile, GradleDependencyConfiguration configuration) {
+                String projectPath = projectPath(buildFile);
+                if (inScope(projectPath, configuration.getName(), false, acc, cache)) {
+                    return true;
+                }
+                // A classpath also moves when an in-scope configuration it extends from declares the dependency
+                for (GradleDependencyConfiguration parent : configuration.allExtendsFrom()) {
+                    if (parent.findRequestedDependency(groupId, artifactId) != null &&
+                            inScope(projectPath, parent.getName(), false, acc, cache)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public boolean includesVersionVariable(String name) {
+                return variables.contains(name);
+            }
+
+            @Override
+            public boolean includesCatalogLibrary(GroupArtifact ga) {
+                return catalogInScope;
+            }
+        };
+    }
+
+    // A script outside any scanned project is left to the path-based gate of isInUpgradeScope
+    private boolean inScope(@Nullable String projectPath, String declaredConfiguration, boolean inProjectsBlock,
+                            Scanned acc, Map<String, Boolean> cache) {
+        if (inProjectsBlock) {
+            for (String p : acc.buildProjects.keySet()) {
+                if (inScope(p, declaredConfiguration, false, acc, cache)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        BuildProject project = projectPath == null ? null : acc.buildProjects.get(projectPath);
+        if (project == null) {
+            return true;
+        }
+        return cache.computeIfAbsent(projectPath + "#" + declaredConfiguration,
+                k -> configurationInScope(project, declaredConfiguration, acc));
+    }
+
+    private boolean configurationInScope(BuildProject project, String declaredConfiguration, Scanned acc) {
+        if (!isUsing(project.getJava(), acc)) {
+            return false;
+        }
+        Set<String> targets = targetConfigurations(project.getJava(), acc);
+        if (targets.contains(declaredConfiguration)) {
+            return true;
+        }
+        Set<String> declaredClasspaths = project.getClasspathsByConfiguration().getOrDefault(declaredConfiguration, emptySet());
+        for (String target : targets) {
+            if (!Collections.disjoint(declaredClasspaths, project.getClasspathsByConfiguration().getOrDefault(target, emptySet()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean inProjectsBlock(Cursor cursor) {
+        for (Cursor c = cursor.getParent(); c != null; c = c.getParent()) {
+            if (c.getValue() instanceof J.MethodInvocation) {
+                String name = ((J.MethodInvocation) c.getValue()).getSimpleName();
+                if ("subprojects".equals(name) || "allprojects".equals(name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static @Nullable String projectPath(SourceFile sourceFile) {
+        return sourceFile.getMarkers().findFirst(GradleProject.class).map(GradleProject::getPath).orElse(null);
+    }
+
+    private void recordDeclarations(SourceFile sourceFile, Scanned acc, ExecutionContext ctx) {
+        String path = sourceFile.getSourcePath().toString();
+        if (!(sourceFile instanceof JavaSourceFile) || (!path.endsWith(".gradle") && !path.endsWith(".gradle.kts"))) {
+            return;
+        }
+        GradleProject gp = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
+        if (gp != null && (!acc.buildProjects.containsKey(gp.getPath()) ||
+                path.endsWith("build.gradle") || path.endsWith("build.gradle.kts"))) {
+            Map<String, Set<String>> classpathsByConfiguration = new HashMap<>();
+            Set<String> requestingConfigurations = new HashSet<>();
+            for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+                if (!c.isCanBeResolved() && c.findRequestedDependency(groupId, artifactId) != null) {
+                    requestingConfigurations.add(c.getName());
+                }
+                Set<String> classpaths = new HashSet<>();
+                if (c.isCanBeResolved()) {
+                    classpaths.add(c.getName());
+                }
+                for (GradleDependencyConfiguration extending : gp.configurationsExtendingFrom(c, true)) {
+                    if (extending.isCanBeResolved()) {
+                        classpaths.add(extending.getName());
+                    }
+                }
+                if (!classpaths.isEmpty()) {
+                    classpathsByConfiguration.put(c.getName(), classpaths);
+                }
+            }
+            acc.buildProjects.put(gp.getPath(), new BuildProject(
+                    sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null), classpathsByConfiguration, requestingConfigurations));
+        }
+        String projectPath = gp == null ? null : gp.getPath();
+        // Matched on resolved coordinates, since a catalog reference like `libs.guava` declares none
+        GradleMultiDependency.matcher()
+                .asVisitor((multiDependency, c) -> {
+                    multiDependency.forEach(dep -> {
+                        if (groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId())) {
+                            acc.declarations.add(new Declaration(projectPath, dep.getConfigurationName(),
+                                    dep.getVersionVariable(), dep.getDeclaredVersion() == null, inProjectsBlock(dep.getCursor())));
+                        }
+                    });
+                    return multiDependency.getTree();
+                })
+                .visit(sourceFile, ctx);
     }
 
     private boolean declaredOnSibling(GradleProject gp, GradleDependencyConfiguration gdc) {

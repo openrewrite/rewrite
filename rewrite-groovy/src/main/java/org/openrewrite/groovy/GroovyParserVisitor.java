@@ -24,6 +24,7 @@ import groovy.transform.Immutable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
@@ -3095,7 +3096,11 @@ public class GroovyParserVisitor {
                     Space namePrefix = whitespace();
                     if (source.startsWith(simpleName, cursor)) {
                         skip(simpleName);
-                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)), null));
+                        // On Groovy 2, which still runs StaticImportVisitor, a statically imported field read arrives here
+                        FieldNode field = prop.getObjectExpression() instanceof ClassExpression ?
+                                ClassNodeUtils.getField(prop.getObjectExpression().getType(), simpleName) : null;
+                        queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)),
+                                field != null && field.isStatic() ? typeMapping.variableType(field) : null));
                         return;
                     }
                     // The trait transform may rewrite `this.X` to `$self.X` even though the source contains
@@ -3573,11 +3578,24 @@ public class GroovyParserVisitor {
         @Override
         public void visitVariableExpression(VariableExpression expression) {
             queue.add(insideParentheses(expression, fmt -> {
+                Variable accessed = expression.getAccessedVariable();
+                AnnotatedNode imported = accessed instanceof DynamicVariable ?
+                        StaticImportTypeCheckingExtension.staticallyImportedProperty(classVisitor.getSourceUnit().getAST(), accessed.getName()) : null;
                 JavaType type;
-                if (expression.isDynamicTyped() && expression.getAccessedVariable() != null && expression.getAccessedVariable().getType() != expression.getOriginType()) {
-                    type = typeMapping.type(staticType(expression.getAccessedVariable()));
+                JavaType.Variable variable;
+                if (imported instanceof FieldNode) {
+                    type = typeMapping.type(((FieldNode) imported).getType());
+                    variable = typeMapping.variableType((FieldNode) imported);
+                } else if (imported instanceof MethodNode) {
+                    type = typeMapping.type(((MethodNode) imported).getReturnType());
+                    variable = null;
                 } else {
-                    type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
+                    if (expression.isDynamicTyped() && accessed != null && accessed.getType() != expression.getOriginType()) {
+                        type = typeMapping.type(staticType(accessed));
+                    } else {
+                        type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
+                    }
+                    variable = referencedVariableType(accessed == null ? expression : accessed);
                 }
 
                 return new J.Identifier(randomId(),
@@ -3586,7 +3604,7 @@ public class GroovyParserVisitor {
                         emptyList(),
                         expression.getName(),
                         type,
-                        referencedVariableType(expression.getAccessedVariable() == null ? expression : expression.getAccessedVariable()));
+                        variable);
             }));
         }
 
