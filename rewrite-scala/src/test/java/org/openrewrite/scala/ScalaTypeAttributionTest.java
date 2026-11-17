@@ -18,6 +18,7 @@ package org.openrewrite.scala;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
@@ -934,7 +935,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                     assertThat(global.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits$");
                 });
 
-                J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
+                J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> !m.getArguments().isEmpty() && m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
                 assertThat(explicit.getMarkers().findFirst(ImplicitArguments.class)).isEmpty();
 
                 J.MethodInvocation sorted = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("sorted"));
@@ -2521,7 +2522,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
 
     private static <T extends J> List<T> findAll(J cu, Class<T> type, Predicate<T> matching) {
         return List.copyOf(assertThat(collect(cu, type, matching))
-          .as("%s matching in %s", type.getSimpleName(), cu.printTrimmed())
+          .as(() -> type.getSimpleName() + " matching in " + cu.printTrimmed(new Cursor(null, Cursor.ROOT_VALUE)))
           .isNotEmpty()
           .actual());
     }

@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
@@ -36,6 +37,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -230,6 +232,7 @@ public interface S extends J {
         @Override
         public List<J.ClassDeclaration> getClasses() {
             return statements.stream()
+                    .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
                     .collect(Collectors.toList());
@@ -237,8 +240,14 @@ public interface S extends J {
 
         @Override
         public S.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
-            // Scala compilation units use statements, not a separate classes list
-            return this;
+            Iterator<J.ClassDeclaration> replacements = classes.iterator();
+            List<JRightPadded<Statement>> replaced = ListUtils.map(statements, rp ->
+                    !(rp.getElement() instanceof J.ClassDeclaration) ? rp :
+                            replacements.hasNext() ? rp.withElement(replacements.next()) : null);
+            while (replacements.hasNext()) {
+                replaced = ListUtils.concat(replaced, JRightPadded.<Statement>build(replacements.next()));
+            }
+            return getPadding().withStatements(replaced);
         }
 
         @Override

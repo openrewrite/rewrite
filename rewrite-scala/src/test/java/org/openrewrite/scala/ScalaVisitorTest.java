@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ScalaVisitorTest {
 
@@ -110,5 +111,30 @@ class ScalaVisitorTest {
 
         // then
         assertThat(visited).containsExactly("PACKAGE", "p", "IMPORT", "import", "java", "lang", "System", "out", "S");
+    }
+
+    @Test
+    void exceptionFromVisitInsideClassPropagates() {
+        // given
+        ScalaParser parser = ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build();
+        SourceFile cu = parser.parse(
+          """
+            object Test {
+                println("hi")
+            }
+            """
+        ).toList().getFirst();
+
+        ScalaVisitor<ExecutionContext> visitor = new ScalaVisitor<>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                throw new IllegalStateException("boom");
+            }
+        };
+
+        // when / then
+        assertThatThrownBy(() -> visitor.visit(cu, new InMemoryExecutionContext()))
+          .hasRootCauseInstanceOf(IllegalStateException.class)
+          .hasRootCauseMessage("boom");
     }
 }
