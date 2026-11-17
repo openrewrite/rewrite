@@ -231,7 +231,8 @@ public interface S extends J {
 
         @Override
         public List<J.ClassDeclaration> getClasses() {
-            return getStatements().stream()
+            return statements.stream()
+                    .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
                     .collect(Collectors.toList());
