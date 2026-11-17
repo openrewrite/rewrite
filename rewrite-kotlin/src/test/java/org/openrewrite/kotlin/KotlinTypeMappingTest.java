@@ -2725,6 +2725,56 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void localUseHasSameOwnerAsDeclaration() {
+            rewriteRun(
+              kotlin(
+                """
+                  val top = 1
+                  class K2 {
+                      fun m(p: Int): Int {
+                          val local = 1
+                          val lam = { x: Int -> x + local + p + top }
+                          return local
+                      }
+                  }
+                  enum class E {
+                      A {
+                          init {
+                              val z = 1
+                              println(z)
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Set<String>> ownersByName = new KotlinIsoVisitor<Map<String, Set<String>>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
+                            JavaType.Variable fieldType = identifier.getFieldType();
+                            if (fieldType != null && Set.of("top", "p", "local", "x", "z").contains(identifier.getSimpleName())) {
+                                acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
+                                  .add(String.valueOf(fieldType.getOwner()));
+                            }
+                            return super.visitIdentifier(identifier, acc);
+                        }
+                    }.reduce(cu, new HashMap<>());
+
+                    // then
+                    String m = "K2{name=m,return=int,parameters=[int]}";
+                    assertThat(ownersByName).containsExactlyInAnyOrderEntriesOf(Map.of(
+                      "top", Set.of("OpenRewriteFile0Kt"),
+                      "p", Set.of(m),
+                      "local", Set.of(m),
+                      "x", Set.of(m),
+                      "z", Set.of("E")
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
         void scriptDeclarationsAreNotStatic() {
             rewriteRun(
               kotlinScript(
