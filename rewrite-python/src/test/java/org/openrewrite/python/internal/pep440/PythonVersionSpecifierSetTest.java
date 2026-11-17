@@ -125,6 +125,8 @@ class PythonVersionSpecifierSetTest {
         assertThat(startsAtOrAbove(">=2.0,!=2.5", ">=2.31.0")).isFalse();
         assertThat(startsAtOrAbove("<3", ">=2.31.0")).isFalse();
         assertThat(startsAtOrAbove("", ">=2.31.0")).isFalse();
+        assertThat(startsAtOrAbove("", "<3")).isFalse();
+        assertThat(startsAtOrAbove("<2", "<3")).isFalse();
         assertThat(startsAtOrAbove(">=1.0", "<3")).isTrue();
     }
 

@@ -516,6 +516,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void appliesConstraintWithoutLowerBoundToUnconstrainedRequirement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", "<3", null, null)),
+          requirementsTxt(
+            "requests\nclick>=8.0",
+            "requests<3\nclick>=8.0"
+          )
+        );
+    }
+
+    @Test
     void upgradeQuotedKeyInPipfile() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("urllib3", ">=2.0", null, null)),

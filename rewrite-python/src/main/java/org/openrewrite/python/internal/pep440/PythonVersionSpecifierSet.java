@@ -96,15 +96,16 @@ public class PythonVersionSpecifierSet {
     /**
      * Whether the lowest version this set admits is at or above the lowest version {@code other}
      * admits. Only lower bounds ({@code >=}, {@code >}, {@code ==}, {@code ~=}, {@code ===}) count;
-     * upper bounds and exclusions are ignored, and a set without a lower bound starts below every version.
+     * upper bounds and exclusions are ignored. A set without a lower bound never starts at or above
+     * {@code other}, while any set with one starts at or above an {@code other} without one.
      */
     public boolean startsAtOrAbove(PythonVersionSpecifierSet other) {
-        LowerBound theirs = other.lowerBound();
-        if (theirs == null) {
-            return true;
-        }
         LowerBound mine = lowerBound();
-        return mine != null && !theirs.isAbove(mine);
+        if (mine == null) {
+            return false;
+        }
+        LowerBound theirs = other.lowerBound();
+        return theirs == null || !theirs.isAbove(mine);
     }
 
     private @Nullable LowerBound lowerBound() {
