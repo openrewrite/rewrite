@@ -158,6 +158,7 @@ public class GroovyParser implements Parser {
                             try {
                                 StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
                                 staticTypeCheckingVisitor.setCompilationUnit(compUnit);
+                                staticTypeCheckingVisitor.addTypeCheckingExtension(new StaticImportTypeCheckingExtension(staticTypeCheckingVisitor));
                                 for (Function<StaticTypeCheckingVisitor, TypeCheckingExtension> extension : typeCheckingExtensions) {
                                     staticTypeCheckingVisitor.addTypeCheckingExtension(extension.apply(staticTypeCheckingVisitor));
                                 }

@@ -504,18 +504,75 @@ class GroovyTypeAttributionTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              import static java.lang.System.getProperties
-              def p = properties
+              import static java.lang.Runtime.getRuntime
+              def r = runtime
               """,
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
                     J.Identifier read = (J.Identifier) variable.getInitializer();
-                    assertThat(TypeUtils.isOfClassType(read.getType(), "java.util.Properties")).isTrue();
+                    assertThat(TypeUtils.isOfClassType(read.getType(), "java.lang.Runtime")).isTrue();
                     assertThat(read.getFieldType()).isNull();
+                    assertThat(TypeUtils.isOfClassType(variable.getVariableType().getType(), "java.lang.Runtime")).isTrue();
                     return variable;
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedFieldIsTypedForTheTypeChecker() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.out
+              def x = out
+              out.println("hi")
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(variable.getVariableType().getType(), "java.io.PrintStream")).isTrue();
+                    return variable;
+                }
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(method.getMethodType().getDeclaringType(), "java.io.PrintStream")).isTrue();
+                    assertThat(method.getMethodType().getParameterTypes()).containsExactly(JavaType.ShallowClass.build("java.lang.String"));
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedMethodCallHasTheMethodType() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.singletonList as one
+              import static java.lang.Math.*
+              one("a")
+              max(1, 2)
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, JavaType.Method> calls = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        calls.put(method.getSimpleName(), method.getMethodType());
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(calls.get("one").getName()).isEqualTo("singletonList");
+                assertThat(TypeUtils.isOfClassType(calls.get("one").getDeclaringType(), "java.util.Collections")).isTrue();
+
+                assertThat(TypeUtils.isOfClassType(calls.get("max").getDeclaringType(), "java.lang.Math")).isTrue();
+                assertThat(calls.get("max").getParameterTypes()).containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int);
+            })
           )
         );
     }
