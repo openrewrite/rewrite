@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -208,6 +209,24 @@ class GroovyParserTest implements RewriteTest {
               def x = true
               def s = "${if (x) { return 'a' }; return ''}"
               """
+          )
+        );
+    }
+
+    @Test
+    void aliasedStaticFieldRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI as pi
+              def x = pi
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations x = (J.VariableDeclarations) cu.getStatements().get(1);
+                J.Identifier pi = (J.Identifier) x.getVariables().get(0).getInitializer();
+                assertThat(pi.getSimpleName()).isEqualTo("pi");
+                assertThat(pi.getFieldType().getName()).isEqualTo("PI");
+            })
           )
         );
     }

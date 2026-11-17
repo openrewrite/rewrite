@@ -3087,6 +3087,22 @@ public class GroovyParserVisitor {
                         queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)), null));
                         return;
                     }
+                    // On Groovy 2.5 `StaticImportVisitor` turns a read of an aliased static field into a property
+                    // of the imported class, while the source holds the alias
+                    if (prop.getObjectExpression() instanceof ClassExpression) {
+                        int aliasEnd = cursor;
+                        while (aliasEnd < source.length() && isJavaIdentifierPart(source.charAt(aliasEnd))) {
+                            aliasEnd++;
+                        }
+                        if (aliasEnd > cursor) {
+                            String alias = source.substring(cursor, aliasEnd);
+                            skip(alias);
+                            JavaType.Variable field = propertyField(prop, false);
+                            queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), alias,
+                                    propertyType(prop, field), field));
+                            return;
+                        }
+                    }
                     // The trait transform may rewrite `this.X` to `$self.X` even though the source contains
                     // `this` rather than the property name at the cursor. Preserve `this` by keeping the
                     // PropertyExpression structure with `this` as the receiver.
