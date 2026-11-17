@@ -16,18 +16,13 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -105,25 +100,35 @@ class KTSTest implements RewriteTest {
 
     @Test
     void scriptSeesNonScriptSourcesButNotOtherScriptsParsedWithIt() {
-        List<SourceFile> parsed = KotlinParser.builder()
-          .isKotlinScript(true)
-          .dependsOn("fun greet(): String = \"hi\"")
-          .build()
-          .parseInputs(List.of(
-            Parser.Input.fromString(Path.of("a.kts"), "fun version(s: String): String = s"),
-            Parser.Input.fromString(Path.of("b.kts"), "greet()\nversion(\"x\")")
-          ), null, new InMemoryExecutionContext()).toList();
+        rewriteRun(
+          spec -> spec
+            .parser(KotlinParser.builder().isKotlinScript(true).dependsOn("fun greet(): String = \"hi\""))
+            .typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              fun version(s: String): String = s
+              """,
+            spec -> spec.path("a.kts")
+          ),
+          kotlinScript(
+            """
+              greet()
+              version("x")
+              """,
+            spec -> spec.path("b.kts").afterRecipe(cu -> {
+                Map<String, J.MethodInvocation> calls = new HashMap<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        calls.put(method.getSimpleName(), method);
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(calls.get("greet").getMethodType()).isNotNull();
 
-        Map<String, J.MethodInvocation> calls = new HashMap<>();
-        new KotlinIsoVisitor<Integer>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                calls.put(method.getSimpleName(), method);
-                return method;
-            }
-        }.visit(parsed.get(1), 0);
-        assertThat(calls.get("greet").getMethodType()).isNotNull();
-
-        assertThat(calls.get("version").getMethodType()).isNull();
+                assertThat(calls.get("version").getMethodType()).isNull();
+            })
+          )
+        );
     }
 }

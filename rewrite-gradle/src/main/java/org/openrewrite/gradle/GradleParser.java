@@ -40,7 +40,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -136,8 +135,13 @@ public class GradleParser implements Parser {
 
         List<Input> inputs = new ArrayList<>();
         sources.forEach(inputs::add);
-        // Parsing all build scripts in one KotlinParser call loads the classpath once for them.
-        AtomicReference<@Nullable Iterator<SourceFile>> kotlinBuildScripts = new AtomicReference<>();
+        // Parsing all build scripts in one KotlinParser call loads the classpath once for them. The iterator is lazy, so
+        // the call happens when the stream first reaches a build script.
+        Iterator<SourceFile> kotlinBuildScripts = Stream.of(inputs.stream()
+                        .filter(input -> isKotlinBuildScript(input.getPath()))
+                        .collect(toList()))
+                .flatMap(scripts -> kotlinBuildParser.parseInputs(scripts, relativeTo, ctx))
+                .iterator();
         return inputs.stream()
                 .flatMap(source -> {
                     Path sourcePath = source.getPath();
@@ -146,11 +150,7 @@ public class GradleParser implements Parser {
                     } else if (sourcePath.endsWith("settings.gradle")) {
                         return groovySettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
                     } else if (isKotlinBuildScript(sourcePath)) {
-                        Iterator<SourceFile> parsed = kotlinBuildScripts.updateAndGet(it -> it != null ? it :
-                                kotlinBuildParser.parseInputs(inputs.stream()
-                                        .filter(input -> isKotlinBuildScript(input.getPath()))
-                                        .collect(toList()), relativeTo, ctx).iterator());
-                        return Stream.of(parsed.next());
+                        return Stream.of(kotlinBuildScripts.next());
                     }
                     return groovyBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
                 });
