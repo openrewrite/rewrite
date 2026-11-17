@@ -195,6 +195,12 @@ public class KotlinParser implements Parser {
             CompiledSource compilerCus = parse(acceptedInputs, disposable, pctx);
             parsed = new ArrayList<>(compilerCus.getSources().size());
             for (KotlinSource kotlinSource : compilerCus.getSources()) {
+                Throwable failure = kotlinSource.getFailure();
+                if (failure != null) {
+                    ctx.getOnError().accept(failure);
+                    parsed.add(ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, failure));
+                    continue;
+                }
                 try {
                     assert kotlinSource.getFirFile() != null;
                     assert kotlinSource.getFirFile().getSource() != null;
@@ -480,18 +486,24 @@ public class KotlinParser implements Parser {
             Parser.Input source = sources.get(i);
             String fileName = buildFilename(source, i);
 
-            String sourceText = source.getSource(ctx).readFully();
-            List<Integer> cRLFLocations = getCRLFLocations(sourceText);
+            try {
+                String sourceText = source.getSource(ctx).readFully();
+                List<Integer> cRLFLocations = getCRLFLocations(sourceText);
 
-            VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, StringUtilRt.convertLineSeparators(sourceText));
-            final FileViewProvider fileViewProvider = new SingleRootFileViewProvider(
-                    PsiManager.getInstance(environment.getProject()),
-                    vFile
-            );
-            KtFile file = (KtFile) fileViewProvider.getPsi(KotlinLanguage.INSTANCE);
-            assert file != null;
-            ktFiles.add(file);
-            kotlinSources.add(new KotlinSource(source, file, cRLFLocations));
+                VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, StringUtilRt.convertLineSeparators(sourceText));
+                final FileViewProvider fileViewProvider = new SingleRootFileViewProvider(
+                        PsiManager.getInstance(environment.getProject()),
+                        vFile
+                );
+                KtFile file = (KtFile) fileViewProvider.getPsi(KotlinLanguage.INSTANCE);
+                assert file != null;
+                ktFiles.add(file);
+                kotlinSources.add(new KotlinSource(source, file, cRLFLocations));
+            } catch (Throwable t) {
+                KotlinSource unreadable = new KotlinSource(source, null, emptyList());
+                unreadable.setFailure(t);
+                kotlinSources.add(unreadable);
+            }
         }
 
         VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
@@ -519,16 +531,28 @@ public class KotlinParser implements Parser {
 
         Map<KtFile, KotlinSource> sourceByKtFile = new IdentityHashMap<>(kotlinSources.size());
         for (KotlinSource kotlinSource : kotlinSources) {
-            sourceByKtFile.put(kotlinSource.getKtFile(), kotlinSource);
+            if (kotlinSource.getKtFile() != null) {
+                sourceByKtFile.put(kotlinSource.getKtFile(), kotlinSource);
+            }
         }
         for (SessionWithSources<KtFile> session : sessions) {
             FirSession firSession = session.getSession();
-            List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, session.getFiles());
-            List<FirFile> resolved = AnalyseKt.runResolution(firSession, rawFir).getSecond();
-            for (int i = 0; i < resolved.size(); i++) {
-                KotlinSource kotlinSource = sourceByKtFile.get(session.getFiles().get(i));
-                kotlinSource.setFirFile(resolved.get(i));
-                kotlinSource.setFirSession(firSession);
+            List<KtFile> files = session.getFiles();
+            try {
+                List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, files);
+                List<FirFile> resolved = AnalyseKt.runResolution(firSession, rawFir).getSecond();
+                if (resolved.size() != files.size()) {
+                    throw new IllegalStateException("Resolved " + resolved.size() + " of " + files.size() + " files");
+                }
+                for (int i = 0; i < resolved.size(); i++) {
+                    KotlinSource kotlinSource = sourceByKtFile.get(files.get(i));
+                    kotlinSource.setFirFile(resolved.get(i));
+                    kotlinSource.setFirSession(firSession);
+                }
+            } catch (Throwable t) {
+                for (KtFile file : files) {
+                    sourceByKtFile.get(file).setFailure(t);
+                }
             }
         }
 

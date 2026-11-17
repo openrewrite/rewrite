@@ -23,12 +23,18 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.psi.KtFile
 import org.openrewrite.Parser
 
+/**
+ * One input of a compilation, with what the compiler made of it or the failure that stopped it.
+ */
 @Getter
 class KotlinSource(
     var input: Parser.Input,
-    val ktFile: KtFile,
+    val ktFile: KtFile?,
     val cRLFLocations : List<Int>
 ) {
+    @Setter
+    var failure: Throwable? = null
+
     @Setter
     var firFile: FirFile? = null
 
