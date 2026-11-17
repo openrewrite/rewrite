@@ -73,6 +73,29 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
+    void keepsImportThatDoesNotResolve() {
+        rewriteRun(
+          scala(
+            """
+              import akka.actor.ActorSystem
+              import akka.actor.{Props, Actor => A}
+              import akka.Defaults.given
+              import java.util.UUID
+
+              object X
+              """,
+            """
+              import akka.actor.ActorSystem
+              import akka.actor.{Props, Actor => A}
+              import akka.Defaults.given
+
+              object X
+              """
+          )
+        );
+    }
+
+    @Test
     void keepsLanguageFeatureImport() {
         rewriteRun(
           scala(
@@ -88,7 +111,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
-    void keepsGivenImportUsedBySummon() {
+    void givenImportIsKeptOnlyWhenAGivenIsSummoned() {
         rewriteRun(
           scala(
             """
@@ -105,6 +128,17 @@ class RemoveUnusedImportsTest implements RewriteTest {
               object A {
                 val x = summon[Int]
               }
+              """
+          ),
+          scala(
+            """
+              package example
+              import example.Defaults.given
+              object B
+              """,
+            """
+              package example
+              object B
               """
           )
         );

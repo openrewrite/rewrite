@@ -150,7 +150,7 @@ public class RemoveUnusedImports extends Recipe {
             } else if ("given".equals(name)) {
                 used = usages.usesImplicitMemberOf(qualifier, qualid.getTarget().getType());
             } else {
-                used = usages.uses(name, qualid.getType());
+                used = qualid.getType() instanceof JavaType.Unknown || usages.uses(name, qualid.getType());
             }
             return used ? anImport : null;
         }
@@ -178,7 +178,7 @@ public class RemoveUnusedImports extends Recipe {
                 } else {
                     J.Identifier name = Objects.requireNonNull(selector.getName());
                     J.Identifier alias = selector.getAlias();
-                    used = !targets(qualifier, name.getSimpleName()) ||
+                    used = !targets(qualifier, name.getSimpleName()) || name.getType() instanceof JavaType.Unknown ||
                            usages.uses(alias == null ? name.getSimpleName() : alias.getSimpleName(), name.getType());
                 }
                 if (used) {
@@ -474,6 +474,10 @@ public class RemoveUnusedImports extends Recipe {
         }
 
         boolean usesImplicitMemberOf(String qualifier, @Nullable JavaType qualifierType) {
+            // A package qualifier is untyped whether or not it resolves, and a package can declare givens too
+            if (qualifierType == null || qualifierType instanceof JavaType.Unknown) {
+                return true;
+            }
             for (JavaType implicit : implicitReferences) {
                 JavaType.FullyQualified owner = implicit instanceof JavaType.Method ?
                         ((JavaType.Method) implicit).getDeclaringType() :
