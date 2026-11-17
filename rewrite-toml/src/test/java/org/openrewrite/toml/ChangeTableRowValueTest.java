@@ -340,4 +340,23 @@ class ChangeTableRowValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepTheKeyAsWrittenAndAligned() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("bin", "name", "cli", null, "path", "\"src/main.rs\"")),
+          toml(
+            """
+              [[bin]]
+              name    = "cli"
+              "path"  = "src/cli.rs" # entry point
+              """,
+            """
+              [[bin]]
+              name    = "cli"
+              "path"  = "src/main.rs" # entry point
+              """
+          )
+        );
+    }
 }
