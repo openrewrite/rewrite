@@ -663,16 +663,29 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   // --- Core type mapping ---
 
-  def mapType(tpe: Type): JavaType = {
-    if (tpe == null || tpe == NoType || denotesPackage(tpe)) return null
+  /** What each type of this file mapped to. Dotty shares one instance among equal types, so most types recur. */
+  private val mappedTypes = new java.util.IdentityHashMap[Type, JavaType]()
 
-    val sig = signatureBuilder.signature(tpe)
+  def mapType(tpe: Type): JavaType = {
+    if (tpe == null) return null
+    var mapped = mappedTypes.get(tpe)
+    if (mapped == null) {
+      mapped = mapTypeOnce(tpe)
+      if (mapped != null) mappedTypes.put(tpe, mapped)
+    }
+    mapped
+  }
+
+  private def mapTypeOnce(tpe: Type): JavaType = {
+    if (tpe == NoType || denotesPackage(tpe)) return null
+
+    lazy val sig = signatureBuilder.signature(tpe)
 
     try {
       tpe.dealias match {
         case ct: ConstantType => mapConstantType(ct)
         case tr: TypeRef => mapTypeRef(tr, sig)
-        case tmr: TermRef => mapTermRef(tmr, sig)
+        case tmr: TermRef => mapTermRef(tmr)
         case tt: ThisType => mapType(tt.tref)
         case et: ExprType => mapType(et.resultType)
         case at: AppliedType if at.isRepeatedParam => mapType(at.translateFromRepeated(toArray = false))
@@ -684,8 +697,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
-          val fqn = signatureBuilder.classFqn(ci.cls)
-          mapClassType(ci.cls, fqn, fqn)
+          mapClassType(ci.cls, signatureBuilder.classFqn(ci.cls))
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
         // An alias of a type constructor, such as `scala.List` for `[A] =>> immutable.List[A]`, names the
@@ -703,8 +715,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   /** A package is not a type in the Java type model. */
-  private def denotesPackage(tpe: Type): Boolean =
-    try isPackage(tpe.typeSymbol) || isPackage(tpe.termSymbol) catch { case NonFatal(_) => false }
+  private def denotesPackage(tpe: Type): Boolean = tpe match {
+    case _: NamedType | _: ThisType | _: ClassInfo =>
+      try isPackage(tpe.typeSymbol) || isPackage(tpe.termSymbol) catch { case NonFatal(_) => false }
+    case _ => false
+  }
 
   private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
     case Nil => mapType(ctx.definitions.NothingType)
@@ -737,7 +752,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     }
   }
 
-  private def mapTypeRef(tr: TypeRef, sig: String): JavaType = {
+  private def mapTypeRef(tr: TypeRef, sig: => String): JavaType = {
     val sym = tr.symbol
     if (!sym.exists) return unknown
     if (sym.isTypeParam) return mapTypeVariable(sym.name.toString, tr.underlying, sig)
@@ -759,10 +774,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case _ =>
     }
 
-    mapClassType(sym, signatureBuilder.classFqn(sym), sig)
+    mapClassType(sym, signatureBuilder.classFqn(sym))
   }
 
-  private def mapTermRef(tmr: TermRef, sig: String): JavaType = {
+  private def mapTermRef(tmr: TermRef): JavaType = {
     val sym = tmr.symbol
     if (!sym.exists) return unknown
     val underlying = tmr.underlying
@@ -807,8 +822,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         underlying match {
           case tb: TypeBounds =>
-            val hi = upperBoundOfKind(tb.hi)
-            if (!(hi =:= ctx.definitions.AnyType)) {
+            val hi = signatureBuilder.upperBoundOfKind(tb.hi)
+            if (!signatureBuilder.isAny(hi)) {
               bounds = new ArrayList[JavaType]()
               val mapped = mapType(hi)
               if (mapped != null) bounds.add(mapped)
@@ -821,23 +836,17 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       })
   }
 
-  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
-  private def upperBoundOfKind(hi: Type): Type = hi match {
-    case lambda: HKTypeLambda => lambda.resType
-    case other => other
-  }
-
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {
     typeFactory.computeGenericTypeVariable(sig, "?", JavaType.GenericTypeVariable.Variance.INVARIANT,
       (gtv: JavaType.GenericTypeVariable) => {
         var bounds: ArrayList[JavaType] = null
         var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
 
-        if (!(tb.hi =:= ctx.definitions.AnyType)) {
+        if (!signatureBuilder.isAny(tb.hi)) {
           bounds = new ArrayList[JavaType]()
           bounds.add(mapType(tb.hi))
           variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-        } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
+        } else if (!signatureBuilder.isNothing(tb.lo)) {
           bounds = new ArrayList[JavaType]()
           bounds.add(mapType(tb.lo))
           variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
@@ -847,28 +856,17 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       })
   }
 
-  def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+  def mapClassType(symbol: Symbol, fqn: String): JavaType.FullyQualified = {
     val sym = javaClassOfStatics(symbol)
-    // Members of library types are not populated to avoid deep recursive type
-    // graphs that cause StackOverflowError in recipes like ChangeType. A class
-    // loaded from TASTy has a source too, so also check what it was loaded from.
-    val isSourceDefined = try {
-      val src = sym.source
-      val file = sym.associatedFile
-      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala") &&
-        file != null && !file.ext.isScalaBinary
-    } catch {
-      case NonFatal(_) => false
-    }
+    typeFactory.computeClass(fqn, 0L, JavaType.FullyQualified.Kind.Class, (clazz: JavaType.Class) => {
+      // Only a class the cache lacks pays for its flags and kind. They are set before the members,
+      // which may lead back to this class and read its kind.
+      val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
+      else if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
+      else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
+      else JavaType.FullyQualified.Kind.Class
+      clazz.unsafeSet(mapFlags(sym) & Flag.VALID_CLASS_FLAGS, kind, fqn, null, null, null, null, null, null, null)
 
-    val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
-    else if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
-    else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
-    else JavaType.FullyQualified.Kind.Class
-
-    val flagsBits = mapFlags(sym)
-
-    typeFactory.computeClass(fqn, flagsBits, kind, (clazz: JavaType.Class) => {
       val parentTypes = if (fqn == "java.lang.Object") Nil else try {
         sym.info match {
           case ci: ClassInfo => ci.parents
@@ -898,12 +896,17 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      val methods: util.List[JavaType.Method] = if (!isSourceDefined) null else try {
-        val decls = sym.info match {
-          case ci: ClassInfo => ci.decls.toList
+      val decls = try {
+        sym.info match {
+          case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
           case _ => Nil
         }
-        val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor && !s.name.toString.startsWith("$"))
+      } catch {
+        case NonFatal(_) => Nil
+      }
+
+      val methods: util.List[JavaType.Method] = try {
+        val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor)
         if (methodSyms.nonEmpty) {
           val ms = new ArrayList[JavaType.Method]()
           methodSyms.foreach { m =>
@@ -915,12 +918,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      val members: util.List[JavaType.Variable] = if (!isSourceDefined) null else try {
-        val decls = sym.info match {
-          case ci: ClassInfo => ci.decls.toList
-          case _ => Nil
-        }
-        val fieldSyms = decls.filter(s => s.isTerm && !s.is(Flags.Method) && !s.name.toString.startsWith("$"))
+      val members: util.List[JavaType.Variable] = try {
+        val fieldSyms = decls.filter(s => s.isTerm && !s.is(Flags.Method))
         if (fieldSyms.nonEmpty) {
           val fs = new ArrayList[JavaType.Variable]()
           fieldSyms.foreach { f =>
@@ -932,7 +931,18 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case NonFatal(_) => null
       }
 
-      clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
+      val typeParameters: util.List[JavaType] = try {
+        val tparams = sym.typeParams
+        if (tparams.nonEmpty) {
+          val tps = new ArrayList[JavaType](tparams.size)
+          tparams.foreach(tp => tps.add(mapType(tp.typeRef)))
+          tps
+        } else null
+      } catch {
+        case NonFatal(_) => null
+      }
+
+      clazz.unsafeSet(typeParameters, supertype, null, null, interfaces, members, methods)
     })
   }
 
@@ -949,17 +959,15 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   /** Map the method with the given parameter and result types, as instantiated at a call. */
   private def mapMethodType(sym: Symbol, info: Type): JavaType.Method = {
     val sig = signatureBuilder.methodSignature(sym, info)
-    val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
-    val flagsBits = mapFlags(sym)
-
-    val paramNamesArr: Array[String] = info.stripPoly match {
-      case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
-      case _ => null
-    }
-
-    val finalParamNames = paramNamesArr
     typeFactory.methodFor(sig,
-      () => new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null),
+      () => {
+        val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
+        val paramNames: Array[String] = info.stripPoly match {
+          case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
+          case _ => null
+        }
+        new JavaType.Method(null, mapFlags(sym), null, name, null, paramNames, null, null, null, null, null)
+      },
       (method: JavaType.Method) => {
         val paramTypes: util.List[JavaType] = info.stripPoly match {
           case mt: MethodType =>
@@ -984,9 +992,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     if (sym == null || !sym.exists) return null
 
     val sig = signatureBuilder.variableSignature(sym)
-    val flagsBits = mapFlags(sym)
     typeFactory.variableFor(sig, () => {
-      val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
+      val variable = new JavaType.Variable(null, mapFlags(sym), sym.name.toString, null, null, null)
       val ownerType = try { variableOwner(sym) } catch { case NonFatal(_) => unknown }
       val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case NonFatal(_) => unknown }
       variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
