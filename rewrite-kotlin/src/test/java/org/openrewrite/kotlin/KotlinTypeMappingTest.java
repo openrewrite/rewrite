@@ -2725,6 +2725,76 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void localUseHasSameOwnerAsDeclaration() {
+            rewriteRun(
+              kotlin(
+                """
+                  val top = 1
+                  class K2 {
+                      fun m(p: Int): Int {
+                          val local = 1
+                          val lam = { x: Int -> x + local + p + top }
+                          return local
+                      }
+                  }
+                  enum class E {
+                      A {
+                          init {
+                              val z = 1
+                              println(z)
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Set<String>> ownersByName = fieldOwnersByName(cu);
+
+                    // then
+                    String m = "K2{name=m,return=int,parameters=[int]}";
+                    assertThat(ownersByName).containsAllEntriesOf(Map.of(
+                      "top", Set.of("OpenRewriteFile0Kt"),
+                      "p", Set.of(m),
+                      "local", Set.of(m),
+                      "x", Set.of(m),
+                      "z", Set.of("E")
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
+        void topLevelPropertyOwnerIsDeclaringFileFacade() {
+            rewriteRun(
+              kotlin(
+                """
+                  package a.b
+                  val TOP = 1
+                  """
+              ),
+              kotlin(
+                """
+                  package c
+                  import a.b.TOP
+                  import kotlin.math.PI
+                  fun f() = TOP + a.b.TOP + PI
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Set<String>> ownersByName = fieldOwnersByName(cu);
+
+                    // then
+                    assertThat(ownersByName).containsExactlyInAnyOrderEntriesOf(Map.of(
+                      "TOP", Set.of("a.b.OpenRewriteFile0Kt"),
+                      "PI", Set.of("kotlin.math.MathKt")
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
         void scriptDeclarationsAreNotStatic() {
             rewriteRun(
               kotlinScript(
@@ -2749,6 +2819,20 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        private static Map<String, Set<String>> fieldOwnersByName(K.CompilationUnit cu) {
+            return new KotlinIsoVisitor<Map<String, Set<String>>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
+                    JavaType.Variable fieldType = identifier.getFieldType();
+                    if (fieldType != null) {
+                        acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
+                          .add(String.valueOf(fieldType.getOwner()));
+                    }
+                    return super.visitIdentifier(identifier, acc);
+                }
+            }.reduce(cu, new HashMap<>());
         }
 
         private static Map<String, Boolean> staticFlagByElement(K.CompilationUnit cu) {

@@ -171,6 +171,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 return typeMapping.type(matchClassId(psiElement, symbol.classId), owner)
             }
         }
+        val local = referencedLocalVariable(fir)
+        if (local != null) {
+            return typeMapping.type(local, localVariableOwner(local))
+        }
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
@@ -333,6 +337,26 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             is FirErrorNamedReference, is FirPackageDirective -> null
             else -> null
         }
+    }
+
+    @OptIn(SymbolInternals::class)
+    private fun referencedLocalVariable(fir: FirElement?): FirVariable? {
+        val reference = (if (fir is FirPropertyAccessExpression) fir.calleeReference else fir) as? FirResolvedNamedReference
+        val variable = (reference?.resolvedSymbol as? FirVariableSymbol<*>)?.fir
+        return if (variable is FirValueParameter || variable is FirProperty && variable.isLocal) variable else null
+    }
+
+    /**
+     * Mirrors `KotlinTreeParserVisitor.owner`, so a use gets the same variable type as its declaration.
+     * That owner is the nearest enclosing named function, class or file.
+     * The parser never makes an enum entry an owner, though `KtEnumEntry` is a `KtClass`.
+     */
+    private fun localVariableOwner(variable: FirVariable): FirElement? {
+        val declaration = variable.source?.psi ?: return null
+        val owner = PsiTreeUtil.findFirstParent(declaration, true) {
+            it is KtNamedFunction || it is KtFile || it is KtClass && it !is KtEnumEntry
+        }
+        return owner?.let { primary(it) }
     }
 
     fun fir(psi: PsiElement?, filter: (FirElement) -> Boolean) : FirElement? {
