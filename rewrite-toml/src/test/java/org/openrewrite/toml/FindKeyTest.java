@@ -337,4 +337,27 @@ class FindKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void quotedPartKeepsTheDotItHolds() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("target.\"x86_64.linux\".dependencies.winapi")),
+          toml(
+            """
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+
+              [target.x86_64.linux.dependencies]
+              winapi = "0.3"
+              """,
+            """
+              [target."x86_64.linux".dependencies]
+              ~~>winapi = "0.3"
+
+              [target.x86_64.linux.dependencies]
+              winapi = "0.3"
+              """
+          )
+        );
+    }
 }
