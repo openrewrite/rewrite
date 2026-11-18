@@ -53,6 +53,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private final String constantName;
         private final JavaType.FullyQualified existingOwningTypeFqn;
         private final JavaType.FullyQualified newOwningType;
+        private final JavaType.FullyQualified newOutermostType;
         private final JavaType.FullyQualified newOwningEnumType;
         private final JavaType.FullyQualified newTargetType;
         private final String newConstantName;
@@ -62,6 +63,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             this.constantName = existingFullyQualifiedConstantName.substring(existingFullyQualifiedConstantName.lastIndexOf('.') + 1);
             this.existingOwningTypeFqn = JavaType.ShallowClass.build(existingOwningType);
             this.newOwningType = ownerType(fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.')));
+            this.newOutermostType = ChangeType.getTopLevelClassName(newOwningType);
             this.newOwningEnumType = new JavaType.ShallowClass(null, 1, newOwningType.getFullyQualifiedName(),
                     JavaType.FullyQualified.Kind.Enum, null, null, newOwningType.getOwningClass(), null, null, null, null);
             this.newTargetType = JavaType.ShallowClass.build(fullyQualifiedConstantName);
@@ -73,7 +75,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImport(sf));
+                return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImports(sf, newOutermostType));
             }
             return super.visitFieldAccess(fieldAccess, ctx);
         }
@@ -83,7 +85,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = ident.getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(ident, fieldType, hasNoConflictingImport(sf));
+                return replaceFieldAccess(ident, fieldType, hasNoConflictingImports(sf, newOwningType));
             }
             return super.visitIdentifier(ident, ctx);
         }
@@ -111,18 +113,14 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
                 if (hasNoConflictingImport) {
-                    maybeAddImport(outermostClass(newOwningType).getFullyQualifiedName(), false);
+                    maybeAddImport(newOutermostType.getFullyQualifiedName(), false);
                 }
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                 Expression target = fieldAccess.getTarget();
                 J.Identifier name = fieldAccess.getName();
-                if (!hasNoConflictingImport) {
-                    target = FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
-                } else if (target instanceof J.Identifier) {
-                    target = typeReference(newOwningType, (J.Identifier) target);
-                } else {
-                    target = typeReference(newOwningType, ((J.FieldAccess) target).getName());
-                }
+                target = hasNoConflictingImport ?
+                        typeReference(newOwningType, target.getPrefix()) :
+                        FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
                 name = name
                         .withFieldType(newFieldType(fieldType))
                         .withSimpleName(newConstantName)
@@ -151,26 +149,15 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return fullyQualifiedName.substring(Math.max(fullyQualifiedName.lastIndexOf('.'), fullyQualifiedName.lastIndexOf('$')) + 1);
         }
 
-        private static JavaType.FullyQualified outermostClass(JavaType.FullyQualified type) {
-            JavaType.FullyQualified outermost = type;
-            while (outermost.getOwningClass() != null) {
-                outermost = outermost.getOwningClass();
-            }
-            return outermost;
-        }
-
-        private static Expression typeReference(JavaType.FullyQualified type, J.Identifier name) {
-            J.Identifier typeName = name.withSimpleName(simpleName(type.getFullyQualifiedName())).withType(type);
+        private static Expression typeReference(JavaType.FullyQualified type, Space prefix) {
+            J.Identifier name = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
+                    simpleName(type.getFullyQualifiedName()), type, null);
             JavaType.FullyQualified owningClass = type.getOwningClass();
             if (owningClass == null) {
-                return typeName;
+                return name.withPrefix(prefix);
             }
-            J.Identifier owningClassName = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
-                    simpleName(owningClass.getFullyQualifiedName()), owningClass, null);
-            return new J.FieldAccess(Tree.randomId(), name.getPrefix(), Markers.EMPTY,
-                    typeReference(owningClass, owningClassName),
-                    JLeftPadded.build(typeName.withPrefix(Space.EMPTY)),
-                    type);
+            return new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY,
+                    typeReference(owningClass, Space.EMPTY), JLeftPadded.build(name), type);
         }
 
         private JavaType.Variable newFieldType(JavaType.Variable fieldType) {
@@ -193,8 +180,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     varType.getName().equals(constantName);
         }
 
-        private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {
-            return hasNoConflictingImport(sf, outermostClass(newOwningType)) && hasNoConflictingImport(sf, newTargetType);
+        private boolean hasNoConflictingImports(@Nullable JavaSourceFile sf, JavaType.FullyQualified referencedType) {
+            return hasNoConflictingImport(sf, referencedType) && hasNoConflictingImport(sf, newTargetType);
         }
 
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf, JavaType.FullyQualified targetType) {

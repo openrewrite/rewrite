@@ -792,6 +792,75 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceConstantAccessedThroughAnExpression() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Old old() {
+                      return null;
+                  }
+                  Object o = old().A;
+              }
+              """,
+            """
+              import a.Old;
+              import b.Outer;
+
+              class Test {
+                  Old old() {
+                      return null;
+                  }
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportConstantOfNestedClassDespiteOuterClassNameClash() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              OLD,
+              OUTER,
+              """
+                package c;
+                public class Outer {
+                }
+                """
+            )),
+          java(
+            """
+              import c.Outer;
+
+              import static a.Old.A;
+
+              class Test {
+                  Outer outer;
+                  Object o = A;
+              }
+              """,
+            """
+              import c.Outer;
+
+              import static b.Outer.Inner.B;
+
+              class Test {
+                  Outer outer;
+                  Object o = B;
+              }
+              """
+          )
+        );
+    }
+
     private static final String OLD = """
       package a;
       public class Old {
