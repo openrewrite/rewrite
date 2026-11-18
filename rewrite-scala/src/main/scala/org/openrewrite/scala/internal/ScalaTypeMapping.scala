@@ -857,7 +857,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   def mapClassType(symbol: Symbol, fqn: String): JavaType.FullyQualified = {
-    val sym = javaClassOfStatics(symbol)
+    // `scala.Any` shares this key but is abstract, so `java.lang.Object` is described by Dotty's `Object`.
+    val sym = if (fqn == "java.lang.Object") ctx.definitions.ObjectClass else javaClassOfStatics(symbol)
     typeFactory.computeClass(fqn, 0L, JavaType.FullyQualified.Kind.Class, (clazz: JavaType.Class) => {
       // Only a class the cache lacks pays for its flags and kind. They are set before the members,
       // which may lead back to this class and read its kind.

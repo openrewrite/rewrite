@@ -1846,6 +1846,22 @@ class ScalaTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void objectFirstSeenAsAnyIsNotAbstract() {
+        rewriteRun(
+          scala(
+            """
+            class P { def f(x: Any): Unit = () }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.FullyQualified object = TypeUtils.asFullyQualified(declared(cu, "P", "f").getParameterTypes().get(0));
+                assertThat(object.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+                assertThat(object.getFlags()).doesNotContain(Flag.Abstract);
+            })
+          )
+        );
+    }
+
     private static void assertBoundIsPairOfItself(JavaType type, String name) {
         assertBoundIsPairOf(type, name, name);
     }
