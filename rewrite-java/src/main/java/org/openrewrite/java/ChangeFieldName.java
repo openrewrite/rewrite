@@ -91,7 +91,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private @Nullable Expression qualifierWhereShadowed(JavaType.Variable field) {
         Object parent = getCursor().getParentTreeCursor().getValue();
         if (parent instanceof J.FieldAccess || parent instanceof J.VariableDeclarations.NamedVariable ||
-            !Scope.at(getCursor()).lookup(toName).filter(b -> !b.isMember()).isPresent()) {
+            !Scope.at(getCursor()).lookup(toName).filter(Scope.Binding::isLocal).isPresent()) {
             return null;
         }
         JavaType.FullyQualified owner = TypeUtils.asFullyQualified(field.getOwner());

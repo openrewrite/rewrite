@@ -32,7 +32,7 @@ import java.util.*;
  * pattern definition binds a variable. An import in a block binds its name for the rest of the block. A local
  * {@code def} is visible throughout its block.
  */
-@Incubating(since = "8.111.0")
+@Incubating(since = "8.112.0")
 public class ScalaScopeService extends ScopeService {
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
             "abstract", "case", "catch", "class", "def", "do", "else", "enum", "export", "extends", "false", "final",
@@ -53,6 +53,15 @@ public class ScalaScopeService extends ScopeService {
             patternVariables(scope, new ArrayList<>(((J.Case) tree).getCaseLabels()), bindings);
         } else if (tree instanceof S.For) {
             patternVariables(scope, new ArrayList<>(((S.For) tree).getEnumerators()), bindings);
+        } else if (tree instanceof J.Lambda) {
+            // A parameter without a type is a bare name
+            Cursor parameters = new Cursor(scope, ((J.Lambda) tree).getParameters());
+            for (J parameter : ((J.Lambda) tree).getParameters().getParameters()) {
+                if (parameter instanceof J.Identifier) {
+                    bindings.add(new Scope.Binding(new Cursor(parameters, parameter), ((J.Identifier) parameter).getSimpleName(),
+                            Scope.Namespace.VARIABLE, scope, ((J.Identifier) parameter).getFieldType()));
+                }
+            }
         }
         List<Statement> statements = tree instanceof J.Block ? ((J.Block) tree).getStatements() :
                 tree instanceof J.ClassDeclaration ? ((J.ClassDeclaration) tree).getBody().getStatements() :
@@ -111,10 +120,15 @@ public class ScalaScopeService extends ScopeService {
             parent.getParentTreeCursor().getValue() instanceof J.MethodInvocation) {
             return null;
         }
-        if (isPatternVariable(identifier)) {
+        if (isPatternVariable(identifier) || parent.getValue() instanceof J.Lambda.Parameters) {
             return null;
         }
         return super.namespaceOf(identifier);
+    }
+
+    @Override
+    public boolean localMayShadowLocal() {
+        return true;
     }
 
     @Override

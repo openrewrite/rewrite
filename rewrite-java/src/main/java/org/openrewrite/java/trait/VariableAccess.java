@@ -81,7 +81,7 @@ public class VariableAccess implements Trait<J.Identifier> {
      * The variable this access reads or writes, found by its position in the tree rather than by its type
      * attribution, so it tells apart two locals of one name, type and method declared in sibling blocks.
      */
-    @Incubating(since = "8.111.0")
+    @Incubating(since = "8.112.0")
     public Optional<Scope.Binding> getBinding() {
         String name = getTree().getSimpleName();
         Object parent = cursor.getParentTreeCursor().getValue();
@@ -101,7 +101,7 @@ public class VariableAccess implements Trait<J.Identifier> {
             if (self && (tree instanceof J.ClassDeclaration || tree instanceof J.NewClass) ||
                 tree instanceof J.ClassDeclaration && ((J.ClassDeclaration) tree).getSimpleName().equals(qualifier)) {
                 for (Scope.Binding binding : scope.getBindings()) {
-                    if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) && binding.isMember()) {
+                    if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) && !binding.isLocal()) {
                         return Optional.of(binding);
                     }
                 }

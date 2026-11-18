@@ -21,15 +21,11 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
-import org.openrewrite.trait.VisitFunction2;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -40,11 +36,12 @@ import java.util.stream.Stream;
  * come from the source file's {@link ScopeService}, so the same questions work for every language built on {@link J}
  * that supplies one.
  */
-@Incubating(since = "8.111.0")
+@Incubating(since = "8.112.0")
 @Value
 public class Scope implements Trait<J> {
     private static final String SERVICE = ScopeService.class.getName();
     private static final String BINDINGS = Scope.class.getName() + ".bindings";
+    private static final String REFERENCES = Scope.class.getName() + ".references";
 
     /**
      * The tree that opens the scope.
@@ -81,14 +78,7 @@ public class Scope implements Trait<J> {
      */
     public List<Binding> getBindings() {
         // Kept per source file and by tree identity, so a cursor built by hand finds them and an edited copy does not
-        Cursor holder = cursor;
-        for (Cursor c = cursor; c != null; c = c.getParent()) {
-            if (c.getValue() instanceof JavaSourceFile) {
-                holder = c;
-                break;
-            }
-        }
-        Map<Object, List<Binding>> bindings = holder.computeMessageIfAbsent(BINDINGS, k -> new IdentityHashMap<>());
+        Map<Object, List<Binding>> bindings = perSourceFile(cursor).computeMessageIfAbsent(BINDINGS, k -> new IdentityHashMap<>());
         List<Binding> own = bindings.get(cursor.getValue());
         if (own == null) {
             own = service(cursor).bindings(cursor);
@@ -123,7 +113,9 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * The innermost binding of a simple name in a namespace that is visible at the position.
+     * The innermost binding of a simple name in a namespace that is visible at the position. A type of the same
+     * package, a type an on-demand import brings in, and an inherited member type the file never names are not
+     * bound, so no type binding does not mean the name is free.
      */
     public Optional<Binding> lookup(String name, Namespace namespace) {
         ScopeService service = service(position);
@@ -190,7 +182,7 @@ public class Scope implements Trait<J> {
             return false;
         }
         for (Cursor region : regions) {
-            if (Stream.concat(declaredWithin(region), readWithin(region))
+            if (Stream.concat(declaredWithin(region), referencedWithin(region))
                     .anyMatch(binding -> own.contains(binding.getNamespace() + " " + binding.getName()))) {
                 return true;
             }
@@ -246,10 +238,10 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * The bindings that references under the region's tree read from outside it, in the order first read. These
-     * are what code moved elsewhere still needs to reach. A name read but bound nowhere has no binding to report.
+     * The bindings that the region's tree reads or assigns but does not declare, in the order first referenced.
+     * These are what code moved elsewhere still needs to reach. A name bound nowhere has no binding to report.
      */
-    public static Stream<Binding> readWithin(Cursor region) {
+    public static Stream<Binding> referencedWithin(Cursor region) {
         J regionTree = region.getValue();
         ScopeService service = service(region);
         Set<String> seen = new HashSet<>();
@@ -288,6 +280,19 @@ public class Scope implements Trait<J> {
             }
         }.visit(region.getValue(), names, region.getParentOrThrow());
         return names;
+    }
+
+    /**
+     * Where facts about the trees of one source file are kept for a traversal: its cursor, or the given one where
+     * no source file is above it.
+     */
+    private static Cursor perSourceFile(Cursor cursor) {
+        for (Cursor c = cursor; c != null; c = c.getParent()) {
+            if (c.getValue() instanceof JavaSourceFile) {
+                return c;
+            }
+        }
+        return cursor;
     }
 
     private static @Nullable Cursor enclosingScope(ScopeService service, Cursor from) {
@@ -451,11 +456,25 @@ public class Scope implements Trait<J> {
 
         public Kind getKind() {
             J tree = getTree();
+            Object scopeTree = scope.getValue();
             if (tree instanceof J.Import) {
                 return Kind.IMPORTED;
             }
-            if (isMember()) {
-                return tree == scope.getValue() ? Kind.INHERITED : Kind.MEMBER;
+            if (scopeTree instanceof JavaSourceFile) {
+                return Kind.MEMBER;
+            }
+            if (scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass) {
+                if (tree == scopeTree) {
+                    return Kind.INHERITED;
+                }
+                // A pattern variable in a field initializer is bound by the class but local to that initializer.
+                if (!(tree instanceof J.Identifier) || cursor.firstEnclosing(J.InstanceOf.class) == null) {
+                    return Kind.MEMBER;
+                }
+            }
+            if (tree == scopeTree && tree instanceof J.Lambda) {
+                // A parameter the lambda takes without naming it, such as Kotlin's or Groovy's `it`
+                return Kind.PARAMETER;
             }
             if (tree instanceof J.Identifier) {
                 Cursor declarations = cursor.getParentTreeCursor().getParentTreeCursor();
@@ -470,18 +489,12 @@ public class Scope implements Trait<J> {
         }
 
         /**
-         * Whether the name belongs to a class or comes in through an import, rather than being local to code.
+         * Whether the name is local to code, as a local or a parameter is, rather than belonging to a class or
+         * coming in through an import.
          */
-        public boolean isMember() {
-            Object scopeTree = scope.getValue();
-            if (scopeTree instanceof JavaSourceFile) {
-                return true;
-            }
-            if (!(scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass)) {
-                return false;
-            }
-            // A pattern variable in a field initializer is bound by the class but local to that initializer.
-            return !(getTree() instanceof J.Identifier) || cursor.firstEnclosing(J.InstanceOf.class) == null;
+        public boolean isLocal() {
+            Kind kind = getKind();
+            return kind == Kind.LOCAL || kind == Kind.PARAMETER;
         }
 
         /**
@@ -489,33 +502,23 @@ public class Scope implements Trait<J> {
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
          */
         public Stream<Cursor> references() {
-            List<Cursor> references = new ArrayList<>();
-            Scope scope = getScope();
-            ScopeService service = service(scope.getCursor());
-            new JavaIsoVisitor<List<Cursor>>() {
-                @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, List<Cursor> found) {
-                    if (!identifier.getSimpleName().equals(name)) {
-                        return identifier;
-                    }
-                    if (namespace == service.namespaceOf(getCursor())) {
-                        if (at(getCursor()).lookup(name, namespace).filter(Binding.this::equals).isPresent()) {
-                            found.add(getCursor());
-                        }
-                    } else if (selects(getCursor())) {
-                        found.add(getCursor());
-                    }
-                    return identifier;
-                }
-            }.visit(scope.getTree(), references, scope.getCursor().getParentOrThrow());
-            return references.stream();
+            // One walk of the scope answers for every binding in it
+            Map<Object, References> references = perSourceFile(scope).computeMessageIfAbsent(REFERENCES, k -> new IdentityHashMap<>());
+            References inScope = references.get(scope.getValue());
+            if (inScope == null) {
+                inScope = referencesWithin(scope);
+                references.put(scope.getValue(), inScope);
+            }
+            return inScope.of(this);
         }
 
         /**
          * Whether renaming this binding to {@code newName} keeps every name in the file reading what it reads now.
          * It does not where its own scope already binds the name, where a nearer binding of the name would take one
          * of its references, where it would take a reference that now reads a binding further out or none, or where
-         * a local would come to share its name with another local in reach.
+         * a local would come to share its name with another local in reach and the language forbids that.
+         * The answer is for the tree the cursor holds, so a visitor renaming several bindings keeps track of the
+         * names it has handed out.
          */
         public boolean canRenameTo(String newName) {
             Scope declaring = getScope();
@@ -546,9 +549,9 @@ public class Scope implements Trait<J> {
             if (!safe[0]) {
                 return false;
             }
-            if (namespace == Namespace.VARIABLE && !isMember()) {
+            if (namespace == Namespace.VARIABLE && isLocal() && !service.localMayShadowLocal()) {
                 // A local may not share its name with a local declared inside its scope or visible where it is declared
-                return !at(cursor).lookup(newName).filter(outer -> !outer.isMember()).isPresent() &&
+                return !at(cursor).lookup(newName).filter(Binding::isLocal).isPresent() &&
                        declaredWithin(scope).noneMatch(inner -> inner.namespace == namespace && inner.name.equals(newName));
             }
             return true;
@@ -789,41 +792,6 @@ public class Scope implements Trait<J> {
                 }
                 return null;
             }
-        }
-    }
-
-    /**
-     * Matches the trees that open a scope, optionally only those binding a given name.
-     */
-    public static class Matcher extends SimpleTraitMatcher<Scope> {
-        private @Nullable String declaring;
-
-        public Matcher declaring(String name) {
-            this.declaring = name;
-            return this;
-        }
-
-        @Override
-        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<Scope, P> visitor) {
-            return new JavaVisitor<P>() {
-                @Override
-                public @Nullable J preVisit(J tree, P p) {
-                    Scope scope = test(getCursor());
-                    return scope != null ? (J) visitor.visit(scope, p) : tree;
-                }
-            };
-        }
-
-        @Override
-        protected @Nullable Scope test(Cursor cursor) {
-            if (!(cursor.getValue() instanceof J) || !service(cursor).isScope(cursor)) {
-                return null;
-            }
-            Scope scope = new Scope(cursor, cursor);
-            if (declaring != null && scope.getBindings().stream().noneMatch(b -> b.getName().equals(declaring))) {
-                return null;
-            }
-            return scope;
         }
     }
 }

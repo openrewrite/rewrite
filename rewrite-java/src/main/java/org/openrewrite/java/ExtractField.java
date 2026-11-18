@@ -73,7 +73,7 @@ public class ExtractField<P> extends JavaVisitor<P> {
         if (multiVariable == scope) {
             // A member of the local's name is already there, and a second field of that name would not compile
             String name = multiVariable.getVariables().get(0).getSimpleName();
-            if (Scope.at(getCursor()).lookup(name).filter(Scope.Binding::isMember).isPresent()) {
+            if (Scope.at(getCursor()).lookup(name).filter(binding -> !binding.isLocal()).isPresent()) {
                 return multiVariable;
             }
             getCursor()

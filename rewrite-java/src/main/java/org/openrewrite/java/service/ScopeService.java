@@ -32,7 +32,7 @@ import java.util.function.ToLongFunction;
  * The name binding rules of one language, which {@link Scope} asks through the source file. This class holds
  * Java's rules, and a language built on {@link J} with rules of its own overrides it.
  */
-@Incubating(since = "8.111.0")
+@Incubating(since = "8.112.0")
 public class ScopeService {
 
     /**
@@ -211,6 +211,14 @@ public class ScopeService {
             return Scope.Namespace.TYPE;
         }
         return Scope.Namespace.VARIABLE;
+    }
+
+    /**
+     * Whether a local variable may take the name of another local that is in scope where it is declared. Java
+     * forbids it.
+     */
+    public boolean localMayShadowLocal() {
+        return false;
     }
 
     /**

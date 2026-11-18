@@ -322,7 +322,7 @@ class ScopeTest implements RewriteTest {
                     .filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE)
                     .map(b -> SearchResult.found(identifier, b.references().count() + " references, " +
                                                              (b.isEffectivelyFinal() ? "effectively final" : "not effectively final") +
-                                                             (b.isMember() ? ", member" : "")))
+                                                             (b.isLocal() ? "" : ", member")))
                     .orElse(identifier);
               }
           })),
@@ -573,7 +573,7 @@ class ScopeTest implements RewriteTest {
                       return b;
                   }
                   return SearchResult.found(b, "declared " + names(Scope.declaredWithin(getCursor())) +
-                                               ", read " + names(Scope.readWithin(getCursor())));
+                                               ", read " + names(Scope.referencedWithin(getCursor())));
               }
           })),
           java(
@@ -632,7 +632,7 @@ class ScopeTest implements RewriteTest {
                       return b;
                   }
                   // What a lambda made of the block would capture
-                  return SearchResult.found(b, Scope.readWithin(getCursor())
+                  return SearchResult.found(b, Scope.referencedWithin(getCursor())
                     .filter(binding -> binding.getKind() == Scope.Kind.LOCAL || binding.getKind() == Scope.Kind.PARAMETER)
                     .map(Scope.Binding::getName)
                     .collect(joining(" ")));
@@ -932,40 +932,6 @@ class ScopeTest implements RewriteTest {
                       { int taken = 1; }
                       return local_ + free_;
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void matcherFindsTheScopesThatDeclareAName() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new Scope.Matcher().declaring("x")
-            .asVisitor(scope -> SearchResult.found(scope.getTree())))),
-          java(
-            """
-              import java.util.function.IntUnaryOperator;
-
-              class A {
-                  int x;
-                  void m(int y) {
-                      int x = y;
-                      IntUnaryOperator f = z -> { int x2 = z; return x2; };
-                  }
-                  void n(int x) {}
-              }
-              """,
-            """
-              import java.util.function.IntUnaryOperator;
-
-              /*~~>*/class A {
-                  int x;
-                  void m(int y) /*~~>*/{
-                      int x = y;
-                      IntUnaryOperator f = z -> { int x2 = z; return x2; };
-                  }
-                  /*~~>*/void n(int x) {}
               }
               """
           )

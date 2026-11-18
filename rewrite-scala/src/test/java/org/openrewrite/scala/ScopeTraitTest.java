@@ -48,7 +48,7 @@ class ScopeTraitTest implements RewriteTest {
                       return m;
                   }
                   Scope scope = Scope.at(getCursor());
-                  String visible = Arrays.stream(new String[]{"top", "a", "b", "K", "L", "x", "all", "inner", "i", "j"})
+                  String visible = Arrays.stream(new String[]{"top", "a", "b", "K", "L", "x", "all", "inner", "i", "j", "lam"})
                     .filter(name -> scope.lookup(name).isPresent())
                     .collect(joining(" "));
                   String helper = scope.lookup("helper", Scope.Namespace.METHOD).isPresent() ? " helper" : "";
@@ -68,6 +68,7 @@ class ScopeTraitTest implements RewriteTest {
                     case all @ Some(inner) => here()
                   }
                   for (i <- List(1); j = i) yield here()
+                  List(1).foreach(lam => here())
                   def helper(): Int = 1
                   here()
                 }
@@ -86,6 +87,7 @@ class ScopeTraitTest implements RewriteTest {
                     case all @ Some(inner) => /*~~(top a b K L all inner helper)~~>*/here()
                   }
                   for (i <- List(1); j = i) yield /*~~(top a b K L i j helper)~~>*/here()
+                  List(1).foreach(lam => /*~~(top a b K L lam helper)~~>*/here())
                   def helper(): Int = 1
                   /*~~(top a b K L helper)~~>*/here()
                 }
@@ -128,7 +130,7 @@ class ScopeTraitTest implements RewriteTest {
               object O {
                 def m(p: Int): Int = {
                   val /*~~(2 references, final, free:safe taken:unsafe x:unsafe)~~>*/read_ = p
-                  var /*~~(2 references, assigned, free:safe taken:unsafe x:unsafe)~~>*/assigned_ = p
+                  var /*~~(2 references, assigned, free:safe taken:unsafe x:safe)~~>*/assigned_ = p
                   val taken = 2
                   List(1).foreach(x => use(x + read_))
                   assigned_ = taken

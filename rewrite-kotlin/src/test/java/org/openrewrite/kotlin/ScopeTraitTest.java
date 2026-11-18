@@ -43,8 +43,9 @@ class ScopeTraitTest implements RewriteTest {
     void namesAreVisibleWhereKotlinScopesThem() {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> {
-              String visible = Arrays.stream(new String[]{"top", "prop", "a", "b", "w", "it"})
+              String visible = Arrays.stream(new String[]{"top", "prop", "a", "b", "w", "it", "x"})
                 .filter(name -> scope.lookup(name).isPresent())
+                .map(name -> "it".equals(name) ? name + "=" + scope.lookup(name).get().getKind() : name)
                 .collect(joining(" "));
               return visible.isEmpty() ? "none" : visible;
           })),
@@ -59,6 +60,7 @@ class ScopeTraitTest implements RewriteTest {
                       }
                       here()
                       listOf(1).forEach { here() }
+                      listOf(1).forEach { x -> here() }
                   }
               }
               fun here() {}
@@ -72,7 +74,8 @@ class ScopeTraitTest implements RewriteTest {
                           is String -> /*~~(top prop a b w)~~>*/here()
                       }
                       /*~~(top prop a b)~~>*/here()
-                      listOf(1).forEach { /*~~(top prop a b it)~~>*/here() }
+                      listOf(1).forEach { /*~~(top prop a b it=PARAMETER)~~>*/here() }
+                      listOf(1).forEach { x -> /*~~(top prop a b x)~~>*/here() }
                   }
               }
               fun here() {}
