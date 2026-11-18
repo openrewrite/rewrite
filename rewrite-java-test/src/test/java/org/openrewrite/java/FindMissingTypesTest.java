@@ -443,6 +443,22 @@ class FindMissingTypesTest implements RewriteTest {
     }
 
     @Test
+    void unresolvedQualifiedJavadocLink() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMissingTypes(true)),
+          java(
+            """
+              /**
+               * {@link some.missing.Type}
+               */
+              class Foo {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noMissingJavadocReference() {
         rewriteRun(
           spec -> spec.recipe(new FindMissingTypes(true)),

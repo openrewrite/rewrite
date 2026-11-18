@@ -201,6 +201,10 @@ public class FindMissingTypes extends Recipe {
                 return !isWellFormedType(fa.getTarget().getType(), seenTypes);
             }
             Tree parent = getCursor().getParentTreeCursor().getValue();
+            // Like a simple name, a qualified Javadoc reference may name something that is not on the classpath
+            if (parent instanceof Javadoc.Reference && fa == ((Javadoc.Reference) parent).getTree()) {
+                return true;
+            }
             boolean isQualifier = parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
                                   !"class".equals(((J.FieldAccess) parent).getSimpleName()) ||
                                   parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect();
