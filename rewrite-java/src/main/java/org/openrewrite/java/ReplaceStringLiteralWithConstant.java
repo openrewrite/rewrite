@@ -21,12 +21,15 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.lang.reflect.Field;
 import java.util.Objects;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @Value
@@ -131,11 +134,26 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             }
 
             maybeAddImport(owningType, false);
-            return JavaTemplate.builder(template)
+            J constant = JavaTemplate.builder(template)
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())
                     .withPrefix(literal.getPrefix());
+            return constant instanceof J.FieldAccess ? attributed((J.FieldAccess) constant) : constant;
+        }
+
+        // A constant declared outside the JDK is unknown to the template parser, so attribute its access here
+        private J.FieldAccess attributed(J.FieldAccess constant) {
+            if (TypeUtils.isWellFormedType(constant.getType())) {
+                return constant;
+            }
+            JavaType.FullyQualified owner = JavaType.ShallowClass.build(owningType);
+            JavaType.Variable fieldType = new JavaType.Variable(null, Flag.Static.getBitMask(),
+                    constant.getSimpleName(), owner, JavaType.Primitive.String, emptyList());
+            return constant
+                    .withTarget(constant.getTarget().withType(owner))
+                    .withName(constant.getName().withType(JavaType.Primitive.String).withFieldType(fieldType))
+                    .withType(JavaType.Primitive.String);
         }
     }
 

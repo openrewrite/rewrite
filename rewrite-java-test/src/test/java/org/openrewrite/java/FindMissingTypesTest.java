@@ -253,6 +253,86 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void untypedFieldAccess() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                    return fa.withType(null);
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              class A {
+                  int x;
+                  int y = this.x;
+              }
+              """,
+            """
+              class A {
+                  int x;
+                  int y = /*~~(FieldAccess type is missing or malformed)~~>*/this.x;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedFieldAccess() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = System.missing;
+              }
+              """,
+            """
+              class A {
+                  Object o = /*~~(FieldAccess type is missing or malformed)~~>*/System.missing;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typedFieldAccesses() {
+        rewriteRun(
+          java(
+            """
+              package a.b;
+
+              import java.util.List;
+
+              import static java.util.Collections.EMPTY_LIST;
+
+              @SuppressWarnings(java.lang.annotation.RetentionPolicy.SOURCE.name)
+              class A {
+                  int x;
+                  enum E { P }
+                  java.util.Map.Entry<String, String> e;
+
+                  void m(int[] arr) {
+                      this.x = arr.length;
+                      System.out.println(java.lang.Integer.MAX_VALUE);
+                      Class<?> c = java.lang.String.class;
+                      Object p = A.E.P;
+                      Object s = Thread.State.NEW;
+                      int y = A.this.x;
+                      Runnable r = A.this::toString;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("JavadocDeclaration")
     @Test
     void missingJavadocReference() {

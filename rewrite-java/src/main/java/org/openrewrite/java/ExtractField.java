@@ -49,9 +49,7 @@ public class ExtractField<P> extends JavaVisitor<P> {
                     scope.withId(randomId())
                             .withVariables(ListUtils.map(scope.getVariables(), v -> v
                                     .withInitializer(null)
-                                    .withVariableType(new JavaType.Variable(null, Flag.Private.getBitMask(),
-                                            v.getSimpleName(), getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType(),
-                                            v.getType(), emptyList())))
+                                    .withVariableType(fieldType(v)))
                             )
                             .withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, null, J.Modifier.Type.Private, emptyList()))),
                     p, getCursor()
@@ -75,19 +73,33 @@ public class ExtractField<P> extends JavaVisitor<P> {
                     .next()
                     .putMessage("extractTo", true);
 
-            String fieldType = requireNonNull(multiVariable.getTypeAsFullyQualified()).getFullyQualifiedName();
+            J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
+            String typeName = requireNonNull(multiVariable.getTypeAsFullyQualified()).getFullyQualifiedName();
             J.Assignment assignment = JavaTemplate
-                    .builder("this.#{} = #{any(" + fieldType + ")}")
+                    .builder("this.#{} = #{any(" + typeName + ")}")
                     .contextSensitive()
                     .build()
                     .apply(
                             getCursor(),
                             multiVariable.getCoordinates().replace(),
-                            multiVariable.getVariables().get(0).getSimpleName(),
-                            multiVariable.getVariables().get(0).getInitializer()
+                            variable.getSimpleName(),
+                            variable.getInitializer()
                     );
+            // The field does not exist yet when the template is compiled, so its access is attributed here
+            if (assignment.getVariable() instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
+                JavaType.Variable fieldType = fieldType(variable);
+                assignment = assignment.withVariable(fieldAccess
+                        .withName(fieldAccess.getName().withType(fieldType.getType()).withFieldType(fieldType))
+                        .withType(fieldType.getType()));
+            }
             return assignment.withType(multiVariable.getType());
         }
         return super.visitVariableDeclarations(multiVariable, p);
+    }
+
+    private JavaType.Variable fieldType(J.VariableDeclarations.NamedVariable variable) {
+        return new JavaType.Variable(null, Flag.Private.getBitMask(), variable.getSimpleName(),
+                getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType(), variable.getType(), emptyList());
     }
 }

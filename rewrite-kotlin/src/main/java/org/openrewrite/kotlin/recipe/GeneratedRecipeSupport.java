@@ -37,6 +37,7 @@ import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -466,12 +467,35 @@ public final class GeneratedRecipeSupport {
                 }
                 J result = KotlinTemplate.builder(afterTemplate).build()
                         .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
-                J inserted = result.withPrefix(fieldAccess.getPrefix());
+                J inserted = attributed(result.withPrefix(fieldAccess.getPrefix()));
                 doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
                 return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    /**
+     * The template stub is compiled without the recipe target's own classes, so a property it reads on one of
+     * them is left untyped; attribute it from the receiver's type.
+     */
+    private static J attributed(J j) {
+        if (!(j instanceof J.FieldAccess) || TypeUtils.isWellFormedType(((J.FieldAccess) j).getType())) {
+            return j;
+        }
+        J.FieldAccess fieldAccess = (J.FieldAccess) j;
+        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(fieldAccess.getTarget().getType());
+        if (owner == null) {
+            return j;
+        }
+        for (JavaType.Variable member : owner.getMembers()) {
+            if (member.getName().equals(fieldAccess.getSimpleName())) {
+                return fieldAccess
+                        .withName(fieldAccess.getName().withType(member.getType()).withFieldType(member))
+                        .withType(member.getType());
+            }
+        }
+        return j;
     }
 
     /**

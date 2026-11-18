@@ -250,7 +250,7 @@ public final class Assertions {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier || missingType.getJ() instanceof J.FieldAccess) {
                             return typeValidation.identifiers();
                         } else if (missingType.getJ() instanceof J.ClassDeclaration) {
                             return typeValidation.classDeclarations();
@@ -418,6 +418,27 @@ public final class Assertions {
                 }
             }
             return mi;
+        }
+
+        @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fa)) {
+                fa = SearchResult.found(fa, "FieldAccess type is missing or malformed");
+            }
+            return fa;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.FieldAccess fa) {
+            if (inPackageDeclaration() || inImport() || "class".equals(fa.getSimpleName())) {
+                return true;
+            }
+            Tree parent = getCursor().getParentTreeCursor().getValue();
+            // Package segments are typed as unknown, and only ever occur as the qualifier of a member,
+            // whose own attribution is checked instead
+            return parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                   !"class".equals(((J.FieldAccess) parent).getSimpleName()) ||
+                   parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect();
         }
 
         @Override

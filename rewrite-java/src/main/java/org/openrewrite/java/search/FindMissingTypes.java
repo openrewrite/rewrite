@@ -184,6 +184,29 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fa)) {
+                fa = SearchResult.found(fa, "FieldAccess type is missing or malformed");
+            }
+            return fa;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.FieldAccess fa) {
+            // The Javadoc parser leaves qualified names in references unattributed
+            if (inPackageDeclaration() || inImport() || "class".equals(fa.getSimpleName()) ||
+                getCursor().firstEnclosing(Javadoc.class) != null) {
+                return true;
+            }
+            Tree parent = getCursor().getParentTreeCursor().getValue();
+            // Package segments are typed as unknown, and only ever occur as the qualifier of a member,
+            // whose own attribution is checked instead
+            return parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                   !"class".equals(((J.FieldAccess) parent).getSimpleName()) ||
+                   parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect();
+        }
+
+        @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
             if (mr.getMethodType() != null) {
