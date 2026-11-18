@@ -100,15 +100,12 @@ public class VariableNameUtils {
             throw new IllegalStateException("A JavaSourceFile is required in the cursor path.");
         }
         Set<String> names = new HashSet<>();
-        for (Scope enclosing = Scope.at(scope); enclosing != null; enclosing = enclosing.enclosing().orElse(null)) {
-            for (Scope.Binding binding : enclosing.getBindings()) {
-                if (binding.getNamespace() == Scope.Namespace.VARIABLE && !names.contains(binding.getName()) &&
-                    enclosing.lookup(binding.getName()).isPresent()) {
-                    names.add(binding.getName());
-                }
-            }
-        }
-        names.addAll(Scope.namesDeclaredWithin(scope));
+        Scope.at(scope).visible()
+                .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
+                .forEach(binding -> names.add(binding.getName()));
+        Scope.declaredWithin(scope)
+                .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
+                .forEach(binding -> names.add(binding.getName()));
         // A variable named like an enum the file uses would obscure that enum wherever it qualifies a constant (JLS 6.4.2).
         new JavaIsoVisitor<Set<String>>() {
             @Override

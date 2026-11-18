@@ -80,7 +80,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                             new Scope.Binding.Matcher().get(getCursor()).ifPresent(binding -> {
                                 field = binding.isMember();
                                 found.add(identifier.getId());
-                                binding.getReferences().forEach(reference -> found.add(reference.<J>getValue().getId()));
+                                binding.references().forEach(reference -> found.add(reference.<J>getValue().getId()));
                             });
                         }
                         return identifier;

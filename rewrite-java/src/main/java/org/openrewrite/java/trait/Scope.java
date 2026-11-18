@@ -31,6 +31,7 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * One lexical scope of the tree, asked about the names visible from a position inside it. The binding rules
@@ -78,6 +79,24 @@ public class Scope implements Trait<J> {
      */
     public List<Binding> getBindings() {
         return cursor.computeMessageIfAbsent(BINDINGS, k -> service(cursor).bindings(cursor));
+    }
+
+    /**
+     * Every binding visible at the position, innermost first, leaving out any a nearer binding of its name and
+     * namespace shadows.
+     */
+    public Stream<Binding> visible() {
+        ScopeService service = service(position);
+        Set<String> seen = new HashSet<>();
+        List<Binding> visible = new ArrayList<>();
+        for (Scope scope = this; scope != null; scope = scope.enclosing().orElse(null)) {
+            for (Binding binding : scope.getBindings()) {
+                if (service.isVisibleAt(binding, position) && seen.add(binding.getNamespace() + " " + binding.getName())) {
+                    visible.add(binding);
+                }
+            }
+        }
+        return visible.stream();
     }
 
     /**
@@ -142,69 +161,69 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * The names of the variables declared anywhere under the region's tree, in source order.
+     * The bindings declared anywhere under the region's tree, in source order.
      */
-    public static Set<String> namesDeclaredWithin(Cursor region) {
+    public static Stream<Binding> declaredWithin(Cursor region) {
         // Read from the region's own tree, which may be an edited copy its ancestors do not hold yet.
         J regionTree = region.getValue();
         ScopeService service = service(region);
-        Set<UUID> declaring = new HashSet<>();
-        Set<String> names = new LinkedHashSet<>();
+        Map<UUID, Binding> byIdentifier = new HashMap<>();
+        List<Binding> onStatements = new ArrayList<>();
         new JavaIsoVisitor<Integer>() {
             @Override
             public @Nullable J preVisit(J tree, Integer p) {
                 if (tree == regionTree || service.isScope(getCursor())) {
                     for (Binding binding : service.bindings(getCursor())) {
                         J anchor = binding.getTree();
-                        if (binding.getNamespace() != Namespace.VARIABLE) {
-                            continue;
-                        }
                         if (anchor instanceof J.Identifier) {
-                            declaring.add(anchor.getId());
+                            byIdentifier.putIfAbsent(anchor.getId(), binding);
                         } else if (anchor != tree && !(anchor instanceof J.Import)) {
                             // A language may anchor a declared name on its statement. An anchor on the scope node itself marks an inherited or implied name.
-                            names.add(binding.getName());
+                            onStatements.add(binding);
                         }
                     }
                 }
                 return tree;
             }
         }.visit(regionTree, 0, region.getParentOrThrow());
-        Set<String> ordered = new LinkedHashSet<>();
-        new JavaIsoVisitor<Set<String>>() {
+        List<Binding> ordered = new ArrayList<>();
+        new JavaIsoVisitor<List<Binding>>() {
             @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> found) {
-                if (declaring.contains(identifier.getId())) {
-                    found.add(identifier.getSimpleName());
+            public J.Identifier visitIdentifier(J.Identifier identifier, List<Binding> found) {
+                Binding binding = byIdentifier.remove(identifier.getId());
+                if (binding != null) {
+                    found.add(binding);
                 }
                 return identifier;
             }
         }.visit(regionTree, ordered, region.getParentOrThrow());
-        ordered.addAll(names);
-        return ordered;
+        ordered.addAll(onStatements);
+        return ordered.stream();
     }
 
     /**
-     * The names that variable references under the region's tree read without a declaration inside the region
-     * binding them, in source order. These are the names code moved elsewhere still needs to reach.
+     * The bindings that references under the region's tree read from outside it, in the order first read. These
+     * are what code moved elsewhere still needs to reach. A name read but bound nowhere has no binding to report.
      */
-    public static Set<String> namesReadWithin(Cursor region) {
-        Set<String> names = new LinkedHashSet<>();
+    public static Stream<Binding> readWithin(Cursor region) {
         J regionTree = region.getValue();
         ScopeService service = service(region);
-        new JavaIsoVisitor<Set<String>>() {
+        Set<String> seen = new HashSet<>();
+        List<Binding> read = new ArrayList<>();
+        new JavaIsoVisitor<List<Binding>>() {
             @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> found) {
-                if (service.namespaceOf(getCursor()) == Namespace.VARIABLE) {
-                    Optional<Binding> binding = at(getCursor()).lookup(identifier.getSimpleName());
-                    if (!binding.isPresent() || !isUnder(binding.get().getCursor(), regionTree)) {
-                        found.add(identifier.getSimpleName());
-                    }
+            public J.Identifier visitIdentifier(J.Identifier identifier, List<Binding> found) {
+                Namespace namespace = service.namespaceOf(getCursor());
+                if (namespace != null) {
+                    at(getCursor()).lookup(identifier.getSimpleName(), namespace)
+                            .filter(binding -> !isUnder(binding.getCursor(), regionTree))
+                            .filter(binding -> seen.add(binding.getNamespace() + " " + binding.getName() + " " + binding.getTree().getId()))
+                            .ifPresent(found::add);
                 }
                 return identifier;
             }
-        }.visit(regionTree, names, region.getParentOrThrow());
-        return names;
+        }.visit(regionTree, read, region.getParentOrThrow());
+        return read.stream();
     }
 
     /**
@@ -311,7 +330,7 @@ public class Scope implements Trait<J> {
          * The identifiers in the binding's scope that refer to it, by its simple name, as {@code this.name} or
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
          */
-        public List<Cursor> getReferences() {
+        public Stream<Cursor> references() {
             List<Cursor> references = new ArrayList<>();
             Scope scope = getScope();
             ScopeService service = service(scope.getCursor());
@@ -331,7 +350,7 @@ public class Scope implements Trait<J> {
                     return identifier;
                 }
             }.visit(scope.getTree(), references, scope.getCursor().getParentOrThrow());
-            return references;
+            return references.stream();
         }
 
         /**
@@ -408,7 +427,7 @@ public class Scope implements Trait<J> {
                             ((J.VariableDeclarations.NamedVariable) declaring.getValue()).getInitializer() == null &&
                             declaring.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Block;
             int assignments = 0;
-            for (Cursor reference : getReferences()) {
+            for (Cursor reference : (Iterable<Cursor>) references()::iterator) {
                 if (isAssigned(reference)) {
                     // A local declared without an initializer may be assigned once (JLS 4.12.4).
                     if (!blank || !isSimpleAssignment(reference) || ++assignments > 1 || isInLoopBelow(reference, scope)) {

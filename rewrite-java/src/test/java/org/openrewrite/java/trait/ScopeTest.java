@@ -30,6 +30,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.Assertions.java;
@@ -61,6 +62,37 @@ class ScopeTest implements RewriteTest {
                       int before = 0;
                       /*~~(before, p)~~>*/here();
                       int after = 0;
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void visibleListsTheBindingsInScopeInnermostFirst() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> names(scope.visible()))),
+          java(
+            """
+              class A {
+                  int x;
+                  int y;
+                  void m(int p) {
+                      int x = 0;
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A {
+                  int x;
+                  int y;
+                  void m(int p) {
+                      int x = 0;
+                      /*~~(x p y)~~>*/here();
                   }
                   void here() {}
               }
@@ -284,7 +316,7 @@ class ScopeTest implements RewriteTest {
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                   return new Scope.Binding.Matcher().get(getCursor())
                     .filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE)
-                    .map(b -> SearchResult.found(identifier, b.getReferences().size() + " references, " +
+                    .map(b -> SearchResult.found(identifier, b.references().count() + " references, " +
                                                              (b.isEffectivelyFinal() ? "effectively final" : "not effectively final") +
                                                              (b.isMember() ? ", member" : "")))
                     .orElse(identifier);
@@ -391,7 +423,7 @@ class ScopeTest implements RewriteTest {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                   return new Scope.Binding.Matcher().get(getCursor())
-                    .map(b -> SearchResult.found(identifier, b.getReferences().size() + " references"))
+                    .map(b -> SearchResult.found(identifier, b.references().count() + " references"))
                     .orElse(identifier);
               }
           })),
@@ -491,7 +523,7 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
-    void namesDeclaredAndReadWithinARegion() {
+    void bindingsDeclaredAndReadWithinARegion() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
@@ -500,8 +532,8 @@ class ScopeTest implements RewriteTest {
                   if (!(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
                       return b;
                   }
-                  return SearchResult.found(b, "declared " + String.join(" ", Scope.namesDeclaredWithin(getCursor())) +
-                                               ", read " + String.join(" ", Scope.namesReadWithin(getCursor())));
+                  return SearchResult.found(b, "declared " + names(Scope.declaredWithin(getCursor())) +
+                                               ", read " + names(Scope.readWithin(getCursor())));
               }
           })),
           java(
@@ -536,7 +568,7 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
-    void namesDeclaredWithinAnEditedCopyComeFromTheCopy() {
+    void declaredWithinAnEditedCopyComeFromTheCopy() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
@@ -550,7 +582,7 @@ class ScopeTest implements RewriteTest {
                   // A recipe mid-visit holds an edited copy its ancestors do not have yet.
                   J.If edited = (J.If) other.getBody().getStatements().getFirst();
                   Cursor copy = new Cursor(getCursor().getParentOrThrow(), edited);
-                  return SearchResult.found(i, "declared " + String.join(" ", Scope.namesDeclaredWithin(copy)));
+                  return SearchResult.found(i, "declared " + names(Scope.declaredWithin(copy)));
               }
           })),
           java(
@@ -610,6 +642,10 @@ class ScopeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static String names(Stream<Scope.Binding> bindings) {
+        return bindings.filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE).map(Scope.Binding::getName).collect(joining(" "));
     }
 
     private static String visible(Scope scope, Scope.Namespace namespace, String... candidates) {
