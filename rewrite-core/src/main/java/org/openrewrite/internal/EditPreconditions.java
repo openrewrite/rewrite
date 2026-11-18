@@ -59,6 +59,14 @@ public final class EditPreconditions {
         return guard(recipe.getRecipeList(), emptyList());
     }
 
+    /**
+     * @param recipe A recipe that {@link #prepare(Recipe)} or {@link #recipeList(Recipe)} returned.
+     * @return The recipes that decide its edit preconditions, which run while it scans and edits.
+     */
+    public static List<Recipe> conditionRecipes(Recipe recipe) {
+        return recipe instanceof Guarded ? ((Guarded) recipe).conditionRecipes : emptyList();
+    }
+
     private static List<Recipe> guard(List<Recipe> recipes, List<Guarded> guards) {
         return ListUtils.map(recipes, recipe -> guard(recipe, guards));
     }
@@ -133,6 +141,14 @@ public final class EditPreconditions {
             return conditions;
         }
 
+        static void collectRecipes(List<Condition> conditions, List<Recipe> recipes) {
+            for (Condition condition : conditions) {
+                recipes.add(condition.recipe);
+                collectRecipes(condition.conditions, recipes);
+                collectRecipes(condition.recipeList, recipes);
+            }
+        }
+
         @SuppressWarnings("unchecked")
         ScanningRecipe<Object> scanningRecipe() {
             return (ScanningRecipe<Object>) recipe;
@@ -197,6 +213,7 @@ public final class EditPreconditions {
     private static final class Guarded extends DecoratedScanningRecipe<Accumulator> {
         private final List<Condition> conditions;
         private final List<Condition> scanningConditions = new ArrayList<>();
+        private final List<Recipe> conditionRecipes = new ArrayList<>();
         private final List<Guarded> outerGuards;
         private final List<Guarded> guards;
 
@@ -209,6 +226,7 @@ public final class EditPreconditions {
         Guarded(ScanningRecipe<Object> delegate, List<Recipe> conditions, List<Guarded> outerGuards) {
             super(delegate);
             this.conditions = Condition.of(conditions, scanningConditions);
+            Condition.collectRecipes(this.conditions, conditionRecipes);
             this.outerGuards = outerGuards;
             List<Guarded> guards = new ArrayList<>(outerGuards.size() + 1);
             guards.addAll(outerGuards);
