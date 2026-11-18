@@ -1493,27 +1493,33 @@ public class RewriteRpcServer
             recipe = InstantiateWithOptions(recipe.GetType(), options);
         }
 
-        // Validate required options and the recipe's own Validate() constraints on the instantiated
-        // recipe — the root against the caller's options, and every child against the values its
-        // parent set in GetRecipeList(). Because PrepareInstance recurses, this covers the whole
-        // tree, and it's the only place the C# tree gets validated: declarative recipes bundled in
-        // an artifact often ship without a test that runs validateAll, so this is the safety net
-        // against executing a broken recipe. It is also the only place that reports a bad option
-        // once: the visitor factories run per source file, so validating there turns one
-        // misconfiguration into one error per file. Delegating recipes forward to a Java recipe that
-        // validates its own options, so they are skipped here.
+        // Validate the instantiated recipe — the root against the caller's options, and every child
+        // against the values its parent set in GetRecipeList(). Because PrepareInstance recurses,
+        // this covers the whole tree, and it is the only place the C# tree gets validated:
+        // declarative recipes bundled in an artifact often ship without a test that validates them,
+        // so this is the safety net against executing a broken recipe. It is also the only place
+        // that reports a bad option once: the visitor factories run per source file, so validating
+        // there turns one misconfiguration into one error per file. Delegating recipes forward to a
+        // Java recipe that validates its own options, so they are skipped here.
+        List<OptionValidation>? validations = null;
         if (recipe is not IDelegatesTo)
         {
             var descriptor = recipe.GetDescriptor();
+
+            // Reported on this node rather than thrown, so a host can present each rejected option
+            // instead of a stack trace, and can refuse the run itself.
             foreach (var option in descriptor.Options)
             {
                 if (option.Required && option.Value is null)
                 {
-                    throw new ArgumentException(
-                        $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
+                    (validations ??= []).Add(new OptionValidation(option.Name, "is required"));
                 }
             }
 
+            // Still thrown, unlike the loop above: Validate() answers with bare strings naming no
+            // option, and a host's validation failure has no form without one. Carrying these
+            // structurally means widening this published virtual, which belongs with the per-language
+            // validation hooks rather than here.
             var validationErrors = recipe.Validate().ToList();
             if (validationErrors.Count > 0)
             {
@@ -1531,7 +1537,8 @@ public class RewriteRpcServer
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
             ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null,
-            CausesAnotherCycle = acceptsCausesAnotherCycle && recipe.CausesAnotherCycle ? true : null
+            CausesAnotherCycle = acceptsCausesAnotherCycle && recipe.CausesAnotherCycle ? true : null,
+            Validations = validations
         };
 
         if (recipe is IDelegatesTo del)
@@ -2735,7 +2742,21 @@ public class PrepareRecipeResponse
     public DelegatesTo? DelegatesTo { get; set; }
     public List<PrepareRecipeResponse> RecipeList { get; set; } = [];
     public bool? CausesAnotherCycle { get; set; }
+
+    /// <summary>
+    /// The options of this node that this server rejected, null when it found nothing wrong. A host
+    /// resolves the offending value from this node's own <see cref="Descriptor"/>, so nothing here
+    /// repeats it.
+    /// </summary>
+    public List<OptionValidation>? Validations { get; set; }
 }
+
+/// <summary>
+/// One rejected option. <paramref name="Message"/> is a fragment completing
+/// "&lt;option&gt; was '&lt;value&gt;' but it …", the form a host renders, so it reads "is required"
+/// rather than as a standalone sentence.
+/// </summary>
+public record OptionValidation(string Option, string Message);
 
 public class DelegatesTo
 {
