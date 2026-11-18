@@ -36,11 +36,15 @@ import org.openrewrite.scala.marker.AmpersandIntersection;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
+import org.openrewrite.scala.marker.Given;
+import org.openrewrite.scala.marker.GivenConditionArrow;
+import org.openrewrite.scala.marker.GivenWith;
 import org.openrewrite.scala.marker.Implicit;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.InfixNotation;
 import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.OmitName;
+import org.openrewrite.scala.marker.ParameterClause;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TrailingComma;
@@ -922,6 +926,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+        if (classDecl.getMarkers().findFirst(Given.class).isPresent()) {
+            return visitStructuralGiven(classDecl, p);
+        }
+
         // Check if this is a Scala object declaration
         boolean isObject = classDecl.getMarkers().findFirst(SObject.class).isPresent();
 
@@ -1001,33 +1009,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(classDecl.getName(), p);
             visitTypeParameters(classDecl.getPadding().getTypeParameters(), p);
 
-            // Print primaryConstructor with parens and comma separators. Each element is a
-            // J.VariableDeclarations modeled like a Scala parameter (no implicit val/var,
-            // type comes after the name with `:`). We can't fall through to visitVariableDeclarations
-            // because that one is for field/local declarations and always emits a val/var keyword.
-            if (classDecl.getPadding().getPrimaryConstructor() != null &&
-                !classDecl.getPadding().getPrimaryConstructor().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
-                JContainer<Statement> primaryConstructor = classDecl.getPadding().getPrimaryConstructor();
-                visitSpace(primaryConstructor.getBefore(), Space.Location.RECORD_STATE_VECTOR, p);
-                p.append('(');
-                List<JRightPadded<Statement>> ctorElements = primaryConstructor.getPadding().getElements();
-                for (int i = 0; i < ctorElements.size(); i++) {
-                    JRightPadded<Statement> rp = ctorElements.get(i);
-                    Statement element = rp.getElement();
-                    if (element instanceof J.VariableDeclarations) {
-                        printParameter((J.VariableDeclarations) element, p);
-                    } else {
-                        visit(element, p);
-                    }
-                    visitListElementSuffix(rp, i == ctorElements.size() - 1, Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
-                }
-                p.append(')');
-                // Re-emit any additional curried constructor param lists captured verbatim
-                // from source (e.g. `(using Executor)`).
-                primaryConstructor.getMarkers()
-                    .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
-                    .ifPresent(m -> p.append(m.text()));
-            }
+            visitPrimaryConstructor(classDecl.getPadding().getPrimaryConstructor(), p);
 
             if (classDecl.getPadding().getExtends() != null) {
                 visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
@@ -1035,40 +1017,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visit(classDecl.getPadding().getExtends().getElement(), p);
             }
 
-            if (classDecl.getPadding().getImplements() != null) {
-                // In Scala, implements are printed with "with" keyword
-                // The container already has the proper space before the first keyword
-                
-                String firstKeyword = "";
-                String separator = "";
-
-                if (classDecl.getPadding().getExtends() != null) {
-                    // If we have extends, traits use "with"
-                    firstKeyword = "with";
-                    separator = "with";
-                } else {
-                    // If no extends, first trait uses "extends"
-                    firstKeyword = "extends";
-                    separator = "with";
-                }
-
-                // Custom handling for Scala traits
-                JContainer<TypeTree> implContainer = classDecl.getPadding().getImplements();
-                visitSpace(implContainer.getBefore(), Space.Location.IMPLEMENTS, p);
-                p.append(firstKeyword);
-
-                List<JRightPadded<TypeTree>> elements = implContainer.getPadding().getElements();
-                for (int i = 0; i < elements.size(); i++) {
-                    JRightPadded<TypeTree> elem = elements.get(i);
-                    visit(elem.getElement(), p);
-
-                    if (i < elements.size() - 1) {
-                        // Print space after element and the separator
-                        visitSpace(elem.getAfter(), Space.Location.IMPLEMENTS_SUFFIX, p);
-                        p.append(separator);
-                    }
-                }
-            }
+            // Without an extends clause, the first trait follows "extends"
+            visitWithParents(classDecl.getPadding().getImplements(),
+                    classDecl.getPadding().getExtends() != null ? "with" : "extends", p);
 
             if (classDecl.getPadding().getPermits() != null) {
                 visitContainer(" permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", "", p);
@@ -1082,6 +1033,123 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // Fall through to default Java printing.
             return super.visitClassDeclaration(classDecl, p);
         }
+    }
+
+    /**
+     * A {@code given} that defines what it implements, such as {@code given intOrd: Ord[Int] with { ... }}.
+     * What it implements follows a colon when the given has a name, type parameters or a using clause, and
+     * follows {@code =>} in the {@link GivenConditionArrow} form.
+     */
+    private J visitStructuralGiven(J.ClassDeclaration given, PrintOutputCapture<P> p) {
+        beforeSyntax(given, Space.Location.CLASS_DECLARATION_PREFIX, p);
+        visit(given.getLeadingAnnotations(), p);
+        for (J.Modifier m : given.getModifiers()) {
+            if (!m.getMarkers().findFirst(Implicit.class).isPresent()) {
+                visit(m, p);
+            }
+        }
+        visit(given.getPadding().getKind().getAnnotations(), p);
+        visitSpace(given.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+        p.append("given");
+        visit(given.getName(), p);
+
+        GivenConditionArrow arrow = given.getMarkers().findFirst(GivenConditionArrow.class).orElse(null);
+        if (arrow != null && arrow.getBeforeNameColon() != null) {
+            visitSpace(arrow.getBeforeNameColon(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append(':');
+        }
+        visitTypeParameters(given.getPadding().getTypeParameters(), p);
+        if (arrow != null && arrow.getBeforeTypeParametersArrow() != null) {
+            visitSpace(arrow.getBeforeTypeParametersArrow(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append("=>");
+        }
+        JContainer<Statement> primaryConstructor = given.getPadding().getPrimaryConstructor();
+        visitPrimaryConstructor(primaryConstructor, p);
+
+        JLeftPadded<TypeTree> extends_ = given.getPadding().getExtends();
+        if (extends_ != null) {
+            visitSpace(extends_.getBefore(), Space.Location.EXTENDS, p);
+            if (arrow != null) {
+                p.append("=>");
+            } else if (!given.getSimpleName().isEmpty() || given.getTypeParameters() != null ||
+                       primaryConstructor != null && !primaryConstructor.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                p.append(':');
+            }
+            visit(extends_.getElement(), p);
+        }
+        visitWithParents(given.getPadding().getImplements(), "with", p);
+        visit(given.getBody(), p);
+        afterSyntax(given, p);
+        return given;
+    }
+
+    private void visitWithParents(@Nullable JContainer<TypeTree> parents, String firstKeyword, PrintOutputCapture<P> p) {
+        if (parents == null) {
+            return;
+        }
+        visitSpace(parents.getBefore(), Space.Location.IMPLEMENTS, p);
+        p.append(firstKeyword);
+        List<JRightPadded<TypeTree>> elements = parents.getPadding().getElements();
+        for (int i = 0; i < elements.size(); i++) {
+            visit(elements.get(i).getElement(), p);
+            if (i < elements.size() - 1) {
+                visitSpace(elements.get(i).getAfter(), Space.Location.IMPLEMENTS_SUFFIX, p);
+                p.append("with");
+            }
+        }
+    }
+
+    /**
+     * An {@link OmitParentheses} container prints its elements without parens, for a
+     * given's bare-type condition such as {@code given Ord[Int] => Foo}.
+     */
+    private void visitPrimaryConstructor(@Nullable JContainer<Statement> primaryConstructor, PrintOutputCapture<P> p) {
+        if (primaryConstructor == null) {
+            return;
+        }
+        boolean parens = !primaryConstructor.getMarkers().findFirst(OmitParentheses.class).isPresent();
+        if (!parens && primaryConstructor.getElements().isEmpty()) {
+            return;
+        }
+        visitSpace(primaryConstructor.getBefore(), Space.Location.RECORD_STATE_VECTOR, p);
+        if (parens) {
+            p.append('(');
+        }
+        List<JRightPadded<Statement>> ctorElements = primaryConstructor.getPadding().getElements();
+        for (int i = 0; i < ctorElements.size(); i++) {
+            JRightPadded<Statement> rp = ctorElements.get(i);
+            Statement element = rp.getElement();
+            ParameterClause clause = element.getMarkers().findFirst(ParameterClause.class).orElse(null);
+            if (clause != null) {
+                if (parens) {
+                    p.append(')');
+                }
+                if (clause.getBeforeArrow() != null) {
+                    visitSpace(clause.getBeforeArrow(), Space.Location.LANGUAGE_EXTENSION, p);
+                    p.append("=>");
+                }
+                parens = clause.isParenthesized();
+                if (parens) {
+                    visitSpace(clause.getPrefix(), Space.Location.RECORD_STATE_VECTOR, p);
+                    p.append('(');
+                }
+            }
+            if (element instanceof J.VariableDeclarations) {
+                printParameter((J.VariableDeclarations) element, p);
+            } else {
+                visit(element, p);
+            }
+            boolean lastOfClause = i == ctorElements.size() - 1 ||
+                                   ctorElements.get(i + 1).getElement().getMarkers().findFirst(ParameterClause.class).isPresent();
+            visitListElementSuffix(rp, lastOfClause, Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+        }
+        if (parens) {
+            p.append(')');
+        }
+        // An LST written before ParameterClause holds the later clauses as text.
+        primaryConstructor.getMarkers()
+            .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+            .ifPresent(m -> p.append(m.text()));
     }
 
     private void visitTypeParameters(@Nullable JContainer<J.TypeParameter> typeParams, PrintOutputCapture<P> p) {
@@ -1106,6 +1174,23 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
             visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            afterSyntax(block, p);
+            return block;
+        }
+        GivenWith givenWith = block.getMarkers().findFirst(GivenWith.class).orElse(null);
+        if (givenWith != null) {
+            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+            p.append("with");
+            boolean braces = !block.getMarkers().findFirst(IndentedSyntax.class).isPresent();
+            if (braces) {
+                visitSpace(givenWith.getBeforeBrace(), Space.Location.BLOCK_PREFIX, p);
+                p.append('{');
+            }
+            visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+            visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            if (braces) {
+                p.append('}');
+            }
             afterSyntax(block, p);
             return block;
         }
@@ -1497,6 +1582,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(mod, p);
             return mod;
         }
+        // The `val` of a pattern definition is Final by type and prints as written
+        if (mod.getType() == J.Modifier.Type.Final && "val".equals(mod.getKeyword())) {
+            visit(mod.getAnnotations(), p);
+            beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
+            p.append("val");
+            afterSyntax(mod, p);
+            return mod;
+        }
         return super.visitModifier(mod, p);
     }
 
@@ -1844,9 +1937,38 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return selector;
     }
 
+    @SuppressWarnings("deprecation")
     public J visitPatternDefinition(S.PatternDefinition patDef, PrintOutputCapture<P> p) {
         beforeSyntax(patDef, Space.Location.LANGUAGE_EXTENSION, p);
-        p.append(patDef.getText());
+        if (patDef.getText() != null) {
+            p.append(patDef.getText());
+            afterSyntax(patDef, p);
+            return patDef;
+        }
+        visit(patDef.getLeadingAnnotations(), p);
+        for (J.Modifier modifier : patDef.getModifiers()) {
+            visit(modifier, p);
+        }
+        List<JRightPadded<J>> patterns = patDef.getPadding().getPatterns().getPadding().getElements();
+        for (int i = 0; i < patterns.size(); i++) {
+            visit(patterns.get(i).getElement(), p);
+            visitSpace(patterns.get(i).getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < patterns.size() - 1) {
+                p.append(',');
+            }
+        }
+        JLeftPadded<TypeTree> type = patDef.getPadding().getTypeExpression();
+        if (type != null) {
+            visitSpace(type.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append(':');
+            visit(type.getElement(), p);
+        }
+        JLeftPadded<Expression> initializer = patDef.getPadding().getInitializer();
+        if (initializer != null) {
+            visitSpace(initializer.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append('=');
+            visit(initializer.getElement(), p);
+        }
         afterSyntax(patDef, p);
         return patDef;
     }

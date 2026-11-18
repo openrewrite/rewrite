@@ -244,6 +244,18 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void nestedCommentBeforeExtends() {
+        rewriteRun(
+          scala(
+            """
+              class Base
+              class Derived /* a /* b */ c */ extends Base
+              """
+          )
+        );
+    }
+
+    @Test
     void classWithTypeParameter() {
         rewriteRun(
             scala(
