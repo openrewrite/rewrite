@@ -1866,6 +1866,8 @@ public interface S extends J {
     /**
      * Represents a Scala singleton type: {@code foo.type}.
      * The qualifier is any expression, typically an object/module reference.
+     * A literal type such as {@code "a"} or {@code -1} is a singleton type with a
+     * {@link J.Literal} qualifier and no {@code .type} suffix.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

@@ -8153,7 +8153,7 @@ class ScalaTreeVisitor(
   }
 
   private def visitSingletonTypeTree(stt: Trees.SingletonTypeTree[?]): S.SingletonType = {
-    // Singleton type reference: `None.type`, `obj.type`, `foo.bar.type`
+    // Singleton type reference: `None.type`, `obj.type`, `foo.bar.type`, or a literal type like `"a"`
     val prefix = extractPrefix(stt.span)
     val qualifier = visitTree(stt.ref) match {
       case e: Expression => e
@@ -8161,8 +8161,8 @@ class ScalaTreeVisitor(
       case null => throw new UnsupportedOperationException(
         s"SingletonTypeTree.ref did not produce an Expression: ${stt.ref.getClass.getSimpleName}")
     }
-    // After visiting qualifier, cursor is at the end of qualifier.
-    // The remaining source should be whitespace followed by ".type".
+    // After visiting qualifier, cursor is at the end of qualifier. The remaining source is
+    // whitespace followed by ".type", or empty for a literal type.
     val endPos = Math.max(0, stt.span.end - offsetAdjustment)
     val between = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
     val dotIdx = positionOfNextIn(between, ".", 0)
