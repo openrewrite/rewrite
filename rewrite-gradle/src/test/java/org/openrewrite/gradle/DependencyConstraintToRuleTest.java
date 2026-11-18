@@ -73,6 +73,48 @@ class DependencyConstraintToRuleTest implements RewriteTest {
     }
 
     @Test
+    void separatedFromWhatPrecedesItAsTheDependenciesBlockIs() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              description = "Scan Tools"
+
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5')
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              description = "Scan Tools"
+
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                      }
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void newResolutionStrategyBlockKts() {
         rewriteRun(
           buildGradleKts(
