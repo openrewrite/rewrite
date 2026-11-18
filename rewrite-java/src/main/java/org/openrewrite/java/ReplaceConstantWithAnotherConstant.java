@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -101,7 +102,11 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withSimpleName(newConstantName)
                         .withFieldType(newFieldType(fieldType))
                         .withType(newType(identifier.getType()));
-                if (hasNoConflictingImport) {
+                // A local, parameter or field of the new name would capture the bare name
+                boolean captured = Scope.at(getCursor()).lookup(newConstantName)
+                        .filter(binding -> !(binding.getTree() instanceof J.Import))
+                        .isPresent();
+                if (hasNoConflictingImport && !captured) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
                     return identifier;
                 }
