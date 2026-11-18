@@ -59,6 +59,12 @@ public class MergeTableRow extends Recipe {
     String description = "Merge a TOML row into an array table. If a row with the same identifying property exists, merge the values. Otherwise, insert a new row.";
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test("row", "Could not parse as TOML key-values", row,
+                r -> r != null && TomlSnippets.keyValuesWithNulls(r) != null));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         // A row that is not TOML changes nothing, rather than what error recovery made of part of it
         List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValuesWithNulls(row);

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class MergeTableRowTest implements RewriteTest {
@@ -334,20 +335,19 @@ class MergeTableRowTest implements RewriteTest {
     }
 
     @Test
-    void rowThatIsNotTomlChangesNothing() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeTableRow(
-            "package.contributors",
-            "name = \"Alice\"\nrole = \"maintainer\"\nurl = https://example.com",
-            "name"
-          )),
-          toml(
-            """
-              [[package.contributors]]
-              name = "Alice"
-              """
-          )
-        );
+    void rowThatIsNotTomlIsInvalid() {
+        assertThat(new MergeTableRow(
+          "package.contributors",
+          "name = \"Alice\"\nrole = \"maintainer\"\nurl = https://example.com",
+          "name"
+        ).validate().failures())
+          .singleElement()
+          .satisfies(failure -> assertThat(failure.getProperty()).isEqualTo("row"));
+    }
+
+    @Test
+    void rowWithNullInAnInlineTableIsInvalid() {
+        assertThat(new MergeTableRow("pkg", "name = \"a\"\nm = { x = null }", "name").validate().isInvalid()).isTrue();
     }
 
     @Test

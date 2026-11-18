@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class ReplaceTableRowTest implements RewriteTest {
@@ -328,5 +329,10 @@ class ReplaceTableRowTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void rowThatIsNotTomlIsInvalid() {
+        assertThat(new ReplaceTableRow("pkg", "name = \"a\"\nurl = https://example.com", "name").validate().isInvalid()).isTrue();
     }
 }

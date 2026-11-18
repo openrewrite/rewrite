@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
@@ -53,6 +54,12 @@ public class ReplaceTableRow extends Recipe {
     String displayName = "Replace TOML table row";
 
     String description = "Replace a TOML table row with new content. If a row with the same identifying property exists, replace it entirely.";
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test("row", "Could not parse as TOML key-values", row,
+                r -> r != null && TomlSnippets.keyValues(r) != null));
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
