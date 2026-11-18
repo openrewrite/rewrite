@@ -101,6 +101,29 @@ class VariableNameUtilsTest implements RewriteTest {
     }
 
     @Test
+    void namesOfTheWholeFileFromItsOwnCursor() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  assertThat(VariableNameUtils.findNamesInScope(getCursor())).containsExactlyInAnyOrder("field", "local");
+                  return cu;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  int field;
+                  void m() {
+                      int local;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotAddPackagePrivateNameFromSuperClass() {
         rewriteRun(
           baseTest("classBlock", "classBlock"),

@@ -109,7 +109,7 @@ public class VariableNameUtils {
                 .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
                 .forEach(binding -> names.add(binding.getName()));
         // A variable named like an enum the file uses would obscure that enum wherever it qualifies a constant (JLS 6.4.2).
-        Cursor sourceFile = scope.dropParentUntil(JavaSourceFile.class::isInstance);
+        Cursor sourceFile = scope.getValue() instanceof JavaSourceFile ? scope : scope.dropParentUntil(JavaSourceFile.class::isInstance);
         names.addAll(sourceFile.computeMessageIfAbsent(ENUM_NAMES, k -> {
             Set<String> enums = new HashSet<>();
             new JavaIsoVisitor<Set<String>>() {
