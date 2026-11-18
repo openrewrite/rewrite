@@ -221,6 +221,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         break;
                     }
                     case STATEMENT_PREFIX: {
+                        if (block.getStatements().stream().noneMatch(this::isScope)) {
+                            break;
+                        }
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
                             if (isScope(statement)) {
                                 return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
