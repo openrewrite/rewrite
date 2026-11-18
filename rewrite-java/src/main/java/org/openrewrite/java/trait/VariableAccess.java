@@ -19,7 +19,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.trait.internal.MaybeParenthesesPair;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -39,42 +38,49 @@ public class VariableAccess implements Trait<J.Identifier> {
     Cursor cursor;
 
     /**
-     * A write access to a variable occurs as the destination of an assignment.
+     * Whether the access gives the variable a value: as the destination of an assignment, simple or compound, or as
+     * the operand of {@code ++} or {@code --}.
      */
     public boolean isWriteAccess() {
-        MaybeParenthesesPair pair = MaybeParenthesesPair.from(cursor);
-        if (pair.getParent() instanceof J.Assignment) {
-            J.Assignment assignment = (J.Assignment) pair.getParent();
-            return assignment.getVariable() == pair.getTree();
-        }
-        if (pair.getParent() instanceof J.Unary) {
-            J.Unary unary = (J.Unary) pair.getParent();
-            return unary.getExpression() == pair.getTree() &&
-                   unary.getOperator().isModifying();
-        }
-        return false;
+        return isSimpleAssignmentTarget() || isModifiedInPlace();
     }
 
     /**
-     * A read access to a variable. In other words, it is a variable access that does
-     * _not_ occur as the destination of a simple assignment, but it may occur as
-     * the destination of a compound assignment or a unary assignment.
+     * Whether the access takes the variable's value, which every access does except the destination of a simple
+     * assignment. A compound assignment and {@code ++} or {@code --} read the variable as well as write it.
      */
     public boolean isReadAccess() {
-        if (isWriteAccess()) {
-            return false;
+        return !isSimpleAssignmentTarget();
+    }
+
+    private boolean isSimpleAssignmentTarget() {
+        Object[] used = usedAs();
+        return used[1] instanceof J.Assignment && ((J.Assignment) used[1]).getVariable() == used[0];
+    }
+
+    private boolean isModifiedInPlace() {
+        Object[] used = usedAs();
+        return used[1] instanceof J.AssignmentOperation && ((J.AssignmentOperation) used[1]).getVariable() == used[0] ||
+               used[1] instanceof J.Unary && ((J.Unary) used[1]).getOperator().isModifying() &&
+               ((J.Unary) used[1]).getExpression() == used[0];
+    }
+
+    /**
+     * The expression that stands for the variable and the tree using it: outside the field access that names the
+     * variable, as in {@code this.x}, and outside any parentheses.
+     */
+    private Object[] usedAs() {
+        Object expression = cursor.getValue();
+        Cursor parent = cursor.getParentTreeCursor();
+        if (parent.getValue() instanceof J.FieldAccess && ((J.FieldAccess) parent.getValue()).getName() == expression) {
+            expression = parent.getValue();
+            parent = parent.getParentTreeCursor();
         }
-        MaybeParenthesesPair pair = MaybeParenthesesPair.from(cursor);
-        if (pair.getParent() instanceof J.Assignment) {
-            J.Assignment assignment = (J.Assignment) pair.getParent();
-            return assignment.getVariable() != pair.getTree();
+        while (parent.getValue() instanceof J.Parentheses) {
+            expression = parent.getValue();
+            parent = parent.getParentTreeCursor();
         }
-        if (pair.getParent() instanceof J.Unary) {
-            J.Unary unary = (J.Unary) pair.getParent();
-            return unary.getExpression() == pair.getTree() &&
-                   !unary.getOperator().isModifying();
-        }
-        return true;
+        return new Object[]{expression, parent.getValue()};
     }
 
     /**

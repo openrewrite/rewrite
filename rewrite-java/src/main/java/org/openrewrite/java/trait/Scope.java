@@ -804,18 +804,7 @@ public class Scope implements Trait<J> {
         }
 
         private static boolean isAssigned(Cursor identifier) {
-            Object child = identifier.getValue();
-            for (Cursor c = identifier.getParentTreeCursor(); ; c = c.getParentTreeCursor()) {
-                Object parent = c.getValue();
-                if (parent instanceof J.Parentheses) {
-                    child = parent;
-                    continue;
-                }
-                return parent instanceof J.Assignment && ((J.Assignment) parent).getVariable() == child ||
-                       parent instanceof J.AssignmentOperation && ((J.AssignmentOperation) parent).getVariable() == child ||
-                       parent instanceof J.Unary && ((J.Unary) parent).getOperator().isModifying() &&
-                       ((J.Unary) parent).getExpression() == child;
-            }
+            return new VariableAccess(identifier).isWriteAccess();
         }
 
         /**

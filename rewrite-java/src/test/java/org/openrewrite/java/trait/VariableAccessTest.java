@@ -42,10 +42,13 @@ class VariableAccessTest implements RewriteTest {
           java(
             """
               class Test {
+                 int f;
                  int test(int p) {
                    int a = p;
                    p++;
-                   p = p+1;
+                   p += 2;
+                   (p) = p+1;
+                   this.f = 3;
                    int negP = -p;
                    return a+1;
                  }
@@ -53,17 +56,20 @@ class VariableAccessTest implements RewriteTest {
               """,
             """
               class Test {
+                 int f;
                  int test(int p) {
                    int a = /*~~(read p)~~>*/p;
-                   /*~~(write p)~~>*/p++;
-                   /*~~(write p)~~>*/p = /*~~(read p)~~>*/p+1;
+                   /*~~(read+write p)~~>*/p++;
+                   /*~~(read+write p)~~>*/p += 2;
+                   (/*~~(write p)~~>*/p) = /*~~(read p)~~>*/p+1;
+                   this./*~~(write f)~~>*/f = 3;
                    int negP = -/*~~(read p)~~>*/p;
                    return /*~~(read a)~~>*/a+1;
                  }
               }
               """,
             spec -> spec.afterRecipe(cu ->
-                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6))
+                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(8))
           )
         );
     }
@@ -99,10 +105,9 @@ class VariableAccessTest implements RewriteTest {
 
     Recipe markVariableAccesses(VariableAccess.Matcher matcher) {
         return toRecipe(() -> matcher.asVisitor(va -> {
-            String op = va.isReadAccess() ? "read" : "write";
-            if (!(va.isReadAccess() ^ va.isWriteAccess())) {
-                op = "neither";
-            }
+            String op = va.isReadAccess() && va.isWriteAccess() ? "read+write" :
+              va.isReadAccess() ? "read" :
+                va.isWriteAccess() ? "write" : "neither";
             return SearchResult.found(va.getTree(),
               op + " " + va.getTree().getSimpleName());
         }));
