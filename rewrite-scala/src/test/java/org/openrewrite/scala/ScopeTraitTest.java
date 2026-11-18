@@ -48,7 +48,7 @@ class ScopeTraitTest implements RewriteTest {
                       return m;
                   }
                   Scope scope = Scope.at(getCursor());
-                  String visible = Arrays.stream(new String[]{"top", "a", "b", "K", "L", "x", "all", "inner", "i", "j", "lam"})
+                  String visible = Arrays.stream(new String[]{"top", "a", "x", "all", "inner", "i", "j", "lam"})
                     .filter(name -> scope.lookup(name).isPresent())
                     .collect(joining(" "));
                   String helper = scope.lookup("helper", Scope.Namespace.METHOD).isPresent() ? " helper" : "";
@@ -59,10 +59,9 @@ class ScopeTraitTest implements RewriteTest {
             """
               object O {
                 val top = 1
-                def f(p: (Int, Int), s: Any): Int = {
+                def f(p: Int, s: Any): Int = {
                   here()
-                  val (a, b) = p
-                  val K, L = 1
+                  val a = p
                   s match {
                     case x: String => here()
                     case all @ Some(inner) => here()
@@ -78,18 +77,17 @@ class ScopeTraitTest implements RewriteTest {
             """
               object O {
                 val top = 1
-                def f(p: (Int, Int), s: Any): Int = {
+                def f(p: Int, s: Any): Int = {
                   /*~~(top helper)~~>*/here()
-                  val (a, b) = p
-                  val K, L = 1
+                  val a = p
                   s match {
-                    case x: String => /*~~(top a b K L x helper)~~>*/here()
-                    case all @ Some(inner) => /*~~(top a b K L all inner helper)~~>*/here()
+                    case x: String => /*~~(top a x helper)~~>*/here()
+                    case all @ Some(inner) => /*~~(top a all inner helper)~~>*/here()
                   }
-                  for (i <- List(1); j = i) yield /*~~(top a b K L i j helper)~~>*/here()
-                  List(1).foreach(lam => /*~~(top a b K L lam helper)~~>*/here())
+                  for (i <- List(1); j = i) yield /*~~(top a i j helper)~~>*/here()
+                  List(1).foreach(lam => /*~~(top a lam helper)~~>*/here())
                   def helper(): Int = 1
-                  /*~~(top a b K L helper)~~>*/here()
+                  /*~~(top a helper)~~>*/here()
                 }
                 def here(): Int = 0
               }

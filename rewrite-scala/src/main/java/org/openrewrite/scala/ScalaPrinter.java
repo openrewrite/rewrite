@@ -722,8 +722,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitImportSelector((S.ImportSelector) tree, p);
         } else if (tree instanceof S.PatternDefinition) {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
-        } else if (tree instanceof S.GivenInstance) {
-            return visitGivenInstance((S.GivenInstance) tree, p);
         } else if (tree instanceof S.AnonymousGiven) {
             return visitAnonymousGiven((S.AnonymousGiven) tree, p);
         } else if (tree instanceof S.FunctionCall) {
@@ -1489,13 +1487,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(mod, p);
             return mod;
         }
-        // The `val` of a pattern definition is Final by type and prints as written
-        if (mod.getType() == J.Modifier.Type.Final && "val".equals(mod.getKeyword())) {
-            beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
-            p.append("val");
-            afterSyntax(mod, p);
-            return mod;
-        }
         return super.visitModifier(mod, p);
     }
 
@@ -1844,39 +1835,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     public J visitPatternDefinition(S.PatternDefinition patDef, PrintOutputCapture<P> p) {
         beforeSyntax(patDef, Space.Location.LANGUAGE_EXTENSION, p);
-        visit(patDef.getLeadingAnnotations(), p);
-        for (J.Modifier modifier : patDef.getModifiers()) {
-            visit(modifier, p);
-        }
-        List<JRightPadded<J>> patterns = patDef.getPadding().getPatterns().getPadding().getElements();
-        for (int i = 0; i < patterns.size(); i++) {
-            visit(patterns.get(i).getElement(), p);
-            visitSpace(patterns.get(i).getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
-            if (i < patterns.size() - 1) {
-                p.append(',');
-            }
-        }
-        JLeftPadded<TypeTree> type = patDef.getPadding().getTypeExpression();
-        if (type != null) {
-            visitSpace(type.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
-            p.append(':');
-            visit(type.getElement(), p);
-        }
-        JLeftPadded<Expression> initializer = patDef.getPadding().getInitializer();
-        if (initializer != null) {
-            visitSpace(initializer.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
-            p.append('=');
-            visit(initializer.getElement(), p);
-        }
+        p.append(patDef.getText());
         afterSyntax(patDef, p);
         return patDef;
-    }
-
-    public J visitGivenInstance(S.GivenInstance given, PrintOutputCapture<P> p) {
-        beforeSyntax(given, Space.Location.LANGUAGE_EXTENSION, p);
-        p.append(given.getText());
-        afterSyntax(given, p);
-        return given;
     }
 
     public J visitAnonymousGiven(S.AnonymousGiven g, PrintOutputCapture<P> p) {
