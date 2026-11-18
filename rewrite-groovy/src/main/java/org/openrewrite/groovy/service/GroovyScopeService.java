@@ -17,6 +17,7 @@ package org.openrewrite.groovy.service;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.groovy.marker.LambdaStyle;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.trait.Scope;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Groovy's binding rules where they part from Java's. A closure without parameters binds {@code it}. A variable
+ * Groovy's binding rules where they part from Java's. A closure that names no parameters and has no arrow binds {@code it}. A variable
  * a script declares is local to the script's body, so it is visible after its declaration and not inside the
  * script's methods and classes.
  */
@@ -69,6 +70,10 @@ public class GroovyScopeService extends ScopeService {
     }
 
     private static boolean declaresNoParameter(J.Lambda lambda) {
+        // An arrow without parameters, as in { -> ... }, declares that the closure takes none
+        if (lambda.getMarkers().findFirst(LambdaStyle.class).filter(LambdaStyle::isArrow).isPresent()) {
+            return false;
+        }
         for (J parameter : lambda.getParameters().getParameters()) {
             if (!(parameter instanceof J.Empty)) {
                 return false;

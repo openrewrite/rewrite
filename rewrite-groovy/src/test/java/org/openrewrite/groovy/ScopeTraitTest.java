@@ -55,6 +55,7 @@ class ScopeTraitTest implements RewriteTest {
                   def a = p
                   l.each { here() }
                   l.each { x -> here() }
+                  def none = { -> here() }
                   here()
               }
               def here() {}
@@ -66,6 +67,7 @@ class ScopeTraitTest implements RewriteTest {
                   def a = p
                   l.each { /*~~(p a it)~~>*/here() }
                   l.each { x -> /*~~(p a x)~~>*/here() }
+                  def none = { -> /*~~(p a)~~>*/here() }
                   /*~~(p a)~~>*/here()
               }
               def here() {}
