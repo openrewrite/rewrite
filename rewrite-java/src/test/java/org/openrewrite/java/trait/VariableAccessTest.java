@@ -75,6 +75,34 @@ class VariableAccessTest implements RewriteTest {
     }
 
     @Test
+    void patternVariableDeclarationIsNotAnAccess() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                 int test(Object o) {
+                   if (o instanceof String s) {
+                     return s.length();
+                   }
+                   return 0;
+                 }
+              }
+              """,
+            """
+              class Test {
+                 int test(Object o) {
+                   if (/*~~(read o)~~>*/o instanceof String s) {
+                     return /*~~(read s)~~>*/s.length();
+                   }
+                   return 0;
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void accessResolvesToItsDeclarationByPosition() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
