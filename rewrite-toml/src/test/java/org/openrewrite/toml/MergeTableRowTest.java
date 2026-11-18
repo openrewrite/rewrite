@@ -416,4 +416,83 @@ class MergeTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentOnTheLastLineStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nx = 1",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void newKeysTakeTheRowIndent() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nx = 1\ny = 2",
+            "name"
+          )),
+          toml(
+            """
+              [a]
+              b = 1
+
+                [[pkg]]
+                name = "a"
+              """,
+            """
+              [a]
+              b = 1
+
+                [[pkg]]
+                name = "a"
+                x = 1
+                y = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentOnTheLastLineBeforeAnotherTableStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nx = 1",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              # about b
+              [[pkg]]
+              name = "b"
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
+              # about b
+              [[pkg]]
+              name = "b"
+              """
+          )
+        );
+    }
 }
