@@ -1100,6 +1100,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
 
         /**
+         * The manifest as the scan read it before the cycle's edits, with the versions its lock resolves.
+         */
+        public NodeDependencyScan.Manifest scanned() {
+            return requireNonNull(acc.captured(path));
+        }
+
+        /**
          * The nearest manifest, from this one up to the repository's root, that declares {@code name} in any scope, as
          * the scan read it before the cycle's edits: the one Node resolves {@code name} from. Null when none does.
          */
