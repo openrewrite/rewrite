@@ -4800,4 +4800,52 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/9788")
+    void removeImportOfOutermostClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Middle$Inner", "b.Inner", true)),
+          java("package a; public class Outer { public static class Middle { public enum Inner { ONE } } }"),
+          java("package b; public enum Inner { ONE }"),
+          java(
+            """
+              import a.Outer;
+
+              class Test {
+                  Object o = Outer.Middle.Inner.ONE;
+              }
+              """,
+            """
+              import b.Inner;
+
+              class Test {
+                  Object o = Inner.ONE;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Outer.Middle;
+
+              /**
+               * {@link Middle.Inner}
+               */
+              class TestMiddle {
+                  Object o = Middle.Inner.ONE;
+              }
+              """,
+            """
+              import b.Inner;
+
+              /**
+               * {@link Inner}
+               */
+              class TestMiddle {
+                  Object o = Inner.ONE;
+              }
+              """
+          )
+        );
+    }
 }

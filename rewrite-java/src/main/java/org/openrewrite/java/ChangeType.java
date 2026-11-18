@@ -374,8 +374,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                                 JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                                 if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
                                     sf = (JavaSourceFile) service(ImportService.class).<ExecutionContext>removeImportVisitor(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
-                                } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                    sf = (JavaSourceFile) service(ImportService.class).<ExecutionContext>removeImportVisitor(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                } else if (enclosesOriginal(type)) {
+                                    sf = (JavaSourceFile) service(ImportService.class).<ExecutionContext>removeImportVisitor(type.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
                                 }
                             }
                         }
@@ -425,7 +425,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             }
                             return fa;
                         }
-                        maybeRemoveImport(originalType.getOwningClass());
+                        for (JavaType.FullyQualified owner = originalType.getOwningClass(); owner != null; owner = owner.getOwningClass()) {
+                            maybeRemoveImport(owner);
+                        }
                     }
                     Expression qualified = qualifiedName(fqTarget, fieldAccess.getPrefix());
                     if (!(qualified instanceof J.FieldAccess)) {
@@ -463,11 +465,15 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         break;
                     }
                 }
-                JavaType.Class oldType = JavaType.ShallowClass.build(originalType.getFullyQualifiedName());
-                if (maybeClass.toString().equals(oldType.getClassName())) {
-                    maybeRemoveImport(oldType.getOwningClass());
-                    JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
-                    return name(target.getClassName(), target, fieldAccess.getPrefix());
+                for (JavaType.FullyQualified owner = originalType.getOwningClass(); owner != null; owner = owner.getOwningClass()) {
+                    String className = owner.getOwningClass() == null ?
+                            originalType.getClassName() :
+                            originalType.getFullyQualifiedName().substring(owner.getOwningClass().getFullyQualifiedName().length() + 1).replace('$', '.');
+                    if (maybeClass.toString().equals(className)) {
+                        maybeRemoveImport(owner);
+                        JavaType.FullyQualified target = (JavaType.FullyQualified) targetType;
+                        return name(target.getClassName(), target, fieldAccess.getPrefix());
+                    }
                 }
             }
             return super.visitFieldAccess(fieldAccess, ctx);
@@ -548,6 +554,15 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return target instanceof J.ParameterizedType;
         }
 
+        private boolean enclosesOriginal(JavaType.FullyQualified type) {
+            for (JavaType.FullyQualified owner = originalType.getOwningClass(); owner != null; owner = owner.getOwningClass()) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(owner.getFullyQualifiedName(), type.getFullyQualifiedName())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private J.FieldAccess updateParameterizedFieldAccess(
                 J.FieldAccess fieldAccess,
                 JavaType.FullyQualified origType,
@@ -558,8 +573,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             JavaType.FullyQualified targetOwner = targetFq.getOwningClass();
             assert targetOwner != null;
 
-            if (!TypeUtils.fullyQualifiedNamesAreEqual(origOwner.getFullyQualifiedName(), targetOwner.getFullyQualifiedName())) {
-                maybeRemoveImport(origOwner);
+            for (JavaType.FullyQualified owner = origOwner; owner != null; owner = owner.getOwningClass()) {
+                if (!TypeUtils.fullyQualifiedNamesAreEqual(owner.getFullyQualifiedName(), targetOwner.getFullyQualifiedName())) {
+                    maybeRemoveImport(owner);
+                }
             }
 
             Expression target = fieldAccess.getTarget();
