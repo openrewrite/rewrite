@@ -299,7 +299,7 @@ class ScalaTreeVisitor(
       case _ if tree.isEmpty => throw unmappedException(tree)
       case lit: Trees.Literal[?] => visitLiteral(lit)
       case num: untpd.Number => visitNumber(num)
-      case id: Trees.Ident[?] => visitIdent(id)
+      case id: Trees.Ident[?] => visitReference(id)
       case app: Trees.Apply[?] => visitApply(app)
       case sel: Trees.Select[?] => visitSelect(sel)
       case infixOp: untpd.InfixOp => visitInfixOp(infixOp)
@@ -480,6 +480,14 @@ class ScalaTreeVisitor(
       val quoted = sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2
       ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id), quoted = quoted)
     }
+  }
+
+  private def visitReference(id: Trees.Ident[?]): J = visitIdent(id) match {
+    case name: J.Identifier if !isInImportContext && !inPattern =>
+      argumentlessCallOf(id).fold[J](name) { methodType =>
+        argumentlessInvocation(name.getPrefix, null, name.withPrefix(Space.EMPTY), methodType)
+      }
+    case other => other
   }
 
   private def visitApply(app: Trees.Apply[?]): J = {
@@ -1651,17 +1659,7 @@ class ScalaTreeVisitor(
 
       argumentlessCallOf(sel) match {
         case Some(methodType) if !isTypeProjection =>
-          new J.MethodInvocation(
-            Tree.randomId(),
-            prefix,
-            Markers.EMPTY,
-            new JRightPadded(target, beforeDotSpace, Markers.EMPTY),
-            null,
-            typedMethodName(name, methodType),
-            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
-              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
-            methodType
-          )
+          argumentlessInvocation(prefix, new JRightPadded(target, beforeDotSpace, Markers.EMPTY), name, methodType)
         case _ =>
           new J.FieldAccess(
             Tree.randomId(),
@@ -1676,9 +1674,27 @@ class ScalaTreeVisitor(
   }
 
   /** An assignment target names the member being written, even when the write goes through a setter. */
-  private def argumentlessCallOf(sel: Trees.Select[?]): Option[JavaType.Method] =
-    if (sel eq assignmentTarget) None
-    else typeMapping.flatMap(_.argumentlessCallOf(sel.asInstanceOf[untpd.Tree]))
+  private def argumentlessCallOf(reference: Trees.Tree[?]): Option[JavaType.Method] =
+    if (reference eq assignmentTarget) None
+    else typeMapping.flatMap(_.argumentlessCallOf(reference.asInstanceOf[untpd.Tree]))
+
+  private def argumentlessInvocation(
+    prefix: Space,
+    select: JRightPadded[Expression],
+    name: J.Identifier,
+    methodType: JavaType.Method
+  ): J.MethodInvocation =
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      select,
+      null,
+      typedMethodName(name, methodType),
+      JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+      methodType
+    )
 
   private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
     val enclosingTarget = assignmentTarget
@@ -2114,6 +2130,7 @@ class ScalaTreeVisitor(
     
     var beforeParenSpace = Space.EMPTY
     var hasParentheses = false
+    var emptyParenInterior = ""
     if (typeEnd < argsStart && typeEnd >= cursor && argsStart <= source.length) {
       val between = source.substring(typeEnd, argsStart)
       val parenIndex = positionOfNextIn(between, "(", 0)
@@ -2121,18 +2138,19 @@ class ScalaTreeVisitor(
         hasParentheses = true
         beforeParenSpace = Space.format(between.substring(0, parenIndex))
         cursor = typeEnd + parenIndex + 1
+        if (app.args.isEmpty) {
+          emptyParenInterior = between.substring(parenIndex + 1)
+        }
       }
     } else if (app.args.isEmpty && typeEnd >= cursor) {
       // Check if there are parentheses for empty args
       val endBound = Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment))
-      if (typeEnd < endBound) {
-        val after = source.substring(typeEnd, endBound)
-        hasParentheses = after.contains("(") && after.contains(")")
-        if (hasParentheses) {
-          val parenIndex = positionOfNextIn(after, "(", 0)
-          beforeParenSpace = Space.format(after.substring(0, parenIndex))
-          cursor = typeEnd + positionOfNextIn(after, ")", 0) + 1
-        }
+      val (parenIndex, closeIndex) = locateEmptyParentheses(typeEnd, endBound)
+      if (closeIndex >= 0) {
+        hasParentheses = true
+        beforeParenSpace = Space.format(source.substring(typeEnd, parenIndex))
+        emptyParenInterior = source.substring(parenIndex + 1, closeIndex)
+        cursor = closeIndex + 1
       }
     }
     
@@ -2205,11 +2223,9 @@ class ScalaTreeVisitor(
     updateCursor(app.span.end)
     
     val argContainer = if (!hasParentheses && args.isEmpty) {
-      // No parentheses and no arguments - e.g. "new Person"
-      null
+      omittedNewClassArguments()
     } else if (args.isEmpty) {
-      // Empty parentheses - e.g. "new Person()"
-      JContainer.build(beforeParenSpace, Collections.emptyList[JRightPadded[Expression]](), Markers.EMPTY)
+      emptyNewClassArguments(beforeParenSpace, emptyParenInterior)
     } else {
       // Has arguments - e.g. "new Person(name, age)"
       JContainer.build(beforeParenSpace, args, Markers.EMPTY)
@@ -2247,6 +2263,25 @@ class ScalaTreeVisitor(
         }
       }
     )
+  }
+
+  private def omittedNewClassArguments(): JContainer[Expression] =
+    JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+      Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
+
+  private def locateEmptyParentheses(from: Int, until: Int): (Int, Int) = {
+    if (from < 0 || from >= until || until > source.length) return (-1, -1)
+    val text = source.substring(from, until)
+    val open = positionOfNextIn(text, "(", 0)
+    val close = if (open >= 0) positionOfNextIn(text, ")", open + 1) else -1
+    if (close >= 0) (from + open, from + close) else (-1, -1)
+  }
+
+  private def emptyNewClassArguments(beforeParen: Space, interior: String): JContainer[Expression] = {
+    val elements =
+      if (interior.isEmpty) Collections.emptyList[JRightPadded[Expression]]()
+      else Collections.singletonList(JRightPadded.build[Expression](new J.Empty(Tree.randomId(), ScalaSpace.format(interior), Markers.EMPTY)))
+    JContainer.build(beforeParen, elements, Markers.EMPTY)
   }
 
   private def visitNew(newTree: Trees.New[?]): J = {
@@ -2291,7 +2326,7 @@ class ScalaTreeVisitor(
         val (firstClazz, args) = parents.headOption match {
           case None =>
             // `new {}` — no parents at all (anonymous class extending the implicit Object)
-            (null, null)
+            (null, omittedNewClassArguments())
           case Some(firstParent) =>
             // Peel nested curried constructor applies. For `new Foo(1)(2) { ... }`
             // the parent is `Apply(Apply(Select(New(Foo), <init>), List(1)), List(2))`;
@@ -2395,7 +2430,16 @@ class ScalaTreeVisitor(
 
                       JContainer.build(beforeParenSpace, args, Markers.EMPTY)
                     } else {
-                      null
+                      val typeEnd = Math.max(0, newInner.tpt.span.end - offsetAdjustment)
+                      val appEnd = Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment))
+                      val searchStart = Math.max(cursor, typeEnd)
+                      val (parenIndex, closeIndex) = locateEmptyParentheses(searchStart, appEnd)
+                      if (closeIndex >= 0) {
+                        updateCursor(closeIndex + 1)
+                        emptyNewClassArguments(Space.format(source.substring(searchStart, parenIndex)), source.substring(parenIndex + 1, closeIndex))
+                      } else {
+                        omittedNewClassArguments()
+                      }
                     }
 
                     // Capture any remaining curried parameter lists verbatim.
@@ -2414,7 +2458,7 @@ class ScalaTreeVisitor(
             } else {
                 // Simple interface/trait: new Runnable { ... }
                 val typeTree = visitTree(firstParent).asInstanceOf[TypeTree]
-                (typeTree, null)
+                (typeTree, omittedNewClassArguments())
             }
         }
 
@@ -9146,7 +9190,7 @@ class ScalaTreeVisitor(
    */
   private def parentTypeTree(visited: J): TypeTree = visited match {
     case tt: TypeTree => tt
-    case nc: J.NewClass if nc.getClazz != null && nc.getPadding.getArguments != null =>
+    case nc: J.NewClass if nc.getClazz != null && !nc.getPadding.getArguments.getMarkers.findFirst(classOf[OmitParentheses]).isPresent =>
       S.ConstructorInvocation.build(
         Tree.randomId(),
         nc.getPrefix,

@@ -590,6 +590,36 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void unqualifiedParameterlessMethodCallIsAMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+            class A {
+              private var n = 0
+              def count: Int = n
+              def twice = count * 2
+              def answer() = 42
+              val x = answer
+              val y = count
+              val z = n
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation count = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("count"));
+                assertThat(count.getSelect()).isNull();
+                assertThat(count.getArguments()).isEmpty();
+                assertThat(count.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(new MethodMatcher("A count()").matches(count)).isTrue();
+                assertThat(new MethodMatcher("A answer()").matches(
+                  find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("answer")))).isTrue();
+                assertThat(collect(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("count"))).hasSize(2);
+                assertThat(collect(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("n"))).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
     void parameterlessMethodCallKeepsItsShapeWhereItIsNotACall() {
         rewriteRun(
           scala(
@@ -969,7 +999,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                J.Identifier greet = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("greet") && i.getMarkers().findFirst(ImplicitArguments.class).isPresent());
+                J.MethodInvocation greet = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("greet"));
                 assertThat(greet.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments()).singleElement().satisfies(arg -> {
                     JavaType.Variable name = (JavaType.Variable) arg;
                     assertThat(name.getName()).isEqualTo("name");
@@ -1824,6 +1854,42 @@ class ScalaTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void overridesOfJavaClassMethodsAreFound() {
+        rewriteRun(
+          scala(
+            """
+            class E extends Exception { override def getMessage: String = "x" }
+            class S { override def toString: String = "s" }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(overridden(cu, "E", "getMessage").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.Throwable");
+                JavaType.FullyQualified object = overridden(cu, "S", "toString").getDeclaringType();
+                assertThat(object.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+                assertThat(object.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder(
+                  "getClass", "hashCode", "equals", "clone", "toString",
+                  "notify", "notifyAll", "wait", "wait", "wait", "finalize");
+            })
+          )
+        );
+    }
+
+    @Test
+    void objectFirstSeenAsAnyIsNotAbstract() {
+        rewriteRun(
+          scala(
+            """
+            class P { def f(x: Any): Unit = () }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.FullyQualified object = TypeUtils.asFullyQualified(declared(cu, "P", "f").getParameterTypes().get(0));
+                assertThat(object.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+                assertThat(object.getFlags()).doesNotContain(Flag.Abstract);
+            })
+          )
+        );
+    }
+
     private static void assertBoundIsPairOfItself(JavaType type, String name) {
         assertBoundIsPairOf(type, name, name);
     }
@@ -2196,6 +2262,20 @@ class ScalaTypeAttributionTest implements RewriteTest {
         J.MethodInvocation javaFormat = (J.MethodInvocation) ((J.VariableDeclarations) fields.get(1)).getVariables().getFirst().getInitializer();
         assertThat(javaParseInt.getMethodType()).isNotNull().isSameAs(method(scalaCu, "parseInt").getMethodType());
         assertThat(javaFormat.getMethodType()).isNotNull().isSameAs(method(scalaCu, "format").getMethodType());
+    }
+
+    @Test
+    void anyMethodIsSharedWithJavaParserThroughTypeCache() {
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        J scalaCu = (J) ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class S { def f(o: Object): String = o.toString() }
+          """).findFirst().orElseThrow();
+        J.CompilationUnit javaCu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class J { String f(Object o) { return o.toString(); } }
+          """).findFirst().orElseThrow();
+
+        assertThat(javaMethod(javaCu, "toString").getMethodType()).isNotNull().isSameAs(method(scalaCu, "toString").getMethodType());
     }
 
     @Test

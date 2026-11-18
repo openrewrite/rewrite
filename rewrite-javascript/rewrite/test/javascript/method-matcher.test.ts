@@ -476,6 +476,30 @@ describe('MethodMatcher', () => {
             );
         });
 
+        test('walks past a module declaring a function', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Unrelated *(..)', true);
+            //language=typescript
+            await spec.rewriteRun(
+                {
+                    ...typescript(
+                        `
+                        declare module 'testing' {
+                            export function fakeAsync(fn: () => void): () => void;
+                        }
+                        `
+                    ),
+                    path: 'testing.d.ts'
+                },
+                typescript(
+                    `
+                    import {fakeAsync} from 'testing';
+                    fakeAsync(() => {});
+                    `
+                )
+            );
+        });
+
         test('usesMethod passes matchOverrides to its native visitor', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(usesMethod('Base save()', true).localVisitor!);

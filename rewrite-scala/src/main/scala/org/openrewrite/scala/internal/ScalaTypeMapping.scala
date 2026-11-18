@@ -857,7 +857,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   def mapClassType(symbol: Symbol, fqn: String): JavaType.FullyQualified = {
-    val sym = javaClassOfStatics(symbol)
+    // `scala.Any` shares this key but is abstract, so `java.lang.Object` is described by Dotty's `Object`.
+    val isObject = fqn == "java.lang.Object"
+    val sym = if (isObject) ctx.definitions.ObjectClass else javaClassOfStatics(symbol)
     typeFactory.computeClass(fqn, 0L, JavaType.FullyQualified.Kind.Class, (clazz: JavaType.Class) => {
       // Only a class the cache lacks pays for its flags and kind. They are set before the members,
       // which may lead back to this class and read its kind.
@@ -867,7 +869,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       else JavaType.FullyQualified.Kind.Class
       clazz.unsafeSet(mapFlags(sym) & Flag.VALID_CLASS_FLAGS, kind, fqn, null, null, null, null, null, null, null)
 
-      val parentTypes = if (fqn == "java.lang.Object") Nil else try {
+      val parentTypes = if (isObject) Nil else try {
         sym.info match {
           case ci: ClassInfo => ci.parents
           case _ => Nil
@@ -897,10 +899,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       }
 
       val decls = try {
-        sym.info match {
-          case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
-          case _ => Nil
-        }
+        if (isObject) objectDeclarations else declarationsOf(sym)
       } catch {
         case NonFatal(_) => Nil
       }
@@ -944,6 +943,24 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
       clazz.unsafeSet(typeParameters, supertype, null, null, interfaces, members, methods)
     })
+  }
+
+  private def declarationsOf(cls: Symbol): List[Symbol] = cls.info match {
+    case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
+    case _ => Nil
+  }
+
+  /**
+   * `scala.Any` and `java.lang.Object` both map to `java.lang.Object`, which lists the methods its class file declares.
+   * Dotty declares `toString` and `getClass` of those on `Any` and the rest on `Object`. Both declare `equals` and
+   * `hashCode`, and the class lists `Object`'s.
+   */
+  private def objectDeclarations: List[Symbol] = {
+    val classFileMethods =
+      Set("getClass", "hashCode", "equals", "clone", "toString", "notify", "notifyAll", "wait", "finalize")
+    val own = declarationsOf(ctx.definitions.ObjectClass)
+    (own ++ declarationsOf(ctx.definitions.AnyClass).filterNot(m => own.exists(_.name == m.name)))
+      .filter(m => classFileMethods.contains(m.name.toString))
   }
 
   /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */
