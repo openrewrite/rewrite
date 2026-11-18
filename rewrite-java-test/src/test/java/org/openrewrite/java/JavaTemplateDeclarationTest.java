@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -610,7 +610,7 @@ class JavaTemplateDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail("a type parameter added by replaceTypeParameters is not attributed in a later replaceParameters template")
     @Test
     void replaceMethodTypeParameters() {
         rewriteRun(
