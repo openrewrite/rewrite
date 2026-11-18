@@ -19,9 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.scala.Assertions.scala;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -449,6 +455,35 @@ class NewClassTest implements RewriteTest {
               val d = new StringBuilder("x") with Logger { }
               val e = new Object( )
               val f = new Object() with Logger
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void argumentsAddedToParenlessConstructorCallArePrinted() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                  J.NewClass nc = super.visitNewClass(newClass, ctx);
+                  if (!nc.getArguments().isEmpty()) {
+                      return nc;
+                  }
+                  return nc.withArguments(List.of(
+                    new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, 16, "16", null, JavaType.Primitive.Int)));
+              }
+          })),
+          scala(
+            """
+            class A {
+              val p = new java.util.ArrayList[String]
+            }
+            """,
+            """
+            class A {
+              val p = new java.util.ArrayList[String](16)
             }
             """
           )

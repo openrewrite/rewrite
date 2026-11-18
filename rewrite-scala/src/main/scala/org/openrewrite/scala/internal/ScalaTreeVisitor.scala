@@ -2129,16 +2129,12 @@ class ScalaTreeVisitor(
     } else if (app.args.isEmpty && typeEnd >= cursor) {
       // Check if there are parentheses for empty args
       val endBound = Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment))
-      if (typeEnd < endBound) {
-        val after = source.substring(typeEnd, endBound)
-        hasParentheses = after.contains("(") && after.contains(")")
-        if (hasParentheses) {
-          val parenIndex = positionOfNextIn(after, "(", 0)
-          val closeIndex = positionOfNextIn(after, ")", 0)
-          beforeParenSpace = Space.format(after.substring(0, parenIndex))
-          emptyParenInterior = after.substring(parenIndex + 1, closeIndex)
-          cursor = typeEnd + closeIndex + 1
-        }
+      val (parenIndex, closeIndex) = locateEmptyParentheses(typeEnd, endBound)
+      if (closeIndex >= 0) {
+        hasParentheses = true
+        beforeParenSpace = Space.format(source.substring(typeEnd, parenIndex))
+        emptyParenInterior = source.substring(parenIndex + 1, closeIndex)
+        cursor = closeIndex + 1
       }
     }
     
@@ -2257,10 +2253,18 @@ class ScalaTreeVisitor(
     JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
       Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
 
+  private def locateEmptyParentheses(from: Int, until: Int): (Int, Int) = {
+    if (from < 0 || from >= until || until > source.length) return (-1, -1)
+    val text = source.substring(from, until)
+    val open = positionOfNextIn(text, "(", 0)
+    val close = if (open >= 0) positionOfNextIn(text, ")", open + 1) else -1
+    if (close >= 0) (from + open, from + close) else (-1, -1)
+  }
+
   private def emptyNewClassArguments(beforeParen: Space, interior: String): JContainer[Expression] = {
     val elements =
       if (interior.isEmpty) Collections.emptyList[JRightPadded[Expression]]()
-      else Collections.singletonList(JRightPadded.build[Expression](new J.Empty(Tree.randomId(), Space.format(interior), Markers.EMPTY)))
+      else Collections.singletonList(JRightPadded.build[Expression](new J.Empty(Tree.randomId(), ScalaSpace.format(interior), Markers.EMPTY)))
     JContainer.build(beforeParen, elements, Markers.EMPTY)
   }
 
@@ -2413,12 +2417,10 @@ class ScalaTreeVisitor(
                       val typeEnd = Math.max(0, newInner.tpt.span.end - offsetAdjustment)
                       val appEnd = Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment))
                       val searchStart = Math.max(cursor, typeEnd)
-                      val after = if (searchStart < appEnd) source.substring(searchStart, appEnd) else ""
-                      val parenIndex = positionOfNextIn(after, "(", 0)
-                      val closeIndex = if (parenIndex >= 0) positionOfNextIn(after, ")", parenIndex + 1) else -1
+                      val (parenIndex, closeIndex) = locateEmptyParentheses(searchStart, appEnd)
                       if (closeIndex >= 0) {
-                        updateCursor(searchStart + closeIndex + 1)
-                        emptyNewClassArguments(Space.format(after.substring(0, parenIndex)), after.substring(parenIndex + 1, closeIndex))
+                        updateCursor(closeIndex + 1)
+                        emptyNewClassArguments(Space.format(source.substring(searchStart, parenIndex)), source.substring(parenIndex + 1, closeIndex))
                       } else {
                         omittedNewClassArguments()
                       }
