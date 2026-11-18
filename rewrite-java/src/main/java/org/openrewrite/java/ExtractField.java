@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.format.BlankLines;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -70,6 +71,11 @@ public class ExtractField<P> extends JavaVisitor<P> {
     @Override
     public J visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         if (multiVariable == scope) {
+            // A member of the local's name is already there, and a second field of that name would not compile
+            String name = multiVariable.getVariables().get(0).getSimpleName();
+            if (Scope.at(getCursor()).lookup(name).filter(Scope.Binding::isMember).isPresent()) {
+                return multiVariable;
+            }
             getCursor()
                     .getPathAsCursors(c -> c.getValue() instanceof J.Block && c.getParentTreeCursor().getValue() instanceof J.ClassDeclaration)
                     .next()
