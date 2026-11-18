@@ -16,9 +16,14 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class NewClassTest implements RewriteTest {
 
@@ -389,6 +394,64 @@ class NewClassTest implements RewriteTest {
                 }
                 """
             )
+        );
+    }
+
+    @Test
+    void argumentsAreNeverNull() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                  J.NewClass nc = super.visitNewClass(newClass, ctx);
+                  return SearchResult.found(nc, String.valueOf(nc.getArguments().size()));
+              }
+          })),
+          scala(
+            """
+            trait Logger
+            class A {
+              val r = new Runnable { def run(): Unit = () }
+              val p = new Object
+              val q = new Object()
+              val b = new java.util.ArrayList[java.lang.Boolean] { }
+              val l = new Object with Logger { }
+              val s = new StringBuilder("x") { }
+              val e = new {}
+            }
+            """,
+            """
+            trait Logger
+            class A {
+              val r = /*~~(0)~~>*/new Runnable { def run(): Unit = () }
+              val p = /*~~(0)~~>*/new Object
+              val q = /*~~(0)~~>*/new Object()
+              val b = /*~~(0)~~>*/new java.util.ArrayList[java.lang.Boolean] { }
+              val l = /*~~(0)~~>*/new Object with Logger { }
+              val s = /*~~(1)~~>*/new StringBuilder("x") { }
+              val e = /*~~(0)~~>*/new {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void anonymousClassWithEmptyParentheses() {
+        rewriteRun(
+          scala(
+            """
+            trait Logger
+            object Test {
+              val a = new Object() { }
+              val b = new Object() with Logger { }
+              val c = new Object ( ) { }
+              val d = new StringBuilder("x") with Logger { }
+              val e = new Object( )
+              val f = new Object() with Logger
+            }
+            """
+          )
         );
     }
 }

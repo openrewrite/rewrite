@@ -1355,7 +1355,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         }
         p.append("new");
-        if (newClass.getClazz() instanceof J.IntersectionType && newClass.getPadding().getArguments() != null) {
+        JContainer<Expression> arguments = newClass.getPadding().getArguments();
+        boolean printArguments = arguments != null && !arguments.getMarkers().findFirst(OmitParentheses.class).isPresent();
+        if (newClass.getClazz() instanceof J.IntersectionType && printArguments) {
             J.IntersectionType intersectionType = (J.IntersectionType) newClass.getClazz();
             beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
             visitSpace(intersectionType.getPadding().getBounds().getBefore(), Space.Location.TYPE_BOUNDS, p);
@@ -1364,7 +1366,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (!bounds.isEmpty()) {
                 JRightPadded<TypeTree> first = bounds.get(0);
                 visit(first.getElement(), p);
-                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+                visitContainer("(", arguments, JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
                 newClass.getMarkers()
                         .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
                         .ifPresent(m -> p.append(m.text()));
@@ -1378,9 +1380,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(intersectionType, p);
         } else {
             visit(newClass.getClazz(), p);
-            // In Scala, constructors can be called without parentheses
-            if (newClass.getPadding().getArguments() != null) {
-                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            if (printArguments) {
+                visitContainer("(", arguments, JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
             }
             newClass.getMarkers()
                     .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
