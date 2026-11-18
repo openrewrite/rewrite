@@ -80,7 +80,21 @@ public class Scope implements Trait<J> {
      * Every name this scope binds itself, in every namespace, wherever in it each one becomes visible.
      */
     public List<Binding> getBindings() {
-        return cursor.computeMessageIfAbsent(BINDINGS, k -> service(cursor).bindings(cursor));
+        // Kept per source file and by tree identity, so a cursor built by hand finds them and an edited copy does not
+        Cursor holder = cursor;
+        for (Cursor c = cursor; c != null; c = c.getParent()) {
+            if (c.getValue() instanceof JavaSourceFile) {
+                holder = c;
+                break;
+            }
+        }
+        Map<Object, List<Binding>> bindings = holder.computeMessageIfAbsent(BINDINGS, k -> new IdentityHashMap<>());
+        List<Binding> own = bindings.get(cursor.getValue());
+        if (own == null) {
+            own = service(cursor).bindings(cursor);
+            bindings.put(cursor.getValue(), own);
+        }
+        return own;
     }
 
     /**
