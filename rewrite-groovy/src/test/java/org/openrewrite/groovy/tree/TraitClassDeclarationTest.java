@@ -17,10 +17,15 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class TraitClassDeclarationTest implements RewriteTest {
@@ -815,5 +820,53 @@ class TraitClassDeclarationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9228")
+    @Test
+    void annotationWhoseNameExtendsAResolvedOne() {
+        rewriteRun(
+          groovy(
+            """
+              trait T {
+                @Deprecated2 @Deprecated
+                List v
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(annotationTypes(cu))
+              .containsExactly("Deprecated2=Deprecated2", "Deprecated=java.lang.Deprecated"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9228")
+    @Test
+    void unresolvedAnnotationTypedByItsImport() {
+        rewriteRun(
+          groovy(
+            """
+              import com.example.Missing
+
+              trait T {
+                @Missing
+                List v
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(annotationTypes(cu))
+              .containsExactly("Missing=com.example.Missing"))
+          )
+        );
+    }
+
+    private static List<String> annotationTypes(J cu) {
+        List<String> types = new ArrayList<>();
+        new JavaIsoVisitor<List<String>>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, List<String> acc) {
+                acc.add(annotation.getSimpleName() + "=" + TypeUtils.toString(annotation.getType()));
+                return annotation;
+            }
+        }.visit(cu, types);
+        return types;
     }
 }

@@ -508,9 +508,10 @@ public class GroovyParserVisitor {
             Map<String, org.codehaus.groovy.ast.expr.Expression> initialExpressions = new HashMap<>();
             ClassNode traitHelperClass = traitHelpers.get(clazz.getName());
             if (traitHelperClass != null) {
+                // A final field has no setter; its value comes from $static$init$T__field or $init$T__field
+                String[] initPrefixes = {"$static$init$" + accessorPrefix, "$init$" + accessorPrefix};
                 for (MethodNode m : traitHelperClass.getMethods()) {
-                    // A final field has no setter; its value comes from $static$init$T__field or $init$T__field
-                    for (String initPrefix : new String[]{"$static$init$" + accessorPrefix, "$init$" + accessorPrefix}) {
+                    for (String initPrefix : initPrefixes) {
                         if (m.getName().startsWith(initPrefix) && m.getName().length() > initPrefix.length()) {
                             org.codehaus.groovy.ast.stmt.Statement body = m.getCode();
                             if (body instanceof BlockStatement && ((BlockStatement) body).getStatements().size() == 1) {
@@ -3106,12 +3107,6 @@ public class GroovyParserVisitor {
                    expression instanceof MethodCallExpression && isSyntheticTraitSelf(((MethodCallExpression) expression).getObjectExpression());
         }
 
-        private boolean isSyntheticTraitSelf(org.codehaus.groovy.ast.expr.Expression expression) {
-            return expression instanceof VariableExpression &&
-                   ("$self".equals(((VariableExpression) expression).getName()) ||
-                    "$static$self".equals(((VariableExpression) expression).getName()));
-        }
-
         @Override
         public void visitPropertyExpression(PropertyExpression prop) {
             // The trait AST transformation rewrites field accesses inside trait method bodies to use a synthetic
@@ -3753,7 +3748,7 @@ public class GroovyParserVisitor {
         while (visited) {
             visited = false;
             for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
-                if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
+                if (sourceStartsWithName("@" + discarded.getSimpleName()) || sourceStartsWithName("@" + discarded.getCanonicalName())) {
                     paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
                     visited = true;
                 }
@@ -3772,7 +3767,8 @@ public class GroovyParserVisitor {
             // Groovy also drops some annotations whose classes it can't resolve, e.g. on trait fields
             String unresolved = visited ? null : annotationNameInSource();
             if (unresolved != null) {
-                paramAnnotations.add(visitAnnotation(new AnnotationNode(ClassHelper.make(unresolved)), classVisitor));
+                ImportNode imported = unresolved.indexOf('.') < 0 ? classVisitor.getSourceUnit().getAST().getImport(unresolved) : null;
+                paramAnnotations.add(visitAnnotation(new AnnotationNode(imported != null ? imported.getType() : ClassHelper.make(unresolved)), classVisitor));
                 visited = true;
             }
         }
@@ -4916,7 +4912,7 @@ public class GroovyParserVisitor {
         if (node instanceof AnnotationNode) {
             String name = ((AnnotationNode) node).getClassNode().getUnresolvedName();
             String[] parts = name.split("\\.");
-            return sourceStartsWith("@" + name) || sourceStartsWith("@" + parts[parts.length - 1]);
+            return sourceStartsWithName("@" + name) || sourceStartsWithName("@" + parts[parts.length - 1]);
         }
         if (node instanceof ConstructorNode && ((ConstructorNode) node).getDeclaringClass().isEnum()) {
             return ((ConstructorNode) node).getAnnotations(new ClassNode(Generated.class)).isEmpty();
@@ -4924,13 +4920,22 @@ public class GroovyParserVisitor {
 
         // An unresolved name in a trait becomes a positionless $self.name; only the name keeps its position
         if (node instanceof PropertyExpression && node.getLineNumber() < 0 &&
-            ((PropertyExpression) node).getObjectExpression() instanceof VariableExpression) {
-            String receiver = ((VariableExpression) ((PropertyExpression) node).getObjectExpression()).getName();
-            if ("$self".equals(receiver) || "$static$self".equals(receiver)) {
-                return appearsInSource(((PropertyExpression) node).getProperty());
-            }
+            isSyntheticTraitSelf(((PropertyExpression) node).getObjectExpression())) {
+            return appearsInSource(((PropertyExpression) node).getProperty());
         }
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
+    }
+
+    private static boolean isSyntheticTraitSelf(org.codehaus.groovy.ast.expr.Expression expression) {
+        return expression instanceof VariableExpression &&
+               ("$self".equals(((VariableExpression) expression).getName()) ||
+                "$static$self".equals(((VariableExpression) expression).getName()));
+    }
+
+    private boolean sourceStartsWithName(String name) {
+        int start = indexOfNextNonWhitespace(cursor, source);
+        int end = start + name.length();
+        return source.startsWith(name, start) && (end >= source.length() || !isJavaIdentifierPart(source.charAt(end)));
     }
 
     /**
