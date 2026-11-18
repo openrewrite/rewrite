@@ -1824,6 +1824,42 @@ class ScalaTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void overridesOfJavaClassMethodsAreFound() {
+        rewriteRun(
+          scala(
+            """
+            class E extends Exception { override def getMessage: String = "x" }
+            class S { override def toString: String = "s" }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(overridden(cu, "E", "getMessage").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.Throwable");
+                JavaType.FullyQualified object = overridden(cu, "S", "toString").getDeclaringType();
+                assertThat(object.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+                assertThat(object.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder(
+                  "getClass", "hashCode", "equals", "clone", "toString",
+                  "notify", "notifyAll", "wait", "wait", "wait", "finalize");
+            })
+          )
+        );
+    }
+
+    @Test
+    void objectFirstSeenAsAnyIsNotAbstract() {
+        rewriteRun(
+          scala(
+            """
+            class P { def f(x: Any): Unit = () }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.FullyQualified object = TypeUtils.asFullyQualified(declared(cu, "P", "f").getParameterTypes().get(0));
+                assertThat(object.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+                assertThat(object.getFlags()).doesNotContain(Flag.Abstract);
+            })
+          )
+        );
+    }
+
     private static void assertBoundIsPairOfItself(JavaType type, String name) {
         assertBoundIsPairOf(type, name, name);
     }
@@ -2196,6 +2232,20 @@ class ScalaTypeAttributionTest implements RewriteTest {
         J.MethodInvocation javaFormat = (J.MethodInvocation) ((J.VariableDeclarations) fields.get(1)).getVariables().getFirst().getInitializer();
         assertThat(javaParseInt.getMethodType()).isNotNull().isSameAs(method(scalaCu, "parseInt").getMethodType());
         assertThat(javaFormat.getMethodType()).isNotNull().isSameAs(method(scalaCu, "format").getMethodType());
+    }
+
+    @Test
+    void anyMethodIsSharedWithJavaParserThroughTypeCache() {
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        J scalaCu = (J) ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class S { def f(o: Object): String = o.toString() }
+          """).findFirst().orElseThrow();
+        J.CompilationUnit javaCu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class J { String f(Object o) { return o.toString(); } }
+          """).findFirst().orElseThrow();
+
+        assertThat(javaMethod(javaCu, "toString").getMethodType()).isNotNull().isSameAs(method(scalaCu, "toString").getMethodType());
     }
 
     @Test
