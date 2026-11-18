@@ -1644,6 +1644,87 @@ public interface S extends J {
     }
 
     /**
+     * The self type that opens a class, trait, object or given body, such as {@code self: Runnable =>}, {@code self =>}
+     * or {@code this: Runnable =>}. It gives {@code this} a name, a type or both, and is the first statement of the
+     * body. The declaration of {@code this: Runnable =>} is named {@code this}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class SelfType implements S, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The name and any type, padded by the space before {@code =>}.
+         */
+        JRightPadded<J.VariableDeclarations> declaration;
+
+        public static SelfType build(UUID id, Space prefix, Markers markers,
+                                     JRightPadded<J.VariableDeclarations> declaration) {
+            return new SelfType(null, id, prefix, markers, declaration);
+        }
+
+        public J.VariableDeclarations getDeclaration() {
+            return declaration.getElement();
+        }
+
+        public SelfType withDeclaration(J.VariableDeclarations declaration) {
+            return getPadding().withDeclaration(JRightPadded.withElement(this.declaration, declaration));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitSelfType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SelfType t;
+
+            public JRightPadded<J.VariableDeclarations> getDeclaration() {
+                return t.declaration;
+            }
+
+            public SelfType withDeclaration(JRightPadded<J.VariableDeclarations> declaration) {
+                return t.declaration == declaration ? t : new SelfType(null, t.id, t.prefix, t.markers, declaration);
+            }
+        }
+    }
+
+    /**
      * Represents a function call where the callee is itself an expression rather than a simple
      * method select. Used for Scala forms that are not adequately modelled by
      * {@link J.MethodInvocation}, such as curried application of another application's result:
@@ -1866,6 +1947,8 @@ public interface S extends J {
     /**
      * Represents a Scala singleton type: {@code foo.type}.
      * The qualifier is any expression, typically an object/module reference.
+     * A literal type such as {@code "a"} or {@code -1} is a singleton type with a
+     * {@link J.Literal} qualifier and no {@code .type} suffix.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

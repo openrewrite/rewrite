@@ -241,6 +241,18 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return pd;
     }
 
+    public J visitSelfType(S.SelfType selfType, P p) {
+        S.SelfType s = selfType;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(s, p);
+        if (!(temp instanceof S.SelfType)) {
+            return temp;
+        }
+        s = (S.SelfType) temp;
+        return s.getPadding().withDeclaration(visitRightPadded(s.getPadding().getDeclaration(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+    }
+
     public J visitAnonymousGiven(S.AnonymousGiven anonymousGiven, P p) {
         S.AnonymousGiven g = anonymousGiven;
         g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
