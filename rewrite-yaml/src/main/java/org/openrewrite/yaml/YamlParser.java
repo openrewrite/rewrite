@@ -765,7 +765,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
                     inBlockScalar = true;
-                    blockScalarBaseIndent = indent;
+                    blockScalarBaseIndent = blockScalarParentIndent(lineContent);
                 }
             }
 
@@ -773,6 +773,29 @@ public class YamlParser implements org.openrewrite.Parser {
         }
 
         return result.toString();
+    }
+
+    /**
+     * The indent a block scalar's content must exceed, given the line holding its header. That is the column of the
+     * key the scalar belongs to, such as {@code expr} in {@code - expr: |-}, or of the last dash when the scalar is a
+     * sequence entry itself, as in {@code - |}.
+     */
+    private static int blockScalarParentIndent(String line) {
+        int i = leadingSpaceCount(line);
+        int lastDash = -1;
+        while (i < line.length() && line.charAt(i) == '-' &&
+               (i + 1 == line.length() || line.charAt(i + 1) == ' ' || line.charAt(i + 1) == '\t')) {
+            lastDash = i;
+            i++;
+            while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+                i++;
+            }
+        }
+        if (lastDash == -1) {
+            return leadingSpaceCount(line);
+        }
+        char next = i < line.length() ? line.charAt(i) : '|';
+        return next == '|' || next == '>' ? lastDash : i;
     }
 
     private static int appendNewline(String source, int lineEnd, StringBuilder result) {

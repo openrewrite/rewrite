@@ -889,4 +889,57 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void standaloneTemplateAfterBlockScalarInSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.rules[0].record", "renamed", null)),
+          yaml(
+            """
+              rules:
+                - expr: |-
+                    sum(x)
+                  labels:
+                    quantile: '0.99'
+                  {{- with .Values.extraLabels }}
+                    {{- toYaml . | nindent 6 }}
+                  {{- end }}
+                  record: first
+              """,
+            """
+              rules:
+                - expr: |-
+                    sum(x)
+                  labels:
+                    quantile: '0.99'
+                  {{- with .Values.extraLabels }}
+                    {{- toYaml . | nindent 6 }}
+                  {{- end }}
+                  record: renamed
+              """
+          )
+        );
+    }
+
+    @Test
+    void standaloneTemplateInsideBlockScalarInSequenceItemStaysText() {
+        rewriteRun(
+          yaml(
+            """
+              - script: |
+                  {{- if .Values.debug }}
+                  set -x
+                  {{- end }}
+                next: 1
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var seq = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                var item = (Yaml.Mapping) seq.getEntries().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) item.getEntries().getFirst().getValue()).getValue())
+                  .contains("{{- if .Values.debug }}", "set -x", "{{- end }}");
+                assertThat(item.getEntries()).hasSize(2);
+            })
+          )
+        );
+    }
 }
