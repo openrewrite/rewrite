@@ -27,7 +27,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -66,7 +65,8 @@ public class ChangeTableRowValue extends Recipe {
     String newValue;
 
     @Option(displayName = "Add if missing",
-            description = "Whether to add the property to the matched row when the row does not have it yet. Default is false.",
+            description = "Whether to add the property to each matched row that does not have it yet. Default is false. " +
+                          "Unlike `MergeTableRow`, this matches rows by a regular expression when asked to, and never adds a row.",
             required = false)
     @Nullable
     Boolean addIfMissing;
@@ -134,14 +134,21 @@ public class ChangeTableRowValue extends Recipe {
                 }));
             }
 
+            /**
+             * @return the property as a key-value, its key as TOML reads {@code propertyKey}, so {@code meta.url} is a
+             * dotted key as it is when changed, and its value as {@link ChangeValue} reads the new value
+             */
             private Toml.@Nullable KeyValue parseKeyValue() {
-                String key = BARE_KEY.matcher(propertyKey).matches() ? propertyKey : "\"" + TomlString.quoteBasic(propertyKey) + "\"";
-                Toml.Document doc = TomlSnippets.parse(key + " = " + newValue.trim());
-                return doc != null && doc.getValues().size() == 1 && doc.getValues().get(0) instanceof Toml.KeyValue ?
-                        (Toml.KeyValue) doc.getValues().get(0) : null;
+                Toml.Document doc = TomlSnippets.parse(propertyKey + " = 0");
+                if (doc == null || doc.getValues().size() != 1 || !(doc.getValues().get(0) instanceof Toml.KeyValue)) {
+                    doc = TomlSnippets.parse("\"" + TomlString.quoteBasic(propertyKey) + "\" = 0");
+                }
+                if (doc == null || newValue == null) {
+                    return null;
+                }
+                Toml.KeyValue kv = (Toml.KeyValue) doc.getValues().get(0);
+                return kv.withValue(TomlSnippets.valueOrString(newValue).withPrefix(kv.getValue().getPrefix()));
             }
         };
     }
-
-    private static final Pattern BARE_KEY = Pattern.compile("[A-Za-z0-9_-]+");
 }

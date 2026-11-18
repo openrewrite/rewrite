@@ -429,4 +429,40 @@ class ChangeTableRowValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addADottedPropertyKeyAsADottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "meta.url", "\"https://example.com\"", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              meta.url = "https://example.com"
+              """
+          )
+        );
+    }
+
+    @Test
+    void addAValueThatIsNotTomlAsAString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "version", "2.0.0", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              version = "2.0.0"
+              """
+          )
+        );
+    }
 }
