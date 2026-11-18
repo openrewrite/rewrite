@@ -444,7 +444,7 @@ class ScopeTest implements RewriteTest {
             """
               class A {
                   int f;
-                  /*~~(p:2 n:1! n:2)~~>*/void m(int p) {
+                  /*~~(m:0 p:2 n:1! n:2)~~>*/void m(int p) {
                       { int n = p; n++; }
                       { int n = p; this.f = n + n; }
                   }
@@ -683,6 +683,10 @@ class ScopeTest implements RewriteTest {
                       { int y = 1; }
                       use(field);
                   }
+                  void localClass() {
+                      { class Helper {} }
+                      class Helper {}
+                  }
                   void use(int i) {}
               }
               """,
@@ -700,6 +704,10 @@ class ScopeTest implements RewriteTest {
                   void untouched() {
                       /*~~(free)~~>*/{ int y = 1; }
                       use(field);
+                  }
+                  void localClass() {
+                      /*~~(collides)~~>*/{ class Helper {} }
+                      class Helper {}
                   }
                   void use(int i) {}
               }

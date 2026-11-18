@@ -211,6 +211,12 @@ public class Scope implements Trait<J> {
             }
         }.visit(regionTree, 0, region.getParentOrThrow());
         List<Binding> ordered = new ArrayList<>();
+        // A class or method that is the region declares its own name, which the scope around it binds
+        J.Identifier ownName = regionTree instanceof J.ClassDeclaration ? ((J.ClassDeclaration) regionTree).getName() :
+                regionTree instanceof J.MethodDeclaration ? ((J.MethodDeclaration) regionTree).getName() : null;
+        if (ownName != null) {
+            new Binding.Matcher().get(new Cursor(region, ownName)).ifPresent(ordered::add);
+        }
         new JavaIsoVisitor<List<Binding>>() {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, List<Binding> found) {
