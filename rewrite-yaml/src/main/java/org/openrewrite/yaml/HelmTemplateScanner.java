@@ -31,7 +31,8 @@ import java.util.List;
  *     <li>A double-quoted string or character literal, which may hold backslash escapes, closes on the line it
  *     opens. A raw string, in backticks, may span lines.</li>
  *     <li>A comment opens with a slash and asterisk straight after "{{" (or after a "-" and whitespace), ends at
- *     the first asterisk and slash, and must close with "}}", optionally preceded by whitespace and a "-".</li>
+ *     the first asterisk and slash, and must close with "}}", optionally preceded by whitespace and a "-". Any
+ *     other comment is rejected, as Go rejects it; none of the other syntaxes below writes comments this way.</li>
  * </ul>
  * YAML files also carry other syntax in "{{ }}", such as GitHub Actions expressions, Jinja and Mustache, which Go
  * would reject. So the scanner does not check that an action is well-formed Go; it reads what Go would reject in

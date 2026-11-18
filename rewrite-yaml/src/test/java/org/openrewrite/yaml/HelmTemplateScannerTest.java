@@ -217,12 +217,23 @@ class HelmTemplateScannerTest {
         @ValueSource(strings = {
           "{{",
           "{{ .x",
-          "{{/* no end }}",
-          "{{/* a */ }}",
-          "{{/* a */x}}"
+          "{{/* no end",
+          "{{ .x\n}"
         })
         void unclosed(String source) {
             assertActions(source);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+          "{{/* never closed }}",
+          "{{- /* space before the delimiter */ }}",
+          "{{/* closed early */ more */}}",
+          "{{/* text after the close */x}}",
+          "{{- /*\nspans lines\n*/ }}"
+        })
+        void commentGoRejects(String source) {
+            assertActions(source + "\nk: v\n");
         }
 
         @Test

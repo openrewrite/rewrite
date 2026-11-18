@@ -16,7 +16,11 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -742,6 +746,145 @@ class HelmTemplateParsingTest implements RewriteTest {
               name: web
               port: 8080
               desc: done }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void delimitersInsideLiteralsOnOneLine() {
+        rewriteRun(
+          yaml(
+            """
+              a: {{ "{" }}
+              b: {{ "}}" }}
+              c: {{ if eq .c '}' }}x{{ end }}
+              d: {{ "{{" }}
+              e: {{ `}}` }}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(root.getEntries()).extracting(e -> ((Yaml.Scalar) e.getValue()).getValue())
+                  .containsExactly("{{ \"{\" }}", "{{ \"}}\" }}", "{{ if eq .c '}' }}x{{ end }}", "{{ \"{{\" }}", "{{ `}}` }}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void tripleBracesStayAScalar() {
+        rewriteRun(
+          yaml(
+            """
+              k: {{{ raw }}}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) root.getEntries().getFirst().getValue()).getValue()).isEqualTo("{{{ raw }}}");
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "{{- /* a space before the delimiter */ }}",
+      "{{/* closed early */ more */}}",
+      "{{/* never closed }}"
+    })
+    void commentGoRejectsIsNotATemplate(String comment) {
+        // Helm fails to render these, so the file is not valid and does not parse
+        SourceFile sourceFile = YamlParser.builder().build().parse(comment + "\napiVersion: v1\n").findFirst().orElseThrow();
+        assertThat(sourceFile).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void commentGoRejectsAfterAValueStaysInTheValue() {
+        rewriteRun(
+          yaml(
+            """
+              name: web {{/* the name */ }}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) root.getEntries().getFirst().getValue()).getValue())
+                  .isEqualTo("web {{/* the name */ }}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionWithCrlf() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.spec.replicas", "2", null)),
+          yaml(
+            "spec:\r\n  {{- include \"x\" (dict\r\n    \"a\" .) | nindent 2 }}\r\n  replicas: 1\r\n",
+            "spec:\r\n  {{- include \"x\" (dict\r\n    \"a\" .) | nindent 2 }}\r\n  replicas: 2\r\n"
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionInBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.next", "2", null)),
+          yaml(
+            """
+              script: |
+                {{- range $k, $v := .Values.env
+                }}
+                export {{ $k }}={{ $v }}
+                {{- end }}
+              next: 1
+              """,
+            """
+              script: |
+                {{- range $k, $v := .Values.env
+                }}
+                export {{ $k }}={{ $v }}
+                {{- end }}
+              next: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void azurePipelinesConditionalKeySpanningLines() {
+        rewriteRun(
+          yaml(
+            """
+              steps:
+              - ${{ if and(
+                  eq(parameters.a, true),
+                  ne(parameters.b, false)) }}:
+                - script: echo hi
+              """
+          )
+        );
+    }
+
+    @Test
+    void jinjaDictionaryOnOneLine() {
+        rewriteRun(
+          yaml(
+            """
+              k: {{ {'a': 1} | to_json }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void mustacheTemplates() {
+        rewriteRun(
+          yaml(
+            """
+              {{! don't change }}
+              {{#items}}
+              - {{name}}
+              {{/items}}
               """
           )
         );
