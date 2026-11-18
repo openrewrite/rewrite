@@ -59,21 +59,28 @@ public class TomlParser implements Parser {
                         sourceStream.getCharset(),
                         sourceStream.isCharsetBomMarked()
                 ).visitDocument(parser.document());
-                if (errorListener.firstError != null) {
-                    // recovered: prints as written, but the tree may not mean what the file does
-                    document = document.withMarkers(document.getMarkers().add(ParseExceptionResult.build(this, errorListener.firstError)));
-                }
-                parsingListener.parsed(input, document);
-                return requirePrintEqualsInput(document, input, relativeTo, ctx);
-            } catch (Throwable t) {
-                // report the syntax error, not the visitor's failure on what recovery left
                 TomlParsingException syntaxError = errorListener.firstError;
                 if (syntaxError != null) {
-                    syntaxError.addSuppressed(t);
-                    t = syntaxError;
+                    // Unlike JsonParser and ProtoParser, which turn any syntax error into a ParseError, a tree
+                    // that ANTLR recovered and that prints back as written stays a document, so that files
+                    // which parsed before keep parsing. It may not mean what the file does, so it is marked
+                    // with the syntax error, which FindParseFailures reports.
+                    document = document.withMarkers(document.getMarkers().add(ParseExceptionResult.build(this, syntaxError)));
                 }
+                parsingListener.parsed(input, document);
+                SourceFile sourceFile = requirePrintEqualsInput(document, input, relativeTo, ctx);
+                if (syntaxError != null && sourceFile instanceof ParseError) {
+                    // the recovered tree did not print back: the syntax error is the reason
+                    return ParseError.build(this, input, relativeTo, ctx, syntaxError)
+                            .withErroneous(((ParseError) sourceFile).getErroneous());
+                }
+                return sourceFile;
+            } catch (Throwable t) {
+                // The listener already reported each syntax error, so report only the visitor's failure,
+                // but build the ParseError from the syntax error, which is the reason the visitor failed
                 ctx.getOnError().accept(t);
-                return ParseError.build(this, input, relativeTo, ctx, t);
+                TomlParsingException syntaxError = errorListener.firstError;
+                return ParseError.build(this, input, relativeTo, ctx, syntaxError != null ? syntaxError : t);
             }
         });
     }

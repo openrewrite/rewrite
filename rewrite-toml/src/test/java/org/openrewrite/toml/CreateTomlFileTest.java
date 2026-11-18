@@ -342,7 +342,8 @@ class CreateTomlFileTest implements RewriteTest {
               [new]
               value = "replacement"
               """,
-            spec -> spec.path("config.toml")
+            // keep the newline the file ends with, which RewriteTest would trim
+            spec -> spec.path("config.toml").noTrim()
           )
         );
     }
