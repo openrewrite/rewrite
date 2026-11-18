@@ -277,11 +277,11 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     /**
-     * TOML allows a space or a lowercase {@code t} between date and time, and a lowercase {@code z}
-     * offset, none of which {@code DateTimeFormatter.ISO_LOCAL_DATE_TIME} accepts.
+     * TOML allows a space or a lowercase {@code t} between date and time, neither of which
+     * {@code DateTimeFormatter.ISO_LOCAL_DATE_TIME} accepts.
      */
     private static String isoDateTime(String dateTime) {
-        return (dateTime.substring(0, 10) + 'T' + dateTime.substring(11)).toUpperCase();
+        return dateTime.substring(0, 10) + 'T' + dateTime.substring(11);
     }
 
     @Override
