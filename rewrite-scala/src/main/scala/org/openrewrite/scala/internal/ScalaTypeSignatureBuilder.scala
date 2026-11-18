@@ -184,7 +184,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   /** The signature of the method with the given parameter and result types, as instantiated at a call. */
   def methodSignature(sym: Symbols.Symbol, info: Type): String = {
-    val owner = methodOwnerFqn(sym.owner)
+    val owner = classFqn(sym.owner)
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
     val returnType = info.finalResultType match {
       case NoType => "void"

@@ -2235,6 +2235,20 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void anyMethodIsSharedWithJavaParserThroughTypeCache() {
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        J scalaCu = (J) ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class S { def f(o: Object): String = o.toString() }
+          """).findFirst().orElseThrow();
+        J.CompilationUnit javaCu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class J { String f(Object o) { return o.toString(); } }
+          """).findFirst().orElseThrow();
+
+        assertThat(javaMethod(javaCu, "toString").getMethodType()).isNotNull().isSameAs(method(scalaCu, "toString").getMethodType());
+    }
+
+    @Test
     void javaStaticOwnerIsTheJavaClassWithItsSupertypes() {
         rewriteRun(
           scala(
