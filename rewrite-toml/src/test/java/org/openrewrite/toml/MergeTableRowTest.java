@@ -374,4 +374,46 @@ class MergeTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nullInsideAMultiLineStringIsText() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nscript = \"\"\"\ndebug = null\n\"\"\"",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              """,
+            "[[pkg]]\nname = \"a\"\nscript = \"\"\"\ndebug = null\n\"\"\""
+          )
+        );
+    }
+
+    @Test
+    void nullRemovesADottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nm.x = null\nv = 2",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              m.x = 1
+              v = 1
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              v = 2
+              """
+          )
+        );
+    }
 }

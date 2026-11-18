@@ -21,7 +21,6 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.marker.ArrayTable;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
@@ -29,13 +28,8 @@ import org.openrewrite.toml.tree.TomlRightPadded;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
 @Value
@@ -63,7 +57,8 @@ public class MergeTableRow extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Set<String> removedKeys = nullEntries(row);
+        // A row that is not TOML changes nothing, rather than what error recovery made of part of it
+        List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValuesWithNulls(row);
         return new TomlVisitor<ExecutionContext>() {
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
@@ -73,8 +68,8 @@ public class MergeTableRow extends Recipe {
                 }
 
                 // Parse the incoming row to get identifying value
-                List<Toml.KeyValue> keyValues = parseTomlRow(row);
-                if (keyValues.isEmpty()) {
+                List<Toml.KeyValue> keyValues = rowKeyValues;
+                if (keyValues == null || keyValues.isEmpty()) {
                     return doc;
                 }
 
@@ -107,7 +102,7 @@ public class MergeTableRow extends Recipe {
                 );
 
                 List<TomlRightPadded<Toml>> values = new ArrayList<>();
-                for (Toml.KeyValue kv : ListUtils.filter(keyValues, kv -> !removedKeys.contains(keyName(kv)))) {
+                for (Toml.KeyValue kv : ListUtils.filter(keyValues, kv -> !TomlSnippets.isNull(kv))) {
                     Toml.KeyValue kvWithPrefix = kv.withPrefix(Space.format("\n"));
                     values.add(new TomlRightPadded<>(kvWithPrefix, Space.EMPTY, Markers.EMPTY));
                 }
@@ -135,10 +130,10 @@ public class MergeTableRow extends Recipe {
                 }
 
                 // Parse the incoming row
-                List<Toml.KeyValue> incomingKeyValues = parseTomlRow(row);
-                if (incomingKeyValues.isEmpty()) {
+                if (rowKeyValues == null || rowKeyValues.isEmpty()) {
                     return super.visitTable(table, ctx);
                 }
+                List<Toml.KeyValue> incomingKeyValues = new ArrayList<>(rowKeyValues);
 
                 // Get the identifying property value from the incoming row
                 String identifyingValue = TableRowMatcher.getKeyValue(incomingKeyValues, identifyingKey);
@@ -165,7 +160,7 @@ public class MergeTableRow extends Recipe {
                                             if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
                                                 incomingKeyValues.remove(i);
 
-                                                if (removedKeys.contains(keyName(incomingKv))) {
+                                                if (TomlSnippets.isNull(incomingKv)) {
                                                     return null; // Remove the key-value pair
                                                 } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
                                                     return existingKv.withValue(incomingKv.getValue());
@@ -175,7 +170,7 @@ public class MergeTableRow extends Recipe {
                                         }
                                         return existingKv;
                                     }),
-                                    ListUtils.map(ListUtils.filter(incomingKeyValues, kv -> !removedKeys.contains(keyName(kv))),
+                                    ListUtils.map(ListUtils.filter(incomingKeyValues, kv -> !TomlSnippets.isNull(kv)),
                                             kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()))
                             )
                     );
@@ -183,40 +178,6 @@ public class MergeTableRow extends Recipe {
 
                 return super.visitTable(table, ctx);
             }
-
-            private List<Toml.KeyValue> parseTomlRow(@Language("toml") String tomlContent) {
-                // A row that is not TOML changes nothing, rather than what error recovery made of part of it
-                Toml.Document doc = TomlSnippets.parse(NULL_ENTRY.matcher(tomlContent).replaceAll("$1\"\"$3"));
-                if (doc == null) {
-                    return emptyList();
-                }
-                List<Toml.KeyValue> result = new ArrayList<>();
-                for (TomlValue value : doc.getValues()) {
-                    if (value instanceof Toml.KeyValue) {
-                        result.add((Toml.KeyValue) value);
-                    }
-                }
-                return result;
-            }
         };
-    }
-
-    /**
-     * An entry such as {@code enabled = null}, which is no TOML but how a row says to remove a property.
-     */
-    private static final Pattern NULL_ENTRY = Pattern.compile(
-            "(?m)^([ \\t]*([A-Za-z0-9_-]+|\"[^\"\\n]*\"|'[^'\\n]*')[ \\t]*=[ \\t]*)null([ \\t]*(?:#.*)?)$");
-
-    private static Set<String> nullEntries(String row) {
-        Set<String> keys = new HashSet<>();
-        Matcher m = NULL_ENTRY.matcher(row);
-        while (m.find()) {
-            keys.addAll(TomlKeyParts.split(m.group(2)));
-        }
-        return keys;
-    }
-
-    private static String keyName(Toml.KeyValue kv) {
-        return kv.getKey() instanceof Toml.Identifier ? ((Toml.Identifier) kv.getKey()).getName() : "";
     }
 }
