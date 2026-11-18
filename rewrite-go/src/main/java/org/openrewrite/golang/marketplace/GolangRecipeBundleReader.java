@@ -27,6 +27,8 @@ import org.openrewrite.marketplace.RecipeMarketplace;
 
 import java.util.Map;
 
+import static java.util.Collections.emptyMap;
+
 @RequiredArgsConstructor
 public class GolangRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
@@ -39,7 +41,9 @@ public class GolangRecipeBundleReader implements RecipeBundleReader {
 
     @Override
     public RecipeDescriptor describe(RecipeListing listing) {
-        return rpc.prepareRecipe(listing.getName()).getDescriptor();
+        // Deferring, because describing a recipe must not require it to be validly configured:
+        // this prepares with no options at all, so every required option is unset.
+        return rpc.prepareRecipeDeferringValidation(listing.getName(), emptyMap()).getDescriptor();
     }
 
     @Override
