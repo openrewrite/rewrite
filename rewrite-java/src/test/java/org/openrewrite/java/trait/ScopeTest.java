@@ -417,6 +417,42 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void referencesWithinARegionAnswerForEveryBindingAtOnce() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  Scope.References references = Scope.referencesWithin(getCursor());
+                  String facts = Scope.declaredWithin(getCursor())
+                    .map(b -> b.getName() + ":" + references.of(b).count() + (references.isEffectivelyFinal(b) ? "" : "!"))
+                    .collect(joining(" "));
+                  return SearchResult.found(method, facts);
+              }
+          })),
+          java(
+            """
+              class A {
+                  int f;
+                  void m(int p) {
+                      { int n = p; n++; }
+                      { int n = p; this.f = n + n; }
+                  }
+              }
+              """,
+            """
+              class A {
+                  int f;
+                  /*~~(p:2 n:1! n:2)~~>*/void m(int p) {
+                      { int n = p; n++; }
+                      { int n = p; this.f = n + n; }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodAndTypeReferencesIncludeSelectionsFromThis() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

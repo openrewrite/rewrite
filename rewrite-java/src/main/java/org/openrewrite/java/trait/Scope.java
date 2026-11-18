@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.trait;
 
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -278,6 +280,74 @@ public class Scope implements Trait<J> {
     }
 
     /**
+     * Every reference under the region's tree, resolved in one walk. Ask it about many bindings where asking each
+     * binding would walk its scope again.
+     */
+    public static References referencesWithin(Cursor region) {
+        ScopeService service = service(region);
+        Map<String, List<References.Reference>> byName = new HashMap<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                Namespace namespace = service.namespaceOf(getCursor());
+                Binding binding = null;
+                if (namespace != null) {
+                    binding = at(getCursor()).lookup(identifier.getSimpleName(), namespace).orElse(null);
+                    if (binding == null) {
+                        return identifier;
+                    }
+                } else {
+                    Object parent = getCursor().getParentTreeCursor().getValue();
+                    if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier ||
+                          parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == identifier)) {
+                        return identifier;
+                    }
+                }
+                byName.computeIfAbsent(identifier.getSimpleName(), n -> new ArrayList<>())
+                        .add(new References.Reference(getCursor(), binding));
+                return identifier;
+            }
+        }.visit(region.getValue(), 0, region.getParentOrThrow());
+        return new References(byName);
+    }
+
+    /**
+     * The references found under one region, grouped so that each binding's are a lookup away.
+     */
+    @Value
+    public static class References {
+        @Getter(AccessLevel.NONE)
+        Map<String, List<Reference>> byName;
+
+        /**
+         * The identifiers in the region that refer to the binding, in source order.
+         */
+        public Stream<Cursor> of(Binding binding) {
+            return byName.getOrDefault(binding.getName(), Collections.emptyList()).stream()
+                    .filter(reference -> reference.binding != null ? reference.binding.equals(binding) : binding.selects(reference.cursor))
+                    .map(reference -> reference.cursor);
+        }
+
+        /**
+         * As {@link Binding#isEffectivelyFinal()}, counting the assignments in the region.
+         */
+        public boolean isEffectivelyFinal(Binding binding) {
+            return binding.isEffectivelyFinal(of(binding));
+        }
+
+        /**
+         * One identifier, with the binding its name resolves to, or none where it names a member after a dot.
+         */
+        @Value
+        private static class Reference {
+            Cursor cursor;
+
+            @Nullable
+            Binding binding;
+        }
+    }
+
+    /**
      * What a name denotes. Java looks variables, methods and types up separately, so one name can be bound in each.
      */
     public enum Namespace {
@@ -341,16 +411,24 @@ public class Scope implements Trait<J> {
                         return identifier;
                     }
                     if (namespace == service.namespaceOf(getCursor())) {
-                        if (at(getCursor()).lookup(name, namespace).filter(Binding.this::isSameAs).isPresent()) {
+                        if (at(getCursor()).lookup(name, namespace).filter(Binding.this::equals).isPresent()) {
                             found.add(getCursor());
                         }
-                    } else if (selectedFromOwnClass(getCursor()) || isSameField(getCursor())) {
+                    } else if (selects(getCursor())) {
                         found.add(getCursor());
                     }
                     return identifier;
                 }
             }.visit(scope.getTree(), references, scope.getCursor().getParentOrThrow());
             return references.stream();
+        }
+
+        /**
+         * Whether the identifier names this member after a dot: from {@code this} or {@code super} in its own class,
+         * or for a field from another instance.
+         */
+        private boolean selects(Cursor identifier) {
+            return selectedFromOwnClass(identifier) || isSameField(identifier);
         }
 
         /**
@@ -395,6 +473,10 @@ public class Scope implements Trait<J> {
          * final counts as assigned, since code outside its scope may assign it. A method or type is never assigned.
          */
         public boolean isEffectivelyFinal() {
+            return isEffectivelyFinal(references());
+        }
+
+        private boolean isEffectivelyFinal(Stream<Cursor> references) {
             if (namespace != Namespace.VARIABLE) {
                 return true;
             }
@@ -427,7 +509,7 @@ public class Scope implements Trait<J> {
                             ((J.VariableDeclarations.NamedVariable) declaring.getValue()).getInitializer() == null &&
                             declaring.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Block;
             int assignments = 0;
-            for (Cursor reference : (Iterable<Cursor>) references()::iterator) {
+            for (Cursor reference : (Iterable<Cursor>) references::iterator) {
                 if (isAssigned(reference)) {
                     // A local declared without an initializer may be assigned once (JLS 4.12.4).
                     if (!blank || !isSimpleAssignment(reference) || ++assignments > 1 || isInLoopBelow(reference, scope)) {
@@ -438,8 +520,22 @@ public class Scope implements Trait<J> {
             return true;
         }
 
-        private boolean isSameAs(Binding other) {
+        /**
+         * Two bindings are the same where they bind one name in one namespace from one tree, whichever cursors hold
+         * it, so a binding is a stable key for facts computed about it.
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Binding)) {
+                return false;
+            }
+            Binding other = (Binding) o;
             return namespace == other.namespace && name.equals(other.name) && getTree().getId().equals(other.getTree().getId());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(namespace, name, getTree().getId());
         }
 
         private static boolean isSimpleAssignment(Cursor identifier) {
