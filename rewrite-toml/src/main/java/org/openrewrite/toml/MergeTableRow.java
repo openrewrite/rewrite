@@ -28,7 +28,10 @@ import org.openrewrite.toml.tree.TomlRightPadded;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
@@ -60,10 +63,19 @@ public class MergeTableRow extends Recipe {
         // A row that is not TOML changes nothing, rather than what error recovery made of part of it
         List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValuesWithNulls(row);
         return new TomlVisitor<ExecutionContext>() {
+            /**
+             * Each table key-values were appended to, with its last value before them.
+             */
+            private final Map<Toml.Table, UUID> grownTables = new IdentityHashMap<>();
+
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
                 Toml.Document doc = (Toml.Document) super.visitDocument(document, ctx);
                 if (doc != document) {
+                    for (Map.Entry<Toml.Table, UUID> grown : grownTables.entrySet()) {
+                        doc = TableRowMatcher.keepCommentOnLastLine(doc, grown.getKey(), grown.getValue());
+                    }
+                    grownTables.clear();
                     return doc;
                 }
 
@@ -146,34 +158,35 @@ public class MergeTableRow extends Recipe {
 
                 if (identifyingValue.equals(tableIdentifyingValue)) {
                     // Merge the values
-                    return table.withValues(
-                            ListUtils.concatAll(
-                                    ListUtils.map(table.getValues(), value -> {
-                                        if (!(value instanceof Toml.KeyValue)) {
-                                            return value;
-                                        }
-                                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
+                    List<Toml> merged = ListUtils.map(table.getValues(), value -> {
+                        if (!(value instanceof Toml.KeyValue)) {
+                            return value;
+                        }
+                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
 
-                                        // Check if any incoming key-value matches this one
-                                        for (int i = 0; i < incomingKeyValues.size(); i++) {
-                                            Toml.KeyValue incomingKv = incomingKeyValues.get(i);
-                                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
-                                                incomingKeyValues.remove(i);
+                        // Check if any incoming key-value matches this one
+                        for (int i = 0; i < incomingKeyValues.size(); i++) {
+                            Toml.KeyValue incomingKv = incomingKeyValues.get(i);
+                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
+                                incomingKeyValues.remove(i);
 
-                                                if (TomlSnippets.isNull(incomingKv)) {
-                                                    return null; // Remove the key-value pair
-                                                } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
-                                                    return existingKv.withValue(incomingKv.getValue());
-                                                }
-                                                return existingKv; // No change needed
-                                            }
-                                        }
-                                        return existingKv;
-                                    }),
-                                    ListUtils.map(ListUtils.filter(incomingKeyValues, kv -> !TomlSnippets.isNull(kv)),
-                                            kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()))
-                            )
-                    );
+                                if (TomlSnippets.isNull(incomingKv)) {
+                                    return null; // Remove the key-value pair
+                                } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
+                                    return existingKv.withValue(incomingKv.getValue());
+                                }
+                                return existingKv; // No change needed
+                            }
+                        }
+                        return existingKv;
+                    });
+                    List<Toml.KeyValue> appended = ListUtils.map(ListUtils.filter(incomingKeyValues, kv -> !TomlSnippets.isNull(kv)),
+                            kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()));
+                    Toml.Table mergedTable = table.withValues(ListUtils.concatAll(merged, appended));
+                    if (!appended.isEmpty() && !merged.isEmpty()) {
+                        grownTables.put(mergedTable, merged.get(merged.size() - 1).getId());
+                    }
+                    return mergedTable;
                 }
 
                 return super.visitTable(table, ctx);
