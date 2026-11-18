@@ -16,8 +16,16 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaVisitor;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class VariableDeclarationsTest implements RewriteTest {
@@ -141,6 +149,44 @@ class VariableDeclarationsTest implements RewriteTest {
     void patternDeclaration() {
         rewriteRun(
           scala("val (a, b) = (1, 2)")
+        );
+    }
+
+    @Test
+    void patternDefinitionsHoldTheirPatternsAsTrees() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val (a, b) = (1, 2)
+                var Some(x) = Option(1)
+                private lazy val ((c, d), e) = ((1, 2), 3)
+                @deprecated val p @ (f, g) = (1, 2)
+                val h :: t = List(1, 2)
+                val K, L: Int = 3
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<String> shapes = new ArrayList<>();
+                new ScalaVisitor<Integer>() {
+                    @Override
+                    public J visitPatternDefinition(S.PatternDefinition patDef, Integer p) {
+                        shapes.add(patDef.getModifiers().getLast().getKeyword() + " " + patDef.getPatterns().stream()
+                          .map(pattern -> pattern.getClass().getSimpleName()).collect(Collectors.joining(",")) +
+                                   (patDef.getTypeExpression() == null ? "" : " :") + (patDef.getInitializer() == null ? "" : " ="));
+                        return patDef;
+                    }
+                }.visit(cu, 0);
+                assertThat(shapes).containsExactly(
+                  "val TuplePattern =",
+                  "var DeconstructionPattern =",
+                  "val TuplePattern =",
+                  "val Binding =",
+                  "val DeconstructionPattern =",
+                  "val Identifier,Identifier : ="
+                );
+            })
+          )
         );
     }
 

@@ -26,12 +26,10 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Scala's binding rules where they part from Java's. A lowercase name in a {@code case} pattern or a
- * {@code for} enumerator binds a variable. An import in a block binds its name for the rest of the block. A local
+ * Scala's binding rules where they part from Java's. A name in a {@code case} pattern, a {@code for} enumerator or a
+ * pattern definition binds a variable. An import in a block binds its name for the rest of the block. A local
  * {@code def} is visible throughout its block.
  */
 @Incubating(since = "8.111.0")
@@ -41,11 +39,6 @@ public class ScalaScopeService extends ScopeService {
             "finally", "for", "forSome", "given", "if", "implicit", "import", "lazy", "match", "new", "null", "object",
             "override", "package", "private", "protected", "return", "sealed", "super", "then", "this", "throw",
             "trait", "try", "true", "type", "val", "var", "while", "with", "yield"));
-
-    /**
-     * A lowercase name in a pattern that no dot, parenthesis or colon makes a member, extractor or type.
-     */
-    private static final Pattern PATTERN_VARIABLE = Pattern.compile("(?<![.\\w`:])\\s*\\b([a-z_][\\w$]*)\\b(?!\\s*[.(\\w])");
 
     @Override
     public boolean isScope(Cursor cursor) {
@@ -61,16 +54,19 @@ public class ScalaScopeService extends ScopeService {
         } else if (tree instanceof S.For) {
             patternVariables(scope, new ArrayList<>(((S.For) tree).getEnumerators()), bindings);
         }
-        if (tree instanceof J.Block || tree instanceof J.ClassDeclaration) {
-            J.Block block = tree instanceof J.Block ? (J.Block) tree : ((J.ClassDeclaration) tree).getBody();
-            Cursor statements = tree instanceof J.Block ? scope : new Cursor(scope, block);
-            for (Statement statement : block.getStatements()) {
-                Cursor anchor = new Cursor(statements, statement);
-                if (statement instanceof S.PatternDefinition) {
-                    for (String name : definedNames(((S.PatternDefinition) statement).getText())) {
-                        bindings.add(new Scope.Binding(anchor, name, Scope.Namespace.VARIABLE, scope, null));
-                    }
-                } else if (statement instanceof J.Import && tree instanceof J.Block) {
+        List<Statement> statements = tree instanceof J.Block ? ((J.Block) tree).getStatements() :
+                tree instanceof J.ClassDeclaration ? ((J.ClassDeclaration) tree).getBody().getStatements() :
+                tree instanceof S.CompilationUnit ? ((S.CompilationUnit) tree).getStatements() : Collections.emptyList();
+        Cursor owner = tree instanceof J.ClassDeclaration ? new Cursor(scope, ((J.ClassDeclaration) tree).getBody()) : scope;
+        for (Statement statement : statements) {
+            if (statement instanceof S.PatternDefinition) {
+                patternVariables(scope, Collections.singletonList(statement), owner, bindings);
+            }
+        }
+        if (tree instanceof J.Block) {
+            for (Statement statement : statements) {
+                Cursor anchor = new Cursor(scope, statement);
+                if (statement instanceof J.Import) {
                     String name = ((J.Import) statement).getQualid().getSimpleName();
                     if (!"_".equals(name) && !"*".equals(name)) {
                         for (Scope.Namespace namespace : Scope.Namespace.values()) {
@@ -97,7 +93,7 @@ public class ScalaScopeService extends ScopeService {
             int asked = indexUnder(position, enumerators);
             return declared >= 0 && asked > declared;
         }
-        if (scopeTree instanceof J.Block && (anchor instanceof S.PatternDefinition || anchor instanceof J.Import)) {
+        if (scopeTree instanceof J.Block && anchor instanceof J.Import) {
             List<Statement> statements = ((J.Block) scopeTree).getStatements();
             return indexUnder(position, statements) > statements.indexOf(anchor);
         }
@@ -126,26 +122,11 @@ public class ScalaScopeService extends ScopeService {
         return KEYWORDS.contains(name);
     }
 
-    /**
-     * The names a {@code val} or {@code var} pattern definition binds, read from its source text, since the parser
-     * keeps that statement as text.
-     */
-    static List<String> definedNames(String text) {
-        Matcher definition = Pattern.compile("^\\s*(?:\\w+\\s+)*?(?:val|var)\\s+(.*?)\\s*(?<![=<>!])=(?![=>])", Pattern.DOTALL).matcher(text);
-        List<String> names = new ArrayList<>();
-        if (definition.find()) {
-            Matcher variable = PATTERN_VARIABLE.matcher(definition.group(1));
-            while (variable.find()) {
-                String name = variable.group(1);
-                if (!"_".equals(name) && !KEYWORDS.contains(name)) {
-                    names.add(name);
-                }
-            }
-        }
-        return names;
+    private void patternVariables(Cursor scope, List<? extends J> patterns, List<Scope.Binding> bindings) {
+        patternVariables(scope, patterns, scope, bindings);
     }
 
-    private void patternVariables(Cursor scope, List<J> patterns, List<Scope.Binding> bindings) {
+    private void patternVariables(Cursor scope, List<? extends J> patterns, Cursor parent, List<Scope.Binding> bindings) {
         for (J pattern : patterns) {
             new JavaIsoVisitor<List<Scope.Binding>>() {
                 @Override
@@ -156,20 +137,22 @@ public class ScalaScopeService extends ScopeService {
                     }
                     return identifier;
                 }
-            }.visit(pattern, bindings, scope);
+            }.visit(pattern, bindings, parent);
         }
     }
 
     /**
-     * Whether the identifier is a lowercase name standing alone in a {@code case} pattern or an enumerator's left
-     * side, which Scala reads as a new variable rather than a constant.
+     * Whether the identifier is a name standing alone in a pattern, which Scala reads as a new variable. In a
+     * {@code case} pattern, an enumerator's left side or a single-pattern definition only a lowercase name is one, an
+     * uppercase name being a constant. In a definition listing several names, such as {@code val A, B = 1}, each is.
      */
     private static boolean isPatternVariable(Cursor identifier) {
         J.Identifier ident = identifier.getValue();
         String name = ident.getSimpleName();
-        if (name.isEmpty() || "_".equals(name) || !Character.isLowerCase(name.charAt(0)) && name.charAt(0) != '_') {
+        if (name.isEmpty() || "_".equals(name)) {
             return false;
         }
+        boolean lowercase = Character.isLowerCase(name.charAt(0)) || name.charAt(0) == '_';
         Object child = ident;
         for (Cursor c = identifier.getParentTreeCursor(); ; c = c.getParentTreeCursor()) {
             Object parent = c.getValue();
@@ -186,9 +169,12 @@ public class ScalaScopeService extends ScopeService {
                     return false;
                 }
             } else if (parent instanceof J.Case) {
-                return ((J.Case) parent).getCaseLabels().contains(child);
+                return lowercase && ((J.Case) parent).getCaseLabels().contains(child);
             } else if (parent instanceof S.For.Enumerator) {
-                return ((S.For.Enumerator) parent).getLhs() == child;
+                return lowercase && ((S.For.Enumerator) parent).getLhs() == child;
+            } else if (parent instanceof S.PatternDefinition) {
+                List<J> patterns = ((S.PatternDefinition) parent).getPatterns();
+                return patterns.contains(child) && (lowercase || patterns.size() > 1 && child == ident);
             } else if (!(parent instanceof S.TuplePattern || parent instanceof J.Parentheses)) {
                 return false;
             }
