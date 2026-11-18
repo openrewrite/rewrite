@@ -179,8 +179,9 @@ public class ScopeService {
 
     /**
      * The namespace the identifier at the cursor refers into, or null where it declares a name or names a member
-     * selected with a dot, a label or a package. An ambiguous name such as {@code A} in {@code A.b} reads a variable
-     * unless attribution marks it a type, as a variable obscures a type of its name (JLS 6.4.2).
+     * selected with a dot, an enum constant in a case label, a label or a package. An ambiguous name such as
+     * {@code A} in {@code A.b} reads a type only where attribution marks it one and no variable of its name is in
+     * scope, as a variable obscures a type of its name (JLS 6.4.2).
      */
     public Scope.@Nullable Namespace namespaceOf(Cursor identifier) {
         J.Identifier ident = identifier.getValue();
@@ -201,13 +202,13 @@ public class ScopeService {
             parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == ident ||
             parent instanceof J.MemberReference && ((J.MemberReference) parent).getReference() == ident ||
             parent instanceof J.Assignment && ((J.Assignment) parent).getVariable() == ident && parentTree(parentCursor) instanceof J.Annotation ||
-            parent instanceof J.Case && "default".equals(ident.getSimpleName())) {
+            parent instanceof J.Case && ("default".equals(ident.getSimpleName()) || isEnumCaseLabel((J.Case) parent, ident))) {
             return null;
         }
         if (parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == ident) {
             return ((J.MethodInvocation) parent).getSelect() == null ? Scope.Namespace.METHOD : null;
         }
-        if (isTypeName(ident) || isTypePosition(parentCursor, parent, ident)) {
+        if (isTypePosition(parentCursor, parent, ident) || isTypeName(ident) && !isVariableInScope(identifier)) {
             return Scope.Namespace.TYPE;
         }
         return Scope.Namespace.VARIABLE;
@@ -229,12 +230,16 @@ public class ScopeService {
     }
 
     private static boolean isTypePosition(Cursor parentCursor, Object parent, J.Identifier ident) {
-        if (parent instanceof J.VariableDeclarations || parent instanceof J.MethodDeclaration ||
+        if (parent instanceof J.VariableDeclarations ||
             parent instanceof J.ClassDeclaration || parent instanceof J.TypeParameter ||
             parent instanceof J.ParameterizedType || parent instanceof J.ArrayType || parent instanceof J.Wildcard ||
-            parent instanceof J.NewArray || parent instanceof J.DeconstructionPattern ||
+            parent instanceof J.DeconstructionPattern ||
             parent instanceof J.AnnotatedType || parent instanceof J.IntersectionType || parent instanceof J.MultiCatch) {
             return true;
+        } else if (parent instanceof J.MethodDeclaration) {
+            return ((J.MethodDeclaration) parent).getDefaultValue() != ident;
+        } else if (parent instanceof J.NewArray) {
+            return ((J.NewArray) parent).getTypeExpression() == ident;
         } else if (parent instanceof J.NewClass) {
             return ((J.NewClass) parent).getClazz() == ident;
         } else if (parent instanceof J.InstanceOf) {
@@ -664,6 +669,28 @@ public class ScopeService {
 
     private static boolean isColonCase(J tree) {
         return tree instanceof J.Case && ((J.Case) tree).getType() == J.Case.Type.Statement;
+    }
+
+    /**
+     * Whether the identifier is a case label naming a constant of the enum switched on, which is looked up in that
+     * enum rather than in scope (JLS 14.11.1).
+     */
+    private static boolean isEnumCaseLabel(J.Case case_, J.Identifier identifier) {
+        return identifier.getFieldType() != null && identifier.getFieldType().hasFlags(Flag.Enum) &&
+               case_.getCaseLabels().contains(identifier);
+    }
+
+    /**
+     * Whether a variable of the identifier's name is visible where it stands. An identifier a recipe built may
+     * carry a variable's type without its field type, and would otherwise pass for a type name.
+     */
+    private boolean isVariableInScope(Cursor identifier) {
+        for (Cursor c = identifier.getParent(); c != null; c = c.getParent()) {
+            if (c.getValue() instanceof J && isScope(c)) {
+                return Scope.at(identifier).lookup(identifier.<J.Identifier>getValue().getSimpleName()).isPresent();
+            }
+        }
+        return false;
     }
 
     private static boolean isTypeName(J.Identifier identifier) {

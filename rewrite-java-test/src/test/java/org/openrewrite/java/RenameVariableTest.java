@@ -1688,4 +1688,70 @@ class RenameVariableTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renameWithinASubtreeVisitedOnItsOwn() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.VariableDeclarations parameter = (J.VariableDeclarations) method.getParameters().getFirst();
+                  return (J.MethodDeclaration) new RenameVariable<ExecutionContext>(parameter.getVariables().getFirst(), "n")
+                    .visitNonNull(method, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  int increment(int v) {
+                      return v + 1;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int increment(int n) {
+                      return n + 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameAReferenceThatCarriesNoFieldType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  Object parent = getCursor().getParentTreeCursor().getValue();
+                  if (parent instanceof J.VariableDeclarations.NamedVariable variable) {
+                      doAfterVisit(new RenameVariable<>(variable, "n"));
+                      return identifier;
+                  }
+                  // A reference a recipe builds may carry a type and no field type
+                  return identifier.withFieldType(null);
+              }
+          })),
+          java(
+            """
+              class A {
+                  int length() {
+                      String v = "";
+                      return v.length();
+                  }
+              }
+              """,
+            """
+              class A {
+                  int length() {
+                      String n = "";
+                      return n.length();
+                  }
+              }
+              """
+          )
+        );
+    }
 }

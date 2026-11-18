@@ -249,11 +249,15 @@ public class Scope implements Trait<J> {
         new JavaIsoVisitor<Integer>() {
             @Override
             public @Nullable J preVisit(J tree, Integer p) {
-                if (tree == regionTree || service.isScope(getCursor())) {
+                boolean scope = service.isScope(getCursor());
+                if (tree == regionTree || scope) {
                     for (Binding binding : service.bindings(getCursor())) {
                         J anchor = binding.getTree();
                         if (anchor instanceof J.Identifier) {
-                            byIdentifier.putIfAbsent(anchor.getId(), binding);
+                            // A region that opens no scope declares its names in the scope around it, which binds them
+                            // unless the region is an edited copy that scope does not hold.
+                            Binding bound = scope ? null : Binding.declaredBy(binding.getCursor());
+                            byIdentifier.putIfAbsent(anchor.getId(), bound != null ? bound : binding);
                         } else if (anchor != tree && !(anchor instanceof J.Import)) {
                             // A language may anchor a declared name on its statement. An anchor on the scope node itself marks an inherited or implied name.
                             onStatements.add(binding);
@@ -392,7 +396,8 @@ public class Scope implements Trait<J> {
                 } else {
                     Object parent = getCursor().getParentTreeCursor().getValue();
                     if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier ||
-                          parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == identifier)) {
+                          parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == identifier ||
+                          parent instanceof J.Case && ((J.Case) parent).getCaseLabels().contains(identifier))) {
                         return identifier;
                     }
                 }
@@ -422,7 +427,8 @@ public class Scope implements Trait<J> {
         }
 
         /**
-         * One identifier, with the binding its name resolves to, or none where it names a member after a dot.
+         * One identifier, with the binding its name resolves to, or none where it names a member after a dot or
+         * an enum constant in a case label.
          */
         @Value
         private static class Reference {
@@ -542,6 +548,8 @@ public class Scope implements Trait<J> {
         /**
          * The identifiers in the binding's scope that refer to it, by its simple name, as {@code this.name} or
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
+         * Where a class redeclares a field of its superclass, {@code super.name} reads the inherited one and is
+         * still listed.
          */
         public Stream<Cursor> references() {
             // One walk of the scope answers for every binding in it
@@ -608,11 +616,23 @@ public class Scope implements Trait<J> {
         }
 
         /**
-         * Whether the identifier names this member after a dot: from {@code this} or {@code super} in its own class,
-         * or for a field from another instance.
+         * Whether the identifier names this member after a dot or as a case label. After a dot it is selected from
+         * {@code this} or {@code super} in its own class, or for a field from another instance.
          */
         private boolean selects(Cursor identifier) {
-            return selectedFromOwnClass(identifier) || isSameField(identifier);
+            return selectedFromOwnClass(identifier) || isSameField(identifier) || isCaseLabelOfThisConstant(identifier);
+        }
+
+        /**
+         * Whether the identifier is a case label naming this enum constant, as the label's attribution tells.
+         */
+        private boolean isCaseLabelOfThisConstant(Cursor identifier) {
+            J.Identifier label = identifier.getValue();
+            Object enumClass = scope.getValue();
+            return identifier.getParentTreeCursor().getValue() instanceof J.Case &&
+                   cursor.getParentTreeCursor().getValue() instanceof J.EnumValue &&
+                   enumClass instanceof J.ClassDeclaration && label.getFieldType() != null &&
+                   TypeUtils.isOfType(label.getFieldType().getOwner(), ((J.ClassDeclaration) enumClass).getType());
         }
 
         /**

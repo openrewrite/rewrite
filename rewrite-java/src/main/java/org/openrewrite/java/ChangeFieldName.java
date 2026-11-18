@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -86,11 +87,13 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
 
     /**
      * What the field has to be selected from at the cursor once it has its new name, or {@code null} where the bare
-     * name still reads it. A local variable of the new name would otherwise be read in its place.
+     * name still reads it or nothing names the instance holding it. A local variable of the new name would otherwise
+     * be read in its place.
      */
     private @Nullable Expression qualifierWhereShadowed(JavaType.Variable field) {
         Object parent = getCursor().getParentTreeCursor().getValue();
-        if (parent instanceof J.FieldAccess || parent instanceof J.VariableDeclarations.NamedVariable ||
+        if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == getCursor().getValue() ||
+            parent instanceof J.VariableDeclarations.NamedVariable ||
             !Scope.at(getCursor()).lookup(toName).filter(Scope.Binding::isLocal).isPresent()) {
             return null;
         }
@@ -98,17 +101,37 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         if (owner == null) {
             return null;
         }
-        J.Identifier className = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), owner.getClassName(), owner, null);
         if (field.hasFlags(Flag.Static)) {
-            return className;
+            return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), owner.getClassName(), owner, null);
         }
-        J.Identifier this_ = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this", owner, null);
-        Object innermost = getCursor().dropParentUntil(v -> v instanceof J.ClassDeclaration ||
-                v instanceof J.NewClass && ((J.NewClass) v).getBody() != null).getValue();
-        if (innermost instanceof J.ClassDeclaration && TypeUtils.isOfType(((J.ClassDeclaration) innermost).getType(), owner)) {
-            return this_;
+        // The field belongs to the nearest enclosing class that declares or inherits it
+        boolean innermost = true;
+        for (Cursor c = getCursor(); c != null; c = c.getParent()) {
+            Object tree = c.getValue();
+            JavaType.FullyQualified enclosing;
+            if (tree instanceof J.ClassDeclaration) {
+                enclosing = ((J.ClassDeclaration) tree).getType();
+            } else if (tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null) {
+                enclosing = TypeUtils.asFullyQualified(((J.NewClass) tree).getType());
+            } else {
+                continue;
+            }
+            if (enclosing != null && TypeUtils.isAssignableTo(owner, enclosing)) {
+                J.Identifier this_ = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this", enclosing, null);
+                if (innermost) {
+                    return this_;
+                }
+                if (!(tree instanceof J.ClassDeclaration)) {
+                    // An anonymous class further out has no name to select `this` from
+                    return null;
+                }
+                J.Identifier className = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
+                        ((J.ClassDeclaration) tree).getSimpleName(), enclosing, null);
+                return new J.FieldAccess(randomId(), Space.EMPTY, Markers.EMPTY, className, JLeftPadded.build(this_), enclosing);
+            }
+            innermost = false;
         }
-        return new J.FieldAccess(randomId(), Space.EMPTY, Markers.EMPTY, className, JLeftPadded.build(this_), owner);
+        return null;
     }
 
     @Value

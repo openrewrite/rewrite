@@ -68,9 +68,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
          */
         private boolean field;
 
+        /**
+         * Whether the references were collected, which happens on the tree the visit starts from.
+         */
+        private boolean resolved;
+
         @Override
         public @Nullable J visit(@Nullable Tree tree, P p) {
-            if (tree instanceof JavaSourceFile) {
+            if (!resolved && tree instanceof J) {
+                resolved = true;
                 new JavaIsoVisitor<Set<UUID>>() {
                     @Override
                     public J.Identifier visitIdentifier(J.Identifier identifier, Set<UUID> found) {

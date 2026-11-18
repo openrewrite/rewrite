@@ -370,6 +370,74 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void referencesIncludeArrayElementsAndAnAnnotationDefault() {
+        rewriteRun(
+          spec -> spec.recipe(referenceCounts()),
+          java(
+            """
+              @interface Limit {
+                  int MAX = 1;
+                  int value() default MAX;
+              }
+              class A {
+                  int[] m(int p) {
+                      int[] braces = {p};
+                      return new int[]{p};
+                  }
+              }
+              """,
+            """
+              @interface Limit {
+                  int /*~~(1 references)~~>*/MAX = 1;
+                  int value() default MAX;
+              }
+              class A {
+                  int[] m(int /*~~(2 references)~~>*/p) {
+                      int[] /*~~(0 references)~~>*/braces = {p};
+                      return new int[]{p};
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantInACaseLabelIsNotLookedUpInScope() {
+        rewriteRun(
+          spec -> spec.recipe(referenceCounts()),
+          java(
+            """
+              enum Level {
+                  LOW;
+                  int rank(Level level, int LOW) {
+                      switch (level) {
+                          case LOW:
+                              return LOW;
+                          default:
+                              return 0;
+                      }
+                  }
+              }
+              """,
+            """
+              enum Level {
+                  /*~~(1 references)~~>*/LOW;
+                  int rank(Level /*~~(1 references)~~>*/level, int /*~~(1 references)~~>*/LOW) {
+                      switch (level) {
+                          case LOW:
+                              return LOW;
+                          default:
+                              return 0;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodsAndTypesAreLookedUpInTheirOwnNamespace() {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> visible(scope, Scope.Namespace.TYPE, "T", "Inner", "Local", "List", "A", "B") + " | " +
@@ -602,6 +670,38 @@ class ScopeTest implements RewriteTest {
                       }
                   }
                   void use(int i) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declaredWithinAStatementBindsInTheScopeAroundIt() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  return SearchResult.found(multiVariable, Scope.declaredWithin(getCursor())
+                    .map(b -> b.getName() + " has " + b.references().count() + " references")
+                    .collect(joining(", ")));
+              }
+          })),
+          java(
+            """
+              class A {
+                  int m() {
+                      int a = 1;
+                      return a + a;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int m() {
+                      /*~~(a has 2 references)~~>*/int a = 1;
+                      return a + a;
+                  }
               }
               """
           )
@@ -1060,6 +1160,18 @@ class ScopeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Recipe referenceCounts() {
+        return toRecipe(() -> new JavaIsoVisitor<>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                return Scope.bindingOf(getCursor(), identifier)
+                  .filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE)
+                  .map(b -> SearchResult.found(identifier, b.references().count() + " references"))
+                  .orElse(identifier);
+            }
+        });
     }
 
     private static String names(Stream<Scope.Binding> bindings) {

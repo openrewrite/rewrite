@@ -305,4 +305,66 @@ class ChangeFieldNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void qualifyAnInheritedFieldWithThis() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Base", "count", "n")),
+          java(
+            """
+              class Base {
+                  protected int count;
+              }
+              """,
+            """
+              class Base {
+                  protected int n;
+              }
+              """
+          ),
+          java(
+            """
+              class Test extends Base {
+                  int add(int n) {
+                      return count + n;
+                  }
+              }
+              """,
+            """
+              class Test extends Base {
+                  int add(int n) {
+                      return this.n + n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyWhereTheFieldIsSelectedFrom() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "counts", "n")),
+          java(
+            """
+              class Test {
+                  int[] counts;
+
+                  int size(int[] n) {
+                      return counts.length + n.length;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int[] n;
+
+                  int size(int[] n) {
+                      return this.n.length + n.length;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

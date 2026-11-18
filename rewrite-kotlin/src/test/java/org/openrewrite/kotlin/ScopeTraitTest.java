@@ -154,6 +154,10 @@ class ScopeTraitTest implements RewriteTest {
                   return read_ + assigned_
               }
               fun use(i: Int) {}
+              class C(val property_: Int) {
+                  val taken = 1
+                  fun get() = property_
+              }
               """,
             """
               fun m(p: Int): Int {
@@ -165,6 +169,10 @@ class ScopeTraitTest implements RewriteTest {
                   return read_ + assigned_
               }
               fun use(i: Int) {}
+              class C(val /*~~(1 references, final, free:safe taken:unsafe it:safe)~~>*/property_: Int) {
+                  val taken = 1
+                  fun get() = property_
+              }
               """
           )
         );

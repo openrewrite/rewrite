@@ -52,6 +52,14 @@ public class KotlinScopeService extends ScopeService {
             bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null));
         } else if (tree instanceof J.ClassDeclaration) {
             properties(scope, (J.ClassDeclaration) tree, bindings);
+        } else if (tree instanceof J.MethodDeclaration &&
+                   ((J.MethodDeclaration) tree).getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+            // The class binds a property parameter, where the whole body sees it
+            bindings.removeIf(binding -> {
+                Object declarations = binding.getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
+                return declarations instanceof J.VariableDeclarations && isProperty((J.VariableDeclarations) declarations) &&
+                       ((J.MethodDeclaration) tree).getParameters().contains(declarations);
+            });
         }
         return bindings;
     }
