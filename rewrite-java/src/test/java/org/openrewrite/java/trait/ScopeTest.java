@@ -688,6 +688,57 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void blankLocalIsEffectivelyFinalWhereEachPathAssignsItOnce() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  return new Scope.Binding.Matcher().get(getCursor())
+                    .filter(b -> b.getName().endsWith("_"))
+                    .map(b -> SearchResult.found(identifier, b.isEffectivelyFinal() ? "final" : "assigned"))
+                    .orElse(identifier);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(boolean c, int k) {
+                      int branches_;
+                      if (c) branches_ = 1; else branches_ = 2;
+                      int twice_;
+                      if (c) twice_ = 1;
+                      twice_ = 2;
+                      int arrows_;
+                      switch (k) { case 1 -> arrows_ = 1; default -> arrows_ = 2; }
+                      int fallsThrough_;
+                      switch (k) { case 1: fallsThrough_ = 1; default: fallsThrough_ = 2; }
+                      int ternary_;
+                      int unused = c ? (ternary_ = 1) : (ternary_ = 2);
+                  }
+              }
+              """,
+            """
+              class A {
+                  void m(boolean c, int k) {
+                      int /*~~(final)~~>*/branches_;
+                      if (c) branches_ = 1; else branches_ = 2;
+                      int /*~~(assigned)~~>*/twice_;
+                      if (c) twice_ = 1;
+                      twice_ = 2;
+                      int /*~~(final)~~>*/arrows_;
+                      switch (k) { case 1 -> arrows_ = 1; default -> arrows_ = 2; }
+                      int /*~~(assigned)~~>*/fallsThrough_;
+                      switch (k) { case 1: fallsThrough_ = 1; default: fallsThrough_ = 2; }
+                      int /*~~(final)~~>*/ternary_;
+                      int unused = c ? (ternary_ = 1) : (ternary_ = 2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void declaredWithinAnEditedCopyComeFromTheCopy() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

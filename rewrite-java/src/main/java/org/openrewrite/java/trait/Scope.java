@@ -639,16 +639,72 @@ public class Scope implements Trait<J> {
             boolean blank = declaring.getValue() instanceof J.VariableDeclarations.NamedVariable &&
                             ((J.VariableDeclarations.NamedVariable) declaring.getValue()).getInitializer() == null &&
                             declaring.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Block;
-            int assignments = 0;
+            Set<UUID> assignments = new HashSet<>();
             for (Cursor reference : (Iterable<Cursor>) references::iterator) {
                 if (isAssigned(reference)) {
-                    // A local declared without an initializer may be assigned once (JLS 4.12.4).
-                    if (!blank || !isSimpleAssignment(reference) || ++assignments > 1 || isInLoopBelow(reference, scope)) {
+                    if (!blank || !isSimpleAssignment(reference) || isInLoopBelow(reference, scope)) {
                         return false;
                     }
+                    assignments.add(((J) reference.getValue()).getId());
                 }
             }
-            return true;
+            // A local declared without an initializer may be assigned once on each path (JLS 4.12.4).
+            return assignments.size() <= 1 || mostOnOnePath(scope.getValue(), assignments) <= 1;
+        }
+
+        /**
+         * The most of the given identifiers that one run through the tree can reach, where only one branch of an
+         * {@code if}, a conditional expression or an arrow {@code switch} runs.
+         */
+        private static int mostOnOnePath(J tree, Set<UUID> identifiers) {
+            int[] count = {0};
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                    if (identifiers.contains(identifier.getId())) {
+                        count[0]++;
+                    }
+                    return identifier;
+                }
+
+                @Override
+                public J.If visitIf(J.If iff, Integer p) {
+                    visit(iff.getIfCondition(), p);
+                    oneOf(Arrays.asList(iff.getThenPart(), iff.getElsePart()), p);
+                    return iff;
+                }
+
+                @Override
+                public J.Ternary visitTernary(J.Ternary ternary, Integer p) {
+                    visit(ternary.getCondition(), p);
+                    oneOf(Arrays.asList(ternary.getTruePart(), ternary.getFalsePart()), p);
+                    return ternary;
+                }
+
+                @Override
+                public J.Switch visitSwitch(J.Switch switch_, Integer p) {
+                    for (Statement case_ : switch_.getCases().getStatements()) {
+                        if (!(case_ instanceof J.Case) || ((J.Case) case_).getType() != J.Case.Type.Rule) {
+                            return super.visitSwitch(switch_, p);
+                        }
+                    }
+                    visit(switch_.getSelector(), p);
+                    oneOf(switch_.getCases().getStatements(), p);
+                    return switch_;
+                }
+
+                private void oneOf(List<? extends @Nullable J> branches, Integer p) {
+                    int before = count[0];
+                    int most = before;
+                    for (J branch : branches) {
+                        count[0] = before;
+                        visit(branch, p);
+                        most = Math.max(most, count[0]);
+                    }
+                    count[0] = most;
+                }
+            }.visit(tree, 0);
+            return count[0];
         }
 
         /**
