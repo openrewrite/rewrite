@@ -30,7 +30,6 @@ import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.EtaExpansion
-import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.ImplicitArguments
 import org.openrewrite.scala.marker.ImplicitConversion
@@ -49,8 +48,10 @@ import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.CommaContinuation
 import org.openrewrite.scala.marker.FunctionApplication
+import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.GivenConditionArrow
 import org.openrewrite.scala.marker.GivenWith
+import org.openrewrite.scala.marker.ParameterClause
 import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
@@ -3871,15 +3872,7 @@ class ScalaTreeVisitor(
       }
     }
 
-    val firstValueParameter = template.constr.paramss.find(_.forall(_.isInstanceOf[Trees.ValDef[?]])).flatMap(_.headOption)
-    val primaryConstructor = firstValueParameter match {
-      // A condition written as a bare type, `given Ord[Int] => Foo`, is an anonymous using parameter.
-      case Some(parameter: Trees.ValDef[?]) if source.charAt(indexOfNextNonWhitespace(cursor)) != '(' =>
-        JContainer.build(Space.EMPTY,
-          Collections.singletonList(JRightPadded.build[Statement](visitConstructorParameter(parameter, isFirstInList = true))),
-          Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
-      case _ => templatePrimaryConstructor(template)
-    }
+    val primaryConstructor = templatePrimaryConstructor(template, end, conditionsEnd = firstParentStart)
 
     val next = indexOfNextNonWhitespace(cursor)
     val keyword = if (source.startsWith("=>", next)) {
@@ -5460,7 +5453,8 @@ class ScalaTreeVisitor(
     
     val typeParameters = templateTypeParameters(template)
 
-    val primaryConstructor = templatePrimaryConstructor(template)
+    val primaryConstructor = templatePrimaryConstructor(template,
+      if (td.span.exists) Math.max(0, td.span.end - offsetAdjustment) else source.length)
 
     
     // Filter out synthetic parents added by the compiler (e.g., implicit "extends Object")
@@ -5664,31 +5658,36 @@ class ScalaTreeVisitor(
       null
     }
 
-  private def templatePrimaryConstructor(template: Trees.Template[?]): JContainer[Statement] = {
-    // Handle constructor parameters - build a proper JContainer<Statement> of J.VariableDeclarations.
-    // The first paramss list may contain TypeDefs (type params, consumed by templateTypeParameters); we only
-    // process the first list of value (ValDef) parameters here. Additional param clauses
-    // (curried `(x)(y)` constructors) are not yet modeled.
-    val firstValueParamList: Option[List[Trees.ValDef[?]]] = if (template != null) {
-      template.constr.paramss.collectFirst {
-        case lst if lst.forall(_.isInstanceOf[Trees.ValDef[?]]) =>
-          lst.collect { case vd: Trees.ValDef[?] => vd }
-      }
-    } else None
+  /**
+   * The parameters of every term clause of a class's or given's constructor, in order, ending before `end`. The
+   * first parameter of a later clause carries a [[ParameterClause]]. A given's conditions, before `conditionsEnd`
+   * where what it implements starts, may be separated by `=>`, and one written as a bare type has no parentheses.
+   */
+  private def templatePrimaryConstructor(template: Trees.Template[?], end: Int, conditionsEnd: Int = -1): JContainer[Statement] = {
+    // Dotty drops a given's empty `()` condition, so only non-empty clauses are matched against the source.
+    var clauses: List[List[Trees.ValDef[?]]] = if (template == null) Nil else template.constr.paramss.collect {
+      case clause if clause.nonEmpty && clause.forall(_.isInstanceOf[Trees.ValDef[?]]) =>
+        stripTrailingCommaArtifact(clause.collect { case vd: Trees.ValDef[?] => vd })
+    }
+    val parameters = new util.ArrayList[JRightPadded[Statement]]()
 
-    // Source has a primary-constructor parameter list iff the next non-whitespace char is `(`.
-    val ctorParenPos: Int = {
-      var i = cursor
-      while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      if (i < source.length && source.charAt(i) == '(') i else -1
+    def nextClause(open: Int): List[Trees.ValDef[?]] =
+      if (source.charAt(indexOfNextNonWhitespace(open + 1)) == ')') Nil
+      else clauses match {
+        case clause :: rest =>
+          clauses = rest
+          clause
+        case Nil => throw new IllegalStateException("A parameter clause the compiler did not parse: " +
+          source.substring(open, Math.min(end, source.length)))
+      }
+
+    def addParameter(vd: Trees.ValDef[?], isFirstInList: Boolean, clause: ParameterClause): Unit = {
+      val parameter = visitConstructorParameter(vd, isFirstInList)
+      val marked = if (clause == null) parameter else parameter.withMarkers(parameter.getMarkers.add(clause))
+      parameters.add(JRightPadded.build[Statement](marked))
     }
 
-    if (ctorParenPos >= 0) {
-      val params = stripTrailingCommaArtifact(firstValueParamList.getOrElse(Nil))
-      val parenSpace = ScalaSpace.format(source, cursor, ctorParenPos)
-      cursor = ctorParenPos + 1
-
-      val jParams = new util.ArrayList[JRightPadded[Statement]]()
+    def parenthesizedClause(params: List[Trees.ValDef[?]], clause: ParameterClause): Unit = {
       params.zipWithIndex.foreach { case (vd, idx) =>
         val isLast = idx == params.size - 1
         val param = visitConstructorParameter(vd, isFirstInList = idx == 0)
@@ -5731,50 +5730,76 @@ class ScalaTreeVisitor(
         } else {
           Markers.EMPTY
         }
-        jParams.add(new JRightPadded(param.asInstanceOf[Statement], afterParam, paramMarkers))
+        val marked = if (idx == 0 && clause != null) param.withMarkers(param.getMarkers.add(clause)) else param
+        parameters.add(new JRightPadded(marked.asInstanceOf[Statement], afterParam, paramMarkers))
       }
 
       // Advance cursor past closing `)`
       if (cursor < source.length) {
         val remaining = source.substring(cursor, Math.min(cursor + 500, source.length))
         val closeParen = positionOfNextIn(remaining, ")", 0)
-        if (closeParen >= 0) cursor = cursor + closeParen + 1
-      }
-
-      // Scala 3 allows curried constructor param lists: `class C(a: Int)(using Executor)`.
-      // J.ClassDeclaration only models the first list; collect the rest verbatim from source
-      // so the printer can re-emit them. Stops at the first non-`(` non-whitespace char.
-      val extraListsBuf = new StringBuilder
-      var scanCursor = cursor
-      var keepScanning = true
-      while (keepScanning) {
-        var probe = scanCursor
-        while (probe < source.length && source.charAt(probe).isWhitespace) probe += 1
-        if (probe < source.length && source.charAt(probe) == '(') {
-          val closePos = positionOfMatchingClose('(', ')', probe + 1)
-          if (closePos >= 0) {
-            extraListsBuf.append(source.substring(scanCursor, closePos + 1))
-            scanCursor = closePos + 1
-          } else {
-            keepScanning = false
+        if (closeParen >= 0) {
+          if (params.isEmpty && clause != null) {
+            // An empty later clause holds a J.Empty to carry its marker, as an empty Java parameter list does.
+            parameters.add(new JRightPadded[Statement](
+              new J.Empty(Tree.randomId(), Space.EMPTY, Markers.build(Collections.singletonList(clause))),
+              ScalaSpace.format(source, cursor, cursor + closeParen), Markers.EMPTY))
           }
-        } else {
-          keepScanning = false
+          cursor = cursor + closeParen + 1
         }
       }
-      val containerMarkers: Markers = if (extraListsBuf.nonEmpty) {
-        cursor = scanCursor
-        Markers.build(Collections.singletonList(
-          org.openrewrite.scala.marker.ExtraConstructorParamLists(
-            Tree.randomId(), extraListsBuf.toString)))
-      } else Markers.EMPTY
+    }
 
-      JContainer.build(parenSpace, jParams, containerMarkers)
+    def bareClause(clause: ParameterClause): Unit = clauses match {
+      case List(vd) :: rest =>
+        clauses = rest
+        addParameter(vd, isFirstInList = true, clause)
+      case _ => throw new IllegalStateException("A condition written as a type is not one parameter: " +
+        source.substring(cursor, Math.min(end, source.length)))
+    }
+
+    // A given's parent may itself start with `(`, as in `given (Ord[Int]) with {}`
+    val limit = if (conditionsEnd >= 0) conditionsEnd else end
+
+    // The clauses after the first, `(a)(b)` in a class or old-style given, `(a) => (b) =>` in a 3.6 given.
+    def laterClauses(): Unit = {
+      var more = true
+      while (more) {
+        val next = indexOfNextNonWhitespace(cursor)
+        if (next < limit && source.charAt(next) == '(') {
+          val prefix = ScalaSpace.format(source, cursor, next)
+          cursor = next + 1
+          parenthesizedClause(nextClause(next), ParameterClause.create(null, prefix, true))
+        } else if (conditionsEnd >= 0 && source.startsWith("=>", next) && indexOfNextNonWhitespace(next + 2) < conditionsEnd) {
+          val beforeArrow = ScalaSpace.format(source, cursor, next)
+          cursor = next + 2
+          val open = indexOfNextNonWhitespace(cursor)
+          if (source.charAt(open) == '(') {
+            val prefix = ScalaSpace.format(source, cursor, open)
+            cursor = open + 1
+            parenthesizedClause(nextClause(open), ParameterClause.create(beforeArrow, prefix, true))
+          } else {
+            bareClause(ParameterClause.create(beforeArrow, Space.EMPTY, false))
+          }
+        } else {
+          more = false
+        }
+      }
+    }
+
+    val first = indexOfNextNonWhitespace(cursor)
+    if (first < limit && source.charAt(first) == '(') {
+      val before = ScalaSpace.format(source, cursor, first)
+      cursor = first + 1
+      parenthesizedClause(nextClause(first), null)
+      laterClauses()
+      JContainer.build(before, parameters, Markers.EMPTY)
     } else {
-      // No `(` in source — non-constructor class definition. Emit an empty container
-      // marked with OmitParentheses so the printer skips emitting `(...)`.
-      JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
-        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
+      if (conditionsEnd >= 0 && clauses.nonEmpty && first < conditionsEnd) {
+        bareClause(null)
+        laterClauses()
+      }
+      JContainer.build(Space.EMPTY, parameters, Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
     }
   }
 

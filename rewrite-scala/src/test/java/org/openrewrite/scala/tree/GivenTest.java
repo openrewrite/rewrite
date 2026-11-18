@@ -20,6 +20,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.ScalaIsoVisitor;
 import org.openrewrite.scala.marker.Given;
+import org.openrewrite.scala.marker.ParameterClause;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -77,6 +78,52 @@ class GivenTest implements RewriteTest {
                   "final given : Ord[Long] { compare }",
                   "given [T](ord): Ord[List[T]] { compare }"
                 );
+            })
+          )
+        );
+    }
+
+    @Test
+    void laterParameterClausesAreConstructorParameters() {
+        rewriteRun(
+          scala(
+            """
+              trait Ord[T]
+              trait Show[T]
+              trait Executor
+              class C(a: Int)(using e: Executor)
+              class D(a: Int)( )
+              object Test {
+                given [T] => (a: Ord[T])  =>/* c */( b: Show[T] ) => Ord[List[T]]:
+                  def x = 1
+                given [T] => Ord[T] => Show[T] => Ord[Vector[T]]:
+                  def x = 1
+                given seqOrd[T](using a: Ord[T]) (using b: Show[T]): Ord[Seq[T]] with {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<String> clauses = new ArrayList<>();
+                new ScalaIsoVisitor<Integer>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                        List<Statement> parameters = classDecl.getPrimaryConstructor();
+                        if (parameters != null && parameters.size() > 1) {
+                            StringBuilder shape = new StringBuilder("(");
+                            for (int i = 0; i < parameters.size(); i++) {
+                                Statement parameter = parameters.get(i);
+                                if (i > 0) {
+                                    shape.append(parameter.getMarkers().findFirst(ParameterClause.class).isPresent() ? ")(" : ",");
+                                }
+                                if (parameter instanceof J.VariableDeclarations) {
+                                    shape.append(((J.VariableDeclarations) parameter).getVariables().getFirst().getSimpleName());
+                                }
+                            }
+                            clauses.add(shape.append(")").toString());
+                        }
+                        return super.visitClassDeclaration(classDecl, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(clauses).containsExactly("(a)(e)", "(a)()", "(a)(b)", "(x$1)(x$2)", "(a)(b)");
             })
           )
         );
@@ -178,6 +225,35 @@ class GivenTest implements RewriteTest {
                 } // after
                 given /* : */ [T] /* : */ => /* with */ Ord[List[T]] /* { */ :
                   def x = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedComments() {
+        rewriteRun(
+          scala(
+            """
+              trait Ord[T]
+              trait Show
+              object Test {
+                private /* a /* b */ c */ given longOrd /* d /* e */ f */ : Ord[Long] /* g /* h */ i */ with Show with {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parentInParentheses() {
+        rewriteRun(
+          scala(
+            """
+              trait Ord[T]
+              object Test {
+                given (Ord[Int]) with {}
               }
               """
           )

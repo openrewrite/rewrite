@@ -44,6 +44,7 @@ import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.InfixNotation;
 import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.OmitName;
+import org.openrewrite.scala.marker.ParameterClause;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TrailingComma;
@@ -1118,18 +1119,34 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         for (int i = 0; i < ctorElements.size(); i++) {
             JRightPadded<Statement> rp = ctorElements.get(i);
             Statement element = rp.getElement();
+            ParameterClause clause = element.getMarkers().findFirst(ParameterClause.class).orElse(null);
+            if (clause != null) {
+                if (parens) {
+                    p.append(')');
+                }
+                if (clause.getBeforeArrow() != null) {
+                    visitSpace(clause.getBeforeArrow(), Space.Location.LANGUAGE_EXTENSION, p);
+                    p.append("=>");
+                }
+                parens = clause.isParenthesized();
+                if (parens) {
+                    visitSpace(clause.getPrefix(), Space.Location.RECORD_STATE_VECTOR, p);
+                    p.append('(');
+                }
+            }
             if (element instanceof J.VariableDeclarations) {
                 printParameter((J.VariableDeclarations) element, p);
             } else {
                 visit(element, p);
             }
-            visitListElementSuffix(rp, i == ctorElements.size() - 1, Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+            boolean lastOfClause = i == ctorElements.size() - 1 ||
+                                   ctorElements.get(i + 1).getElement().getMarkers().findFirst(ParameterClause.class).isPresent();
+            visitListElementSuffix(rp, lastOfClause, Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
         }
         if (parens) {
             p.append(')');
         }
-        // Re-emit any additional curried constructor param lists captured verbatim
-        // from source (e.g. `(using Executor)`).
+        // An LST written before ParameterClause holds the later clauses as text.
         primaryConstructor.getMarkers()
             .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
             .ifPresent(m -> p.append(m.text()));

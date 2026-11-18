@@ -128,11 +128,11 @@ case class OmitName(id: UUID) extends Marker {
 }
 
 /**
- * Captures additional constructor parameter lists for a Scala 3 class declared
- * with curried constructor params, e.g. `class C(a: Int)(using Executor)`.
- * The J.ClassDeclaration's `primaryConstructor` JContainer only models the first
- * list; this marker holds the verbatim source text of the remaining lists so the
- * printer can re-emit them after the first `)`. Includes the surrounding parens.
+ * The verbatim source of the argument lists after the first in a curried
+ * `new Foo(1)(2) { ... }`, parens included, which the printer re-emits after
+ * the first `)`. A class declaration's later parameter clauses are parameters
+ * marked with `ParameterClause`. LSTs written before that carry this marker on
+ * the primary constructor instead, and it still prints there.
  */
 case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
   override def getId(): UUID = id
