@@ -9572,25 +9572,11 @@ class ScalaTreeVisitor(
     def isWordChar(c: Char): Boolean = Character.isLetterOrDigit(c) || c == '_'
     val firstIsWord = delimiter.nonEmpty && isWordChar(delimiter.charAt(0))
     val lastIsWord = delimiter.nonEmpty && isWordChar(delimiter.charAt(delimiter.length - 1))
-    var inSingleLine = false
-    var inMultiLine = false
     var i = startFrom
     while (i <= text.length - delimiter.length) {
-      val c = text.charAt(i)
-      if (inSingleLine) {
-        if (c == '\n') inSingleLine = false
-        i += 1
-      } else if (inMultiLine) {
-        if (c == '*' && i + 1 < text.length && text.charAt(i + 1) == '/') {
-          inMultiLine = false
-          i += 2
-        } else i += 1
-      } else if (c == '/' && i + 1 < text.length && text.charAt(i + 1) == '/') {
-        inSingleLine = true
-        i += 2
-      } else if (c == '/' && i + 1 < text.length && text.charAt(i + 1) == '*') {
-        inMultiLine = true
-        i += 2
+      val afterComment = skipComment(text, i, text.length)
+      if (afterComment > i) {
+        i = afterComment
       } else if (text.startsWith(delimiter, i)) {
         val before = !firstIsWord || i == 0 || !isWordChar(text.charAt(i - 1))
         val afterPos = i + delimiter.length
@@ -9631,27 +9617,21 @@ class ScalaTreeVisitor(
   private def positionOfMatchingClose(openChar: Char, closeChar: Char, afterOpen: Int): Int = {
     var depth = 1
     var i = afterOpen
-    var inLineComment = false
-    var inBlockComment = false
     var inString = false
     while (i < source.length && depth > 0) {
       val c = source.charAt(i)
-      if (inLineComment) {
-        if (c == '\n') inLineComment = false
-        i += 1
-      } else if (inBlockComment) {
-        if (c == '*' && i + 1 < source.length && source.charAt(i + 1) == '/') { inBlockComment = false; i += 2 }
-        else i += 1
-      } else if (inString) {
+      if (inString) {
         if (c == '\\') i += 2
         else { if (c == '"') inString = false; i += 1 }
-      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '/') { inLineComment = true; i += 2 }
-      else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '*') { inBlockComment = true; i += 2 }
-      else if (c == '"') { inString = true; i += 1 }
-      else {
-        if (c == openChar) depth += 1
-        else if (c == closeChar) depth -= 1
-        if (depth > 0) i += 1
+      } else {
+        val afterComment = skipComment(source, i, source.length)
+        if (afterComment > i) i = afterComment
+        else if (c == '"') { inString = true; i += 1 }
+        else {
+          if (c == openChar) depth += 1
+          else if (c == closeChar) depth -= 1
+          if (depth > 0) i += 1
+        }
       }
     }
     if (depth == 0) i else -1
@@ -9664,18 +9644,10 @@ class ScalaTreeVisitor(
    *  parameter) is not mistaken for the method-body `=`. Comments are skipped too. */
   private def bodyOpensWithBrace(start: Int, end: Int): Boolean = {
     var i = start
-    var inLineComment = false
-    var inBlockComment = false
     while (i < end) {
       val c = source.charAt(i)
-      if (inLineComment) {
-        if (c == '\n') inLineComment = false
-        i += 1
-      } else if (inBlockComment) {
-        if (c == '*' && i + 1 < end && source.charAt(i + 1) == '/') { inBlockComment = false; i += 2 }
-        else i += 1
-      } else if (c == '/' && i + 1 < end && source.charAt(i + 1) == '/') { inLineComment = true; i += 2 }
-      else if (c == '/' && i + 1 < end && source.charAt(i + 1) == '*') { inBlockComment = true; i += 2 }
+      val afterComment = skipComment(source, i, end)
+      if (afterComment > i) i = afterComment
       else if (c == '(' || c == '[') {
         val close = positionOfMatchingClose(c, if (c == '(') ')' else ']', i + 1)
         i = if (close >= 0) close + 1 else end
@@ -9759,34 +9731,47 @@ class ScalaTreeVisitor(
   private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
     var i = startFrom
     while (i < source.length) {
-      val c = source.charAt(i)
-      if (Character.isWhitespace(c)) {
+      if (Character.isWhitespace(source.charAt(i))) {
         i += 1
-      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '*') {
-        // Scala block comments nest, so the first `*/` may close only an inner one
-        var depth = 1
-        i += 2
-        while (depth > 0) {
-          if (i + 1 >= source.length) return source.length
-          if (source.charAt(i) == '/' && source.charAt(i + 1) == '*') {
-            depth += 1
-            i += 2
-          } else if (source.charAt(i) == '*' && source.charAt(i + 1) == '/') {
-            depth -= 1
-            i += 2
-          } else {
-            i += 1
-          }
-        }
-      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '/') {
-        val nl = source.indexOf('\n', i + 2)
-        if (nl < 0) return source.length
-        i = nl + 1
       } else {
-        return i
+        val afterComment = skipComment(source, i, source.length)
+        if (afterComment == i) return i
+        i = afterComment
       }
     }
     i
+  }
+
+  /**
+   * The index just past the comment starting at `i` in `text`, or `i` when no comment starts there.
+   * Scala block comments nest, so a block comment ends at the close matching its own opening.
+   * A comment left open runs to `limit`.
+   */
+  private def skipComment(text: String, i: Int, limit: Int): Int = {
+    if (i + 1 >= limit || text.charAt(i) != '/') {
+      i
+    } else if (text.charAt(i + 1) == '/') {
+      val newline = text.indexOf('\n', i + 2)
+      if (newline < 0 || newline >= limit) limit else newline + 1
+    } else if (text.charAt(i + 1) == '*') {
+      var depth = 1
+      var j = i + 2
+      while (depth > 0) {
+        if (j + 1 >= limit) return limit
+        if (text.charAt(j) == '/' && text.charAt(j + 1) == '*') {
+          depth += 1
+          j += 2
+        } else if (text.charAt(j) == '*' && text.charAt(j + 1) == '/') {
+          depth -= 1
+          j += 2
+        } else {
+          j += 1
+        }
+      }
+      j
+    } else {
+      i
+    }
   }
   
   /** Find a keyword in text, ensuring it's a whole word (not part of an identifier). */

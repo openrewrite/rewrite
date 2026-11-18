@@ -60,6 +60,21 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void procedureSyntaxAfterNestedCommentHoldingAnEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def hello() /* a /* b */ = */ {
+                    println("hello")
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void procedureSyntaxWithParams() {
         rewriteRun(
             scala(

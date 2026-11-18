@@ -245,6 +245,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void nestedCommentHoldingABracketInTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def identity[T /* [ /* ] */ ] */](x: T): T = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void abstractMethod() {
         rewriteRun(
             scala(

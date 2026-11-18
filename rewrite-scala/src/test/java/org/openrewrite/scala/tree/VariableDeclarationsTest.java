@@ -162,6 +162,7 @@ class VariableDeclarationsTest implements RewriteTest {
               object Test {
                 private /* a /* b */ c */ val (a, b) /* d /* e */ f */ = /* g /* h */ i */ (1, 2)
                 private /* a /* b */ c */ lazy /* val */ val (c, d) = (1, 2)
+                val e /* x /* y */ , */ , f = 1
               }
               """
           )
