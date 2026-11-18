@@ -19,7 +19,7 @@ package main
 import (
 	"encoding/json"
 	"reflect"
-	"strings"
+
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,6 +37,16 @@ func (*goReqOptRecipe) DisplayName() string { return "Requires opt" }
 func (*goReqOptRecipe) Description() string { return "A recipe with a required option." }
 func (*goReqOptRecipe) Options() []recipe.OptionDescriptor {
 	return []recipe.OptionDescriptor{recipe.Option("text", "Text", "Required text.")}
+}
+
+// goSetOptRecipe reports a value for its required option, so preparing it must find nothing wrong.
+type goSetOptRecipe struct{ recipe.Base }
+
+func (*goSetOptRecipe) Name() string        { return "org.openrewrite.go.test.SetOpt" }
+func (*goSetOptRecipe) DisplayName() string { return "Set opt" }
+func (*goSetOptRecipe) Description() string { return "A recipe whose required option has a value." }
+func (*goSetOptRecipe) Options() []recipe.OptionDescriptor {
+	return []recipe.OptionDescriptor{recipe.Option("text", "Text", "Required text.").WithValue("hi")}
 }
 
 type goLeafRecipe struct{ recipe.Base }
@@ -63,22 +73,35 @@ func (*goCompositeInvalidChild) RecipeList() []recipe.Recipe {
 	return []recipe.Recipe{&goReqOptRecipe{}}
 }
 
-func prepareErr(t *testing.T, s *server, id string) *rpcError {
+func prepareResp(t *testing.T, s *server, id string) (prepareRecipeResponse, *rpcError) {
 	t.Helper()
 	params, err := json.Marshal(prepareRecipeRequest{ID: id})
 	require.NoError(t, err, "marshal prepare request")
-	_, rpcErr := s.handlePrepareRecipe(params)
-	return rpcErr
+	result, rpcErr := s.handlePrepareRecipe(params)
+	if rpcErr != nil {
+		return prepareRecipeResponse{}, rpcErr
+	}
+	return result.(prepareRecipeResponse), nil
 }
 
-func TestPrepareRecipeRejectsMissingRequiredOption(t *testing.T) {
+func TestPrepareRecipeEmitsValidationForMissingRequiredOption(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.registry.Register(&goReqOptRecipe{})
 
-	rpcErr := prepareErr(t, s, "org.openrewrite.go.test.RequiresOpt")
+	resp, rpcErr := prepareResp(t, s, "org.openrewrite.go.test.RequiresOpt")
 
-	require.NotNil(t, rpcErr, "expected a missing-required-option error, got success")
-	assert.Falsef(t, !strings.Contains(rpcErr.Message, "Missing required option") || !strings.Contains(rpcErr.Message, "text"), "error %q does not report the missing `text` option", rpcErr.Message)
+	require.Nil(t, rpcErr, "preparing must not fail; the host decides what to do with validations")
+	assert.Equal(t, []optionValidation{{Option: "text", Message: "is required"}}, resp.Validations)
+}
+
+func TestPrepareRecipeSuppliedOptionEmitsNoValidations(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.registry.Register(&goSetOptRecipe{})
+
+	resp, rpcErr := prepareResp(t, s, "org.openrewrite.go.test.SetOpt")
+
+	require.Nil(t, rpcErr)
+	assert.Empty(t, resp.Validations)
 }
 
 // Validation recurses through the whole prepared tree (like the C#, JS, and Python servers).
@@ -86,10 +109,12 @@ func TestPrepareRecipeValidatesChildRequiredOptions(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.registry.Register(&goCompositeInvalidChild{})
 
-	rpcErr := prepareErr(t, s, "org.openrewrite.go.test.CompositeInvalid")
+	resp, rpcErr := prepareResp(t, s, "org.openrewrite.go.test.CompositeInvalid")
 
-	require.NotNil(t, rpcErr, "expected a missing-required-option error for the child, got success")
-	assert.Falsef(t, !strings.Contains(rpcErr.Message, "Missing required option") || !strings.Contains(rpcErr.Message, "text"), "error %q does not report the child's missing `text` option", rpcErr.Message)
+	require.Nil(t, rpcErr, "preparing must not fail; the host decides what to do with validations")
+	assert.Empty(t, resp.Validations, "the composite itself has no bad options")
+	require.Len(t, resp.RecipeList, 1)
+	assert.Equal(t, []optionValidation{{Option: "text", Message: "is required"}}, resp.RecipeList[0].Validations)
 }
 
 func TestPrepareRecipeReturnsWholeChildTree(t *testing.T) {
