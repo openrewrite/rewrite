@@ -318,7 +318,7 @@ class ScopeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  return new Scope.Binding.Matcher().get(getCursor())
+                  return Scope.bindingOf(getCursor(), identifier)
                     .filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE)
                     .map(b -> SearchResult.found(identifier, b.references().count() + " references, " +
                                                              (b.isEffectivelyFinal() ? "effectively final" : "not effectively final") +
@@ -421,14 +421,15 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
-    void referencesWithinARegionAnswerForEveryBindingAtOnce() {
+    void referencesOfABindingAllOrOnlyThoseInARegion() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  Scope.References references = Scope.referencesWithin(getCursor());
+                  Cursor lastBlock = new Cursor(new Cursor(getCursor(), method.getBody()), method.getBody().getStatements().get(1));
                   String facts = Scope.declaredWithin(getCursor())
-                    .map(b -> b.getName() + ":" + references.of(b).count() + (references.isEffectivelyFinal(b) ? "" : "!"))
+                    .map(b -> b.getName() + ":" + b.references().count() + "/" + b.references(lastBlock).count() +
+                              (b.isEffectivelyFinal() ? "" : "!"))
                     .collect(joining(" "));
                   return SearchResult.found(method, facts);
               }
@@ -446,7 +447,7 @@ class ScopeTest implements RewriteTest {
             """
               class A {
                   int f;
-                  /*~~(m:0 p:2 n:1! n:2)~~>*/void m(int p) {
+                  /*~~(m:0/0 p:2/1 n:1/0! n:2/2)~~>*/void m(int p) {
                       { int n = p; n++; }
                       { int n = p; this.f = n + n; }
                   }
@@ -462,7 +463,7 @@ class ScopeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  return new Scope.Binding.Matcher().get(getCursor())
+                  return Scope.bindingOf(getCursor(), identifier)
                     .map(b -> SearchResult.found(identifier, b.references().count() + " references"))
                     .orElse(identifier);
               }
@@ -693,7 +694,7 @@ class ScopeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  return new Scope.Binding.Matcher().get(getCursor())
+                  return Scope.bindingOf(getCursor(), identifier)
                     .filter(b -> b.getName().endsWith("_"))
                     .map(b -> SearchResult.found(identifier, b.isEffectivelyFinal() ? "final" : "assigned"))
                     .orElse(identifier);
@@ -917,7 +918,7 @@ class ScopeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  return new Scope.Binding.Matcher().get(getCursor())
+                  return Scope.bindingOf(getCursor(), identifier)
                     .filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE && b.getName().endsWith("_"))
                     .map(b -> SearchResult.found(identifier, b.canRenameTo("taken") ? "safe" : "unsafe"))
                     .orElse(identifier);

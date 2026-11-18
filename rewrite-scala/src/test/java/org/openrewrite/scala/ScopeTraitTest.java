@@ -102,7 +102,7 @@ class ScopeTraitTest implements RewriteTest {
           spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  return new Scope.Binding.Matcher().get(getCursor())
+                  return Scope.bindingOf(getCursor(), identifier)
                     .filter(b -> b.getName().endsWith("_"))
                     .map(b -> SearchResult.found(identifier, b.references().count() + " references, " +
                       (b.isEffectivelyFinal() ? "final" : "assigned") + ", " +

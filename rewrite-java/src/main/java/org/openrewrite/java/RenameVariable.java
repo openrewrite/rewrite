@@ -77,7 +77,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         Object parent = getCursor().getParentTreeCursor().getValue();
                         if (parent instanceof J.VariableDeclarations.NamedVariable && parent.equals(renameVariable) &&
                             ((J.VariableDeclarations.NamedVariable) parent).getName() == identifier) {
-                            new Scope.Binding.Matcher().get(getCursor()).ifPresent(binding -> {
+                            Scope.bindingOf(getCursor(), identifier).ifPresent(binding -> {
                                 field = binding.getKind() == Scope.Kind.MEMBER;
                                 found.add(identifier.getId());
                                 binding.references().forEach(reference -> found.add(reference.<J>getValue().getId()));

@@ -27,7 +27,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
@@ -235,7 +234,7 @@ public class Scope implements Trait<J> {
                 return identifier;
             }
         }.visit(cursor.getValue(), 0, cursor.getParentOrThrow());
-        return found[0] == null ? Optional.empty() : new Binding.Matcher().get(found[0]);
+        return found[0] == null ? Optional.empty() : Optional.ofNullable(Binding.declaredBy(found[0]));
     }
 
     /**
@@ -269,7 +268,7 @@ public class Scope implements Trait<J> {
         J.Identifier ownName = regionTree instanceof J.ClassDeclaration ? ((J.ClassDeclaration) regionTree).getName() :
                 regionTree instanceof J.MethodDeclaration ? ((J.MethodDeclaration) regionTree).getName() : null;
         if (ownName != null) {
-            new Binding.Matcher().get(new Cursor(region, ownName)).ifPresent(ordered::add);
+            Optional.ofNullable(Binding.declaredBy(new Cursor(region, ownName))).ifPresent(ordered::add);
         }
         new JavaIsoVisitor<List<Binding>>() {
             @Override
@@ -375,10 +374,9 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * Every reference under the region's tree, resolved in one walk. Ask it about many bindings where asking each
-     * binding would walk its scope again.
+     * Every reference under the region's tree, resolved in one walk.
      */
-    public static References referencesWithin(Cursor region) {
+    private static References referencesWithin(Cursor region) {
         ScopeService service = service(region);
         Map<String, List<References.Reference>> byName = new HashMap<>();
         new JavaIsoVisitor<Integer>() {
@@ -410,24 +408,17 @@ public class Scope implements Trait<J> {
      * The references found under one region, grouped so that each binding's are a lookup away.
      */
     @Value
-    public static class References {
+    private static class References {
         @Getter(AccessLevel.NONE)
         Map<String, List<Reference>> byName;
 
         /**
          * The identifiers in the region that refer to the binding, in source order.
          */
-        public Stream<Cursor> of(Binding binding) {
+        Stream<Cursor> of(Binding binding) {
             return byName.getOrDefault(binding.getName(), Collections.emptyList()).stream()
                     .filter(reference -> reference.binding != null ? reference.binding.equals(binding) : binding.selects(reference.cursor))
                     .map(reference -> reference.cursor);
-        }
-
-        /**
-         * As {@link Binding#isEffectivelyFinal()}, counting the assignments in the region.
-         */
-        public boolean isEffectivelyFinal(Binding binding) {
-            return binding.isEffectivelyFinal(of(binding));
         }
 
         /**
@@ -445,6 +436,7 @@ public class Scope implements Trait<J> {
     /**
      * What a name denotes. Java looks variables, methods and types up separately, so one name can be bound in each.
      */
+    @Incubating(since = "8.112.0")
     public enum Namespace {
         VARIABLE,
         METHOD,
@@ -454,6 +446,7 @@ public class Scope implements Trait<J> {
     /**
      * Where a bound name comes from.
      */
+    @Incubating(since = "8.112.0")
     public enum Kind {
         /**
          * Declared in code: a local variable, a catch or loop variable, a pattern variable, a local class.
@@ -481,6 +474,7 @@ public class Scope implements Trait<J> {
      * One name a scope binds. It is anchored on its declaring identifier, or on the static import or inheriting
      * class when the field is declared elsewhere.
      */
+    @Incubating(since = "8.112.0")
     @Value
     public static class Binding implements Trait<J> {
         Cursor cursor;
@@ -558,6 +552,14 @@ public class Scope implements Trait<J> {
                 references.put(scope.getValue(), inScope);
             }
             return inScope.of(this);
+        }
+
+        /**
+         * Those of the {@link #references()} that are under the region's tree.
+         */
+        public Stream<Cursor> references(Cursor region) {
+            J regionTree = region.getValue();
+            return references().filter(reference -> isUnder(reference, regionTree));
         }
 
         /**
@@ -808,27 +810,24 @@ public class Scope implements Trait<J> {
         }
 
         /**
-         * Matches an identifier that declares a name, giving the binding it declares.
+         * The binding an identifier declares, looked for in each scope around it.
          */
-        public static class Matcher extends SimpleTraitMatcher<Binding> {
-            @Override
-            protected @Nullable Binding test(Cursor cursor) {
-                if (!(cursor.getValue() instanceof J.Identifier)) {
-                    return null;
-                }
-                J.Identifier identifier = cursor.getValue();
-                ScopeService service = service(cursor);
-                for (Cursor scope = cursor.getParent() == null ? null : enclosingScope(service, cursor.getParent());
-                     scope != null;
-                     scope = scope.getParent() == null ? null : enclosingScope(service, scope.getParent())) {
-                    for (Binding binding : new Scope(scope, scope).getBindings()) {
-                        if (binding.getTree() instanceof J.Identifier && binding.getTree().getId().equals(identifier.getId())) {
-                            return binding;
-                        }
-                    }
-                }
+        private static @Nullable Binding declaredBy(Cursor cursor) {
+            if (!(cursor.getValue() instanceof J.Identifier)) {
                 return null;
             }
+            J.Identifier identifier = cursor.getValue();
+            ScopeService service = service(cursor);
+            for (Cursor scope = cursor.getParent() == null ? null : enclosingScope(service, cursor.getParent());
+                 scope != null;
+                 scope = scope.getParent() == null ? null : enclosingScope(service, scope.getParent())) {
+                for (Binding binding : new Scope(scope, scope).getBindings()) {
+                    if (binding.getTree() instanceof J.Identifier && binding.getTree().getId().equals(identifier.getId())) {
+                        return binding;
+                    }
+                }
+            }
+            return null;
         }
     }
 }
