@@ -2555,6 +2555,7 @@ class ScalaTreeVisitor(
 
           // Convert body statements
           val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
+          Option(selfType(template)).foreach(self => statementPaddings.add(JRightPadded.build[Statement](self)))
           val bodyEnd = if (newTree.span.exists) Math.max(0, newTree.span.end - offsetAdjustment) else source.length
           if (!isBraceless) {
             consumeEmptyStatements(bodyEnd, statementPaddings)
@@ -4323,6 +4324,7 @@ class ScalaTreeVisitor(
 
         // Create a block from the template body
         val statements = new util.ArrayList[JRightPadded[Statement]]()
+        Option(selfType(tmpl)).foreach(self => statements.add(JRightPadded.build[Statement](self)))
         val visitedSpans = new java.util.HashSet[Int]()
         // Sort by source position to preserve source order (Dotty may reorder imports)
         val sortedBody = tmpl.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
@@ -5890,6 +5892,51 @@ class ScalaTreeVisitor(
   }
 
   /**
+   * The self type opening the template's body, or null when it has none. The cursor must be just past what opens
+   * the body.
+   */
+  private def selfType(template: Trees.Template[?]): S.SelfType = {
+    val self = template.self
+    if (self.isEmpty || !self.span.exists) return null
+    val prefix = extractPrefix(self.span)
+    // Dotty names the self of `this: T =>` `_`
+    val (name, nameEnd, quoted) =
+      if (self.name.toString == "_") ("this", cursor + "this".length, false)
+      else if (source.charAt(cursor) == '`') (self.name.toString, source.indexOf('`', cursor + 1) + 1, true)
+      else (self.name.toString, cursor + self.name.toString.length, false)
+    cursor = nameEnd
+    val variableType = Option(variableTypeAt(self)).map(_.withName(name)).orNull
+    val (beforeColon, typeExpression) =
+      if (self.tpt.isEmpty || !self.tpt.span.exists) (null, null)
+      else {
+        val beforeColon = sourceBefore(":")
+        val typeExpression = visitTypeTree(self.tpt)
+        updateCursor(self.tpt.span.end)
+        (if (beforeColon.isEmpty) null else beforeColon, typeExpression)
+      }
+    val variable = new J.VariableDeclarations.NamedVariable(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      ident(name, Space.EMPTY, if (variableType == null) null else variableType.getType, variableType, quoted),
+      Collections.emptyList(),
+      null,
+      variableType
+    )
+    val declaration = new J.VariableDeclarations(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      Collections.emptyList(),
+      typeExpression,
+      beforeColon,
+      Collections.singletonList(JRightPadded.build(variable))
+    )
+    S.SelfType.build(Tree.randomId(), prefix, Markers.EMPTY, new JRightPadded(declaration, sourceBefore("=>"), Markers.EMPTY))
+  }
+
+  /**
    * The body of a class or `given`, from the cursor just past what opens it to the end of `span`.
    * An indentation-based body gets `IndentedSyntax` added to `markers`.
    */
@@ -5897,6 +5944,7 @@ class ScalaTreeVisitor(
                            isClassBraceless: Boolean, markers: Markers): J.Block = {
     // Visit the template body to get statements
     val statements = new util.ArrayList[JRightPadded[Statement]]()
+    Option(selfType(template)).foreach(self => statements.add(JRightPadded.build[Statement](self)))
     
     // Visit each statement in the template body.
     // When traversing the typed tree, the compiler duplicates constructor params
