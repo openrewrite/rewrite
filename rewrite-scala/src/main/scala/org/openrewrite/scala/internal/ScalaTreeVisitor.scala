@@ -9083,20 +9083,14 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Visit a single union operand as an `Expression`. Most operands are types
-   * (identifiers, parameterized types) that are also `Expression`s. Singleton
-   * literal types like `"resize"` are parsed by Dotty as `SingletonTypeTree(Literal)`;
-   * the literal itself *is* the type (there is no `.type` suffix in source), so we
-   * visit the inner literal directly rather than producing an `S.SingletonType`
-   * (which would print a spurious `.type`). Returns null for an operand that cannot
-   * be represented as an `Expression` (e.g. a nested intersection), signalling the
-   * caller to fall back to source preservation.
+   * Visit a single union operand as an `Expression`. Most operands are types that are also
+   * `Expression`s. A bare `Literal` is an `Expression` but not a `TypeTree`, so it is visited
+   * directly. Returns null for an operand that cannot be represented as an `Expression`
+   * (e.g. a nested intersection), signalling the caller to fall back to source preservation.
    */
   private def visitUnionOperand(tree: Trees.Tree[?]): Expression = tree match {
     case _: Trees.Literal[?] =>
       asExpression(visitTree(tree))
-    case stt: Trees.SingletonTypeTree[?] if stt.ref.isInstanceOf[Trees.Literal[?]] =>
-      asExpression(visitTree(stt.ref))
     case _ =>
       visitTypeTree(tree) match {
         case e: Expression => e
