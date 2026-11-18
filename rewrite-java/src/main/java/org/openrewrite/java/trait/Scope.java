@@ -452,6 +452,49 @@ public class Scope implements Trait<J> {
         }
 
         /**
+         * Whether renaming this binding to {@code newName} keeps every name in the file reading what it reads now.
+         * It does not where its own scope already binds the name, where a nearer binding of the name would take one
+         * of its references, where it would take a reference that now reads a binding further out or none, or where
+         * a local would come to share its name with another local in reach.
+         */
+        public boolean canRenameTo(String newName) {
+            Scope declaring = getScope();
+            ScopeService service = service(scope);
+            for (Binding sibling : declaring.getBindings()) {
+                if (sibling.namespace == namespace && sibling.name.equals(newName)) {
+                    return false;
+                }
+            }
+            for (Cursor reference : (Iterable<Cursor>) references()::iterator) {
+                if (service.namespaceOf(reference) != null &&
+                    at(reference).lookup(newName, namespace).filter(nearer -> isUnder(nearer.scope, scope.getValue())).isPresent()) {
+                    return false;
+                }
+            }
+            boolean[] safe = {true};
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                    if (safe[0] && identifier.getSimpleName().equals(newName) && service.namespaceOf(getCursor()) == namespace &&
+                        service.isVisibleAt(Binding.this, getCursor()) &&
+                        !at(getCursor()).lookup(newName, namespace).filter(read -> isUnder(read.scope, scope.getValue())).isPresent()) {
+                        safe[0] = false;
+                    }
+                    return identifier;
+                }
+            }.visit(declaring.getTree(), 0, scope.getParentOrThrow());
+            if (!safe[0]) {
+                return false;
+            }
+            if (namespace == Namespace.VARIABLE && !isMember()) {
+                // A local may not share its name with a local declared inside its scope or visible where it is declared
+                return !at(cursor).lookup(newName).filter(outer -> !outer.isMember()).isPresent() &&
+                       declaredWithin(scope).noneMatch(inner -> inner.namespace == namespace && inner.name.equals(newName));
+            }
+            return true;
+        }
+
+        /**
          * Whether the identifier names this member after a dot: from {@code this} or {@code super} in its own class,
          * or for a field from another instance.
          */

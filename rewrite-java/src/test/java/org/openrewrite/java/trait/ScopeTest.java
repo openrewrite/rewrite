@@ -719,6 +719,77 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void renameIsSafeUnlessANameWouldReadSomethingElse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  return new Scope.Binding.Matcher().get(getCursor())
+                    .filter(b -> b.getNamespace() == Scope.Namespace.VARIABLE && b.getName().endsWith("_"))
+                    .map(b -> SearchResult.found(identifier, b.canRenameTo("taken") ? "safe" : "unsafe"))
+                    .orElse(identifier);
+              }
+          })),
+          java(
+            """
+              class A {
+                  int qualified_;
+                  A set(int taken) {
+                      this.qualified_ = taken;
+                      return this;
+                  }
+              }
+              class C {
+                  int bare_;
+                  int get(int taken) {
+                      return bare_ + taken;
+                  }
+              }
+              class D {
+                  int sibling_;
+                  int taken;
+              }
+              class B {
+                  int free_;
+                  int m(int p) {
+                      int local_ = p;
+                      { int taken = 1; }
+                      return local_ + free_;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int /*~~(safe)~~>*/qualified_;
+                  A set(int taken) {
+                      this.qualified_ = taken;
+                      return this;
+                  }
+              }
+              class C {
+                  int /*~~(unsafe)~~>*/bare_;
+                  int get(int taken) {
+                      return bare_ + taken;
+                  }
+              }
+              class D {
+                  int /*~~(unsafe)~~>*/sibling_;
+                  int taken;
+              }
+              class B {
+                  int /*~~(safe)~~>*/free_;
+                  int m(int p) {
+                      int /*~~(unsafe)~~>*/local_ = p;
+                      { int taken = 1; }
+                      return local_ + free_;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void matcherFindsTheScopesThatDeclareAName() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new Scope.Matcher().declaring("x")
