@@ -825,4 +825,34 @@ class TomlParserTest implements RewriteTest {
     void rejectsNonTomlFiles(String fileName) {
         assertThat(new TomlParser().accept(Paths.get("project", fileName))).isFalse();
     }
+
+    @Test
+    void emptyCommentInArray() {
+        rewriteRun(
+          toml(
+            """
+              a = [
+                1 #
+              ]
+              b = [
+                1 #
+                , 2
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyCommentInInlineTable() {
+        rewriteRun(
+          toml(
+            """
+              t = {
+                  a = 1 #
+              }
+              """
+          )
+        );
+    }
 }
