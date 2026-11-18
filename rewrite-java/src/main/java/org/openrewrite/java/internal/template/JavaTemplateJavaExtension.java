@@ -113,18 +113,22 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
              */
             private @Nullable J insertIntoSourceFile(JavaSourceFile cu, Integer p) {
                 SourceFileStatementService statements = cu.service(SourceFileStatementService.class);
-                List<Statement> existing = statements.getStatements(cu);
-                if (existing.stream().noneMatch(s -> s.isScope(insertionPoint))) {
+                List<Statement> spliced = spliceIntoStatements(statements.getStatements(cu), p);
+                return spliced == null ? null : statements.withStatements(cu, spliced);
+            }
+
+            private @Nullable List<Statement> spliceIntoStatements(List<Statement> statements, Integer p) {
+                if (statements.stream().noneMatch(this::isScope)) {
                     return null;
                 }
-                return statements.withStatements(cu, ListUtils.flatMap(existing, statement -> {
+                return ListUtils.flatMap(statements, statement -> {
                     if (!isScope(statement)) {
                         return statement;
                     }
                     return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
                             new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
                             substitutions.getTypeVariables(), loc, mode)), p);
-                }));
+                });
             }
 
             /**
@@ -221,14 +225,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         break;
                     }
                     case STATEMENT_PREFIX: {
-                        return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
-                            if (isScope(statement)) {
-                                return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
-                                        new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
-                                        substitutions.getTypeVariables(), loc, mode)), p);
-                            }
-                            return statement;
-                        }));
+                        List<Statement> spliced = spliceIntoStatements(block.getStatements(), p);
+                        if (spliced != null) {
+                            return block.withStatements(spliced);
+                        }
+                        break;
                     }
                 }
                 return super.visitBlock(block, p);
