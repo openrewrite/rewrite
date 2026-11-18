@@ -1988,12 +1988,15 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
     descriptor = recipe.descriptor()
     is_delegating = hasattr(recipe, 'java_recipe_name')
 
+    # Reported on this node rather than raised: the host turns each entry into one of its own
+    # validation failures and decides whether to refuse the run, which lets it name the option
+    # instead of showing a traceback. `message` is a fragment completing
+    # "<option> was '<value>' but it ...", the form the host renders.
+    validations = []
     if not is_delegating:
         for name, value, opt in descriptor.options:
             if opt.required and value is None:
-                raise ValueError(
-                    f"Missing required option `{name}` for recipe `{descriptor.name}`."
-                )
+                validations.append({'option': name, 'message': 'is required'})
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
@@ -2035,6 +2038,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
         'scanPreconditions': scan_preconditions,
     }
+    if validations:
+        response['validations'] = validations
     # Older Java hosts reject unknown response fields, so this is only sent when asked.
     if accepts_causes_another_cycle and getattr(recipe, 'causes_another_cycle', False):
         response['causesAnotherCycle'] = True

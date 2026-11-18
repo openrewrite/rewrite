@@ -366,9 +366,9 @@ def test_get_marketplace_row_unattributed_has_none_package_name(monkeypatch):
     assert row["packageName"] is None
 
 
-def test_prepare_recipe_rejects_missing_required_option(monkeypatch):
-    """The server validates required options when preparing a recipe, rather than silently
-    preparing a broken recipe."""
+def test_prepare_recipe_emits_validation_for_missing_required_option(monkeypatch):
+    """The server reports a rejected option on the response node rather than failing the request,
+    so the host can present it per option instead of as a stack trace."""
     import rewrite.rpc.server as server
     from rewrite.marketplace import RecipeMarketplace
     from rewrite import Recipe, CategoryDescriptor
@@ -391,16 +391,14 @@ def test_prepare_recipe_rejects_missing_required_option(monkeypatch):
     marketplace.install(_RequiresText, [CategoryDescriptor(display_name="Test")])
     monkeypatch.setattr(server, "_marketplace", marketplace)
 
-    try:
-        server.handle_prepare_recipe({"id": "org.example.RequiresText"})
-        assert False, "expected a missing-required-option error"
-    except ValueError as e:
-        assert "Missing required option `text`" in str(e)
+    response = server.handle_prepare_recipe({"id": "org.example.RequiresText"})
+
+    assert response["validations"] == [{"option": "text", "message": "is required"}]
 
 
 def test_prepare_recipe_validates_required_options_of_children(monkeypatch):
-    """Validation recurses through the whole prepared tree (like the C# and JS servers), so a
-    composite whose child is missing a required option is rejected."""
+    """Validation recurses through the whole prepared tree (like the C#, JS and Go servers), so a
+    composite's child reports its own rejected options on its own node."""
     import rewrite.rpc.server as server
     from rewrite.marketplace import RecipeMarketplace
     from rewrite import Recipe, CategoryDescriptor
@@ -434,11 +432,28 @@ def test_prepare_recipe_validates_required_options_of_children(monkeypatch):
     marketplace.install(_CompositeWithInvalidChild, [CategoryDescriptor(display_name="Test")])
     monkeypatch.setattr(server, "_marketplace", marketplace)
 
-    try:
-        server.handle_prepare_recipe({"id": "org.example.CompositeWithInvalidChild"})
-        assert False, "expected a missing-required-option error for the child"
-    except ValueError as e:
-        assert "Missing required option `text`" in str(e)
+    response = server.handle_prepare_recipe({"id": "org.example.CompositeWithInvalidChild"})
+
+    assert "validations" not in response, "the composite itself has no bad options"
+    assert response["recipeList"][0]["validations"] == [{"option": "text", "message": "is required"}]
+
+
+def test_prepare_java_recipe_raises_on_validations(monkeypatch):
+    """The peer reports rejected options instead of failing the request, so this side has to refuse
+    rather than hand back a half-configured recipe. There is no validate stage here to defer to."""
+    import pytest
+    import rewrite.rpc.server as server
+    from rewrite.rpc.rpc_recipe import prepare_java_recipe
+
+    monkeypatch.setattr(server, "send_request", lambda method, params: {
+        'id': 'x',
+        'editVisitor': 'edit:x',
+        'descriptor': {},
+        'validations': [{'option': 'text', 'message': 'is required'}],
+    })
+
+    with pytest.raises(ValueError, match="`text` is required"):
+        prepare_java_recipe("org.openrewrite.text.ChangeText")
 
 
 def test_prepare_recipe_returns_whole_child_tree(monkeypatch):
