@@ -28,10 +28,7 @@ import org.openrewrite.toml.tree.TomlRightPadded;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
@@ -69,20 +66,11 @@ public class MergeTableRow extends Recipe {
         // A row that is not TOML changes nothing, rather than what error recovery made of part of it
         List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValuesWithNulls(row);
         return new TomlVisitor<ExecutionContext>() {
-            /**
-             * Each table key-values were appended to, with its last value before them.
-             */
-            private final Map<Toml.Table, UUID> grownTables = new IdentityHashMap<>();
-
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
                 Toml.Document doc = (Toml.Document) super.visitDocument(document, ctx);
                 if (doc != document) {
-                    for (Map.Entry<Toml.Table, UUID> grown : grownTables.entrySet()) {
-                        doc = TableRowMatcher.keepCommentOnLastLine(doc, grown.getKey(), grown.getValue());
-                    }
-                    grownTables.clear();
-                    return doc;
+                    return TableRowMatcher.keepCommentsOnLastLines(doc);
                 }
 
                 // Parse the incoming row to get identifying value
@@ -186,13 +174,8 @@ public class MergeTableRow extends Recipe {
                         }
                         return existingKv;
                     });
-                    List<Toml.KeyValue> appended = ListUtils.map(ListUtils.filter(incomingKeyValues, kv -> !TomlSnippets.isNull(kv)),
-                            kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()));
-                    Toml.Table mergedTable = table.withValues(ListUtils.concatAll(merged, appended));
-                    if (!appended.isEmpty() && !merged.isEmpty()) {
-                        grownTables.put(mergedTable, merged.get(merged.size() - 1).getId());
-                    }
-                    return mergedTable;
+                    return TableRowMatcher.append(table, merged,
+                            ListUtils.filter(incomingKeyValues, kv -> !TomlSnippets.isNull(kv)));
                 }
 
                 return super.visitTable(table, ctx);

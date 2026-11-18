@@ -335,4 +335,22 @@ class ReplaceTableRowTest implements RewriteTest {
     void rowThatIsNotTomlIsInvalid() {
         assertThat(new ReplaceTableRow("pkg", "name = \"a\"\nurl = https://example.com", "name").validate().isInvalid()).isTrue();
     }
+
+    @Test
+    void commentOnTheLastLineStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceTableRow("pkg", "name = \"a\"\nx = 1", "name")),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
+              """
+          )
+        );
+    }
 }
