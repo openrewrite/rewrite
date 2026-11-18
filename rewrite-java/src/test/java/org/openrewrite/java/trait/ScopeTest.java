@@ -608,6 +608,86 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void bindingsTellWhatKindOfNameTheyAre() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (!"here".equals(m.getSimpleName())) {
+                      return m;
+                  }
+                  Scope scope = Scope.at(getCursor());
+                  return SearchResult.found(m, Stream.concat(
+                      Stream.of("param", "local", "caught", "field", "inherited").map(scope::lookup),
+                      Stream.of(scope.lookup("max", Scope.Namespace.METHOD)))
+                    .map(b -> b.map(binding -> binding.getName() + "=" + binding.getKind()).orElse("?"))
+                    .collect(joining(" ")));
+              }
+
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block b = super.visitBlock(block, ctx);
+                  if (!(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
+                      return b;
+                  }
+                  // What a lambda made of the block would capture
+                  return SearchResult.found(b, Scope.readWithin(getCursor())
+                    .filter(binding -> binding.getKind() == Scope.Kind.LOCAL || binding.getKind() == Scope.Kind.PARAMETER)
+                    .map(Scope.Binding::getName)
+                    .collect(joining(" ")));
+              }
+          })),
+          java(
+            """
+              import static java.lang.Math.max;
+
+              class Base {
+                  int inherited;
+              }
+              class A extends Base {
+                  int field;
+                  void m(int param) {
+                      int local = 0;
+                      int written;
+                      {
+                          written = max(param, field);
+                      }
+                      try {
+                      } catch (RuntimeException caught) {
+                          here();
+                      }
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              import static java.lang.Math.max;
+
+              class Base {
+                  int inherited;
+              }
+              class A extends Base {
+                  int field;
+                  void m(int param) {
+                      int local = 0;
+                      int written;
+                      /*~~(written param)~~>*/{
+                          written = max(param, field);
+                      }
+                      try {
+                      } catch (RuntimeException caught) {
+                          /*~~(param=PARAMETER local=LOCAL caught=LOCAL field=MEMBER inherited=INHERITED max=IMPORTED)~~>*/here();
+                      }
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void declaredWithinAnEditedCopyComeFromTheCopy() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

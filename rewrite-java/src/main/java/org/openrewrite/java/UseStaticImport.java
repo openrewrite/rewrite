@@ -131,7 +131,7 @@ public class UseStaticImport extends Recipe {
      */
     private static boolean hasConflictingMethod(String methodName, Cursor cursor) {
         return Scope.at(cursor).lookup(methodName, Scope.Namespace.METHOD)
-                .filter(binding -> !(binding.getTree() instanceof J.Import))
+                .filter(binding -> binding.getKind() != Scope.Kind.IMPORTED)
                 .isPresent();
     }
 }

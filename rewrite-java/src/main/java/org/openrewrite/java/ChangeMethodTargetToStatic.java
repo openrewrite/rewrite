@@ -179,7 +179,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
          */
         private boolean enclosingClassHasMethodNamed(String name) {
             return Scope.at(getCursor()).lookup(name, Scope.Namespace.METHOD)
-                    .filter(binding -> !(binding.getTree() instanceof J.Import))
+                    .filter(binding -> binding.getKind() != Scope.Kind.IMPORTED)
                     .isPresent();
         }
 

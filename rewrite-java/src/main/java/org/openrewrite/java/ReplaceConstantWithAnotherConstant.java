@@ -104,7 +104,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withType(newType(identifier.getType()));
                 // A local, parameter or field of the new name would capture the bare name
                 boolean captured = Scope.at(getCursor()).lookup(newConstantName)
-                        .filter(binding -> !(binding.getTree() instanceof J.Import))
+                        .filter(binding -> binding.getKind() != Scope.Kind.IMPORTED)
                         .isPresent();
                 if (hasNoConflictingImport && !captured) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);

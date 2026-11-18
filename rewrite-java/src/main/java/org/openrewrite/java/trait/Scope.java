@@ -399,6 +399,32 @@ public class Scope implements Trait<J> {
     }
 
     /**
+     * Where a bound name comes from.
+     */
+    public enum Kind {
+        /**
+         * Declared in code: a local variable, a catch or loop variable, a pattern variable, a local class.
+         */
+        LOCAL,
+        /**
+         * A parameter of a method, constructor or lambda.
+         */
+        PARAMETER,
+        /**
+         * Declared in the body of the class that binds it, or at the top of the source file.
+         */
+        MEMBER,
+        /**
+         * A member the class that binds it takes from a supertype.
+         */
+        INHERITED,
+        /**
+         * Brought in by an import.
+         */
+        IMPORTED
+    }
+
+    /**
      * One name a scope binds. It is anchored on its declaring identifier, or on the static import or inheriting
      * class when the field is declared elsewhere.
      */
@@ -421,6 +447,26 @@ public class Scope implements Trait<J> {
 
         public Scope getScope() {
             return new Scope(scope, scope);
+        }
+
+        public Kind getKind() {
+            J tree = getTree();
+            if (tree instanceof J.Import) {
+                return Kind.IMPORTED;
+            }
+            if (isMember()) {
+                return tree == scope.getValue() ? Kind.INHERITED : Kind.MEMBER;
+            }
+            if (tree instanceof J.Identifier) {
+                Cursor declarations = cursor.getParentTreeCursor().getParentTreeCursor();
+                Object declaredIn = declarations.getParentTreeCursor().getValue();
+                if (declarations.getValue() instanceof J.VariableDeclarations &&
+                    (declaredIn instanceof J.MethodDeclaration || declaredIn instanceof J.Lambda.Parameters ||
+                     declaredIn instanceof J.Lambda)) {
+                    return Kind.PARAMETER;
+                }
+            }
+            return Kind.LOCAL;
         }
 
         /**
