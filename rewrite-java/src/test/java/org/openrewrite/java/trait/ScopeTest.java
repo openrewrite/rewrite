@@ -749,6 +749,15 @@ class ScopeTest implements RewriteTest {
                   int sibling_;
                   int taken;
               }
+              class E {
+                  int taken;
+                  class Inner {
+                      int capturing_;
+                      int get() {
+                          return taken;
+                      }
+                  }
+              }
               class B {
                   int free_;
                   int m(int p) {
@@ -775,6 +784,15 @@ class ScopeTest implements RewriteTest {
               class D {
                   int /*~~(unsafe)~~>*/sibling_;
                   int taken;
+              }
+              class E {
+                  int taken;
+                  class Inner {
+                      int /*~~(unsafe)~~>*/capturing_;
+                      int get() {
+                          return taken;
+                      }
+                  }
               }
               class B {
                   int /*~~(safe)~~>*/free_;
