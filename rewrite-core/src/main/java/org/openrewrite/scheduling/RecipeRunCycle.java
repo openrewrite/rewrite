@@ -273,6 +273,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
                                     Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                    if (maybeMutated != source) {
+                                        recordScannerEdit(scanningRecipe, source);
+                                    }
                                     assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
                                             scanningRecipe.getName() + "'s scanner changed " + source.getSourcePath() +
                                             ", and the scanning phase discards edits. Record what the scanner finds " +
@@ -832,6 +835,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // Use the attribution map: only include search results created by this recipe
         recordSourceFileResultAndSearchResults(before, after, recipeStack,
                 collectSearchResults(before, after, leaf(recipeStack).getName(), attributionMap), ctx);
+    }
+
+    /**
+     * Called when a recipe's scanner returns a tree other than the source file it visited. The scanning phase
+     * discards that tree.
+     */
+    @Incubating(since = "8.106.0")
+    protected void recordScannerEdit(Recipe recipe, SourceFile source) {
     }
 
     protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {

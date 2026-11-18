@@ -203,8 +203,11 @@ public class AddMethodParameter extends Recipe {
             if (genericsIndex != -1) {
                 TypeTree rawType = createTypeTree(typeName.substring(0, genericsIndex));
                 List<JRightPadded<Expression>> typeParameters = new ArrayList<>();
+                List<JavaType> typeArguments = new ArrayList<>();
                 for (String typeParam : typeName.substring(genericsIndex + 1, typeName.lastIndexOf('>')).split(",")) {
-                    typeParameters.add(JRightPadded.build((Expression) createTypeTree(typeParam.trim())));
+                    TypeTree typeArgument = createTypeTree(typeParam.trim());
+                    typeParameters.add(JRightPadded.build((Expression) typeArgument));
+                    typeArguments.add(typeArgumentType(typeArgument));
                 }
                 return new J.ParameterizedType(
                         randomId(),
@@ -212,7 +215,7 @@ public class AddMethodParameter extends Recipe {
                         Markers.EMPTY,
                         rawType,
                         JContainer.build(Space.EMPTY, typeParameters, Markers.EMPTY),
-                        new JavaType.Parameterized(null, (JavaType.FullyQualified) rawType.getType(), null)
+                        new JavaType.Parameterized(null, (JavaType.FullyQualified) rawType.getType(), typeArguments)
                 );
             }
             JavaType.Primitive type = JavaType.Primitive.fromKeyword(typeName);
@@ -266,6 +269,25 @@ public class AddMethodParameter extends Recipe {
             }
             return typeTree;
         }
+    }
+
+    /**
+     * A wildcard has no type of its own, so its type as an argument is the generic type variable the parser makes of
+     * it, without the bound {@code Object}, which the parser leaves out.
+     */
+    private static JavaType typeArgumentType(TypeTree typeArgument) {
+        if (!(typeArgument instanceof J.Wildcard)) {
+            return typeArgument.getType() == null ? JavaType.Unknown.getInstance() : typeArgument.getType();
+        }
+        J.Wildcard wildcard = (J.Wildcard) typeArgument;
+        JavaType bound = wildcard.getBoundedType() == null ? null : wildcard.getBoundedType().getType();
+        JavaType.GenericTypeVariable.Variance variance = wildcard.getBound() == null ?
+                JavaType.GenericTypeVariable.Variance.INVARIANT :
+                wildcard.getBound() == J.Wildcard.Bound.Extends ?
+                        JavaType.GenericTypeVariable.Variance.COVARIANT :
+                        JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+        return new JavaType.GenericTypeVariable(null, "?", variance,
+                bound == null || TypeUtils.isObject(bound) ? emptyList() : singletonList(bound));
     }
 
     private static class DeclaresMatchingType extends JavaIsoVisitor<ExecutionContext> {

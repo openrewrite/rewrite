@@ -23,6 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.coldfusion.ColdFusionVisitor;
 import org.openrewrite.coldfusion.internal.ColdFusionPrinter;
 import org.openrewrite.coldfusion.service.ColdFusionAutoFormatService;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
@@ -30,11 +31,15 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
@@ -163,6 +168,33 @@ public interface Cf extends J {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new ColdFusionPrinter<>();
+        }
+
+        /**
+         * Whether the tree prints the file's bytes, its byte order mark among them, which comparing the text read with
+         * the text printed cannot tell.
+         */
+        @Override
+        public boolean printEqualsInput(Parser.Input input, ExecutionContext ctx) {
+            ByteArrayOutputStream read = new ByteArrayOutputStream();
+            try (EncodingDetectingInputStream is = input.getSource(ctx)) {
+                byte[] buffer = new byte[8192];
+                for (int n; (n = is.read(buffer, 0, buffer.length)) != -1; ) {
+                    read.write(buffer, 0, n);
+                }
+                byte[] bytes = read.toByteArray();
+                if (is.isCharsetBomMarked()) {
+                    byte[] marked = new byte[bytes.length + 3];
+                    marked[0] = (byte) 0xEF;
+                    marked[1] = (byte) 0xBB;
+                    marked[2] = (byte) 0xBF;
+                    System.arraycopy(bytes, 0, marked, 3, bytes.length);
+                    bytes = marked;
+                }
+                return Arrays.equals(printAllAsBytes(), bytes);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
 
         /**

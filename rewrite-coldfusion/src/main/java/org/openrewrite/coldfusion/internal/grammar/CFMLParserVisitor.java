@@ -374,89 +374,17 @@ public interface CFMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitTernaryExpression(CFMLParser.TernaryExpressionContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link CFMLParser#implicationExpression}.
+	 * Visit a parse tree produced by {@link CFMLParser#operation}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitImplicationExpression(CFMLParser.ImplicationExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#equivalenceExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitEquivalenceExpression(CFMLParser.EquivalenceExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#xorExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitXorExpression(CFMLParser.XorExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#orExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitOrExpression(CFMLParser.OrExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#andExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitAndExpression(CFMLParser.AndExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#notExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitNotExpression(CFMLParser.NotExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#comparisonExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitComparisonExpression(CFMLParser.ComparisonExpressionContext ctx);
+	T visitOperation(CFMLParser.OperationContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link CFMLParser#comparisonOperator}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitComparisonOperator(CFMLParser.ComparisonOperatorContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#concatExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitConcatExpression(CFMLParser.ConcatExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#additiveExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitAdditiveExpression(CFMLParser.AdditiveExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#moduloExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitModuloExpression(CFMLParser.ModuloExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#integerDivisionExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitIntegerDivisionExpression(CFMLParser.IntegerDivisionExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#multiplicativeExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitMultiplicativeExpression(CFMLParser.MultiplicativeExpressionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CFMLParser#powerExpression}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitPowerExpression(CFMLParser.PowerExpressionContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link CFMLParser#unaryExpression}.
 	 * @param ctx the parse tree

@@ -1640,6 +1640,13 @@ class CSharpPrinterParityTest {
         """,
 
       "spaceBeforeSemicolon", """
+        extern alias Legacy ;
+
+        namespace Block
+        {
+            extern alias Nested ;
+        }
+
         class Terminators
         {
             event Action Changed ;
@@ -1660,7 +1667,8 @@ class CSharpPrinterParityTest {
                     case 2: goto default ;
                     default: goto done ;
                 }
-                done: x++;
+                done: x++ ;
+                outer: inner: x++ ;
                 yield return x ;
                 try { } catch { throw ; }
                 if (x < 0) throw new Exception() ;

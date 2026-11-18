@@ -3368,4 +3368,226 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void classAttributeWithSameSimpleNameFromOtherPackageIsUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", "type", "org.example.data.SomeData.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> type();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example.data;
+              public interface SomeData {}
+              """
+          ),
+          java(
+            """
+              package org.other;
+              public interface SomeData {}
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.other.SomeData;
+
+              @Foo(type = SomeData.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+              import org.example.data.SomeData;
+
+              @Foo(type = SomeData.class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitValueWithSameSimpleNameFromOtherPackageIsUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "org.example.data.SomeData.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example.data;
+              public interface SomeData {}
+              """
+          ),
+          java(
+            """
+              package org.other;
+              public interface SomeData {}
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.other.SomeData;
+
+              @Foo(SomeData.class)
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+              import org.example.data.SomeData;
+
+              @Foo(SomeData.class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classAttributeWithCommentInsideIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", "type", "org.example.data.SomeData.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> type();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example.data;
+              public interface SomeData {}
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.data.SomeData;
+
+              @Foo(type = SomeData/* keep */.class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitValueWithWhitespaceInsideIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "org.example.data.SomeData.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example.data;
+              public interface SomeData {}
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.data.SomeData;
+
+              @Foo(SomeData .class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitPrimitiveClassValueIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "int.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(int.class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitArrayClassValueIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "String[].class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(String[].class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void primitiveClassAttributeIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", "type", "int.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> type();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(type = int.class)
+              public class A {}
+              """
+          )
+        );
+    }
 }

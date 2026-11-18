@@ -47,6 +47,57 @@ Comprehensive mapping of every Roslyn C# syntax element to its OpenRewrite LST r
 | `TypeParameterSyntax` | `Cs.ConstrainedTypeParameter` | `T where T : class, new()` | Variance (`in`/`out`) + `where` constraints |
 | Primary constructor | `J.MethodDeclaration` + `PrimaryConstructor` | `class Foo(int x /*~~>*/) { }` | Synthesized method in class body |
 
+### Primary-constructor templates
+
+For classes and structs, the C# parser places a synthetic `J.MethodDeclaration`
+first in the declaration's body. The method carries a `PrimaryConstructor` marker;
+its synthetic `<constructor>` name carries an `Implicit` marker. The enclosing
+`J.ClassDeclaration` has no `PrimaryConstructor` marker, and its
+`PrimaryConstructor` property remains null.
+
+The existing `CSharpTemplate.ClassMember` API can produce this shape. In the C#
+SDK, using `OpenRewrite.CSharp.Template` and `OpenRewrite.Java`, extract the
+synthetic method from an applied scaffold and prepend it to an eligible
+`declaration`, with `Cursor` pointing to that declaration:
+
+```csharp
+var template = CSharpTemplate.ClassMember("class C(int value) { }");
+var scaffold = (ClassDeclaration)template.Apply(Cursor)!;
+var constructor = scaffold.Body.Statements[0];
+var updated = declaration.WithBody(declaration.Body.WithStatements(
+    [constructor, .. declaration.Body.Statements]));
+```
+
+`Apply` refreshes node IDs; inserting cached `GetTree()` nodes directly would
+reuse IDs across declarations. This example preserves the original declaration's
+name, modifiers, type parameters, and body members, but constructs syntax only.
+`Apply` retains the scaffold's type attribution: the constructor and its
+parameters still belong to the scaffold type, and existing field initializers
+are not rebound to the new parameters. Template `usings` and `context` can resolve
+parameter types in the scaffold but do not rebind ownership to the destination.
+The modified source must be attributed in its destination context before relying
+on constructor ownership or parameter bindings; reparsing with a semantic model
+for the modified source provides those bindings. That standalone reparse creates
+new nodes and does not preserve existing node IDs or markers, and the example
+recipe does not perform it.
+
+For a simple conversion of an ordinary constructor with an unchanged signature,
+retaining its parameter nodes and moving the existing assignment's value into a
+field initializer can preserve the parameter binding. The synthetic constructor
+must also retain the original constructor's `MethodType` and use that same type
+for its implicit name; replacing only the parameter nodes leaves their owner
+inconsistent with the scaffold's method type. The conversion tests cover this
+restricted case, including a generic parameter type, without reparsing the result.
+
+A restricted `UsePrimaryConstructor` recipe can reuse existing constructor and
+parameter attribution as demonstrated here. Cases requiring changed signatures or
+newly bound references need additional SDK support and should initially be excluded.
+
+A conversion recipe must check eligibility, skip existing primary constructors,
+and handle constructor delegation, base initializers, parameter scope, and field
+initialization safety. The scaffold alone does not make arbitrary constructor
+conversions safe.
+
 ## Statements
 
 | Roslyn Syntax | LST Type | Example | Cs Justification |
@@ -284,3 +335,38 @@ The following Cs types were evaluated for potential mapping to J types:
 | All LINQ types | **No** | LINQ query syntax is entirely C#-specific. |
 | All pattern types | **Mostly No** | C# pattern matching (relational, property, list, slice) has no Java equivalent. `BinaryPattern` and `UnaryPattern` cleverly reuse J.Binary/J.Unary. |
 | All preprocessor types | **No** | Java has no preprocessor directives. |
+
+## C# language versions
+
+A `CSharpLanguageVersion` marker on each C# compilation unit records the effective
+Roslyn parse-options version as a string, such as `"12.0"`. `latest` and `default`
+are resolved by Roslyn before the marker is created. A standalone parse records
+the parser's default version. Project parses additionally populate
+`TargetFrameworkVersions` with the effective version of each loaded target-framework
+variant, including versions overridden in MSBuild. `Version` describes the compilation
+used for attribution; recipes introducing syntax must check every applicable
+`TargetFrameworkVersions` entry. The list is empty for standalone parses and project
+recovery without an evaluated Roslyn project. Unloaded target frameworks cannot be
+reported by this marker.
+
+Framework names prefer Roslyn's compiler-visible `TargetFramework` metadata, then
+MSBuild-evaluated declarations (including imported properties) for single-target
+projects. The Roslyn project name is a fallback for multi-target variants.
+`IsTargetFrameworkCoverageComplete` is true only when every evaluated target framework
+has a loaded, supported variant with an identified framework name. It is false when
+coverage is incomplete or cannot be established, including standalone and recovery
+parses. Consumers can require this flag before checking every framework's version;
+no comparison with `DotNetProject.TargetFrameworks` is needed.
+
+`preview` remains the literal string `"preview"` in both `Version` and framework
+entries. It does not resolve to a numeric version, so consumers must handle it
+explicitly rather than assuming all effective versions parse as numbers. The
+coverage flag describes framework coverage only; it does not imply a particular
+language feature is available.
+
+Conditional preprocessor branches retain the original Roslyn parse options,
+including the language version, even when a secondary branch has no semantic model.
+Project parsing attaches the same `CSharpLanguageVersion` metadata to the outer
+compilation unit and every nested branch compilation unit. A recipe may therefore
+read the nearest compilation unit's marker for both its version and framework
+coverage without walking back to the outer file.

@@ -88,7 +88,7 @@ public class MethodParamPad extends Recipe {
                 );
             }
             if (!md.getParameters().isEmpty()) {
-                md = (J.MethodDeclaration) new SpacesVisitor<>(spacesStyle, md.getParameters().get(0))
+                md = (J.MethodDeclaration) new SpacesVisitor<>(spacesStyle, null, null, md.getParameters().get(0))
                         .visitNonNull(md, ctx, getCursor().getParentTreeCursor().fork());
             }
             return md;
@@ -104,7 +104,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            return (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, mi)
+            return (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, null, null, mi)
                     .visitNonNull(mi, ctx, getCursor().getParentTreeCursor().fork());
         }
 
@@ -120,7 +120,7 @@ public class MethodParamPad extends Recipe {
                     );
                 }
             }
-            return (J.NewClass) new SpacesVisitor<>(spacesStyle, nc)
+            return (J.NewClass) new SpacesVisitor<>(spacesStyle, null, null, nc)
                     .visitNonNull(nc, ctx, getCursor().getParentTreeCursor().fork());
         }
     }

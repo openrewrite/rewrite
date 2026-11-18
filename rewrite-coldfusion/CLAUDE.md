@@ -38,11 +38,13 @@ The parser retypes what depends on where a statement starts:
 
 - `classifyStatement()` retypes a statement's first word: `component`, `property`, a function's
   modifiers and return type (`TYPE_WORD`), or a tag name such as `lock` (`SCRIPT_TAG_NAME`). A `{`
-  that starts a statement becomes `BLOCK_LBRACE`.
+  that starts a statement becomes `BLOCK_LBRACE`. Modifiers may follow the return type too, as in
+  `boolean public function f()`.
 - The `{` of a tag's body, in `lock name="x" {` or `cfloop(...) {`, becomes `BODY_LBRACE`, so a block
   on the next line can never be read as the body.
 - `markAttribute()` retypes the first word of each attribute of a property or a tag written as a
-  statement, so the attribute loop needs no lookahead to see where its statement ends.
+  statement, so the attribute loop needs no lookahead to see where its statement ends. After a comma, as in
+  `thread name="t", action="run"`, it retypes the word after the comma.
 
 All of this keeps every prediction short. Statements need no semicolon between them, so if a
 decision could go either way across a block, ANTLR would look ahead through the whole block, and its
@@ -55,6 +57,11 @@ A template is parsed flat and folded into a tree by the visitor. A start tag pus
 never takes a body. Its end tag pops to it, and a tag left open between them gives its children to its
 parent. An end tag for a tag that takes no body, as in `<cfthrow ...></cfthrow>`, closes the last such
 tag.
+
+A tree prints the file's bytes, not only its text. The printer writes a byte order mark from `charsetBomMarked`, and
+`Cf.CompilationUnit.printEqualsInput` compares bytes. `ColdFusionParser.text` fails a file whose bytes do not decode to
+text that encodes back to them, so a zip or a `cfencode`d template is a parse error and no recipe touches it. A NUL
+alone does not fail a file, since real templates hold a stray one. The corpus tests read files through it too.
 
 ## Mapping rules
 

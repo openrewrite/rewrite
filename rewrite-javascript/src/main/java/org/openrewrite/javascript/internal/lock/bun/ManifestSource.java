@@ -17,10 +17,18 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+
 /**
  * The registry documents a Bun install reads.
  */
 public interface ManifestSource {
+
+    /** Live request adapters bind or explicitly decline the manager's network policy. */
+    default ManifestSource withNetworkSettings(Map<String, ?> settings) {
+        return this;
+    }
+
 
     /**
      * {@code GET <registry><name>}: the abbreviated packument, or the full one (with {@code time}) when

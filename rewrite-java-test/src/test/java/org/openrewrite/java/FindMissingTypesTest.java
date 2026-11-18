@@ -17,8 +17,10 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -26,6 +28,7 @@ import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ClassInitializerMayBeStatic")
 class FindMissingTypesTest implements RewriteTest {
@@ -181,7 +184,7 @@ class FindMissingTypesTest implements RewriteTest {
     @Test
     void missingMethodReturnTypeNoMethodArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodDeclarations(false).identifiers(false)),
           java(
             """
               import java.util.GenClass1;
@@ -194,7 +197,7 @@ class FindMissingTypesTest implements RewriteTest {
               import java.util.GenClass1;
 
               abstract class Foo1 {
-                  /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 noArg();
+                  /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract /*~~(Identifier type is missing or malformed)~~>*/GenClass1 noArg();
               }
               """
           ),
@@ -210,7 +213,40 @@ class FindMissingTypesTest implements RewriteTest {
               import java.util.GenClass1;
 
               abstract class Foo2 {
-                  /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 withArg(String a);
+                  /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract /*~~(Identifier type is missing or malformed)~~>*/GenClass1 withArg(String a);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedReturnTypeExpression() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                    //noinspection DataFlowIssue
+                    return m.withReturnTypeExpression(m.getReturnTypeExpression().withType(JavaType.Unknown.getInstance()));
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              class A {
+                  String foo() {
+                      return null;
+                  }
+              }
+              """,
+            """
+              class A {
+                  /*~~(Identifier type is missing or malformed)~~>*/String foo() {
+                      return null;
+                  }
               }
               """
           )

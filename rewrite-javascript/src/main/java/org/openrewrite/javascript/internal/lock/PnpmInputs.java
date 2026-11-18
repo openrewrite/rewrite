@@ -86,7 +86,7 @@ final class PnpmInputs implements Port {
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client)).regenerate();
+        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client, host.pnpmRequestEnvironment())).regenerate();
     }
 
     /**
@@ -100,8 +100,8 @@ final class PnpmInputs implements Port {
         PnpmRelease release = PnpmReleases.runs(host.packageManagerVersion(PackageManager.Pnpm));
         return project(dir)
                 .release(release)
-                .userNpmrc(host.userNpmrc(release != null && !release.atLeast(11, 0, 0) ?
-                        HostInputs.GLOBAL_AND_USER : HostInputs.USER))
+                .userNpmrc(host.userPnpmrc(release != null && !release.atLeast(11, 0, 0) ?
+                        HostInputs.GLOBAL_AND_USER : HostInputs.USER, release != null && !release.atLeast(11, 0, 0)))
                 .env(host.getEnvironment().process())
                 .host(host.getHost())
                 .now(host.getNow())

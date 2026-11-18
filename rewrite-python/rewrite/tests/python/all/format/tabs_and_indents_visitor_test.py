@@ -2,6 +2,7 @@ import pytest
 
 from rewrite import ExecutionContext
 from rewrite.java import J
+from rewrite.java.tree import ArrayDimension
 from rewrite.python import CompilationUnit, IntelliJ, PythonVisitor
 from rewrite.python.format import TabsAndIndentsVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
@@ -704,6 +705,322 @@ def test_multiline_list_inside_function_with_trailing_comma():
                     4,
                 ]
                 return my_list
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_bracket_closing_after_trailing_comma_inside_function():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              g(1, 2,
+              )
+              f(
+                1,
+              )
+              def h(
+                a,
+              ):
+                pass
+              class A(
+                B,
+              ):
+                pass
+              from os import (
+                path,
+              )
+              x = [1, 2,
+              ]
+            """,
+            """
+            def create():
+                g(1, 2,
+                )
+                f(
+                    1,
+                )
+                def h(
+                        a,
+                ):
+                    pass
+                class A(
+                        B,
+                ):
+                    pass
+                from os import (
+                    path,
+                )
+                x = [1, 2,
+                ]
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_comment_after_trailing_comma_stays_inside_the_brackets():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              f(
+                1,
+                # c
+              )
+              g(1, 2,
+                # d
+              )
+            """,
+            """
+            def create():
+                f(
+                    1,
+                    # c
+                )
+                g(1, 2,
+                  # d
+                )
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_comment_after_trailing_comma_moves_no_further_left_than_its_bracket():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+                    g(1, 2,
+
+              # d
+                    )
+            """,
+            """
+            def create():
+                g(1, 2,
+
+                # d
+                )
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_trailing_comma_without_a_bracket_leaves_the_next_statement_in_its_block():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def f():
+                for a in b:
+                    x = 1,
+                return x
+            def g():
+                del a, b,
+            y = 2
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_comment_before_closing_bracket_keeps_the_column_of_the_elements():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              f(
+                1
+                # c
+              )
+              x = [
+                1
+                # c
+              ]
+              x = y[
+                1
+                # c
+              ]
+              x = y[a,
+                b
+                # c
+              ]
+            """,
+            """
+            def create():
+                f(
+                    1
+                    # c
+                )
+                x = [
+                    1
+                    # c
+                ]
+                x = y[
+                    1
+                    # c
+                ]
+                x = y[a,
+                    b
+                    # c
+                ]
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_bracket_after_the_last_element_closes_at_the_line_that_opens_it():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def create():
+              class A(
+                      B
+                      ):
+                pass
+              x: Dict[
+                str
+                ] = 1
+              with (
+                a,
+                b
+                ):
+                pass
+            """,
+            """
+            def create():
+                class A(
+                        B
+                ):
+                    pass
+                x: Dict[
+                    str
+                ] = 1
+                with (
+                    a,
+                    b
+                ):
+                    pass
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_subscript_spread_over_lines():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def f():
+              x = y[
+                1
+              ]
+              x = y[
+                1,
+                2
+              ]
+              x = y[
+                1,
+                2,
+              ]
+              x = y[
+                1:2
+              ]
+              x = y[a,
+                  b]
+            """,
+            """
+            def f():
+                x = y[
+                    1
+                ]
+                x = y[
+                    1,
+                    2
+                ]
+                x = y[
+                    1,
+                    2,
+                ]
+                x = y[
+                    1:2
+                ]
+                x = y[a,
+                    b]
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_subscript_index_formatted_on_its_own_takes_the_column_whole_file_formatting_gives_it():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+
+    class FormatIndex(PythonVisitor[ExecutionContext]):
+        def visit_literal(self, literal, p):
+            if isinstance(self.cursor.parent_tree_cursor().value, ArrayDimension):
+                return TabsAndIndentsVisitor(style).visit(literal, p, self.cursor.parent)
+            return literal
+
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def f():
+                x = y[
+              1
+                ]
+            """,
+            """
+            def f():
+                x = y[
+                    1
+                ]
+            """
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(FormatIndex()))
+    )
+
+
+def test_function_type_parameters_spread_over_lines():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4).with_indent_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            """
+            def f():
+              def g[
+                T,
+                U
+              ](x):
+                pass
+            """,
+            """
+            def f():
+                def g[
+                        T,
+                        U
+                ](x):
+                    pass
             """
         ),
         spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))

@@ -35,6 +35,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("JavadocLinkAsPlainText")
 public class OpenRewriteModelBuilder {
@@ -84,7 +85,27 @@ public class OpenRewriteModelBuilder {
      * </pre>
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
+        return forProjectDirectory(projectDir, buildFile, initScript, null);
+    }
+
+    /**
+     * As {@link #forProjectDirectory(File, File, String)}, but builds in the given Gradle user home, like TestKit's
+     * {@code GradleRunner.withTestKitDir}. Builds in separate homes don't wait on each other's cache locks.
+     * Distributions stay in the default home.
+     * <p>
+     * A fresh home has none of the default home's {@code gradle.properties} or {@code init.d} scripts, so settings,
+     * credentials and repository mirrors configured there don't apply.
+     *
+     * @param gradleUserHome The Gradle user home to build in, or null for the default one.
+     */
+    public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript, @Nullable File gradleUserHome) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+        if (gradleUserHome != null) {
+            connector.useGradleUserHomeDir(gradleUserHome);
+            connector.useDistributionBaseDir(defaultGradleUserHome());
+            // No other JVM reuses these daemons
+            connector.daemonMaxIdleTime(2, TimeUnit.MINUTES);
+        }
         Path wrapperProperties = projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties");
         String gradleVersion;
         if (Files.exists(wrapperProperties)) {
@@ -203,15 +224,17 @@ public class OpenRewriteModelBuilder {
     /**
      * When the env vars {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME}, and
      * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
-     * points the embedded Gradle build's Maven Central, Sonatype snapshot and Gradle plugin portal
-     * repositories at that mirror instead, with its credentials, including the portal Gradle adds on
-     * its own when a build names no plugin repository. Other repositories stay as the build files
-     * declare them. If any var is missing, returns the empty string.
+     * points the embedded Gradle build's Maven Central and Sonatype snapshot repositories at that
+     * mirror instead, with its credentials. Other repositories stay as the build files declare them.
+     * The Gradle plugin portal contains releases that Maven Central does not, so it must stay separate.
+     * If any var is missing, returns the empty string.
      */
     private static String mirrorScriptSnippet() {
-        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
-        String user = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME");
-        String pass = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD");
+        return mirrorScriptSnippet(System.getenv("MAVEN_CENTRAL_MIRROR_URL"),
+                System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME"), System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD"));
+    }
+
+    static String mirrorScriptSnippet(@Nullable String url, @Nullable String user, @Nullable String pass) {
         if (url == null || user == null || pass == null || url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
             return "";
         }
@@ -222,7 +245,7 @@ public class OpenRewriteModelBuilder {
                 // configureEach also reaches the repositories the build files add after these hooks run
                 "def __rewriteUseMirror = { repositories ->\n" +
                 "    repositories.withType(MavenArtifactRepository).configureEach { repo ->\n" +
-                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org',\n" +
+                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org',\n" +
                 "                'central.sonatype.com', 'oss.sonatype.org', 's01.oss.sonatype.org']) {\n" +
                 "            repo.url = __rewriteMirrorUrl\n" +
                 "            repo.credentials {\n" +
@@ -237,13 +260,6 @@ public class OpenRewriteModelBuilder {
                 "        __rewriteUseMirror(settings.pluginManagement.repositories)\n" +
                 "        try { __rewriteUseMirror(settings.buildscript.repositories) } catch (Throwable ignored) {}\n" +
                 "        try { __rewriteUseMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
-                "    }\n" +
-                // When a build names no plugin repository, Gradle adds the portal itself, where the hook above
-                // can't see it; naming it here lets the hook point it at the mirror
-                "    gradle.settingsEvaluated { settings ->\n" +
-                "        if (settings.pluginManagement.repositories.isEmpty()) {\n" +
-                "            settings.pluginManagement.repositories.gradlePluginPortal()\n" +
-                "        }\n" +
                 "    }\n" +
                 "} catch (Throwable ignored) {}\n" +
                 "gradle.beforeProject { project ->\n" +
@@ -317,12 +333,20 @@ public class OpenRewriteModelBuilder {
         return null;
     }
 
+    private static File defaultGradleUserHome() {
+        String home = System.getProperty("gradle.user.home");
+        if (home == null) {
+            home = System.getenv("GRADLE_USER_HOME");
+        }
+        return home == null ? new File(System.getProperty("user.home"), ".gradle") : new File(home);
+    }
+
     /**
      * Everywhere except within openrewrite/rewrite itself the plugin will be resolved from some artifact repository
      * But within openrewrite/rewrite it comes from a build directory.
      * So for our build only use an init script which understands that.
      */
-    private static String generateInitScriptFromManifest() throws IOException {
+    static String generateInitScriptFromManifest() throws IOException {
         String manifestPath = System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath");
         if (manifestPath == null || manifestPath.isEmpty()) {
             throw new IllegalStateException("System property org.openrewrite.gradle.local.use-embedded-classpath must be set to the path of test-manifest.txt");

@@ -34,6 +34,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.marker.ResolvedNames;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.json.JsonParser;
@@ -63,9 +64,12 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -670,6 +674,112 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         Autodetect otherAutodetect = otherJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
 
         assertThat(indexAutodetect).isSameAs(otherAutodetect);
+    }
+
+    @Test
+    void parseProjectResolvesNamesWhenAsked(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        Files.writeString(projectDir.resolve("lib.js"), "export function greet() {}\n");
+        Files.writeString(projectDir.resolve("use.js"), "\uFEFFimport {greet} from './lib.js';\ngreet();\n");
+
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(JavaScriptRewriteRpc.RESOLVE_NAMES, true);
+        SourceFile use = client().parseProject(projectDir, ctx)
+          .filter(sf -> sf.getSourcePath().toString().equals("use.js"))
+          .findFirst().orElseThrow();
+
+        ResolvedNames names = use.getMarkers().findFirst(ResolvedNames.class).orElseThrow();
+        String printed = use.printAll();
+        int[] spans = names.getSpans();
+        List<String> resolved = new ArrayList<>();
+        for (int i = 0; i < spans.length; i += 4) {
+            resolved.add(printed.substring(spans[i], spans[i + 1]) + " " + names.getKinds().get(spans[i + 3]) + " " +
+                         names.getNames().get(spans[i + 2]));
+        }
+        assertThat(resolved).containsExactly(
+          "greet import-ref lib.greet",
+          "'./lib.js' import-ref lib.js",
+          "greet method-call lib.greet");
+        assertThat(names.getPackages()).containsOnlyNulls();
+    }
+
+    @Test
+    void parseProjectNamesThePackageThatDeclaresAName(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0", "dependencies": {"typed": "1.0.0"}}
+          """);
+        Path pkg = Files.createDirectories(projectDir.resolve("node_modules/typed"));
+        Files.writeString(pkg.resolve("package.json"), """
+          {"name": "typed", "version": "1.0.0", "types": "index.d.ts"}
+          """);
+        Files.writeString(pkg.resolve("index.d.ts"), "export declare function go(): void;\n");
+        Files.writeString(projectDir.resolve("use.js"), "import {go} from 'typed';\ngo();\n");
+
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(JavaScriptRewriteRpc.RESOLVE_NAMES, true);
+        SourceFile use = client().parseProject(projectDir, ctx)
+          .filter(sf -> sf.getSourcePath().toString().equals("use.js"))
+          .findFirst().orElseThrow();
+
+        ResolvedNames names = use.getMarkers().findFirst(ResolvedNames.class).orElseThrow();
+        assertThat(names.getNames()).contains("index.d.go");
+        assertThat(names.getPackages().get(names.getNames().indexOf("index.d.go"))).isEqualTo("typed");
+        assertThat(names.getPackages().get(names.getNames().indexOf("index.d.ts"))).isEqualTo("typed");
+    }
+
+    @Test
+    void parseProjectLeavesNamesUnresolvedUnlessAsked(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
+
+        assertThat(client().parseProject(projectDir, new InMemoryExecutionContext()).toList())
+          .allSatisfy(sf -> assertThat(sf.getMarkers().findFirst(ResolvedNames.class)).isEmpty());
+    }
+
+    @Test
+    void anUntypedPackageDefinesItsModuleAndItsId(@TempDir Path projectDir) throws Exception {
+        Path pkg = Files.createDirectories(projectDir.resolve("node_modules/untyped"));
+        Files.writeString(pkg.resolve("package.json"), """
+          {"name": "untyped", "version": "1.0.0", "main": "index.js"}
+          """);
+        Files.writeString(pkg.resolve("index.js"), "module.exports = function () {};\n");
+
+        Set<String> defined = new LinkedHashSet<>();
+        List<JavaType.FullyQualified> types = new ArrayList<>();
+        client().dependencyTypes(new Dependency("untyped", "1.0.0", projectDir.toString()), defined::addAll, types::add);
+
+        assertThat(defined).containsExactly("untyped", "npm:untyped");
+        assertThat(types).extracting(JavaType.FullyQualified::getFullyQualifiedName).containsExactly("untyped", "npm:untyped");
+        assertThat(types).allSatisfy(type -> assertThat(type.getMethods()).isEmpty());
+    }
+
+    @Test
+    void anAccessorIsNotAConstructor() {
+        SourceFile cu = JavaScriptParser.builder().build().parseInputs(List.of(Parser.Input.fromString(
+          Path.of("box.js"), """
+            class Box {
+                constructor() {}
+                get size() { return 1; }
+                set size(value) {}
+            }
+            """)), null, new InMemoryExecutionContext()).findFirst().orElseThrow();
+
+        List<String> methods = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                JavaType.Method type = method.getMethodType();
+                assertThat(type).isNotNull();
+                methods.add(type.getName() + " " + type.isConstructor());
+                return method;
+            }
+        }.visit(cu, 0);
+
+        assertThat(methods).containsExactly("<constructor> true", "size false", "size false");
     }
 
     @Test

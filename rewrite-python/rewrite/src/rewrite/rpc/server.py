@@ -757,23 +757,42 @@ DEFAULT_PARSE_EXCLUSIONS = [
 
 # Build output, which only ever sits at the project root; deeper down these are
 # ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
-ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+ROOT_PARSE_EXCLUSIONS = ['/build', '/dist']
+
+
+class _Exclusions:
+    """Patterns as ``exclusions`` in ``ParseProjectOptions`` describes them."""
+
+    def __init__(self, patterns: List[str]):
+        self._names, self._paths = set(), set()
+        self._name_globs, self._path_globs = [], []
+        for pattern in patterns:
+            anchored = '/' in pattern
+            pattern = os.path.normcase(pattern.lstrip('/'))
+            # A caller can list thousands of files, so a pattern without wildcards is a lookup.
+            if any(c in pattern for c in '*?['):
+                (self._path_globs if anchored else self._name_globs).append(pattern)
+            else:
+                (self._paths if anchored else self._names).add(pattern)
+
+    def cover(self, name: str, path: str) -> bool:
+        import fnmatch
+        name, path = os.path.normcase(name), os.path.normcase(path)
+        return (name in self._names or path in self._paths
+                or any(fnmatch.fnmatch(name, glob) for glob in self._name_globs)
+                or any(fnmatch.fnmatch(path, glob) for glob in self._path_globs))
 
 
 def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
-    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
-    import fnmatch
-
-    def excluded(name: str, patterns: List[str]) -> bool:
-        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
-
+    """Yield every ``.py`` path under ``project_path`` that no exclusion covers."""
+    excluded = _Exclusions(exclusions + ROOT_PARSE_EXCLUSIONS)
     for root, dirs, files in os.walk(project_path):
-        at_root = root == project_path
-        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
-        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+        below = os.path.relpath(root, project_path)
+        prefix = '' if below == os.curdir else below.replace(os.sep, '/') + '/'
+        dirs[:] = [d for d in dirs if not excluded.cover(d, prefix + d)]
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith('.py') and not excluded.cover(file, prefix + file):
                 yield os.path.join(root, file)
 
 
@@ -1315,6 +1334,7 @@ def handle_reset(params: dict) -> bool:
     _prepared_recipes.clear()
     _delegating_recipes.clear()
     _prepared_unwrapped_editors.clear()
+    _prepared_unwrapped_scanners.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _local_object_ids.clear()
@@ -1331,6 +1351,7 @@ def handle_reset(params: dict) -> bool:
     _hub_send_checkpoint.clear()
     _hub_recv_checkpoint.clear()
     _hub_last_served.clear()
+    _hub_deleted.clear()
     # A half-drained page would resume mid-list for a host that expects to start over.
     _dependency_types_pending.clear()
 
@@ -1390,7 +1411,9 @@ def _get_marketplace():
             from rewrite.discovery import discover_root_recipes
             discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
                                   attribution_name=_attribution_name)
-        else:
+        elif not _facade_mode():
+            # A facade's is scoped the same way, to the bundles activate_bundle_in_process
+            # installs into it. Ambient discovery belongs to a plain server.
             from rewrite.discovery import discover_recipes, recipe_name_set
             from rewrite import activate
 
@@ -1750,6 +1773,36 @@ def _collect_marketplace_rows(
     return rows
 
 
+def activate_bundle_in_process(venv_dir: Path, bundle_dist: str,
+                               attribution_name: Optional[str] = None) -> List[dict]:
+    """Activate a recipe bundle in the facade's own process and return its marketplace rows.
+
+    The bundle's venv joins this process's path, which is what ``--child-bundle`` on the venv
+    interpreter buys a child. ``addsitedir`` appends, so the engine keeps the precedence
+    ``_child_env`` gives it in a child, and it processes the venv's ``.pth`` files. The shared
+    recipe-install directory leaves the path, as ``_child_env`` keeps it off a child's.
+    """
+    import importlib
+    import site
+
+    from rewrite.discovery import discover_root_recipes
+    from rewrite.rpc import venv_manager
+
+    if _recipe_install_dir is not None:
+        install_root = os.path.realpath(_recipe_install_dir)
+        sys.path[:] = [p for p in sys.path if not p or os.path.realpath(p) != install_root]
+    packages = venv_manager.site_packages(venv_dir)
+    if packages is not None:
+        site.addsitedir(str(packages))
+        importlib.invalidate_caches()
+
+    marketplace = _get_marketplace()
+    discover_root_recipes(bundle_dist, marketplace=marketplace, attribution=_attribution,
+                          attribution_name=attribution_name)
+    return _collect_marketplace_rows(
+        marketplace, recipe_filter=_attribution.recipes_for(attribution_name or bundle_dist))
+
+
 def _category_descriptor_to_dict(descriptor) -> dict:
     """Convert a CategoryDescriptor to a dict for JSON serialization."""
     return {
@@ -1837,6 +1890,8 @@ _delegating_recipes: Dict[str, Any] = {}
 # with every precondition sent in editPreconditions. The host evaluates those,
 # so dispatching edit:<id> unwraps the editor to keep them from running twice.
 _prepared_unwrapped_editors: Set[str] = set()
+# The same for a scanning recipe's scanner() and its scanPreconditions.
+_prepared_unwrapped_scanners: Set[str] = set()
 # Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
 # time from a Preconditions.check(...) wrapper around recipe.editor().
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
@@ -1942,8 +1997,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
-    # A Preconditions.check(...) wrapper around the editor is sent as editPreconditions, so the
-    # host can skip the visit RPC for files that don't match.
+    # A Preconditions.check(...) wrapper around the editor or scanner is sent as editPreconditions
+    # or scanPreconditions, so the host can skip the visit RPC for files that don't match.
     edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
     if not is_scanning:
         try:
@@ -1951,11 +2006,26 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         except Exception:
             editor_visitor = None
         if editor_visitor is not None:
-            extracted = _extract_preconditions_from_editor(editor_visitor)
+            extracted = _extract_preconditions(editor_visitor)
             if extracted is not None:
                 _prepared_unwrapped_editors.add(prepared_id)
                 edit_preconditions.extend(extracted[1])
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
+
+    scan_preconditions: List[Dict[str, Any]] = []
+    if is_scanning:
+        scan_preconditions.extend(_get_preconditions(recipe, 'scan'))
+        # No run has started, so the scanner gets a fresh accumulator of its own.
+        from rewrite import InMemoryExecutionContext
+        try:
+            scanner = recipe.scanner(recipe.initial_value(InMemoryExecutionContext()))
+        except Exception:
+            scanner = None
+        if scanner is not None:
+            extracted = _extract_preconditions(scanner)
+            if extracted is not None:
+                _prepared_unwrapped_scanners.add(prepared_id)
+                scan_preconditions.extend(extracted[1])
 
     response = {
         'id': prepared_id,
@@ -1963,7 +2033,7 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         'editVisitor': f'edit:{prepared_id}',
         'editPreconditions': edit_preconditions,
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
-        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
+        'scanPreconditions': scan_preconditions,
     }
     # Older Java hosts reject unknown response fields, so this is only sent when asked.
     if accepts_causes_another_cycle and getattr(recipe, 'causes_another_cycle', False):
@@ -2091,8 +2161,8 @@ def _get_preconditions(recipe, phase: str) -> List[dict]:
 
     Always includes the language gate (only visit Python source files). Recipe-
     declared preconditions from a ``Preconditions.check(...)`` wrapper around
-    ``recipe.editor()`` are added on top by ``handle_prepare_recipe`` — see
-    :func:`_extract_preconditions_from_editor`.
+    ``recipe.editor()`` or ``recipe.scanner()`` are added on top by
+    ``_prepare_instance`` — see :func:`_extract_preconditions`.
     """
     return [{
         'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
@@ -2100,11 +2170,11 @@ def _get_preconditions(recipe, phase: str) -> List[dict]:
     }]
 
 
-def _extract_preconditions_from_editor(editor_visitor):
-    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor result.
+def _extract_preconditions(visitor):
+    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor or scanner.
 
-    If ``editor_visitor`` is a :class:`rewrite.preconditions.Check`, returns a
-    tuple ``(bare_editor, [precondition_wire_entry, ...])`` where ``bare_editor``
+    If ``visitor`` is a :class:`rewrite.preconditions.Check`, returns a
+    tuple ``(bare_visitor, [precondition_wire_entry, ...])`` where ``bare_visitor``
     is the innermost non-Check visitor and the wire entries describe each
     precondition in evaluation order. Returns ``None`` if no Check wrapper
     is present.
@@ -2128,16 +2198,16 @@ def _extract_preconditions_from_editor(editor_visitor):
     """
     from rewrite.preconditions import Check, RecipeCheck
 
-    if not isinstance(editor_visitor, Check):
+    if not isinstance(visitor, Check):
         return None
 
     wire_entries: List[Dict[str, Any]] = []
-    inner: Any = editor_visitor
+    inner: Any = visitor
     while isinstance(inner, Check):
         wire = _check_wire_entry(inner)
         if wire is None:
             # Cannot serialize this check to the wire; abort the optimization
-            # for this editor. Returning None leaves the wrapper intact so
+            # for this visitor. Returning None leaves the wrapper intact so
             # the precondition runs Python-side as a fallback.
             return None
         wire_entries.append(wire)
@@ -2484,7 +2554,12 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             _recipe_accumulators[recipe_id] = recipe.initial_value(ctx)
         acc = _recipe_accumulators[recipe_id]
 
-        return recipe.scanner(acc)
+        scanner = recipe.scanner(acc)
+        if recipe_id in _prepared_unwrapped_scanners:
+            from rewrite.preconditions import Check
+            while isinstance(scanner, Check):
+                scanner = scanner.wrapped
+        return scanner
 
     else:
         # Look up visitor by fully-qualified name from registry
@@ -2574,16 +2649,18 @@ _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that chil
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
 _hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
 _hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
+_hub_deleted: Set[str] = set()              # obj_ids a visit deleted, which Java holds until their Evict
 
-def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
-    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
-    first time it is needed and owned by the facade from then on."""
+def _hub_acquire(obj_id: str, source_file_type: Optional[str], refresh: bool = False):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) when
+    the facade holds none or ``refresh`` asks for Java's current one. Between fetches the facade's
+    copy is authoritative, as a child's pulled edit puts it ahead of Java."""
     if obj_id is None:
         return None
     # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
     # it sees a file early enough to checkpoint the facade<->Java tables.
     _checkpoint_refs(obj_id)
-    tree = _hub_tree.get(obj_id)
+    tree = None if refresh else _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
         if tree is not None:
@@ -2687,13 +2764,14 @@ def _hub_drop_bundle(bundle: str) -> None:
 
 
 def _hub_forget(obj_id: str) -> None:
-    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
-    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
-    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
+    """Let go of a file a visit deleted while leaving every child's ref numbering where it stands.
+    This is the half of _hub_release that is safe without an Evict: a child that has not been told to
+    roll back still holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
     _hub_tree.pop(obj_id, None)
     local_objects.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
+    _hub_deleted.add(obj_id)
 
 
 def _hub_release(obj_id: str) -> None:
@@ -2702,6 +2780,7 @@ def _hub_release(obj_id: str) -> None:
     holds ("Received reference to unknown object").
     """
     _hub_forget(obj_id)
+    _hub_deleted.discard(obj_id)
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
         checkpoint = _hub_send_checkpoint.pop(key)
         refs = _hub_send_refs.get(key[0])
@@ -2715,14 +2794,18 @@ def _hub_release(obj_id: str) -> None:
                 del refs[ref_id]
 
 
-def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
-    """True for a visitor the server implements itself rather than one a recipe bundle owns."""
-    return bool(visitor_name) and visitor_name in _get_visitor_registry()
+def _hub_is_local_visitor(visitor_name: Optional[str]) -> bool:
+    """True for a built-in visitor, or one of a recipe prepared in this process."""
+    if not visitor_name:
+        return False
+    if visitor_name.startswith(('edit:', 'scan:')):
+        return visitor_name[5:] in _prepared_recipes
+    return visitor_name in _get_visitor_registry()
 
 
 def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
-    """Run the built-in service visitors (no recipe bundle owns them) against the facade's own tree
-    in order, threading each result into the next as a child would sequence a BatchVisit."""
+    """Run visitors that belong to no child against the facade's own tree in order, threading each
+    result into the next as a child would sequence a BatchVisit."""
     tree_id = params.get('treeId')
     source_file_type = params.get('sourceFileType')
     tree = _hub_acquire(tree_id, source_file_type)
@@ -2734,15 +2817,22 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
     cursor = _build_cursor(params.get('cursor'), source_file_type)
 
     results = []
+    known_ids = None  # collected on the first edit, as most visits edit nothing
     for item in visitor_items:
         before = tree
         visitor = _instantiate_visitor(item['visitor'], ctx, item.get('visitorOptions'))
         after = visitor.visit(before, ctx, cursor)
+        search_result_ids = []
+        if after is not None and after is not before:
+            if known_ids is None:
+                known_ids = _collect_search_result_ids(before)
+            search_result_ids = list(_collect_search_result_ids(after) - known_ids)
+            known_ids.update(search_result_ids)
         results.append({
             'modified': after is not before,
             'deleted': after is None,
             'hasNewMessages': False,
-            'searchResultIds': [],
+            'searchResultIds': search_result_ids,
         })
         if after is None:
             _hub_forget(tree_id)
@@ -2795,11 +2885,14 @@ def _get_facade():
                         len(removed), _recipe_install_dir, ", ".join(removed))
         _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
                                         upstream=_serve_child_object,
+                                        activate=activate_bundle_in_process,
                                         on_child_replaced=_hub_drop_bundle),
                          hub_pull=_hub_pull_child_edit,
                          hub_drop=_hub_forget,
                          local_visit=_hub_local_visit,
-                         is_local_visitor=_hub_is_builtin_visitor)
+                         is_local_visitor=_hub_is_local_visitor,
+                         local_prepare=handle_prepare_recipe,
+                         local_generate=handle_generate)
     return _facade
 
 
@@ -2808,38 +2901,46 @@ def handle_request(method: str, params: dict) -> Any:
     if _facade_mode():
         facade = _get_facade()
 
-        if method == 'Evict':
+        # Bundle lifecycle is always the facade's. SetDataTableStore, Evict and Reset also fall
+        # through to the server's own handlers, which serve a bundle hosted in this process.
+        if method == 'InstallRecipes':
+            return facade.install_recipes(params)
+        if method == 'GetMarketplace':
+            return facade.get_marketplace(params)
+        if method == 'SetDataTableStore':
+            facade.set_data_table_store(params)
+        elif method == 'Evict':
             facade.evict(params)
             _hub_release(params.get('id'))
-            return handle_evict(params)
-        if method == 'Reset':
+        elif method == 'Reset':
             facade.reset(params)
-            return handle_reset(params)
-        facade_handlers = {
-            'InstallRecipes': facade.install_recipes,
-            'GetMarketplace': facade.get_marketplace,
-            'PrepareRecipe': facade.prepare_recipe,
-            'SetDataTableStore': facade.set_data_table_store,
-            'Visit': facade.visit,
-            'BatchVisit': facade.batch_visit,
-            'Generate': facade.generate,
-        }
-        facade_handler = facade_handlers.get(method)
-        if facade_handler:
-            # Acquire at the top level, before any child runs — acquiring inside a child's
-            # GetObject callback would deadlock (the child waits on us, Java on this request).
-            if method in ('Visit', 'BatchVisit'):
-                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
-            return facade_handler(params)
-        if method in ('Print', 'GetObject'):
-            obj_id = params.get('treeId') or params.get('id')
-            source_file_type = params.get('sourceFileType')
-            # Java fetches non-tree objects by id as well (the execution context, cursors).
-            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
-            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
-            # that has no codec for them, desynchronizing the queue for every later object.
-            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
-                _hub_acquire(obj_id, source_file_type)
+        elif facade.routes_to_children():
+            facade_handlers = {
+                'PrepareRecipe': facade.prepare_recipe,
+                'Visit': facade.visit,
+                'BatchVisit': facade.batch_visit,
+                'Generate': facade.generate,
+            }
+            facade_handler = facade_handlers.get(method)
+            if facade_handler:
+                # Acquire at the top level, before any child runs — acquiring inside a child's
+                # GetObject callback would deadlock (the child waits on us, Java on this request).
+                # Refreshed on every request, as a Java recipe may have edited the file since the last
+                # one and Java evicts a file only after the cycle has run every recipe on it.
+                if method in ('Visit', 'BatchVisit'):
+                    _hub_acquire(params.get('treeId'), params.get('sourceFileType'), refresh=True)
+                return facade_handler(params)
+            if method in ('Print', 'GetObject'):
+                obj_id = params.get('treeId') or params.get('id')
+                source_file_type = params.get('sourceFileType')
+                # Java fetches non-tree objects by id as well (the execution context, cursors).
+                # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+                # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+                # that has no codec for them, desynchronizing the queue for every later object.
+                # Acquiring a deleted file would hand Java back its own copy and undo the deletion.
+                if (obj_id is not None and source_file_type and obj_id not in _hub_tree
+                        and obj_id not in _hub_deleted):
+                    _hub_acquire(obj_id, source_file_type)
 
     handlers = {
         'Parse': handle_parse,

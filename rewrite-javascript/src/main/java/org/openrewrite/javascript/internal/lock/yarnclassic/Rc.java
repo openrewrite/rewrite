@@ -171,6 +171,27 @@ final class Rc {
     }
 
     /**
+     * The request options an install's command line reads, even when the lock-only port does not consume them.
+     * Keep command scopes and precedence from getRcArgs; the live source must bind or decline these settings.
+     */
+    static Map<String, Object> networkSettings(Map<String, @Nullable Object> rc) {
+        Map<String, Object> settings = new LinkedHashMap<>();
+        for (String command : Arrays.asList("*", "install")) {
+            for (String key : Js.keys(rc)) {
+                Matcher match = RC_ARG.matcher(key);
+                if (!match.find() || !command.equals(match.group(1) == null ? "*" : match.group(1))) {
+                    continue;
+                }
+                String option = match.group(2);
+                if (Arrays.asList("proxy", "https-proxy", "network-timeout").contains(option)) {
+                    settings.put(option, rc.get(key));
+                }
+            }
+        }
+        return settings;
+    }
+
+    /**
      * {@code getRcArgs} as {@code release}'s commander sets the flags: an option the release does not declare is one
      * commander drops with the value after it. Before 1.1.0, the args by their values, parsed before the command line
      * with what they leave of it; the arguments no option takes are under {@link #ARGS}.
@@ -205,9 +226,10 @@ final class Rc {
                     case "cache-folder":
                         args.put(camelCase(arg), value);
                         break;
+                    case "no-bin-links":
                     case "no-lockfile":
                         if (Boolean.TRUE.equals(value)) {
-                            args.put("lockfile", false);
+                            args.put(camelCase(arg.substring(3)), false);
                         }
                         break;
                     case "cwd":

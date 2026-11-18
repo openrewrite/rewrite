@@ -37,6 +37,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -44,6 +45,58 @@ class ChangeDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi());
+    }
+
+    @Test
+    void selectsVersionFromSubprojectRepositoriesInRootSubprojectsBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("org.springframework.cloud", "spring-cloud-starter-aws-secrets-manager-config",
+              "io.awspring.cloud", "spring-cloud-aws-starter-secrets-manager", "3.3.x", null, null, null))
+            // Without Maven settings, so that only the projects' own repositories are searched
+            .executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+                throw new AssertionError(t);
+            }))),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation 'org.springframework.cloud:spring-cloud-starter-aws-secrets-manager-config:2.2.6.RELEASE'
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager:3.3.1'
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
+          )
+        );
     }
 
     @Test

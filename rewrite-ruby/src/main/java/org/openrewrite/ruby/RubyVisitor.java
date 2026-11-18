@@ -198,11 +198,17 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         Rb.BlockArgument b = blockArgument;
         b = b.withPrefix(visitSpace(b.getPrefix(), RubySpace.Location.BLOCK_ARGUMENT_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(b, p);
+        Statement temp = (Statement) visitStatement(b, p);
         if (!(temp instanceof Rb.BlockArgument)) {
             return temp;
         } else {
             b = (Rb.BlockArgument) temp;
+        }
+        Expression temp2 = (Expression) visitExpression(b, p);
+        if (!(temp2 instanceof Rb.BlockArgument)) {
+            return temp2;
+        } else {
+            b = (Rb.BlockArgument) temp2;
         }
         b = b.withArgument((Expression) visit(b.getArgument(), p));
         return b.withType(visitType(b.getType(), p));

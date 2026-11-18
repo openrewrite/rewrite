@@ -349,10 +349,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     @Test
     void unresolvableTgzDependencyShouldNotFailBuild() {
         rewriteRun(
-          spec -> spec.executionContext(new InMemoryExecutionContext())
-            .typeValidationOptions(TypeValidation.builder()
-              .dependencyModel(false)
-              .build()),
+          spec -> spec.executionContext(new InMemoryExecutionContext()),
           pomXml(
             """
               <project>

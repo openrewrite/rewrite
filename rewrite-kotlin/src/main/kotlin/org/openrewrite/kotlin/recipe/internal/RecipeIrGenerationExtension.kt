@@ -85,6 +85,7 @@ import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
+import org.jetbrains.kotlin.load.kotlin.PackagePartClassUtils
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -1419,9 +1420,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun defaultFacadeBaseName(filePath: String): String? {
         val nameOnly = filePath.substringAfterLast('/').substringAfterLast('\\')
         if (!nameOnly.endsWith(".kt")) return null
-        val stem = nameOnly.removeSuffix(".kt")
-        if (stem.isEmpty()) return null
-        return stem.replaceFirstChar { it.uppercaseChar() } + "Kt"
+        return PackagePartClassUtils.getFilePartShortName(nameOnly)
     }
 
     /**

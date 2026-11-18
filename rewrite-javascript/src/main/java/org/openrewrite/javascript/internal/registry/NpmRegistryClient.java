@@ -16,11 +16,13 @@
 package org.openrewrite.javascript.internal.registry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException.Reason;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -38,13 +40,27 @@ public class NpmRegistryClient {
     private static final String FULL_ACCEPT = "application/json";
 
     private final HttpSender httpSender;
+    private final RegistryTransport transport;
     // Never let a response obtained with one credential bypass another project's registry authorization.
     // Registry values are memory-only keys; credentials are not embedded in printable URL/cache-key strings.
     private final Map<NodeRegistry, Map<String, byte[]>> tarballCache = new ConcurrentHashMap<>();
     private final Map<NodeRegistry, Map<String, String>> documentCache = new ConcurrentHashMap<>();
 
     public NpmRegistryClient(HttpSender httpSender) {
+        this(httpSender, RegistryTransport.DEFAULT);
+    }
+
+    private NpmRegistryClient(HttpSender httpSender, RegistryTransport transport) {
         this.httpSender = httpSender;
+        this.transport = transport;
+    }
+
+    /**
+     * A transport-bound client with its own credential and response caches. No response fetched on another route
+     * can satisfy a request on this route, including one whose configuration must be refused.
+     */
+    public NpmRegistryClient withTransport(RegistryTransport transport) {
+        return new NpmRegistryClient(httpSender, transport);
     }
 
     /**
@@ -113,40 +129,58 @@ public class NpmRegistryClient {
 
     private byte[] send(NodeRegistry registry, String name, @Nullable String version, String url,
                         String accept, boolean packument) {
+        guard(registry);
+        if (hasAuthorization(registry) && !sameHttpsAuthority(registry.getUrl(), url)) {
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
+                    "Registry credentials cannot be safely applied outside the configured HTTPS authority", null);
+        }
+        HttpSender sender = transport.sender(httpSender, url);
         HttpSender.Request request;
         try {
-            HttpSender.Request.Builder builder = httpSender.get(url).accept(accept);
+            HttpSender.Request.Builder builder = sender.get(url).accept(accept);
             applyAuth(builder, registry);
             request = builder.build();
         } catch (Exception e) {
-            throw new NodeRegistryException(Reason.UNREACHABLE, registry.getUrl(), name, version,
-                    "Invalid registry URL: " + url, e);
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
+                    "Invalid registry URL: " + Urls.stripUserinfo(url), null);
         }
-        try (HttpSender.Response response = httpSender.send(request)) {
+        try (HttpSender.Response response = sender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
                 throw new NodeRegistryException(Reason.AUTH_FAILED, safeUrl(registry), name, version,
-                        "HTTP " + code + " from " + url + unresolvedCredentialsHint(registry), null);
+                        "HTTP " + code + " from " + Urls.stripUserinfo(url) + unresolvedCredentialsHint(registry), null);
             }
             if (code == 404) {
                 Reason reason = packument ? Reason.PACKAGE_NOT_FOUND : Reason.VERSION_NOT_FOUND;
                 throw new NodeRegistryException(reason, safeUrl(registry), name, version,
-                        "HTTP 404 from " + url, null);
+                        "HTTP 404 from " + Urls.stripUserinfo(url), null);
             }
             if (!response.isSuccessful()) {
                 throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
-                        "HTTP " + code + " from " + url, null);
+                        "HTTP " + code + " from " + Urls.stripUserinfo(url), null);
             }
             return response.getBodyAsBytes();
         } catch (NodeRegistryException e) {
             throw e;
         } catch (Exception e) {
             throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
-                    "Failed to fetch " + url + ": " + e, e);
+                    "Failed to fetch " + Urls.stripUserinfo(url) + " through the configured registry transport (" + failureKind(e) + ")", null);
         }
     }
 
+    private static String failureKind(Exception failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getSimpleName();
+    }
+
     private void guard(NodeRegistry registry) {
+        if (hasAuthorization(registry) && !isHttps(registry.getUrl())) {
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
+                    "Registry credentials require HTTPS; anonymous fallback cannot honor this configuration");
+        }
         if (registry.isUnresolvedPlaceholders()) {
             throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
                     "Registry URL contains unresolved environment placeholders: " + safeUrl(registry));
@@ -175,8 +209,8 @@ public class NpmRegistryClient {
     }
 
     private static void applyAuth(HttpSender.Request.Builder builder, NodeRegistry registry) {
-        // Never send credentials over a non-TLS scheme — a cleartext (or unknown-scheme) registry could
-        // exfiltrate the token. npm's own default is to refuse auth over http.
+        // The request boundary rejects credentialed non-TLS and other-authority targets before this method.
+        // Anonymous registries remain usable over HTTP.
         if (!isHttps(registry.getUrl())) {
             return;
         }
@@ -186,6 +220,28 @@ public class NpmRegistryClient {
             builder.withAuthentication("Basic", registry.getAuthBase64());
         } else if (registry.getUsername() != null) {
             builder.withBasicAuthentication(registry.getUsername(), registry.getPassword());
+        }
+    }
+
+    private static boolean hasAuthorization(NodeRegistry registry) {
+        if (registry.getAuthToken() != null) {
+            return !StringUtils.isBlank(registry.getAuthToken());
+        }
+        if (registry.getAuthBase64() != null) {
+            return !StringUtils.isBlank(registry.getAuthBase64());
+        }
+        return !StringUtils.isBlank(registry.getUsername());
+    }
+
+    private static boolean sameHttpsAuthority(String registry, String target) {
+        try {
+            URI from = URI.create(registry);
+            URI to = URI.create(target);
+            return "https".equalsIgnoreCase(from.getScheme()) && "https".equalsIgnoreCase(to.getScheme()) &&
+                   from.getHost() != null && from.getHost().equalsIgnoreCase(to.getHost()) &&
+                   (from.getPort() < 0 ? 443 : from.getPort()) == (to.getPort() < 0 ? 443 : to.getPort());
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 

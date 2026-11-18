@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.NuGet;
+using OpenRewrite.Xml;
 
 namespace OpenRewrite.Tests;
 
@@ -185,5 +187,44 @@ public class NuGetRestoreGraphTests : IDisposable
         Assert.Equal(
             firstLockFile.Libraries.Select(l => l.Name + "/" + l.Version).OrderBy(x => x).ToArray(),
             secondLockFile.Libraries.Select(l => l.Name + "/" + l.Version).OrderBy(x => x).ToArray());
+    }
+
+    [Fact]
+    public void ProjectReachedThroughSymbolicLinkKeepsItsProjectReferences()
+    {
+        WriteFile("real/src/Lib/Lib.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        const string app = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="..\Lib\Lib.csproj" />
+              </ItemGroup>
+            </Project>
+            """;
+        WriteFile("real/src/App/App.csproj", app);
+        var linked = Path.Combine(_tempDir, "linked");
+        try
+        {
+            Directory.CreateSymbolicLink(linked, Path.Combine(_tempDir, "real"));
+        }
+        catch (Exception ex) when (OperatingSystem.IsWindows() && ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        var document = new XmlParser().Parse(app, "src/App/App.csproj");
+        var marker = MSBuildProjectHelper.CreateMarker(document, linked);
+
+        Assert.NotNull(marker);
+        var tf = Assert.Single(marker.TargetFrameworks);
+        Assert.Equal("Lib", Assert.Single(tf.ProjectReferences).Name);
     }
 }

@@ -146,6 +146,7 @@ class ScalaASTConverter {
           visitor.visitTree(stat) match {
             case _: J.Empty => null
             case stmt: Statement => stmt
+            case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
             case _ => null
           }
       }

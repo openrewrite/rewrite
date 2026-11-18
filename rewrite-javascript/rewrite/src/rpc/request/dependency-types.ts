@@ -25,7 +25,7 @@ import {lastParsedProject} from "./last-parsed-project";
 
 const JAVA_TYPE_CLASS = "org.openrewrite.java.tree.JavaType$Class";
 
-type ExportedTypes = typeof import("../../javascript/package-exported-types.js")["exportedTypes"];
+type PackageExportedTypes = typeof import("../../javascript/package-exported-types.js");
 
 /**
  * Handle a DependencyTypes request: resolve one dependency, named by its npm coordinate, against
@@ -58,10 +58,10 @@ export class DependencyTypes {
                     const key = JSON.stringify([request.name, version, projectDir]);
                     if (!pending.has(key)) {
                         // Dynamic import to break the circular dependency with the javascript module.
-                        const {exportedTypes} = await import("../../javascript/package-exported-types.js");
+                        const exported = await import("../../javascript/package-exported-types.js");
                         const types = version === null
-                            ? exportedTypes([runtimeLibFile(request.name)], [])
-                            : packageTypes(request.name, exportedTypes,
+                            ? exported.exportedTypes([runtimeLibFile(request.name)], [])
+                            : packageTypes(request.name, exported,
                                 projectDir === null ? projectNodeModules() : path.join(projectDir, "node_modules"));
 
                         const q = new RpcSendQueue(new ReferenceMap(), JAVA_TYPE_CLASS, false);
@@ -101,19 +101,31 @@ function projectNodeModules(): string {
 }
 
 /** The installed package's own types, falling back to its DefinitelyTyped package when it ships none. */
-function packageTypes(name: string, exportedTypes: ExportedTypes, nodeModules: string): Type.FullyQualified[] {
+function packageTypes(name: string, {exportedTypes, packageNames}: PackageExportedTypes,
+                      nodeModules: string): Type.FullyQualified[] {
     const pkgDir = path.join(nodeModules, ...name.split("/"));
     if (!fs.existsSync(pkgDir)) {
         throw new Error(`Package '${name}' is not installed under ${nodeModules}`);
     }
     const types = exportedTypes([pkgDir], []);
-    if (types.length > 0) {
+    // Every package defines its own names, so those alone are a package that ships no types.
+    const own = packageNames(pkgDir);
+    if (types.some(type => !own.includes(Type.FullyQualified.getFullyQualifiedName(type)))) {
         return types;
     }
     // @scope/pkg -> @types/scope__pkg
     const typesDir = path.join(nodeModules, "@types",
         name.startsWith("@") ? name.slice(1).replace("/", "__") : name);
-    return fs.existsSync(typesDir) ? exportedTypes([typesDir], []) : types;
+    if (!fs.existsSync(typesDir)) {
+        return types;
+    }
+    // The fallback stands for this package, so it goes by this package's names. The DefinitelyTyped
+    // package's id is left to that package's own table, or two tables would claim it.
+    const theirs = packageNames(typesDir).filter(typesName => !own.includes(typesName));
+    const typed = exportedTypes([typesDir], [])
+        .filter(type => !theirs.includes(Type.FullyQualified.getFullyQualifiedName(type)));
+    const named = new Set(typed.map(type => Type.FullyQualified.getFullyQualifiedName(type)));
+    return [...typed, ...types.filter(type => !named.has(Type.FullyQualified.getFullyQualifiedName(type)))];
 }
 
 /** A runtime declaration file (e.g. lib.dom.d.ts): the project's installed TypeScript first, else the engine's own. */

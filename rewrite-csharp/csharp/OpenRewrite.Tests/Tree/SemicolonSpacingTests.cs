@@ -161,6 +161,48 @@ public class SemicolonSpacingTests : RewriteTest
     }
 
     [Fact]
+    public void ExternAliasSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                extern alias A ;
+                namespace N;
+                extern alias B ;
+                class C {
+                }
+                """
+            ),
+            CSharp(
+                """
+                namespace N {
+                    extern alias B ;
+                    class C {
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void LabeledStatementSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class C {
+                    void M(int x) {
+                        L: x++ ;
+                        A: B: return ;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void JumpStatementSpaceBeforeSemicolon()
     {
         RewriteRun(

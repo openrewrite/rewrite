@@ -22,8 +22,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -32,7 +34,9 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeMethodInvocationReturnType("java.lang.Integer parseInt(String)", "long"));
+        spec.recipe(new ChangeMethodInvocationReturnType("java.lang.Integer parseInt(String)", "long"))
+          // the recipe models a library whose method returns a new type, which the test's classpath doesn't have
+          .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build());
     }
 
     @DocumentExample
@@ -54,7 +58,15 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                       long one = Integer.parseInt("1");
                   }
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(variable.getType()).isEqualTo(JavaType.Primitive.Long);
+                    assertThat(variable.getName().getFieldType()).isEqualTo(variable.getVariableType());
+                    return variable;
+                }
+            }.visit(cu, 0))
           )
         );
     }
@@ -908,6 +920,77 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                   void foo() throws Exception {
                       try (LineNumberReader one = Bar.reader()) {
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retypesOnlyAVariableThatCannotHoldTheReturnTypeTheCallAlreadyHas() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("java.util.logging.LogRecord getThreadID()", "getLongThreadID", null, null),
+            new ChangeMethodInvocationReturnType("java.util.logging.LogRecord getLongThreadID()", "long")),
+          //language=java
+          java(
+            """
+              import java.util.logging.LogRecord;
+
+              class Foo {
+                  void foo(LogRecord record) {
+                      int id = record.getThreadID();
+                      Object boxed = record.getThreadID();
+                      var inferred = record.getThreadID();
+                  }
+              }
+              """,
+            """
+              import java.util.logging.LogRecord;
+
+              class Foo {
+                  void foo(LogRecord record) {
+                      long id = record.getLongThreadID();
+                      Object boxed = record.getLongThreadID();
+                      var inferred = record.getLongThreadID();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsADeclarationThatIsNotKnownToMisfitTheReturnTypeTheCallAlreadyHas() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar names()", "java.util.List"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static java.util.List names() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            )
+            .typeValidationOptions(TypeValidation.builder().identifiers(false).variableDeclarations(false).build()),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+
+              import java.util.List;
+
+              class Foo {
+                  void foo() {
+                      List<String> unchecked = Bar.names();
+
+                      Missing unresolved = Bar.names();
                   }
               }
               """

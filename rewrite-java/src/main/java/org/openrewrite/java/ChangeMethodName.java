@@ -173,17 +173,7 @@ public class ChangeMethodName extends Recipe {
                     // Without type attribution, assume a clash when the arity matches
                     return m1.getParameters().size() == m2.getParameters().size();
                 }
-                List<JavaType> p1 = t1.getParameterTypes();
-                List<JavaType> p2 = t2.getParameterTypes();
-                if (p1.size() != p2.size()) {
-                    return false;
-                }
-                for (int i = 0; i < p1.size(); i++) {
-                    if (!TypeUtils.isOfType(p1.get(i), p2.get(i))) {
-                        return false;
-                    }
-                }
-                return true;
+                return CalledMethod.sameTypes(t1.getParameterTypes(), t2.getParameterTypes());
             }
 
             @Override
@@ -192,12 +182,102 @@ public class ChangeMethodName extends Recipe {
                 if (methodMatcher.matches(method) && !method.getSimpleName().equals(newMethodName)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
-                        type = type.withName(newMethodName);
+                        type = renamed(m, type);
                     }
                     m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
                             .withMethodType(type);
                 }
                 return m;
+            }
+
+            /**
+             * The method named {@code newMethodName} that {@code call} calls, such as a {@code select()} that
+             * returns another type than the {@code transform()} it replaces, or {@code type} with the new name where
+             * that can't be told.
+             */
+            private JavaType.Method renamed(J.MethodInvocation call, JavaType.Method type) {
+                JavaType.Method renamed = type.withName(newMethodName);
+                JavaType.FullyQualified declaringType = type.getDeclaringType();
+                JavaType.FullyQualified receiver = call.getSelect() != null ?
+                        TypeUtils.asFullyQualified(call.getSelect().getType()) : thisType(declaringType);
+                // Kotlin, Groovy and the other languages resolve a call by rules of their own
+                if (receiver == null || getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
+                    return renamed;
+                }
+                JavaType.Method called;
+                if (!TypeUtils.isAssignableTo(declaringType.getFullyQualifiedName(), receiver)) {
+                    // an earlier recipe gave the receiver another type, as in `multi.select().byTakingFirstItems(2)`
+                    called = CalledMethod.find(receiver, newMethodName, call.getArguments());
+                } else {
+                    // Where this recipe renames the old method's declaration too, the call calls that method, which
+                    // its type's members don't hold. The declaration keeps its name only where its type declares the
+                    // new name with the same parameters, so only then is a method of the new name there to call.
+                    JavaType.Method original = declared(declaringType, type.getName(),
+                            method -> TypeUtils.isOfTypeIgnoringGenerics(method, type));
+                    if (original == null) {
+                        return renamed;
+                    }
+                    JavaType.Method target = declared(declaringType, newMethodName,
+                            method -> CalledMethod.sameTypes(method.getParameterTypes(), original.getParameterTypes()));
+                    if (target == null) {
+                        return renamed;
+                    }
+                    // the receiver's own type may override that method, or overload it for these arguments
+                    List<JavaType.Method> candidates = CalledMethod.candidates(receiver, newMethodName,
+                            call.getArguments());
+                    called = candidates.size() == 1 ? candidates.get(0) :
+                            CalledMethod.find(receiver, newMethodName, call.getArguments());
+                    if (called != null && TypeUtils.isOfType(called, target) &&
+                        TypeUtils.isOfType(original.getReturnType(), target.getReturnType()) &&
+                        CalledMethod.sameTypes(original.getThrownExceptions(), target.getThrownExceptions())) {
+                        // javac inferred the call's types from this signature, type variables of the method included
+                        return target.withDeclaringType(declaringType)
+                                .withReturnType(type.getReturnType())
+                                .withParameterTypes(type.getParameterTypes())
+                                .withThrownExceptions(type.getThrownExceptions());
+                    }
+                }
+                if (called == null || CalledMethod.isErased(receiver, called, call.getArguments())) {
+                    return renamed;
+                }
+                called = CalledMethod.calledOn(receiver, called);
+                return called == null ? renamed : called;
+            }
+
+            /**
+             * The type of {@code this} for the call at the cursor, which has no receiver and calls a method of
+             * {@code declaringType}. It is the class around the call where that is a subtype. An anonymous class
+             * doesn't tell its type and a static import has none, so there it is {@code declaringType} as a raw type.
+             */
+            private JavaType.FullyQualified thisType(JavaType.FullyQualified declaringType) {
+                Object enclosing = getCursor().dropParentUntil(tree -> tree instanceof J.ClassDeclaration ||
+                        tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null ||
+                        tree == Cursor.ROOT_VALUE).getValue();
+                if (enclosing instanceof J.ClassDeclaration) {
+                    JavaType.FullyQualified type = ((J.ClassDeclaration) enclosing).getType();
+                    if (type != null && TypeUtils.isAssignableTo(declaringType.getFullyQualifiedName(), type)) {
+                        return type;
+                    }
+                }
+                return declaringType instanceof JavaType.Parameterized ?
+                        ((JavaType.Parameterized) declaringType).getType() : declaringType;
+            }
+
+            /**
+             * The one method that {@code type} itself declares with the name {@code name} that passes {@code test}.
+             */
+            private JavaType.@Nullable Method declared(JavaType.FullyQualified type, String name,
+                                                       Predicate<JavaType.Method> test) {
+                JavaType.Method declared = null;
+                for (JavaType.Method method : type.getMethods()) {
+                    if (method.getName().equals(name) && test.test(method)) {
+                        if (declared != null) {
+                            return null;
+                        }
+                        declared = method;
+                    }
+                }
+                return declared;
             }
 
             @Override

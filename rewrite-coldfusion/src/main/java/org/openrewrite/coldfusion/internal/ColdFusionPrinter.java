@@ -58,6 +58,11 @@ public class ColdFusionPrinter<P> extends ColdFusionVisitor<PrintOutputCapture<P
 
     @Override
     public J visitCompilationUnit(Cf.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
+        if (compilationUnit.isCharsetBomMarked()) {
+            // here rather than where any source file's printing restores it, which leaves it out of a file that is empty
+            // or begins with a U+FEFF of its own
+            p.append('﻿');
+        }
         beforeSyntax(compilationUnit.getPrefix(), compilationUnit.getMarkers(), Space.Location.COMPILATION_UNIT_PREFIX, p);
         for (JRightPadded<Statement> statement : compilationUnit.getPadding().getStatements()) {
             visit(statement.getElement(), p);
@@ -211,6 +216,11 @@ public class ColdFusionPrinter<P> extends ColdFusionVisitor<PrintOutputCapture<P
         beforeSyntax(scriptTag, CfSpace.Location.SCRIPT_TAG_PREFIX, p);
         visit(scriptTag.getName(), p);
         for (Cf.TagAttribute attribute : scriptTag.getAttributes()) {
+            AttributeComma comma = attribute.getMarkers().findFirst(AttributeComma.class).orElse(null);
+            if (comma != null) {
+                visitSpace(comma.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append(',');
+            }
             visit(attribute, p);
         }
         visit(scriptTag.getExpression(), p);
@@ -448,10 +458,16 @@ public class ColdFusionPrinter<P> extends ColdFusionVisitor<PrintOutputCapture<P
                 afterSyntax(method, p);
                 return method;
             }
-            for (J.Modifier modifier : method.getModifiers()) {
-                visitModifier(modifier, p);
+            List<J.Modifier> modifiers = method.getModifiers();
+            int returnTypePosition = method.getMarkers().findFirst(ReturnTypePosition.class)
+                    .map(ReturnTypePosition::getPosition).orElse(modifiers.size());
+            for (int i = 0; i < modifiers.size(); i++) {
+                if (i == returnTypePosition && returnTypeClause == null) {
+                    visit(returnType, p);
+                }
+                visitModifier(modifiers.get(i), p);
             }
-            if (returnTypeClause == null) {
+            if (returnTypePosition >= modifiers.size() && returnTypeClause == null) {
                 visit(returnType, p);
             }
             FunctionKeyword function = method.getMarkers().findFirst(FunctionKeyword.class).orElse(null);

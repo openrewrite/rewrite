@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -143,4 +144,56 @@ func nameOrEmpty(id *java.Identifier) string {
 		return ""
 	}
 	return id.Name
+}
+
+func TestGenericValueInstantiationTrailingComma(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		params string
+		args   string
+		count  int
+	}{
+		{"single", "T any", "int,", 1},
+		{"multiple", "T, U any", "int, string,", 2},
+		{"singleComments", "T any", "int /* before */, /* after */", 1},
+		{"multipleComments", "T, U any", "int, string /* before */, /* after */", 2},
+		{"singleMultiline", "T any", "\nint,\n", 1},
+		{"multipleMultiline", "T, U any", "\nint,\nstring,\n", 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			src := "package main\nfunc F[" + tt.params + "]() {}\nfunc main() {\nf := F[" + tt.args + "]\n_ = f\n}\n"
+
+			// when
+			rhs := firstAssignRHS(t, src)
+
+			// then
+			inst, ok := rhs.(*golang.IndexList)
+			require.Truef(t, ok, "expected IndexList, got %T", rhs)
+			require.Len(t, inst.Indices.Elements, tt.count)
+			require.NotNil(t, java.FindMarker[golang.TrailingComma](inst.Indices.Markers))
+			for _, arg := range inst.Indices.Elements {
+				assert.NotContains(t, arg.After.Whitespace(), ",")
+			}
+			assertRoundTrip(t, src)
+		})
+	}
+}
+
+func TestGenericValueInstantiationWithoutTrailingComma(t *testing.T) {
+	for _, args := range []string{"int", "int /* , */ ", "*int", "(int)", "func(int, string)", "[]map[string]*int"} {
+		t.Run(args, func(t *testing.T) {
+			// given
+			src := "package main\nfunc F[T any]() {}\nfunc main() {\nf := F[" + args + "]\n_ = f\n}\n"
+
+			// when
+			rhs := firstAssignRHS(t, src)
+
+			// then
+			inst, ok := rhs.(*golang.IndexList)
+			require.Truef(t, ok, "expected IndexList, got %T", rhs)
+			require.Nil(t, java.FindMarker[golang.TrailingComma](inst.Indices.Markers))
+			assertRoundTrip(t, src)
+		})
+	}
 }

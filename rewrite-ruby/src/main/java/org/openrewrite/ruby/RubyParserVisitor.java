@@ -2354,9 +2354,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitYieldNode(Nodes.YieldNode node) {
         Space prefix = prefix(node);
         skip("yield");
-        //noinspection unchecked
-        return new Rb.Yield(randomId(), prefix, Markers.EMPTY,
-                (JContainer<Statement>) (JContainer<?>) callArguments(node.arguments, null));
+        return new Rb.Yield(randomId(), prefix, Markers.EMPTY, callArguments(node.arguments, null));
     }
 
     @Override

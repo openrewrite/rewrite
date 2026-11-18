@@ -32,6 +32,19 @@ import static java.util.Collections.emptyList;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
     @Override
+    public J visitAssert(J.Assert assertion, ExecutionContext ctx) {
+        SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+        // Groovy power assertions (including Spock conditions) render the source expression
+        // and record intermediate values. Preserve their input before visiting children,
+        // even when a simplification would preserve the boolean result.
+        // Use the tree type to avoid a dependency from rewrite-java to rewrite-groovy.
+        if (source != null && "org.openrewrite.groovy.tree.G$CompilationUnit".equals(source.getClass().getName())) {
+            return assertion;
+        }
+        return super.visitAssert(assertion, ctx);
+    }
+
+    @Override
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         J j = super.visitBinary(binary, ctx);
         J.Binary asBinary = (J.Binary) j;
@@ -150,6 +163,18 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     @Override
     public J visitUnary(J.Unary unary, ExecutionContext ctx) {
+        if (unary.getOperator() == J.Unary.Type.Not &&
+            unary.getExpression().unwrap() instanceof J.Unary &&
+            ((J.Unary) unary.getExpression().unwrap()).getOperator() == J.Unary.Type.Not) {
+            SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+            // Avoid a dependency from rewrite-java to rewrite-groovy. The tree type, rather than
+            // the file extension, identifies Groovy even when a source path has been changed.
+            if (source != null && "org.openrewrite.groovy.tree.G$CompilationUnit".equals(source.getClass().getName())) {
+                // Spock's compiler uses double logical negation to disable condition rendering.
+                // Preserve the whole expression before visiting children can invert a comparison.
+                return unary;
+            }
+        }
         J j = super.visitUnary(unary, ctx);
         if (j instanceof J.Unary) {
             J.Unary asUnary = (J.Unary) j;

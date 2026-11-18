@@ -556,6 +556,27 @@ class GroovyParserTest implements RewriteTest {
         assertThat(invocations).hasPositiveValue();
     }
 
+    @Test
+    void parenthesizedClosuresMethodPointersArraysAndClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = ({ it }) * 2
+              def b = (({ it }))(1)
+              def c = -({ 1 })
+              def d = (y.&toString)()
+              def e = [(y.&toString): 1]
+              def f = (new int[2]).length
+              def g = (String).name
+              def h = ((String[])).class
+              def i = (String[]) == null
+              def j = ((x) -> x)
+              """
+          )
+        );
+    }
+
     private static void parse(GroovyParser.Builder builder) {
         builder.build().parse(new InMemoryExecutionContext(), "def a = 1").findFirst().orElseThrow();
     }

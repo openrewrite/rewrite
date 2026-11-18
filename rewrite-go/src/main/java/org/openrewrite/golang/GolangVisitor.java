@@ -161,7 +161,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         if (c.getTypeExpr() != null) {
             c = c.withTypeExpr((Expression) visitAndCast(c.getTypeExpr(), p));
         }
-        return c.getPadding().withElements(visitContainer(c.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        c = c.getPadding().withElements(visitContainer(c.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return c.withType(visitType(c.getType(), p));
     }
 
     public J visitKeyValue(Go.KeyValue keyValue, P p) {
@@ -174,7 +175,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         kv = (Go.KeyValue) tempExpression;
         kv = kv.withMarkers(visitMarkers(kv.getMarkers(), p));
         kv = kv.withKeyExpr((Expression) visitAndCast(kv.getKeyExpr(), p));
-        return kv.getPadding().withValue(visitLeftPadded(kv.getPadding().getValue(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        kv = kv.getPadding().withValue(visitLeftPadded(kv.getPadding().getValue(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return kv.withType(visitType(kv.getType(), p));
     }
 
     public J visitSliceExpr(Go.SliceExpr slice, P p) {
@@ -193,7 +195,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         if (s.getMax() != null) {
             s = s.withMax((Expression) visitAndCast(s.getMax(), p));
         }
-        return s.withCloseBracket(visitSpace(s.getCloseBracket(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withCloseBracket(visitSpace(s.getCloseBracket(), Space.Location.LANGUAGE_EXTENSION, p));
+        return s.withType(visitType(s.getType(), p));
     }
 
     public J visitGoArrayType(Go.ArrayType arrayType, P p) {
@@ -206,7 +209,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         a = (Go.ArrayType) tempExpression;
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = a.getPadding().withLength(visitRightPadded(a.getPadding().getLength(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
-        return a.withElementType((Expression) visitAndCast(a.getElementType(), p));
+        a = a.withElementType((Expression) visitAndCast(a.getElementType(), p));
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitMapType(Go.MapType mapType, P p) {
@@ -220,7 +224,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         m = m.withOpenBracket(visitSpace(m.getOpenBracket(), Space.Location.LANGUAGE_EXTENSION, p));
         m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
-        return m.withValue((Expression) visitAndCast(m.getValue(), p));
+        m = m.withValue((Expression) visitAndCast(m.getValue(), p));
+        return m.withType(visitType(m.getType(), p));
     }
 
     public J visitTypeAssertion(Go.TypeAssertion typeAssertion, P p) {
@@ -234,7 +239,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         ta = ta.withMarkers(visitMarkers(ta.getMarkers(), p));
         ta = ta.getPadding().withLeft(visitRightPadded(ta.getPadding().getLeft(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
         //noinspection unchecked
-        return ta.withAssertedType((J.ControlParentheses<Expression>) visitAndCast(ta.getAssertedType(), p));
+        ta = ta.withAssertedType((J.ControlParentheses<Expression>) visitAndCast(ta.getAssertedType(), p));
+        return ta.withType(visitType(ta.getType(), p));
     }
 
     public J visitExpressionStatement(Go.ExpressionStatement expressionStatement, P p) {
@@ -270,7 +276,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         }
         pt = (Go.PointerType) tempExpression;
         pt = pt.withMarkers(visitMarkers(pt.getMarkers(), p));
-        return pt.withElem((Expression) visitAndCast(pt.getElem(), p));
+        pt = pt.withElem((Expression) visitAndCast(pt.getElem(), p));
+        return pt.withType(visitType(pt.getType(), p));
     }
 
     public J visitChannel(Go.Channel channel, P p) {
@@ -282,7 +289,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         }
         c = (Go.Channel) tempExpression;
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        return c.withValue((Expression) visitAndCast(c.getValue(), p));
+        c = c.withValue((Expression) visitAndCast(c.getValue(), p));
+        return c.withType(visitType(c.getType(), p));
     }
 
     public J visitFuncType(Go.FuncType funcType, P p) {
@@ -298,7 +306,7 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         if (f.getReturnType() != null) {
             f = f.withReturnType((Expression) visitAndCast(f.getReturnType(), p));
         }
-        return f;
+        return f.withType(visitType(f.getType(), p));
     }
 
     public J visitStructType(Go.StructType structType, P p) {
@@ -310,7 +318,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         }
         s = (Go.StructType) tempExpression;
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        return s.withBody((J.Block) visitAndCast(s.getBody(), p));
+        s = s.withBody((J.Block) visitAndCast(s.getBody(), p));
+        return s.withType(visitType(s.getType(), p));
     }
 
     public J visitInterfaceType(Go.InterfaceType interfaceType, P p) {
@@ -322,7 +331,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         }
         i = (Go.InterfaceType) tempExpression;
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        return i.withBody((J.Block) visitAndCast(i.getBody(), p));
+        i = i.withBody((J.Block) visitAndCast(i.getBody(), p));
+        return i.withType(visitType(i.getType(), p));
     }
 
     public J visitTypeList(Go.TypeList typeList, P p) {
@@ -334,7 +344,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         }
         t = (Go.TypeList) tempExpression;
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
-        return t.getPadding().withTypes(visitContainer(t.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        t = t.getPadding().withTypes(visitContainer(t.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return t.withType(visitType(t.getType(), p));
     }
 
     public J visitUnion(Go.Union union, P p) {
@@ -346,8 +357,9 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         }
         u = (Go.Union) tempExpression;
         u = u.withMarkers(visitMarkers(u.getMarkers(), p));
-        return u.getPadding().withTypes(ListUtils.map(u.getPadding().getTypes(),
+        u = u.getPadding().withTypes(ListUtils.map(u.getPadding().getTypes(),
                 t -> visitRightPadded(t, JRightPadded.Location.LANGUAGE_EXTENSION, p)));
+        return u.withType(visitType(u.getType(), p));
     }
 
     public J visitUnderlyingType(Go.UnderlyingType underlyingType, P p) {
@@ -494,7 +506,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         i = (Go.IndexList) tempExpression;
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.withTarget((Expression) visitAndCast(i.getTarget(), p));
-        return i.getPadding().withIndices(visitContainer(i.getPadding().getIndices(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        i = i.getPadding().withIndices(visitContainer(i.getPadding().getIndices(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return i.withType(visitType(i.getType(), p));
     }
 
     public J visitGoUnary(Go.Unary unary, P p) {
@@ -512,7 +525,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         u = (Go.Unary) tempExpression;
         u = u.withMarkers(visitMarkers(u.getMarkers(), p));
         u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return u.withExpression((Expression) visitAndCast(u.getExpression(), p));
+        u = u.withExpression((Expression) visitAndCast(u.getExpression(), p));
+        return u.withType(visitType(u.getType(), p));
     }
 
     public J visitGoBinary(Go.Binary binary, P p) {
@@ -526,7 +540,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
         b = b.withLeft((Expression) visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return b.withRight((Expression) visitAndCast(b.getRight(), p));
+        b = b.withRight((Expression) visitAndCast(b.getRight(), p));
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, P p) {
@@ -545,7 +560,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = a.withVariable((Expression) visitAndCast(a.getVariable(), p));
         a = a.getPadding().withOperator(visitLeftPadded(a.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return a.withAssignment((Expression) visitAndCast(a.getAssignment(), p));
+        a = a.withAssignment((Expression) visitAndCast(a.getAssignment(), p));
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitGoVariadic(Go.Variadic variadic, P p) {
@@ -558,6 +574,7 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         v = (Go.Variadic) tempExpression;
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
         v = v.withElement((Expression) visitAndCast(v.getElement(), p));
-        return v.withDots(visitSpace(v.getDots(), Space.Location.LANGUAGE_EXTENSION, p));
+        v = v.withDots(visitSpace(v.getDots(), Space.Location.LANGUAGE_EXTENSION, p));
+        return v.withType(visitType(v.getType(), p));
     }
 }

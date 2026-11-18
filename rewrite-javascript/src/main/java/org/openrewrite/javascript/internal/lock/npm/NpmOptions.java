@@ -16,13 +16,16 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Builder;
+import lombok.ToString;
 import lombok.Value;
+
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
+import org.openrewrite.javascript.internal.registry.RegistryTransport;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,6 +49,14 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 @Builder(toBuilder = true)
 public class NpmOptions {
 
+    @Builder.Default
+    @ToString.Exclude
+    Map<String, Object> network = Collections.emptyMap();
+
+    public RegistryTransport transport(Map<String, String> environment) {
+        return RegistryTransport.npm(network, environment);
+    }
+
     public static final NpmOptions DEFAULT = NpmOptions.builder().build();
 
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}?]+)(\\?)?\\}");
@@ -59,7 +70,8 @@ public class NpmOptions {
             "engine-strict", "before", "min-release-age", "min-release-age-exclude", "omit", "include", "only",
             "production", "dev", "optional", "also", "allow-git", "allow-file", "allow-directory", "allow-remote",
             "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global", "location", "registry",
-            "scope");
+            "scope", "proxy", "https-proxy", "noproxy", "ca", "cafile", "cert", "key", "strict-ssl", "local-address",
+            "offline", "fetch-timeout");
     private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
     // @npmcli/config definitions.js: every key npm 12.0.0 defines, in its order, which no release to 12.2.0 changes
@@ -346,6 +358,8 @@ public class NpmOptions {
         HostEnvironment env = HostEnvironment.UNKNOWN;
         NpmOptionsBuilder options = builder().release(release);
         Map<String, String> scopedRegistries = new LinkedHashMap<>();
+        Map<String, Object> network = new LinkedHashMap<>();
+        options.network(network);
         Object omit = null;
         Object include = null;
         Object only = null;
@@ -387,6 +401,23 @@ public class NpmOptions {
             }
             Object value = entry.getValue();
             switch (key) {
+                case "offline":
+                    network.put(key, booleanField(value, env, validated));
+                    break;
+                case "fetch-timeout":
+                    network.put(key, parseField(value, Type.NUMBER, env));
+                    break;
+                case "proxy":
+                case "https-proxy":
+                case "noproxy":
+                case "ca":
+                case "cafile":
+                case "cert":
+                case "key":
+                case "strict-ssl":
+                case "local-address":
+                    network.put(key, parseField(value, Type.LITERAL, env));
+                    break;
                 case "lockfile-version":
                     if (!release.definesLockfileVersion()) {
                         break;

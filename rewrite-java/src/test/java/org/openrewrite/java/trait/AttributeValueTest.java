@@ -797,7 +797,7 @@ class AttributeValueTest implements RewriteTest {
                 "/" + (v.getReferencedField() != null) +
                 "/" + (v.getClassValue() != null) +
                 "/" + v.getConstantValue()))))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @Example(e = E.ONE)

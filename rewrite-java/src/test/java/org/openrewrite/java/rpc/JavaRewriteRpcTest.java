@@ -30,6 +30,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
@@ -60,8 +61,8 @@ class JavaRewriteRpcTest implements RewriteTest {
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), env.toMarketplace(runtimeClasspath()));
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()));
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .log(System.out);
 //        client.traceGetObject(true, true);
     }
@@ -99,8 +100,12 @@ class JavaRewriteRpcTest implements RewriteTest {
 
     static class ChangeName extends JavaIsoVisitor<Integer> {
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-            return identifier.withSimpleName("Changed");
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+            if ("Changed".equals(classDecl.getSimpleName())) {
+                return classDecl;
+            }
+            JavaType.ShallowClass changed = JavaType.ShallowClass.build("Changed");
+            return classDecl.withName(classDecl.getName().withSimpleName("Changed").withType(changed)).withType(changed);
         }
     }
 }

@@ -165,6 +165,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         {
             return trailingComma.WithSuffix(VisitSpace(trailingComma.Suffix, p));
         }
+        if (marker is Struct structMarker)
+        {
+            return structMarker.WithPrefix(VisitSpace(structMarker.Prefix, p));
+        }
+        if (marker is RecordClass recordClass)
+        {
+            return recordClass.WithPrefix(VisitSpace(recordClass.Prefix, p));
+        }
 
         return base.VisitMarker(marker, p);
     }
@@ -1224,7 +1232,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithReturnType(VisitLeftPadded(node.ReturnType, p)!)
             .WithParameters(VisitContainer(node.Parameters, p)!)
             .WithExpressionBody(VisitLeftPadded(node.ExpressionBody, p))
-            .WithBody((Block?)Visit(node.Body, p));
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
     public virtual J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)

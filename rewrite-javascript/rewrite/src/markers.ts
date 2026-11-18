@@ -172,22 +172,25 @@ export interface SearchResult extends Marker {
     readonly description?: string
 }
 
+/**
+ * Marks `t` as a search result, unless it already carries one with this description.
+ */
 export function foundSearchResult<T extends { markers: Markers }>(t: T, description?: string): T {
-    const existing = findMarker(t, MarkersKind.SearchResult);
-    if (!existing || (existing as SearchResult).description !== description) {
-        return {
-            ...t,
-            markers: {
-                ...t.markers,
-                markers: [...t.markers.markers, {
-                    kind: MarkersKind.SearchResult,
-                    id: randomId(),
-                    description: description
-                } as SearchResult]
-            }
-        } as T;
+    if (t.markers.markers.some(m => m.kind === MarkersKind.SearchResult &&
+        (m as SearchResult).description === description)) {
+        return t;
     }
-    return t;
+    return {
+        ...t,
+        markers: {
+            ...t.markers,
+            markers: [...t.markers.markers, {
+                kind: MarkersKind.SearchResult,
+                id: randomId(),
+                description: description
+            } as SearchResult]
+        }
+    } as T;
 }
 
 export interface ParseExceptionResult extends Marker {

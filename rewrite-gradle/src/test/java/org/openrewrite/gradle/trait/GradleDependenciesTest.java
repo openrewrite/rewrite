@@ -18,12 +18,18 @@ package org.openrewrite.gradle.trait;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
+import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Trait;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -937,5 +943,22 @@ class GradleDependenciesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void kotlinDependenciesBlockWithoutGradleProject() {
+        SourceFile buildGradleKts = GradleParser.builder().build().parseInputs(
+            List.of(Parser.Input.fromString(Path.of("build.gradle.kts"), """
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.17.0")
+              }
+              """)), null, new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow();
+        AtomicReference<GradleDependencies> found = new AtomicReference<>();
+        new GradleDependencies.Matcher().asVisitor(deps -> {
+            found.set(deps);
+            return deps.getTree();
+        }).visit(buildGradleKts, 0);
+        assertThat(found.get()).isNotNull();
     }
 }

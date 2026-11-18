@@ -97,9 +97,10 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
             charIndex[codePoints] = source.length();
         }
         for (Token token : tokens) {
-            String text = token.getText();
-            if (text != null && text.startsWith("<!---") && text.endsWith("--->") && text.length() >= 9) {
-                tagCommentEnds.put(start(token), charIndex(token.getStopIndex() + 1));
+            int start = start(token);
+            int end = charIndex(token.getStopIndex() + 1);
+            if (end - start >= 9 && source.startsWith("<!---", start) && source.startsWith("--->", end - 4)) {
+                tagCommentEnds.put(start, end);
             }
         }
     }
@@ -1225,7 +1226,17 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
         if (ctx.expression() != null) {
             expression = expression(ctx.expression());
         }
-        attributes = statementAttributes(ctx.statementAttribute());
+        attributes = new ArrayList<>(ctx.statementAttribute().size());
+        AttributeComma comma = null;
+        for (ParseTree child : ctx.children) {
+            if (child instanceof TerminalNode && ((TerminalNode) child).getSymbol().getType() == COMMA) {
+                comma = new AttributeComma(randomId(), sourceBefore(((TerminalNode) child).getSymbol()));
+            } else if (child instanceof StatementAttributeContext) {
+                Cf.TagAttribute attribute = statementAttribute((StatementAttributeContext) child);
+                attributes.add(comma == null ? attribute : attribute.withMarkers(attribute.getMarkers().add(comma)));
+                comma = null;
+            }
+        }
         J.Block body = ctx.bodyBlock() == null ? null : block(ctx.bodyBlock());
         return new Cf.ScriptTag(randomId(), prefix, Markers.EMPTY, identifier(Space.EMPTY, name.getText()), attributes,
                 expression, body);
@@ -1234,12 +1245,20 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
     private JRightPadded<Statement> functionDeclaration(FunctionDeclarationContext ctx) {
         Space prefix = prefix(ctx.getStart());
         List<J.Modifier> modifiers = new ArrayList<>();
-        for (FunctionModifierContext modifier : ctx.functionModifier()) {
-            Token token = modifier.getStart();
-            Space modifierPrefix = sourceBefore(token);
-            modifiers.add(modifier(modifierPrefix, token.getText(), modifierType(token.getType())));
+        TypeTree returnType = null;
+        int returnTypePosition = 0;
+        for (ParseTree child : ctx.children) {
+            if (child instanceof FunctionModifierContext) {
+                Token token = ((FunctionModifierContext) child).getStart();
+                Space modifierPrefix = sourceBefore(token);
+                modifiers.add(modifier(modifierPrefix, token.getText(), modifierType(token.getType())));
+            } else if (child instanceof ReturnTypeContext) {
+                returnType = returnType((ReturnTypeContext) child);
+                returnTypePosition = modifiers.size();
+            } else if (child instanceof TerminalNode) {
+                break;
+            }
         }
-        TypeTree returnType = ctx.returnType() == null ? null : returnType(ctx.returnType());
         Token function = ctx.FUNCTION().getSymbol();
         FunctionKeyword keyword = new FunctionKeyword(randomId(), sourceBefore(function), function.getText());
         Token nameToken = ctx.anyWord().getStart();
@@ -1253,6 +1272,9 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
         DeclarationAttributes attributes = declarationAttributes(headerAttributes(ctx.headerAttribute()),
                 LanguageAttributes.FUNCTION, "returntype", true, returnType != null);
         attributes.markers.add(0, keyword);
+        if (returnType != null && returnTypePosition < modifiers.size()) {
+            attributes.markers.add(new ReturnTypePosition(randomId(), returnTypePosition));
+        }
         J.Block body = ctx.block() == null ? null : block(ctx.block());
         J.MethodDeclaration method = new J.MethodDeclaration(randomId(), prefix, Markers.build(attributes.markers),
                 attributes.annotations, modifiers, null, returnType != null ? returnType : attributes.type,
@@ -1361,26 +1383,30 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
     private List<Cf.TagAttribute> statementAttributes(List<StatementAttributeContext> contexts) {
         List<Cf.TagAttribute> attributes = new ArrayList<>(contexts.size());
         for (StatementAttributeContext ctx : contexts) {
-            Space prefix = prefix(ctx.getStart());
-            int start = start(ctx.getStart());
-            Token last = ctx.getStart();
-            for (ParseTree child : ctx.children) {
-                Token token = child instanceof TerminalNode ? ((TerminalNode) child).getSymbol() : ((ParserRuleContext) child).getStop();
-                if (token.getType() == ASSIGN) {
-                    break;
-                }
-                last = token;
-            }
-            skip(last);
-            J.Identifier name = identifier(Space.EMPTY, source.substring(start, cursor));
-            JLeftPadded<Expression> value = null;
-            if (ctx.ASSIGN() != null) {
-                Space beforeEquals = sourceBefore(ctx.ASSIGN().getSymbol());
-                value = new JLeftPadded<>(beforeEquals, expression(ctx.ternaryExpression()), Markers.EMPTY);
-            }
-            attributes.add(new Cf.TagAttribute(randomId(), prefix, Markers.EMPTY, name, value));
+            attributes.add(statementAttribute(ctx));
         }
         return attributes;
+    }
+
+    private Cf.TagAttribute statementAttribute(StatementAttributeContext ctx) {
+        Space prefix = prefix(ctx.getStart());
+        int start = start(ctx.getStart());
+        Token last = ctx.getStart();
+        for (ParseTree child : ctx.children) {
+            Token token = child instanceof TerminalNode ? ((TerminalNode) child).getSymbol() : ((ParserRuleContext) child).getStop();
+            if (token.getType() == ASSIGN) {
+                break;
+            }
+            last = token;
+        }
+        skip(last);
+        J.Identifier name = identifier(Space.EMPTY, source.substring(start, cursor));
+        JLeftPadded<Expression> value = null;
+        if (ctx.ASSIGN() != null) {
+            Space beforeEquals = sourceBefore(ctx.ASSIGN().getSymbol());
+            value = new JLeftPadded<>(beforeEquals, expression(ctx.ternaryExpression()), Markers.EMPTY);
+        }
+        return new Cf.TagAttribute(randomId(), prefix, Markers.EMPTY, name, value);
     }
 
     private Cf.TagAttribute namedAttribute(NamedAttributeContext ctx) {
@@ -1406,20 +1432,8 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
             return assignment((ExpressionContext) ctx);
         } else if (ctx instanceof TernaryExpressionContext) {
             return ternary((TernaryExpressionContext) ctx);
-        } else if (ctx instanceof NotExpressionContext) {
-            NotExpressionContext not = (NotExpressionContext) ctx;
-            if (not.comparisonExpression() != null) {
-                return expression(not.comparisonExpression());
-            }
-            return unary(not.getStart(), not.notExpression());
-        } else if (ctx instanceof PowerExpressionContext) {
-            PowerExpressionContext power = (PowerExpressionContext) ctx;
-            Expression left = expression(power.unaryExpression());
-            if (power.CARET() == null) {
-                return left;
-            }
-            Space before = sourceBefore(power.CARET().getSymbol());
-            return cfBinary(left, before, Cf.Binary.Type.Power, null, expression(power.powerExpression()));
+        } else if (ctx instanceof OperationContext) {
+            return operation((OperationContext) ctx);
         } else if (ctx instanceof UnaryExpressionContext) {
             UnaryExpressionContext unary = (UnaryExpressionContext) ctx;
             if (unary.postfixExpression() != null) {
@@ -1429,16 +1443,30 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
         } else if (ctx instanceof PostfixExpressionContext) {
             return postfix((PostfixExpressionContext) ctx);
         }
-        // a left-associative chain of binary operators
-        Expression left = expression((ParserRuleContext) ctx.getChild(0));
-        for (int i = 1; i < ctx.getChildCount(); i += 2) {
-            ParseTree operator = ctx.getChild(i);
-            Token token = operator instanceof TerminalNode ? ((TerminalNode) operator).getSymbol() : ((ParserRuleContext) operator).getStart();
-            Space before = sourceBefore(token);
-            Expression right = expression((ParserRuleContext) ctx.getChild(i + 1));
-            left = binary(left, before, token, right);
+        throw error("an expression of an unknown kind", ctx.getStart());
+    }
+
+    // The binary nodes on the left spine are folded in a loop, up through the parents of the leftmost operand,
+    // since a run of left-associative operators nests to the left as deep as the run is long.
+    private Expression operation(OperationContext ctx) {
+        if (ctx.unaryExpression() != null) {
+            return expression(ctx.unaryExpression());
+        } else if (ctx.NOT() != null || ctx.BANG() != null) {
+            return unary(ctx.getStart(), ctx.operation(0));
         }
-        return left;
+        OperationContext left = ctx;
+        while (left.operation(1) != null) {
+            left = left.operation(0);
+        }
+        Expression result = operation(left);
+        while (left != ctx) {
+            left = (OperationContext) left.getParent();
+            ComparisonOperatorContext comparison = left.comparisonOperator();
+            Token operator = comparison != null ? comparison.getStart() : ((TerminalNode) left.getChild(1)).getSymbol();
+            Space before = sourceBefore(operator);
+            result = binary(result, before, operator, expression(left.operation(1)));
+        }
+        return result;
     }
 
     private Expression assignment(ExpressionContext ctx) {
@@ -1479,7 +1507,7 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
     }
 
     private Expression ternary(TernaryExpressionContext ctx) {
-        Expression condition = expression(ctx.implicationExpression());
+        Expression condition = expression(ctx.operation());
         if (ctx.ELVIS() != null) {
             Token elvis = ctx.ELVIS().getSymbol();
             Space before = sourceBefore(elvis);
@@ -1573,6 +1601,8 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
                 return binary(left, before, J.Binary.Type.Multiplication, null, right);
             case SLASH:
                 return binary(left, before, J.Binary.Type.Division, null, right);
+            case CARET:
+                return cfBinary(left, before, Cf.Binary.Type.Power, null, right);
             default:
                 throw error("an unknown operator", operator);
         }

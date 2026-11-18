@@ -817,6 +817,24 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 4, 0);
     }
 
+    // yarn src/package-linker.js
+
+    /**
+     * Bin linking finds the nearest installed version and rejects an inaccessible dependency from 1.7.0;
+     * before, linkBinDependencies uses the reference's installed locations directly.
+     */
+    boolean findsTheNearestInstalledVersionForBins() {
+        return atLeast(1, 7, 0);
+    }
+
+    /**
+     * findNearestInstalledVersionOfPackage checks its nonempty candidates with invariant from 1.8.0;
+     * 1.7.0 reduces the empty array and throws TypeError instead.
+     */
+    boolean checksForAnAccessibleBinLocation() {
+        return atLeast(1, 8, 0);
+    }
+
     // yarn src/resolvers/exotics/link-resolver.js
 
     /**

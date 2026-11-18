@@ -676,9 +676,10 @@ class PythonRpcSender:
         q.get_and_send(case, lambda x: x.guard, lambda el: self._visit(el, q) if el else None)
 
     def _visit_j_array_access(self, arr, q: 'RpcSendQueue') -> None:
-        # Java ArrayAccess: indexed, dimension
+        # Java ArrayAccess: indexed, dimension, type
         q.get_and_send(arr, lambda x: x.indexed, lambda el: self._visit(el, q))
         q.get_and_send(arr, lambda x: x.dimension, lambda el: self._visit(el, q))
+        q.get_and_send_as_ref(arr, lambda x: x.type, lambda t: self._visit_type(t, q))
 
     def _visit_j_array_dimension(self, dim, q: 'RpcSendQueue') -> None:
         # Java ArrayDimension: index (right-padded)

@@ -66,6 +66,15 @@ public enum DependencyManifest {
     private static final Pattern EXTRAS = Pattern.compile("\\[(?<extras>[^]]*)]$");
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{(\\w+)}");
     private static final Pattern INDEX_NAME = Pattern.compile("[A-Za-z0-9_-]+");
+    /**
+     * A string literal that is the whole value, not the start of an expression such as {@code '>={}'.format(...)}.
+     */
+    private static final String SETUP_PY_STRING =
+            "[rRuU]?(['\"])(?<specifier>[^'\"\\n]+)\\1(?=\\s*\\)?\\s*(?:[,)}#]|$))";
+    private static final Pattern SETUP_PY_PYTHON_REQUIRES = Pattern.compile(
+            "(?m)^[^#\\n]*\\bpython_requires['\"]?\\s*[=:]\\s*\\(?\\s*" + SETUP_PY_STRING);
+    private static final Pattern SETUP_PY_PYTHON_REQUIRES_CONSTANT = Pattern.compile(
+            "(?m)^[^#\\n]*\\bpython_requires\\s*=\\s*\\(?\\s*(?<name>[A-Za-z_]\\w*)\\s*\\)?\\s*[,)]");
     private static final List<String> PIPFILE_LOCAL_KEYS = Arrays.asList("path", "file", "git", "hg", "svn", "bzr");
 
     /**
@@ -169,7 +178,7 @@ public enum DependencyManifest {
         if (Files.isRegularFile(projectDir.resolve("setup.cfg"))) {
             return SetupCfg;
         }
-        return marker != null ? PyProjectToml : null;
+        return pyproject != null && PyprojectData.toNestedMap(pyproject).containsKey("project") ? PyProjectToml : null;
     }
 
     /**
@@ -255,6 +264,45 @@ public enum DependencyManifest {
             requirements.requiresPython(pythonRequires.trim());
         }
         return requirements.build();
+    }
+
+    /**
+     * The Python versions the project declares it supports, read without running anything: pyproject.toml's
+     * {@code requires-python} or Poetry {@code python} first, then setup.cfg's {@code python_requires}, then a
+     * {@code python_requires} that setup.py passes as a string literal or a module-level string constant. A
+     * requirements file declares none.
+     */
+    public static @Nullable String requiresPython(Path projectDir) {
+        Toml.Document pyproject = parse(new TomlParser(), projectDir.resolve("pyproject.toml"), null);
+        PythonResolutionResult marker = pyproject == null ? null : PythonDependencyParser.createMarker(pyproject, null);
+        if (marker != null && marker.getRequiresPython() != null) {
+            return marker.getRequiresPython();
+        }
+        Path setupCfg = projectDir.resolve("setup.cfg");
+        List<String> setupCfgRequiresPython = Files.isRegularFile(setupCfg) ?
+                ofSetupCfg(readString(setupCfg), null).getRequiresPython() : emptyList();
+        if (!setupCfgRequiresPython.isEmpty()) {
+            return setupCfgRequiresPython.get(0);
+        }
+        Path setupPy = projectDir.resolve("setup.py");
+        if (Files.isRegularFile(setupPy)) {
+            String setupPyText = readString(setupPy);
+            String literal = specifier(SETUP_PY_PYTHON_REQUIRES.matcher(setupPyText));
+            if (literal != null) {
+                return literal;
+            }
+            // python_requires=REQUIRES_PYTHON, with REQUIRES_PYTHON = '>=3.6' at the top of the file
+            Matcher constant = SETUP_PY_PYTHON_REQUIRES_CONSTANT.matcher(setupPyText);
+            if (constant.find()) {
+                return specifier(Pattern.compile("(?m)^" + Pattern.quote(constant.group("name")) +
+                        "\\s*=\\s*" + SETUP_PY_STRING).matcher(setupPyText));
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable String specifier(Matcher matcher) {
+        return matcher.find() ? matcher.group("specifier").trim() : null;
     }
 
     /**
@@ -408,8 +456,11 @@ public enum DependencyManifest {
                 .excludes(excludes)
                 .constraints(pins(marker.getResolvedDependencies()))
                 .indexes(indexes(marker.getSourceIndexes(), environment));
-        if (marker.getRequiresPython() != null) {
-            requirements.requiresPython("==" + marker.getRequiresPython() + ".*");
+        String python = marker.getRequiresPython();
+        if (python != null) {
+            // python_full_version names a patch release, such as 3.11.4, and the env's Python is picked by minor
+            String[] release = python.split("\\.");
+            requirements.requiresPython("==" + (release.length > 2 ? release[0] + "." + release[1] : python) + ".*");
         }
         return requirements.build();
     }

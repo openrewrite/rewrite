@@ -37,7 +37,10 @@ public class CSharpParser
         if (symbols.Count == 0)
             return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
-        return ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
+        var cu = ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
+        return cu.WithMarkers(cu.Markers.Add(new CSharpLanguageVersion(Tree.RandomId(),
+            ((CSharpParseOptions?)semanticModel?.SyntaxTree.Options ?? CSharpParseOptions.Default)
+            .LanguageVersion.ToDisplayString())));
     }
 
     /// <summary>
@@ -87,6 +90,8 @@ public class CSharpParser
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
+        var parseOptions = (semanticModel?.SyntaxTree.Options as CSharpParseOptions)
+            ?.WithPreprocessorSymbols(Array.Empty<string>());
         for (int i = 0; i < permutations.Count; i++)
         {
             var (cleanSource, definedSymbols) = permutations[i];
@@ -95,9 +100,6 @@ public class CSharpParser
             CompilationUnit cu;
             if (isPrimary && semanticModel != null)
             {
-                // Preserve parse options from the original tree to avoid "Inconsistent syntax tree features"
-                var parseOptions = semanticModel.SyntaxTree.Options as CSharpParseOptions;
-                parseOptions = parseOptions?.WithPreprocessorSymbols(Array.Empty<string>());
                 var syntaxTree = CSharpSyntaxTree.ParseText(cleanSource, options: parseOptions, path: sourcePath);
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
@@ -106,7 +108,7 @@ public class CSharpParser
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache, parseOptions);
             }
 
             cu = (CompilationUnit)DirectiveBoundaryInjector.Inject(cu);
@@ -141,7 +143,7 @@ public class CSharpParser
     }
 
     private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel,
-        Dictionary<ISymbol, JavaType>? typeCache = null)
+        Dictionary<ISymbol, JavaType>? typeCache = null, CSharpParseOptions? parseOptions = null)
     {
         if (semanticModel != null)
         {
@@ -156,7 +158,7 @@ public class CSharpParser
         }
         else
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, path: sourcePath);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, options: parseOptions, path: sourcePath);
             var root = syntaxTree.GetCompilationUnitRoot();
             var visitor = new CSharpParserVisitor(source, charsetBomMarked: _charsetBomMarked);
             return visitor.VisitCompilationUnit(root);
@@ -179,6 +181,8 @@ public class CSharpParser
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
+        var parseOptions = (semanticModel?.SyntaxTree.Options as CSharpParseOptions)
+            ?.WithPreprocessorSymbols(Array.Empty<string>());
         for (int i = 0; i < permutations.Count; i++)
         {
             var (cleanSource, definedSymbols) = permutations[i];
@@ -187,9 +191,6 @@ public class CSharpParser
             CompilationUnit cu;
             if (isPrimary && semanticModel != null)
             {
-                // Preserve parse options from the original tree to avoid "Inconsistent syntax tree features"
-                var parseOptions = semanticModel.SyntaxTree.Options as CSharpParseOptions;
-                parseOptions = parseOptions?.WithPreprocessorSymbols(Array.Empty<string>());
                 var syntaxTree = CSharpSyntaxTree.ParseText(cleanSource, options: parseOptions, path: sourcePath);
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
@@ -198,7 +199,7 @@ public class CSharpParser
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache, parseOptions);
             }
 
             // Convert ghost comments in whitespace to DirectiveBoundaryMarker markers
@@ -332,7 +333,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -388,7 +389,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new CompilationUnit(
             Tree.RandomId(),
             prefix,
-            Markers.Empty,
+            Markers.Build([new CSharpLanguageVersion(Tree.RandomId(),
+                ((CSharpParseOptions)node.SyntaxTree.Options).LanguageVersion.ToDisplayString())]),
             node.SyntaxTree.FilePath ?? "source.cs",
             "UTF-8",
             _charsetBomMarked,
@@ -505,7 +507,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -579,7 +581,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -683,21 +685,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public override J VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
-        var result = VisitTypeDeclaration(node);
-
-        // For record struct, add Struct marker (KindType is already Record)
-        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
-        {
-            return AddClassDeclMarker(result, new Struct(Tree.RandomId()));
-        }
-
-        // For "record class" (explicit class keyword), add RecordClass marker
-        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword))
-        {
-            return AddClassDeclMarker(result, new RecordClass(Tree.RandomId()));
-        }
-
-        return result;
+        return VisitTypeDeclaration(node);
     }
 
     /// <summary>
@@ -917,12 +905,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var kindPrefix = ExtractSpaceBefore(node.Keyword);
         _cursor = node.Keyword.Span.End;
 
-        // For record declarations, also skip the optional 'class' or 'struct' keyword
-        // (record, record class, record struct)
+        Marker? recordKeywordMarker = null;
         if (node is RecordDeclarationSyntax recordDecl &&
             !recordDecl.ClassOrStructKeyword.IsKind(SyntaxKind.None))
         {
+            var recordKeywordPrefix = ExtractSpaceBefore(recordDecl.ClassOrStructKeyword);
             _cursor = recordDecl.ClassOrStructKeyword.Span.End;
+            recordKeywordMarker = recordDecl.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword)
+                ? new Struct(Tree.RandomId(), recordKeywordPrefix)
+                : new RecordClass(Tree.RandomId(), recordKeywordPrefix);
         }
 
         var kind = new ClassDeclaration.Kind(
@@ -1084,6 +1075,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var classMarkers = trailingSemicolon
             ? Markers.Build([new Semicolon(Tree.RandomId())])
             : Markers.Empty;
+        if (recordKeywordMarker != null)
+        {
+            classMarkers = classMarkers.Add(recordKeywordMarker);
+        }
 
         // If there's a primary constructor, prepend it as the first statement in the body.
         // The MethodDeclaration already carries a PrimaryConstructor marker to identify it.
@@ -1588,13 +1583,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var arguments = ParseArgumentList(node.Initializer.ArgumentList);
 
+            var initializerType = _typeMapping?.MethodType(node.Initializer);
             var initInvocation = new MethodInvocation(
                 Tree.RandomId(), kwPrefix, Markers.Empty,
                 null, // select
-                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], kwName, null, null),
+                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], kwName, initializerType, null),
                 null, // typeParameters
                 arguments,
-                null // methodType
+                initializerType
             );
 
             defaultValue = new JLeftPadded<Expression>(colonPrefix, initInvocation);
@@ -2146,7 +2142,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new ConversionOperatorDeclaration(Tree.RandomId(), prefix, Markers.Empty,
             modifiers, kindPadded, interfaceSpecifier, returnTypePadded,
             new JContainer<Statement>(paramsPrefix, parameters, Markers.Empty),
-            expressionBody, body);
+            expressionBody, body, _typeMapping?.MethodType(node));
     }
 
     public override J VisitPropertyDeclaration(PropertyDeclarationSyntax node)
@@ -7671,6 +7667,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     /// </summary>
     private MethodDeclaration ParsePrimaryConstructor(ParameterListSyntax paramList)
     {
+        var methodType = _typeMapping?.MethodType(paramList);
         var paramsPrefix = ExtractSpaceBefore(paramList.OpenParenToken);
         _cursor = paramList.OpenParenToken.Span.End;
 
@@ -7707,7 +7704,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Build([new Implicit(Tree.RandomId())]),
             [],
             "<constructor>",
-            null,
+            methodType,
             null
         );
 
@@ -7726,7 +7723,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,    // Throws
             null,    // Body
             null,    // DefaultValue
-            null     // MethodType
+            methodType
         );
     }
 
@@ -8885,6 +8882,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 var commentStart = FindTrailingCommentStart(hashPos, contentEnd);
                 if (commentStart >= 0) contentEnd = commentStart;
+                while (contentEnd > hashPos && char.IsWhiteSpace(_source[contentEnd - 1]))
+                    contentEnd--;
             }
 
             var directiveText = _source[hashPos..contentEnd];
@@ -9104,14 +9103,28 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (afterAction.Length > 0)
         {
             var parts = afterAction.Split(',');
-            foreach (var part in parts)
+            for (var i = 0; i < parts.Length; i++)
             {
-                var trimmed = part.TrimStart();
-                if (trimmed.Length == 0) continue;
-                var spaceLen = part.Length - trimmed.Length;
-                var codePrefix = spaceLen > 0 ? Space.Format(part[..spaceLen]) : Space.Empty;
-                var code = new Identifier(Tree.RandomId(), codePrefix, Markers.Empty, [], trimmed, null, null);
-                codes.Add(new JRightPadded<Expression>(code, Space.Empty, Markers.Empty));
+                var part = parts[i];
+                var nameStart = part.Length - part.TrimStart().Length;
+                if (nameStart == part.Length)
+                {
+                    if (i == parts.Length - 1 && codes.Count > 0)
+                    {
+                        var last = codes[^1];
+                        codes[^1] = last.WithMarkers(last.Markers.Add(new TrailingComma(Tree.RandomId(), Space.Format(part))));
+                    }
+                    else
+                    {
+                        codes.Add(new JRightPadded<Expression>(new Empty(Tree.RandomId(), Space.Format(part), Markers.Empty),
+                            Space.Empty, Markers.Empty));
+                    }
+                    continue;
+                }
+                var nameEnd = part.TrimEnd().Length;
+                var code = new Identifier(Tree.RandomId(), Space.Format(part[..nameStart]), Markers.Empty, [],
+                    part[nameStart..nameEnd], null, null);
+                codes.Add(new JRightPadded<Expression>(code, Space.Format(part[nameEnd..]), Markers.Empty));
             }
         }
 
@@ -9635,16 +9648,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var after = _pendingSemicolonSpace;
         _pendingSemicolonSpace = Space.Empty;
         return new JRightPadded<Statement>(s, after, Markers.Empty);
-    }
-
-    /// <summary>
-    /// Wraps an ExternAlias in JRightPadded, consuming any pending semicolon space into After.
-    /// </summary>
-    private JRightPadded<ExternAlias> PadExternAlias(ExternAlias ea)
-    {
-        var after = _pendingSemicolonSpace;
-        _pendingSemicolonSpace = Space.Empty;
-        return new JRightPadded<ExternAlias>(ea, after, Markers.Empty);
     }
 
     /// <summary>

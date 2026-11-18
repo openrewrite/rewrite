@@ -862,7 +862,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameters = q.Receive(cod.Parameters, c => VisitContainer(c, q));
         var exprBody = q.Receive(cod.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)cod.Body, el => (J)VisitNonNull(el!, q));
-        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithInterfaceSpecifier(interfaceSpec).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body);
+        var methodType = q.Receive((JavaType?)cod.MethodType, t => VisitType(t, q)!);
+        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithInterfaceSpecifier(interfaceSpec).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body).WithMethodType((JavaType.Method?)methodType);
     }
 
     public override J VisitOperatorDeclaration(OperatorDeclaration opd, RpcReceiveQueue q)

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.ruby;
 
+import com.dylibso.chicory.runtime.Memory;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -22,6 +23,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.ruby.internal.NestingDepth;
 import org.openrewrite.ruby.internal.PrismSource;
 import org.openrewrite.ruby.tree.Rb;
 import org.openrewrite.tree.ParseError;
@@ -42,15 +44,68 @@ import java.util.stream.Stream;
 
 public class RubyParser implements Parser {
 
+    private static final Object PRISM_LOCK = new Object();
+
     /**
-     * Booting the Prism WASM module costs about a second, so all parses share one instance. The
-     * underlying parse is not reentrant, hence the synchronization.
+     * Booting the Prism WASM module costs about a second, so parses share one instance until one
+     * leaves it unusable. The underlying parse is not reentrant, hence {@link #PRISM_LOCK}.
      */
-    private static final class PrismHolder {
-        static final Prism INSTANCE = new Prism();
+    private static @Nullable StackGuardedPrism prism;
+
+    /**
+     * Why the module would not boot, so that every later parse fails at once rather than booting
+     * it again.
+     */
+    private static @Nullable RuntimeException bootFailure;
+
+    /**
+     * Prism's WASM module keeps its C stack in the 64 KiB of linear memory just above its global
+     * data, and nothing stops the stack at the bottom: some 45 levels of nesting run it down into
+     * the globals that malloc and Prism rely on. That parse, or any later one on the instance, may
+     * then return garbage, trap, or never return. So a source estimated to nest deeper than this
+     * is not parsed at all.
+     */
+    private static final int MAX_NESTING = 40;
+
+    /**
+     * Catches the overruns {@link NestingDepth} does not foresee: the bottom of the stack is filled
+     * with a pattern before each parse, and a parse that wrote into it fails.
+     */
+    private static final class StackGuardedPrism extends Prism {
+        private static final int GUARD_BYTES = 4096;
+        private static final byte GUARD = (byte) 0xA5;
+
+        private final int stackLow = (int) exports._StackLow().getValue();
+
+        @Override
+        public byte[] parse(byte[] source, byte[] options) {
+            Memory memory = exports.memory();
+            memory.fill(GUARD, stackLow, stackLow + GUARD_BYTES);
+            byte[] serialized = super.parse(source, options);
+            for (byte b : memory.readBytes(stackLow, GUARD_BYTES)) {
+                if (b != GUARD) {
+                    throw new StackExhaustedException("Ruby source nests too deeply for Prism's 64 KiB WASM stack.");
+                }
+            }
+            return serialized;
+        }
+    }
+
+    /**
+     * The source nests deeper than the Prism WASM module's stack allows.
+     */
+    public static class StackExhaustedException extends RuntimeException {
+        StackExhaustedException(String message) {
+            super(message);
+        }
     }
 
     static ParseResult parse(Path path, PrismSource source) {
+        int nesting = NestingDepth.of(source.getText());
+        if (nesting > MAX_NESTING) {
+            throw new StackExhaustedException("Ruby source nests about " + nesting + " levels deep. " +
+                                              "Prism's 64 KiB WASM stack has room for about " + MAX_NESTING + ".");
+        }
         byte[] options = ParsingOptions.serialize(
                 path.toString().getBytes(StandardCharsets.UTF_8),
                 1,
@@ -67,8 +122,31 @@ public class RubyParser implements Parser {
                 true,
                 new ParsingOptions.Scope[0]);
         byte[] serialized;
-        synchronized (PrismHolder.INSTANCE) {
-            serialized = PrismHolder.INSTANCE.parse(source.getParseBytes(), options);
+        synchronized (PRISM_LOCK) {
+            if (bootFailure != null) {
+                throw bootFailure;
+            }
+            if (prism == null) {
+                try {
+                    prism = new StackGuardedPrism();
+                } catch (RuntimeException | LinkageError e) {
+                    bootFailure = new IllegalStateException("The Prism WASM module did not boot", e);
+                    throw bootFailure;
+                }
+            }
+            StackGuardedPrism instance = prism;
+            try {
+                serialized = instance.parse(source.getParseBytes(), options);
+            } catch (Throwable t) {
+                // A trap or a stack overrun leaves the module's memory in a state no later parse can trust.
+                prism = null;
+                try {
+                    instance.close();
+                } catch (Throwable e) {
+                    t.addSuppressed(e);
+                }
+                throw t;
+            }
         }
         ParseResult result = Loader.load(serialized);
         if (result.errors.length > 0) {

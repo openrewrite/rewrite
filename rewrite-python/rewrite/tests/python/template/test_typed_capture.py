@@ -23,7 +23,7 @@ from rewrite.test import RecipeSpec, python
 
 
 def _recipe(pat, tmpl) -> Recipe:
-    """A recipe replacing every call matching ``pat`` with ``tmpl``."""
+    """A recipe replacing every call or assignment matching ``pat`` with ``tmpl``."""
 
     class Replace(Recipe):
         @property
@@ -44,6 +44,11 @@ def _recipe(pat, tmpl) -> Recipe:
                     method = super().visit_method_invocation(method, p)
                     match = pat.match(method, self.cursor)
                     return tmpl.apply(self.cursor, values=match) if match else method
+
+                def visit_assignment(self, assignment, p):
+                    assignment = super().visit_assignment(assignment, p)
+                    match = pat.match(assignment, self.cursor)
+                    return tmpl.apply(self.cursor, values=match) if match else assignment
 
             return Visitor()
 
@@ -171,6 +176,27 @@ def test_any_hint_constrains_nothing():
             """,
             """
             repr(undefined)
+            """,
+        )
+    )
+
+
+def test_typed_capture_in_a_statement_matches_only_assignable_targets():
+    x = capture('x', type_hint='str')
+    RecipeSpec(recipe=_recipe(
+        pattern(f"y = {x}.upper()"),
+        template(f"y = {x}.casefold()"),
+    )).rewrite_run(
+        python(
+            """
+            def f(s: str, b: bytes):
+                y = s.upper()
+                y = b.upper()
+            """,
+            """
+            def f(s: str, b: bytes):
+                y = s.casefold()
+                y = b.upper()
             """,
         )
     )

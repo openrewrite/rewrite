@@ -350,6 +350,71 @@ class LiteralTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9750")
+    @Test
+    void numericLiteralsWithSignedExponent() {
+        rewriteRun(
+          groovy(
+            """
+              def a = 1.2E+12
+              def b = 1.2e-3
+              def c = 1e+5
+              def d = 1.5E+3d
+              def e = 2.5e-3f
+              def f = 1E-5G
+              def g = -1.2E-3
+              def h = 1E5
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9750")
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "1.76244514319E+12|1.76244514319E+12",
+      "1.2e-3|1.2e-3",
+      "1e5+2|1e5",
+      "0x1e+2|0x1e",
+      "0X1E-2|0X1E"
+    })
+    void signedExponentIsPartOfTheLiteral(String expression, String firstLiteral) {
+        rewriteRun(
+          groovy(
+            "def a = " + expression,
+            spec -> spec.beforeRecipe(cu -> {
+                J initializer = requireNonNull(((J.VariableDeclarations) cu.getStatements().getFirst())
+                  .getVariables().getFirst().getInitializer());
+                J.Literal literal = initializer instanceof J.Binary binary ?
+                  (J.Literal) binary.getLeft() : (J.Literal) initializer;
+                assertThat(literal.getValueSource()).isEqualTo(firstLiteral);
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9750")
+    @Test
+    void signedExponentInSpockWhereTable() {
+        rewriteRun(
+          groovy(
+            """
+              class S {
+                def 't'() {
+                  expect:
+                  f(m) == r
+
+                  where:
+                  m || r
+                  [createdAt: 1.76244514319E+12] || Optional.of(1762445143190)
+                  [createdAt: 1.2e-3]            || Optional.empty()
+                }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void literalValueAndTypeAgree() {
         rewriteRun(groovy(

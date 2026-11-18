@@ -51,7 +51,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @SuppressWarnings("all")
@@ -518,7 +518,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return lambda;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import java.util.function.Consumer;
@@ -567,7 +567,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @SuppressWarnings("all")

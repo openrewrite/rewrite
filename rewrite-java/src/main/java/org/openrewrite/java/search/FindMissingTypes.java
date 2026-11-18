@@ -298,7 +298,7 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName() ||
-                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isMethodName(ident) || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
                     isInJavaDoc(ident);
         }
@@ -316,9 +316,10 @@ public class FindMissingTypes extends Recipe {
             return parent != null && parent.getValue() instanceof J.ClassDeclaration;
         }
 
-        private boolean isMethodName() {
+        private boolean isMethodName(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.MethodDeclaration;
+            return parent != null && parent.getValue() instanceof J.MethodDeclaration &&
+                    ident == ((J.MethodDeclaration) parent.getValue()).getName();
         }
 
         private boolean isMethodInvocationName() {

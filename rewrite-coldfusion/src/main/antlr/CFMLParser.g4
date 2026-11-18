@@ -2,9 +2,11 @@ parser grammar CFMLParser;
 
 options {
     tokenVocab = CFMLLexer;
+    contextSuperClass = CompactContext;
 }
 
 @parser::header {
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -15,6 +17,25 @@ import java.util.Set;
 }
 
 @parser::members {
+    // Most nodes have one child. Under the JVM's default compressed references, room for two takes no
+    // more memory than room for one.
+    public static class CompactContext extends ParserRuleContext {
+        public CompactContext() {
+        }
+
+        public CompactContext(ParserRuleContext parent, int invokingStateNumber) {
+            super(parent, invokingStateNumber);
+        }
+
+        @Override
+        public <T extends ParseTree> T addAnyChild(T t) {
+            if (children == null) {
+                children = new ArrayList<>(2);
+            }
+            return super.addAnyChild(t);
+        }
+    }
+
     // Tags written as script statements that take an expression rather than attributes.
     private static final Set<String> EXPRESSION_SCRIPT_TAGS = new HashSet<String>(Arrays.asList(
             "abort", "exit", "include", "param", "pageencoding", "rethrow", "retry", "flush"));
@@ -145,6 +166,9 @@ import java.util.Set;
     protected void markAttribute(boolean named) {
         if (la(1) != ATTRIBUTE_WORD && (attributeAhead() || !named && bareAttribute())) {
             retype(1, ATTRIBUTE_WORD);
+        } else if (!named && la(1) == COMMA && la(2) != ATTRIBUTE_WORD && attributeAt(2)) {
+            // the engines take a comma between the attributes of a tag written as a statement
+            retype(2, ATTRIBUTE_WORD);
         }
     }
 
@@ -288,7 +312,25 @@ import java.util.Set;
         if (function < 0) {
             return false;
         }
-        int i = 1;
+        int i = modifiers(1, function);
+        if (i < function) {
+            int last = i;
+            while (la(last + 1) == DOT && isWord(lt(last + 2))) {
+                last += 2;
+            }
+            retype(last, TYPE_WORD);
+            // the engines take a return type before the access modifier too, as `boolean public function f()`
+            i = last + 1;
+            if ((la(i) == LBRACKET || la(i) == INDEX_LBRACKET) && la(i + 1) == RBRACKET) {
+                i += 2;
+            }
+            modifiers(i, function);
+        }
+        return true;
+    }
+
+    // Retypes the modifiers from token i on, before the function keyword at token function, and returns where they end.
+    private int modifiers(int i, int function) {
         while (i < function && la(i) == IDENTIFIER) {
             int modifier = modifier(lower(lt(i)));
             if (modifier < 0) {
@@ -297,14 +339,7 @@ import java.util.Set;
             retype(i, modifier);
             i++;
         }
-        if (i < function) {
-            int last = i;
-            while (la(last + 1) == DOT && isWord(lt(last + 2))) {
-                last += 2;
-            }
-            retype(last, TYPE_WORD);
-        }
-        return true;
+        return i;
     }
 
     private static int modifier(String word) {
@@ -545,7 +580,7 @@ staticInitializer
     ;
 
 scriptTag
-    : SCRIPT_TAG_NAME { markAttribute(false); } (statementAttribute { markAttribute(false); })* { bodyBrace(); } bodyBlock?
+    : SCRIPT_TAG_NAME { markAttribute(false); } (COMMA? statementAttribute { markAttribute(false); })* { bodyBrace(); } bodyBlock?
     | EXPRESSION_TAG_NAME expression { markAttribute(true); } (statementAttribute { markAttribute(true); })* { bodyBrace(); }
       bodyBlock?
     ;
@@ -557,8 +592,8 @@ expressionStatement
 // A function without a body ends with a semicolon. Letting it end with nothing would make every
 // function body a candidate for a block statement after it, and prediction would scan each one.
 functionDeclaration
-    : functionModifier* returnType? FUNCTION anyWord (LPAREN | CALL_LPAREN) parameters? RPAREN headerAttribute*
-      (block SEMI? | SEMI)
+    : functionModifier* (returnType functionModifier*)? FUNCTION anyWord (LPAREN | CALL_LPAREN) parameters? RPAREN
+      headerAttribute* (block SEMI? | SEMI)
     ;
 
 functionModifier
@@ -611,7 +646,7 @@ attributeName
     ;
 
 // =============================================================================================
-// Expressions, lowest precedence first
+// Expressions
 // =============================================================================================
 
 expression
@@ -629,37 +664,26 @@ assignmentOperator
     ;
 
 ternaryExpression
-    : implicationExpression (ELVIS ternaryExpression | QUESTION ternaryExpression COLON ternaryExpression)?
+    : operation (ELVIS ternaryExpression | QUESTION ternaryExpression COLON ternaryExpression)?
     ;
 
-implicationExpression
-    : equivalenceExpression (IMP equivalenceExpression)*
-    ;
-
-equivalenceExpression
-    : xorExpression (EQV xorExpression)*
-    ;
-
-xorExpression
-    : orExpression (XOR orExpression)*
-    ;
-
-orExpression
-    : andExpression ((PIPEPIPE | OR) andExpression)*
-    ;
-
-andExpression
-    : notExpression ((AMPAMP | AND) notExpression)*
-    ;
-
-// NOT binds more loosely than comparison in CFML: NOT a EQ b is NOT (a EQ b).
-notExpression
-    : (BANG | NOT) notExpression
-    | comparisonExpression
-    ;
-
-comparisonExpression
-    : concatExpression (comparisonOperator concatExpression)*
+// The binary operators and the loose NOT, from the tightest binding to the loosest. NOT binds more loosely
+// than comparison in CFML, so NOT a EQ b is NOT (a EQ b).
+operation
+    : unaryExpression
+    | <assoc=right> operation CARET operation
+    | operation (STAR | SLASH) operation
+    | operation BACKSLASH operation
+    | operation (PERCENT | MOD) operation
+    | operation (PLUS | MINUS) operation
+    | operation AMP operation
+    | operation comparisonOperator operation
+    | (BANG | NOT) operation
+    | operation (AMPAMP | AND) operation
+    | operation (PIPEPIPE | OR) operation
+    | operation XOR operation
+    | operation EQV operation
+    | operation IMP operation
     ;
 
 comparisonOperator
@@ -690,30 +714,6 @@ comparisonOperator
     | LTE_SIGN
     | GT_SIGN
     | LT_SIGN
-    ;
-
-concatExpression
-    : additiveExpression (AMP additiveExpression)*
-    ;
-
-additiveExpression
-    : moduloExpression ((PLUS | MINUS) moduloExpression)*
-    ;
-
-moduloExpression
-    : integerDivisionExpression ((PERCENT | MOD) integerDivisionExpression)*
-    ;
-
-integerDivisionExpression
-    : multiplicativeExpression (BACKSLASH multiplicativeExpression)*
-    ;
-
-multiplicativeExpression
-    : powerExpression ((STAR | SLASH) powerExpression)*
-    ;
-
-powerExpression
-    : unaryExpression (CARET powerExpression)?
     ;
 
 unaryExpression

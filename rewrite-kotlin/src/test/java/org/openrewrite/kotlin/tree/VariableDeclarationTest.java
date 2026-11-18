@@ -393,7 +393,7 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void unresolvedNameFirSource() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().variableDeclarations(false)),
           kotlin(
             //language=none, disabled due to invalid code
             """
@@ -820,6 +820,19 @@ class VariableDeclarationTest implements RewriteTest {
             """
               fun method () /*C3*/ :  Int {
                  return 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dynamicType() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(x: dynamic, y:  dynamic) {
+                  val z: dynamic = x
               }
               """
           )

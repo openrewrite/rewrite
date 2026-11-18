@@ -197,7 +197,7 @@ class MemberReferenceTest implements RewriteTest {
     @Test
     void firCallableReferenceAccess() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               open class Foo<out A, out B> {

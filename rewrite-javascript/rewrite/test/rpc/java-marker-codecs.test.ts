@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
+import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc.mjs";
 import {ExecutionContext} from "../../src/execution";
 import {emptySpace, J} from "../../src/java";
 import {
@@ -88,6 +88,14 @@ const samples: { [kind: string]: () => Marker } = {
     [JS.Markers.DelegatedYield]: () => ({kind: JS.Markers.DelegatedYield, id: randomId(), prefix: emptySpace} as Marker),
     [JS.Markers.FunctionDeclaration]: () => ({kind: JS.Markers.FunctionDeclaration, id: randomId(), prefix: emptySpace} as Marker),
     [JS.Markers.Computed]: () => ({kind: JS.Markers.Computed, id: randomId(), suffix: emptySpace} as Marker),
+    [JS.Markers.ResolvedNames]: () => ({
+        kind: JS.Markers.ResolvedNames,
+        id: randomId(),
+        names: ["lib/view.render", "path.join"],
+        packages: [null, "@types/node"],
+        kinds: ["method", "method-call"],
+        spans: [6, 10, 0, 0, 20, 24, 1, 1]
+    } as Marker),
     [NodeResolutionResultKind]: () => createNodeResolutionResultMarker("package.json", {
         name: "example",
         version: "1.0.0",

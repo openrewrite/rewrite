@@ -2,6 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "target": "es2016",
+    // nodenext lets the CommonJS test files import the java-rpc fixture, which is an ES module
+    "module": "nodenext",
     "types": ["vitest/globals"],
     "paths": {
       "@openrewrite/rewrite": ["./src/index.ts"],
