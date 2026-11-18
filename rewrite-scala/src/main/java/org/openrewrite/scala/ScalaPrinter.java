@@ -2239,7 +2239,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(ext.getTypeParameters(), p);
         }
         JContainer<Statement> params = ext.getPadding().getParameters();
-        p.append(params.getBefore().getWhitespace());
+        visitSpace(params.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
         p.append('(');
         List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
         for (int i = 0; i < paramList.size(); i++) {

@@ -29,6 +29,19 @@ import static org.openrewrite.scala.Assertions.scala;
 class ImportTest implements RewriteTest {
 
     @Test
+    void commentsHoldingACommaBetweenImports() {
+        rewriteRun(
+          scala(
+            """
+              import scala.util._, /* , */ scala.math._
+              import scala.util.{Try, Success}, /* , */ scala.math.{max, min}
+              object Test
+              """
+          )
+        );
+    }
+
+    @Test
     void importOfMembersOfAnObjectOrClassIsStatic() {
         rewriteRun(
           scala(

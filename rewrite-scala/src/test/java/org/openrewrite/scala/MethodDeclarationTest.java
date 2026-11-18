@@ -28,6 +28,20 @@ import static org.openrewrite.scala.Assertions.scala;
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
+    void commentsAfterTheExtensionKeyword() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  extension /* extension */ (i: Int)
+                    def twice = i * 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void extraSpaceBetweenModifierAndDef() {
         rewriteRun(
             scala(

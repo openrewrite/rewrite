@@ -830,7 +830,7 @@ class ScalaTreeVisitor(
       if (firstArgStart > cursor) {
         // Skip past "@deprecated(" to position cursor at the first arg
         val between = source.substring(cursor, firstArgStart)
-        val parenIdx = between.lastIndexOf('(')
+        val parenIdx = positionOfLastIn(between, "(", between.length)
         if (parenIdx >= 0) {
           cursor = cursor + parenIdx + 1
         }
@@ -2773,8 +2773,8 @@ class ScalaTreeVisitor(
     keyword: String
   ): J = {
     val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
-    val commaIdx = source.lastIndexOf(',', adjustedStart - 1)
-    if (commaIdx < cursor) {
+    val commaIdx = positionOfNext(",", cursor)
+    if (commaIdx < 0 || commaIdx >= adjustedStart) {
       throw new IllegalStateException(
         s"Continuation $keyword without preceding ',': '${spanSource(tree)}'"
       )
@@ -2888,8 +2888,8 @@ class ScalaTreeVisitor(
     keyword: String
   ): J = {
     val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
-    val commaIdx = source.lastIndexOf(',', adjustedStart - 1)
-    if (commaIdx < cursor) {
+    val commaIdx = positionOfNext(",", cursor)
+    if (commaIdx < 0 || commaIdx >= adjustedStart) {
       throw new IllegalStateException(
         s"Continuation brace $keyword without preceding ',': '${spanSource(tree)}'"
       )
@@ -3951,7 +3951,7 @@ class ScalaTreeVisitor(
       val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
       if (cursor < rhsStart && rhsStart <= source.length) {
         val between = source.substring(cursor, rhsStart)
-        val equalsIndex = between.indexOf('=')
+        val equalsIndex = positionOfNextIn(between, "=", 0)
         if (equalsIndex >= 0) {
           val beforeEquals = ScalaSpace.format(between.substring(0, equalsIndex))
           val afterEqualsStr = between.substring(equalsIndex + 1)
@@ -7659,7 +7659,7 @@ class ScalaTreeVisitor(
     // Scala 3 selector-style match `selector.match { ... }`: the `match` keyword is preceded
     // by a `.`. Record it via a marker so the dot isn't stored as (non-whitespace) Space.
     val beforeMatch = if (mi > 0) ms.substring(0, mi) else ""
-    val dotIdx = beforeMatch.indexOf('.')
+    val dotIdx = positionOfNextIn(beforeMatch, ".", 0)
     val isDottedMatch = dotIdx >= 0
     val matchKeywordSpace =
       if (isDottedMatch) ScalaSpace.format(beforeMatch.substring(0, dotIdx))
@@ -7802,7 +7802,7 @@ class ScalaTreeVisitor(
       // Qualified `this`, e.g. `Outer.this`, modeled as a field access onto the `this` keyword.
       val afterQual = Math.max(0, thisTree.span.start - offsetAdjustment) + qualName.length
       val thisEnd = Math.max(0, thisTree.span.end - offsetAdjustment)
-      val dotIdx = source.indexOf('.', afterQual)
+      val dotIdx = positionOfNext(".", afterQual)
       val thisStart = thisEnd - "this".length
       val beforeDot = ScalaSpace.format(source, afterQual, dotIdx)
       val namePrefix = ScalaSpace.format(source, dotIdx + 1, thisStart)
@@ -8306,19 +8306,18 @@ class ScalaTreeVisitor(
   private def visitExtMethods(ext: untpd.ExtMethods): S.ExtensionMethods = {
     // Scala 3 extension method block: `extension (x: T) { def ... }`
     // The dotty span of an ExtMethods begins at the parameter/method region, not at
-    // the `extension` keyword, so we search backwards for the keyword. Floor that
-    // search at the previous statement's end (the cursor before the prefix) — otherwise
-    // a `(` in a preceding extension's method body (e.g. `def a = foo()`) is mistaken
-    // for this extension's parameter clause, rewinding the cursor into the previous
-    // block and duplicating it on print.
+    // the `extension` keyword, so the keyword is looked for from the previous statement's
+    // end (the cursor before the prefix). Neither search starts before it, so a `(` in a
+    // preceding extension's method body (e.g. `def a = foo()`) is not mistaken for this
+    // extension's parameter clause.
     val keywordFloor = cursor
     val prefix = extractPrefix(ext.span)
     val adjustedStart = Math.max(0, ext.span.start - offsetAdjustment)
     val searchStart = Math.max(keywordFloor, Math.min(cursor, adjustedStart) - "extension".length)
     val firstParenIdx = positionOfNext("(", searchStart)
     val extKwIdx = if (firstParenIdx >= 0) {
-      val idx = source.lastIndexOf("extension", firstParenIdx)
-      if (idx >= keywordFloor) idx else -1
+      val idx = positionOfNext("extension", keywordFloor)
+      if (idx < firstParenIdx) idx else -1
     } else positionOfNext("extension", cursor)
     val keywordEnd = if (extKwIdx >= 0) extKwIdx + "extension".length else cursor
     cursor = keywordEnd
@@ -9223,7 +9222,7 @@ class ScalaTreeVisitor(
     val params = func.args
     val closeParenAbs = if (parenthesized) {
       // Find the matching `)` before the arrow.
-      val rel = funcSource.lastIndexOf(')', if (relArrowIdx >= 0) relArrowIdx - 1 else funcSource.length - 1)
+      val rel = positionOfLastIn(funcSource, ")", if (relArrowIdx >= 0) relArrowIdx else funcSource.length)
       if (rel >= 0) funcStart + rel else arrowAbs
     } else arrowAbs
 
@@ -9564,6 +9563,17 @@ class ScalaTreeVisitor(
       } else i += 1
     }
     -1
+  }
+
+  /** As {@link positionOfNextIn}, but the last occurrence that starts before `until`. */
+  private def positionOfLastIn(text: String, delimiter: String, until: Int): Int = {
+    var last = -1
+    var next = positionOfNextIn(text, delimiter, 0)
+    while (next >= 0 && next < until) {
+      last = next
+      next = positionOfNextIn(text, delimiter, next + 1)
+    }
+    last
   }
 
   /** The deprecated Scala 2 unicode glyph of an ASCII arrow token: `⇒` for `=>`, `←` for `<-`. */
@@ -10159,17 +10169,17 @@ class ScalaTreeVisitor(
             s"Varargs splat element must be an Expression, got: ${if (other == null) "null" else other.getClass.getName}")
         }
         val typedEnd = if (typed.span.exists) Math.max(0, typed.span.end - offsetAdjustment) else cursor
-        val starPos = source.indexOf('*', cursor)
+        val starPos = positionOfNext("*", cursor)
         val starIdx = if (starPos >= cursor && starPos < typedEnd) starPos else typedEnd - 1
         val between = if (cursor >= 0 && starIdx >= cursor && starIdx <= source.length) {
           source.substring(cursor, starIdx)
         } else ""
-        val colonIdx = between.indexOf(':')
+        val colonIdx = positionOfNextIn(between, ":", 0)
         val (beforeColon, afterColon, beforeStar) = if (colonIdx >= 0) {
           // Scala 2 form: `<expr> [ws]:[ws]_[ws]*`
           val bColon = ScalaSpace.format(between.substring(0, colonIdx))
           val afterColonStart = cursor + colonIdx + 1
-          val underscoreIdx = source.indexOf('_', afterColonStart)
+          val underscoreIdx = positionOfNext("_", afterColonStart)
           val uIdx = if (underscoreIdx >= afterColonStart && underscoreIdx < starIdx) underscoreIdx else starIdx
           val aColon = ScalaSpace.format(source, afterColonStart, uIdx)
           val bStar = ScalaSpace.format(source, uIdx + 1, starIdx)
