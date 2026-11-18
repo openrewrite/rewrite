@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -124,33 +125,13 @@ public class UseStaticImport extends Recipe {
         return false;
     }
 
+    /**
+     * Whether an unqualified call of the name at the cursor would reach a method of an enclosing class, anonymous
+     * ones included, declared or inherited.
+     */
     private static boolean hasConflictingMethod(String methodName, Cursor cursor) {
-        Cursor cdCursor = cursor.dropParentUntil(it -> it instanceof J.ClassDeclaration || it == Cursor.ROOT_VALUE);
-        Object maybeCd = cdCursor.getValue();
-        if (!(maybeCd instanceof J.ClassDeclaration)) {
-            return false;
-        }
-        return hasConflictingMethod(methodName, ((J.ClassDeclaration) maybeCd).getType()) ||
-                hasConflictingMethod(methodName, cdCursor);
-    }
-
-    private static boolean hasConflictingMethod(String methodName, JavaType.@Nullable FullyQualified ct) {
-        if (ct == null) {
-            return false;
-        }
-        for (JavaType.Method method : ct.getMethods()) {
-            if (method.getName().equals(methodName)) {
-                return true;
-            }
-        }
-        if (hasConflictingMethod(methodName, ct.getSupertype())) {
-            return true;
-        }
-        for (JavaType.FullyQualified intf : ct.getInterfaces()) {
-            if (hasConflictingMethod(methodName, intf)) {
-                return true;
-            }
-        }
-        return false;
+        return Scope.at(cursor).lookup(methodName, Scope.Namespace.METHOD)
+                .filter(binding -> !(binding.getTree() instanceof J.Import))
+                .isPresent();
     }
 }

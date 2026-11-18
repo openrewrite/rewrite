@@ -500,4 +500,31 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepQualifiedWhereAnAnonymousClassDeclaresTheMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class Test {
+                  void m() {
+                      Object o = new Object() {
+                          List<Object> emptyList() {
+                              return null;
+                          }
+
+                          List<Object> list() {
+                              return Collections.emptyList();
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
 }
