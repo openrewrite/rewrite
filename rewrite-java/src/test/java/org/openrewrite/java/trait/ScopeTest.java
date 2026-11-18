@@ -260,7 +260,7 @@ class ScopeTest implements RewriteTest {
     @Test
     void patternVariablesFollowFlowScoping() {
         rewriteRun(
-          spec -> spec.recipe(visibleAtHere("a", "b", "d", "e", "f", "g", "h", "i")),
+          spec -> spec.recipe(visibleAtHere("a", "b", "d", "e", "f", "g", "h", "i", "j")),
           java(
             """
               class A {
@@ -278,6 +278,7 @@ class ScopeTest implements RewriteTest {
                       here();
                       if (o instanceof Float i) { } else { return; }
                       here();
+                      if (!(o instanceof Character j)) { here(); } else { here(); }
                   }
                   int here() { return 0; }
                   void use() {}
@@ -300,6 +301,7 @@ class ScopeTest implements RewriteTest {
                       /*~~(b, h)~~>*/here();
                       if (o instanceof Float i) { } else { return; }
                       /*~~(b, h, i)~~>*/here();
+                      if (!(o instanceof Character j)) { /*~~(b, h, i)~~>*/here(); } else { /*~~(b, h, i, j)~~>*/here(); }
                   }
                   int here() { return 0; }
                   void use() {}
