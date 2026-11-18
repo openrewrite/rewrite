@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
 import org.openrewrite.rpc.internal.FindTreesOfType;
@@ -74,9 +75,50 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     private final boolean causesAnotherCycle;
 
+    /**
+     * The option values the remote rejected for this node, null when it found nothing wrong or did
+     * not check.
+     */
+    private final @Nullable List<PrepareRecipeResponse.OptionValidation> validations;
+
     @Override
     public String getName() {
         return descriptor.getName();
+    }
+
+    /**
+     * The failures the remote reported for this node's options. The base implementation cannot help
+     * here: it reflects over non-null fields, and this recipe's fields are its own RPC plumbing
+     * rather than the remote recipe's options, so it would answer "valid" for options it never saw.
+     */
+    @Override
+    public Validated<Object> validate() {
+        return toValidated(descriptor, validations);
+    }
+
+    static Validated<Object> toValidated(RecipeDescriptor descriptor,
+                                         @Nullable List<PrepareRecipeResponse.OptionValidation> validations) {
+        Validated<Object> validated = Validated.none();
+        if (validations == null) {
+            return validated;
+        }
+        for (PrepareRecipeResponse.OptionValidation validation : validations) {
+            OptionDescriptor option = null;
+            for (OptionDescriptor candidate : descriptor.getOptions()) {
+                if (candidate.getName().equals(validation.getOption())) {
+                    option = candidate;
+                    break;
+                }
+            }
+            // Qualified the way Recipe#validate() qualifies its own reflective findings, so one
+            // failure in a tree of recipes still says which recipe is misconfigured.
+            String property = descriptor.getName() + '.' + validation.getOption();
+            Object value = option == null ? null : option.getValue();
+            validated = validated.and(option != null && option.isRequired() && value == null ?
+                    Validated.missing(property, null, validation.getMessage()) :
+                    Validated.invalid(property, value, validation.getMessage()));
+        }
+        return validated;
     }
 
     @Override

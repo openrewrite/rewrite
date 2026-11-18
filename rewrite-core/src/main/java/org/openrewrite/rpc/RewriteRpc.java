@@ -547,7 +547,7 @@ public class RewriteRpc {
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
-                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()));
+                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()), r.getValidations());
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {

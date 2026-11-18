@@ -77,7 +77,8 @@ public class PrepareRecipe implements RpcRequest {
                     emptyList(),
                     null,
                     children,
-                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null);
+                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null,
+                    null);
         }
     }
 }

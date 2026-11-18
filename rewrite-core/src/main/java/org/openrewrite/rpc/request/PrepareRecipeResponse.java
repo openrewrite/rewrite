@@ -63,6 +63,34 @@ public class PrepareRecipeResponse {
     @Nullable
     Boolean causesAnotherCycle;
 
+    /**
+     * The option values of this node that the remote rejected, empty or null when it found nothing
+     * wrong or did not check. A host turns each into a {@link org.openrewrite.Validated.Invalid},
+     * resolving the offending value from this node's own {@link #descriptor}.
+     */
+    @Nullable
+    List<OptionValidation> validations;
+
+    /**
+     * One rejected option of the recipe this node describes.
+     */
+    @Value
+    public static class OptionValidation {
+        /**
+         * Names an option of the enclosing node's descriptor. Never null: a
+         * {@link org.openrewrite.Validated.Invalid} has no legal form without a property, so a rule
+         * about the recipe as a whole still names the option a user would have to change.
+         */
+        String option;
+
+        /**
+         * A fragment completing "{@code <option> was '<value>' but it …}", as
+         * {@link org.openrewrite.ValidationException} renders it — {@code "is required"}, not a
+         * standalone sentence.
+         */
+        String message;
+    }
+
     @Value
     public static class DelegatesTo {
         String recipeName;
