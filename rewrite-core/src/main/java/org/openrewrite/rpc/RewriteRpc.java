@@ -25,6 +25,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.DataTableSuppressingExecutionContextView;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
@@ -441,11 +442,13 @@ public class RewriteRpc {
 
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
+        Boolean suppressDataTables = p instanceof ExecutionContext &&
+                                     DataTableSuppressingExecutionContextView.isSuppressing((ExecutionContext) p) ? true : null;
 
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
                 (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
         Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, visitorOptions,
-                tree.getId().toString(), pId, cursorIds), VisitResponse.class);
+                tree.getId().toString(), pId, cursorIds, suppressDataTables), VisitResponse.class);
         VisitResponse response = p instanceof ExecutionContext
                 ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
                 : doSend.get();
@@ -530,7 +533,7 @@ public class RewriteRpc {
         // Required-option validation is enforced server-side: PrepareRecipe instantiates the whole
         // tree there and validates each recipe's option values (root and children alike), which a
         // host-side check on the root descriptor alone cannot cover.
-        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
+        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, true, true), PrepareRecipeResponse.class);
         return recipeFromPrepareResponse(r);
     }
 
@@ -547,7 +550,19 @@ public class RewriteRpc {
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
-                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()));
+                r.getRecipeList(), r.getEditPreconditionRecipes(), Boolean.TRUE.equals(r.getCausesAnotherCycle()));
+    }
+
+    /**
+     * Like {@link #recipeFromPrepareResponse}, but a condition may name a recipe class that no marketplace lists,
+     * such as a search recipe a remote precondition helper refers to.
+     */
+    Recipe editPreconditionFromPrepareResponse(PrepareRecipeResponse r) {
+        PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
+        if (d != null && marketplace.findRecipe(d.getRecipeName()) == null) {
+            return preparedRecipes.instantiateRecipe(d.getRecipeName(), d.getOptions());
+        }
+        return recipeFromPrepareResponse(r);
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {

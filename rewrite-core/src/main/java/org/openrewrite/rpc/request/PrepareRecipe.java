@@ -43,6 +43,13 @@ public class PrepareRecipe implements RpcRequest {
     @Nullable
     Boolean acceptsCausesAnotherCycle;
 
+    /**
+     * Set by hosts that evaluate {@link PrepareRecipeResponse#getEditPreconditionRecipes()}. A remote recipe with
+     * edit preconditions cannot run on an older host, which would edit every source file.
+     */
+    @Nullable
+    Boolean acceptsEditPreconditionRecipes;
+
     public interface Loader {
         Recipe load(String id, Map<String, Object> options) throws Exception;
     }
@@ -78,7 +85,8 @@ public class PrepareRecipe implements RpcRequest {
                     emptyList(),
                     null,
                     children,
-                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null);
+                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null,
+                    null);
         }
     }
 }

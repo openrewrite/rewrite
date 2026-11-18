@@ -1086,6 +1086,35 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     /**
+     * A JS scanning recipe whose edit preconditions are a JS scanning recipe and a {@code hasSourcePath} reference:
+     * the host evaluates both, and their result also gates the Java recipe in its recipe list.
+     */
+    @Test
+    void jsRecipeEditsOnlyTheSourceFilesThatMeetItsEditPreconditions() {
+        Environment env = Environment.builder()
+          .scanRuntimeClasspath("org.openrewrite.text")
+          .build();
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(env.toMarketplace(RecipeBundle.runtimeClasspath()))
+          .resolvers(List.of(new RuntimeClasspathResolver(env)))
+          .log(tempDir.resolve("rpc.log")));
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/edit-preconditions.js"))
+          .getRecipesInstalled()).isGreaterThan(0);
+        Recipe recipe = client().prepareRecipe("org.openrewrite.example.text.exclaim-where-go");
+
+        assertThat(recipe.getDescriptor().getPreconditions())
+          .extracting(RecipeDescriptor::getName)
+          .containsExactly("org.openrewrite.example.text.mentions-go", "org.openrewrite.FindSourceFiles");
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          text("go now", "went now!", spec -> spec.path("src/go.txt")),
+          text("stop", spec -> spec.path("src/stop.txt")),
+          text("go", spec -> spec.path("src/go.md"))
+        );
+    }
+
+    /**
      * A {@link RecipeBundleResolver} that materializes a listed recipe from an {@link Environment}
      * scanned off the JVM classpath, the shape of a host's runtime-classpath resolver.
      */

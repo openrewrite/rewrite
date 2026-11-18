@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.DataTableSuppressingExecutionContextView;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.function.Supplier;
@@ -184,33 +185,6 @@ public class Preconditions {
             return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx), parent) != tree ?
                     v.visit(tree, ctx, parent) :
                     tree;
-        }
-    }
-
-    /**
-     * An ExecutionContext view that suppresses data table row insertion.
-     * Installs a no-op {@link DataTableStore} that silently drops inserts
-     * while delegating reads to the real store.
-     */
-    private static class DataTableSuppressingExecutionContextView extends DelegatingExecutionContext {
-        private DataTableSuppressingExecutionContextView(ExecutionContext delegate) {
-            super(delegate);
-        }
-
-        public static DataTableSuppressingExecutionContextView view(ExecutionContext ctx) {
-            if (ctx instanceof DataTableSuppressingExecutionContextView) {
-                return (DataTableSuppressingExecutionContextView) ctx;
-            }
-            return new DataTableSuppressingExecutionContextView(ctx);
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public <T> @Nullable T getMessage(String key) {
-            if (DataTableExecutionContextView.DATA_TABLE_STORE.equals(key)) {
-                return (T) DataTableStore.noop();
-            }
-            return super.getMessage(key);
         }
     }
 }

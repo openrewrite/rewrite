@@ -72,7 +72,22 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     private final @Nullable List<PrepareRecipeResponse> childResponses;
 
+    /**
+     * The prepared edit preconditions of the remote recipe, from which {@link #getEditPreconditions()} builds them.
+     */
+    private final @Nullable List<PrepareRecipeResponse> editPreconditionResponses;
+
     private final boolean causesAnotherCycle;
+
+    private transient @Nullable List<Recipe> editPreconditions;
+
+    public RpcRecipe(RewriteRpc rpc, String remoteId, RecipeDescriptor descriptor, String editVisitor,
+                     @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor, @Nullable String scanVisitor,
+                     @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor,
+                     @Nullable List<PrepareRecipeResponse> childResponses, boolean causesAnotherCycle) {
+        this(rpc, remoteId, descriptor, editVisitor, editPreconditionVisitor, scanVisitor, scanPreconditionVisitor,
+                childResponses, null, causesAnotherCycle);
+    }
 
     @Override
     public String getName() {
@@ -207,6 +222,17 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
             gated.visit(source, ctx, cursor);
         }
         return reached[0];
+    }
+
+    @Override
+    public synchronized List<Recipe> getEditPreconditions() {
+        if (editPreconditions == null) {
+            editPreconditions = editPreconditionResponses == null ? emptyList() :
+                    editPreconditionResponses.stream()
+                            .map(rpc::editPreconditionFromPrepareResponse)
+                            .collect(toList());
+        }
+        return editPreconditions;
     }
 
     @Override

@@ -34,6 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.internal.DataTableSuppressingExecutionContextView;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markup;
@@ -1187,6 +1188,48 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void remoteRecipeEditsOnlyTheSourceFilesThatMeetItsEditPreconditions() {
+        rewriteRun(
+          spec -> spec.recipe(guardedBy(List.of(prepared("org.openrewrite.text.Find", Map.of("find", "go"))),
+            "org.openrewrite.text.ChangeText", Map.of("toText", "changed")))
+            .validateRecipeSerialization(false),
+          text("go", "changed"),
+          text("stop")
+        );
+    }
+
+    @Test
+    void editPreconditionOfARemoteRecipeMayNameARecipeClassThatNoMarketplaceLists() {
+        rewriteRun(
+          spec -> spec.recipe(guardedBy(List.of(delegatingTo("org.openrewrite.FindSourceFiles", Map.of("filePattern", "**/go.txt"))),
+            "org.openrewrite.text.ChangeText", Map.of("toText", "changed")))
+            .validateRecipeSerialization(false),
+          text("go", "changed", spec -> spec.path("go.txt")),
+          text("stop", spec -> spec.path("stop.txt"))
+        );
+    }
+
+    @Test
+    void remoteEditPreconditionDecidesWithoutWritingDataTableRows() {
+        // given
+        RecordsDataTableSuppression.SUPPRESSED.clear();
+        Recipe guarded = guardedBy(List.of(prepared(RecordsDataTableSuppression.class.getName(), Map.of())),
+          "org.openrewrite.text.ChangeText", Map.of("toText", "changed"));
+
+        // when
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          guarded,
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("go").sourcePath(Path.of("go.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        // then
+        assertThat(run.getChangeset().getAllResults())
+          .extracting(r -> r.getAfter().printAll())
+          .containsExactly("changed");
+        assertThat(RecordsDataTableSuppression.SUPPRESSED).containsExactly(true);
+    }
+
+    @Test
     void batchedEditPreconditionSeesTheEarlierRecipesEdits() {
         rewriteRun(
           spec -> spec
@@ -1281,7 +1324,28 @@ class RewriteRpcTest implements RewriteTest {
         RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(recipeName, options);
         String editVisitor = prepared.getEditVisitor();
         return client.recipeFromPrepareResponse(new PrepareRecipeResponse(editVisitor.substring("edit:".length()),
-          prepared.getDescriptor(), editVisitor, List.of(editPrecondition), null, List.of(), null, List.of(), null));
+          prepared.getDescriptor(), editVisitor, List.of(editPrecondition), null, List.of(), null, List.of(), null, null));
+    }
+
+    /**
+     * Builds the recipe as it arrives from a peer that sends its edit preconditions with PrepareRecipe.
+     */
+    private Recipe guardedBy(List<PrepareRecipeResponse> editPreconditions, String recipeName, Map<String, Object> options) {
+        PrepareRecipeResponse prepared = prepared(recipeName, options);
+        return client.recipeFromPrepareResponse(new PrepareRecipeResponse(prepared.getId(), prepared.getDescriptor(),
+          prepared.getEditVisitor(), List.of(), prepared.getScanVisitor(), List.of(), null, List.of(), null, editPreconditions));
+    }
+
+    private PrepareRecipeResponse prepared(String recipeName, Map<String, Object> options) {
+        RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(recipeName, options);
+        String editVisitor = prepared.getEditVisitor();
+        return new PrepareRecipeResponse(editVisitor.substring("edit:".length()), prepared.getDescriptor(), editVisitor,
+          List.of(), prepared.getScanVisitor(), List.of(), null, List.of(), null, null);
+    }
+
+    private static PrepareRecipeResponse delegatingTo(String recipeName, Map<String, Object> options) {
+        return new PrepareRecipeResponse("delegate", Recipe.noop().getDescriptor(), "edit:delegate", List.of(), null,
+          List.of(), new PrepareRecipeResponse.DelegatesTo(recipeName, options), null, null, null);
     }
 
     /**
@@ -1368,6 +1432,31 @@ class RewriteRpcTest implements RewriteTest {
         public PlainText visitText(PlainText text, Integer p) {
             RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
             return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
+        }
+    }
+
+    public static class RecordsDataTableSuppression extends Recipe {
+        static final List<Boolean> SUPPRESSED = new CopyOnWriteArrayList<>();
+
+        @Override
+        public String getDisplayName() {
+            return "Records data table suppression";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Marks every source file as found, recording whether the data table rows it would write are dropped.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    SUPPRESSED.add(DataTableSuppressingExecutionContextView.isSuppressing(ctx));
+                    return SearchResult.found(text);
+                }
+            };
         }
     }
 

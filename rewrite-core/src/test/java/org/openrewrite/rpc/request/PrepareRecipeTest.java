@@ -65,7 +65,7 @@ class PrepareRecipeTest {
         recipe.initialize(emptyList());
         PreparedRecipeCache cache = new PreparedRecipeCache();
         PrepareRecipeResponse prepared = (PrepareRecipeResponse) new PrepareRecipe.Handler(cache, (id, options) -> recipe)
-          .handle(new PrepareRecipe("test.Gated", emptyMap(), null));
+          .handle(new PrepareRecipe("test.Gated", emptyMap(), null, null));
 
         assertThat(editInTreeOrder(prepared, cache, PlainText.builder().sourcePath(Path.of("x.txt")).text("x").build()).getText()).isEqualTo("changed");
         assertThat(editInTreeOrder(prepared, cache, PlainText.builder().sourcePath(Path.of("y.txt")).text("y").build()).getText()).isEqualTo("y");

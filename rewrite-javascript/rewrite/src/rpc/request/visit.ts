@@ -18,7 +18,7 @@ import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
-import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
+import {DATA_TABLE_STORE, DataTableStore, suppressDataTables} from "../../data-table";
 import {withMetrics, extractSourcePath} from "./metrics";
 import {lookupVisitor} from "./visitor-registry";
 
@@ -36,7 +36,9 @@ export class Visit {
                 readonly visitorOptions: Map<string, any> | undefined,
                 readonly treeId: string,
                 readonly p: string,
-                readonly cursor: string[] | undefined) {
+                readonly cursor: string[] | undefined,
+                // Set by a host deciding an edit precondition, whose data table rows it discards.
+                readonly suppressDataTables?: boolean) {
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -54,10 +56,13 @@ export class Visit {
                 "Visit",
                 metricsCsv,
                 (context) => async (request) => {
-                    const p = await getObject(request.p, undefined);
+                    let p = await getObject(request.p, undefined);
                     const store = dataTableStore();
                     if (store && p instanceof ExecutionContext) {
                         p.messages[DATA_TABLE_STORE] = store;
+                    }
+                    if (request.suppressDataTables === true && p instanceof ExecutionContext) {
+                        p = suppressDataTables(p);
                     }
                     captureRefCheckpoint(request.treeId);
                     const before: Tree = await getObject(request.treeId, request.sourceFileType);

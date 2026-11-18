@@ -34,6 +34,25 @@ public class PreparedRecipeCache {
     private final @Getter Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
     @SuppressWarnings("unchecked")
+    /**
+     * Constructs the recipe class {@code recipeName} with {@code options}, for a recipe that a remote refers to by
+     * class name, such as one of its precondition helpers.
+     */
+    public Recipe instantiateRecipe(String recipeName, @Nullable Map<String, Object> options) {
+        Map<Object, Object> withJsonType = options == null ? new HashMap<>() : new HashMap<>(options);
+        withJsonType.put("@c", recipeName);
+        Class<?> type;
+        try {
+            type = TypeFactory.defaultInstance().findClass(recipeName);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("No recipe " + recipeName + " found in the marketplace or on the classpath.", e);
+        }
+        if (!Recipe.class.isAssignableFrom(type)) {
+            throw new IllegalStateException(recipeName + " is not a recipe.");
+        }
+        return (Recipe) mapper.convertValue(withJsonType, type);
+    }
+
     public <P> TreeVisitor<?, P> instantiateVisitor(String visitorName, @Nullable Map<String, Object> visitorOptions) {
         if (visitorName.startsWith("scan:")) {
             //noinspection unchecked

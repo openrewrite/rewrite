@@ -18,6 +18,7 @@ import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
 import {DataTableDescriptor} from "./data-table";
 import {mapAsync} from "./util";
+import type {RecipeRef} from "./preconditions";
 
 const OPTIONS_KEY = "__recipe_options__";
 
@@ -193,6 +194,49 @@ export abstract class ScanningRecipe<P> extends Recipe {
 
     abstract initialValue(ctx: ExecutionContext): P
 
+    /**
+     * Conditions that a source file must meet before the {@link editorWithData editing visitor} of this recipe and
+     * those of every recipe in its {@link recipeList recipe list}, recursively, may change it. This mirrors Java's
+     * `ScanningRecipe#getEditPreconditions()` and the `preconditions` of a declarative recipe:
+     * ```ts
+     * async editPreconditions(): Promise<(Recipe | RecipeRef)[]> {
+     *     return [usesType("react")];
+     * }
+     * ```
+     * A source file matches when every listed condition marks it as found. A condition with a recipe list also
+     * matches when any recipe in that list does. The conditions are evaluated once per source file in each cycle,
+     * immediately before this recipe edits it and with the edits of the recipes that ran before it, and that result
+     * then applies to the whole recipe list.
+     *
+     * Scanning and generation are not affected: this recipe and its recipe list still scan every source file and
+     * generate new ones, which are then edited only if they match. A {@link ScanningRecipe} condition scans every
+     * source file into an accumulator of its own before its editing visitor decides. Conditions never generate
+     * source files, and the changes and data table rows they make while deciding are discarded.
+     *
+     * When the Java host runs this recipe, it evaluates the conditions, so a {@link RecipeRef} condition runs as the
+     * Java recipe it names. A run in this process evaluates a {@link RecipeRef} with its local visitor where it has
+     * one, and otherwise asks the connected Java peer.
+     */
+    async editPreconditions(): Promise<(Recipe | RecipeRef)[]> {
+        return [];
+    }
+
+    async descriptor(): Promise<RecipeDescriptor> {
+        const descriptor = await super.descriptor();
+        const editPreconditions = await this.editPreconditions();
+        if (editPreconditions.length === 0) {
+            return descriptor;
+        }
+        return {
+            ...descriptor,
+            preconditions: [
+                ...descriptor.preconditions,
+                ...await mapAsync(editPreconditions, async c =>
+                    c instanceof Recipe ? c.descriptor() : recipeRefDescriptor(c))
+            ]
+        };
+    }
+
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const editorWithContext = (cursor: Cursor, ctx: ExecutionContext) =>
             this.editorWithData(this.accumulator(cursor, ctx));
@@ -228,6 +272,30 @@ export abstract class ScanningRecipe<P> extends Recipe {
     async scanner(acc: P): Promise<TreeVisitor<any, ExecutionContext>> {
         return noopVisitor();
     }
+}
+
+function recipeRefDescriptor(ref: RecipeRef): RecipeDescriptor {
+    return {
+        name: ref.recipeName,
+        displayName: ref.recipeName,
+        instanceName: ref.recipeName,
+        description: `Delegates to the Java recipe \`${ref.recipeName}\`.`,
+        tags: [],
+        estimatedEffortPerOccurrence: 5,
+        options: Object.entries(ref.options).map(([name, value]) => ({
+            name,
+            value,
+            displayName: name,
+            description: "",
+            required: false
+        })),
+        preconditions: [],
+        recipeList: [],
+        dataTables: [],
+        maintainers: [],
+        contributors: [],
+        examples: []
+    };
 }
 
 /**
