@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DataTable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -34,6 +35,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
@@ -98,6 +100,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private final Map<Path, Map<String, String>> editedManifests = new HashMap<>();
     private int editedManifestsAt = -1;
     private final List<String> pending = new ArrayList<>();
+    private final Map<Path, List<String>> warnedThisCycle = new HashMap<>();
     private @Nullable Decider decider;
     private @Nullable SourceFile visiting;
     private int version;
@@ -185,6 +188,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      */
     public List<SourceFile> decideAll(ExecutionContext ctx, Decider decider) {
         this.decider = decider;
+        // a deferred manifest is decided again from this cycle's scan
+        Deferrals deferrals = ctx.getMessage(DEFERRED);
+        if (deferrals != null && deferrals.cycle < ctx.getCycle()) {
+            deferrals.pending.clear();
+        }
         PackageJsonHelper.addFileEditor(ctx, this);
         linkWorkspaceMembers();
         for (Path project : new TreeMap<>(scan.projects).keySet()) {
@@ -277,7 +285,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                SourceFile sf = (SourceFile) tree;
+                SourceFile sf = withoutDeferralWarning(ctx, (SourceFile) tree);
                 Path p = sf.getSourcePath();
                 pending.clear();
                 SourceFile out;
@@ -290,7 +298,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                     } else if (scan.lockToPackage.containsKey(p)) {
                         out = visitLock(ctx, sf);
                     } else {
-                        return tree;
+                        return sf;
                     }
                 } finally {
                     visiting = null;
@@ -298,9 +306,27 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 for (String warning : pending) {
                     out = warn(out, warning);
                 }
+                List<String> added = warningsAdded(sf, out);
+                if (!added.isEmpty()) {
+                    warnedThisCycle.put(p, added);
+                }
                 return out;
             }
         };
+    }
+
+    private static List<String> warningsAdded(SourceFile before, SourceFile after) {
+        Set<String> had = new HashSet<>();
+        for (Markup.Warn warn : before.getMarkers().findAll(Markup.Warn.class)) {
+            had.add(warn.getMessage());
+        }
+        List<String> added = new ArrayList<>();
+        for (Markup.Warn warn : after.getMarkers().findAll(Markup.Warn.class)) {
+            if (!had.contains(warn.getMessage())) {
+                added.add(warn.getMessage());
+            }
+        }
+        return added;
     }
 
     private SourceFile visitManaged(ExecutionContext ctx, ManagedFile file, SourceFile sf) {
@@ -476,9 +502,109 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         withdrawn.withdrawn = true;
         install(withdrawn);
         rebuild();
-        cannotKnow(ctx, path, "a recipe before this one changed " + changed + " after files visited earlier were " +
-                              "written by this recipe's decision then" + (previous.description == null ? "" : ", " +
-                              previous.description + "; it is now " + decision.description));
+        String why = "a recipe before this one changed " + changed + " after files visited earlier were " +
+                     "written by this recipe's decision then" + (previous.description == null ? "" : ", " +
+                     previous.description + "; it is now " + decision.description);
+        if (!deferToNextCycle(ctx, path, why)) {
+            cannotKnow(ctx, path, why);
+        }
+    }
+
+    /**
+     * Leave {@code path} to the next cycle, whose scan reads it as the recipes before this one leave it, unless it was
+     * deferred before in this run. The deferral is a new message, which counts as this recipe's change, so the cycle's
+     * end asks {@link #deferredThisCycle()} whether to run another.
+     */
+    private boolean deferToNextCycle(ExecutionContext ctx, Path path, String why) {
+        Deferrals deferrals = ctx.computeMessageIfAbsent(DEFERRED, k -> new Deferrals());
+        if (!deferrals.ever.add(path)) {
+            return false;
+        }
+        deferrals.cycle = ctx.getCycle();
+        deferrals.pending.put(path, new Deferral(rows, new LockFileRegeneration.Failure(
+                LockFileRegeneration.Kind.CANNOT_KNOW, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, null, why)));
+        // warned as before in case no cycle follows; the next cycle removes the warning, and those the overturned
+        // decision left on the files of path's project visited earlier
+        pending.add(why);
+        if (visiting != null) {
+            deferrals.warned.computeIfAbsent(visiting.getSourcePath(), k -> new HashSet<>()).add(why);
+        }
+        Set<Path> project = new LinkedHashSet<>();
+        project.add(path);
+        Path lock = NodeDependencyScan.lockFor(scan, path);
+        if (lock != null) {
+            project.add(lock);
+        }
+        ManagedFile file = managedOf(path);
+        if (file != null) {
+            project.add(file.path);
+        }
+        for (Path visited : project) {
+            for (String warning : warnedThisCycle.getOrDefault(visited, Collections.emptyList())) {
+                deferrals.warned.computeIfAbsent(visited, k -> new HashSet<>()).add(warning);
+            }
+        }
+        ctx.putMessage(DEFERRED, deferrals);
+        return true;
+    }
+
+    // a later cycle decides a deferred manifest again, so the warning its deferral left is withdrawn
+    private static SourceFile withoutDeferralWarning(ExecutionContext ctx, SourceFile sf) {
+        Deferrals deferrals = ctx.getMessage(DEFERRED);
+        Set<String> overturned = deferrals == null || deferrals.cycle >= ctx.getCycle() ? null :
+                deferrals.warned.remove(sf.getSourcePath());
+        if (overturned == null) {
+            return sf;
+        }
+        List<Marker> kept = new ArrayList<>();
+        for (Marker marker : sf.getMarkers().getMarkers()) {
+            if (!(marker instanceof Markup.Warn && overturned.contains(((Markup.Warn) marker).getMessage()))) {
+                kept.add(marker);
+            }
+        }
+        return sf.withMarkers(sf.getMarkers().withMarkers(kept));
+    }
+
+    /**
+     * Whether a dependency recipe left a manifest to the next cycle in the cycle now running.
+     */
+    public static boolean deferredThisCycle() {
+        ExecutionContext ctx = RecipeScheduler.currentContext();
+        Deferrals deferrals = ctx == null ? null : ctx.getMessage(DEFERRED);
+        return deferrals != null && !deferrals.pending.isEmpty() && deferrals.cycle == ctx.getCycle();
+    }
+
+    /**
+     * Report the manifests left to a next cycle that the run ended before.
+     */
+    public static void reportUnresolvedDeferrals(ExecutionContext ctx) {
+        Deferrals deferrals = ctx.getMessage(DEFERRED);
+        if (deferrals == null) {
+            return;
+        }
+        for (Map.Entry<Path, Deferral> pending : deferrals.pending.entrySet()) {
+            pending.getValue().rows.failure(ctx, pending.getKey(), pending.getValue().failure);
+        }
+        deferrals.pending.clear();
+    }
+
+    private static final String DEFERRED = "org.openrewrite.javascript.dependencyEditsDeferred";
+
+    private static final class Deferrals {
+        int cycle;
+        final Set<Path> ever = new HashSet<>();
+        final Map<Path, Set<String>> warned = new HashMap<>();
+        final Map<Path, Deferral> pending = new LinkedHashMap<>();
+    }
+
+    private static final class Deferral {
+        final Rows rows;
+        final LockFileRegeneration.Failure failure;
+
+        Deferral(Rows rows, LockFileRegeneration.Failure failure) {
+            this.rows = rows;
+            this.failure = failure;
+        }
     }
 
     private void install(Decision decision) {
