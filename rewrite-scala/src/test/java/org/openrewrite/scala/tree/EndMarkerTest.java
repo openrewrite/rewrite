@@ -79,6 +79,39 @@ class EndMarkerTest implements RewriteTest {
     }
 
     @Test
+    void anonymousGivenAliases() {
+        rewriteRun(
+          scala(
+            """
+              trait Ord[T]
+              object O:
+                given Ord[Int] =
+                  new Ord[Int] {}
+                end given
+                given (using Ord[Int]): Ord[Long] =
+                  new Ord[Long] {}
+                end given
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedNames() {
+        rewriteRun(
+          scala(
+            """
+              class `my class`:
+                def `my f` =
+                  1
+                end `my f`
+              end `my class`
+              """
+          )
+        );
+    }
+
+    @Test
     void methodsAndValues() {
         rewriteRun(
           scala(

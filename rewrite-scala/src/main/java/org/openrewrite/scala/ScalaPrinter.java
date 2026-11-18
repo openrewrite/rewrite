@@ -2330,11 +2330,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     private void visitEndMarker(J j, PrintOutputCapture<P> p) {
         EndMarker endMarker = j.getMarkers().findFirst(EndMarker.class).orElse(null);
-        if (endMarker != null) {
+        if (endMarker == null) {
+            return;
+        }
+        String name = EndMarker.nameOf(j);
+        // A recipe can turn the element into a kind no end marker closes, which then prints without one.
+        if (name != null) {
             visitSpace(endMarker.getBeforeEnd(), Space.Location.LANGUAGE_EXTENSION, p);
             p.append("end");
             visitSpace(endMarker.getBeforeName(), Space.Location.LANGUAGE_EXTENSION, p);
-            p.append(EndMarker.nameOf(j));
+            p.append(name);
         }
     }
 }

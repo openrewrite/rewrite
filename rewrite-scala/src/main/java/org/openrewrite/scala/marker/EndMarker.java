@@ -19,6 +19,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
+import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
@@ -48,12 +49,13 @@ public class EndMarker implements Marker {
      */
     public static @Nullable String nameOf(J j) {
         if (j instanceof J.ClassDeclaration) {
-            String name = ((J.ClassDeclaration) j).getSimpleName();
-            return name.isEmpty() ? "given" : name;
+            return asWritten(((J.ClassDeclaration) j).getName());
         } else if (j instanceof J.MethodDeclaration) {
-            return ((J.MethodDeclaration) j).getSimpleName();
+            return asWritten(((J.MethodDeclaration) j).getName());
         } else if (j instanceof J.VariableDeclarations) {
-            return ((J.VariableDeclarations) j).getVariables().get(0).getSimpleName();
+            return asWritten(((J.VariableDeclarations) j).getVariables().get(0).getName());
+        } else if (j instanceof S.AnonymousGiven) {
+            return "given";
         } else if (j instanceof S.PatternDefinition) {
             return "val";
         } else if (j instanceof S.ExtensionMethods) {
@@ -75,5 +77,17 @@ public class EndMarker implements Marker {
             return "new";
         }
         return null;
+    }
+
+    /**
+     * An anonymous given has no name, so its end marker says {@code given}.
+     */
+    private static String asWritten(J.Identifier name) {
+        if (name.getSimpleName().isEmpty()) {
+            return "given";
+        }
+        return name.getMarkers().findFirst(Quoted.class).isPresent() ?
+                "`" + name.getSimpleName() + "`" :
+                name.getSimpleName();
     }
 }
