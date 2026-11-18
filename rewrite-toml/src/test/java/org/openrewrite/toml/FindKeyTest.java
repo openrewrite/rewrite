@@ -412,4 +412,100 @@ class FindKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findArrayTablesByTheirHeader() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("[[bin]]")),
+          toml(
+            """
+              [package]
+              name = "app"
+
+              [[bin]]
+              name = "cli"
+              """,
+            """
+              [package]
+              name = "app"
+
+              ~~>[[bin]]
+              name = "cli"
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleWildcardMatchesOneMorePart() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("dependencies.*")),
+          toml(
+            """
+              [dependencies]
+              log = "0.4"
+
+              [dependencies.serde]
+              version = "1"
+              """,
+            """
+              [dependencies]
+              ~~>log = "0.4"
+
+              ~~>[dependencies.serde]
+              version = "1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleWildcardAloneMatchesTopLevelTablesAndKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("*")),
+          toml(
+            """
+              title = "app"
+
+              [dependencies]
+              log = "0.4"
+
+              [[bin]]
+              name = "cli"
+              """,
+            """
+              ~~>title = "app"
+
+              ~~>[dependencies]
+              log = "0.4"
+
+              ~~>[[bin]]
+              name = "cli"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleWildcardAloneMatchesEveryTableAndKey() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("**")),
+          toml(
+            """
+              [dependencies]
+              log = "0.4"
+
+              [[bin]]
+              name = "cli"
+              """,
+            """
+              ~~>[dependencies]
+              ~~>log = "0.4"
+
+              ~~>[[bin]]
+              ~~>name = "cli"
+              """
+          )
+        );
+    }
 }
