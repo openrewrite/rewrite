@@ -950,13 +950,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   /**
-   * `scala.Any` and `java.lang.Object` both map to `java.lang.Object`. Dotty declares `toString` and `getClass` on
-   * `Any` and `clone` and `wait` on `Object`, so the class lists the methods of both. Where `Object` overrides a
-   * method of `Any`, as it does `equals`, the class lists `Object`'s.
+   * `scala.Any` and `java.lang.Object` both map to `java.lang.Object`, which lists the methods its class file declares.
+   * Dotty declares `toString` and `getClass` of those on `Any` and the rest on `Object`. Both declare `equals` and
+   * `hashCode`, and the class lists `Object`'s.
    */
   private def objectDeclarations: List[Symbol] = {
+    val classFileMethods =
+      Set("getClass", "hashCode", "equals", "clone", "toString", "notify", "notifyAll", "wait", "finalize")
     val own = declarationsOf(ctx.definitions.ObjectClass)
-    own ++ declarationsOf(ctx.definitions.AnyClass).filterNot(m => own.exists(_.name == m.name))
+    (own ++ declarationsOf(ctx.definitions.AnyClass).filterNot(m => own.exists(_.name == m.name)))
+      .filter(m => classFileMethods.contains(m.name.toString))
   }
 
   /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */
