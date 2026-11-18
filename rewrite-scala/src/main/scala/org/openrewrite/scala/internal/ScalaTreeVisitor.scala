@@ -484,20 +484,8 @@ class ScalaTreeVisitor(
 
   private def visitReference(id: Trees.Ident[?]): J = visitIdent(id) match {
     case name: J.Identifier if !isInImportContext && !inPattern =>
-      argumentlessCallOf(id) match {
-        case Some(methodType) =>
-          new J.MethodInvocation(
-            Tree.randomId(),
-            name.getPrefix,
-            Markers.EMPTY,
-            null,
-            null,
-            typedMethodName(name.withPrefix(Space.EMPTY), methodType),
-            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
-              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
-            methodType
-          )
-        case None => name
+      argumentlessCallOf(id).fold[J](name) { methodType =>
+        argumentlessInvocation(name.getPrefix, null, name.withPrefix(Space.EMPTY), methodType)
       }
     case other => other
   }
@@ -1671,17 +1659,7 @@ class ScalaTreeVisitor(
 
       argumentlessCallOf(sel) match {
         case Some(methodType) if !isTypeProjection =>
-          new J.MethodInvocation(
-            Tree.randomId(),
-            prefix,
-            Markers.EMPTY,
-            new JRightPadded(target, beforeDotSpace, Markers.EMPTY),
-            null,
-            typedMethodName(name, methodType),
-            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
-              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
-            methodType
-          )
+          argumentlessInvocation(prefix, new JRightPadded(target, beforeDotSpace, Markers.EMPTY), name, methodType)
         case _ =>
           new J.FieldAccess(
             Tree.randomId(),
@@ -1699,6 +1677,24 @@ class ScalaTreeVisitor(
   private def argumentlessCallOf(reference: Trees.Tree[?]): Option[JavaType.Method] =
     if (reference eq assignmentTarget) None
     else typeMapping.flatMap(_.argumentlessCallOf(reference.asInstanceOf[untpd.Tree]))
+
+  private def argumentlessInvocation(
+    prefix: Space,
+    select: JRightPadded[Expression],
+    name: J.Identifier,
+    methodType: JavaType.Method
+  ): J.MethodInvocation =
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      select,
+      null,
+      typedMethodName(name, methodType),
+      JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+      methodType
+    )
 
   private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
     val enclosingTarget = assignmentTarget
