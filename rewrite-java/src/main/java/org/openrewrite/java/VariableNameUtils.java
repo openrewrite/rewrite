@@ -29,6 +29,8 @@ import java.util.*;
 @Value
 public class VariableNameUtils {
 
+    private static final String ENUM_NAMES = VariableNameUtils.class.getName() + ".enumNames";
+
     private VariableNameUtils() {
     }
 
@@ -107,16 +109,21 @@ public class VariableNameUtils {
                 .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
                 .forEach(binding -> names.add(binding.getName()));
         // A variable named like an enum the file uses would obscure that enum wherever it qualifies a constant (JLS 6.4.2).
-        new JavaIsoVisitor<Set<String>>() {
-            @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> found) {
-                if (identifier.getType() instanceof JavaType.Class &&
-                    ((JavaType.Class) identifier.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
-                    found.add(identifier.getSimpleName());
+        Cursor sourceFile = scope.dropParentUntil(JavaSourceFile.class::isInstance);
+        names.addAll(sourceFile.computeMessageIfAbsent(ENUM_NAMES, k -> {
+            Set<String> enums = new HashSet<>();
+            new JavaIsoVisitor<Set<String>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> found) {
+                    if (identifier.getType() instanceof JavaType.Class &&
+                        ((JavaType.Class) identifier.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
+                        found.add(identifier.getSimpleName());
+                    }
+                    return identifier;
                 }
-                return identifier;
-            }
-        }.visit(scope.firstEnclosing(JavaSourceFile.class), names);
+            }.visit(sourceFile.<JavaSourceFile>getValue(), enums);
+            return enums;
+        }));
         return names;
     }
 
