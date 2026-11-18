@@ -27,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -116,6 +117,47 @@ class ScopeTraitTest implements RewriteTest {
                   val (a, b) = pair
               }
               fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void referencesAndRenameSafetyFollowKotlinScoping() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  return new Scope.Binding.Matcher().get(getCursor())
+                    .filter(b -> b.getName().endsWith("_"))
+                    .map(b -> SearchResult.found(identifier, b.references().count() + " references, " +
+                      (b.isEffectivelyFinal() ? "final" : "assigned") + ", " +
+                      Stream.of("free", "taken", "it").map(n -> n + (b.canRenameTo(n) ? ":safe" : ":unsafe")).collect(joining(" "))))
+                    .orElse(identifier);
+              }
+          })),
+          kotlin(
+            """
+              fun m(p: Int): Int {
+                  val read_ = p
+                  var assigned_ = p
+                  val taken = 2
+                  listOf(1).forEach { use(it + read_) }
+                  assigned_ = taken
+                  return read_ + assigned_
+              }
+              fun use(i: Int) {}
+              """,
+            """
+              fun m(p: Int): Int {
+                  val /*~~(2 references, final, free:safe taken:unsafe it:unsafe)~~>*/read_ = p
+                  var /*~~(2 references, assigned, free:safe taken:unsafe it:safe)~~>*/assigned_ = p
+                  val taken = 2
+                  listOf(1).forEach { use(it + read_) }
+                  assigned_ = taken
+                  return read_ + assigned_
+              }
+              fun use(i: Int) {}
               """
           )
         );

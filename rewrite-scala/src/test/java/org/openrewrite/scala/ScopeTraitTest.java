@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.scala.Assertions.scala;
@@ -85,6 +86,51 @@ class ScopeTraitTest implements RewriteTest {
                   /*~~(top a b K L helper)~~>*/here()
                 }
                 def here(): Int = 0
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void referencesAndRenameSafetyFollowScalaScoping() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  return new Scope.Binding.Matcher().get(getCursor())
+                    .filter(b -> b.getName().endsWith("_"))
+                    .map(b -> SearchResult.found(identifier, b.references().count() + " references, " +
+                      (b.isEffectivelyFinal() ? "final" : "assigned") + ", " +
+                      Stream.of("free", "taken", "x").map(n -> n + (b.canRenameTo(n) ? ":safe" : ":unsafe")).collect(joining(" "))))
+                    .orElse(identifier);
+              }
+          })),
+          scala(
+            """
+              object O {
+                def m(p: Int): Int = {
+                  val read_ = p
+                  var assigned_ = p
+                  val taken = 2
+                  List(1).foreach(x => use(x + read_))
+                  assigned_ = taken
+                  read_ + assigned_
+                }
+                def use(i: Int): Unit = ()
+              }
+              """,
+            """
+              object O {
+                def m(p: Int): Int = {
+                  val /*~~(2 references, final, free:safe taken:unsafe x:unsafe)~~>*/read_ = p
+                  var /*~~(2 references, assigned, free:safe taken:unsafe x:unsafe)~~>*/assigned_ = p
+                  val taken = 2
+                  List(1).foreach(x => use(x + read_))
+                  assigned_ = taken
+                  read_ + assigned_
+                }
+                def use(i: Int): Unit = ()
               }
               """
           )
