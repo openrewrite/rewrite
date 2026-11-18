@@ -59,7 +59,8 @@ public class RecipeThatMadeChanges extends Recipe implements RpcCodec<RecipeThat
         RecipeDescriptor descriptor = recipe.getDescriptor();
         Map<String, Object> options = null;
         for (OptionDescriptor option : descriptor.getOptions()) {
-            if (option.getValue() != null) {
+            // A secret is given to the recipe, but never recorded with what it changed.
+            if (option.getValue() != null && !option.isSecret()) {
                 if (options == null) {
                     options = new LinkedHashMap<>();
                 }
