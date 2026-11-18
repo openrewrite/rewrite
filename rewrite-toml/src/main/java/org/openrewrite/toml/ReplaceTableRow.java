@@ -25,12 +25,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
 @Value
@@ -58,6 +56,8 @@ public class ReplaceTableRow extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        // A row that is not TOML changes nothing, rather than what error recovery made of part of it
+        List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValues(row);
         return new TomlVisitor<ExecutionContext>() {
 
             @Override
@@ -67,10 +67,10 @@ public class ReplaceTableRow extends Recipe {
                 }
 
                 // Parse the incoming row
-                List<Toml.KeyValue> incomingKeyValues = parseTomlRow(row);
-                if (incomingKeyValues.isEmpty()) {
+                if (rowKeyValues == null || rowKeyValues.isEmpty()) {
                     return super.visitTable(table, ctx);
                 }
+                List<Toml.KeyValue> incomingKeyValues = new ArrayList<>(rowKeyValues);
 
                 // Get the identifying property value from the incoming row
                 String identifyingValue = TableRowMatcher.getKeyValue(incomingKeyValues, identifyingKey);
@@ -115,21 +115,6 @@ public class ReplaceTableRow extends Recipe {
                 }
 
                 return super.visitTable(table, ctx);
-            }
-
-            private List<Toml.KeyValue> parseTomlRow(@Language("toml") String tomlContent) {
-                // A row that is not TOML changes nothing, rather than what error recovery made of part of it
-                Toml.Document doc = TomlSnippets.parse(tomlContent);
-                if (doc == null) {
-                    return emptyList();
-                }
-                List<Toml.KeyValue> result = new ArrayList<>();
-                for (TomlValue value : doc.getValues()) {
-                    if (value instanceof Toml.KeyValue) {
-                        result.add((Toml.KeyValue) value);
-                    }
-                }
-                return result;
             }
         };
     }
