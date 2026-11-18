@@ -163,6 +163,28 @@ public class Scope implements Trait<J> {
     }
 
     /**
+     * Whether the names this scope binds itself would be in the way were they in scope across the given regions too,
+     * as when a block's statements move into the block around it. A region is in the way where it declares one of
+     * the names, or reads one from outside itself, which the moved declaration would then capture.
+     */
+    public boolean collidesAcross(Collection<Cursor> regions) {
+        Set<String> own = new HashSet<>();
+        for (Binding binding : getBindings()) {
+            own.add(binding.getNamespace() + " " + binding.getName());
+        }
+        if (own.isEmpty()) {
+            return false;
+        }
+        for (Cursor region : regions) {
+            if (Stream.concat(declaredWithin(region), readWithin(region))
+                    .anyMatch(binding -> own.contains(binding.getNamespace() + " " + binding.getName()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * The bindings declared anywhere under the region's tree, in source order.
      */
     public static Stream<Binding> declaredWithin(Cursor region) {

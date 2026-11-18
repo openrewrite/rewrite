@@ -28,7 +28,9 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -640,6 +642,66 @@ class ScopeTest implements RewriteTest {
                   void other(Object o) {
                       if (o instanceof Integer moved) { }
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockCollidesAcrossLaterStatementsThatDeclareOrReadItsNames() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block b = super.visitBlock(block, ctx);
+                  Cursor parent = getCursor().getParentTreeCursor();
+                  if (!(parent.getValue() instanceof J.Block)) {
+                      return b;
+                  }
+                  List<Statement> statements = parent.<J.Block>getValue().getStatements();
+                  List<Cursor> later = new ArrayList<>();
+                  for (Statement statement : statements.subList(statements.indexOf(block) + 1, statements.size())) {
+                      later.add(new Cursor(parent, statement));
+                  }
+                  return SearchResult.found(b, Scope.at(getCursor()).collidesAcross(later) ? "collides" : "free");
+              }
+          })),
+          java(
+            """
+              class A {
+                  int field;
+                  void declaredLater() {
+                      { int x = 1; }
+                      for (int x = 0; x < 1; x++) { }
+                  }
+                  void readLater() {
+                      { int field = 1; }
+                      use(field);
+                  }
+                  void untouched() {
+                      { int y = 1; }
+                      use(field);
+                  }
+                  void use(int i) {}
+              }
+              """,
+            """
+              class A {
+                  int field;
+                  void declaredLater() {
+                      /*~~(collides)~~>*/{ int x = 1; }
+                      for (int x = 0; x < 1; x++) { }
+                  }
+                  void readLater() {
+                      /*~~(collides)~~>*/{ int field = 1; }
+                      use(field);
+                  }
+                  void untouched() {
+                      /*~~(free)~~>*/{ int y = 1; }
+                      use(field);
+                  }
+                  void use(int i) {}
               }
               """
           )
