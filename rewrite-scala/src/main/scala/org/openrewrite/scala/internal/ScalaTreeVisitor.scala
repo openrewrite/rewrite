@@ -3470,7 +3470,6 @@ class ScalaTreeVisitor(
     var afterValVar = Space.EMPTY
     val modifiers = new util.ArrayList[J.Modifier]()
     var hasExplicitFinal = false
-    var hasExplicitLazy = false
     
     // Track the position right after the last modifier keyword (excluding any trailing whitespace).
     // Used later to compute beforeValVar — the whitespace between the last modifier and val/var/given.
@@ -3478,109 +3477,18 @@ class ScalaTreeVisitor(
     if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedStart < adjustedEnd) {
       val sourceSnippet = source.substring(adjustedStart, adjustedEnd)
 
-      // First, extract any modifiers before val/var
-      // When annotations are present, there may be whitespace before the modifier
-      var modifierEndPos = 0
-      val trimmedSnippet = sourceSnippet.stripLeading()
-      val leadingWs = sourceSnippet.length - trimmedSnippet.length
-      modifierEndPos = leadingWs
+      val (scannedModifiers, modifierEndPos) = parseModifierKeywords(sourceSnippet, definitionModifierKeywords)
+      modifiers.addAll(scannedModifiers)
+      scannedModifiers.forEach(m => if (m.getType == J.Modifier.Type.Final) hasExplicitFinal = true)
+      if (!scannedModifiers.isEmpty) lastModifierKeywordEnd = modifierEndPos
 
-      // Check for access modifiers (including scoped: private[scope], protected[this])
-      if (trimmedSnippet.startsWith("private")) {
-        var keyword = "private"
-        var keyLen = keyword.length
-        val afterKw = trimmedSnippet.substring(keyLen)
-        if (afterKw.startsWith("[")) {
-          val cb = positionOfNextIn(afterKw, "]", 0)
-          if (cb >= 0) { keyword = "private" + afterKw.substring(0, cb + 1); keyLen = keyword.length }
-        }
-        val modPrefix = if (leadingWs > 0) ScalaSpace.format(sourceSnippet.substring(0, leadingWs)) else Space.EMPTY
-        modifiers.add(new J.Modifier(
-          Tree.randomId(), modPrefix, Markers.EMPTY,
-          keyword, J.Modifier.Type.Private, Collections.emptyList()
-        ))
-        modifierEndPos = leadingWs + keyLen
-        lastModifierKeywordEnd = modifierEndPos
-        if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
-      } else if (trimmedSnippet.startsWith("protected")) {
-        var keyword = "protected"
-        var keyLen = keyword.length
-        val afterKw = trimmedSnippet.substring(keyLen)
-        if (afterKw.startsWith("[")) {
-          val cb = positionOfNextIn(afterKw, "]", 0)
-          if (cb >= 0) { keyword = "protected" + afterKw.substring(0, cb + 1); keyLen = keyword.length }
-        }
-        val modPrefix = if (leadingWs > 0) ScalaSpace.format(sourceSnippet.substring(0, leadingWs)) else Space.EMPTY
-        modifiers.add(new J.Modifier(
-          Tree.randomId(), modPrefix, Markers.EMPTY,
-          keyword, J.Modifier.Type.Protected, Collections.emptyList()
-        ))
-        modifierEndPos = leadingWs + keyLen
-        lastModifierKeywordEnd = modifierEndPos
-        if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
-      }
-      
-      // Check for remaining modifiers (in any order) before val/var/def
-      // These include: implicit, override, abstract, final, lazy, sealed
-      var scanning = true
-      while (scanning && modifierEndPos < sourceSnippet.length) {
-        val remaining = sourceSnippet.substring(modifierEndPos)
-        // When the first modifier in this loop sits directly after annotations (no preceding access
-        // modifier consumed leadingWs), preserve that whitespace as the modifier's prefix. Otherwise
-        // a newline between `@Ann` and e.g. `lazy val` is silently collapsed to nothing on print.
-        val modSpace =
-          if (modifierEndPos > leadingWs) Space.SINGLE_SPACE
-          else if (leadingWs > 0) ScalaSpace.format(sourceSnippet.substring(0, leadingWs))
-          else Space.EMPTY
-
-        if (remaining.startsWith("final ")) {
-          hasExplicitFinal = true
-          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
-            "final", J.Modifier.Type.Final, Collections.emptyList()))
-          lastModifierKeywordEnd = modifierEndPos + "final".length
-          modifierEndPos += "final ".length
-        } else if (remaining.startsWith("lazy ")) {
-          hasExplicitLazy = true
-          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
-            "lazy", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
-          lastModifierKeywordEnd = modifierEndPos + "lazy".length
-          modifierEndPos += "lazy ".length
-        } else if (remaining.startsWith("implicit ")) {
-          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
-            "implicit", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
-          lastModifierKeywordEnd = modifierEndPos + "implicit".length
-          modifierEndPos += "implicit ".length
-        } else if (remaining.startsWith("override ")) {
-          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
-            "override", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
-          lastModifierKeywordEnd = modifierEndPos + "override".length
-          modifierEndPos += "override ".length
-        } else if (remaining.startsWith("abstract ")) {
-          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
-            "abstract", J.Modifier.Type.Abstract, Collections.emptyList()))
-          lastModifierKeywordEnd = modifierEndPos + "abstract".length
-          modifierEndPos += "abstract ".length
-        } else if (remaining.startsWith("sealed ")) {
-          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
-            "sealed", J.Modifier.Type.Sealed, Collections.emptyList()))
-          lastModifierKeywordEnd = modifierEndPos + "sealed".length
-          modifierEndPos += "sealed ".length
-        } else {
-          scanning = false
-        }
-      }
-      
-      // Now find val/var/given after modifiers
       val afterModifiers = sourceSnippet.substring(modifierEndPos)
-      val valIndex = findKeyword(afterModifiers, "val")
-      val varIndex = findKeyword(afterModifiers, "var")
-      val givenIndex = findKeyword(afterModifiers, "given")
-
       val (keywordStart, keyword) = {
-        val candidates = List(
-          (valIndex, "val"), (varIndex, "var"), (givenIndex, "given")
-        ).filter(_._1 >= 0).sortBy(_._1)
-        if (candidates.nonEmpty) candidates.head else (-1, "")
+        val next = indexOfNextNonWhitespace(0, afterModifiers)
+        List("val", "var", "given").find(k => isWordAt(afterModifiers, next, k)) match {
+          case Some(k) => (next, k)
+          case None => (-1, "")
+        }
       }
       
       if (keywordStart >= 0) {
@@ -4135,8 +4043,8 @@ class ScalaTreeVisitor(
     val modifierScanStart = if (hasAnnotations) cursor else adjustedStart
     if (modifierScanStart >= cursor && adjustedEnd <= source.length) {
       val sourceSnippet = source.substring(cursor, adjustedEnd)
-      objectIndex = findKeyword(sourceSnippet, "object")
-      val caseIndex = findKeyword(sourceSnippet, "case")
+      objectIndex = positionOfNextIn(sourceSnippet, "object", 0)
+      val caseIndex = positionOfNextIn(sourceSnippet, "case", 0)
       // Enum cases have `case` but NO `object` keyword: `case Red extends Color`
       // Case objects have both: `case object Empty`
       if (caseIndex >= 0 && objectIndex < 0) {
@@ -4157,7 +4065,7 @@ class ScalaTreeVisitor(
     // class declaration. Must come before `case` so ordering stays source-faithful.
     val isPackageObject = md.mods.is(Flags.Package) && modifierText.contains("package")
     if (isPackageObject) {
-      val packageIndex = findKeyword(modifierText, "package")
+      val packageIndex = positionOfNextIn(modifierText, "package", 0)
       if (packageIndex >= 0) {
         val packageSpace = if (packageIndex > lastModEnd) {
           ScalaSpace.format(modifierText.substring(lastModEnd, packageIndex))
@@ -5403,9 +5311,9 @@ class ScalaTreeVisitor(
       sourceSnippet = source.substring(cursor, adjustedEnd)
       // Find the class/trait/enum keyword - use whichever comes first in source.
       // Must match as a whole word (not inside an identifier).
-      val classIdx = findKeyword(sourceSnippet, "class")
-      val traitIdx = findKeyword(sourceSnippet, "trait")
-      val enumIdx = findKeyword(sourceSnippet, "enum")
+      val classIdx = positionOfNextIn(sourceSnippet, "class", 0)
+      val traitIdx = positionOfNextIn(sourceSnippet, "trait", 0)
+      val enumIdx = positionOfNextIn(sourceSnippet, "enum", 0)
 
       // Pick the first keyword found
       val candidates = List(
@@ -5422,7 +5330,7 @@ class ScalaTreeVisitor(
       } else {
         // No class/trait/enum keyword found — check for enum case class: `case Cons(h: A, ...)`
         // In Scala 3, enum members with params are TypeDefs with only `case` keyword.
-        val caseIdx = findKeyword(sourceSnippet, "case")
+        val caseIdx = positionOfNextIn(sourceSnippet, "case", 0)
         if (caseIdx >= 0) {
           classIndex = caseIdx
           isEnum = true
@@ -9795,21 +9703,27 @@ class ScalaTreeVisitor(
 
   /**
    * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
-   * position of the next significant character. Returns `source.length` if no
+   * position of the next significant character. Returns `text.length` if no
    * such character exists.
    */
-  private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
+  private def indexOfNextNonWhitespace(startFrom: Int = cursor, text: String = source): Int = {
     var i = startFrom
-    while (i < source.length) {
-      if (Character.isWhitespace(source.charAt(i))) {
+    while (i < text.length) {
+      if (Character.isWhitespace(text.charAt(i))) {
         i += 1
       } else {
-        val afterComment = skipComment(source, i, source.length)
+        val afterComment = skipComment(text, i, text.length)
         if (afterComment == i) return i
         i = afterComment
       }
     }
     i
+  }
+
+  /** Whether `word` is at `i` in `text` and no identifier character follows it. */
+  private def isWordAt(text: String, i: Int, word: String): Boolean = {
+    val end = i + word.length
+    text.startsWith(word, i) && (end >= text.length || !Character.isUnicodeIdentifierPart(text.charAt(end)))
   }
 
   /**
@@ -9844,61 +9758,32 @@ class ScalaTreeVisitor(
     }
   }
   
-  /** Find a keyword in text, ensuring it's a whole word (not part of an identifier). */
-  private def findKeyword(text: String, keyword: String): Int = {
-    var pos = 0
-    while (pos < text.length) {
-      val idx = text.indexOf(keyword, pos)
-      if (idx < 0) return -1
-      val before = idx == 0 || !Character.isLetterOrDigit(text.charAt(idx - 1))
-      val after = idx + keyword.length >= text.length || !Character.isLetterOrDigit(text.charAt(idx + keyword.length))
-      if (before && after) return idx
-      pos = idx + 1
-    }
-    -1
-  }
-
   /**
-   * Parse modifier keywords out of a raw text window — the source text between the
-   * cursor and the keyword that ends the modifier list (`class`/`def`/the parameter
-   * name, etc.). Recognises whole-word occurrences only, sorts by source position,
-   * captures the inter-modifier whitespace, and expands `private[scope]` /
-   * `protected[scope]` qualified-access suffixes.
-   *
-   * Returns the parsed modifiers along with the offset within `text` where the
-   * last consumed modifier ended — callers use that to advance their cursor.
+   * Reads the modifier keywords that open `text`, one after another, each with the space before it.
+   * Expands `private[scope]` and `protected[scope]`. Returns the modifiers and the offset in `text`
+   * just past the last one.
    */
   private def parseModifierKeywords(
       text: String,
       keywords: List[(String, J.Modifier.Type)]
   ): (util.ArrayList[J.Modifier], Int) = {
     val modifierList = new util.ArrayList[J.Modifier]()
-    val present = keywords.flatMap { case (kw, mt) =>
-      val pos = findKeyword(text, kw)
-      if (pos >= 0) Some((pos, kw, mt)) else None
-    }.sortBy(_._1)
-
     var lastEnd = 0
-    for ((pos, kw, mt) <- present) {
-      val spaceBefore = if (pos > lastEnd) ScalaSpace.format(text, lastEnd, pos) else Space.EMPTY
-
-      // `private[scope]` / `protected[scope]` qualified access
-      var fullKw = kw
-      var kwLen = kw.length
-      if ((kw == "private" || kw == "protected") && pos + kwLen < text.length) {
-        val afterKw = text.substring(pos + kwLen)
-        if (afterKw.startsWith("[")) {
-          val close = positionOfNextIn(afterKw, "]", 0)
-          if (close >= 0) {
-            fullKw = kw + afterKw.substring(0, close + 1)
-            kwLen = kw.length + close + 1
-          }
-        }
+    var next = indexOfNextNonWhitespace(0, text)
+    var keyword = keywords.find { case (kw, _) => isWordAt(text, next, kw) }
+    while (keyword.isDefined) {
+      val (kw, mt) = keyword.get
+      var end = next + kw.length
+      if ((kw == "private" || kw == "protected") && text.startsWith("[", end)) {
+        val close = positionOfNextIn(text, "]", end)
+        if (close >= 0) end = close + 1
       }
-
       modifierList.add(new J.Modifier(
-        Tree.randomId(), spaceBefore, Markers.EMPTY, fullKw, mt, Collections.emptyList()))
-      lastEnd = pos + kwLen
+        Tree.randomId(), ScalaSpace.format(text, lastEnd, next), Markers.EMPTY, text.substring(next, end), mt,
+        Collections.emptyList()))
+      lastEnd = end
+      next = indexOfNextNonWhitespace(end, text)
+      keyword = keywords.find { case (kw, _) => isWordAt(text, next, kw) }
     }
     (modifierList, lastEnd)
   }
@@ -9926,9 +9811,8 @@ class ScalaTreeVisitor(
   )
 
   private def extractModifiersFromText(mods: untpd.Modifiers, modifierText: String): (util.ArrayList[J.Modifier], Int) = {
-    // `mods` is unused: `findKeyword` already enforces whole-word matching against the
-    // source text, which is authoritative — Dotty flags drift for qualified access like
-    // `private[scope]`, where the simple `Flags.Private` bit may not be set.
+    // `mods` is unused. The source text is authoritative, since Dotty's flags drift for
+    // qualified access like `private[scope]`, where the simple `Flags.Private` bit may not be set.
     parseModifierKeywords(modifierText, definitionModifierKeywords)
   }
   

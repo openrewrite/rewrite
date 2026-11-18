@@ -163,6 +163,23 @@ class VariableDeclarationsTest implements RewriteTest {
                 private /* a /* b */ c */ val (a, b) /* d /* e */ f */ = /* g /* h */ i */ (1, 2)
                 private /* a /* b */ c */ lazy /* val */ val (c, d) = (1, 2)
                 val e /* x /* y */ , */ , f = 1
+                private /* lazy */ val (g, h) = (1, 2)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentsAndLineBreaksAmongValModifiers() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                private /* c */ final val a = 1
+                final /* val */ val b = 1
+                private
+                final val c = 1
               }
               """
           )

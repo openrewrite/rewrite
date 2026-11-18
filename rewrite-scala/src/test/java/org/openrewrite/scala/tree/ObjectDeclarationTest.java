@@ -23,6 +23,17 @@ import static org.openrewrite.scala.Assertions.scala;
 class ObjectDeclarationTest implements RewriteTest {
 
     @Test
+    void objectKeywordInCommentBeforeIt() {
+        rewriteRun(
+            scala(
+                """
+                private /* object */ object MySingleton
+                """
+            )
+        );
+    }
+
+    @Test
     void singletonObject() {
         rewriteRun(
             scala(
