@@ -206,11 +206,19 @@ public class DependencyConstraintToRule extends Recipe {
                 return m;
             }
             J.Block closureBody = (J.Block) ((J.Lambda) maybeClosure).getBody();
-            J rawParam = ((J.Lambda) maybeClosure).getParameters().getParameters().get(0);
-            if (!(rawParam instanceof J.VariableDeclarations)) {
+            List<J> params = ((J.Lambda) maybeClosure).getParameters().getParameters();
+            J rawParam = params.isEmpty() ? null : params.get(0);
+            J.Identifier p;
+            if (rawParam == null || rawParam instanceof J.Empty) {
+                // A closure without a declared parameter has the details as its receiver in the Kotlin DSL, and as
+                // its implicit parameter in Groovy
+                p = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
+                        isKotlinDsl ? "this" : "it", null, null);
+            } else if (rawParam instanceof J.VariableDeclarations) {
+                p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getName();
+            } else {
                 return m;
             }
-            J.Identifier p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getName();
 
             // The closure parameter comes from the tree and the coordinates from the recipe's options, so the
             // predicate is assembled from parameters and needs no declaration of `p` to parse against
