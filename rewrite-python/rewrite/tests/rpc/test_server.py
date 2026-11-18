@@ -456,6 +456,29 @@ def test_prepare_java_recipe_raises_on_validations(monkeypatch):
         prepare_java_recipe("org.openrewrite.text.ChangeText")
 
 
+def test_prepare_java_recipe_raises_on_a_childs_validations(monkeypatch):
+    """Every node of the tree carries its own validations, so a composite whose child is missing an
+    option has to be refused too — the TypeScript client walks recipeList for the same reason."""
+    import pytest
+    import rewrite.rpc.server as server
+    from rewrite.rpc.rpc_recipe import prepare_java_recipe
+
+    monkeypatch.setattr(server, "send_request", lambda method, params: {
+        'id': 'x',
+        'editVisitor': 'edit:x',
+        'descriptor': {},
+        'recipeList': [{
+            'id': 'c',
+            'editVisitor': 'edit:c',
+            'descriptor': {},
+            'validations': [{'option': 'text', 'message': 'is required'}],
+        }],
+    })
+
+    with pytest.raises(ValueError, match="`text` is required"):
+        prepare_java_recipe("org.example.CompositeWithInvalidChild")
+
+
 def test_prepare_recipe_returns_whole_child_tree(monkeypatch):
     """PrepareRecipe prepares and returns the whole tree (recipeList), so the host builds it
     locally instead of a round trip per child."""

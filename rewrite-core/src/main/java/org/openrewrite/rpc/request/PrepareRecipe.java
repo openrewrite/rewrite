@@ -24,11 +24,15 @@ import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
@@ -69,12 +73,20 @@ public class PrepareRecipe implements RpcRequest {
             }
             RecipeDescriptor descriptor = recipe.getDescriptor();
 
-            // Deliberately the descriptor's own options rather than Recipe#validate(), whose
-            // reflective findings are named for fields (com.example.MyRecipe.fieldName) and so match
-            // no option a host could resolve a value for.
+            // Options come from the descriptor, whose names a host can resolve a value for, but
+            // required-ness comes from the same place Recipe#validate() gets it. The two disagree:
+            // `@Option.required()` defaults to true and the descriptor copies it verbatim, while
+            // NullUtils skips a @Nullable field before it ever looks at @Option. Trusting the
+            // descriptor alone would make this server stricter than the recipe is in process, and
+            // would reject an option declared on a getter or constructor parameter outright, since
+            // the descriptor hardcodes a null value for those.
+            Set<String> requiredFields = new HashSet<>();
+            for (Field field : NullUtils.findNonNullFields(recipe.getClass())) {
+                requiredFields.add(field.getName());
+            }
             List<PrepareRecipeResponse.OptionValidation> validations = new ArrayList<>();
             for (OptionDescriptor option : descriptor.getOptions()) {
-                if (option.isRequired() && option.getValue() == null) {
+                if (option.getValue() == null && requiredFields.contains(option.getName())) {
                     validations.add(new PrepareRecipeResponse.OptionValidation(option.getName(), "is required"));
                 }
             }
