@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -61,27 +60,6 @@ public class OptionDescriptor {
      * displayed, stored or exported. See {@link org.openrewrite.Option#secret()}.
      */
     boolean secret;
-
-    @JsonCreator
-    public OptionDescriptor(String name, String type, String displayName, String description,
-                            @Nullable String example, @Nullable List<String> valid, boolean required,
-                            @Nullable Object value, boolean secret) {
-        this.name = name;
-        this.type = type;
-        this.displayName = displayName;
-        this.description = description;
-        this.example = example;
-        this.valid = valid;
-        this.required = required;
-        this.value = value;
-        this.secret = secret;
-    }
-
-    public OptionDescriptor(String name, String type, String displayName, String description,
-                            @Nullable String example, @Nullable List<String> valid, boolean required,
-                            @Nullable Object value) {
-        this(name, type, displayName, description, example, valid, required, value, false);
-    }
 
     /**
      * @return This option, with its value replaced by {@link #REDACTED} when it is a secret that is set.

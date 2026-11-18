@@ -102,7 +102,7 @@ public class RecipeThatMadeChanges extends Recipe implements RpcCodec<RecipeThat
         if (options != null) {
             for (Map.Entry<String, Object> option : options.entrySet()) {
                 // Option types don't travel, only their values.
-                optionDescriptors.add(new OptionDescriptor(option.getKey(), "", "", "", null, null, false, option.getValue()));
+                optionDescriptors.add(new OptionDescriptor(option.getKey(), "", "", "", null, null, false, option.getValue(), false));
             }
         }
         return new RecipeDescriptor(name, getDisplayName(), getInstanceName(), "", emptySet(),
