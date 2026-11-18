@@ -4132,11 +4132,8 @@ class ScalaTreeVisitor(
     
     // Extract space between modifiers and "object" keyword
     val kindPrefix = if (!modifiers.isEmpty && objectIndex > 0) {
-      val afterModifiers = if (modifierText.contains("case")) {
-        positionOfNextIn(modifierText, "case", 0) + "case".length
-      } else {
-        lastModEnd
-      }
+      val caseIndex = positionOfNextIn(modifierText, "case", 0)
+      val afterModifiers = if (caseIndex >= 0) caseIndex + "case".length else lastModEnd
       ScalaSpace.format(modifierText.substring(afterModifiers, objectIndex))
     } else {
       Space.EMPTY

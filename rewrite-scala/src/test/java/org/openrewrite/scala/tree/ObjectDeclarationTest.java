@@ -34,6 +34,17 @@ class ObjectDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void caseKeywordInCommentBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                private /* case */ object MySingleton
+                """
+            )
+        );
+    }
+
+    @Test
     void singletonObject() {
         rewriteRun(
             scala(
