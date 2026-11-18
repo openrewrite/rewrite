@@ -897,10 +897,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       }
 
       val decls = try {
-        sym.info match {
-          case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
-          case _ => Nil
-        }
+        if (fqn == "java.lang.Object") objectDeclarations else declarationsOf(sym)
       } catch {
         case NonFatal(_) => Nil
       }
@@ -944,6 +941,21 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
       clazz.unsafeSet(typeParameters, supertype, null, null, interfaces, members, methods)
     })
+  }
+
+  private def declarationsOf(cls: Symbol): List[Symbol] = cls.info match {
+    case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
+    case _ => Nil
+  }
+
+  /**
+   * `scala.Any` and `java.lang.Object` both map to `java.lang.Object`. Dotty declares `toString` and `getClass` on
+   * `Any` and `clone` and `wait` on `Object`, so the class lists the methods of both. Where `Object` overrides a
+   * method of `Any`, as it does `equals`, the class lists `Object`'s.
+   */
+  private def objectDeclarations: List[Symbol] = {
+    val own = declarationsOf(ctx.definitions.ObjectClass)
+    own ++ declarationsOf(ctx.definitions.AnyClass).filterNot(m => own.exists(_.name == m.name))
   }
 
   /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */

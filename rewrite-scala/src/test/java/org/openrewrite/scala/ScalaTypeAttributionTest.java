@@ -1824,6 +1824,28 @@ class ScalaTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void overridesOfJavaClassMethodsAreFound() {
+        rewriteRun(
+          scala(
+            """
+            class E extends Exception { override def getMessage: String = "x" }
+            class S {
+              override def toString: String = "s"
+              override def clone(): AnyRef = this
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(overridden(cu, "E", "getMessage").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.Throwable");
+                JavaType.FullyQualified object = overridden(cu, "S", "toString").getDeclaringType();
+                assertThat(object.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+                assertThat(overridden(cu, "S", "clone").getDeclaringType()).isSameAs(object);
+                assertThat(object.getMethods()).filteredOn(m -> m.getName().equals("equals")).hasSize(1);
+            })
+          )
+        );
+    }
+
     private static void assertBoundIsPairOfItself(JavaType type, String name) {
         assertBoundIsPairOf(type, name, name);
     }
