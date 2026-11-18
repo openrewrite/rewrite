@@ -942,4 +942,27 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void lineOfOnlyTemplates() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.spec.replicas", "2", null)),
+          yaml(
+            """
+              spec:
+                {{- if .Values.a }}{{- else if .Values.b }}
+                ports: []
+                {{- end }} {{- /* trailing */ -}}
+                replicas: 1
+              """,
+            """
+              spec:
+                {{- if .Values.a }}{{- else if .Values.b }}
+                ports: []
+                {{- end }} {{- /* trailing */ -}}
+                replicas: 2
+              """
+          )
+        );
+    }
 }

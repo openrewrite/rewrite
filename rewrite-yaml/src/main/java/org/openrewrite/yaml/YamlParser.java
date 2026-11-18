@@ -65,6 +65,8 @@ public class YamlParser implements org.openrewrite.Parser {
     // These are invalid YAML aliases but used as credential placeholders
     private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
 
+    private static final int UUID_LENGTH = 36;
+
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -756,11 +758,13 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            if (helmUuids.contains(trimmed)) {
+            String firstUuid = onlyHelmUuids(trimmed, helmUuids);
+            if (firstUuid != null) {
+                // Only the first placeholder takes the #; any others on the line are restored as usual
                 result.append(lineContent, 0, indent);
                 result.append('#');
                 result.append(trimmed);
-                commentedUuids.add(trimmed);
+                commentedUuids.add(firstUuid);
             } else {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
@@ -773,6 +777,30 @@ public class YamlParser implements org.openrewrite.Parser {
         }
 
         return result.toString();
+    }
+
+    /**
+     * @return the first placeholder on a line holding only Helm placeholders, optionally separated by whitespace,
+     * or null if the line holds anything else
+     */
+    private static @Nullable String onlyHelmUuids(String trimmedLine, Set<String> helmUuids) {
+        String first = null;
+        int i = 0;
+        while (i < trimmedLine.length()) {
+            if (Character.isWhitespace(trimmedLine.charAt(i))) {
+                i++;
+                continue;
+            }
+            int end = i + UUID_LENGTH;
+            if (end > trimmedLine.length() || !helmUuids.contains(trimmedLine.substring(i, end))) {
+                return null;
+            }
+            if (first == null) {
+                first = trimmedLine.substring(i, end);
+            }
+            i = end;
+        }
+        return first;
     }
 
     /**
