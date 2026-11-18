@@ -214,6 +214,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public S.SelfType visitSelfType(S.SelfType selfType, P p) {
+        return (S.SelfType) super.visitSelfType(selfType, p);
+    }
+
+    @Override
     public S.Export visitExport(S.Export export, P p) {
         return (S.Export) super.visitExport(export, p);
     }

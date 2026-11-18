@@ -755,6 +755,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
         } else if (tree instanceof S.AnonymousGiven) {
             return visitAnonymousGiven((S.AnonymousGiven) tree, p);
+        } else if (tree instanceof S.SelfType) {
+            return visitSelfType((S.SelfType) tree, p);
         } else if (tree instanceof S.FunctionCall) {
             return visitFunctionCall((S.FunctionCall) tree, p);
         } else if (tree instanceof S.ConstructorInvocation) {
@@ -1971,6 +1973,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         afterSyntax(patDef, p);
         return patDef;
+    }
+
+    public J visitSelfType(S.SelfType selfType, PrintOutputCapture<P> p) {
+        beforeSyntax(selfType, Space.Location.LANGUAGE_EXTENSION, p);
+        JRightPadded<J.VariableDeclarations> declaration = selfType.getPadding().getDeclaration();
+        printParameter(declaration.getElement(), p);
+        visitSpace(declaration.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("=>");
+        afterSyntax(selfType, p);
+        return selfType;
     }
 
     public J visitAnonymousGiven(S.AnonymousGiven g, PrintOutputCapture<P> p) {
