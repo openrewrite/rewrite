@@ -17,6 +17,8 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.Cursor;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.trait.Scope;
@@ -26,6 +28,8 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -156,6 +160,62 @@ class ScopeTraitTest implements RewriteTest {
                   listOf(1).forEach { use(it + read_) }
                   assigned_ = taken
                   return read_ + assigned_
+              }
+              fun use(i: Int) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockCollidesAcrossLaterStatements() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  Cursor parent = getCursor().getParentTreeCursor();
+                  if (!(parent.getValue() instanceof J.Block)) {
+                      return iff;
+                  }
+                  List<Statement> statements = parent.<J.Block>getValue().getStatements();
+                  List<Cursor> later = new ArrayList<>();
+                  for (Statement statement : statements.subList(statements.indexOf(iff) + 1, statements.size())) {
+                      later.add(new Cursor(parent, statement));
+                  }
+                  Cursor block = new Cursor(getCursor(), iff.getThenPart());
+                  return SearchResult.found(iff, Scope.at(block).collidesAcross(later) ? "collides" : "free");
+              }
+          })),
+          kotlin(
+            """
+              val field = 0
+              fun declaredLater(c: Boolean) {
+                  if (c) { val x = 1 }
+                  val x = 2
+              }
+              fun readLater(c: Boolean) {
+                  if (c) { val field = 1 }
+                  use(field)
+              }
+              fun untouched(c: Boolean) {
+                  if (c) { val y = 1 }
+                  use(field)
+              }
+              fun use(i: Int) {}
+              """,
+            """
+              val field = 0
+              fun declaredLater(c: Boolean) {
+                  /*~~(collides)~~>*/if (c) { val x = 1 }
+                  val x = 2
+              }
+              fun readLater(c: Boolean) {
+                  /*~~(collides)~~>*/if (c) { val field = 1 }
+                  use(field)
+              }
+              fun untouched(c: Boolean) {
+                  /*~~(free)~~>*/if (c) { val y = 1 }
+                  use(field)
               }
               fun use(i: Int) {}
               """
