@@ -193,6 +193,88 @@ class RecipeCompatibilityTest implements RewriteTest {
         );
     }
 
+    @Test
+    void changeMethodNameOnInheritedCallWithoutParentheses() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("java.util.ArrayList size()", "length", null, null),
+            new ChangeMethodName("java.util.ArrayList clear()", "wipe", null, null)
+          ),
+          scala(
+            """
+              import java.util.ArrayList
+
+              class A extends ArrayList[String] {
+                def n = size
+                def reset(): Unit = {
+                  clear
+                }
+              }
+              """,
+            """
+              import java.util.ArrayList
+
+              class A extends ArrayList[String] {
+                def n = length
+                def reset(): Unit = {
+                  wipe
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeMethodNameOnImportedCallWithoutParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("java.lang.Thread currentThread()", "current", null, null)),
+          scala(
+            """
+              import java.lang.Thread.currentThread
+
+              class A {
+                def t = currentThread
+              }
+              """,
+            """
+              import java.lang.Thread.current
+
+              class A {
+                def t = current
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeMethodNameOnCallWithoutParenthesesThroughImportedMembers() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("java.util.ArrayList size()", "length", null, null)),
+          scala(
+            """
+              import java.util.ArrayList
+
+              class A {
+                val list = new ArrayList[String]()
+                import list._
+                def n = size
+              }
+              """,
+            """
+              import java.util.ArrayList
+
+              class A {
+                val list = new ArrayList[String]()
+                import list._
+                def n = length
+              }
+              """
+          )
+        );
+    }
+
     // ---- ChangeType ----
 
     @Test

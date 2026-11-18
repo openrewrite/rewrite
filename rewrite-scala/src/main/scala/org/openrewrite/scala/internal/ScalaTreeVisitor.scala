@@ -299,7 +299,7 @@ class ScalaTreeVisitor(
       case _ if tree.isEmpty => throw unmappedException(tree)
       case lit: Trees.Literal[?] => visitLiteral(lit)
       case num: untpd.Number => visitNumber(num)
-      case id: Trees.Ident[?] => visitIdent(id)
+      case id: Trees.Ident[?] => visitReference(id)
       case app: Trees.Apply[?] => visitApply(app)
       case sel: Trees.Select[?] => visitSelect(sel)
       case infixOp: untpd.InfixOp => visitInfixOp(infixOp)
@@ -480,6 +480,14 @@ class ScalaTreeVisitor(
       val quoted = sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2
       ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id), quoted = quoted)
     }
+  }
+
+  private def visitReference(id: Trees.Ident[?]): J = visitIdent(id) match {
+    case name: J.Identifier if !isInImportContext && !inPattern =>
+      argumentlessCallOf(id).fold[J](name) { methodType =>
+        argumentlessInvocation(name.getPrefix, null, name.withPrefix(Space.EMPTY), methodType)
+      }
+    case other => other
   }
 
   private def visitApply(app: Trees.Apply[?]): J = {
@@ -1651,17 +1659,7 @@ class ScalaTreeVisitor(
 
       argumentlessCallOf(sel) match {
         case Some(methodType) if !isTypeProjection =>
-          new J.MethodInvocation(
-            Tree.randomId(),
-            prefix,
-            Markers.EMPTY,
-            new JRightPadded(target, beforeDotSpace, Markers.EMPTY),
-            null,
-            typedMethodName(name, methodType),
-            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
-              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
-            methodType
-          )
+          argumentlessInvocation(prefix, new JRightPadded(target, beforeDotSpace, Markers.EMPTY), name, methodType)
         case _ =>
           new J.FieldAccess(
             Tree.randomId(),
@@ -1676,9 +1674,27 @@ class ScalaTreeVisitor(
   }
 
   /** An assignment target names the member being written, even when the write goes through a setter. */
-  private def argumentlessCallOf(sel: Trees.Select[?]): Option[JavaType.Method] =
-    if (sel eq assignmentTarget) None
-    else typeMapping.flatMap(_.argumentlessCallOf(sel.asInstanceOf[untpd.Tree]))
+  private def argumentlessCallOf(reference: Trees.Tree[?]): Option[JavaType.Method] =
+    if (reference eq assignmentTarget) None
+    else typeMapping.flatMap(_.argumentlessCallOf(reference.asInstanceOf[untpd.Tree]))
+
+  private def argumentlessInvocation(
+    prefix: Space,
+    select: JRightPadded[Expression],
+    name: J.Identifier,
+    methodType: JavaType.Method
+  ): J.MethodInvocation =
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      select,
+      null,
+      typedMethodName(name, methodType),
+      JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+      methodType
+    )
 
   private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
     val enclosingTarget = assignmentTarget
