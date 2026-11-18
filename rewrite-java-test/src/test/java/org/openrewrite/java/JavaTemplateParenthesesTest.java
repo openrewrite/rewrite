@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
+@SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnusedAssignment", "ResultOfMethodCallIgnored"})
 class JavaTemplateParenthesesTest implements RewriteTest {
 
     @Test
