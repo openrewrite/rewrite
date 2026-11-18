@@ -299,7 +299,7 @@ class ScalaTreeVisitor(
       case _ if tree.isEmpty => throw unmappedException(tree)
       case lit: Trees.Literal[?] => visitLiteral(lit)
       case num: untpd.Number => visitNumber(num)
-      case id: Trees.Ident[?] => visitIdent(id)
+      case id: Trees.Ident[?] => visitReference(id)
       case app: Trees.Apply[?] => visitApply(app)
       case sel: Trees.Select[?] => visitSelect(sel)
       case infixOp: untpd.InfixOp => visitInfixOp(infixOp)
@@ -480,6 +480,26 @@ class ScalaTreeVisitor(
       val quoted = sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2
       ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id), quoted = quoted)
     }
+  }
+
+  private def visitReference(id: Trees.Ident[?]): J = visitIdent(id) match {
+    case name: J.Identifier if !isInImportContext && !inPattern =>
+      argumentlessCallOf(id) match {
+        case Some(methodType) =>
+          new J.MethodInvocation(
+            Tree.randomId(),
+            name.getPrefix,
+            Markers.EMPTY,
+            null,
+            null,
+            typedMethodName(name.withPrefix(Space.EMPTY), methodType),
+            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+            methodType
+          )
+        case None => name
+      }
+    case other => other
   }
 
   private def visitApply(app: Trees.Apply[?]): J = {
@@ -1676,9 +1696,9 @@ class ScalaTreeVisitor(
   }
 
   /** An assignment target names the member being written, even when the write goes through a setter. */
-  private def argumentlessCallOf(sel: Trees.Select[?]): Option[JavaType.Method] =
-    if (sel eq assignmentTarget) None
-    else typeMapping.flatMap(_.argumentlessCallOf(sel.asInstanceOf[untpd.Tree]))
+  private def argumentlessCallOf(reference: Trees.Tree[?]): Option[JavaType.Method] =
+    if (reference eq assignmentTarget) None
+    else typeMapping.flatMap(_.argumentlessCallOf(reference.asInstanceOf[untpd.Tree]))
 
   private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
     val enclosingTarget = assignmentTarget

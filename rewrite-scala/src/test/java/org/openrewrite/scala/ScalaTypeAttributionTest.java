@@ -590,6 +590,36 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void unqualifiedParameterlessMethodCallIsAMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+            class A {
+              private var n = 0
+              def count: Int = n
+              def twice = count * 2
+              def answer() = 42
+              val x = answer
+              val y = count
+              val z = n
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation count = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("count"));
+                assertThat(count.getSelect()).isNull();
+                assertThat(count.getArguments()).isEmpty();
+                assertThat(count.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(new MethodMatcher("A count()").matches(count)).isTrue();
+                assertThat(new MethodMatcher("A answer()").matches(
+                  find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("answer")))).isTrue();
+                assertThat(collect(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("count"))).hasSize(2);
+                assertThat(collect(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("n"))).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
     void parameterlessMethodCallKeepsItsShapeWhereItIsNotACall() {
         rewriteRun(
           scala(
@@ -969,7 +999,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                J.Identifier greet = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("greet") && i.getMarkers().findFirst(ImplicitArguments.class).isPresent());
+                J.MethodInvocation greet = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("greet"));
                 assertThat(greet.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments()).singleElement().satisfies(arg -> {
                     JavaType.Variable name = (JavaType.Variable) arg;
                     assertThat(name.getName()).isEqualTo("name");
