@@ -164,26 +164,46 @@ class VariableDeclarationsTest implements RewriteTest {
                 @deprecated val p @ (f, g) = (1, 2)
                 val h :: t = List(1, 2)
                 val K, L: Int = 3
+                val (m, n): (Int, Int) = (1, 2)
+                val _ = 4
+              }
+              trait Abstract {
+                val q, r: Int
               }
               """,
             spec -> spec.afterRecipe(cu -> {
                 List<String> shapes = new ArrayList<>();
+                List<String> boundTypes = new ArrayList<>();
                 new ScalaVisitor<Integer>() {
                     @Override
+                    public J visitIdentifier(J.Identifier identifier, Integer p) {
+                        if (("a".equals(identifier.getSimpleName()) || "b".equals(identifier.getSimpleName())) &&
+                            identifier.getFieldType() != null) {
+                            boundTypes.add(identifier.getSimpleName() + ": " + identifier.getFieldType().getType());
+                        }
+                        return identifier;
+                    }
+
+                    @Override
                     public J visitPatternDefinition(S.PatternDefinition patDef, Integer p) {
-                        shapes.add(patDef.getModifiers().getLast().getKeyword() + " " + patDef.getPatterns().stream()
+                        shapes.add((patDef.getModifiers().getLast().getType() == J.Modifier.Type.Final ? "final " : "") +
+                                   patDef.getModifiers().getLast().getKeyword() + " " + patDef.getPatterns().stream()
                           .map(pattern -> pattern.getClass().getSimpleName()).collect(Collectors.joining(",")) +
                                    (patDef.getTypeExpression() == null ? "" : " :") + (patDef.getInitializer() == null ? "" : " ="));
-                        return patDef;
+                        return super.visitPatternDefinition(patDef, p);
                     }
                 }.visit(cu, 0);
+                assertThat(boundTypes).containsExactly("a: int", "b: int");
                 assertThat(shapes).containsExactly(
-                  "val TuplePattern =",
+                  "final val TuplePattern =",
                   "var DeconstructionPattern =",
-                  "val TuplePattern =",
-                  "val Binding =",
-                  "val DeconstructionPattern =",
-                  "val Identifier,Identifier : ="
+                  "final val TuplePattern =",
+                  "final val Binding =",
+                  "final val DeconstructionPattern =",
+                  "final val Identifier,Identifier : =",
+                  "final val TuplePattern : =",
+                  "final val Wildcard =",
+                  "final val Identifier,Identifier :"
                 );
             })
           )

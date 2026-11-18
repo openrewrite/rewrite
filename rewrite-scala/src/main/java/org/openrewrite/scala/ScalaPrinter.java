@@ -1489,6 +1489,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(mod, p);
             return mod;
         }
+        // The `val` of a pattern definition is Final by type and prints as written
+        if (mod.getType() == J.Modifier.Type.Final && "val".equals(mod.getKeyword())) {
+            beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
+            p.append("val");
+            afterSyntax(mod, p);
+            return mod;
+        }
         return super.visitModifier(mod, p);
     }
 

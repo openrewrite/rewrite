@@ -8685,8 +8685,9 @@ class ScalaTreeVisitor(
     val modifierText = snippet.substring(0, keywordIndex)
     val (modifiers, lastModifierEnd) = extractModifiersFromText(pd.mods, modifierText)
     val keywordPrefix = if (lastModifierEnd <= modifierText.length) modifierText.substring(lastModifierEnd) else ""
-    modifiers.add(new J.Modifier(Tree.randomId(), Space.format(keywordPrefix), Markers.EMPTY,
-      keyword, J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+    // `val` is Final, as it is on a plain val, so hasModifier(Final) answers alike for both
+    modifiers.add(new J.Modifier(Tree.randomId(), Space.format(keywordPrefix), Markers.EMPTY, keyword,
+      if (keyword == "val") J.Modifier.Type.Final else J.Modifier.Type.LanguageExtension, Collections.emptyList()))
     cursor = cursor + keywordIndex + keyword.length
 
     val patterns = new util.ArrayList[JRightPadded[J]]()
