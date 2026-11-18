@@ -55,7 +55,7 @@ public class ChangeTableRowValue extends Recipe {
     String propertyKey;
 
     @Option(displayName = "New value",
-            description = "The new value to set for the property. If null, the property will be removed.",
+            description = "The new value to set for the property, read as `ChangeValue` reads it: as TOML, or else as a string. If null, the property will be removed.",
             example = "\"alice.new@example.com\"",
             required = false)
     @Nullable
@@ -91,8 +91,8 @@ public class ChangeTableRowValue extends Recipe {
                             return null; // Remove the key-value pair
                         }
                         // Replace only the value, so the key keeps how it is written and aligned
-                        Toml newValueNode = TomlSnippets.value(newValue.trim());
-                        if (newValueNode != null && !SemanticallyEqual.areEqual(kv.getValue(), newValueNode)) {
+                        Toml newValueNode = TomlSnippets.valueOrString(newValue);
+                        if (!SemanticallyEqual.areEqual(kv.getValue(), newValueNode)) {
                             return kv.withValue(newValueNode.withPrefix(kv.getValue().getPrefix()));
                         }
                     }

@@ -18,11 +18,7 @@ package org.openrewrite.toml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.toml.internal.TomlString;
-import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlType;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -55,31 +51,13 @@ public class ChangeValue extends Recipe {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
 
                 if (matcher.matches(getCursor())) {
-                    Toml newValueNode = parseValue(newValue, kv.getValue().getPrefix());
+                    Toml newValueNode = TomlSnippets.valueOrString(newValue).withPrefix(kv.getValue().getPrefix());
                     if (!newValueNode.print(getCursor()).equals(kv.getValue().print(getCursor()))) {
                         kv = kv.withValue(newValueNode);
                     }
                 }
 
                 return kv;
-            }
-
-            private Toml parseValue(String value, Space prefix) {
-                // Read the value as TOML does, so a date stays a date, an array an array, and escapes decode
-                Toml parsed = TomlSnippets.value(value.trim());
-                if (parsed != null) {
-                    return parsed.withPrefix(prefix);
-                }
-                // What is not a TOML value, such as 2.0.0, is meant as a string
-                String string = value.trim();
-                return new Toml.Literal(
-                        Tree.randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        TomlType.Primitive.String,
-                        "\"" + TomlString.quoteBasic(string) + "\"",
-                        string
-                );
             }
         };
     }

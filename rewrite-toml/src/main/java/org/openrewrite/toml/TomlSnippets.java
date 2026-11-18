@@ -25,8 +25,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.internal.grammar.TomlLexer;
+import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.tree.TomlType;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.ArrayList;
@@ -62,6 +67,26 @@ final class TomlSnippets {
         }
         TomlValue kv = doc.getValues().get(0);
         return kv instanceof Toml.KeyValue ? ((Toml.KeyValue) kv).getValue() : null;
+    }
+
+    /**
+     * @return the value as TOML reads it, so a date stays a date, an array an array, and escapes decode, or, when it is
+     * no TOML value, such as {@code 2.0.0}, the string it is meant as
+     */
+    static Toml valueOrString(String value) {
+        String trimmed = value.trim();
+        Toml parsed = value(trimmed);
+        if (parsed != null) {
+            return parsed;
+        }
+        return new Toml.Literal(
+                Tree.randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                TomlType.Primitive.String,
+                "\"" + TomlString.quoteBasic(trimmed) + "\"",
+                trimmed
+        );
     }
 
     /**
