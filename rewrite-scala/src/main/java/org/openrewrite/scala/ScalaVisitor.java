@@ -216,6 +216,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    @SuppressWarnings("deprecation")
     public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
         S.PatternDefinition pd = patDef;
         pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
@@ -225,6 +226,18 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
             return temp;
         }
         pd = (S.PatternDefinition) temp;
+        if (pd.getText() != null) {
+            return pd;
+        }
+        pd = pd.withLeadingAnnotations(ListUtils.map(pd.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        pd = pd.withModifiers(ListUtils.map(pd.getModifiers(), m -> visitAndCast(m, p)));
+        pd = pd.getPadding().withPatterns(visitContainer(pd.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        if (pd.getPadding().getTypeExpression() != null) {
+            pd = pd.getPadding().withTypeExpression(visitLeftPadded(pd.getPadding().getTypeExpression(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (pd.getPadding().getInitializer() != null) {
+            pd = pd.getPadding().withInitializer(visitLeftPadded(pd.getPadding().getInitializer(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
         return pd;
     }
 
