@@ -35,7 +35,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Console.Write({expr})",
-                $"Console.WriteLine({expr})")),
+                CSharpTemplate.Expression($"Console.WriteLine({expr})"))),
             CSharp(
                 "class C { void M() { Console.Write(42); } }",
                 "class C { void M() { Console.WriteLine(42); } }"
@@ -50,7 +50,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Console.Write({expr})",
-                $"Console.WriteLine({expr})")),
+                CSharpTemplate.Expression($"Console.WriteLine({expr})"))),
             CSharp(
                 "class C { void M() { Console.WriteLine(42); } }"
             )
@@ -64,7 +64,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Console.Write({expr})",
-                $"Console.WriteLine({expr})")),
+                CSharpTemplate.Expression($"Console.WriteLine({expr})"))),
             CSharp(
                 """
                 class C
@@ -98,7 +98,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 "Console.Write(42)",
-                "Console.WriteLine(\"hello\")")),
+                CSharpTemplate.Expression("Console.WriteLine(\"hello\")"))),
             CSharp(
                 "class C { void M() { Console.Write(42); } }",
                 "class C { void M() { Console.WriteLine(\"hello\"); } }"
@@ -133,7 +133,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Binary>(
                 $"{left} && {right}",
-                $"{left} || {right}")),
+                CSharpTemplate.Expression($"{left} || {right}"))),
             CSharp(
                 "class C { void M(object x, bool b) { var r = b && x is null; } }",
                 "class C { void M(object x, bool b) { var r = b || x is null; } }"
@@ -417,7 +417,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Binary>(
                 $"{lhs} + {rhs}",
-                $"{lhs} - {rhs}")),
+                CSharpTemplate.Expression($"{lhs} - {rhs}"))),
             CSharp(
                 "class C { void M() { var x = 1 + 2; } }",
                 "class C { void M() { var x = 1 - 2; } }"
@@ -432,7 +432,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Throw>(
                 $"throw new Exception({msg})",
-                $"throw new ArgumentException({msg})")),
+                CSharpTemplate.Statement($"throw new ArgumentException({msg})"))),
             CSharp(
                 "class C { void M() { throw new Exception(\"oops\"); } }",
                 "class C { void M() { throw new ArgumentException(\"oops\"); } }"
@@ -447,7 +447,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<NewClass>(
                 $"new List({arg})",
-                $"new ArrayList({arg})")),
+                CSharpTemplate.Expression($"new ArrayList({arg})"))),
             CSharp(
                 "class C { void M() { var x = new List(10); } }",
                 "class C { void M() { var x = new ArrayList(10); } }"
@@ -462,7 +462,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Console.Write({expr})",
-                $"Console.WriteLine({expr})")),
+                CSharpTemplate.Expression($"Console.WriteLine({expr})"))),
             CSharp(
                 "class C { void M() { Console.Write(1 + 2); } }",
                 "class C { void M() { Console.WriteLine(1 + 2); } }"
@@ -478,7 +478,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Console.{method}({args})",
-                $"Trace.{method}({args})")),
+                CSharpTemplate.Expression($"Trace.{method}({args})"))),
             CSharp(
                 "class C { void M() { Console.Write(42); } }",
                 "class C { void M() { Trace.Write(42); } }"
@@ -493,7 +493,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Foo({args})",
-                $"Bar({args})")),
+                CSharpTemplate.Expression($"Bar({args})"))),
             CSharp(
                 "class C { void M() { Foo(1, 2, 3); } }",
                 "class C { void M() { Bar(1, 2, 3); } }"
@@ -509,7 +509,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"new Random().{method}({args})",
-                $"Random.Shared.{method}({args})")),
+                CSharpTemplate.Expression($"Random.Shared.{method}({args})"))),
             CSharp(
                 "class C { void M() { new Random().Next(10); } }",
                 "class C { void M() { Random.Shared.Next(10); } }"
@@ -525,7 +525,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"new Random().{method}({args})",
-                $"Random.Shared.{method}({args})")),
+                CSharpTemplate.Expression($"Random.Shared.{method}({args})"))),
             CSharp(
                 "class C { void M() { new Random().NextDouble(); } }",
                 "class C { void M() { Random.Shared.NextDouble(); } }"
@@ -541,7 +541,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Foo({args}, {last})",
-                $"Bar({last}, {args})")),
+                CSharpTemplate.Expression($"Bar({last}, {args})"))),
             CSharp(
                 "class C { void M() { Foo(1, 2, 3); } }",
                 "class C { void M() { Bar(3, 1, 2); } }"
@@ -626,7 +626,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<FieldAccess>(
                 $"DateTime.{field}",
-                $"DateTimeOffset.{field}")),
+                CSharpTemplate.Expression($"DateTimeOffset.{field}"))),
             CSharp(
                 "class C { void M() { var x = DateTime.Now; } }",
                 "class C { void M() { var x = DateTimeOffset.Now; } }"
@@ -642,7 +642,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Assignment>(
                 $"{x} = {x} + {y}",
-                $"{x} += {y}")),
+                CSharpTemplate.Expression($"{x} += {y}"))),
             CSharp(
                 "class C { int x; void M() { x = x + 2; } }",
                 "class C { int x; void M() { x += 2; } }"
@@ -720,7 +720,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Binary>(
                 $"{lhs} + {rhs}",
-                $"{lhs} - {rhs}")),
+                CSharpTemplate.Expression($"{lhs} - {rhs}"))),
             CSharp(
                 "class C { void M() { var x = 2 * (1 + 3); } }",
                 "class C { void M() { var x = 2 * (1 - 3); } }"
@@ -738,7 +738,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Binary>(
                 $"{left} - {right}",
-                $"{left} * {right}")),
+                CSharpTemplate.Expression($"{left} * {right}"))),
             CSharp(
                 "class C { int M() { return 1 + 2 - 3; } }",
                 "class C { int M() { return (1 + 2) * 3; } }"
@@ -1095,7 +1095,7 @@ public class TemplateApplyTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(Replace<Binary>(
                 $"{left} - {right}",
-                $"{left} + {right}")),
+                CSharpTemplate.Expression($"{left} + {right}"))),
             CSharp(
                 "class C { void M() { var x = 2 * 3 - 4; } }",
                 "class C { void M() { var x = 2 * 3 + 4; } }"
@@ -1207,12 +1207,12 @@ public class TemplateApplyTests : RewriteTest
         new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));
 
 #pragma warning disable CS0618
-    private static OpenRewrite.Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
+    private static OpenRewrite.Core.Recipe Replace<T>(TemplateStringHandler pattern, CSharpTemplate template)
         where T : J =>
-        new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
+        new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), template);
 
-    private static OpenRewrite.Core.Recipe Replace<T>(string pattern, string template) where T : J =>
-        new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
+    private static OpenRewrite.Core.Recipe Replace<T>(string pattern, CSharpTemplate template) where T : J =>
+        new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), template);
 #pragma warning restore CS0618
 }
 

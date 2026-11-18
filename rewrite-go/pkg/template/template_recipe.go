@@ -17,12 +17,15 @@
 package template
 
 import (
+	goparser "go/parser"
+	gotoken "go/token"
 	"io/fs"
 	"strings"
 	"time"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipegolang "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -201,6 +204,7 @@ func buildVisitor(cfg *templateRecipeConfig) *templateRecipeVisitor {
 
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
 	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind, cfg.afterExportData)
+	after.sourceImports = cfg.sourceImports
 
 	return newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 }
@@ -238,7 +242,9 @@ func buildTemplate(code string, caps []*Capture, imports []string, kind Scaffold
 }
 
 // detectScaffoldKind infers whether code is an expression, statement, or
-// top-level declaration based on leading keywords.
+// top-level declaration based on leading keywords. Code no keyword names is an
+// expression unless only a statement scaffold parses it, as for an assignment,
+// a send, an increment or a bare return.
 func detectScaffoldKind(code string) ScaffoldKind {
 	trimmed := strings.TrimSpace(code)
 	stmtKeywords := []string{"if ", "for ", "switch ", "select ", "go ", "defer ", "return "}
@@ -253,7 +259,17 @@ func detectScaffoldKind(code string) ScaffoldKind {
 			return ScaffoldTopLevel
 		}
 	}
+	if !parsesAs(code, ScaffoldExpression) && parsesAs(code, ScaffoldStatement) {
+		return ScaffoldStatement
+	}
 	return ScaffoldExpression
+}
+
+// parsesAs reports whether the scaffold of the given kind is syntactically Go.
+func parsesAs(code string, kind ScaffoldKind) bool {
+	source, _ := buildScaffold(code, nil, nil, nil, kind)
+	_, err := goparser.ParseFile(gotoken.NewFileSet(), "__template__.go", source, goparser.SkipObjectResolution)
+	return err == nil
 }
 
 // templateRecipeVisitor tries each before pattern in order; first match wins.
@@ -287,7 +303,7 @@ func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 			continue
 		}
 		// See RewriteVisitor.Visit on why the cursor names t rather than j.
-		replaced := v.after.Apply(visitor.NewCursor(v.Cursor(), t), match)
+		replaced := v.after.applyInFile(visitor.NewCursor(v.Cursor(), t), match)
 		if replaced != nil {
 			if len(v.sourceImports) > 0 {
 				for _, imp := range v.sourceImports {
@@ -295,10 +311,74 @@ func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 				}
 				v.DoAfterVisit(recipe.Service[*recipegolang.ImportService](nil).RemoveUnusedImportsVisitor())
 			}
+			// An import only the replaced code used is left unused, which
+			// Go does not compile.
+			for _, path := range importsReferencedBy(compilationUnitOf(v.Cursor()), j) {
+				recipegolang.MaybeRemoveImport(v, path)
+			}
 			return replaced
 		}
 	}
 	return result
+}
+
+// importsReferencedBy returns the paths of the imports of cu that code refers
+// to, through the attribution it carries or the qualifier it names them by.
+func importsReferencedBy(cu *golang.CompilationUnit, code java.J) []string {
+	if cu == nil || cu.Imports == nil {
+		return nil
+	}
+	fqns, quals := map[string]bool{}, map[string]bool{}
+	noteType := func(t java.JavaType) {
+		if fq, ok := t.(java.FullyQualified); ok && fq != nil {
+			fqns[fq.GetFullyQualifiedName()] = true
+		}
+	}
+	noteQualifier := func(e java.Expression) {
+		if ident, ok := e.(*java.Identifier); ok {
+			quals[ident.Name] = true
+		}
+	}
+	visitor.Walk(code, func(t java.Tree) bool {
+		switch n := t.(type) {
+		case *java.Identifier:
+			noteType(n.Type)
+		case *java.FieldAccess:
+			noteQualifier(n.Target)
+		case *java.MethodInvocation:
+			if n.Select != nil {
+				noteQualifier(n.Select.Element)
+			}
+			if n.MethodType != nil && n.MethodType.DeclaringType != nil {
+				noteType(n.MethodType.DeclaringType)
+			}
+		}
+		return true
+	})
+	var paths []string
+	for _, rp := range cu.Imports.Elements {
+		imp := rp.Element
+		if imp == nil {
+			continue
+		}
+		path, name := imp.Path(), packageNameOf(imp.Path())
+		if imp.Alias != nil && imp.Alias.Element != nil {
+			name = imp.Alias.Element.Name
+		}
+		// The cgo pseudo-package carries the preamble above it, which removing
+		// the import would take along.
+		if name == "_" || name == "." || path == "C" {
+			continue
+		}
+		referenced := quals[name]
+		for fqn := range fqns {
+			referenced = referenced || fqn == path || strings.HasPrefix(fqn, path+".")
+		}
+		if referenced {
+			paths = append(paths, path)
+		}
+	}
+	return paths
 }
 
 type builtTemplateRecipe struct {

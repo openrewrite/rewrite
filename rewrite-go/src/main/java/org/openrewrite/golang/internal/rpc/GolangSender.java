@@ -115,6 +115,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitKeyValue(Go.KeyValue keyValue, RpcSendQueue q) {
         q.getAndSend(keyValue, Go.KeyValue::getKeyExpr, el -> visit(el, q));
         q.getAndSend(keyValue, kv -> kv.getPadding().getValue(), el -> visitLeftPadded(el, q));
+        q.getAndSend(keyValue, x -> Reference.asRef(x.getType()), type -> visitType(getValueNonNull(type), q));
         return keyValue;
     }
 
@@ -126,6 +127,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(slice, s -> s.getPadding().getHigh(), el -> visitRightPadded(el, q));
         q.getAndSend(slice, Go.SliceExpr::getMax, el -> visit(el, q));
         q.getAndSend(slice, x -> spaceRef(x.getCloseBracket()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(slice, x -> Reference.asRef(x.getType()), type -> visitType(getValueNonNull(type), q));
         return slice;
     }
 
@@ -305,6 +307,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(binary, Go.Binary::getLeft, el -> visit(el, q));
         q.getAndSend(binary, b -> b.getPadding().getOperator(), op -> visitLeftPadded(op, q));
         q.getAndSend(binary, Go.Binary::getRight, el -> visit(el, q));
+        q.getAndSend(binary, x -> Reference.asRef(x.getType()), type -> visitType(getValueNonNull(type), q));
         return binary;
     }
 

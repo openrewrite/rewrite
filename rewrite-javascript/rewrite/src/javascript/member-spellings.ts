@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 import {create as produce, Draft} from "mutative";
-import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, isStringLiteral, J, singleSpace, Statement} from "../java";
+import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, isStringLiteral, J, singleSpace, splitAtLineEnd, Statement} from "../java";
 import {randomId, UUID} from "../uuid";
-import {Cursor} from "../tree";
 import {isObjectBindingPattern, JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {resolve, rootName} from "./scope";
-import {aliasing, moduleNameOf, movedBinding, newIdentifier, respecify, withMovedTypes, withoutStatement} from "./add-import";
+import {rootName} from "./scope";
+import {
+    aliasing, moduleNameOf, movedBinding, newIdentifier, readsModuleObject, respecify, sameAttributes, withMovedTypes,
+    withoutStatement
+} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
@@ -57,26 +59,18 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         const moved = this.withinModule ? visited : this.withReExportsMoved(visited);
-        return moved === cu ? moved : withMovedTypes(moved, this.from, this.to);
+        return moved === cu ? moved :
+            withMovedTypes(moved, this.from, this.to, this.withinModule ? new Set() : this.moduleObjects);
     }
 
     private get withinModule(): boolean {
         return sameModule(this.from.module, this.to.module);
     }
 
-    /**
-     * Whether `qualifier.member` reads the moved member through a module object: `NS.Old`, `(NS).Old`.
-     * For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`.
-     */
+    /** Whether `qualifier.member` reads the moved member through a module object: `NS.Old`, `(NS).Old`. */
     private readsMovedMember(qualifier: J | undefined, member: string): boolean {
-        let object = qualifier, cursor = this.cursor;
-        while (object?.kind === J.Kind.Parentheses) {
-            cursor = new Cursor(object, cursor);
-            object = (object as J.Parentheses<J>).tree.element;
-        }
         return this.withinModule && member === this.from.member &&
-            object !== undefined && isIdentifier(object) && this.moduleObjects.has(object.simpleName) &&
-            resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
+            readsModuleObject(qualifier, this.cursor, this.moduleObjects);
     }
 
     /** `NS.Old` → `NS.New` */
@@ -182,7 +176,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
      *     export {Old} from "m"       →  export {New as Old} from "m2"
      *     export {Old, X} from "m"    →  export {X} from "m"; export {New as Old} from "m2"
      *     export {Old} from "m";      →  export {Y, New as Old} from "m2"
-     *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not)
+     *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not,
+     *                                      with the same import attributes)
      *
      * A comment ending the line (`export {X} from "m"; // note`) stays on it, before the new statement.
      */
@@ -200,8 +195,11 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
             }
             changed = true;
             const staying = new Set(elements.filter(e => !moving.has(e)));
-            const target = statements.findIndex((s, j) =>
-                j !== i && reExportFrom(s.element, this.to.module)?.typeOnly.element === declaration.typeOnly.element);
+            const target = statements.findIndex((s, j) => {
+                const into = j === i ? undefined : reExportFrom(s.element, this.to.module);
+                return into !== undefined && into.typeOnly.element === declaration.typeOnly.element &&
+                    sameAttributes(into.attributes, declaration.attributes);
+            });
             if (target < 0 && staying.size === 0) {
                 statements[i] = {...statements[i], element: this.respecified(withElements(declaration, elements.map(e => this.renamed(e))))};
                 continue;
@@ -300,25 +298,6 @@ function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclar
     const source = declaration.moduleSpecifier?.element;
     return isStringLiteral(source) && sameModule(moduleNameOf(source), module) && declaration.exportClause?.kind === JS.Kind.NamedExports
         ? declaration : undefined;
-}
-
-/**
- * The space after a statement, split where its line ends:
- * ` // note\n// next` → `line` ` // note`, `rest` `\n// next`. At the end of the file all of it is `line`.
- * `undefined` where no comment follows on the same line.
- */
-function splitAtLineEnd(space: J.Space, endsFile: boolean): {line: J.Space, rest: J.Space} | undefined {
-    if (space.whitespace.includes("\n") || space.comments.length === 0) {
-        return undefined;
-    }
-    const end = space.comments.findIndex(c => c.suffix.includes("\n"));
-    if (end < 0) {
-        return endsFile ? {line: space, rest: {...space, whitespace: "", comments: []}} : undefined;
-    }
-    return {
-        line: {...space, comments: space.comments.slice(0, end + 1)},
-        rest: {...space, whitespace: space.comments[end].suffix, comments: space.comments.slice(end + 1)}
-    };
 }
 
 function clauseOf(declaration: JS.ExportDeclaration): JS.NamedExports {

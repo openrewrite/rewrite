@@ -525,7 +525,9 @@ When in doubt about what pattern to use:
   `recipe.Recipe` with a `GoVisitor` Editor.
 - **Pattern → template rewrite** — use `template.Rewrite(before, after)`
   from `pkg/template`. See `pkg/template/PARITY-AUDIT.md` for the full
-  surface against `JavaTemplate`.
+  surface against `JavaTemplate`. A pattern or template is one node: two
+  statements go in a block, two declarations in a declaration block, and
+  code holding more than one fails to parse rather than lose the rest.
 - **Adding / removing / reordering imports** — use the existing
   recipes in `pkg/recipe/golang/`: `AddImport`, `RemoveImport`,
   `RemoveUnusedImports`, `OrderImports`. They share primitives

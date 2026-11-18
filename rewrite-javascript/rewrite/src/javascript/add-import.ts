@@ -1,7 +1,8 @@
 import {JavaScriptVisitor} from "./visitor";
-import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TextComment, TrailingComma, Type} from "../java";
+import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, spaceContainsNewline, splitAtLineEnd, Statement, TextComment, TrailingComma, Type} from "../java";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {randomId, UUID} from "../uuid";
+import {Cursor} from "../tree";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
 import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name";
@@ -859,8 +860,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * @param group The rebind moves this import takes in. It goes where their statement was,
      * laid out and ordered as it was.
+     * @param attributes the `with {…}` clause the import carries, which a binding moved from another
+     * import keeps. An import of the module takes the member in only where its attributes are the same.
      */
-    constructor(options: AddImportOptions, bindingName?: string, private readonly group?: RebindGroup) {
+    constructor(
+        options: AddImportOptions,
+        bindingName?: string,
+        private readonly group?: RebindGroup,
+        readonly attributes?: JS.ImportAttributes
+    ) {
         super();
 
         validate(options);
@@ -945,31 +953,35 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Find the position to insert the import
         const placement = this.placementInGroup(compilationUnit);
         const insertionIndex = placement?.index ?? this.findImportInsertionIndex(compilationUnit);
-        const created = await this.createImportStatement(compilationUnit, insertionIndex, p);
-        const newImport = placement?.replacing ? {...created, prefix: placement.replacing.prefix} : created;
+        // An import in a dropped statement's place takes that statement's prefix, and what followed keeps its own.
+        const {cu, line} = placement?.replacing
+            ? {cu: compilationUnit, line: undefined}
+            : withLineEndTaken(compilationUnit, insertionIndex);
+        const created = await this.createImportStatement(cu, insertionIndex, p);
+        const newImport = {...created, prefix: placement?.replacing?.prefix ?? afterLine(line, created.prefix)};
         this.group?.created.push(newImport.id);
 
-        const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
+        const withImport = await this.produceJavaScript(cu, p, async draft => {
             // Insert the import at the appropriate position
-            const semicolonMarkers = detectSemi(compilationUnit)
+            const semicolonMarkers = detectSemi(cu)
                 ? markers({kind: J.Markers.Semicolon, id: randomId()})
                 : emptyMarkers;
 
             if (placement?.replacing) {
                 // The import goes before the statement `replacing.next` names, or at the end of the file.
                 const following = placement.replacing.next;
-                const next = compilationUnit.statements[insertionIndex];
+                const next = cu.statements[insertionIndex];
                 draft.statements = [
-                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    ...cu.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
                     ...(following ? [{...next, element: {...next.element!, prefix: following.prefix}}] : []),
-                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                    ...cu.statements.slice(insertionIndex + 1)
                 ];
-            } else if (insertionIndex === prologueLength(compilationUnit)) {
+            } else if (insertionIndex === prologueLength(cu)) {
                 // The `after` space should be empty since any semicolon is printed after it
-                const next = compilationUnit.statements[insertionIndex];
+                const next = cu.statements[insertionIndex];
                 draft.statements = [
-                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    ...cu.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
                     ...(next ? [{
                         ...next,
@@ -977,22 +989,22 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                             ? {...next.element, prefix: splitAtBodyStart(next.element.prefix).behind}
                             : undefined
                     } as J.RightPadded<Statement>] : []),
-                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                    ...cu.statements.slice(insertionIndex + 1)
                 ];
             } else {
                 // Insert after existing imports
-                const before = compilationUnit.statements.slice(0, insertionIndex);
-                const after = compilationUnit.statements.slice(insertionIndex);
+                const before = cu.statements.slice(0, insertionIndex);
+                const after = cu.statements.slice(insertionIndex);
 
                 //The `after` space is empty, spacing comes from next statement's prefix
-                // Ensure the next statement has at least one newline in its prefix
+                // A next statement on the import's line moves to its own, with the comments ahead of it
                 if (after.length > 0 && after[0].element) {
                     const currentPrefix = after[0].element.prefix;
                     const needsNewline = !currentPrefix.whitespace.includes('\n');
 
                     const updatedNextStatement = needsNewline ? {
                         ...after[0],
-                        element: {...after[0].element, prefix: space("\n" + currentPrefix.whitespace)}
+                        element: {...after[0].element, prefix: {...currentPrefix, whitespace: "\n"}}
                     } : after[0];
 
                     draft.statements = [
@@ -1026,7 +1038,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
             if (statement?.kind === JS.Kind.Import) {
                 const jsImport = statement as JS.Import;
-                if (!acceptsNamedMember(jsImport, this.module, this.typeOnly)) {
+                if (!acceptsNamedMember(jsImport, this.module, this.typeOnly, this.attributes)) {
                     continue;
                 }
                 const importClause = jsImport.importClause!;
@@ -1635,6 +1647,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 element: moduleSpecifier,
                 markers: emptyMarkers
             },
+            attributes: this.attributes && {...this.attributes, id: randomId(), prefix: singleSpace},
             initializer: undefined
         };
 
@@ -1954,34 +1967,70 @@ function isTripleSlashDirective(comment: Comment): boolean {
  * `cu` with `statement` after its last top-level `require`. A file with none takes it first,
  * after a shebang and any directives, which have to open the file to apply.
  */
-function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
+function withRequireStatement(original: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
+    const {start: at, end} = leadingRequires(original);
+    const {cu, line} = withLineEndTaken(original, end);
     const statements = cu.statements;
     const padded = rightPadded(statement, emptySpace,
         detectSemi(cu) ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers);
-    const {start: at, end} = leadingRequires(cu);
+    const placed = (prefix: J.Space) => ({...padded, element: {...statement, prefix: afterLine(line, prefix)}});
     if (end > at) {
         return {
             ...cu,
             statements: [
                 ...statements.slice(0, end),
-                {...padded, element: {...statement, prefix: space("\n")}},
+                placed(space("\n")),
                 ...statements.slice(end)
             ]
         };
     }
     const next = statements[at]?.element;
     if (next === undefined) {
-        return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
+        return {...cu, statements: [...statements, placed(space(at === 0 ? "" : "\n\n"))]};
     }
     const {ahead, behind} = splitAtBodyStart(next.prefix);
     return {
         ...cu,
         statements: [
             ...statements.slice(0, at),
-            {...padded, element: {...statement, prefix: ahead}},
+            placed(ahead),
             {...statements[at], element: {...next, prefix: behind}},
             ...statements.slice(at + 1)
         ]
+    };
+}
+
+/**
+ * `cu` without the comments that end the line of the statement before `at`, and those comments as
+ * `line`: `a(); // note\nb();` → `line` ` // note`, `b()` prefixed by `\n`. A file header at 0 stays,
+ * as does a comment after a shebang, whose own padding ends its line.
+ */
+function withLineEndTaken(cu: JS.CompilationUnit, at: number): {cu: JS.CompilationUnit; line?: J.Space} {
+    const previous = cu.statements[at - 1];
+    const next = cu.statements[at];
+    const split = previous === undefined || spaceContainsNewline(previous.after) ? undefined :
+        splitAtLineEnd(next?.element.prefix ?? cu.eof, next === undefined);
+    if (split === undefined) {
+        return {cu};
+    }
+    return {
+        cu: next === undefined ? {...cu, eof: split.rest} : {
+            ...cu,
+            statements: cu.statements.map((s, i) => i === at ? {...s, element: {...s.element, prefix: split.rest}} : s)
+        },
+        line: split.line
+    };
+}
+
+/** `prefix` behind the comments `line` ends the previous line with: ` // note` and `\n` → ` // note\n`. */
+function afterLine(line: J.Space | undefined, prefix: J.Space): J.Space {
+    if (line === undefined) {
+        return prefix;
+    }
+    const last = line.comments.length - 1;
+    return {
+        ...line,
+        comments: [...line.comments.slice(0, last), {...line.comments[last], suffix: prefix.whitespace}, ...prefix.comments]
     };
 }
 
@@ -2170,18 +2219,64 @@ function importedModule(jsImport: JS.Import): string | undefined {
         : undefined;
 }
 
-/** Whether `AddImport` merges a named member of `module` into `jsImport` rather than adding a statement. */
-function acceptsNamedMember(jsImport: JS.Import, module: string, typeOnly: boolean): boolean {
+/**
+ * Whether `AddImport` merges a named member of `module`, loaded with `attributes`, into `jsImport`
+ * rather than adding a statement.
+ */
+function acceptsNamedMember(
+    jsImport: JS.Import,
+    module: string,
+    typeOnly: boolean,
+    attributes: JS.ImportAttributes | undefined
+): boolean {
     const clause = jsImport.importClause;
     const specifier = jsImport.moduleSpecifier?.element;
     if (!clause || clause.typeOnly !== typeOnly || specifier?.kind !== J.Kind.Literal ||
-        !sameModule(moduleNameOf(specifier as J.Literal), module)) {
+        !sameModule(moduleNameOf(specifier as J.Literal), module) || !sameAttributes(jsImport.attributes, attributes)) {
         return false;
     }
     if (clause.typeOnly && clause.name !== undefined) {
         return false;
     }
     return clause.namedBindings ? clause.namedBindings.kind === JS.Kind.NamedImports : clause.name !== undefined;
+}
+
+/**
+ * Whether two import attribute clauses ask for the same thing, so that one statement can carry the
+ * bindings of both. A module is loaded per specifier and attributes together, so a binding joined into
+ * an import with other attributes would be loaded differently: a `type: "json"` dropped or gained, or a
+ * type resolved in another `resolution-mode`. Keys and values compare by the strings they spell, in any
+ * order or quoting, and an empty clause is the same as none. `with` and the legacy `assert` differ.
+ */
+export function sameAttributes(a: JS.ImportAttributes | undefined, b: JS.ImportAttributes | undefined): boolean {
+    const left = attributeEntries(a);
+    const right = attributeEntries(b);
+    if (left === undefined || right === undefined) {
+        return a === b;
+    }
+    return left.size === right.size && (left.size === 0 || a!.token === b!.token) &&
+        [...left].every(([key, value]) => right.get(key) === value);
+}
+
+/** The keys and values `attributes` spells, or `undefined` where one is not a string. */
+function attributeEntries(attributes: JS.ImportAttributes | undefined): Map<string, string> | undefined {
+    const entries = new Map<string, string>();
+    for (const {element} of attributes?.elements.elements ?? []) {
+        if (element.kind === J.Kind.Empty) {
+            continue;
+        }
+        if (element.kind !== JS.Kind.ImportAttribute) {
+            return undefined;
+        }
+        const {name, value} = element as JS.ImportAttribute;
+        const literal = value.element;
+        if ((name.kind !== J.Kind.Identifier && name.kind !== J.Kind.Literal) || literal.kind !== J.Kind.Literal ||
+            typeof (literal as J.Literal).value !== "string") {
+            return undefined;
+        }
+        entries.set(moduleExportName(name as J.Identifier | J.Literal), (literal as J.Literal).value as string);
+    }
+    return entries;
 }
 
 /** Which of an import clause's three slots `member` binds — `import`, `import *`, or `import {}`. */
@@ -2400,7 +2495,8 @@ export function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.Compilati
 
 /**
  * Whether moving the only binding of `jsImport` to `to` replaces the statement rather than rewriting
- * it in place. A different shape needs a different clause, and another import of `to` takes it in.
+ * it in place. A different shape needs a different clause, and another import of `to` with the same
+ * attributes takes it in.
  */
 function replacesStatement(
     cu: JS.CompilationUnit,
@@ -2412,7 +2508,7 @@ function replacesStatement(
     const shape = bindingShape(to.member);
     return shape !== bindingShape(from.member) || (shape === "named" && cu.statements.some(s =>
         s.element !== jsImport && s.element?.kind === JS.Kind.Import &&
-        acceptsNamedMember(s.element as JS.Import, to.module, typeOnly)));
+        acceptsNamedMember(s.element as JS.Import, to.module, typeOnly, jsImport.attributes)));
 }
 
 const esmStyle = {default: ImportStyle.ES6Default, namespace: ImportStyle.ES6Namespace, named: ImportStyle.ES6Named};
@@ -2528,6 +2624,44 @@ function withRunSorted(cu: JS.CompilationUnit, ids: ReadonlySet<UUID>): JS.Compi
     return {...cu, statements};
 }
 
+/** For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`. */
+export function readsModuleObject(qualifier: J | undefined, holder: Cursor, moduleObjects: ReadonlySet<string>): boolean {
+    let object = qualifier, cursor = holder;
+    while (object?.kind === J.Kind.Parentheses) {
+        cursor = new Cursor(object, cursor);
+        object = (object as J.Parentheses<J>).tree.element;
+    }
+    return object !== undefined && isIdentifier(object) && moduleObjects.has(object.simpleName) &&
+        resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
+}
+
+export function isModuleObjectRead(cursor: Cursor, moduleObjects: ReadonlySet<string>): boolean {
+    if (moduleObjects.size === 0) {
+        return false;
+    }
+    const node = cursor.value as J;
+    switch (node.kind) {
+        case J.Kind.MethodInvocation:
+            return readsModuleObject((node as J.MethodInvocation).select?.element, cursor, moduleObjects);
+        case J.Kind.FieldAccess:
+            return readsModuleObject((node as J.FieldAccess).target, cursor, moduleObjects);
+        case J.Kind.NewClass: {
+            const clazz = (node as J.NewClass).class;
+            return clazz?.kind === J.Kind.FieldAccess && isModuleObjectRead(new Cursor(clazz, cursor), moduleObjects);
+        }
+        case J.Kind.Identifier: {
+            const holder = cursor.parentTree();
+            const read = holder?.value as J | undefined;
+            return holder !== undefined &&
+                (read?.kind === J.Kind.MethodInvocation && (read as J.MethodInvocation).name === node ||
+                    read?.kind === J.Kind.FieldAccess && (read as J.FieldAccess).name.element === node) &&
+                isModuleObjectRead(holder, moduleObjects);
+        }
+        default:
+            return false;
+    }
+}
+
 /**
  * Moves the binding `from` names to `to`, binding it under `boundName`, and the file's references
  * follow a `boundName` of its own. Whether the statement is rewritten in place or replaced is decided
@@ -2542,7 +2676,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly to: {module: string; member?: string},
         readonly localName: string,
         readonly boundName: string,
-        readonly group?: RebindGroup
+        readonly group?: RebindGroup,
+        readonly keptModuleObjects: ReadonlySet<string> = new Set()
     ) {
         super();
     }
@@ -2553,6 +2688,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private dropped?: UUID;
     private droppedQuote?: QuoteChar;
     private fromModule?: string;
+    /** The attributes the moved binding was loaded with, which the import binding it again keeps. */
+    private attributes?: JS.ImportAttributes;
     private movedTypes!: MovedTypes;
 
     private viaRequire = false;
@@ -2600,7 +2737,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
                 quoteStyle: this.droppedQuote,
                 // The binding keeps its lane, though the file may read otherwise without the statement it left.
                 style: this.viaRequire ? ImportStyle.CommonJS : esmStyle[bindingShape(this.to.member)]
-            }, this.boundName, this.group));
+            }, this.boundName, this.group, this.attributes));
         }
         return visited;
     }
@@ -2619,6 +2756,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         // The replacement takes the moved binding's `type` marking to stay type-safe.
         this.typeOnly = bindsTypeOnly(imp, this.from.member);
         this.fromModule = importedModule(imp);
+        this.attributes = imp.attributes;
 
         if (!isOnlyMember(imp)) {
             return removeBinding(imp, this.from.member, this.localName);
@@ -2695,7 +2833,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     /** Any type in the file can name what moved, whether or not it references the binding. */
     protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
-        return this.movedTypes.visit(javaType, undefined);
+        return isModuleObjectRead(this.cursor, this.keptModuleObjects) ? javaType :
+            this.movedTypes.visit(javaType, undefined);
     }
 
     /**
@@ -3031,12 +3170,13 @@ function movedTypesIn(
 export async function withMovedTypes(
     cu: JS.CompilationUnit,
     from: {module: string; member?: string},
-    to: {module: string; member?: string}
+    to: {module: string; member?: string},
+    keptModuleObjects: ReadonlySet<string> = new Set()
 ): Promise<JS.CompilationUnit> {
     const movedTypes = movedTypesIn(cu, from, to, false);
     return await new class extends JavaScriptVisitor<undefined> {
         protected override async visitType(javaType: Type | undefined): Promise<Type | undefined> {
-            return movedTypes.visit(javaType, undefined);
+            return isModuleObjectRead(this.cursor, keptModuleObjects) ? javaType : movedTypes.visit(javaType, undefined);
         }
     }().visit(cu, undefined) as JS.CompilationUnit;
 }
