@@ -22,6 +22,7 @@ import org.openrewrite.scala.ScalaParser;
 import org.openrewrite.scala.ScalaVisitor;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -180,6 +181,37 @@ class VariableDeclarationsTest implements RewriteTest {
                 final /* val */ val b = 1
                 private
                 final val c = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void softModifierBeforeVal() {
+        rewriteRun(
+          // Soft modifiers are not mapped yet, so `inline` is held as whitespace.
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build()),
+          scala(
+            """
+              object Test {
+                inline val a = 1
+                private inline val b = 2
+                inline private val c = 3
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void accessQualifierAfterASpace() {
+        rewriteRun(
+          scala(
+            """
+              package p
+              object Test {
+                private [p] val a = 1
               }
               """
           )

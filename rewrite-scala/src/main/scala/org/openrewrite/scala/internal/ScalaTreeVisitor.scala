@@ -20,6 +20,7 @@ import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.StdNames.nme
+import dotty.tools.dotc.parsing.Tokens
 import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
@@ -3484,7 +3485,7 @@ class ScalaTreeVisitor(
 
       val afterModifiers = sourceSnippet.substring(modifierEndPos)
       val (keywordStart, keyword) = {
-        val next = indexOfNextNonWhitespace(0, afterModifiers)
+        val next = skipSoftModifiers(afterModifiers, indexOfNextNonWhitespace(0, afterModifiers))
         List("val", "var", "given").find(k => isWordAt(afterModifiers, next, k)) match {
           case Some(k) => (next, k)
           case None => (-1, "")
@@ -9763,23 +9764,38 @@ class ScalaTreeVisitor(
   ): (util.ArrayList[J.Modifier], Int) = {
     val modifierList = new util.ArrayList[J.Modifier]()
     var lastEnd = 0
-    var next = indexOfNextNonWhitespace(0, text)
+    var next = skipSoftModifiers(text, indexOfNextNonWhitespace(0, text))
     var keyword = keywords.find { case (kw, _) => isWordAt(text, next, kw) }
     while (keyword.isDefined) {
       val (kw, mt) = keyword.get
       var end = next + kw.length
-      if ((kw == "private" || kw == "protected") && text.startsWith("[", end)) {
-        val close = positionOfNextIn(text, "]", end)
+      val qualifierStart = indexOfNextNonWhitespace(end, text)
+      if ((kw == "private" || kw == "protected") && text.startsWith("[", qualifierStart)) {
+        val close = positionOfNextIn(text, "]", qualifierStart)
         if (close >= 0) end = close + 1
       }
       modifierList.add(new J.Modifier(
         Tree.randomId(), ScalaSpace.format(text, lastEnd, next), Markers.EMPTY, text.substring(next, end), mt,
         Collections.emptyList()))
       lastEnd = end
-      next = indexOfNextNonWhitespace(end, text)
+      next = skipSoftModifiers(text, indexOfNextNonWhitespace(end, text))
       keyword = keywords.find { case (kw, _) => isWordAt(text, next, kw) }
     }
     (modifierList, lastEnd)
+  }
+
+  /**
+   * Where the next word after the soft modifiers starting at `i` in `text` begins. Soft modifiers
+   * such as `inline` are not mapped yet, so they stay in the space before the next modifier or keyword.
+   */
+  private def skipSoftModifiers(text: String, i: Int): Int = {
+    var next = i
+    var softModifier = Tokens.softModifierNames.find(n => isWordAt(text, next, n.toString))
+    while (softModifier.isDefined) {
+      next = indexOfNextNonWhitespace(next + softModifier.get.toString.length, text)
+      softModifier = Tokens.softModifierNames.find(n => isWordAt(text, next, n.toString))
+    }
+    next
   }
 
   /** Definition-level modifiers (class/object/trait/def/val). Skips `case` — needs special handling. */
