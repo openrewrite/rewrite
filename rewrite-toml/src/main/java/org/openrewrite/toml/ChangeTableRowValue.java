@@ -27,6 +27,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
 
+import static java.util.Collections.singletonList;
+
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -97,6 +99,11 @@ public class ChangeTableRowValue extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TomlVisitor<ExecutionContext>() {
             @Override
+            public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
+                return TableRowMatcher.keepCommentsOnLastLines((Toml.Document) super.visitDocument(document, ctx));
+            }
+
+            @Override
             public Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 // Check if this is the correct table
                 if (!TableRowMatcher.isNamed(table, tableName)) {
@@ -110,8 +117,7 @@ public class ChangeTableRowValue extends Recipe {
 
                 if (newValue != null && Boolean.TRUE.equals(addIfMissing) && TomlTableValue.find(table.getValues(), propertyKey) == null) {
                     Toml.KeyValue added = parseKeyValue();
-                    return added == null ? table : table.withValues(ListUtils.concat(table.getValues(),
-                            TableRowMatcher.onItsOwnLine(added, table.getValues())));
+                    return added == null ? table : TableRowMatcher.append(table, table.getValues(), singletonList(added));
                 }
 
                 return table.withValues(ListUtils.map(table.getValues(), value -> {

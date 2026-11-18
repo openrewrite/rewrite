@@ -465,4 +465,22 @@ class ChangeTableRowValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentOnTheLastLineStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "x", "1", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
+              """
+          )
+        );
+    }
 }
