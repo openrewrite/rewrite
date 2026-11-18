@@ -720,7 +720,7 @@ public class BlockStatementTemplateGenerator {
             at = end;
         }
         Cursor position = new Cursor(blockCursor, at);
-        Scope scope = new Scope(blockCursor, position);
+        Scope scope = Scope.at(blockCursor).withPosition(position);
         for (Scope.Binding binding : scope.getBindings()) {
             String type = patternVariableType(binding);
             if (type != null && scope.isVisible(binding)) {

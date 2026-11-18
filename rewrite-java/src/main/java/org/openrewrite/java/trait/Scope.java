@@ -16,8 +16,10 @@
 package org.openrewrite.java.trait;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
@@ -38,6 +40,7 @@ import java.util.stream.Stream;
  */
 @Incubating(since = "8.112.0")
 @Value
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Scope implements Trait<J> {
     private static final String SERVICE = ScopeService.class.getName();
     private static final String BINDINGS = Scope.class.getName() + ".bindings";
@@ -49,8 +52,10 @@ public class Scope implements Trait<J> {
     Cursor cursor;
 
     /**
-     * Where the questions are asked from, at or below the scope's tree.
+     * Where the questions are asked from, at or below the scope's tree. {@link #at(Cursor)} takes it from its
+     * cursor. Another one asks this scope from a place that opens a scope of its own.
      */
+    @With
     Cursor position;
 
     /**
