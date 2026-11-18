@@ -268,6 +268,32 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _ => true
   }
 
+  /**
+   * For a call written without an argument list to a method declared with an empty one, as
+   * `a.run` for `def run(): Int`, whether the method is defined in Java. This is Dotty's
+   * `matchNullaryLoosely` minus its exemption for classes compiled by Scala 2. Scala 3's
+   * `-rewrite` adds the `()` to calls of those.
+   */
+  def autoApplicationOf(tree: untpd.Tree): Option[Boolean] =
+    typedNodes.get(tree).flatMap { node =>
+      try {
+        val sym = resolved(node).symbol
+        if (sym.exists && sym.is(Flags.Method) && !sym.isConstructor && !isErrorSymbol(sym) &&
+          !isClosure(node.adapted) && declaresEmptyParameterList(sym.info)) {
+          def javaDefined(s: Symbol) =
+            s.is(Flags.JavaDefined) || s.owner == Symbols.defn.AnyClass || s == Symbols.defn.Object_clone
+          Some(javaDefined(sym) || sym.allOverriddenSymbols.exists(javaDefined))
+        } else None
+      } catch {
+        case NonFatal(_) => None
+      }
+    }
+
+  private def declaresEmptyParameterList(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => mt.paramInfos.isEmpty && !mt.isImplicitMethod
+    case _ => false
+  }
+
   private def isParameterless(sym: Symbol): Boolean =
     sym.is(Flags.Method) && !takesParameters(sym.info)
 

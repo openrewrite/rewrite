@@ -26,6 +26,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Expression;
@@ -34,6 +35,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.scala.marker.AutoApplication;
 import org.openrewrite.scala.marker.EtaExpansion;
 import org.openrewrite.scala.marker.FunctionApplication;
 import org.openrewrite.scala.marker.ImplicitArguments;
@@ -54,6 +56,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.openrewrite.scala.Assertions.scala;
 
 /**
@@ -598,21 +601,102 @@ class ScalaTypeAttributionTest implements RewriteTest {
               private var n = 0
               def count: Int = n
               def count_=(v: Int): Unit = n = v
+              def reset(): Unit = count = 0
             }
             class B {
               val c = new Counter
               c.count = 5
               val f: () => String = "abc".toUpperCase
+              def name(): String = "b"
+              val g: () => String = name
             }
             """,
             spec -> spec.afterRecipe(cu -> {
                 J.Assignment assignment = find(cu, J.Assignment.class, a -> !(a.getVariable() instanceof J.Identifier));
                 // Pending https://github.com/openrewrite/rewrite/issues/9918
                 assertThat(assignment.getVariable()).isInstanceOf(J.FieldAccess.class);
+                assertThat(find(cu, J.Assignment.class, a -> a.getVariable() instanceof J.Identifier i && i.getSimpleName().equals("count"))).isNotNull();
                 J.FieldAccess toUpperCase = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toUpperCase"));
                 EtaExpansion eta = toUpperCase.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
                 assertThat(eta.getMethod().getName()).isEqualTo("toUpperCase");
                 assertThat(TypeUtils.asFullyQualified(eta.getType()).getFullyQualifiedName()).isEqualTo("scala.Function0");
+                assertThat(find(cu, J.Identifier.class, i -> i.getSimpleName().equals("name") && i.getMarkers().findFirst(EtaExpansion.class).isPresent())).isNotNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void unqualifiedParameterlessMethodCallIsAMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+            object M {
+              def local(): Int = 3
+              val l = local
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation local = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("local"));
+                assertThat(local.getSelect()).isNull();
+                assertThat(local.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class)).isPresent();
+                assertThat(local.getMethodType().getName()).isEqualTo("local");
+                assertThat(local.getName().getType()).isSameAs(local.getMethodType());
+                assertThat(local.getType()).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void callLeavingOutDeclaredEmptyArgumentListIsMarkedAsAutoApplication() {
+        rewriteRun(
+          spec -> spec.parser(ScalaParser.builder()
+            .classpath(JavaParser.dependenciesFromClasspath("scalatest_2.13", "scalactic_2.13"))),
+          scala(
+            """
+            import scala.language.postfixOps
+            class A {
+              def run(): Int = 1
+              def nul: Int = 2
+              def make[T](): Option[T] = None
+              override def toString(): String = "A"
+            }
+            object M {
+              def local(): Int = 3
+              def fresh[T](): Option[T] = None
+              val a = new A
+              val x: Any = a
+              val r = a.run
+              val l = local
+              val p = (a run)
+              val m = a.make[Int]
+              val f = fresh[Int]
+              val n = a.nul
+              val e = a.run()
+              val s = a.toString
+              val h = x.hashCode
+              val c = Array(1).clone
+              val sb = new java.lang.StringBuilder().length
+              val stop = org.scalatest.Stopper.default.requestStop
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, String> autoApplications = new HashMap<>();
+                collect(cu, J.MethodInvocation.class, m -> true).forEach(m -> autoApplications.merge(m.getSimpleName(),
+                  m.getMarkers().findFirst(AutoApplication.class).map(a -> a.isJavaDefined() ? "java" : "scala").orElse("none"),
+                  (x, y) -> x + "," + y));
+                assertThat(autoApplications).contains(
+                  entry("run", "scala,scala,none"),
+                  entry("local", "scala"),
+                  entry("make", "scala"),
+                  entry("fresh", "scala"),
+                  entry("nul", "none"),
+                  entry("toString", "java"),
+                  entry("hashCode", "java"),
+                  entry("clone", "java"),
+                  entry("length", "java"),
+                  entry("requestStop", "scala"));
             })
           )
         );
@@ -969,7 +1053,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                J.Identifier greet = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("greet") && i.getMarkers().findFirst(ImplicitArguments.class).isPresent());
+                J.MethodInvocation greet = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("greet") && m.getMarkers().findFirst(ImplicitArguments.class).isPresent());
                 assertThat(greet.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments()).singleElement().satisfies(arg -> {
                     JavaType.Variable name = (JavaType.Variable) arg;
                     assertThat(name.getName()).isEqualTo("name");
@@ -1184,7 +1268,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                     assertThat(m.getMarkers().findFirst(FunctionApplication.class)).isEmpty();
                 });
                 assertThat(calls).filteredOn(m -> m.getSimpleName().equals("apply"))
-                  .extracting(m -> ((J.Identifier) m.getSelect()).getSimpleName())
+                  .extracting(m -> m.getSelect() instanceof J.MethodInvocation k ? k.getSimpleName() : ((J.Identifier) m.getSelect()).getSimpleName())
                   .containsExactlyInAnyOrder("h", "k");
             })
           )

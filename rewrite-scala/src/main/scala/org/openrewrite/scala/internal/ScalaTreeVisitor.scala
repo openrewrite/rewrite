@@ -28,6 +28,7 @@ import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.java.marker.Quoted
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.AmpersandIntersection
+import org.openrewrite.scala.marker.AutoApplication
 import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.EtaExpansion
 import org.openrewrite.scala.marker.ExtraConstructorParamLists
@@ -478,7 +479,10 @@ class ScalaTreeVisitor(
     } else {
       // Record backtick quoting with a Quoted marker — id.name.toString already gives the bare name.
       val quoted = sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2
-      ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id), quoted = quoted)
+      argumentlessCallOf(id) match {
+        case Some(methodType) => argumentlessCall(id, prefix, null, ident(simpleName, Space.EMPTY, quoted = quoted), methodType)
+        case None => ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id), quoted = quoted)
+      }
     }
   }
 
@@ -914,6 +918,7 @@ class ScalaTreeVisitor(
 
         val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
         markersList.add(InfixNotation.create())
+        autoApplication(postfixOp).foreach(markersList.add)
 
         new J.MethodInvocation(
           Tree.randomId(),
@@ -1651,17 +1656,7 @@ class ScalaTreeVisitor(
 
       argumentlessCallOf(sel) match {
         case Some(methodType) if !isTypeProjection =>
-          new J.MethodInvocation(
-            Tree.randomId(),
-            prefix,
-            Markers.EMPTY,
-            new JRightPadded(target, beforeDotSpace, Markers.EMPTY),
-            null,
-            typedMethodName(name, methodType),
-            JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
-              Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
-            methodType
-          )
+          argumentlessCall(sel, prefix, new JRightPadded(target, beforeDotSpace, Markers.EMPTY), name, methodType)
         case _ =>
           new J.FieldAccess(
             Tree.randomId(),
@@ -1676,9 +1671,26 @@ class ScalaTreeVisitor(
   }
 
   /** An assignment target names the member being written, even when the write goes through a setter. */
-  private def argumentlessCallOf(sel: Trees.Select[?]): Option[JavaType.Method] =
-    if (sel eq assignmentTarget) None
-    else typeMapping.flatMap(_.argumentlessCallOf(sel.asInstanceOf[untpd.Tree]))
+  private def argumentlessCallOf(reference: Trees.Tree[?]): Option[JavaType.Method] =
+    if (reference eq assignmentTarget) None
+    else ofNode(reference)(_.argumentlessCallOf(_))
+
+  private def argumentlessCall(reference: Trees.Tree[?], prefix: Space, select: JRightPadded[Expression],
+                               name: J.Identifier, methodType: JavaType.Method): J.MethodInvocation =
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.build(autoApplication(reference).toList.asJava),
+      select,
+      null,
+      typedMethodName(name, methodType),
+      JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
+      methodType
+    )
+
+  private def autoApplication(call: Trees.Tree[?]): Option[AutoApplication] =
+    ofNode(call)(_.autoApplicationOf(_)).map(new AutoApplication(Tree.randomId(), _))
 
   private def visitAssignmentTarget(lhs: Trees.Tree[?]): J = {
     val enclosingTarget = assignmentTarget
@@ -6002,7 +6014,7 @@ class ScalaTreeVisitor(
         return new J.MethodInvocation(
           Tree.randomId(),
           prefix,
-          Markers.EMPTY,
+          Markers.build(autoApplication(ta).toList.asJava),
           null,
           typeParams,
           typedMethodName(ident(name), mt),
@@ -6074,7 +6086,7 @@ class ScalaTreeVisitor(
     new J.MethodInvocation(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      Markers.build(autoApplication(ta).toList.asJava),
       new JRightPadded(qual, selectAfter, Markers.EMPTY),
       typeParams,
       typedMethodName(name, mt),
