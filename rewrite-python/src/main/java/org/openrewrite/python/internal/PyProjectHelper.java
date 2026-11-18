@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.PipfileParser;
+import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.trait.PythonDependencyFile;
@@ -57,6 +58,16 @@ public class PyProjectHelper {
             return trimmed;
         }
         return ">=" + trimmed;
+    }
+
+    /**
+     * Whether a declared version constraint already starts at or above {@code newVersion}, so that
+     * replacing it would lower the minimum version. An empty or unparseable constraint does not.
+     */
+    public static boolean startsAtOrAbove(String constraint, String newVersion) {
+        PythonVersionSpecifierSet current = PythonVersionSpecifierSet.parse(constraint);
+        PythonVersionSpecifierSet target = PythonVersionSpecifierSet.parse(normalizeVersionConstraint(newVersion));
+        return current != null && target != null && current.startsAtOrAbove(target);
     }
 
     /**
