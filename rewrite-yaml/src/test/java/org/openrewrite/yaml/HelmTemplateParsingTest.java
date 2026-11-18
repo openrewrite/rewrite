@@ -974,4 +974,110 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void templateOutputtingEntriesBeforeMoreEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.metadata.labels['app.kubernetes.io/component']", "worker", null)),
+          yaml(
+            """
+              metadata:
+                name: {{ include "common.names.fullname" . }}
+                labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+                  app.kubernetes.io/component: broker
+                annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.annotations "context" $ ) | nindent 4 }}
+              spec:
+                selector:
+                  matchLabels: {{- include "common.labels.matchLabels" . | nindent 6 }}
+                    app.kubernetes.io/component: broker
+              """,
+            """
+              metadata:
+                name: {{ include "common.names.fullname" . }}
+                labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+                  app.kubernetes.io/component: worker
+                annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.annotations "context" $ ) | nindent 4 }}
+              spec:
+                selector:
+                  matchLabels: {{- include "common.labels.matchLabels" . | nindent 6 }}
+                    app.kubernetes.io/component: broker
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var metadata = (Yaml.Mapping) ((Yaml.Mapping) docs.getDocuments().getFirst().getBlock())
+                  .getEntries().getFirst().getValue();
+                assertThat(metadata.getEntries().get(1).getValue()).isInstanceOf(Yaml.Mapping.class);
+                // A template with no entries after it stays the key's value
+                assertThat(((Yaml.Scalar) metadata.getEntries().get(2).getValue()).getValue())
+                  .startsWith("{{- include \"common.tplvalues.render\"");
+            })
+          )
+        );
+    }
+
+    @Test
+    void templateOutputtingEntriesBeforeConditionalEntries() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                containers:
+                  - name: app
+                    env: {{- include "env" . | nindent 6 }}
+                      {{- if .Values.debug }}
+                      - name: DEBUG
+                        value: "true"
+                      {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void sequenceEntryTemplateOutputtingEntriesBeforeMoreEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.topologySpreadConstraints[0].labelSelector.matchLabels.app", "web", null)),
+          yaml(
+            """
+              topologySpreadConstraints:
+                {{- range $constraint := . }}
+              - {{ toYaml $constraint | nindent 2 | trim }}
+                {{- if not $constraint.labelSelector }}
+                labelSelector:
+                  matchLabels:
+                    app: server
+                {{- end }}
+                {{- end }}
+              """,
+            """
+              topologySpreadConstraints:
+                {{- range $constraint := . }}
+              - {{ toYaml $constraint | nindent 2 | trim }}
+                {{- if not $constraint.labelSelector }}
+                labelSelector:
+                  matchLabels:
+                    app: web
+                {{- end }}
+                {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void templateFollowedByPlainScalarContinuationStaysTheValue() {
+        rewriteRun(
+          yaml(
+            """
+              description: {{ .Values.prefix }}
+                and some more text
+              next: 1
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) root.getEntries().getFirst().getValue()).getValue())
+                  .isEqualTo("{{ .Values.prefix }}\n  and some more text");
+            })
+          )
+        );
+    }
 }
