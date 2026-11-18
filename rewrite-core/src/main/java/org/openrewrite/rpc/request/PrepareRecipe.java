@@ -22,6 +22,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
+import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.ArrayList;
@@ -65,9 +67,21 @@ public class PrepareRecipe implements RpcRequest {
             for (Recipe child : recipe.getRecipeList()) {
                 children.add(prepareTree(child, preparedRecipes, acceptsCausesAnotherCycle));
             }
+            RecipeDescriptor descriptor = recipe.getDescriptor();
+
+            // Deliberately the descriptor's own options rather than Recipe#validate(), whose
+            // reflective findings are named for fields (com.example.MyRecipe.fieldName) and so match
+            // no option a host could resolve a value for.
+            List<PrepareRecipeResponse.OptionValidation> validations = new ArrayList<>();
+            for (OptionDescriptor option : descriptor.getOptions()) {
+                if (option.isRequired() && option.getValue() == null) {
+                    validations.add(new PrepareRecipeResponse.OptionValidation(option.getName(), "is required"));
+                }
+            }
+
             return new PrepareRecipeResponse(
                     instanceId,
-                    recipe.getDescriptor(),
+                    descriptor,
                     "edit:" + instanceId,
                     // Making this non-empty would only be valuable if a non-Java process was controlling
                     // recipe execution and there would then be some benefit to it preempting the execution
@@ -78,7 +92,7 @@ public class PrepareRecipe implements RpcRequest {
                     null,
                     children,
                     acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null,
-                    null);
+                    validations.isEmpty() ? null : validations);
         }
     }
 }

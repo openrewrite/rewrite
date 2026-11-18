@@ -21,10 +21,12 @@ import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
+import org.openrewrite.text.ChangeText;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,6 +50,31 @@ class PrepareRecipeTest {
           .contains("\"causesAnotherCycle\":true");
     }
 
+    @Test
+    void requiredOptionMissingProducesValidation() throws IOException {
+        assertThat(wire(PrepareRecipe.Handler.prepareTree(new ChangeText(null), new PreparedRecipeCache(), false)))
+          .contains("\"validations\":[{\"option\":\"toText\",\"message\":\"is required\"}]");
+    }
+
+    @Test
+    void requiredOptionSuppliedProducesNoValidationsKey() throws IOException {
+        assertThat(wire(PrepareRecipe.Handler.prepareTree(new ChangeText("hi"), new PreparedRecipeCache(), false)))
+          .doesNotContain("validations");
+    }
+
+    @Test
+    void childRequiredOptionProducesValidationOnTheChildNode() {
+        PrepareRecipeResponse response = PrepareRecipe.Handler.prepareTree(
+          new CompositeWithInvalidChild(), new PreparedRecipeCache(), false);
+
+        assertThat(response.getValidations()).isNull();
+        assertThat(response.getRecipeList()).singleElement().satisfies(child ->
+          assertThat(child.getValidations()).singleElement().satisfies(validation -> {
+              assertThat(validation.getOption()).isEqualTo("toText");
+              assertThat(validation.getMessage()).isEqualTo("is required");
+          }));
+    }
+
     private static String wire(PrepareRecipeResponse response) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         new JsonMessageFormatter(new SimpleModule()).serialize(JsonRpcRequest.newRequest("PrepareRecipe", response), out);
@@ -68,6 +95,23 @@ class PrepareRecipeTest {
         @Override
         public boolean causesAnotherCycle() {
             return true;
+        }
+    }
+
+    static class CompositeWithInvalidChild extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Composite with an invalid child";
+        }
+
+        @Override
+        public String getDescription() {
+            return "A composite whose child is missing a required option.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return List.of(new ChangeText(null));
         }
     }
 }
