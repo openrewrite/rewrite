@@ -517,6 +517,47 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceAfterWhileLoop() {
+        rewriteRun(
+          templatedJava17(
+            """
+              class T {
+                  Object m(Object o) {
+                      while (!(o instanceof String s)) {
+                          o = next();
+                      }
+                      return 42;
+                  }
+                  Object next() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceAfterIfWhoseLoopMayCompleteNormally() {
+        rewriteRun(
+          templatedJava17(
+            """
+              class T {
+                  Object m(Object o, boolean c) {
+                      if (!(o instanceof String s)) {
+                          while (c) {
+                              return 1;
+                          }
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private SourceSpecs templatedJava17(@Language("java") String before) {
         return version(java(
           before,

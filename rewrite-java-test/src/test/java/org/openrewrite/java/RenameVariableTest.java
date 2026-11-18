@@ -650,6 +650,7 @@ class RenameVariableTest implements RewriteTest {
                               v += 2;
                               break;
                           case 3:
+                              // the local declared in case 2 is in scope here
                               v = 0;
                               break;
                           default:
@@ -675,7 +676,8 @@ class RenameVariableTest implements RewriteTest {
                               v += 2;
                               break;
                           case 3:
-                              VALUE = 0;
+                              // the local declared in case 2 is in scope here
+                              v = 0;
                               break;
                           default:
                               break;

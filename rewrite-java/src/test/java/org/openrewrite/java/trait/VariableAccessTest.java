@@ -21,6 +21,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -63,6 +64,35 @@ class VariableAccessTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu ->
                 assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6))
+          )
+        );
+    }
+
+    @Test
+    void accessResolvesToItsDeclarationByPosition() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new VariableAccess.Matcher().asVisitor(va -> SearchResult.found(va.getTree(),
+              va.getBinding().map(b -> "declared in " + b.getScope().getTree().getClass().getSimpleName()).orElse("unbound"))))),
+          java(
+            """
+              class Test {
+                 static int n;
+                 Object test(int p, Test other) {
+                   { int n = p; this.n = n; other.n = n; Test.n = n; }
+                   return undefined;
+                 }
+              }
+              """,
+            """
+              class Test {
+                 static int n;
+                 Object test(int p, Test other) {
+                   { int n = /*~~(declared in MethodDeclaration)~~>*/p; this./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; /*~~(declared in MethodDeclaration)~~>*/other./*~~(unbound)~~>*/n = /*~~(declared in Block)~~>*/n; Test./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; }
+                   return /*~~(unbound)~~>*/undefined;
+                 }
+              }
+              """
           )
         );
     }

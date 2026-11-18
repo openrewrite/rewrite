@@ -29,6 +29,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -326,7 +327,7 @@ public class BlockStatementTemplateGenerator {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
                 // variable declarations up to the point of insertion
-                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, insertionPoint);
+                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before);
 
                 if (m.getReturnTypeExpression() != null && JavaType.Primitive.Void != m.getReturnTypeExpression().getType()) {
                     before.insert(0, "if(true) {");
@@ -348,7 +349,7 @@ public class BlockStatementTemplateGenerator {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
-                addLeadingVariableDeclarations(cursor, prior, b, before, insertionPoint);
+                addLeadingVariableDeclarations(cursor, prior, b, before);
 
                 before.insert(0, "{\n");
             }
@@ -695,7 +696,7 @@ public class BlockStatementTemplateGenerator {
         return sb.toString();
     }
 
-    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {
+    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before) {
         for (Statement statement : containingBlock.getStatements()) {
             if (referToSameElement(current, statement)) {
                 break;
@@ -707,21 +708,50 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "\n" +
                                  variable((J.VariableDeclarations) statement, true, cursor) +
                                  ";\n");
-            } else if (statement instanceof J.If) {
-                J.If iff = (J.If) statement;
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
-                if (condition != null) {
-                    boolean thenAlwaysCompletesAbnormally = PatternVariables.alwaysCompletesAbnormally(iff.getThenPart());
-                    boolean elseAlwaysCompletesAbnormally = iff.getElsePart() != null && PatternVariables.alwaysCompletesAbnormally(iff.getElsePart().getBody());
-                    if (thenAlwaysCompletesAbnormally || elseAlwaysCompletesAbnormally) {
-                        StringBuilder ifStatement = new StringBuilder("if (").append(condition).append(") {");
-                        ifStatement.append(thenAlwaysCompletesAbnormally ? " throw new RuntimeException(); }" : " }");
-                        ifStatement.append(elseAlwaysCompletesAbnormally ? " else { throw new RuntimeException(); }" : " else { }");
-                        before.insert(0, ifStatement);
-                    }
-                }
             }
         }
+        // A pattern variable an earlier statement introduces (JLS 6.3.2) is declared outright, as the scope finds it.
+        Cursor blockCursor = cursor;
+        J at = current;
+        if (referToSameElement(current, containingBlock)) {
+            // Inserting into the block itself puts the template after its last statement.
+            J.Empty end = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
+            blockCursor = new Cursor(cursor.getParentOrThrow(), containingBlock.withStatements(ListUtils.concat(containingBlock.getStatements(), end)));
+            at = end;
+        }
+        Cursor position = new Cursor(blockCursor, at);
+        Scope scope = new Scope(blockCursor, position);
+        for (Scope.Binding binding : scope.getBindings()) {
+            String type = patternVariableType(binding);
+            if (type != null && scope.isVisible(binding)) {
+                before.insert(0, "\n" + type + " " + binding.getName() + " = " + valueOfType(binding.getType() instanceof JavaType.Variable ?
+                        ((JavaType.Variable) binding.getType()).getType() : null) + ";\n");
+            }
+        }
+    }
+
+    /**
+     * The declared type of a binding an {@code instanceof} pattern introduces, or null for any other binding.
+     */
+    private @Nullable String patternVariableType(Scope.Binding binding) {
+        if (!(binding.getTree() instanceof J.Identifier) || binding.getNamespace() != Scope.Namespace.VARIABLE ||
+            binding.getCursor().firstEnclosing(J.InstanceOf.class) == null) {
+            return null;
+        }
+        Cursor declaring = binding.getCursor().getParentTreeCursor();
+        if (declaring.getValue() instanceof J.InstanceOf) {
+            J clazz = ((J.InstanceOf) declaring.getValue()).getClazz();
+            return clazz.withPrefix(Space.EMPTY).printTrimmed(declaring);
+        }
+        if (declaring.getValue() instanceof J.VariableDeclarations.NamedVariable) {
+            J.VariableDeclarations declarations = declaring.getParentTreeCursor().getValue();
+            TypeTree typeExpression = declarations.getTypeExpression();
+            if (typeExpression == null || typeExpression.getMarkers().findFirst(JavaVarKeyword.class).isPresent()) {
+                return Substitutions.getTypeName(((J.VariableDeclarations.NamedVariable) declaring.getValue()).getType());
+            }
+            return typeExpression.withPrefix(Space.EMPTY).printTrimmed(declaring);
+        }
+        return null;
     }
 
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {

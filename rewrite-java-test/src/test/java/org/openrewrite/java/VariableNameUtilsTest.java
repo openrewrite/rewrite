@@ -407,8 +407,8 @@ class VariableNameUtilsTest implements RewriteTest {
 
     @CsvSource(value = {
       "caseA:caseA,methodParam,methodBlockA",
-      "caseB:caseB,methodParam,methodBlockA",
-      "defaultBlock:defaultBlock,methodParam,methodBlockA"
+      "caseB:caseB,caseA,methodParam,methodBlockA",
+      "defaultBlock:defaultBlock,caseA,caseB,methodParam,methodBlockA"
     }, delimiter = ':')
     @ParameterizedTest
     @SuppressWarnings("DuplicateBranchesInSwitch")
@@ -442,9 +442,9 @@ class VariableNameUtilsTest implements RewriteTest {
     @CsvSource(value = {
       "resourceA:resourceA,methodBlockA",
       "tryBlock:tryBlock,methodBlockA,resourceA,resourceB",
-      "catchControl:catchControl,methodBlockA,resourceA,resourceB",
-      "catchBlock:catchBlock,methodBlockA,resourceA,resourceB,catchControl",
-      "finallyBlock:finallyBlock,methodBlockA,resourceA,resourceB"
+      "catchControl:catchControl,methodBlockA",
+      "catchBlock:catchBlock,methodBlockA,catchControl",
+      "finallyBlock:finallyBlock,methodBlockA"
     }, delimiter = ':')
     @ParameterizedTest
     void tryCatchFinally(String scope, String result) {
