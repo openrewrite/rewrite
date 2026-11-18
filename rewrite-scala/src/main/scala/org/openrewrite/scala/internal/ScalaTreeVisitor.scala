@@ -9519,22 +9519,6 @@ class ScalaTreeVisitor(
   }
   
   /**
-   * Extract whitespace between the current cursor position and the given position.
-   */
-  private def spaceBetween(startPos: Int, endPos: Int): Space = {
-    val adjustedStart = Math.max(0, startPos - offsetAdjustment)
-    val adjustedEnd = Math.max(0, endPos - offsetAdjustment)
-    
-    if (adjustedStart >= cursor && adjustedEnd > adjustedStart && adjustedEnd <= source.length) {
-      val spaceText = source.substring(cursor, adjustedStart)
-      cursor = adjustedStart
-      ScalaSpace.format(spaceText)
-    } else {
-      Space.EMPTY
-    }
-  }
-  
-  /**
    * Find the position of the next occurrence of a delimiter, skipping over line
    * (`//...`) and block (`/* ... */`) comments. When the delimiter is a word
    * (starts with a letter/digit/underscore), also enforces whole-word boundaries
