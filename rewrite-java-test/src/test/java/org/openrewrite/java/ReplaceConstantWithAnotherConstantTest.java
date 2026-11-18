@@ -18,8 +18,11 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
@@ -597,4 +600,211 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void replaceWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations o = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.FieldAccess constant = (J.FieldAccess) o.getVariables().getFirst().getInitializer();
+                assertThat(TypeUtils.asFullyQualified(constant.getName().getFieldType().getOwner()).getFullyQualifiedName()).isEqualTo("b.Outer$Inner");
+                J.FieldAccess inner = (J.FieldAccess) constant.getTarget();
+                assertThat(inner.getSimpleName()).isEqualTo("Inner");
+                assertThat(TypeUtils.isOfClassType(inner.getType(), "b.Outer$Inner")).isTrue();
+                assertThat(TypeUtils.isOfClassType(inner.getName().getType(), "b.Outer$Inner")).isTrue();
+                J.Identifier outer = (J.Identifier) inner.getTarget();
+                assertThat(outer.getSimpleName()).isEqualTo("Outer");
+                assertThat(TypeUtils.isOfClassType(outer.getType(), "b.Outer")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void replaceWithConstantOfNestedClassWrittenWithDots() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer.Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceFullyQualifiedReferenceWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              class Test {
+                  Object o = a.Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStaticallyImportedWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import static a.Old.A;
+
+              class Test {
+                  Object o = A;
+              }
+              """,
+            """
+              import static b.Outer.Inner.B;
+
+              class Test {
+                  Object o = B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstantOfNestedClassWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.OldOuter$OldInner.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class OldOuter {
+                    public static class OldInner {
+                        public static final String A = "a";
+                    }
+                }
+                """,
+              OUTER
+            )),
+          java(
+            """
+              import a.OldOuter;
+
+              class Test {
+                  Object o = OldOuter.OldInner.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          ),
+          java(
+            """
+              import a.OldOuter.OldInner;
+
+              class Test2 {
+                  Object o = OldInner.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test2 {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyWhenOuterClassOfNewConstantIsAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              OLD,
+              OUTER,
+              """
+                package c;
+                public class Outer {
+                }
+                """
+            )),
+          java(
+            """
+              import a.Old;
+              import c.Outer;
+
+              class Test {
+                  Outer outer;
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import c.Outer;
+
+              class Test {
+                  Outer outer;
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    private static final String OLD = """
+      package a;
+      public class Old {
+          public static final String A = "a";
+      }
+      """;
+
+    private static final String OUTER = """
+      package b;
+      public class Outer {
+          public static class Inner {
+              public static final String B = "b";
+          }
+      }
+      """;
 }
