@@ -35,6 +35,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -832,5 +834,55 @@ class TomlParserTest implements RewriteTest {
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
         assertThat(new TomlParser().accept(Paths.get("project", fileName))).isFalse();
+    }
+
+    @Test
+    void emptyCommentInArray() {
+        rewriteRun(
+          toml(
+            """
+              a = [
+                1 #
+              ]
+              b = [
+                1 #
+                , 2
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyCommentInInlineTable() {
+        rewriteRun(
+          toml(
+            """
+              t = {
+                  a = 1 #
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recoveredTreeThatDoesNotPrintBackReportsTheSyntaxError() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "a = [1, 2\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage())
+            .startsWith("org.openrewrite.toml.TomlParsingException: Syntax error")
+            .contains("line 2:0"));
+    }
+
+    @Test
+    void eachErrorIsReportedOnce() {
+        List<Throwable> errors = new ArrayList<>();
+        new TomlParser().parse(new InMemoryExecutionContext(errors::add), "not toml\n").findFirst().orElseThrow();
+
+        assertThat(errors).isNotEmpty().doesNotHaveDuplicates();
     }
 }
