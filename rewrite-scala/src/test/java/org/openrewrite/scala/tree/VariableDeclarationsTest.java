@@ -168,6 +168,19 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void commentsAroundValDefinition() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val x /* a /* b */ c */ : Int /* d /* e */ f */ = /* g /* h */ i */ 1
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("deprecation")
     @Test
     void patternDefinitionHoldingOnlyItsSourceTextStillPrints() {
