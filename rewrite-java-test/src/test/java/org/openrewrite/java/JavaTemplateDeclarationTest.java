@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
@@ -34,42 +30,45 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
-import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings("ConstantConditions")
-class JavaTemplateTest6Test implements RewriteTest {
+@SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnnecessaryBoxing", "StatementWithEmptyBody", "UnusedAssignment", "SizeReplaceableByIsEmpty", "ResultOfMethodCallIgnored", "RedundantOperationOnEmptyContainer"})
+class JavaTemplateDeclarationTest implements RewriteTest {
 
-    @DocumentExample
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/550")
     @Test
-    void addVariableAnnotationsToVariableNotAnnotated() {
+    void genericTypeVariable() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
-                  if (multiVariable.getLeadingAnnotations().isEmpty()) {
-                      return JavaTemplate.apply("@SuppressWarnings(\"ALL\")",
-                        getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getTypeExpression() instanceof J.Identifier && "var".equals(((J.Identifier) multiVariable.getTypeExpression()).getSimpleName())) {
+                      return multiVariable;
                   }
-                  return super.visitVariableDeclarations(multiVariable, p);
+                  J.VariableDeclarations.NamedVariable var0 = multiVariable.getVariables().getFirst();
+                  return JavaTemplate.apply("var #{} = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
               }
           })),
           java(
             """
-              class Test {
-                  void test() {
-                      final int m;
-                      int n;
+              import java.io.Serializable;
+
+              abstract class Outer<T extends Serializable> {
+                  abstract T doIt();
+                  void trigger() {
+                      T x = doIt();
                   }
               }
               """,
             """
-              class Test {
-                  void test() {
-                      @SuppressWarnings("ALL") final int m;
-                      @SuppressWarnings("ALL") int n;
+              import java.io.Serializable;
+
+              abstract class Outer<T extends Serializable> {
+                  abstract T doIt();
+                  void trigger() {
+                      var x = doIt();
                   }
               }
               """
@@ -77,42 +76,168 @@ class JavaTemplateTest6Test implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1111")
     @Test
-    void addMethodAnnotations() {
+    void changeFieldToMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  var vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);
+                  if (vd.getVariables().size() == 1 || "a".equals(vd.getVariables().getFirst().getSimpleName())) {
+                      return JavaTemplate.apply("String a();", getCursor(), vd.getCoordinates().replace());
+                  }
+                  return vd;
+              }
+          })),
+          java(
+            """
+              interface Test {
+
+                  String a;
+              }
+              """,
+            """
+              interface Test {
+
+                  String a();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void finalMethodParameter() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  String testMethod(@NotNull final String test) {}
+              }
+              """,
+            """
+              import lombok.NonNull;
+
+              class A {
+                  String testMethod(@NonNull final String test) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableDeclarationWithFinalVar() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
+                  if (TypeUtils.isString(vd.getType()) && "String".equals(((J.Identifier) vd.getTypeExpression()).getSimpleName())) {
+                      JavaCoordinates coordinates = vd.getCoordinates().replace();
+                      return JavaTemplate.builder("final var #{}")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), coordinates, new Object[]{vd.getVariables().getFirst().getSimpleName()});
+                  }
+                  return vd;
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+
+              class A {
+                  void bar(List<String> lst) {
+                      for (String s : lst) {}
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+
+              class A {
+                  void bar(List<String> lst) {
+                      for (final var s : lst) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void replacePackage() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
+                  if ("a".equals(pkg.getExpression().printTrimmed(getCursor()))) {
+                      return JavaTemplate.apply("b", getCursor(), pkg.getCoordinates().replace());
+                  }
+                  return super.visitPackage(pkg, p);
+              }
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+                  var cd = super.visitClassDeclaration(classDecl, p);
+                  if ("a".equals(classDecl.getType().getPackageName())) {
+                      var type = cd.getType().withFullyQualifiedName("b." + cd.getSimpleName());
+                      cd = cd.withType(type).withName(cd.getName().withType(type));
+                  }
+                  return cd;
+              }
+          })),
+          java(
+            """
+              package a;
+              class Test {
+              }
+              """,
+            """
+              package b;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethod() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getLeadingAnnotations().isEmpty()) {
-                      return JavaTemplate.apply("@SuppressWarnings(\"other\")",
-                        getCursor(), method.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  if ("test".equals(method.getSimpleName())) {
+                      return JavaTemplate.apply("int test2(int n) { return n; }", getCursor(), method.getCoordinates().replace());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
-          })),
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var methodType = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
+              assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
+              assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
+          }),
           java(
             """
               class Test {
-                  public void test0() {
-                  }
-
-                  static final String WARNINGS = "ALL";
-
-                  void test1() {
+                  void test() {
                   }
               }
               """,
             """
               class Test {
-                  @SuppressWarnings("other")
-                  public void test0() {
-                  }
 
-                  static final String WARNINGS = "ALL";
-
-                  @SuppressWarnings("other")
-                  void test1() {
+                  int test2(int n) {
+                      return n;
                   }
               }
               """
@@ -121,29 +246,65 @@ class JavaTemplateTest6Test implements RewriteTest {
     }
 
     @Test
-    void addClassAnnotations() {
+    void replaceMethodParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate t = JavaTemplate.builder("int m, java.util.List<String> n").build();
+
               @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
-                  if (classDecl.getLeadingAnnotations().isEmpty() && !"Test".equals(classDecl.getSimpleName())) {
-                      return JavaTemplate.apply("@SuppressWarnings(\"other\")",
-                        getCursor(), classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  if ("test".equals(method.getSimpleName()) && method.getParameters().size() == 1) {
+                      // insert in outer method
+                      J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
+                      var newRunnable = (J.NewClass) method.getBody().getStatements().getFirst();
+
+                      // insert in inner method
+                      var innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().getFirst();
+                      return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
                   }
-                  return super.visitClassDeclaration(classDecl, p);
+                  return super.visitMethodDeclaration(method, p);
               }
-          })),
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+              JavaType.Method type = m.getMethodType();
+              assertThat(type.getParameterNames())
+                .as("Changing the method's parameters should have also updated its type's parameter names")
+                .containsExactly("m", "n");
+              assertThat(type.getParameterTypes().getFirst())
+                .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
+                .isEqualTo(JavaType.Primitive.Int);
+              assertThat(type.getParameterTypes().get(1))
+                .matches(jt -> jt instanceof JavaType.Parameterized &&
+                               "java.util.List".equals(((JavaType.Parameterized) jt).getType().getFullyQualifiedName()) &&
+                               ((JavaType.Parameterized) jt).getTypeParameters().size() == 1 &&
+                               "java.lang.String".equals(TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().getFirst()).getFullyQualifiedName()),
+                  "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
+                );
+              assertThat(m.getName().getType()).isEqualTo(type);
+          }),
           java(
             """
               class Test {
-                  class Inner1 {
+                  void test() {
+                      new Runnable() {
+                          void inner() {
+                          }
+                          @Override
+                          public void run() {}
+                      };
                   }
               }
               """,
             """
               class Test {
-                  @SuppressWarnings("other")
-                  class Inner1 {
+                  void test(int m, java.util.List<String> n) {
+                      new Runnable() {
+                          void inner(int m, java.util.List<String> n) {
+                          }
+                          @Override
+                          public void run() {}
+                      };
                   }
               }
               """
@@ -152,26 +313,102 @@ class JavaTemplateTest6Test implements RewriteTest {
     }
 
     @Test
-    void replaceAnnotation() {
+    void replaceMethodParametersVariadicArray() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate t = JavaTemplate.builder("Object[]... values").build();
+
               @Override
-              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                  if ("SuppressWarnings".equals(annotation.getSimpleName())) {
-                      return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  if ("test".equals(method.getSimpleName()) && method.getParameters().getFirst() instanceof J.Empty) {
+                      // insert in outer method
+                      J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
+                      var newRunnable = (J.NewClass) method.getBody().getStatements().getFirst();
+
+                      // insert in inner method
+                      var innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().getFirst();
+                      return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
                   }
-                  return annotation;
+                  return super.visitMethodDeclaration(method, p);
               }
-          })),
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              final JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst())
+                .getMethodType();
+
+              assertThat(type.getParameterNames())
+                .as("Changing the method's parameters should have also updated its type's parameter names")
+                .containsExactly("values");
+
+              var param = TypeUtils.asArray(type.getParameterTypes().getFirst());
+              assertThat(param.getElemType())
+                .as("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
+                .matches(at -> "java.lang.Object"
+                  .equals(TypeUtils.asFullyQualified(TypeUtils.asArray(at).getElemType()).getFullyQualifiedName()));
+          }),
           java(
             """
-              @SuppressWarnings("ALL")
               class Test {
+                  void test() {
+                      new Runnable() {
+                          void inner() {
+                          }
+                      };
+                  }
               }
               """,
             """
-              @Deprecated
               class Test {
+                  void test(Object[]... values) {
+                      new Runnable() {
+                          void inner(Object[]... values) {
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceAndInterpolateMethodParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  {
+                      if ("test".equals(method.getSimpleName()) && method.getParameters().size() == 1) {
+                          return JavaTemplate.apply("int n, #{}", getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().getFirst());
+                      }
+                      return method;
+                  }
+              }
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
+
+              assertThat(type.getParameterNames())
+                .as("Changing the method's parameters should have also updated its type's parameter names")
+                .containsExactly("n", "s");
+              assertThat(type.getParameterTypes().getFirst())
+                .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
+                .isEqualTo(JavaType.Primitive.Int);
+              assertThat(type.getParameterTypes().get(1))
+                .as("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
+                .matches(jt -> "java.lang.String".equals(TypeUtils.asFullyQualified(jt).getFullyQualifiedName()));
+          }),
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n, String s) {
+                  }
               }
               """
           )
@@ -521,182 +758,6 @@ class JavaTemplateTest6Test implements RewriteTest {
             """
               abstract class Test {
                   void test() {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @SuppressWarnings({
-      "UnnecessaryBoxing",
-      "CachedNumberConstructorCall",
-      "ResultOfMethodCallIgnored"
-      , "Convert2MethodRef"})
-    @Test
-    void replaceNamedVariableInitializerMethodInvocation() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (matcher.matches(method)) {
-                      return JavaTemplate.apply("new Integer(#{any()})",
-                        getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
-              import java.util.Arrays;
-              import java.util.List;
-              import java.util.function.Function;
-              class Test {
-                  void t() {
-                      List<String> nums = Arrays.asList("1", "2", "3");
-                      nums.forEach(s -> Integer.valueOf(s));
-                  }
-                  void inLambda(int i) {
-                      Function<String, Integer> toString = it -> {
-                          try {
-                              return Integer.valueOf(it);
-                          }catch (NumberFormatException ex) {
-                              ex.printStackTrace();
-                          }
-                          return 0;
-                      };
-                  }
-                  String inClassDeclaration(int i) {
-                      return new Object() {
-                          void foo() {
-                              Integer.valueOf(i);
-                          }
-                      }.toString();
-                  }
-              }
-              """,
-            """
-              import java.util.Arrays;
-              import java.util.List;
-              import java.util.function.Function;
-              class Test {
-                  void t() {
-                      List<String> nums = Arrays.asList("1", "2", "3");
-                      nums.forEach(s -> new Integer(s));
-                  }
-                  void inLambda(int i) {
-                      Function<String, Integer> toString = it -> {
-                          try {
-                              return new Integer(it);
-                          }catch (NumberFormatException ex) {
-                              ex.printStackTrace();
-                          }
-                          return 0;
-                      };
-                  }
-                  String inClassDeclaration(int i) {
-                      return new Object() {
-                          void foo() {
-                              new Integer(i);
-                          }
-                      }.toString();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void annotateMethodInAnonymousClassAsFieldInitializerArgument() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                  if (m.getSimpleName().equals("compare") && m.getLeadingAnnotations().stream().noneMatch(
-                    a -> a.getSimpleName().equals("Deprecated"))) {
-                      return JavaTemplate.builder("@Deprecated")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
-              import java.util.Comparator;
-              import java.util.TreeSet;
-              class Test {
-                  TreeSet<String> set = new TreeSet<>(new Comparator<String>() {
-                      public int compare(String a, String b) {
-                          return a.compareTo(b);
-                      }
-                  });
-              }
-              """,
-            """
-              import java.util.Comparator;
-              import java.util.TreeSet;
-              class Test {
-                  TreeSet<String> set = new TreeSet<>(new Comparator<String>() {
-                      @Deprecated
-                      public int compare(String a, String b) {
-                          return a.compareTo(b);
-                      }
-                  });
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/6520")
-    @Test
-    void annotateMethodInAnonymousClassWithMultipleArgs() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                  if (m.getSimpleName().equals("toString") && m.getLeadingAnnotations().stream().noneMatch(
-                    a -> a.getSimpleName().equals("SuppressWarnings"))) {
-                      return JavaTemplate.builder("@SuppressWarnings(\"all\")")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
-              class A {
-                  A(Object o, String name) {}
-              }
-              class B {
-                  void test() {
-                      new A(new Object() {
-                          @Override
-                          public String toString() { return null; }
-                      }, "Elvar Fridriksson");
-                  }
-              }
-              """,
-            """
-              class A {
-                  A(Object o, String name) {}
-              }
-              class B {
-                  void test() {
-                      new A(new Object() {
-                          @Override
-                          @SuppressWarnings("all")
-                          public String toString() { return null; }
-                      }, "Elvar Fridriksson");
                   }
               }
               """
