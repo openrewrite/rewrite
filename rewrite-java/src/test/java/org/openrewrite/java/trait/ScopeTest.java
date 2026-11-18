@@ -739,6 +739,68 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void nameIsFreeUnlessVisibleSpelledInTheScopeOrReserved() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> Stream.of("field", "p", "later", "class", "here", "fresh")
+            .filter(scope::isFree)
+            .collect(joining(" ")))),
+          java(
+            """
+              class A {
+                  int field;
+                  void m(int p) {
+                      here();
+                      int later = 1;
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A {
+                  int field;
+                  void m(int p) {
+                      /*~~(here fresh)~~>*/here();
+                      int later = 1;
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void bindingOfADeclarationFromItsOwnCursorOrOneAbove() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.VariableDeclarations parameter = (J.VariableDeclarations) method.getParameters().get(0);
+                  return SearchResult.found(method, Stream.of(
+                      Scope.bindingOf(getCursor(), method),
+                      Scope.bindingOf(getCursor(), parameter.getVariables().get(0)))
+                    .map(b -> b.map(binding -> binding.getName() + ":" + binding.getNamespace() + ":" + binding.getKind()).orElse("?"))
+                    .collect(joining(" ")));
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(int p) {
+                  }
+              }
+              """,
+            """
+              class A {
+                  /*~~(m:METHOD:MEMBER p:VARIABLE:PARAMETER)~~>*/void m(int p) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void declaredWithinAnEditedCopyComeFromTheCopy() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

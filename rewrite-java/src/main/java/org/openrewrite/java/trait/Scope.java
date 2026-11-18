@@ -23,6 +23,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
@@ -45,6 +46,7 @@ public class Scope implements Trait<J> {
     private static final String SERVICE = ScopeService.class.getName();
     private static final String BINDINGS = Scope.class.getName() + ".bindings";
     private static final String REFERENCES = Scope.class.getName() + ".references";
+    private static final String SPELLED = Scope.class.getName() + ".spelled";
 
     /**
      * The tree that opens the scope.
@@ -143,16 +145,27 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * A name for a new variable declared at the position, which is {@code preferred} or that name with a number
-     * counted up. Any name this scope spells counts as taken, except a member's name after a dot. That keeps clear of
-     * later declarations in any language. A name visible at the position, a reserved word and a name
-     * {@code alsoTaken} accepts are taken too.
+     * Whether a new variable declared at the position can take the name. It cannot take a reserved word, a name
+     * visible at the position, or any name this scope spells other than a member's name after a dot. The last keeps
+     * clear of later declarations in any language.
+     */
+    public boolean isFree(String name) {
+        Map<Object, Set<String>> spelled = perSourceFile(cursor).computeMessageIfAbsent(SPELLED, k -> new IdentityHashMap<>());
+        Set<String> inScope = spelled.get(cursor.getValue());
+        if (inScope == null) {
+            inScope = namesSpelledWithin(cursor);
+            spelled.put(cursor.getValue(), inScope);
+        }
+        return !service(position).isReserved(name) && !inScope.contains(name) && !lookup(name).isPresent();
+    }
+
+    /**
+     * A free name for a new variable declared at the position, which is {@code preferred} or that name with a
+     * number counted up. A name {@code alsoTaken} accepts is passed over, as one handed out earlier in the same
+     * visit is. Another way of making names can try its own candidates on {@link #isFree(String)}.
      */
     public String freeName(String preferred, Predicate<String> alsoTaken) {
-        ScopeService service = service(position);
-        Set<String> spelled = namesSpelledWithin(cursor);
-        Predicate<String> taken = name -> alsoTaken.test(name) || service.isReserved(name) ||
-                                          spelled.contains(name) || lookup(name).isPresent();
+        Predicate<String> taken = name -> alsoTaken.test(name) || !isFree(name);
         if (!taken.test(preferred)) {
             return preferred;
         }
@@ -193,6 +206,36 @@ public class Scope implements Trait<J> {
             }
         }
         return false;
+    }
+
+    /**
+     * The binding a declaration introduces, found from a cursor on the declaration or above it. The declaration is
+     * a named variable, a method or a class, or the identifier that names one.
+     */
+    public static Optional<Binding> bindingOf(Cursor cursor, J declaration) {
+        J.Identifier name = declaration instanceof J.Identifier ? (J.Identifier) declaration :
+                declaration instanceof J.VariableDeclarations.NamedVariable ? ((J.VariableDeclarations.NamedVariable) declaration).getName() :
+                declaration instanceof J.MethodDeclaration ? ((J.MethodDeclaration) declaration).getName() :
+                declaration instanceof J.ClassDeclaration ? ((J.ClassDeclaration) declaration).getName() : null;
+        if (name == null) {
+            return Optional.empty();
+        }
+        Cursor[] found = {null};
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, Integer p) {
+                return found[0] == null ? super.visit(tree, p) : (J) tree;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                if (identifier.isScope(name)) {
+                    found[0] = getCursor();
+                }
+                return identifier;
+            }
+        }.visit(cursor.getValue(), 0, cursor.getParentOrThrow());
+        return found[0] == null ? Optional.empty() : new Binding.Matcher().get(found[0]);
     }
 
     /**
