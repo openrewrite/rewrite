@@ -191,8 +191,8 @@ def prepare_java_recipe(recipe_name: str, options: Optional[Dict[str, Any]] = No
     if result is None:
         raise RuntimeError(f"Failed to prepare Java recipe: {recipe_name}")
 
-    # The peer reports rejected options rather than failing the request, so refusing here is what
-    # keeps a half-configured recipe from running. This side has no validate stage to defer to.
+    # The peer reports rejected options rather than failing the request, and this side has no
+    # validate stage to defer them to, so refusing here is what stops a half-configured run.
     rejected = _rejected_options(result)
     if rejected:
         raise ValueError(f"Invalid options for recipe `{recipe_name}`: {', '.join(rejected)}")

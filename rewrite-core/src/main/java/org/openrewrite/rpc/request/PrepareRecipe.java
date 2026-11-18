@@ -73,13 +73,11 @@ public class PrepareRecipe implements RpcRequest {
             }
             RecipeDescriptor descriptor = recipe.getDescriptor();
 
-            // Options come from the descriptor, whose names a host can resolve a value for, but
-            // required-ness comes from the same place Recipe#validate() gets it. The two disagree:
-            // `@Option.required()` defaults to true and the descriptor copies it verbatim, while
-            // NullUtils skips a @Nullable field before it ever looks at @Option. Trusting the
-            // descriptor alone would make this server stricter than the recipe is in process, and
-            // would reject an option declared on a getter or constructor parameter outright, since
-            // the descriptor hardcodes a null value for those.
+            // Names come from the descriptor, required-ness from where Recipe#validate() gets it.
+            // The two disagree: `@Option.required()` defaults to true and the descriptor copies it
+            // verbatim, while NullUtils skips a @Nullable field before looking at @Option at all.
+            // The descriptor alone would also reject an option declared on a getter or constructor
+            // parameter outright, since it hardcodes a null value for those.
             Set<String> requiredFields = new HashSet<>();
             for (Field field : NullUtils.findNonNullFields(recipe.getClass())) {
                 requiredFields.add(field.getName());

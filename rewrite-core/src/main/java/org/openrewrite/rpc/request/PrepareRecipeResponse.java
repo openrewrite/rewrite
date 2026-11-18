@@ -71,15 +71,12 @@ public class PrepareRecipeResponse {
     @Nullable
     List<OptionValidation> validations;
 
-    /**
-     * One rejected option of the recipe this node describes.
-     */
     @Value
     public static class OptionValidation {
         /**
-         * Names an option of the enclosing node's descriptor. Never null: a
-         * {@link org.openrewrite.Validated.Invalid} has no legal form without a property, so a rule
-         * about the recipe as a whole still names the option a user would have to change.
+         * Names an option of the enclosing node's descriptor. Never null, since a
+         * {@link org.openrewrite.Validated.Invalid} has no form without a property, so even a rule
+         * about the whole recipe names the option a user would have to change.
          */
         String option;
 

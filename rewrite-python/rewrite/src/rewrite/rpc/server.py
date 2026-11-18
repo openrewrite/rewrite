@@ -1988,10 +1988,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
     descriptor = recipe.descriptor()
     is_delegating = hasattr(recipe, 'java_recipe_name')
 
-    # Reported on this node rather than raised: the host turns each entry into one of its own
-    # validation failures and decides whether to refuse the run, which lets it name the option
-    # instead of showing a traceback. `message` is a fragment completing
-    # "<option> was '<value>' but it ...", the form the host renders.
+    # Reported on this node rather than raised, so the host can name the rejected option instead of
+    # showing a traceback. `message` completes "<option> was '<value>' but it ...", as it renders.
     validations = []
     if not is_delegating:
         for name, value, opt in descriptor.options:

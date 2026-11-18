@@ -97,9 +97,8 @@ export class PrepareRecipe {
         preparedRecipes.set(id, recipe);
 
         const descriptor = await recipe.descriptor();
-        // Reported on this node rather than thrown: a host turns each entry into one of its own
-        // validation failures and decides whether to refuse the run, which lets it name the option
-        // instead of showing a traceback.
+        // Reported on this node rather than thrown, so a host can name the rejected option
+        // instead of showing a traceback, and decides itself whether to refuse the run.
         const validations: OptionValidation[] = [];
         for (const option of descriptor.options) {
             if ((option.required ?? true) && option.value == null) {
@@ -303,15 +302,15 @@ export interface PrepareRecipeResponse {
     recipeList?: PrepareRecipeResponse[]
     causesAnotherCycle?: boolean
     /**
-     * The options of this node that this server rejected, omitted when it found nothing wrong. A
-     * host resolves the offending value from this node's own descriptor, so nothing here repeats it.
+     * The options of this node that this server rejected. A host resolves the offending value from
+     * this node's own descriptor, so nothing here repeats it.
      */
     validations?: OptionValidation[]
 }
 
 /**
- * One rejected option. `message` is a fragment completing "<option> was '<value>' but it ...", the
- * form a host renders, so it reads "is required" rather than as a standalone sentence.
+ * `message` completes "<option> was '<value>' but it ...", the form a host renders, so it reads
+ * "is required" rather than as a sentence.
  */
 export interface OptionValidation {
     option: string

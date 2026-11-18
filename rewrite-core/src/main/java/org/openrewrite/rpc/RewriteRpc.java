@@ -533,7 +533,7 @@ public class RewriteRpc {
      * stage instead.
      */
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
-        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
+        PrepareRecipeResponse r = sendPrepareRecipe(id, options);
         // Only what the remote reported. Running validateAll here would also collect every
         // JVM-side node's own validate() -- a delegatesTo child the host resolved locally among
         // them -- and raise it at the load stage, where a host's per-option reporting cannot see it.
@@ -550,8 +550,11 @@ public class RewriteRpc {
      * refusing to run it.
      */
     public Recipe prepareRecipeDeferringValidation(String id, Map<String, Object> options) {
-        return recipeFromPrepareResponse(
-                send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class));
+        return recipeFromPrepareResponse(sendPrepareRecipe(id, options));
+    }
+
+    private PrepareRecipeResponse sendPrepareRecipe(String id, Map<String, Object> options) {
+        return send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
     }
 
     static Validated<Object> remoteValidations(PrepareRecipeResponse r) {

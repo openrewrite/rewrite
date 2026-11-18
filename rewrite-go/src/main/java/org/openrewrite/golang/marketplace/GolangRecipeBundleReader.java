@@ -41,8 +41,7 @@ public class GolangRecipeBundleReader implements RecipeBundleReader {
 
     @Override
     public RecipeDescriptor describe(RecipeListing listing) {
-        // Deferring, because describing a recipe must not require it to be validly configured:
-        // this prepares with no options at all, so every required option is unset.
+        // Deferring, because describing a recipe must not require it to be validly configured.
         return rpc.prepareRecipeDeferringValidation(listing.getName(), emptyMap()).getDescriptor();
     }
 

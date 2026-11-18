@@ -1928,15 +1928,13 @@ type prepareRecipeResponse struct {
 	// leaf; null only for a delegating recipe, whose children the host resolves itself).
 	RecipeList         []prepareRecipeResponse `json:"recipeList"`
 	CausesAnotherCycle bool                    `json:"causesAnotherCycle,omitempty"`
-	// Validations carries the options of this node that this server rejected, omitted when it
-	// found nothing wrong. The host turns each into one of its own validation failures, resolving
+	// Validations carries the options of this node that this server rejected. The host resolves
 	// the offending value from this node's Descriptor, so nothing here repeats it.
 	Validations []optionValidation `json:"validations,omitempty"`
 }
 
-// optionValidation is one rejected option. Message is a fragment completing
-// "<option> was '<value>' but it ...", the form the host renders, so it reads "is required"
-// rather than as a standalone sentence.
+// optionValidation is one rejected option. Message completes "<option> was '<value>' but it ...",
+// the form the host renders, so it reads "is required" rather than as a sentence.
 type optionValidation struct {
 	Option  string `json:"option"`
 	Message string `json:"message"`

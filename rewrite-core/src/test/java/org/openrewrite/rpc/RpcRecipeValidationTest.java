@@ -16,11 +16,11 @@
 package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import lombok.EqualsAndHashCode;
-import lombok.Value;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,11 +134,6 @@ class RpcRecipeValidationTest {
         assertThat(RewriteRpc.remoteValidations(response(null)).isValid()).isTrue();
     }
 
-    private static PrepareRecipeResponse response(@Nullable List<OptionValidation> validations,
-                                                  PrepareRecipeResponse... children) {
-        return new PrepareRecipeResponse("id", descriptor(option("toText", true, null)), "edit:id",
-          emptyList(), null, emptyList(), null, Arrays.asList(children), null, validations);
-    }
 
     @Test
     void absentValidationsAreNone() {
@@ -204,6 +199,12 @@ class RpcRecipeValidationTest {
         assertThat(v.failures())
                 .extracting(Validated.Invalid::getProperty)
                 .containsExactly("org.example.Demo.first", "org.example.Demo.second");
+    }
+
+    private static PrepareRecipeResponse response(@Nullable List<OptionValidation> validations,
+                                                  PrepareRecipeResponse... children) {
+        return new PrepareRecipeResponse("id", descriptor(option("toText", true, null)), "edit:id",
+          emptyList(), null, emptyList(), null, Arrays.asList(children), null, validations);
     }
 
     private static RecipeDescriptor descriptor(OptionDescriptor... options) {

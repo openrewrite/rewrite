@@ -75,10 +75,6 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     private final boolean causesAnotherCycle;
 
-    /**
-     * The option values the remote rejected for this node, null when it found nothing wrong or did
-     * not check.
-     */
     private final @Nullable List<PrepareRecipeResponse.OptionValidation> validations;
 
     @Override
@@ -87,9 +83,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     }
 
     /**
-     * The failures the remote reported for this node's options. The base implementation cannot help
-     * here: it reflects over non-null fields, and this recipe's fields are its own RPC plumbing
-     * rather than the remote recipe's options, so it would answer "valid" for options it never saw.
+     * The failures the remote reported for this node's options. The inherited reflective check sees
+     * only this class's own RPC plumbing, so it would answer "valid" for options it never saw.
      */
     @Override
     public Validated<Object> validate() {
