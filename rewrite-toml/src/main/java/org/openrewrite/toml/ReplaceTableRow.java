@@ -66,6 +66,10 @@ public class ReplaceTableRow extends Recipe {
         // A row that is not TOML changes nothing, rather than what error recovery made of part of it
         List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValues(row);
         return new TomlVisitor<ExecutionContext>() {
+            @Override
+            public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
+                return TableRowMatcher.keepCommentsOnLastLines((Toml.Document) super.visitDocument(document, ctx));
+            }
 
             @Override
             public Toml visitTable(Toml.Table table, ExecutionContext ctx) {
@@ -91,34 +95,29 @@ public class ReplaceTableRow extends Recipe {
                 if (identifyingValue.equals(tableIdentifyingValue)) {
                     Space firstPrefix = table.getValues().isEmpty() ? Space.format("\n") : table.getValues().get(0).getPrefix();
 
-                    return table.withValues(
-                            ListUtils.mapFirst(
-                                    ListUtils.concatAll(
-                                            ListUtils.map(table.getValues(), value -> {
-                                                if (!(value instanceof Toml.KeyValue)) {
-                                                    return null; // Remove non-KeyValue entries in replace mode
-                                                }
-                                                Toml.KeyValue existingKv = (Toml.KeyValue) value;
+                    List<Toml> kept = ListUtils.map(table.getValues(), value -> {
+                        if (!(value instanceof Toml.KeyValue)) {
+                            return null; // Remove non-KeyValue entries in replace mode
+                        }
+                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
 
-                                                // Check if this key exists in the incoming values
-                                                for (int i = 0; i < incomingKeyValues.size(); i++) {
-                                                    Toml.KeyValue incomingKv = incomingKeyValues.get(i);
-                                                    if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
-                                                        incomingKeyValues.remove(i);
+                        // Check if this key exists in the incoming values
+                        for (int i = 0; i < incomingKeyValues.size(); i++) {
+                            Toml.KeyValue incomingKv = incomingKeyValues.get(i);
+                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
+                                incomingKeyValues.remove(i);
 
-                                                        // Replace if value is different
-                                                        if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
-                                                            return incomingKv.withPrefix(existingKv.getPrefix());
-                                                        }
-                                                        return existingKv; // No change needed
-                                                    }
-                                                }
-                                                return null; // Remove key-value not in incoming
-                                            }),
-                                            ListUtils.map(incomingKeyValues, kv -> TableRowMatcher.onItsOwnLine(kv, table.getValues()))
-                                    ), first -> first.withPrefix(firstPrefix)
-                            )
-                    );
+                                // Replace if value is different
+                                if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
+                                    return incomingKv.withPrefix(existingKv.getPrefix());
+                                }
+                                return existingKv; // No change needed
+                            }
+                        }
+                        return null; // Remove key-value not in incoming
+                    });
+                    Toml.Table replaced = TableRowMatcher.append(table, kept, incomingKeyValues);
+                    return replaced.withValues(ListUtils.mapFirst(replaced.getValues(), first -> first.withPrefix(firstPrefix)));
                 }
 
                 return super.visitTable(table, ctx);
