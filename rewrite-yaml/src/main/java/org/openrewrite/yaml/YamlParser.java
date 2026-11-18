@@ -760,10 +760,12 @@ public class YamlParser implements org.openrewrite.Parser {
 
             String firstUuid = onlyHelmUuids(trimmed, helmUuids);
             if (firstUuid != null) {
-                // Only the first placeholder takes the #; any others on the line are restored as usual
-                result.append(lineContent, 0, indent);
+                // Comment out the line in place, so whitespace around the templates is kept. Only the first
+                // placeholder takes the #; any others on the line are restored as usual
+                int start = lineContent.indexOf(firstUuid);
+                result.append(lineContent, 0, start);
                 result.append('#');
-                result.append(trimmed);
+                result.append(lineContent, start, lineContent.length());
                 commentedUuids.add(firstUuid);
             } else {
                 result.append(lineContent);

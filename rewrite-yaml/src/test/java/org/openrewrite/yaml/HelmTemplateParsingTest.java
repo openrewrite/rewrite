@@ -965,4 +965,13 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingWhitespaceAfterStandaloneTemplate() {
+        rewriteRun(
+          yaml(
+            "spec:\n  {{- if .Values.a }}  \n  replicas: 1\n  {{- end }}\t\n"
+          )
+        );
+    }
 }
