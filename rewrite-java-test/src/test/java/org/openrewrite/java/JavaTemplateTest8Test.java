@@ -817,6 +817,46 @@ class JavaTemplateTest8Test implements RewriteTest {
     }
 
     @Test
+    void statementInLambdaBlockIsReachableFromEnclosingMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  if (m.getBody() == null || !(m.getBody().getStatements().getFirst() instanceof J.VariableDeclarations v) ||
+                      !(v.getVariables().getFirst().getInitializer() instanceof J.Lambda l) ||
+                      !(l.getBody() instanceof J.Block b) || b.getStatements().size() != 1) {
+                      return m;
+                  }
+                  Statement nested = b.getStatements().getFirst();
+                  return JavaTemplate.apply("int b = 2;", updateCursor(m), nested.getCoordinates().before());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test() {
+                      Runnable r = () -> {
+                          int a = 1;
+                      };
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      Runnable r = () -> {
+                          int b = 2;
+                          int a = 1;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addElseBranchToAnIfThatHasNone() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
