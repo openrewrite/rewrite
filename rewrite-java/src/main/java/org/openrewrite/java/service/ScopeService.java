@@ -409,6 +409,24 @@ public class ScopeService {
     }
 
     /**
+     * Whether the {@code instanceof} at the cursor is known to have been true wherever the position is reached,
+     * which is where a pattern variable it declared would be in scope (JLS 6.3.1 and 6.3.2). The value tested may
+     * have been assigned since.
+     */
+    public boolean isMatchedAt(Cursor instanceOf, Cursor position) {
+        for (Cursor c = instanceOf.getParent(); c != null; c = c.getParent()) {
+            if (c.getValue() instanceof J && isScope(c)) {
+                J scopeTree = c.getValue();
+                List<J> tested = pathBelow(scopeTree, instanceOf);
+                List<J> at = pathBelow(scopeTree, position);
+                return tested != null && at != null && !tested.isEmpty() &&
+                       matchedAt(tested, tested.size() - 1, scopeTree, at);
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether a pattern variable declared by the {@code instanceof} at {@code declaration.get(instanceOf)} is
      * definitely matched at the position {@code at}, following JLS 6.3.1 and 6.3.2.
      */

@@ -802,6 +802,67 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void instanceOfIsMatchedWhereAPatternVariableOfItWouldBeInScope() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              Cursor instanceOf;
+
+              @Override
+              public J.InstanceOf visitInstanceOf(J.InstanceOf tested, ExecutionContext ctx) {
+                  instanceOf = getCursor();
+                  return super.visitInstanceOf(tested, ctx);
+              }
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (!"here".equals(m.getSimpleName())) {
+                      return m;
+                  }
+                  ScopeService service = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).service(ScopeService.class);
+                  return SearchResult.found(m, service.isMatchedAt(instanceOf, getCursor()) ? "matched" : "open");
+              }
+          })),
+          java(
+            """
+              class A {
+                  void leaves(Object o) {
+                      if (!(o instanceof String)) { here(); return; }
+                      here();
+                  }
+                  void branches(Object o) {
+                      if (!(o instanceof String)) { here(); } else { here(); }
+                      here();
+                  }
+                  void conjunction(Object o) {
+                      if (o instanceof String && here()) { here(); }
+                      here();
+                  }
+                  boolean here() { return true; }
+              }
+              """,
+            """
+              class A {
+                  void leaves(Object o) {
+                      if (!(o instanceof String)) { /*~~(open)~~>*/here(); return; }
+                      /*~~(matched)~~>*/here();
+                  }
+                  void branches(Object o) {
+                      if (!(o instanceof String)) { /*~~(open)~~>*/here(); } else { /*~~(matched)~~>*/here(); }
+                      /*~~(open)~~>*/here();
+                  }
+                  void conjunction(Object o) {
+                      if (o instanceof String && /*~~(matched)~~>*/here()) { /*~~(matched)~~>*/here(); }
+                      /*~~(open)~~>*/here();
+                  }
+                  boolean here() { return true; }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void declaredWithinAnEditedCopyComeFromTheCopy() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
