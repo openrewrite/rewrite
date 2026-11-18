@@ -8153,7 +8153,7 @@ class ScalaTreeVisitor(
   }
 
   private def visitSingletonTypeTree(stt: Trees.SingletonTypeTree[?]): S.SingletonType = {
-    // Singleton type reference: `None.type`, `obj.type`, `foo.bar.type`
+    // Singleton type reference: `None.type`, `obj.type`, `foo.bar.type`, or a literal type like `"a"`
     val prefix = extractPrefix(stt.span)
     val qualifier = visitTree(stt.ref) match {
       case e: Expression => e
@@ -8161,8 +8161,8 @@ class ScalaTreeVisitor(
       case null => throw new UnsupportedOperationException(
         s"SingletonTypeTree.ref did not produce an Expression: ${stt.ref.getClass.getSimpleName}")
     }
-    // After visiting qualifier, cursor is at the end of qualifier.
-    // The remaining source should be whitespace followed by ".type".
+    // After visiting qualifier, cursor is at the end of qualifier. The remaining source is
+    // whitespace followed by ".type", or empty for a literal type.
     val endPos = Math.max(0, stt.span.end - offsetAdjustment)
     val between = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
     val dotIdx = positionOfNextIn(between, ".", 0)
@@ -9083,20 +9083,14 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Visit a single union operand as an `Expression`. Most operands are types
-   * (identifiers, parameterized types) that are also `Expression`s. Singleton
-   * literal types like `"resize"` are parsed by Dotty as `SingletonTypeTree(Literal)`;
-   * the literal itself *is* the type (there is no `.type` suffix in source), so we
-   * visit the inner literal directly rather than producing an `S.SingletonType`
-   * (which would print a spurious `.type`). Returns null for an operand that cannot
-   * be represented as an `Expression` (e.g. a nested intersection), signalling the
-   * caller to fall back to source preservation.
+   * Visit a single union operand as an `Expression`. Most operands are types that are also
+   * `Expression`s. A bare `Literal` is an `Expression` but not a `TypeTree`, so it is visited
+   * directly. Returns null for an operand that cannot be represented as an `Expression`
+   * (e.g. a nested intersection), signalling the caller to fall back to source preservation.
    */
   private def visitUnionOperand(tree: Trees.Tree[?]): Expression = tree match {
     case _: Trees.Literal[?] =>
       asExpression(visitTree(tree))
-    case stt: Trees.SingletonTypeTree[?] if stt.ref.isInstanceOf[Trees.Literal[?]] =>
-      asExpression(visitTree(stt.ref))
     case _ =>
       visitTypeTree(tree) match {
         case e: Expression => e

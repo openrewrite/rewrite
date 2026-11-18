@@ -1998,8 +1998,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitSingletonType(S.SingletonType singletonType, PrintOutputCapture<P> p) {
         beforeSyntax(singletonType, Space.Location.LANGUAGE_EXTENSION, p);
         visit(singletonType.getQualifier(), p);
-        visitSpace(singletonType.getBeforeType(), Space.Location.LANGUAGE_EXTENSION, p);
-        p.append(".type");
+        if (!(singletonType.getQualifier() instanceof J.Literal)) {
+            visitSpace(singletonType.getBeforeType(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append(".type");
+        }
         afterSyntax(singletonType, p);
         return singletonType;
     }
