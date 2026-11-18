@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
@@ -169,9 +170,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                                     emptyList(), alias, null, null),
                             Markers.EMPTY));
 
-            List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
-
-            if (imports.isEmpty() && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
+            if (cu.getPadding().getImports().isEmpty() && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
                 // leave javadocs on the class and move other comments up to the import
                 // (which could include license headers and the like)
                 Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
@@ -184,6 +183,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 ));
             }
 
+            ImportComments comments = cu instanceof J.CompilationUnit && !cu.getImports().isEmpty() ?
+                    new ImportComments((J.CompilationUnit) cu) : null;
+            if (comments != null) {
+                cu = comments.getPrepared();
+            }
+
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
 
@@ -191,7 +196,23 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
             boolean classpathDirty = p instanceof ExecutionContext && JavaSourceSet.isDirty((ExecutionContext) p, cu);
 
-            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
+            List<JRightPadded<J.Import>> newImports;
+            if (comments != null) {
+                Cursor cursor = getCursor();
+                ImportComments previous = cursor.getMessage(ImportComments.CURSOR_MESSAGE_KEY);
+                cursor.putMessage(ImportComments.CURSOR_MESSAGE_KEY, comments);
+                try {
+                    newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty, cursor);
+                } finally {
+                    if (previous == null) {
+                        cursor.pollMessage(ImportComments.CURSOR_MESSAGE_KEY);
+                    } else {
+                        cursor.putMessage(ImportComments.CURSOR_MESSAGE_KEY, previous);
+                    }
+                }
+            } else {
+                newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
+            }
 
             if (member != null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);
@@ -210,7 +231,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
             }));
 
-            j = cu;
+            j = comments != null && cu instanceof J.CompilationUnit ? comments.restore((J.CompilationUnit) cu) : cu;
         }
         return j;
     }

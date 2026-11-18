@@ -573,7 +573,6 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Test
@@ -616,6 +615,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                */
 
               import org.openrewrite.internal.StringUtils;
+
               import java.util.UUID;
 
               class Test {

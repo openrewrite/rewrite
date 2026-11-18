@@ -108,13 +108,15 @@ public final class ImportComments {
         for (int i = 1; i < imports.size(); i++) {
             JRightPadded<J.Import> padded = imports.get(i);
             J.Import anImport = padded.getElement();
+            String newline = first.getPrefix().getWhitespace().contains("\r\n") ||
+                    anImport.getPrefix().getWhitespace().contains("\r\n") ? "\r\n" : "\n";
             List<Comment> moved = ListUtils.concatAll(anImport.getComments(), padded.getAfter().getComments());
             Space trailing = importComments == null ? null : importComments.trailingComments.get(anImport.getId());
             if (trailing != null) {
-                moved = ListUtils.concatAll(moved, trailing.getComments());
+                // Trim inter-block or pre-declaration blank lines so the moved comment sits right above the wildcard.
+                moved = ListUtils.concatAll(moved, ListUtils.mapLast(trailing.getComments(),
+                        comment -> comment.withSuffix(newline)));
             }
-            String newline = first.getPrefix().getWhitespace().contains("\r\n") ||
-                    anImport.getPrefix().getWhitespace().contains("\r\n") ? "\r\n" : "\n";
             comments = ListUtils.concatAll(comments, ListUtils.map(moved,
                     comment -> hasLineBreak(comment.getSuffix()) ? comment : comment.withSuffix(newline)));
         }

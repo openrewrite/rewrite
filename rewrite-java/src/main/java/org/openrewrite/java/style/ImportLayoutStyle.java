@@ -147,6 +147,14 @@ public class ImportLayoutStyle implements JavaStyle {
                                                   J.Import toAdd, J.@Nullable Package pkg,
                                                   Collection<JavaType.FullyQualified> classpath,
                                                   boolean classpathDirty) {
+        return addImport(originalImports, toAdd, pkg, classpath, classpathDirty, null);
+    }
+
+    public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
+                                                  J.Import toAdd, J.@Nullable Package pkg,
+                                                  Collection<JavaType.FullyQualified> classpath,
+                                                  boolean classpathDirty,
+                                                  @Nullable Cursor cursor) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
@@ -177,7 +185,8 @@ public class ImportLayoutStyle implements JavaStyle {
         JRightPadded<J.Import> before = null;
         JRightPadded<J.Import> after = null;
 
-        Block addToBlock = block(paddedToAdd);
+        List<Block> effectiveLayout = getLayout();
+        Block addToBlock = block(effectiveLayout, paddedToAdd);
         int insertPosition = 0;
 
         for (int i = 0; i < ideallyOrdered.size(); i++) {
@@ -191,6 +200,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     for (int j = 0; j < originalImports.size(); j++) {
                         if (after != null && after.getElement().equals(originalImports.get(j).getElement()) && addToBlock.accept(after)) {
                             insertPosition = j;
+                            after = originalImports.get(j);
                             break;
                         } else if (before.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j + 1;
@@ -205,6 +215,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         if (after.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j;
                             before = j > 0 ? originalImports.get(insertPosition - 1) : null;
+                            after = originalImports.get(j);
                             break;
                         }
                     }
@@ -214,28 +225,30 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         AtomicBoolean isNewBlock = new AtomicBoolean(false);
-        if (!(insertPosition == 0 && pkg == null)) {
-            if (before == null) {
-                //noinspection ConstantValue
-                if (pkg != null) {
-                    Space prefix = originalImports.get(0).getElement().getPrefix();
-                    paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
+        if (before != null && block(effectiveLayout, before) != addToBlock) {
+            boolean isFound = false;
+            for (int j = insertPosition; j < originalImports.size(); j++) {
+                if (block(effectiveLayout, originalImports.get(j)) == addToBlock) {
+                    insertPosition = j;
+                    after = originalImports.get(j);
+                    isFound = true;
+                    break;
                 }
-            } else if (block(before) != addToBlock) {
-                boolean isFound = false;
-                for (int j = insertPosition; j < originalImports.size(); j++) {
-                    if (block(originalImports.get(j)) == addToBlock) {
-                        insertPosition = j;
-                        after = originalImports.get(j);
-                        isFound = true;
-                        break;
-                    }
-                }
-                isNewBlock.set(!isFound);
-                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
-            } else {
-                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
             }
+            isNewBlock.set(!isFound);
+        }
+
+        boolean replacesFirstImportPosition = insertPosition == 0 && !isNewBlock.get();
+        if (replacesFirstImportPosition) {
+            // Preserve the import-section header (such as license headers or leading comments) on the first import.
+            Space firstPrefix = originalImports.get(0).getElement().getPrefix();
+            if (pkg != null || !firstPrefix.isEmpty()) {
+                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(firstPrefix));
+            }
+        } else if (before != null && block(effectiveLayout, before) != addToBlock) {
+            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
+        } else {
+            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
         }
 
         // Walk both directions from the insertion point, looking for imports that are in the same block and have the
@@ -247,7 +260,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         for (int i = insertPosition; i < originalImports.size(); i++) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
-            if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
+            if (block(effectiveLayout, anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
                 starFoldTo.set(i + 1);
                 sameCount++;
@@ -258,7 +271,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         for (int i = insertPosition - 1; i >= 0; i--) {
             JRightPadded<J.Import> anImport = originalImports.get(i);
-            if (block(anImport) == addToBlock && packageOrOuterClassName(anImport)
+            if (block(effectiveLayout, anImport) == addToBlock && packageOrOuterClassName(anImport)
                     .equals(packageOrOuterClassName(paddedToAdd))) {
                 starFoldFrom.set(i);
                 sameCount++;
@@ -267,17 +280,18 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
+        ImportComments importComments = cursor == null ? null : cursor.getNearestMessage(ImportComments.CURSOR_MESSAGE_KEY);
         if (((paddedToAdd.getElement().isStatic() && getNameCountToUseStarImport() <= sameCount) ||
              (!paddedToAdd.getElement().isStatic() && getClassCountToUseStarImport() <= sameCount) ||
              isPackageAlwaysFolded(getPackagesToFold(), paddedToAdd.getElement())) &&
             isPackageFoldable(originalImports, paddedToAdd, classpath, classpathDirty)) {
             starFold.set(true);
-            if (insertPosition != starFoldFrom.get()) {
-                // if we're adding to the middle of a group of imports that are getting star folded,
-                // adopt the prefix of the first import in this group.
-                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(
-                        originalImports.get(starFoldFrom.get()).getElement().getPrefix()
-                ));
+            if (starFoldFrom.get() < starFoldTo.get()) {
+                J.Import folded = ImportComments.foldComments(
+                        originalImports.subList(starFoldFrom.get(), starFoldTo.get()), importComments);
+                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement()
+                        .withId(folded.getId())
+                        .withPrefix(folded.getPrefix()));
             }
         }
 
@@ -292,11 +306,20 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         if (after != null) {
-            if (block(after) == addToBlock) {
-                after = after.withElement(after.getElement().withPrefix(Space.format("\n")));
-            } else if (!isNewBlock.get() && after.getElement().getPrefix().getLastWhitespace().chars()
-                    .filter(c -> c == '\n').count() < 2) {
-                after = after.withElement(after.getElement().withPrefix(Space.format("\n\n")));
+            boolean movedFirstImportPrefix = replacesFirstImportPosition && after == originalImports.get(0);
+            Space afterPrefix = after.getElement().getPrefix();
+            if (movedFirstImportPrefix) {
+                after = after.withElement(after.getElement().withPrefix(
+                        block(effectiveLayout, after) == addToBlock ? Space.format("\n") : Space.format("\n\n")));
+            } else if (block(effectiveLayout, after) == addToBlock) {
+                if (afterPrefix.getComments().isEmpty() || afterPrefix.getWhitespace().contains("\n")) {
+                    after = after.withElement(after.getElement().withPrefix(afterPrefix.withWhitespace("\n")));
+                }
+            } else if (!isNewBlock.get() && countLinebreaks(afterPrefix.getLastWhitespace()) < 2) {
+                if (afterPrefix.getComments().isEmpty() ||
+                        (afterPrefix.getWhitespace().contains("\n") && countLinebreaks(afterPrefix.getWhitespace()) < 2)) {
+                    after = after.withElement(after.getElement().withPrefix(afterPrefix.withWhitespace("\n\n")));
+                }
             }
         }
 
@@ -328,8 +351,12 @@ public class ImportLayoutStyle implements JavaStyle {
         });
     }
 
-    private Block block(JRightPadded<J.Import> anImport) {
-        for (Block block : getLayout()) {
+    private static long countLinebreaks(String whitespace) {
+        return whitespace.chars().filter(c -> c == '\n').count();
+    }
+
+    private static Block block(List<Block> effectiveLayout, JRightPadded<J.Import> anImport) {
+        for (Block block : effectiveLayout) {
             if (block.accept(anImport)) {
                 return block;
             }
