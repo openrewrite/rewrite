@@ -599,68 +599,14 @@ public class GroovyParserVisitor {
                         initExpr
                 );
                 // The field's annotations (@Shared, @Autowired) go with it, or they are read as whitespace.
-                List<AnnotationNode> resolved = new ArrayList<>();
                 for (AnnotatedNode annotated : new AnnotatedNode[]{backing, getter}) {
-                    if (annotated != null && resolved.isEmpty()) {
+                    if (annotated != null && synth.getAnnotations().isEmpty()) {
                         for (AnnotationNode a : annotated.getAnnotations()) {
                             if (a.getLineNumber() > 0) {
-                                resolved.add(a);
+                                synth.addAnnotation(a);
                             }
                         }
                     }
-                }
-                // Groovy drops annotations it can't resolve (e.g. @Shared off the classpath);
-                // recover marker annotations on the lines above the field from source
-                {
-                    List<AnnotationNode> markers = new ArrayList<>();
-                    int k = declStart;
-                    while (true) {
-                        int end = k - 1;
-                        while (end >= 0 && Character.isWhitespace(source.charAt(end))) {
-                            end--;
-                        }
-                        if (end < 0) {
-                            break;
-                        }
-                        int lineStart = source.lastIndexOf('\n', end) + 1;
-                        String text = source.substring(lineStart, end + 1).trim();
-                        if (!text.matches("@[A-Za-z_][A-Za-z0-9_.]*(\\s+@[A-Za-z_][A-Za-z0-9_.]*)*")) {
-                            break;
-                        }
-                        List<AnnotationNode> onLine = new ArrayList<>();
-                        java.util.regex.Matcher name = java.util.regex.Pattern.compile("@([A-Za-z_][A-Za-z0-9_.]*)")
-                            .matcher(source).region(lineStart, end + 1);
-                        while (name.find()) {
-                            AnnotationNode marker = new AnnotationNode(ClassHelper.make(name.group(1)));
-                            int aLine = lineOf(name.start());
-                            int aColumn = name.start() - sourceLineNumberOffsets[aLine - 1] + 1;
-                            marker.setLineNumber(aLine);
-                            marker.setColumnNumber(aColumn);
-                            marker.setLastLineNumber(aLine);
-                            marker.setLastColumnNumber(aColumn + name.group().length());
-                            onLine.add(marker);
-                        }
-                        markers.addAll(0, onLine);
-                        k = lineStart;
-                    }
-                    // A resolved annotation may carry the position of the first in its run, so match by simple name
-                    List<AnnotationNode> all = new ArrayList<>();
-                    List<AnnotationNode> unmatched = new ArrayList<>(resolved);
-                    for (AnnotationNode marker : markers) {
-                        AnnotationNode same = null;
-                        for (AnnotationNode a : unmatched) {
-                            if (a.getClassNode().getNameWithoutPackage().equals(marker.getClassNode().getNameWithoutPackage())) {
-                                same = a;
-                                break;
-                            }
-                        }
-                        unmatched.remove(same);
-                        all.add(same != null ? same : marker);
-                    }
-                    if (all.isEmpty()) {
-                        all.addAll(resolved);
-                    }
-                    all.forEach(synth::addAnnotation);
                 }
                 int line = lineOf(declStart);
                 int column = declStart - sourceLineNumberOffsets[line - 1] + 1;
@@ -3822,8 +3768,28 @@ public class GroovyParserVisitor {
                     break;
                 }
             }
+
+            // Groovy also drops some annotations whose classes it can't resolve, e.g. on trait fields
+            String unresolved = visited ? null : annotationNameInSource();
+            if (unresolved != null) {
+                paramAnnotations.add(visitAnnotation(new AnnotationNode(ClassHelper.make(unresolved)), classVisitor));
+                visited = true;
+            }
         }
         return paramAnnotations;
+    }
+
+    private @Nullable String annotationNameInSource() {
+        int start = indexOfNextNonWhitespace(cursor, source) + 1;
+        if (start >= source.length() || source.charAt(start - 1) != '@' || !Character.isJavaIdentifierStart(source.charAt(start))) {
+            return null;
+        }
+        int end = start;
+        while (end < source.length() && (isJavaIdentifierPart(source.charAt(end)) || source.charAt(end) == '.')) {
+            end++;
+        }
+        String name = source.substring(start, end);
+        return "interface".equals(name) ? null : name;
     }
 
     public J.Annotation visitAnnotation(AnnotationNode annotation, RewriteGroovyClassVisitor classVisitor) {
