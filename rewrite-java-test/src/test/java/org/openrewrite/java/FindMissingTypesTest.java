@@ -302,6 +302,85 @@ class FindMissingTypesTest implements RewriteTest {
     }
 
     @Test
+    void membersOfUnresolvedReceiver() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = missing().a.b;
+              }
+              """,
+            """
+              class A {
+                  Object o = /*~~(FieldAccess type is missing or malformed)~~>*//*~~(FieldAccess type is missing or malformed)~~>*//*~~(MethodInvocation type is missing or malformed)~~>*/missing().a.b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedFieldAccessAsQualifier() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                    return "list".equals(fa.getSimpleName()) ? fa.withType(null) : fa;
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              import java.util.List;
+
+              class A {
+                  List<String> list;
+                  int size = this.list.size();
+              }
+              """,
+            """
+              import java.util.List;
+
+              class A {
+                  List<String> list;
+                  int size = /*~~(FieldAccess type is missing or malformed)~~>*/this.list.size();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedClassLiteral() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    return super.visitFieldAccess(fieldAccess, ctx).withType(null);
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              class A {
+                  Class<?> c = String.class;
+              }
+              """,
+            """
+              class A {
+                  Class<?> c = /*~~(FieldAccess type is missing or malformed)~~>*/String.class;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typedFieldAccesses() {
         rewriteRun(
           java(

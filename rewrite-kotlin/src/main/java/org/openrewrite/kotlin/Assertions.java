@@ -423,22 +423,34 @@ public final class Assertions {
         @Override
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
-            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fa)) {
+            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fieldAccess)) {
                 fa = SearchResult.found(fa, "FieldAccess type is missing or malformed");
             }
             return fa;
         }
 
         private boolean isAllowedToHaveUnknownType(J.FieldAccess fa) {
-            if (inPackageDeclaration() || inImport() || "class".equals(fa.getSimpleName())) {
+            if (inPackageDeclaration() || inImport()) {
                 return true;
             }
+            if ("class".equals(fa.getSimpleName())) {
+                // An unattributed class literal target is reported on the target itself
+                return !isWellFormedType(fa.getTarget().getType(), seenTypes);
+            }
             Tree parent = getCursor().getParentTreeCursor().getValue();
-            // Package segments are typed as unknown, and only ever occur as the qualifier of a member,
-            // whose own attribution is checked instead
-            return parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
-                   !"class".equals(((J.FieldAccess) parent).getSimpleName()) ||
-                   parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect();
+            boolean isQualifier = parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                                  !"class".equals(((J.FieldAccess) parent).getSimpleName()) ||
+                                  parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect();
+            return isQualifier && isPackageName(fa);
+        }
+
+        // Neither a package nor any segment of its name has a type
+        private boolean isPackageName(Expression name) {
+            if (isWellFormedType(name.getType(), seenTypes)) {
+                return false;
+            }
+            return name instanceof J.Identifier ||
+                   name instanceof J.FieldAccess && isPackageName(((J.FieldAccess) name).getTarget());
         }
 
         @Override

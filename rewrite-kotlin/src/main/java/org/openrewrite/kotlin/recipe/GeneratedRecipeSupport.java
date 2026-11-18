@@ -475,27 +475,39 @@ public final class GeneratedRecipeSupport {
         return wrapWithPrecondition(matcherSpecsLines, walker);
     }
 
-    /**
-     * The template stub is compiled without the recipe target's own classes, so a property it reads on one of
-     * them is left untyped; attribute it from the receiver's type.
-     */
+    // The template stub is compiled without the recipe target's own classes, so a property it reads on one of
+    // them is left untyped; attribute it from the receiver's type.
     private static J attributed(J j) {
         if (!(j instanceof J.FieldAccess) || TypeUtils.isWellFormedType(((J.FieldAccess) j).getType())) {
             return j;
         }
         J.FieldAccess fieldAccess = (J.FieldAccess) j;
-        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(fieldAccess.getTarget().getType());
-        if (owner == null) {
+        JavaType.Variable member = findMember(TypeUtils.asFullyQualified(fieldAccess.getTarget().getType()),
+                fieldAccess.getSimpleName(), new HashSet<>());
+        if (member == null) {
             return j;
         }
-        for (JavaType.Variable member : owner.getMembers()) {
-            if (member.getName().equals(fieldAccess.getSimpleName())) {
-                return fieldAccess
-                        .withName(fieldAccess.getName().withType(member.getType()).withFieldType(member))
-                        .withType(member.getType());
+        return fieldAccess
+                .withName(fieldAccess.getName().withType(member.getType()).withFieldType(member))
+                .withType(member.getType());
+    }
+
+    private static JavaType.@Nullable Variable findMember(JavaType.@Nullable FullyQualified type, String name,
+                                                          Set<String> visited) {
+        if (type == null || !visited.add(type.getFullyQualifiedName())) {
+            return null;
+        }
+        for (JavaType.Variable member : type.getMembers()) {
+            if (member.getName().equals(name)) {
+                return member;
             }
         }
-        return j;
+        JavaType.Variable inherited = findMember(type.getSupertype(), name, visited);
+        List<JavaType.FullyQualified> interfaces = type.getInterfaces();
+        for (int i = 0; inherited == null && i < interfaces.size(); i++) {
+            inherited = findMember(interfaces.get(i), name, visited);
+        }
+        return inherited;
     }
 
     /**
