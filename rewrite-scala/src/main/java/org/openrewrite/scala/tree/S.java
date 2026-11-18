@@ -1489,18 +1489,27 @@ public interface S extends J {
     }
 
     /**
-     * Represents a Scala pattern definition (destructuring declaration).
+     * A definition that binds the names in one or more patterns, which Scala parses apart from a
+     * plain {@code val x = ...}.
      * <p>
      * Examples:
      * <ul>
      *   <li>{@code val (a, b) = (1, 2)}</li>
-     *   <li>{@code var (x, y) = point}</li>
+     *   <li>{@code var Some(x) = option}</li>
+     *   <li>{@code val a, b: Int}, where each name gets the type and any value</li>
      *   <li>{@code case Red, Green, Blue} (enum cases)</li>
      * </ul>
+     * The {@code val}, {@code var} or {@code case} keyword is the last of the modifiers.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class PatternDefinition implements S, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
 
         @With @Getter @EqualsAndHashCode.Include
         UUID id;
@@ -1511,14 +1520,149 @@ public interface S extends J {
         @With @Getter
         Markers markers;
 
+        @With @Getter
+        List<J.Annotation> leadingAnnotations;
+
+        @With @Getter
+        List<J.Modifier> modifiers;
+
         /**
-         * The original source text. Pattern definitions have complex structure
-         * (multiple patterns, types, initializer) that will be fully modeled later.
+         * The patterns, comma separated. The container's before-space is unused.
          */
+        JContainer<J> patterns;
+
+        /**
+         * The declared type, after the space before its colon.
+         */
+        @Nullable
+        JLeftPadded<TypeTree> typeExpression;
+
+        /**
+         * The value, after the space before its {@code =}. An abstract definition or an enum case list has none.
+         */
+        @Nullable
+        JLeftPadded<Expression> initializer;
+
+        /**
+         * The whole definition as source text. Only an LST written before the other fields existed has it, and then
+         * none of them. The parser never sets it.
+         */
+        @Deprecated
+        @Nullable
+        @With
+        @Getter
+        String text;
+
+        public static PatternDefinition build(UUID id, Space prefix, Markers markers,
+                                              List<J.Annotation> leadingAnnotations, List<J.Modifier> modifiers,
+                                              JContainer<J> patterns, @Nullable JLeftPadded<TypeTree> typeExpression,
+                                              @Nullable JLeftPadded<Expression> initializer) {
+            return new PatternDefinition(null, id, prefix, markers, leadingAnnotations, modifiers, patterns,
+                    typeExpression, initializer, null);
+        }
+
+        public List<J> getPatterns() {
+            return patterns.getElements();
+        }
+
+        public PatternDefinition withPatterns(List<J> patterns) {
+            return getPadding().withPatterns(JContainer.withElements(this.patterns, patterns));
+        }
+
+        public @Nullable TypeTree getTypeExpression() {
+            return typeExpression == null ? null : typeExpression.getElement();
+        }
+
+        public PatternDefinition withTypeExpression(@Nullable TypeTree typeExpression) {
+            return getPadding().withTypeExpression(JLeftPadded.withElement(this.typeExpression, typeExpression));
+        }
+
+        public @Nullable Expression getInitializer() {
+            return initializer == null ? null : initializer.getElement();
+        }
+
+        public PatternDefinition withInitializer(@Nullable Expression initializer) {
+            return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitPatternDefinition(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PatternDefinition t;
+
+            public JContainer<J> getPatterns() {
+                return t.patterns;
+            }
+
+            public PatternDefinition withPatterns(JContainer<J> patterns) {
+                return t.patterns == patterns ? t : new PatternDefinition(null, t.id, t.prefix, t.markers,
+                        t.leadingAnnotations, t.modifiers, patterns, t.typeExpression, t.initializer, t.text);
+            }
+
+            public @Nullable JLeftPadded<TypeTree> getTypeExpression() {
+                return t.typeExpression;
+            }
+
+            public PatternDefinition withTypeExpression(@Nullable JLeftPadded<TypeTree> typeExpression) {
+                return t.typeExpression == typeExpression ? t : new PatternDefinition(null, t.id, t.prefix, t.markers,
+                        t.leadingAnnotations, t.modifiers, t.patterns, typeExpression, t.initializer, t.text);
+            }
+
+            public @Nullable JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public PatternDefinition withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new PatternDefinition(null, t.id, t.prefix, t.markers,
+                        t.leadingAnnotations, t.modifiers, t.patterns, t.typeExpression, initializer, t.text);
+            }
+        }
+    }
+
+    /**
+     * A {@code given} instance with a body, such as {@code given Ord[Int] with { ... }}, kept as its source text.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class GivenInstance implements S, Statement {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
         @With @Getter
         String text;
 
-        public PatternDefinition(UUID id, Space prefix, Markers markers, String text) {
+        public GivenInstance(UUID id, Space prefix, Markers markers, String text) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1527,7 +1671,7 @@ public interface S extends J {
 
         @Override
         public <P> J acceptScala(ScalaVisitor<P> v, P p) {
-            return v.visitPatternDefinition(this, p);
+            return v.visitGivenInstance(this, p);
         }
 
         @Override

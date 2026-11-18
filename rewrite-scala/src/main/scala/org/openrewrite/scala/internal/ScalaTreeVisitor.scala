@@ -3798,18 +3798,18 @@ class ScalaTreeVisitor(
    * Dotty into a synthesized ClassDef/ModuleDef. The synthesized definitions don't
    * map cleanly to J.ClassDeclaration with the current modeling. Until form 3 has
    * proper structured handling, we preserve the original source text via
-   * S.PatternDefinition. A `ModuleDef`/`ClassDef` with the `Given` flag is always a
+   * S.GivenInstance. A `ModuleDef`/`ClassDef` with the `Given` flag is always a
    * synthesized given-with-body — no other construct produces that combination.
    */
   private def isGivenWithBody(t: Trees.Tree[?], mods: untpd.Modifiers): Boolean = {
     mods != null && mods.is(Flags.Given) && t.span.exists
   }
 
-  private def preserveGivenWithBodyAsText(span: dotty.tools.dotc.util.Spans.Span): S.PatternDefinition = {
+  private def preserveGivenWithBodyAsText(span: dotty.tools.dotc.util.Spans.Span): S.GivenInstance = {
     val txtPrefix = extractPrefix(span)
     val txt = extractSource(span)
     updateCursor(span.end)
-    new S.PatternDefinition(Tree.randomId(), txtPrefix, Markers.EMPTY, txt)
+    new S.GivenInstance(Tree.randomId(), txtPrefix, Markers.EMPTY, txt)
   }
 
 /**
@@ -8698,11 +8698,91 @@ class ScalaTreeVisitor(
     new S.TypeAlias(Tree.randomId(), prefix, Markers.EMPTY, text)
   }
 
+  /**
+   * `val`/`var` with one or more patterns, or an enum's `case A, B` list. The keyword becomes the last
+   * modifier, as `def` does in [[visitDefDef]].
+   */
   private def visitPatDef(pd: untpd.PatDef): S.PatternDefinition = {
-    val prefix = extractPrefix(pd.span)
-    val text = extractSource(pd.span)
+    val leadingAnnotations = new util.ArrayList[J.Annotation]()
+    val hasAnnotations = pd.mods != null && pd.mods.annotations.nonEmpty
+    if (hasAnnotations) {
+      for (annot <- pd.mods.annotations) {
+        visitTree(annot) match {
+          case ann: J.Annotation => leadingAnnotations.add(ann)
+          case _ =>
+        }
+      }
+    }
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(pd.span)
+
+    val end = Math.max(0, pd.span.end - offsetAdjustment)
+    val firstPatternStart = pd.pats.headOption.filter(_.span.exists).map(effectiveStart).getOrElse(end)
+    val header = if (cursor <= firstPatternStart && firstPatternStart <= source.length) source.substring(cursor, firstPatternStart) else ""
+    // Skips comments, which may spell a keyword, as in `private /* val */ val (a, b)`
+    val (keywordIndex, keyword) = List("val", "var", "case")
+      .map(k => (positionOfNextIn(header, k, 0), k))
+      .filter(_._1 >= 0)
+      .sortBy(_._1)
+      .headOption
+      .getOrElse((-1, ""))
+    if (keywordIndex < 0) {
+      throw new IllegalStateException("No val, var or case keyword in a pattern definition: " + header)
+    }
+    val modifierText = header.substring(0, keywordIndex)
+    val (modifiers, lastModifierEnd) = extractModifiersFromText(pd.mods, modifierText)
+    val keywordPrefix = if (lastModifierEnd <= modifierText.length) modifierText.substring(lastModifierEnd) else ""
+    // `val` is Final, as it is on a plain val, so hasModifier(Final) answers alike for both
+    modifiers.add(new J.Modifier(Tree.randomId(), ScalaSpace.format(keywordPrefix), Markers.EMPTY, keyword,
+      if (keyword == "val") J.Modifier.Type.Final else J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+    cursor = cursor + keywordIndex + keyword.length
+
+    val patterns = new util.ArrayList[JRightPadded[J]]()
+    val pats = pd.pats
+    for (i <- pats.indices) {
+      val pattern: J = patternContext(pattern = true)(visitTree(pats(i))) match {
+        case j: J => j
+        case _ => throw new IllegalStateException("Unmapped pattern in a pattern definition: " + pats(i))
+      }
+      var after = Space.EMPTY
+      if (i < pats.size - 1) {
+        val comma = positionOfNext(",")
+        after = ScalaSpace.format(source, cursor, comma)
+        cursor = comma + 1
+      }
+      patterns.add(JRightPadded.build(pattern).withAfter(after))
+    }
+
+    var typeExpression: JLeftPadded[TypeTree] = null
+    if (pd.tpt != null && !pd.tpt.isEmpty && pd.tpt.span.exists && pd.tpt.span.start != pd.tpt.span.end) {
+      val colon = positionOfNext(":")
+      val beforeColon = ScalaSpace.format(source, cursor, colon)
+      cursor = colon + 1
+      typeExpression = JLeftPadded.build(visitTypeTree(pd.tpt)).withBefore(beforeColon)
+    }
+
+    var initializer: JLeftPadded[Expression] = null
+    if (pd.rhs != null && !pd.rhs.isEmpty && pd.rhs.span.exists) {
+      val rhsStart = effectiveStart(pd.rhs)
+      val beforeRhs = source.substring(cursor, rhsStart)
+      val equals = positionOfNextIn(beforeRhs, "=", 0)
+      if (equals < 0) {
+        throw new IllegalStateException("No = before the value of a pattern definition: " + beforeRhs)
+      }
+      val beforeEquals = ScalaSpace.format(beforeRhs.substring(0, equals))
+      val afterEquals = ScalaSpace.format(beforeRhs.substring(equals + 1))
+      cursor = rhsStart
+      val value: Expression = visitTree(pd.rhs) match {
+        case block: J.Block => new S.StatementExpression(Tree.randomId(), block.withPrefix(afterEquals))
+        case expr: Expression => expr.withPrefix[Expression](afterEquals)
+        case stmt: Statement => new S.StatementExpression(Tree.randomId(), stmt.withPrefix[Statement](afterEquals))
+        case _ => throw unmappedException(pd.rhs)
+      }
+      initializer = JLeftPadded.build(value).withBefore(beforeEquals)
+    }
+
     updateCursor(pd.span.end)
-    new S.PatternDefinition(Tree.randomId(), prefix, Markers.EMPTY, text)
+    S.PatternDefinition.build(Tree.randomId(), prefix, Markers.EMPTY, leadingAnnotations, modifiers,
+      JContainer.build(Space.EMPTY, patterns, Markers.EMPTY), typeExpression, initializer)
   }
 
   /**
@@ -9567,7 +9647,7 @@ class ScalaTreeVisitor(
 
     var lastEnd = 0
     for ((pos, kw, mt) <- present) {
-      val spaceBefore = if (pos > lastEnd) Space.format(text.substring(lastEnd, pos)) else Space.EMPTY
+      val spaceBefore = if (pos > lastEnd) ScalaSpace.format(text, lastEnd, pos) else Space.EMPTY
 
       // `private[scope]` / `protected[scope]` qualified access
       var fullKw = kw
