@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DataTable;
+import org.openrewrite.DataTableExecutionContextView;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.RecipeScheduler;
 import org.openrewrite.SourceFile;
@@ -138,6 +139,12 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             @Override
             public void failure(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
                 failures.insertRow(ctx, LockFileRegeneration.failureRow(packageJson, failure, packageName));
+            }
+
+            @Override
+            public void failureAtEndOfRun(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
+                DataTableExecutionContextView.view(ctx).getDataTableStore().insertRow(failures, ctx,
+                        LockFileRegeneration.failureRow(packageJson, failure, packageName));
             }
 
             @Override
@@ -285,7 +292,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                SourceFile sf = withoutDeferralWarning(ctx, (SourceFile) tree);
+                SourceFile sf = withoutStaleWarning(ctx, withoutDeferralWarning(ctx, (SourceFile) tree));
                 Path p = sf.getSourcePath();
                 pending.clear();
                 SourceFile out;
@@ -396,6 +403,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (result != null && result.isSuccess()) {
             String content = requireNonNull(result.getLockFileContent());
             out = content.equals(text) ? sf : PackageJsonHelper.reparseLock(sf, content);
+            regenerated(ctx, p);
         } else if (result != null) {
             failure(ctx, requireNonNull(importer), requireNonNull(result.getFailure()));
             out = warn(sf, "lock regeneration failed: " + result.getErrorMessage());
@@ -492,8 +500,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (previousOutputs.equals(outputs(ctx, decision))) {
             for (Path lock : otherwise) {
                 if (scan.lockToPackage.containsKey(lock) && warnedStale.add(lock)) {
-                    cannotKnow(ctx, path, "a recipe before this one changed " + changed + " after this recipe wrote " +
-                                          "the lock from its earlier revision (" + lock + ")");
+                    staleUntilRegenerated(ctx, path, lock, "a recipe before this one changed " + changed +
+                                                           " after this recipe wrote the lock from its earlier revision (" + lock + ")");
                 }
             }
             return;
@@ -508,6 +516,53 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (!deferToNextCycle(ctx, path, why)) {
             cannotKnow(ctx, path, why);
         }
+    }
+
+    /**
+     * Warn that {@code lock} no longer installs {@code path} as an earlier recipe left it, but report it only if no
+     * recipe regenerates the lock before the run ends: a later one in the run, or the same in a later cycle, may.
+     */
+    private void staleUntilRegenerated(ExecutionContext ctx, Path path, Path lock, String why) {
+        pending.add(why);
+        Deferrals deferrals = ctx.computeMessageIfAbsent(DEFERRED, k -> new Deferrals());
+        deferrals.stale.put(lock, new Stale(new Deferral(rows, new LockFileRegeneration.Failure(
+                LockFileRegeneration.Kind.CANNOT_KNOW, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, null, why)),
+                path, visiting == null ? null : visiting.getSourcePath(), why));
+        // put, as a cycle's context keeps only the messages put in it for the run
+        ctx.putMessage(DEFERRED, deferrals);
+    }
+
+    private static void regenerated(ExecutionContext ctx, Path lock) {
+        Deferrals deferrals = ctx.getMessage(DEFERRED);
+        Stale stale = deferrals == null ? null : deferrals.stale.get(lock);
+        if (stale != null) {
+            stale.regenerated = true;
+        }
+    }
+
+    // a lock regenerated since it was warned stale withdraws the warning from the file it was left on
+    private static SourceFile withoutStaleWarning(ExecutionContext ctx, SourceFile sf) {
+        Deferrals deferrals = ctx.getMessage(DEFERRED);
+        if (deferrals == null) {
+            return sf;
+        }
+        Set<String> withdrawn = new HashSet<>();
+        for (Stale stale : deferrals.stale.values()) {
+            if (stale.regenerated && sf.getSourcePath().equals(stale.warned)) {
+                withdrawn.add(stale.why);
+                stale.warned = null;
+            }
+        }
+        if (withdrawn.isEmpty()) {
+            return sf;
+        }
+        List<Marker> kept = new ArrayList<>();
+        for (Marker marker : sf.getMarkers().getMarkers()) {
+            if (!(marker instanceof Markup.Warn && withdrawn.contains(((Markup.Warn) marker).getMessage()))) {
+                kept.add(marker);
+            }
+        }
+        return sf.withMarkers(sf.getMarkers().withMarkers(kept));
     }
 
     /**
@@ -583,9 +638,15 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             return;
         }
         for (Map.Entry<Path, Deferral> pending : deferrals.pending.entrySet()) {
-            pending.getValue().rows.failure(ctx, pending.getKey(), pending.getValue().failure);
+            pending.getValue().rows.failureAtEndOfRun(ctx, pending.getKey(), pending.getValue().failure);
         }
         deferrals.pending.clear();
+        for (Stale stale : deferrals.stale.values()) {
+            if (!stale.regenerated) {
+                stale.deferral.rows.failureAtEndOfRun(ctx, stale.path, stale.deferral.failure);
+            }
+        }
+        deferrals.stale.clear();
     }
 
     private static final String DEFERRED = "org.openrewrite.javascript.dependencyEditsDeferred";
@@ -595,6 +656,24 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         final Set<Path> ever = new HashSet<>();
         final Map<Path, Set<String>> warned = new HashMap<>();
         final Map<Path, Deferral> pending = new LinkedHashMap<>();
+
+        // by lock, those warned stale
+        final Map<Path, Stale> stale = new LinkedHashMap<>();
+    }
+
+    private static final class Stale {
+        final Deferral deferral;
+        final Path path;
+        @Nullable Path warned;
+        final String why;
+        boolean regenerated;
+
+        Stale(Deferral deferral, Path path, @Nullable Path warned, String why) {
+            this.deferral = deferral;
+            this.path = path;
+            this.warned = warned;
+            this.why = why;
+        }
     }
 
     private static final class Deferral {
@@ -1171,6 +1250,14 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      */
     public interface Rows {
         void failure(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure);
+
+        /**
+         * A failure reported once the run's cycles are over, which a data table admitting rows only from the first
+         * cycle would drop.
+         */
+        default void failureAtEndOfRun(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
+            failure(ctx, packageJson, failure);
+        }
 
         void declined(ExecutionContext ctx, Path path, String reason);
     }

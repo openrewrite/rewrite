@@ -28,6 +28,8 @@ import org.openrewrite.json.ChangeValue;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.text.FindAndReplace;
+import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -238,6 +240,142 @@ class DependencyEditAfterEarlierPackageJsonChangeTest implements RewriteTest {
         assertThat(run.getChangeset().getAllResults())
                 .anySatisfy(result -> assertThat(Objects.requireNonNull(result.getAfter()).getMarkers()
                         .findFirst(Markup.Warn.class)).isPresent());
+    }
+
+    @ParameterizedTest(name = "nested: {0}")
+    @ValueSource(booleans = {false, true})
+    void secondRemovalInstallsTheManifestTheFirstLeft(boolean nested) {
+        String dir = nested ? "backend/" : "";
+        Map<String, String> before = new LinkedHashMap<>();
+        before.put(dir + "package.json", fixture("pkg-before").replace("\"is-number\": \"^6.0.0\"",
+                "\"is-number\": \"^6.0.0\",\n    \"left-pad\": \"^1.3.0\""));
+        before.put(dir + "package-lock.json", fixture("after"));
+        if (nested) {
+            before.put("package.json", fixture("pkg-before").replace("\"is-number\": \"^6.0.0\"", ""));
+            before.put("package-lock.json", fixture("before"));
+        }
+        Recipe recipe = new CompositeRecipe(Arrays.asList(
+                new RemoveDependency("left-pad", null, null),
+                new RemoveDependency("is-number", null, null)));
+
+        List<String> failures = new ArrayList<>();
+        Map<String, String> first = null;
+        for (List<String> order : orders(new ArrayList<>(before.keySet()))) {
+            ExecutionContext ctx = addLeafRegistry();
+            List<SourceFile> sources = new ArrayList<>();
+            for (String path : order) {
+                sources.add(parse(ctx, path, before.get(path)));
+            }
+            RecipeRun run = recipe.run(new InMemoryLargeSourceSet(sources), ctx);
+            Map<String, String> actual = new LinkedHashMap<>(before);
+            for (Result result : run.getChangeset().getAllResults()) {
+                SourceFile sf = Objects.requireNonNull(result.getAfter());
+                actual.put(sf.getSourcePath().toString(),
+                        sf.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
+                sf.getMarkers().findFirst(Markup.Warn.class).ifPresent(warn ->
+                        failures.add(order + ": " + sf.getSourcePath() + " is warned " + warn.getMessage()));
+            }
+            for (String path : actual.keySet()) {
+                if (path.startsWith(dir) && (actual.get(path).contains("left-pad") || actual.get(path).contains("is-number"))) {
+                    failures.add(order + ": " + path + " is\n" + actual.get(path));
+                }
+            }
+            if (first == null) {
+                first = actual;
+            } else if (!first.equals(actual)) {
+                failures.add(order + ": differs from the first order: " + actual);
+            }
+            for (NodeLockRegenerationFailures.Row row : run.getDataTableRows(NodeLockRegenerationFailures.class)) {
+                failures.add(order + ": " + row.getSourcePath() + " failed to regenerate: " + row.getDetail());
+            }
+        }
+        assertThat(failures).isEmpty();
+    }
+
+    /**
+     * A removal from the root manifest, which a project beneath it reads, regenerates that project's lock before an
+     * earlier recipe's edit of its manifest is seen. The stale lock is reported, at the end of the run, only if no
+     * later cycle regenerates it, as the removal from the project's own manifest does once its import moves.
+     */
+    @ParameterizedTest(name = "imports move: {0}")
+    @ValueSource(booleans = {true, false})
+    void lockAnEarlierRecipeLeftStaleIsReportedOnlyIfNoLaterCycleRegeneratesIt(boolean importsMove) {
+        Map<String, String> before = new LinkedHashMap<>();
+        before.put("package.json", "{\n  \"name\": \"root\",\n  \"dependencies\": {\n    \"left-pad\": \"^1.3.0\"\n  }\n}\n");
+        before.put("backend/package.json", fixture("pkg-before").replace("\"is-number\": \"^6.0.0\"",
+                "\"is-number\": \"^6.0.0\",\n    \"left-pad\": \"^1.3.0\""));
+        before.put("backend/package-lock.json", fixture("after"));
+        before.put("backend/src/a.ts", "import pad from 'left-pad';\n");
+        List<Recipe> steps = new ArrayList<>();
+        steps.add(new ChangeValue("$.dependencies.is-number", "\"6.0.0\""));
+        if (importsMove) {
+            steps.add(new FindAndReplace("'left-pad'", "'./left-pad'", null, null, null, null, "**/*.ts", null));
+        }
+        steps.add(new RemoveDependency("left-pad", null, singletonList("left-pad")));
+        Recipe recipe = new Recipe() {
+            @Override
+            public String getDisplayName() {
+                return "Edit, then remove once unimported";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Edits package.json, then removes a dependency in the cycle after its imports move.";
+            }
+
+            @Override
+            public List<Recipe> getRecipeList() {
+                return steps;
+            }
+
+            @Override
+            public boolean causesAnotherCycle() {
+                return true;
+            }
+        };
+
+        List<String> failures = new ArrayList<>();
+        int stale = 0;
+        for (List<String> order : orders(new ArrayList<>(before.keySet()))) {
+            ExecutionContext ctx = addLeafRegistry();
+            List<SourceFile> sources = new ArrayList<>();
+            for (String path : order) {
+                sources.add(path.endsWith(".ts") ?
+                        PlainTextParser.builder().build().parse(ctx, before.get(path)).findFirst()
+                                .map(t -> (SourceFile) t.withSourcePath(Paths.get(path))).orElseThrow() :
+                        parse(ctx, path, before.get(path)));
+            }
+            RecipeRun run = recipe.run(new InMemoryLargeSourceSet(sources), ctx, 3);
+            String lock = before.get("backend/package-lock.json");
+            List<String> warnings = new ArrayList<>();
+            for (Result result : run.getChangeset().getAllResults()) {
+                SourceFile sf = Objects.requireNonNull(result.getAfter());
+                if (sf.getSourcePath().toString().equals("backend/package-lock.json")) {
+                    lock = sf.printAll();
+                }
+                sf.getMarkers().findFirst(Markup.Warn.class).ifPresent(warn ->
+                        warnings.add(sf.getSourcePath() + " is warned " + warn.getMessage()));
+            }
+            List<String> rows = new ArrayList<>();
+            for (NodeLockRegenerationFailures.Row row : run.getDataTableRows(NodeLockRegenerationFailures.class)) {
+                rows.add(row.getSourcePath() + " failed to regenerate: " + row.getDetail());
+            }
+            if (lock.contains("\"is-number\": \"6.0.0\"") && lock.contains("left-pad") != importsMove) {
+                if (!rows.isEmpty() || !warnings.isEmpty()) {
+                    failures.add(order + ": the lock was regenerated, yet " + rows + warnings);
+                }
+            } else {
+                stale++;
+                if (importsMove || rows.size() != 1 || !rows.get(0).contains("wrote the lock from its earlier revision") ||
+                    warnings.size() != 1) {
+                    failures.add(order + ": the lock is left stale, reported " + rows + warnings + "\n" + lock);
+                }
+            }
+        }
+        assertThat(failures).isEmpty();
+        if (!importsMove) {
+            assertThat(stale).as("orders whose lock no later cycle regenerates").isPositive();
+        }
     }
 
     private static Json.Document parse(ExecutionContext ctx, String path, String text) {
