@@ -116,6 +116,12 @@ class ScalaASTConverter {
           } else pkgDef.stats
 
         statements.addAll(convertBody(rawStats, visitor))
+        if (packageDecl != null) {
+          visitor.endMarkerOf(pkgDef).foreach { case (endStart, nameStart) =>
+            packageDecl = visitor.endMarkerAfter(packageDecl, endStart, nameStart,
+              Math.max(0, pkgDef.span.end - visitor.getOffsetAdjustment))
+          }
+        }
       case _ =>
         statements.addAll(convertBody(Seq(tree), visitor))
     }
