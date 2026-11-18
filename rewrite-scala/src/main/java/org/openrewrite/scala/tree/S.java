@@ -1644,43 +1644,6 @@ public interface S extends J {
     }
 
     /**
-     * A {@code given} instance with a body, such as {@code given Ord[Int] with { ... }}, kept as its source text.
-     */
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    final class GivenInstance implements S, Statement {
-
-        @With @Getter @EqualsAndHashCode.Include
-        UUID id;
-
-        @With @Getter
-        Space prefix;
-
-        @With @Getter
-        Markers markers;
-
-        @With @Getter
-        String text;
-
-        public GivenInstance(UUID id, Space prefix, Markers markers, String text) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.text = text;
-        }
-
-        @Override
-        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
-            return v.visitGivenInstance(this, p);
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-    }
-
-    /**
      * Represents a function call where the callee is itself an expression rather than a simple
      * method select. Used for Scala forms that are not adequately modelled by
      * {@link J.MethodInvocation}, such as curried application of another application's result:

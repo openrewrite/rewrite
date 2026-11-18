@@ -104,12 +104,13 @@ case class PackageSemicolon(id: UUID) extends Marker {
 
 /**
  * Marks a Scala 3 `given` declaration. Applied to:
- * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`)
- *   and named given instances with `with` bodies (`given x: Foo with { ... }`).
+ * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`).
  * - `J.MethodDeclaration` for method-shaped given aliases
  *   (`given listOrd[T](using Ord[T]): Ord[List[T]] = ...`).
+ * - `J.ClassDeclaration` for givens that define what they implement
+ *   (`given intOrd: Ord[Int] with { ... }`, `given Foo(1)`).
  *
- * The printer uses this to emit `given` in place of `val`/`def`.
+ * The printer uses this to emit `given` in place of `val`/`def`/`object`/`class`.
  */
 case class Given(id: UUID) extends Marker {
   override def getId(): UUID = id

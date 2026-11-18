@@ -241,13 +241,6 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return pd;
     }
 
-    public J visitGivenInstance(S.GivenInstance given, P p) {
-        S.GivenInstance g = given;
-        g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
-        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
-        return visitStatement(g, p);
-    }
-
     public J visitAnonymousGiven(S.AnonymousGiven anonymousGiven, P p) {
         S.AnonymousGiven g = anonymousGiven;
         g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

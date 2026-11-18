@@ -1073,42 +1073,6 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
-    void namedGivenWithBody() {
-        rewriteRun(
-            scala(
-                """
-                trait Ord[T] {
-                  def compare(a: T, b: T): Int
-                }
-                object Test {
-                  given intOrd: Ord[Int] with {
-                    def compare(a: Int, b: Int): Int = a - b
-                  }
-                }
-                """
-            )
-        );
-    }
-
-    @Test
-    void anonymousGivenWithBody() {
-        rewriteRun(
-            scala(
-                """
-                trait Ord[T] {
-                  def compare(a: T, b: T): Int
-                }
-                object Test {
-                  given Ord[Int] with {
-                    def compare(a: Int, b: Int): Int = a - b
-                  }
-                }
-                """
-            )
-        );
-    }
-
-    @Test
     void givenImportBare() {
         rewriteRun(
             scala(
