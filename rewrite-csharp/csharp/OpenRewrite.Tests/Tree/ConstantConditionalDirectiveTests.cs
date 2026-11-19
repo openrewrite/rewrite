@@ -83,6 +83,85 @@ public class ConstantConditionalDirectiveTests : RewriteTest
     }
 
     [Fact]
+    public void IfFalseWithoutElseKeepsItsCode()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                #if false
+                class Inactive { }
+                #endif
+                class C { }
+
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void IfFalseWithoutElseInAMethodKeepsItsCode()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                #if false
+                        M();
+                #endif
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void IfFalseKeepsItsCodeAlongsideAConditionOnASymbol()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                #if DEBUG
+                class Debug { }
+                #endif
+                #if false
+                class Inactive { }
+                #endif
+                class C { }
+
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ARecipeChangesTheCodeUnderIfFalseAsUnderAnyCondition()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls()),
+            CSharp(
+                """
+                #if false
+                class Inactive { void M() { Foo(); } }
+                #endif
+                class C { void Foo() { } void Bar() { } void M() { Foo(); } }
+
+                """,
+                """
+                #if false
+                class Inactive { void M() { Bar(); } }
+                #endif
+                class C { void Foo() { } void Bar() { } void M() { Bar(); } }
+
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void TheDirectiveIsInTheTree()
     {
         RewriteRun(
