@@ -73,7 +73,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
         return new JavaVisitor<Integer>() {
             @Override
             public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
-                return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
+                if (!autoFormat) {
+                    return j;
+                }
+                J2 formatted = super.autoFormat(j, stopAfter, p, parent);
+                return parent.firstEnclosing(JavaSourceFile.class) instanceof J.CompilationUnit ?
+                        substitutions.restoreExpressionTrivia(formatted) : formatted;
             }
 
             /**
