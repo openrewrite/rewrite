@@ -1118,10 +1118,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
     /**
      * Cheap pre-filter for {@link #containsClassDefinition}: a Java file can only declare a type
      * whose package equals the file's package declaration, so a file whose package is not a prefix
-     * of the old type's name can skip the (potentially full-tree) definition scan entirely. This
-     * invariant is Java-specific, so it is only applied to {@link J.CompilationUnit}; other
-     * {@link JavaSourceFile} dialects (e.g. {@code K.CompilationUnit}, {@code G.CompilationUnit})
-     * always fall through to the scan.
+     * of the old type's name can skip the (potentially full-tree) definition scan entirely. The same
+     * holds for Kotlin and Groovy, but rewrite-java can't name their compilation units, so only
+     * {@link J.CompilationUnit} is checked here. It doesn't hold for every dialect: a Scala file can
+     * declare types in several braced packages.
      *
      * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
      */
