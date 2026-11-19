@@ -1142,6 +1142,16 @@ public class RecipeSpec
         return this;
     }
 
+    /// <summary>
+    /// Assertions on the execution context the recipe ran with, such as that it marked a project's restore metadata
+    /// stale with <see cref="MSBuildProjectHelper.MarkAttestationStale"/>.
+    /// </summary>
+    public RecipeSpec ExpectExecutionContext(Action<ExecutionContext> assertion)
+    {
+        _afterRecipe.Add(assertion);
+        return this;
+    }
+
     private readonly List<Action<IReadOnlyList<Result>>> _resultAssertions = [];
 
     internal IReadOnlyList<Action<IReadOnlyList<Result>>> ResultAssertions => _resultAssertions;
