@@ -153,6 +153,46 @@ class JavaTemplateStatementTest implements RewriteTest {
     }
 
     @Test
+    void replaceStatementUsesSpacesInsideMixedPrefix() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(singletonList(IntelliJ.defaults())))
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitIf(J.If iff, ExecutionContext ctx) {
+                  return JavaTemplate.apply("switch (0) { default -> {} }", getCursor(), iff.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              class T {
+                  int first;
+                  int last;
+              \tvoid m() {
+              \t    if (true) {
+              \t      notify();
+              \t    }
+              \t    notify();
+              \t}
+              }
+              """,
+            """
+              class T {
+                  int first;
+                  int last;
+              \tvoid m() {
+              \t    switch (0) {
+              \t      default -> {
+              \t      }
+              \t    }
+              \t    notify();
+              \t}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void firstClassMember() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

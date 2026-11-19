@@ -193,6 +193,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     whitespace = prefix.getWhitespace();
                 }
                 int lineBreak = whitespace.lastIndexOf('\n');
+                if (lineBreak < 0) {
+                    return Space.format("\n");
+                }
                 int start = lineBreak > 0 && whitespace.charAt(lineBreak - 1) == '\r' ? lineBreak - 1 : lineBreak;
                 return Space.format(whitespace.substring(start));
             }
@@ -765,11 +768,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
                 String formattedIndent = formatted.getPrefix().getIndent();
                 String localIndent = anchor.getIndent();
-                if (!formattedIndent.equals(localIndent)) {
-                    JavaSourceFile source = parent.firstEnclosingOrThrow(JavaSourceFile.class);
-                    TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, source, IntelliJ::tabsAndIndents);
-                    int tabSize = style.getTabSize() > 0 ? style.getTabSize() : IntelliJ.tabsAndIndents().getTabSize();
-                    boolean localTabs = localIndent.indexOf('\t') >= 0;
+                JavaSourceFile source = parent.firstEnclosingOrThrow(JavaSourceFile.class);
+                TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, source, IntelliJ::tabsAndIndents);
+                int tabSize = style.getTabSize() > 0 ? style.getTabSize() : IntelliJ.tabsAndIndents().getTabSize();
+                int indentSize = style.getIndentSize() > 0 ? style.getIndentSize() : IntelliJ.tabsAndIndents().getIndentSize();
+                String formattedUnit = style.getUseTabCharacter() ? repeat("\t", indentSize / tabSize) +
+                        repeat(" ", indentSize % tabSize) : repeat(" ", indentSize);
+                String localUnit = localIndentUnit(localIndent, formattedUnit);
+                if (!formattedIndent.equals(localIndent) || !formattedUnit.equals(localUnit)) {
                     formatted = (J2) new JavaIsoVisitor<Integer>() {
                         private boolean stopped;
 
@@ -806,14 +812,34 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 }
                                 columns += ch == '\t' ? tabSize : 1;
                             }
-                            String relative = localTabs ? repeat("\t", columns / tabSize) +
-                                    repeat(" ", columns % tabSize) : repeat(" ", columns);
+                            String relative = repeat(localUnit, columns / indentSize) +
+                                    repeat(" ", columns % indentSize);
                             return whitespace.substring(0, start) + localIndent + relative;
                         }
                     }.visitNonNull(formatted, p, parent.fork());
                 }
 
                 return preservePrefix ? formatted.withPrefix(anchor) : formatted;
+            }
+
+            private String localIndentUnit(String base, String fallback) {
+                // Use the indentation increment of the original statement's nearest nested statements.
+                // Tabs in the shared prefix do not describe how the local block adds another level.
+                List<String> increments = new ArrayList<>();
+                new JavaIsoVisitor<List<String>>() {
+                    @Override
+                    public Statement visitStatement(Statement statement, List<String> found) {
+                        Space prefix = statement.getPrefix();
+                        String indent = prefix.getIndent();
+                        if (prefix.getLastWhitespace().indexOf('\n') >= 0 && indent.startsWith(base) &&
+                                indent.length() > base.length()) {
+                            found.add(indent.substring(base.length()));
+                        }
+                        return super.visitStatement(statement, found);
+                    }
+                }.visit(insertionPoint, increments);
+                return increments.stream().min(Comparator.comparingInt(String::length))
+                        .orElse(base.endsWith("\t") ? "\t" : fallback);
             }
 
             private boolean isScope(J test) {
