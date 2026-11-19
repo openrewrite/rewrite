@@ -254,6 +254,7 @@ public interface JavaParser extends Parser {
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
         private boolean typeCacheConfigured;
         protected @Nullable Path java8Runtime;
+        protected @Nullable Integer sourceCompatibility;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -283,6 +284,23 @@ public interface JavaParser extends Parser {
             }
             java8Runtime = rtJar;
             return (B) this;
+        }
+
+        /** Select source syntax independently of the runtime API; null keeps the parser's default. */
+        public B sourceCompatibility(@Nullable Integer majorVersion) {
+            if (majorVersion != null && !supportsSourceCompatibility(majorVersion)) {
+                throw new UnsupportedOperationException(getClass().getName() +
+                        " does not support source compatibility " + majorVersion);
+            }
+            if (!Objects.equals(sourceCompatibility, majorVersion) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            sourceCompatibility = majorVersion;
+            return (B) this;
+        }
+
+        protected boolean supportsSourceCompatibility(int majorVersion) {
+            return false;
         }
 
         protected boolean supportsJava8Runtime() {
@@ -421,14 +439,14 @@ public interface JavaParser extends Parser {
          * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            if (javaTypeFactory != null || typeCacheConfigured || java8Runtime != null) {
+            if (javaTypeFactory != null || typeCacheConfigured || java8Runtime != null || sourceCompatibility != null) {
                 return javaTypeFactory;
             }
             return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            boolean configured = typeCacheConfigured || javaTypeFactory != null || java8Runtime != null;
+            boolean configured = typeCacheConfigured || javaTypeFactory != null || java8Runtime != null || sourceCompatibility != null;
             javaTypeCache = HashMapJavaTypeCache.forParser(
                     JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;

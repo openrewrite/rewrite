@@ -32,6 +32,7 @@ import java.util.zip.ZipOutputStream;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Java8RuntimeClasspathTest implements RewriteTest {
     @TempDir
@@ -68,9 +69,47 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     }
 
     @Test
+    void unsupportedParserOptionsAreRejectedInsteadOfIgnored() {
+        JavaParser.Builder<?, ?> unsupported = new UnsupportedBuilder();
+        assertThatThrownBy(() -> unsupported.java8Runtime(rtJar))
+          .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> unsupported.sourceCompatibility(8))
+          .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> Java25Parser.builder().sourceCompatibility(7))
+          .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> Java25Parser.builder().java8Runtime(rtJar).sourceCompatibility(17).build())
+          .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    static class UnsupportedBuilder extends JavaParser.Builder<JavaParser, UnsupportedBuilder> {
+        @Override
+        public JavaParser build() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    @Test
+    void legacySourceSyntaxDoesNotHideApisUsedByANewerBuildJdk() {
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().sourceCompatibility(8)),
+          java(
+            """
+              class LegacySyntax {
+                  sun.misc.Unsafe unsafe;
+                  String _(String value) {
+                      return value.strip();
+                  }
+                  String value = _(" text ");
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void hostAndJava8PlatformsDoNotShareJdkClasses() {
         JdkClassSharingTypeFactory.useForParsers();
-        Java25Parser.Builder builder = Java25Parser.builder();
+        JavaParser.Builder<?, ?> builder = Java25Parser.builder();
         assertThat(stringType(builder.build()).getMethods()).extracting(JavaType.Method::getName).contains("strip");
         assertThat(stringType(builder.java8Runtime(rtJar).build()).getMethods())
           .extracting(JavaType.Method::getName).doesNotContain("strip");

@@ -98,7 +98,8 @@ public class ReloadableJava25Parser implements JavaParser {
             Collection<NamedStyles> styles,
             JavaTypeCache typeCache,
             @Nullable JavaTypeFactory typeFactory,
-            @Nullable Path java8Runtime) {
+            @Nullable Path java8Runtime,
+            @Nullable Integer sourceCompatibility) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -108,10 +109,13 @@ public class ReloadableJava25Parser implements JavaParser {
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
-        if (java8Runtime != null) {
-            // An explicit Java 8 platform must supply javac's symbols as well as the mapped types.
-            Options.instance(context).put(Option.SOURCE, "8");
-            Options.instance(context).put(Option.TARGET, "8");
+        if (java8Runtime != null && sourceCompatibility != null && sourceCompatibility > 8) {
+            throw new IllegalArgumentException("A Java 8 platform requires source compatibility 8");
+        }
+        Integer source = sourceCompatibility != null ? sourceCompatibility : java8Runtime != null ? 8 : null;
+        if (source != null) {
+            Options.instance(context).put(Option.SOURCE, source.toString());
+            Options.instance(context).put(Option.TARGET, source.toString());
         }
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
         try {
@@ -422,8 +426,13 @@ public class ReloadableJava25Parser implements JavaParser {
         }
 
         @Override
+        protected boolean supportsSourceCompatibility(int majorVersion) {
+            return majorVersion >= 8 && majorVersion <= 25;
+        }
+
+        @Override
         public ReloadableJava25Parser build() {
-            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, java8Runtime);
+            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, java8Runtime, sourceCompatibility);
         }
     }
 
