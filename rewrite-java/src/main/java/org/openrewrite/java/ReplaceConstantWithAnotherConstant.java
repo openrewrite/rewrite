@@ -211,10 +211,11 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     }
                 }.visit(sf, references);
                 ImportService importService = sf.service(ImportService.class);
+                J shortened = sf;
                 for (J.FieldAccess reference : references) {
-                    sf = (JavaSourceFile) importService.shortenFullyQualifiedTypeReferencesIn(reference).visit(sf, ctx);
+                    shortened = importService.shortenFullyQualifiedTypeReferencesIn(reference).visit(shortened, ctx);
                 }
-                return sf;
+                return shortened;
             }
         }
 
@@ -244,15 +245,16 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         /// Kept on the source file's cursor, as the root cursor is shared by every file of a run.
         private boolean outermostNameTaken() {
-            Cursor sfCursor = getCursor().dropParentUntil(t -> t instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(t));
+            Cursor sfCursor = getCursor().dropParentUntil(t ->
+                    t instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(t));
             return sfCursor.<Boolean>computeMessageIfAbsent(OUTERMOST_NAME_TAKEN, k -> otherClassTakesSimpleName(
                     sfCursor.getValue() instanceof JavaSourceFile ? sfCursor.getValue() : null, newOutermostType));
         }
 
-        /// Whether a class the file declares, imports or uses already goes by `type`'s simple name, also where
-        /// [#hasNoConflictingImport] does not look, such as a class from the file's own package, a statically imported
-        /// nested class or a local class. Importing `type` would then clash with that class or change what the name
-        /// refers to. Types in use leave out imports, so an unused import is checked on its own.
+        /// Whether a class or type parameter the file declares, imports or uses already goes by `type`'s simple name,
+        /// also where [#hasNoConflictingImport] does not look, such as a class from the file's own package, a
+        /// statically imported nested class or a local class. Importing `type` would then clash with that class or
+        /// change what the name refers to. Types in use leave out imports, so an unused import is checked on its own.
         private static boolean otherClassTakesSimpleName(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
             if (sf == null) {
                 return false;
@@ -275,11 +277,22 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return new JavaIsoVisitor<AtomicBoolean>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
-                    if (classDecl.getSimpleName().equals(simpleName) && !TypeUtils.isOfType(classDecl.getType(), type)) {
+                    if (classDecl.getSimpleName().equals(simpleName) &&
+                            !TypeUtils.isOfType(classDecl.getType(), type)) {
                         found.set(true);
                         return classDecl;
                     }
                     return super.visitClassDeclaration(classDecl, found);
+                }
+
+                @Override
+                public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, AtomicBoolean found) {
+                    if (typeParam.getName() instanceof J.Identifier &&
+                            ((J.Identifier) typeParam.getName()).getSimpleName().equals(simpleName)) {
+                        found.set(true);
+                        return typeParam;
+                    }
+                    return super.visitTypeParameter(typeParam, found);
                 }
             }.reduce(sf, new AtomicBoolean()).get();
         }

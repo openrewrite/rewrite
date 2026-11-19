@@ -880,6 +880,21 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   Object o = b.Outer.Inner.B;
               }
               """
+          ),
+
+          java(
+            """
+              import a.Old;
+
+              class Test6<Outer> {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              class Test6<Outer> {
+                  Object o = b.Outer.Inner.B;
+              }
+              """
           )
         );
     }
@@ -1009,6 +1024,45 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               class Test {
                   Outer outer;
                   Object o = B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importOuterClassOfStaticallyImportedConstantWhoseNestedOwnerNameIsImported() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              OLD,
+              OUTER,
+              """
+                package c;
+                public class Outer {
+                    public static class Inner {
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import c.Outer.Inner;
+
+              import static a.Old.A;
+
+              class Test {
+                  Inner inner;
+                  Object o = A;
+              }
+              """,
+            """
+              import b.Outer;
+              import c.Outer.Inner;
+
+              class Test {
+                  Inner inner;
+                  Object o = Outer.Inner.B;
               }
               """
           )
