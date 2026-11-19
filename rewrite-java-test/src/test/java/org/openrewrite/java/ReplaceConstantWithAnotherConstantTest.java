@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
-import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
@@ -759,7 +758,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     }
 
     @Test
-    void fullyQualifyNewConstantOnlyWhenBothItsOuterClassAndOwnerAreAmbiguous() {
+    void fullyQualifyWhenOuterClassOfNewConstantIsAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
             .parser(JavaParser.fromJavaVersion().dependsOn(
@@ -768,20 +767,6 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """
                 package c;
                 public class Outer {
-                }
-                """,
-              """
-                package c;
-                public class Inner {
-                }
-                """,
-              """
-                package c;
-                public class Holder {
-                    public static class Inner {
-                    }
-                    public static class Outer {
-                    }
                 }
                 """
             )),
@@ -796,35 +781,10 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               }
               """,
             """
-              import b.Outer.Inner;
               import c.Outer;
 
               class Test {
                   Outer outer;
-                  Object o = Inner.B;
-              }
-              """
-          ),
-
-          java(
-            """
-              import a.Old;
-              import c.Inner;
-              import c.Outer;
-
-              class Test2 {
-                  Inner inner;
-                  Outer outer;
-                  Object o = Old.A;
-              }
-              """,
-            """
-              import c.Inner;
-              import c.Outer;
-
-              class Test2 {
-                  Inner inner;
-                  Outer outer;
                   Object o = b.Outer.Inner.B;
               }
               """
@@ -833,24 +793,19 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           java(
             """
               import a.Old;
-              import c.Outer;
 
-              class Test3 {
-                  Outer outer;
+              class Test2 {
                   Object o = Old.A;
 
-                  static class Inner {
+                  static class Outer {
                   }
               }
               """,
             """
-              import c.Outer;
-
-              class Test3 {
-                  Outer outer;
+              class Test2 {
                   Object o = b.Outer.Inner.B;
 
-                  static class Inner {
+                  static class Outer {
                   }
               }
               """
@@ -858,47 +813,21 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
           java(
             """
+              package c;
+
               import a.Old;
-              import c.Outer;
 
-              import static c.Holder.Inner;
-
-              class Test4 {
-                  Inner inner;
+              class Test3 {
                   Outer outer;
                   Object o = Old.A;
               }
               """,
             """
-              import c.Outer;
+              package c;
 
-              import static c.Holder.Inner;
-
-              class Test4 {
-                  Inner inner;
+              class Test3 {
                   Outer outer;
                   Object o = b.Outer.Inner.B;
-              }
-              """
-          ),
-
-          java(
-            """
-              import a.Old;
-              import c.Holder.Outer;
-
-              class Test5 {
-                  Outer outer;
-                  Object o = Old.A;
-              }
-              """,
-            """
-              import b.Outer.Inner;
-              import c.Holder.Outer;
-
-              class Test5 {
-                  Outer outer;
-                  Object o = Inner.B;
               }
               """
           )
@@ -973,110 +902,6 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void referenceNewConstantThroughOuterClassUnlessOldOwnerTakesItsName() {
-        rewriteRun(
-          spec -> spec.recipes(commonsCollectionsReferenceStrengthMigration())
-            .parser(JavaParser.fromJavaVersion().dependsOn(COMMONS_COLLECTIONS_3)),
-          java(
-            """
-              import org.apache.commons.collections.map.AbstractReferenceMap;
-              import org.apache.commons.collections.map.ReferenceMap;
-
-              import java.util.Map;
-
-              class A {
-                  Map<String, Object> soft = new ReferenceMap(ReferenceMap.SOFT, ReferenceMap.SOFT);
-                  Map<String, Object> weak = new ReferenceMap(AbstractReferenceMap.HARD, AbstractReferenceMap.WEAK, true);
-              }
-              """,
-            """
-              import org.apache.commons.collections4.map.ReferenceMap;
-              import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
-
-              import java.util.Map;
-
-              class A {
-                  Map<String, Object> soft = new ReferenceMap(ReferenceStrength.SOFT, ReferenceStrength.SOFT);
-                  Map<String, Object> weak = new ReferenceMap(ReferenceStrength.HARD, ReferenceStrength.WEAK, true);
-              }
-              """
-          ),
-
-          java(
-            """
-              import org.apache.commons.collections.ReferenceMap;
-
-              import java.util.Map;
-
-              class B {
-                  Map<String, Object> cache = new ReferenceMap(ReferenceMap.SOFT, ReferenceMap.SOFT);
-              }
-              """,
-            """
-              import org.apache.commons.collections4.map.AbstractReferenceMap;
-              import org.apache.commons.collections4.map.ReferenceMap;
-
-              import java.util.Map;
-
-              class B {
-                  Map<String, Object> cache = new ReferenceMap(AbstractReferenceMap.ReferenceStrength.SOFT, AbstractReferenceMap.ReferenceStrength.SOFT);
-              }
-              """
-          )
-        );
-    }
-
-    private static Recipe[] commonsCollectionsReferenceStrengthMigration() {
-        String strength = "org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength.";
-        return new Recipe[]{
-          new ReplaceConstantWithAnotherConstant("org.apache.commons.collections.map.AbstractReferenceMap.HARD", strength + "HARD"),
-          new ReplaceConstantWithAnotherConstant("org.apache.commons.collections.map.AbstractReferenceMap.SOFT", strength + "SOFT"),
-          new ReplaceConstantWithAnotherConstant("org.apache.commons.collections.map.AbstractReferenceMap.WEAK", strength + "WEAK"),
-          new ReplaceConstantWithAnotherConstant("org.apache.commons.collections.ReferenceMap.HARD", strength + "HARD"),
-          new ReplaceConstantWithAnotherConstant("org.apache.commons.collections.ReferenceMap.SOFT", strength + "SOFT"),
-          new ReplaceConstantWithAnotherConstant("org.apache.commons.collections.ReferenceMap.WEAK", strength + "WEAK"),
-          new ChangeType("org.apache.commons.collections.ReferenceMap", "org.apache.commons.collections4.map.ReferenceMap", null),
-          new ChangePackage("org.apache.commons.collections", "org.apache.commons.collections4", true)
-        };
-    }
-
-    private static final String[] COMMONS_COLLECTIONS_3 = {
-      """
-        package org.apache.commons.collections;
-        public class ReferenceMap extends java.util.AbstractMap<Object, Object> {
-            public static final int HARD = 0;
-            public static final int SOFT = 1;
-            public static final int WEAK = 2;
-            public ReferenceMap(int keyType, int valueType) {
-            }
-            public java.util.Set<java.util.Map.Entry<Object, Object>> entrySet() {
-                return null;
-            }
-        }
-        """,
-      """
-        package org.apache.commons.collections.map;
-        public abstract class AbstractReferenceMap extends java.util.AbstractMap<Object, Object> {
-            public static final int HARD = 0;
-            public static final int SOFT = 1;
-            public static final int WEAK = 2;
-        }
-        """,
-      """
-        package org.apache.commons.collections.map;
-        public class ReferenceMap extends AbstractReferenceMap {
-            public ReferenceMap(int keyType, int valueType) {
-            }
-            public ReferenceMap(int keyType, int valueType, boolean purgeValues) {
-            }
-            public java.util.Set<java.util.Map.Entry<Object, Object>> entrySet() {
-                return null;
-            }
-        }
-        """
-    };
 
     private static final String OLD = """
       package a;

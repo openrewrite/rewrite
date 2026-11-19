@@ -77,7 +77,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(fieldAccess, fieldType, qualifiedReferenceImport(sf));
+                return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImports(sf, newOutermostType) &&
+                        !otherClassTakesSimpleName(sf, newOutermostType));
             }
             return super.visitFieldAccess(fieldAccess, ctx);
         }
@@ -87,30 +88,12 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = ident.getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(ident, fieldType,
-                        hasNoConflictingImports(sf, newOwningType) ? newOwningType : null);
+                return replaceFieldAccess(ident, fieldType, hasNoConflictingImports(sf, newOwningType));
             }
             return super.visitIdentifier(ident, ctx);
         }
 
-        /// The class to import and start a qualified reference from, or null to fully qualify it. The owner stands in
-        /// when another class takes the outermost class's name, for instance an imported old owner of that name.
-        private JavaType.@Nullable FullyQualified qualifiedReferenceImport(@Nullable JavaSourceFile sf) {
-            if (canImport(sf, newOutermostType)) {
-                return newOutermostType;
-            }
-            if (canImport(sf, newOwningType)) {
-                return newOwningType;
-            }
-            return null;
-        }
-
-        private boolean canImport(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
-            return hasNoConflictingImports(sf, type) && !otherClassTakesSimpleName(sf, type);
-        }
-
-        private J replaceFieldAccess(Expression expression, JavaType.Variable fieldType,
-                                     JavaType.@Nullable FullyQualified importedType) {
+        private J replaceFieldAccess(Expression expression, JavaType.Variable fieldType, boolean hasNoConflictingImport) {
             JavaType owner = fieldType.getOwner();
             while (owner instanceof JavaType.FullyQualified) {
                 maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
@@ -123,7 +106,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withSimpleName(newConstantName)
                         .withFieldType(newFieldType(fieldType))
                         .withType(newType(identifier.getType()));
-                if (importedType != null) {
+                if (hasNoConflictingImport) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
                     return identifier;
                 }
@@ -132,14 +115,14 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
-                if (importedType != null) {
-                    maybeAddImport(importedType.getFullyQualifiedName(), false);
+                if (hasNoConflictingImport) {
+                    maybeAddImport(newOutermostType.getFullyQualifiedName(), false);
                 }
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                 Expression target = fieldAccess.getTarget();
                 J.Identifier name = fieldAccess.getName();
-                target = importedType != null ?
-                        typeReference(newOwningType, importedType, target.getPrefix()) :
+                target = hasNoConflictingImport ?
+                        typeReference(newOwningType, target.getPrefix()) :
                         FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
                 name = name
                         .withFieldType(newFieldType(fieldType))
@@ -169,17 +152,15 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return fullyQualifiedName.substring(Math.max(fullyQualifiedName.lastIndexOf('.'), fullyQualifiedName.lastIndexOf('$')) + 1);
         }
 
-        /// A reference to `type` starting from `importedType`, which is `type` or one of its enclosing classes.
-        private static Expression typeReference(JavaType.FullyQualified type, JavaType.FullyQualified importedType,
-                                                Space prefix) {
+        private static Expression typeReference(JavaType.FullyQualified type, Space prefix) {
             J.Identifier name = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                     simpleName(type.getFullyQualifiedName()), type, null);
             JavaType.FullyQualified owningClass = type.getOwningClass();
-            if (owningClass == null || TypeUtils.isOfType(type, importedType)) {
+            if (owningClass == null) {
                 return name.withPrefix(prefix);
             }
             return new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY,
-                    typeReference(owningClass, importedType, Space.EMPTY), JLeftPadded.build(name), type);
+                    typeReference(owningClass, Space.EMPTY), JLeftPadded.build(name), type);
         }
 
         private JavaType.Variable newFieldType(JavaType.Variable fieldType) {
@@ -206,17 +187,19 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return hasNoConflictingImport(sf, referencedType) && hasNoConflictingImport(sf, newTargetType);
         }
 
-        /// [#hasNoConflictingImport] compares class names, which for a nested class include its enclosing classes. So it
-        /// misses that `Outer.Inner` clashes with an import of another `Inner`, static ones included, and that a class
-        /// the file declares under that name shadows the import.
+        /// Whether a class the file declares or uses already goes by `type`'s simple name, also where
+        /// [#hasNoConflictingImport] does not look, such as a class from the file's own package. Importing `type` would
+        /// then clash with that class or change what the name refers to.
         private static boolean otherClassTakesSimpleName(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
             if (sf == null) {
                 return false;
             }
             String simpleName = simpleName(type.getFullyQualifiedName());
-            for (J.Import anImport : sf.getImports()) {
-                if (anImport.getQualid().getSimpleName().equals(simpleName) &&
-                        !TypeUtils.isOfType(anImport.getQualid().getType(), type)) {
+            for (JavaType typeInUse : sf.getTypesInUse().getTypesInUse()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeInUse);
+                if (fq != null && simpleName(fq.getFullyQualifiedName()).equals(simpleName) &&
+                        !TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(),
+                                type.getFullyQualifiedName())) {
                     return true;
                 }
             }
@@ -228,7 +211,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             for (Statement statement : statements) {
                 if (statement instanceof J.ClassDeclaration) {
                     J.ClassDeclaration classDecl = (J.ClassDeclaration) statement;
-                    if (classDecl.getSimpleName().equals(simpleName) && !TypeUtils.isOfType(classDecl.getType(), type) ||
+                    if ((classDecl.getSimpleName().equals(simpleName) &&
+                            !TypeUtils.isOfType(classDecl.getType(), type)) ||
                             declaresOtherClass(classDecl.getBody().getStatements(), simpleName, type)) {
                         return true;
                     }
