@@ -111,6 +111,14 @@ public class NodeExecutionContextView extends DelegatingExecutionContext {
         return getMessage(LIBC);
     }
 
+    /// Host-supplied client whose packument, manifest and tarball caches every lock regeneration in the run
+    /// shares. Set it before the run, over the run's `HttpSender`, with a fresh client per run: the tarball
+    /// cache is unbounded.
+    public NodeExecutionContextView setRegistryClient(NpmRegistryClient registryClient) {
+        putMessage(REGISTRY_CLIENT, registryClient);
+        return this;
+    }
+
     /**
      * A per-run {@link NpmRegistryClient} over the run's {@code HttpSender}, lazily created and shared
      * so its packument/manifest caches are reused across the execution.
