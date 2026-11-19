@@ -611,6 +611,25 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void fractionalSecondsBeyondNanosecondsAreTruncated() {
+        rewriteRun(
+          toml(
+            """
+              a = 1979-05-27T07:32:00.1234567899Z
+              b = 1979-05-27 07:32:00.1234567899
+              c = 07:32:00.1234567899
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 123456789, ZoneOffset.UTC),
+                LocalDateTime.of(1979, 5, 27, 7, 32, 0, 123456789),
+                LocalTime.of(7, 32, 0, 123456789)))
+          )
+        );
+    }
+
+    @Test
     void emptyInlineTableKeepsItsSpace() {
         rewriteRun(
           toml(
