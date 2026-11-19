@@ -324,13 +324,13 @@ public class ScopeService {
         return false;
     }
 
-    private static Scope.Binding declared(Cursor identifier, Cursor scope, Scope.Namespace namespace) {
+    private Scope.Binding declared(Cursor identifier, Cursor scope, Scope.Namespace namespace) {
         J.Identifier ident = identifier.getValue();
         return new Scope.Binding(identifier, ident.getSimpleName(), namespace, scope,
-                namespace == Scope.Namespace.VARIABLE ? ident.getFieldType() : ident.getType());
+                namespace == Scope.Namespace.VARIABLE ? ident.getFieldType() : ident.getType(), this);
     }
 
-    private static void imports(Cursor scope, JavaSourceFile cu, List<Scope.Binding> bindings) {
+    private void imports(Cursor scope, JavaSourceFile cu, List<Scope.Binding> bindings) {
         List<Scope.Binding> onDemand = new ArrayList<>();
         for (J.Import anImport : cu.getImports()) {
             Cursor importCursor = new Cursor(scope, anImport);
@@ -339,7 +339,7 @@ public class ScopeService {
                 if (!"*".equals(name)) {
                     J.Identifier alias = anImport.getAlias();
                     bindings.add(new Scope.Binding(importCursor, alias != null ? alias.getSimpleName() : name,
-                            Scope.Namespace.TYPE, scope, anImport.getQualid().getType()));
+                            Scope.Namespace.TYPE, scope, anImport.getQualid().getType(), this));
                 }
                 continue;
             }
@@ -347,7 +347,7 @@ public class ScopeService {
             if (owner == null) {
                 if (!"*".equals(name)) {
                     for (Scope.Namespace namespace : Scope.Namespace.values()) {
-                        bindings.add(new Scope.Binding(importCursor, name, namespace, scope, null));
+                        bindings.add(new Scope.Binding(importCursor, name, namespace, scope, null, this));
                     }
                 }
                 continue;
@@ -357,20 +357,20 @@ public class ScopeService {
             for (JavaType.Variable field : membersOf(owner, true, null, true, JavaType.FullyQualified::getMembers,
                     JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
                 if ("*".equals(name) || field.getName().equals(name)) {
-                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field, this));
                     found = true;
                 }
             }
             for (JavaType.Method method : membersOf(owner, true, null, true, JavaType.FullyQualified::getMethods,
                     JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
                 if (!method.isConstructor() && ("*".equals(name) || method.getName().equals(name))) {
-                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method));
+                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method, this));
                     found = true;
                 }
             }
             if (!found && !"*".equals(name)) {
                 // A static import of a name that is neither a field nor a method imports a member type.
-                bindings.add(new Scope.Binding(importCursor, name, Scope.Namespace.TYPE, scope, null));
+                bindings.add(new Scope.Binding(importCursor, name, Scope.Namespace.TYPE, scope, null, this));
             }
         }
         // An import of one name shadows an on-demand import of it (JLS 6.4.1), so it is found first
@@ -383,7 +383,7 @@ public class ScopeService {
      * the inherited one it hides. A named class also has members only its attribution lists, as an enum's
      * {@code values()}. An anonymous class is given by the type it extends, whose members it all inherits.
      */
-    private static void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean anonymous,
+    private void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean anonymous,
                                   List<Scope.Binding> bindings) {
         if (!anonymous) {
             Set<String> fields = new HashSet<>();
@@ -395,23 +395,23 @@ public class ScopeService {
             // processor generates
             for (JavaType.Variable field : type.getMembers()) {
                 if (fields.add(field.getName())) {
-                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field, this));
                 }
             }
             for (JavaType.Method method : type.getMethods()) {
                 if (!method.isConstructor() && methods.add(method.getName())) {
-                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method, this));
                 }
             }
         }
         for (JavaType.Variable field : membersOf(type, anonymous, fromPackage, false,
                 JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
-            bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+            bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field, this));
         }
         for (JavaType.Method method : membersOf(type, anonymous, fromPackage, false,
                 JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
             if (!method.isConstructor()) {
-                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method, this));
             }
         }
     }
@@ -421,7 +421,7 @@ public class ScopeService {
                !Flag.hasFlags(flags, Flag.Private) && (fromPackage == null || fromPackage.equals(owner.getPackageName()));
     }
 
-    private static void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean includeSelf,
+    private void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean includeSelf,
                                              List<Scope.Binding> bindings) {
         JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
         if (sourceFile == null) {
@@ -460,7 +460,7 @@ public class ScopeService {
                 String raw = member.getRawClassName();
                 String name = raw.substring(raw.lastIndexOf('$') + 1);
                 if (declared.add(name)) {
-                    bindings.add(new Scope.Binding(scope, name, Scope.Namespace.TYPE, scope, member));
+                    bindings.add(new Scope.Binding(scope, name, Scope.Namespace.TYPE, scope, member, this));
                 }
             }
         }

@@ -49,7 +49,7 @@ public class KotlinScopeService extends ScopeService {
         List<Scope.Binding> bindings = new ArrayList<>(super.bindings(scope));
         Object tree = scope.getValue();
         if (tree instanceof J.Lambda && declaresNoParameter((J.Lambda) tree)) {
-            bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null));
+            bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null, this));
         } else if (tree instanceof J.ClassDeclaration) {
             properties(scope, (J.ClassDeclaration) tree, bindings);
         } else if (tree instanceof J.MethodDeclaration &&
@@ -126,7 +126,7 @@ public class KotlinScopeService extends ScopeService {
         return true;
     }
 
-    private static void properties(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {
+    private void properties(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {
         Cursor body = new Cursor(scope, classDeclaration.getBody());
         for (Statement statement : classDeclaration.getBody().getStatements()) {
             if (!(statement instanceof J.MethodDeclaration) ||
@@ -142,7 +142,7 @@ public class KotlinScopeService extends ScopeService {
                 for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) parameter).getVariables()) {
                     Cursor name = new Cursor(new Cursor(declarations, variable), variable.getName());
                     bindings.add(new Scope.Binding(name, variable.getSimpleName(), Scope.Namespace.VARIABLE, scope,
-                            variable.getName().getFieldType()));
+                            variable.getName().getFieldType(), this));
                 }
             }
         }

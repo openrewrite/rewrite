@@ -45,7 +45,7 @@ public class GroovyScopeService extends ScopeService {
         Object tree = scope.getValue();
         if (tree instanceof J.Lambda && declaresNoParameter((J.Lambda) tree)) {
             bindings = new ArrayList<>(bindings);
-            bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null));
+            bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null, this));
         }
         return bindings;
     }

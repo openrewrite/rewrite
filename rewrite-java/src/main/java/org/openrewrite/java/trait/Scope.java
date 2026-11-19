@@ -17,7 +17,9 @@ package org.openrewrite.java.trait;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -87,6 +89,14 @@ public class Scope implements Trait<J> {
     Cursor position;
 
     /**
+     * The rules of the language of the source file the scope is in.
+     */
+    @Getter(AccessLevel.NONE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    ScopeService service;
+
+    /**
      * The innermost scope holding the position.
      */
     public static Scope at(Cursor position) {
@@ -95,15 +105,15 @@ public class Scope implements Trait<J> {
         if (scope == null) {
             throw new IllegalArgumentException("No scope encloses the cursor");
         }
-        return new Scope(scope, position);
+        return new Scope(scope, position, service);
     }
 
     /**
      * The scope around this one, asked from the same position.
      */
     public Optional<Scope> enclosing() {
-        Cursor scope = cursor.getParent() == null ? null : enclosingScope(service(cursor), cursor.getParent());
-        return scope == null ? Optional.empty() : Optional.of(new Scope(scope, position));
+        Cursor scope = cursor.getParent() == null ? null : enclosingScope(service, cursor.getParent());
+        return scope == null ? Optional.empty() : Optional.of(new Scope(scope, position, service));
     }
 
     /**
@@ -114,7 +124,7 @@ public class Scope implements Trait<J> {
         Map<Object, List<Binding>> bindings = perSourceFile(cursor).computeMessageIfAbsent(BINDINGS, k -> new IdentityHashMap<>());
         List<Binding> own = bindings.get(cursor.getValue());
         if (own == null) {
-            own = service(cursor).bindings(cursor);
+            own = service.bindings(cursor);
             bindings.put(cursor.getValue(), own);
         }
         return own;
@@ -125,7 +135,6 @@ public class Scope implements Trait<J> {
      * namespace shadows.
      */
     public Stream<Binding> visible() {
-        ScopeService service = service(position);
         Set<String> seen = new HashSet<>();
         List<Binding> visible = new ArrayList<>();
         for (Scope scope = this; scope != null; scope = scope.enclosing().orElse(null)) {
@@ -151,7 +160,6 @@ public class Scope implements Trait<J> {
      * bound, so no type binding does not mean the name is free.
      */
     public Optional<Binding> lookup(String name, Namespace namespace) {
-        ScopeService service = service(position);
         for (Scope scope = this; scope != null; scope = scope.enclosing().orElse(null)) {
             for (Binding binding : scope.getBindings()) {
                 if (binding.getNamespace() == namespace && binding.getName().equals(name) &&
@@ -167,7 +175,7 @@ public class Scope implements Trait<J> {
      * Whether a binding is in scope at the position.
      */
     public boolean isVisible(Binding binding) {
-        return service(position).isVisibleAt(binding, position);
+        return service.isVisibleAt(binding, position);
     }
 
     /**
@@ -198,7 +206,6 @@ public class Scope implements Trait<J> {
      * locals.
      */
     private boolean canCapture(Binding local) {
-        ScopeService service = service(position);
         boolean captured = false;
         for (Cursor c = position; c != null && !isTree(c, local.scope); c = c.getParent()) {
             Object tree = c.getValue();
@@ -217,7 +224,6 @@ public class Scope implements Trait<J> {
      * the object under construction is no instance yet.
      */
     private boolean hasInstanceOf(Cursor classScope, boolean constructed) {
-        ScopeService service = service(position);
         boolean constructorCall = false;
         for (Cursor c = position; c != null && !isTree(c, classScope); c = c.getParent()) {
             Object tree = c.getValue();
@@ -256,7 +262,7 @@ public class Scope implements Trait<J> {
             inScope = namesSpelledWithin(cursor);
             spelled.put(cursor.getValue(), inScope);
         }
-        if (service(position).isReserved(name) || inScope.contains(name)) {
+        if (service.isReserved(name) || inScope.contains(name)) {
             return false;
         }
         for (Binding binding : getBindings()) {
@@ -351,7 +357,6 @@ public class Scope implements Trait<J> {
         } else {
             position = inScope.get(0);
         }
-        ScopeService service = service(position);
         Cursor around = position.getParentTreeCursor();
         Scope destination = at(around).withPosition(position);
         Cursor into = enclosingScope(service, holder);
@@ -518,7 +523,7 @@ public class Scope implements Trait<J> {
             public @Nullable J preVisit(J tree, Integer p) {
                 boolean scope = service.isScope(getCursor());
                 if (tree == regionTree || scope) {
-                    List<Binding> bindings = scope ? new Scope(getCursor(), getCursor()).getBindings() : service.bindings(getCursor());
+                    List<Binding> bindings = scope ? new Scope(getCursor(), getCursor(), service).getBindings() : service.bindings(getCursor());
                     for (Binding binding : bindings) {
                         J anchor = binding.getTree();
                         if (anchor instanceof J.Identifier) {
@@ -875,8 +880,15 @@ public class Scope implements Trait<J> {
         @Nullable
         JavaType type;
 
+        /**
+         * The service that made the binding, whose rules its scope goes by.
+         */
+        @Getter(AccessLevel.NONE)
+        @ToString.Exclude
+        ScopeService service;
+
         public Scope getScope() {
-            return new Scope(scope, scope);
+            return new Scope(scope, scope, service);
         }
 
         public Kind getKind() {
@@ -968,7 +980,6 @@ public class Scope implements Trait<J> {
          */
         public boolean canRenameTo(String newName) {
             Scope declaring = getScope();
-            ScopeService service = service(scope);
             for (Binding sibling : declaring.getBindings()) {
                 if (sibling.namespace == namespace && sibling.name.equals(newName)) {
                     return false;
@@ -1248,7 +1259,7 @@ public class Scope implements Trait<J> {
             for (Cursor scope = enclosingScope(service, from);
                  scope != null;
                  scope = scope.getParent() == null ? null : enclosingScope(service, scope.getParent())) {
-                for (Binding binding : new Scope(scope, scope).getBindings()) {
+                for (Binding binding : new Scope(scope, scope, service).getBindings()) {
                     if (binding.getTree() instanceof J.Identifier && binding.getTree().getId().equals(identifier.getId())) {
                         return binding;
                     }
