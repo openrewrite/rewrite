@@ -139,7 +139,8 @@ class NodePropertiesTest implements RewriteTest {
             spec -> spec.afterRecipe(documents -> {
                 Yaml.Scalar scalar = (Yaml.Scalar) anchored(documents, "x");
                 assertThat(scalar.getValue()).isEqualTo("six");
-                assertThat(scalar.getAnchor().getPrefix()).isEqualTo("\n  ");
+                assertThat(scalar.getTag().getSuffix()).isEqualTo("\n  ");
+                assertThat(scalar.getAnchor().getPrefix()).isEmpty();
                 assertThat(scalar.getMarkers().findFirst(TagBeforeAnchor.class)).isPresent();
             })
           )

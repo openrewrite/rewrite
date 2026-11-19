@@ -730,9 +730,9 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     /**
-     * Reads the properties of a node whose tag is written before its anchor, as in {@code !!str &a value}, from where
-     * the node starts. The tag gets {@code tagPrefix}, the anchor the text between the two as its prefix and the
-     * whitespace after it as its postfix, which, as in {@link #buildYamlAnchor}, spans lines only for a scalar.
+     * Reads the properties of a node whose tag is written before its anchor, as in {@code !!str &a value}. Each property
+     * owns the separation after it, so the node still prints valid YAML once one of them is removed or the
+     * {@link TagBeforeAnchor} marker is lost.
      */
     private TagBeforeAnchorProperties readTagBeforeAnchor(FormatPreservingReader reader, Event event, String anchorKey,
                                                           String tagPrefix, boolean isForScalar) {
@@ -754,8 +754,8 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         String source = text.substring(0, postfixEnd);
         return new TagBeforeAnchorProperties(
-                createTag(tagPrefix, Markers.EMPTY, text.substring(0, tagEnd), ""),
-                new Yaml.Anchor(randomId(), text.substring(tagEnd, anchorStart), text.substring(anchorEnd, postfixEnd), Markers.EMPTY, anchorKey),
+                createTag(tagPrefix, Markers.EMPTY, text.substring(0, tagEnd), text.substring(tagEnd, anchorStart)),
+                new Yaml.Anchor(randomId(), "", text.substring(anchorEnd, postfixEnd), Markers.EMPTY, anchorKey),
                 Markers.build(singletonList(new TagBeforeAnchor(randomId()))),
                 source,
                 start + source.codePointCount(0, source.length()));
