@@ -302,7 +302,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             String propertyValue = accumulator.pomProperties.get(new PomProperty(pomSourcePath, tag.getName()));
                             if (propertyValue != null) {
                                 Optional<String> value = tag.getValue();
-                                if (!value.isPresent() || !value.get().equals(propertyValue)) {
+                                // A module scanned against a stale parent model may record a version older than
+                                // what an earlier recipe in the same run already set.
+                                if (!value.isPresent() || isProperty(value.get()) ||
+                                    LATEST_RELEASE.compare(null, value.get(), propertyValue) < 0) {
                                     doAfterVisit(new ChangeTagValueVisitor<>(tag, propertyValue));
                                     maybeUpdateModel();
                                 }
