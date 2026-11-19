@@ -141,6 +141,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
                             mayContainDefinition(cu, normalizedOldName) &&
+                            mayDeclareType(cu.getTypesInUse(), oldFullyQualifiedTypeName) &&
                             containsClassDefinition(cu, oldFullyQualifiedTypeName) &&
                             !declaresNestedTypeThatStays(cu, oldFullyQualifiedTypeName, newFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
@@ -1087,6 +1088,31 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return (Boolean) HAS_DOC_REFERENCE.invoke(typesInUse, fullyQualifiedTypeName);
         } catch (ReflectiveOperationException e) {
             return false;
+        }
+    }
+
+    private static final @Nullable Method MAY_DECLARE_TYPE = findMayDeclareType();
+
+    private static @Nullable Method findMayDeclareType() {
+        try {
+            return TypesInUse.class.getMethod("mayDeclareType", String.class);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Unlike {@link #mayContainDefinition}, holds for every language, so a Scala or Python file isn't walked again for
+     * each type that is changed.
+     */
+    private static boolean mayDeclareType(TypesInUse typesInUse, String fullyQualifiedTypeName) {
+        if (MAY_DECLARE_TYPE == null) {
+            return true;
+        }
+        try {
+            return (Boolean) MAY_DECLARE_TYPE.invoke(typesInUse, fullyQualifiedTypeName);
+        } catch (ReflectiveOperationException e) {
+            return true;
         }
     }
 
