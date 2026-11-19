@@ -30,6 +30,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -601,6 +602,25 @@ class TomlParserTest implements RewriteTest {
                 LocalDateTime.of(1979, 5, 27, 7, 32),
                 OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
                 OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(1))))
+          )
+        );
+    }
+
+    @Test
+    void fractionalSecondsBeyondNanosecondsAreTruncated() {
+        rewriteRun(
+          toml(
+            """
+              a = 1979-05-27T07:32:00.1234567899Z
+              b = 1979-05-27 07:32:00.1234567899
+              c = 07:32:00.1234567899
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 123456789, ZoneOffset.UTC),
+                LocalDateTime.of(1979, 5, 27, 7, 32, 0, 123456789),
+                LocalTime.of(7, 32, 0, 123456789)))
           )
         );
     }

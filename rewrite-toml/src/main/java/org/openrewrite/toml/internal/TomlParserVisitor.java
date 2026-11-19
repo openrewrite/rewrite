@@ -277,11 +277,24 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     /**
-     * TOML allows a space or a lowercase {@code t} between date and time, neither of which
-     * {@code DateTimeFormatter.ISO_LOCAL_DATE_TIME} accepts.
+     * TOML allows a space between date and time, which {@code DateTimeFormatter.ISO_LOCAL_DATE_TIME} rejects,
+     * and fractional seconds beyond the nanoseconds {@code java.time} holds.
      */
     private static String isoDateTime(String dateTime) {
-        return dateTime.substring(0, 10) + 'T' + dateTime.substring(11);
+        return truncateFraction(dateTime.substring(0, 10) + 'T' + dateTime.substring(11));
+    }
+
+    // NOTE: TOML requires extra precision to be truncated, not rounded. Literal.source keeps every digit.
+    private static String truncateFraction(String time) {
+        int dot = time.indexOf('.');
+        if (dot < 0) {
+            return time;
+        }
+        int end = dot + 1;
+        while (end < time.length() && Character.isDigit(time.charAt(end))) {
+            end++;
+        }
+        return end - dot - 1 > 9 ? time.substring(0, dot + 10) + time.substring(end) : time;
     }
 
     @Override
@@ -323,7 +336,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     Markers.EMPTY,
                     TomlType.Primitive.LocalTime,
                     dateTime,
-                    LocalTime.parse(dateTime)
+                    LocalTime.parse(truncateFraction(dateTime))
             );
         });
     }
