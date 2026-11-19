@@ -497,6 +497,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             """
               class T {
                   int first;
+              \t
               \t/**
               \t * A field.
               \t */
@@ -507,6 +508,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             """
               class T {
                   int first;
+              \t
               \t/**
               \t * A field.
               \t */

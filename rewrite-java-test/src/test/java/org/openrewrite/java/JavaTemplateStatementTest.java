@@ -93,6 +93,7 @@ class JavaTemplateStatementTest implements RewriteTest {
             """
               class T {
               \tvoid m() {
+              \t
                     hashCode();
                     notify();
               \t}
@@ -101,6 +102,7 @@ class JavaTemplateStatementTest implements RewriteTest {
             """
               class T {
               \tvoid m() {
+              \t
                     toString();
                     notify();
               \t}
