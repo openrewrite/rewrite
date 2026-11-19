@@ -24,6 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -287,7 +288,7 @@ class ScopeTest implements RewriteTest {
     @Test
     void switchCasesShareTheirBlockButPatternsStayInTheirCase() {
         rewriteRun(
-          spec -> spec.recipe(visibleAtHere("shared", "inner", "s", "n")),
+          spec -> spec.recipe(visibleAtHere("shared", "inner", "s", "n", "guarded")),
           java(
             """
               class A {
@@ -307,6 +308,7 @@ class ScopeTest implements RewriteTest {
                               here();
                           }
                           case Integer n -> here();
+                          case Object any when any instanceof Long guarded -> here();
                           default -> here();
                       }
                   }
@@ -331,6 +333,7 @@ class ScopeTest implements RewriteTest {
                               /*~~(inner, s)~~>*/here();
                           }
                           case Integer n -> /*~~(n)~~>*/here();
+                          case Object any when any instanceof Long guarded -> /*~~(guarded)~~>*/here();
                           default -> /*~~(none)~~>*/here();
                       }
                   }
@@ -1040,6 +1043,34 @@ class ScopeTest implements RewriteTest {
                       /*~~(open)~~>*/here();
                   }
                   boolean here() { return true; }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterIsVisibleInAnEditedCopyOfTheBody() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  // A recipe mid-visit holds an edited copy of the body the method does not have yet.
+                  Cursor copy = new Cursor(getCursor(), method.getBody().withEnd(Space.SINGLE_SPACE));
+                  return SearchResult.found(method, Scope.at(copy).lookup("p").isPresent() ? "visible" : "hidden");
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(int p) {
+                  }
+              }
+              """,
+            """
+              class A {
+                  /*~~(visible)~~>*/void m(int p) {
+                  }
               }
               """
           )

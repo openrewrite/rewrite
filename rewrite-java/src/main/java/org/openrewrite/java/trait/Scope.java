@@ -251,7 +251,8 @@ public class Scope implements Trait<J> {
             public @Nullable J preVisit(J tree, Integer p) {
                 boolean scope = service.isScope(getCursor());
                 if (tree == regionTree || scope) {
-                    for (Binding binding : service.bindings(getCursor())) {
+                    List<Binding> bindings = scope ? new Scope(getCursor(), getCursor()).getBindings() : service.bindings(getCursor());
+                    for (Binding binding : bindings) {
                         J anchor = binding.getTree();
                         if (anchor instanceof J.Identifier) {
                             // A region that opens no scope declares its names in the scope around it, which binds them
@@ -708,7 +709,8 @@ public class Scope implements Trait<J> {
             }
             if (declaring.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                 Cursor declarations = declaring.getParentTreeCursor();
-                if (((J.VariableDeclarations) declarations.getValue()).hasModifier(J.Modifier.Type.Final)) {
+                if (declarations.getValue() instanceof J.VariableDeclarations &&
+                    ((J.VariableDeclarations) declarations.getValue()).hasModifier(J.Modifier.Type.Final)) {
                     return true;
                 }
                 Cursor owner = declarations.getParentTreeCursor();

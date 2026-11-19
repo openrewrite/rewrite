@@ -66,6 +66,9 @@ Type names are bound only in part. A type of the same package, one brought in by
 import, and an inherited member type the file never names are not bound, because the type model
 cannot list them cheaply. No type binding therefore does not mean a simple type name is free.
 
+Kotlin's implicit `it` is bound by every lambda that declares no parameters. A lambda with a receiver or with
+no parameter has no `it`, so inside one the name resolves to that lambda and not to the one around it.
+
 `isEffectivelyFinal` counts assignments per path through the tree. It is not a data-flow analysis.
 An analysis that is one can filter the same streams of bindings and references, without `Scope`
 knowing about it.

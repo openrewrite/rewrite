@@ -169,13 +169,13 @@ public class ScopeService {
             return precedes(statementsOf((J.Block) scopeTree), declaration, at);
         } else if (scopeTree instanceof J.ForLoop) {
             J.ForLoop.Control control = ((J.ForLoop) scopeTree).getControl();
-            if (at.get(0) == control && at.size() > 1 && control.getInit().contains(at.get(1))) {
+            if (same(at.get(0), control) && at.size() > 1 && control.getInit().contains(at.get(1))) {
                 return precedes(new ArrayList<>(control.getInit()), declaration.subList(1, declaration.size()), at.subList(1, at.size()));
             }
             return true;
         } else if (scopeTree instanceof J.Try) {
             J.Try try_ = (J.Try) scopeTree;
-            if (at.get(0) == try_.getBody()) {
+            if (same(at.get(0), try_.getBody())) {
                 return true;
             }
             List<J.Try.Resource> resources = try_.getResources() == null ? Collections.emptyList() : try_.getResources();
@@ -537,6 +537,10 @@ public class ScopeService {
                 J.ForLoop loop = i - 1 >= 0 ? (J.ForLoop) declaration.get(i - 1) : (J.ForLoop) scopeTree;
                 return control.getCondition() == child && whenTrue &&
                        (contains(at, loop.getBody()) || control.getUpdate().stream().anyMatch(u -> contains(at, u)));
+            } else if (parent instanceof J.Case) {
+                J.Case case_ = (J.Case) parent;
+                return case_.getGuard() == child && whenTrue &&
+                       (contains(at, case_.getBody()) || case_.getStatements().stream().anyMatch(s -> contains(at, s)));
             } else {
                 return false;
             }
@@ -736,17 +740,17 @@ public class ScopeService {
 
     private static boolean isBody(J scopeTree, J child) {
         if (scopeTree instanceof J.ClassDeclaration) {
-            return ((J.ClassDeclaration) scopeTree).getBody() == child;
+            return same(((J.ClassDeclaration) scopeTree).getBody(), child);
         } else if (scopeTree instanceof J.NewClass) {
-            return ((J.NewClass) scopeTree).getBody() == child;
+            return same(((J.NewClass) scopeTree).getBody(), child);
         } else if (scopeTree instanceof J.MethodDeclaration) {
-            return ((J.MethodDeclaration) scopeTree).getBody() == child;
+            return same(((J.MethodDeclaration) scopeTree).getBody(), child);
         } else if (scopeTree instanceof J.Lambda) {
-            return ((J.Lambda) scopeTree).getBody() == child;
+            return same(((J.Lambda) scopeTree).getBody(), child);
         } else if (scopeTree instanceof J.ForEachLoop) {
-            return ((J.ForEachLoop) scopeTree).getBody() == child;
+            return same(((J.ForEachLoop) scopeTree).getBody(), child);
         } else if (scopeTree instanceof J.Try.Catch) {
-            return ((J.Try.Catch) scopeTree).getBody() == child;
+            return same(((J.Try.Catch) scopeTree).getBody(), child);
         }
         return false;
     }
@@ -779,7 +783,7 @@ public class ScopeService {
             return asked > declared;
         }
         J statement = statements.get(declared);
-        if (statement instanceof J.ClassDeclaration) {
+        if (statement instanceof J.ClassDeclaration || statement instanceof J.MethodDeclaration) {
             return true;
         }
         if (!(statement instanceof J.VariableDeclarations)) {
@@ -825,6 +829,13 @@ public class ScopeService {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether the two are one tree, by id, since a cursor may hold an edited copy of a tree its scope has.
+     */
+    private static boolean same(@Nullable J a, @Nullable J b) {
+        return a != null && b != null && a.getId().equals(b.getId());
     }
 
     private static boolean contains(List<J> path, @Nullable J tree) {

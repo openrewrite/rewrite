@@ -106,6 +106,31 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     @Test
+    void localFunctionIsVisibleInItsOwnBody() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("local", Scope.Namespace.METHOD).isPresent() ? "bound" : "unbound")),
+          kotlin(
+            """
+              fun m() {
+                  fun local() {
+                      here()
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              fun m() {
+                  fun local() {
+                      /*~~(bound)~~>*/here()
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
     void parameterIsVisibleInTheDefaultOfALaterOne() {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> Stream.of("first", "second", "third")
