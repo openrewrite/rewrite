@@ -608,19 +608,29 @@ public abstract class RewriteTest
 
     private static string PluralCycles(int count) => count == 1 ? "1 cycle" : $"{count} cycles";
 
-    protected static SourceSpec CSharp(string before, string? after = null)
+    /// <summary>
+    /// A C# source, at <paramref name="sourcePath"/> when the recipe looks at where it is, such as one that takes a
+    /// path as an option, or else at <c>source.cs</c>.
+    /// </summary>
+    protected static SourceSpec CSharp(string before, string? after = null, string? sourcePath = null)
     {
-        return new SourceSpec(before, after);
+        return new SourceSpec(before, after, CSharpSourcePath(sourcePath));
     }
 
     /// <summary>
     /// A C# source the recipe changes, whose expected text <paramref name="after"/> makes of what the recipe printed,
     /// such as to assert on parts of a large output and return it, or to compute it from the parts that vary.
     /// </summary>
-    protected static SourceSpec CSharp(string before, Func<string, string> after)
+    protected static SourceSpec CSharp(string before, Func<string, string> after, string? sourcePath = null)
     {
-        return new SourceSpec(before) { AfterFromActual = after };
+        return new SourceSpec(before, null, CSharpSourcePath(sourcePath)) { AfterFromActual = after };
     }
+
+    private static string? CSharpSourcePath(string? sourcePath) =>
+        sourcePath == null || sourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+            ? sourcePath
+            : throw new ArgumentException($"A C# source is parsed here at a path that ends in .cs, not {sourcePath}.",
+                nameof(sourcePath));
 
     /// <summary>
     /// A C# source read from a file, such as a fixture the test project copies to its output directory, by its path

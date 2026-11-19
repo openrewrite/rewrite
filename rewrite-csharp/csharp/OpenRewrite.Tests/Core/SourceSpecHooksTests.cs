@@ -120,9 +120,27 @@ public class SourceSpecHooksTests : RewriteTest
             spec => spec
                 .SetRecipe(new RenameCalls("Foo", "Bar"))
                 .ExpectResults(results => Assert.Equal(["A.cs"], results.Select(r => r.After!.SourcePath))),
-            CSharp(Calls("Foo", "A"), Calls("Bar", "A")) with { SourcePath = "A.cs" },
-            CSharp(Calls("Bar", "B")) with { SourcePath = "B.cs" }
+            CSharp(Calls("Foo", "A"), Calls("Bar", "A"), "A.cs"),
+            CSharp(Calls("Bar", "B"), sourcePath: "B.cs")
         );
+    }
+
+    [Fact]
+    public void ACSharpSourceIsAtThePathTheTestGivesIt()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Foo"), actual => Calls("Bar"), "src/App/Program.cs")
+                .AfterRecipe(cu => Assert.Equal("src/App/Program.cs", cu.SourcePath))
+        );
+    }
+
+    [Fact]
+    public void ACSharpSourceIsAtAPathThatEndsInCs()
+    {
+        var failure = Assert.Throws<ArgumentException>(() => CSharp(Calls("Foo"), sourcePath: "Program.csx"));
+
+        Assert.StartsWith("A C# source is parsed here at a path that ends in .cs, not Program.csx.", failure.Message);
     }
 
     [Theory]
