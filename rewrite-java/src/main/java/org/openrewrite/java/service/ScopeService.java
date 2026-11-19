@@ -357,6 +357,7 @@ public class ScopeService {
         for (Scope.Binding binding : bindings) {
             declared.add(binding.getNamespace() + binding.getName());
         }
+        Set<String> hiding = new HashSet<>(declared);
         for (JavaType.Variable field : membersOf(type, fromPackage, false,
                 JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
             if (declared.add(Scope.Namespace.VARIABLE + field.getName())) {
@@ -367,6 +368,27 @@ public class ScopeService {
                 JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
             if (!method.isConstructor() && declared.add(Scope.Namespace.METHOD + method.getName())) {
                 bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+            }
+        }
+        // A member the body declares hides the inherited one of its name, which `super` still reaches. It is bound
+        // after the one hiding it, so a lookup by name never finds it.
+        List<JavaType.FullyQualified> supertypes = new ArrayList<>(type.getInterfaces());
+        if (type.getSupertype() != null) {
+            supertypes.add(0, type.getSupertype());
+        }
+        for (JavaType.FullyQualified supertype : supertypes) {
+            for (JavaType.Variable field : membersOf(supertype, fromPackage, false,
+                    JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
+                if (hiding.contains(Scope.Namespace.VARIABLE + field.getName()) && hiding.add("super " + Scope.Namespace.VARIABLE + field.getName())) {
+                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+                }
+            }
+            for (JavaType.Method method : membersOf(supertype, fromPackage, false,
+                    JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
+                if (!method.isConstructor() && hiding.contains(Scope.Namespace.METHOD + method.getName()) &&
+                    hiding.add("super " + Scope.Namespace.METHOD + method.getName())) {
+                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+                }
             }
         }
     }

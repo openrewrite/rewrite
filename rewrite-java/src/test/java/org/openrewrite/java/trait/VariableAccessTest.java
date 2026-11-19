@@ -152,7 +152,8 @@ class VariableAccessTest implements RewriteTest {
     void fieldSelectedFromSuperOrAnEnclosingInstanceResolvesToThatClass() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new VariableAccess.Matcher().asVisitor(va -> SearchResult.found(va.getTree(),
-            va.getBinding().map(b -> b.getKind() + " of " + ((J.ClassDeclaration) b.getScope().getTree()).getSimpleName()).orElse("unbound"))))),
+            va.getBinding().map(b -> b.getKind() + " of " + ((J.ClassDeclaration) b.getScope().getTree()).getSimpleName() +
+                                      ", " + b.references().count() + " references").orElse("unbound"))))),
           java(
             """
               class Base {
@@ -163,6 +164,7 @@ class VariableAccessTest implements RewriteTest {
                   int x;
                   void m() {
                       super.x = 1;
+                      this.x = 0;
                       super.inherited = 2;
                   }
                   class Inner {
@@ -181,13 +183,14 @@ class VariableAccessTest implements RewriteTest {
               class Sub extends Base {
                   int x;
                   void m() {
-                      super./*~~(unbound)~~>*/x = 1;
-                      super./*~~(INHERITED of Sub)~~>*/inherited = 2;
+                      super./*~~(INHERITED of Sub, 1 references)~~>*/x = 1;
+                      this./*~~(MEMBER of Sub, 2 references)~~>*/x = 0;
+                      super./*~~(INHERITED of Sub, 1 references)~~>*/inherited = 2;
                   }
                   class Inner {
                       int x;
                       void m() {
-                          Sub.this./*~~(MEMBER of Sub)~~>*/x = 3;
+                          Sub.this./*~~(MEMBER of Sub, 2 references)~~>*/x = 3;
                       }
                   }
               }

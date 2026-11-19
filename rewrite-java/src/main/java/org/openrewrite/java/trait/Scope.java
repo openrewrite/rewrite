@@ -560,8 +560,8 @@ public class Scope implements Trait<J> {
         /**
          * The identifiers in the binding's scope that refer to it, by its simple name, as {@code this.name} or
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
-         * Where a class redeclares a member of its superclass, {@code super.name} reads the inherited one and is not
-         * listed.
+         * Where a class redeclares a member of its superclass, {@code super.name} refers to the inherited one, which
+         * the class binds too.
          */
         public Stream<Cursor> references() {
             // One walk of the scope answers for every binding in it
@@ -662,6 +662,19 @@ public class Scope implements Trait<J> {
         }
 
         /**
+         * Whether a binding of the same name and namespace comes before this one in its scope, as the member a class
+         * declares does before the inherited one it hides.
+         */
+        private boolean isHidden() {
+            for (Binding sibling : getScope().getBindings()) {
+                if (sibling.namespace == namespace && sibling.name.equals(name)) {
+                    return !sibling.equals(this);
+                }
+            }
+            return false;
+        }
+
+        /**
          * Whether the identifier is this member's name selected from {@code this} or {@code super} of the class
          * binding it, which is the innermost class around the identifier.
          */
@@ -679,8 +692,8 @@ public class Scope implements Trait<J> {
                 return false;
             }
             String qualifier = ((J.Identifier) select).getSimpleName();
-            // `super` reaches past a member the class declares itself, to the one it inherits
-            if (!"this".equals(qualifier) && !("super".equals(qualifier) && getKind() == Kind.INHERITED)) {
+            // `super` reaches past a member the class declares itself to the one it inherits, and `this` does not
+            if (!("this".equals(qualifier) && !isHidden()) && !("super".equals(qualifier) && getKind() == Kind.INHERITED)) {
                 return false;
             }
             for (Cursor c = identifier.getParent(); c != null; c = c.getParent()) {
