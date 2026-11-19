@@ -703,6 +703,15 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void slashIsNotAnEscape() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "a = \"\\/\"\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 1:"));
+    }
+
+    @Test
     void recoveredSyntaxErrorIsMarked() {
         SourceFile recovered = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nkey =\nb = 1\n")
           .findFirst().orElseThrow();
