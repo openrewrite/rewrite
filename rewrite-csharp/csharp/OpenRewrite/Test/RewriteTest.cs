@@ -806,6 +806,21 @@ public class RecipeSpec
         return this;
     }
 
+    /// <summary>
+    /// Runs the recipes one after the other on each source, as a recipe that lists them does, such as a recipe that
+    /// Java runs before and after the recipe under test to check that Java matches the types the recipe left. The
+    /// sources the test expects are those the last of them leaves.
+    /// </summary>
+    public RecipeSpec SetRecipes(params Recipe[] recipes)
+    {
+        if (recipes.Length == 0)
+        {
+            throw new ArgumentException("SetRecipes takes the recipes to run, and none were given.");
+        }
+        Recipe = recipes.Length == 1 ? recipes[0] : new RecipeSteps(recipes);
+        return this;
+    }
+
     public RecipeSpec SetCycles(int cycles)
     {
         Cycles = cycles;
@@ -954,6 +969,16 @@ internal sealed record OutputCompilation(
     Action<CSharpCompilation>? Inspect,
     CSharpCompilationOptions? Options,
     CSharpParseOptions? ParseOptions);
+
+/// <summary>The recipes of <see cref="RecipeSpec.SetRecipes"/>, run one after the other.</summary>
+internal sealed class RecipeSteps(IReadOnlyList<Recipe> steps) : Recipe
+{
+    public override string DisplayName => "Recipe steps";
+
+    public override string Description => string.Join(", then ", steps.Select(step => step.DisplayName)) + ".";
+
+    public override List<Recipe> GetRecipeList() => [..steps];
+}
 
 /// <summary>
 /// Pre-configured reference assemblies for common .NET SDK targets.
