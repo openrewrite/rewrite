@@ -241,15 +241,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (versionComparator == null) {
                     return newVersion;
                 }
-                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                List<String> availableVersions = new ArrayList<>();
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                for (String v : mavenMetadata.getVersioning().getVersions()) {
-                    if (versionComparator.isValid(finalCurrentVersion, v)) {
-                        availableVersions.add(v);
-                    }
-                }
-                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
+                return latestMatching(versionComparator, currentVersion, mavenMetadata.getVersioning().getVersions());
             }
 
             private void storeParentPomProperty(@Nullable MavenResolutionResult parent, String propertyName, String newValue, Accumulator acc) {
@@ -310,25 +303,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             if (!"exclusions".equals(t.getName())) {
                                 return t;
                             }
-                            boolean hasOldExclusion = t.getChildren("exclusion").stream()
-                                    .anyMatch(e -> matchesGlob(e.getChildValue("groupId").orElse(null), oldGroupId) &&
-                                                   matchesGlob(e.getChildValue("artifactId").orElse(null), oldArtifactId));
-                            if (!hasOldExclusion) {
-                                return t;
-                            }
-                            boolean hasNewExclusion = t.getChildren("exclusion").stream()
-                                    .anyMatch(e -> effectiveNewGroupId.equals(e.getChildValue("groupId").orElse(null)) &&
-                                                   effectiveNewArtifactId.equals(e.getChildValue("artifactId").orElse(null)));
-                            if (!hasNewExclusion) {
-                                t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build(
-                                        "<exclusion>\n" +
-                                                "<groupId>" + effectiveNewGroupId + "</groupId>\n" +
-                                                "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
-                                                "</exclusion>"))
-                                        .visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                            Xml.Tag withNewExclusion = withNewExclusion(t, getCursor().getParentOrThrow(), ctx);
+                            if (withNewExclusion != t) {
                                 maybeUpdateModel();
                             }
-                            return t;
+                            return withNewExclusion;
                         }
                     });
                 }
@@ -593,7 +572,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (versionComparator == null) {
                     return newVersion;
                 }
-                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
                 String key = groupId + ':' + artifactId;
                 List<String> versions = availableVersionsByArtifact.get(key);
                 if (versions == null) {
@@ -601,15 +579,43 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     versions = mavenMetadata.getVersioning().getVersions();
                     availableVersionsByArtifact.put(key, versions);
                 }
-                List<String> availableVersions = new ArrayList<>();
-                for (String v : versions) {
-                    if (versionComparator.isValid(finalCurrentVersion, v)) {
-                        availableVersions.add(v);
-                    }
-                }
-                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
+                return latestMatching(versionComparator, currentVersion, versions);
             }
         };
+    }
+
+    private String latestMatching(VersionComparator versionComparator, @Nullable String currentVersion, List<String> versions) {
+        String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
+        List<String> availableVersions = new ArrayList<>();
+        for (String v : versions) {
+            if (versionComparator.isValid(finalCurrentVersion, v)) {
+                availableVersions.add(v);
+            }
+        }
+        return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
+    }
+
+    private Xml.Tag withNewExclusion(Xml.Tag exclusions, Cursor parent, ExecutionContext ctx) {
+        boolean hasOldExclusion = exclusions.getChildren("exclusion").stream()
+                .anyMatch(e -> matchesGlob(e.getChildValue("groupId").orElse(null), oldGroupId) &&
+                               matchesGlob(e.getChildValue("artifactId").orElse(null), oldArtifactId));
+        if (!hasOldExclusion) {
+            return exclusions;
+        }
+        String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
+        String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
+        boolean hasNewExclusion = exclusions.getChildren("exclusion").stream()
+                .anyMatch(e -> effectiveNewGroupId.equals(e.getChildValue("groupId").orElse(null)) &&
+                               effectiveNewArtifactId.equals(e.getChildValue("artifactId").orElse(null)));
+        if (hasNewExclusion) {
+            return exclusions;
+        }
+        return (Xml.Tag) new AddToTagVisitor<>(exclusions, Xml.Tag.build(
+                "<exclusion>\n" +
+                "<groupId>" + effectiveNewGroupId + "</groupId>\n" +
+                "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
+                "</exclusion>"))
+                .visitNonNull(exclusions, ctx, parent);
     }
 
     @Value
