@@ -39,6 +39,17 @@ class CursorTest {
     }
 
     @Test
+    void computingAMessageMayStoreAnotherOnTheSameCursor() {
+        var cursor = new Cursor(null, "root");
+
+        String outer = cursor.computeMessageIfAbsent("outer", k -> "outer of " + cursor.computeMessageIfAbsent("inner", i -> "inner"));
+
+        assertThat(outer).isEqualTo("outer of inner");
+        assertThat(cursor.<String>getMessage("inner")).isEqualTo("inner");
+        assertThat(cursor.<String>getMessage("outer")).isEqualTo("outer of inner");
+    }
+
+    @Test
     void parentIsNeverTheSameElement() {
         var t = PlainText.builder()
           .text("test")

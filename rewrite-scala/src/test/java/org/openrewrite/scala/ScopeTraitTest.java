@@ -17,7 +17,6 @@ package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.Statement;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.trait.Scope;
@@ -28,7 +27,6 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
@@ -187,7 +185,7 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     @Test
-    void blockCollidesAcrossLaterStatements() {
+    void blockCanMoveAfterItsStatementUnlessALaterOneUsesItsNames() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
@@ -196,13 +194,8 @@ class ScopeTraitTest implements RewriteTest {
                   if (!(parent.getValue() instanceof J.Block)) {
                       return iff;
                   }
-                  List<Statement> statements = parent.<J.Block>getValue().getStatements();
-                  List<Cursor> later = new ArrayList<>();
-                  for (Statement statement : statements.subList(statements.indexOf(iff) + 1, statements.size())) {
-                      later.add(new Cursor(parent, statement));
-                  }
                   Cursor block = new Cursor(getCursor(), iff.getThenPart());
-                  return SearchResult.found(iff, Scope.at(block).collidesAcross(later) ? "collides" : "free");
+                  return SearchResult.found(iff, Scope.at(block).canMoveAfter(getCursor()) ? "moves" : "stays");
               }
           })),
           scala(
@@ -228,15 +221,15 @@ class ScopeTraitTest implements RewriteTest {
               object O {
                 val field = 0
                 def declaredLater(c: Boolean): Unit = {
-                  /*~~(collides)~~>*/if (c) { val x = 1 }
+                  /*~~(stays)~~>*/if (c) { val x = 1 }
                   val x = 2
                 }
                 def readLater(c: Boolean): Unit = {
-                  /*~~(collides)~~>*/if (c) { val field = 1 }
+                  /*~~(stays)~~>*/if (c) { val field = 1 }
                   use(field)
                 }
                 def untouched(c: Boolean): Unit = {
-                  /*~~(free)~~>*/if (c) { val y = 1 }
+                  /*~~(moves)~~>*/if (c) { val y = 1 }
                   use(field)
                 }
                 def use(i: Int): Unit = ()
