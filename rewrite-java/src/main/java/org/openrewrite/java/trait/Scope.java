@@ -584,7 +584,8 @@ public class Scope implements Trait<J> {
          * The identifiers in the binding's scope that refer to it, by its simple name, as {@code this.name} or
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
          * Where a class redeclares a member of its superclass, {@code super.name} refers to the inherited one, which
-         * the class binds too.
+         * the class binds too. They are read from the scope's tree as it was when the binding was found, so a binding
+         * found before an edit does not see it. Finding the binding again from a cursor on the edited tree does.
          */
         public Stream<Cursor> references() {
             // One walk of the scope answers for every binding in it
