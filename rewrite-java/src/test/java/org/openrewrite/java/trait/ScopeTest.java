@@ -1047,6 +1047,70 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void nameAClassBindsWithoutSpellingItIsTakenWhenAskedAtTheClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  Scope scope = Scope.at(getCursor());
+                  return "A".equals(classDecl.getSimpleName()) ?
+                    SearchResult.found(classDecl, Stream.of("inherited", "fresh").filter(scope::isFree).collect(joining(" "))) :
+                    classDecl;
+              }
+          })),
+          java(
+            """
+              class B {
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              class A extends B {
+              }
+              """,
+            """
+              /*~~(fresh)~~>*/class A extends B {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void classBindsAPrivateMemberOnlyAttributionLists() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok"))
+            .recipe(atHere(scope -> scope.lookup("log").map(b -> b.getKind().toString()).orElse("unbound"))),
+          java(
+            """
+              import lombok.extern.java.Log;
+
+              @Log
+              class A {
+                  void m() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              import lombok.extern.java.Log;
+
+              @Log
+              class A {
+                  void m() {
+                      /*~~(INHERITED)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void bindingOfADeclarationFromItsOwnCursorOrOneAboveOrBelow() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

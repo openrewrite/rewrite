@@ -374,14 +374,15 @@ public class ScopeService {
             for (Scope.Binding binding : bindings) {
                 (binding.getNamespace() == Scope.Namespace.METHOD ? methods : fields).add(binding.getName());
             }
+            // A class reaches its own members whatever their access, as it does a private field an annotation
+            // processor generates
             for (JavaType.Variable field : type.getMembers()) {
-                if (isVisibleFrom(field.getFlagsBitMap(), type, fromPackage) && fields.add(field.getName())) {
+                if (fields.add(field.getName())) {
                     bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
                 }
             }
             for (JavaType.Method method : type.getMethods()) {
-                if (!method.isConstructor() && isVisibleFrom(method.getFlagsBitMap(), type, fromPackage) &&
-                    methods.add(method.getName())) {
+                if (!method.isConstructor() && methods.add(method.getName())) {
                     bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
                 }
             }

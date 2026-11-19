@@ -172,8 +172,9 @@ public class Scope implements Trait<J> {
 
     /**
      * Whether a new variable declared at the position can take the name. It cannot take a reserved word, a name
-     * visible at the position, or any name this scope spells other than a member's name after a dot. The last keeps
-     * clear of later declarations in any language.
+     * visible at the position, a variable this scope binds, or any name this scope spells other than a member's name
+     * after a dot. Counting what the scope spells keeps clear of later declarations in any language. Counting what
+     * it binds covers a name it never spells, as a class's inherited field, when asked from the class itself.
      */
     public boolean isFree(String name) {
         Map<Object, Set<String>> spelled = perSourceFile(cursor).computeMessageIfAbsent(SPELLED, k -> new IdentityHashMap<>());
@@ -182,7 +183,15 @@ public class Scope implements Trait<J> {
             inScope = namesSpelledWithin(cursor);
             spelled.put(cursor.getValue(), inScope);
         }
-        return !service(position).isReserved(name) && !inScope.contains(name) && !lookup(name).isPresent();
+        if (service(position).isReserved(name) || inScope.contains(name)) {
+            return false;
+        }
+        for (Binding binding : getBindings()) {
+            if (binding.namespace == Namespace.VARIABLE && binding.name.equals(name)) {
+                return false;
+            }
+        }
+        return !lookup(name).isPresent();
     }
 
     /**
