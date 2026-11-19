@@ -774,6 +774,15 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                 package c;
                 public class Inner {
                 }
+                """,
+              """
+                package c;
+                public class Holder {
+                    public static class Inner {
+                    }
+                    public static class Outer {
+                    }
+                }
                 """
             )),
           java(
@@ -817,6 +826,79 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   Inner inner;
                   Outer outer;
                   Object o = b.Outer.Inner.B;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+              import c.Outer;
+
+              class Test3 {
+                  Outer outer;
+                  Object o = Old.A;
+
+                  static class Inner {
+                  }
+              }
+              """,
+            """
+              import c.Outer;
+
+              class Test3 {
+                  Outer outer;
+                  Object o = b.Outer.Inner.B;
+
+                  static class Inner {
+                  }
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+              import c.Outer;
+
+              import static c.Holder.Inner;
+
+              class Test4 {
+                  Inner inner;
+                  Outer outer;
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import c.Outer;
+
+              import static c.Holder.Inner;
+
+              class Test4 {
+                  Inner inner;
+                  Outer outer;
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+              import c.Holder.Outer;
+
+              class Test5 {
+                  Outer outer;
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import b.Outer.Inner;
+              import c.Holder.Outer;
+
+              class Test5 {
+                  Outer outer;
+                  Object o = Inner.B;
               }
               """
           )
