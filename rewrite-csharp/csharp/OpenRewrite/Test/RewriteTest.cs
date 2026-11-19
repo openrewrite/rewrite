@@ -115,6 +115,21 @@ public abstract class RewriteTest
             }
         }
 
+        if (recipeSpec.InputCompiles)
+        {
+            if (recipeSpec.ReferenceAssemblies == null)
+            {
+                throw new ArgumentException(
+                    "ExpectInputCompiles compiles against the ReferenceAssemblies, which are not set.");
+            }
+            if (sharedCompilation != null)
+            {
+                AssertCompiles(sharedCompilation,
+                    $"The sources of the test don't compile against {recipeSpec.ReferenceAssemblies.TargetFramework}" +
+                    ", so types the recipe looks at are missing or wrong");
+            }
+        }
+
         var projects = new Dictionary<string, DotNetProject>();
         SourceFile BeforeRecipe(SourceSpec spec, SourceFile source)
         {
@@ -263,6 +278,7 @@ public abstract class RewriteTest
                     }
                     AfterRecipe(spec, source, result == null ? source : result.After);
                 }
+                AssertOutputCompiles(recipeSpec, run.Finals);
 
                 if (run.Unsettled is var (cycle, changes))
                 {
@@ -299,6 +315,7 @@ public abstract class RewriteTest
             {
                 AfterRecipe(spec, source, source);
             }
+            AssertOutputCompiles(recipeSpec, parsed.Select(p => p.Source).ToList());
         }
     }
 
@@ -316,6 +333,41 @@ public abstract class RewriteTest
         {
             assertion(before, after);
         }
+    }
+
+    private static void AssertOutputCompiles(RecipeSpec recipeSpec, List<SourceFile> finals)
+    {
+        if (recipeSpec.OutputCompilations.Count == 0)
+        {
+            return;
+        }
+        var trees = finals.OfType<CSharp.CompilationUnit>()
+            .Select(unit => CSharpSyntaxTree.ParseText(PrintTree(unit, MarkerPrinter.Sanitized), path: unit.SourcePath))
+            .ToList();
+        foreach (var (references, inspect) in recipeSpec.OutputCompilations)
+        {
+            var target = references ?? recipeSpec.ReferenceAssemblies ?? throw new ArgumentException(
+                "ExpectOutputCompiles compiles against the ReferenceAssemblies when it isn't given references, " +
+                "and they are not set.");
+            var compilation = Compile(ResolveAssemblies(target), trees);
+            AssertCompiles(compilation, $"The recipe's output doesn't compile against {target.TargetFramework}");
+            inspect?.Invoke(compilation);
+        }
+    }
+
+    private static void AssertCompiles(CSharpCompilation compilation, string headline)
+    {
+        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+        if (errors.Count == 0)
+        {
+            return;
+        }
+        var failing = errors.Select(e => e.Location.SourceTree).OfType<SyntaxTree>().Distinct();
+        Assert.Fail(string.Join("\n", [
+            $"{headline}:",
+            ..errors.Select(e => $"  {e}"),
+            ..failing.Select(tree => $"{tree.FilePath}:\n{tree.GetText()}")
+        ]));
     }
 
     /// <param name="Changes">The changes of the expected cycles, from the parsed sources to the output of the last of them.</param>
@@ -795,6 +847,36 @@ public class RecipeSpec
         return this;
     }
 
+    private readonly List<OutputCompilation> _outputCompilations = [];
+
+    internal IReadOnlyList<OutputCompilation> OutputCompilations => _outputCompilations;
+
+    /// <summary>
+    /// Expect the C# sources as the recipe left them to compile without errors, against
+    /// <paramref name="references"/> when the output targets other frameworks than the input, and against
+    /// <see cref="ReferenceAssemblies"/> otherwise. <paramref name="inspect"/> gets the compilation, such as to emit
+    /// and run the output. Call it once for each set of references the output has to compile against.
+    /// </summary>
+    public RecipeSpec ExpectOutputCompiles(ReferenceAssemblies? references = null,
+        Action<CSharpCompilation>? inspect = null)
+    {
+        _outputCompilations.Add(new OutputCompilation(references, inspect));
+        return this;
+    }
+
+    /// <summary>Whether the test expects the C# sources to compile without errors before the recipe runs.</summary>
+    public bool InputCompiles { get; private set; }
+
+    /// <summary>
+    /// Expect the C# sources to compile without errors against <see cref="ReferenceAssemblies"/> before the recipe
+    /// runs, so that the types the recipe sees are the ones the compiler resolved.
+    /// </summary>
+    public RecipeSpec ExpectInputCompiles()
+    {
+        InputCompiles = true;
+        return this;
+    }
+
     public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
@@ -807,6 +889,10 @@ public class RecipeSpec
         return this;
     }
 }
+
+/// <param name="References">The references to compile against, or null for the ones the input compiled against.</param>
+/// <param name="Inspect">What the test checks of the compilation.</param>
+internal sealed record OutputCompilation(ReferenceAssemblies? References, Action<CSharpCompilation>? Inspect);
 
 /// <summary>
 /// Pre-configured reference assemblies for common .NET SDK targets.
