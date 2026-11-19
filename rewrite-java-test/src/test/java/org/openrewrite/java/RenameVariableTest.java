@@ -1754,4 +1754,37 @@ class RenameVariableTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renamingAFieldKeepsAJavadocLinkToAMethodOfItsName() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("count", "total", false)),
+          java(
+            """
+              public class A {
+                  private int count;
+
+                  /**
+                   * Reads {@link #count}, as {@link #count()} says.
+                   */
+                  int count() {
+                      return count;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  private int total;
+
+                  /**
+                   * Reads {@link #total}, as {@link #count()} says.
+                   */
+                  int count() {
+                      return total;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

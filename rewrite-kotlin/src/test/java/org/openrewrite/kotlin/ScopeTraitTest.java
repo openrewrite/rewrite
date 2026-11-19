@@ -85,6 +85,46 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     @Test
+    void functionWithoutAReturnTypeIsBoundAsAMethod() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("here", Scope.Namespace.METHOD).isPresent() ? "bound" : "unbound")),
+          kotlin(
+            """
+              fun m() {
+                  here()
+              }
+              fun here() {}
+              """,
+            """
+              fun m() {
+                  /*~~(bound)~~>*/here()
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterIsVisibleInTheDefaultOfALaterOne() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> Stream.of("first", "second", "third")
+            .filter(name -> scope.lookup(name).isPresent())
+            .collect(joining(" ")))),
+          kotlin(
+            """
+              fun m(first: Int, second: Any = here(), third: Int = 0) {}
+              fun here() {}
+              """,
+            """
+              fun m(first: Int, second: Any = /*~~(first)~~>*/here(), third: Int = 0) {}
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
     void namedArgumentIsNotAVariableAccess() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new VariableAccess.Matcher()

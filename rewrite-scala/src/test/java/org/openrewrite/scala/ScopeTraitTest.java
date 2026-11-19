@@ -99,6 +99,49 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     @Test
+    void patternDefinitionBindsItsOwnNamesAndNotThoseOfACaseInItsValue() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (!"here".equals(m.getSimpleName())) {
+                      return m;
+                  }
+                  Scope scope = Scope.at(getCursor());
+                  return SearchResult.found(m, Stream.of("a", "b", "inCase")
+                    .filter(name -> scope.lookup(name).isPresent())
+                    .collect(joining(" ")));
+              }
+          })),
+          scala(
+            """
+              object O {
+                def f(s: Any): Int = {
+                  val (a, b) = s match {
+                    case inCase: Int => (inCase, inCase)
+                  }
+                  here()
+                }
+                def here(): Int = 0
+              }
+              """,
+            """
+              object O {
+                def f(s: Any): Int = {
+                  val (a, b) = s match {
+                    case inCase: Int => (inCase, inCase)
+                  }
+                  /*~~(a b)~~>*/here()
+                }
+                def here(): Int = 0
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void referencesAndRenameSafetyFollowScalaScoping() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {

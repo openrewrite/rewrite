@@ -122,7 +122,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         parent.putMessage("renamed", true);
                         return ident.withSimpleName(newName);
                     }
-                } else if (renamed.contains(ident.getId()) || field && getCursor().firstEnclosing(Javadoc.class) != null) {
+                } else if (renamed.contains(ident.getId()) || field && isJavadocFieldReference(parent, ident)) {
                     if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                         Tree variableDeclaration = parent.getParentTreeCursor().getValue();
                         J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile || is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
@@ -163,6 +163,14 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 m = m.withVariableType(m.getVariableType().withName(newName));
             }
             return m;
+        }
+
+        /**
+         * Whether the identifier is in a Javadoc and is not the name of a method, as it is in {@code {@link #name()}}.
+         */
+        private boolean isJavadocFieldReference(Cursor parent, J.Identifier ident) {
+            return getCursor().firstEnclosing(Javadoc.class) != null &&
+                   !(parent.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) parent.getValue()).getName() == ident);
         }
 
         /**

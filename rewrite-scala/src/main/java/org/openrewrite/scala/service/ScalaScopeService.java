@@ -144,6 +144,15 @@ public class ScalaScopeService extends ScopeService {
         for (J pattern : patterns) {
             new JavaIsoVisitor<List<Scope.Binding>>() {
                 @Override
+                public @Nullable J preVisit(J tree, List<Scope.Binding> found) {
+                    // A scope in a definition's or an enumerator's value binds the names of its own patterns
+                    if (tree != pattern && isScope(getCursor())) {
+                        stopAfterPreVisit();
+                    }
+                    return tree;
+                }
+
+                @Override
                 public J.Identifier visitIdentifier(J.Identifier identifier, List<Scope.Binding> found) {
                     if (isPatternVariable(getCursor())) {
                         found.add(new Scope.Binding(getCursor(), identifier.getSimpleName(), Scope.Namespace.VARIABLE,

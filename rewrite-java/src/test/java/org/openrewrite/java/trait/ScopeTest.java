@@ -150,6 +150,90 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void anonymousClassInheritsWhatItsOwnPackageCanAccess() {
+        rewriteRun(
+          spec -> spec.recipe(visibleAtHere("packagePrivate", "inherited")),
+          java(
+            """
+              package a;
+
+              public class Base {
+                  int packagePrivate;
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import a.Base;
+
+              class A {
+                  void m() {
+                      new Base() {
+                          void n() {
+                              here();
+                          }
+                      };
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              package b;
+
+              import a.Base;
+
+              class A {
+                  void m() {
+                      new Base() {
+                          void n() {
+                              /*~~(inherited)~~>*/here();
+                          }
+                      };
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticImportOfANameShadowsAnOnDemandOne() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("max", Scope.Namespace.METHOD)
+            .map(binding -> ((J.Import) binding.getTree()).getTypeName())
+            .orElse("none"))),
+          java(
+            """
+              import static java.lang.Math.*;
+              import static java.lang.StrictMath.max;
+
+              class A {
+                  void m() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              import static java.lang.Math.*;
+              import static java.lang.StrictMath.max;
+
+              class A {
+                  void m() {
+                      /*~~(java.lang.StrictMath)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void loopTryCatchAndLambdaVariablesReachOnlyTheirOwnPart() {
         rewriteRun(
           spec -> spec.recipe(visibleAtHere("s", "i", "r", "e", "x", "list", "in")),

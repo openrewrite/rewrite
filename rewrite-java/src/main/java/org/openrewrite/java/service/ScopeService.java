@@ -75,7 +75,7 @@ public class ScopeService {
                 if (tree != scopeTree && isScope(getCursor())) {
                     if (tree instanceof J.ClassDeclaration) {
                         found.add(declared(new Cursor(getCursor(), ((J.ClassDeclaration) tree).getName()), scope, Scope.Namespace.TYPE));
-                    } else if (tree instanceof J.MethodDeclaration && !((J.MethodDeclaration) tree).isConstructor()) {
+                    } else if (tree instanceof J.MethodDeclaration && !isConstructor((J.MethodDeclaration) tree)) {
                         found.add(declared(new Cursor(getCursor(), ((J.MethodDeclaration) tree).getName()), scope, Scope.Namespace.METHOD));
                     } else if (tree instanceof J.Case && isColonCase(tree)) {
                         for (Statement statement : ((J.Case) tree).getStatements()) {
@@ -114,15 +114,26 @@ public class ScopeService {
         JavaType.FullyQualified inheriting = null;
         if (scopeTree instanceof J.ClassDeclaration) {
             inheriting = ((J.ClassDeclaration) scopeTree).getType();
-            inherited(scope, inheriting, false, bindings);
         } else if (scopeTree instanceof J.NewClass && ((J.NewClass) scopeTree).getClazz() != null) {
             inheriting = TypeUtils.asFullyQualified(((J.NewClass) scopeTree).getClazz().getType());
-            inherited(scope, inheriting, true, bindings);
         }
         if (inheriting != null) {
-            inheritedMemberTypes(scope, inheriting, scopeTree instanceof J.NewClass, bindings);
+            // An anonymous class belongs to the file's package, whichever package its supertype is in
+            JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
+            String fromPackage = sourceFile == null ? inheriting.getPackageName() :
+                    sourceFile.getPackageDeclaration() == null ? "" : sourceFile.getPackageDeclaration().getPackageName();
+            inherited(scope, inheriting, fromPackage, bindings);
+            inheritedMemberTypes(scope, inheriting, fromPackage, scopeTree instanceof J.NewClass, bindings);
         }
         return bindings;
+    }
+
+    /**
+     * Whether the method is a constructor, which binds no name. Attribution tells where it is present, since a
+     * language may leave the return type off a method too.
+     */
+    private static boolean isConstructor(J.MethodDeclaration method) {
+        return method.getMethodType() != null ? method.getMethodType().isConstructor() : method.isConstructor();
     }
 
     /**
@@ -173,6 +184,12 @@ public class ScopeService {
             return declared >= 0 && asked > declared;
         } else if (scopeTree instanceof J.Case) {
             return !((J.Case) scopeTree).getCaseLabels().contains(at.get(0));
+        } else if (scopeTree instanceof J.MethodDeclaration && !isBody(scopeTree, at.get(0))) {
+            // Where a language gives parameters default values, one can read the parameters before it
+            List<Statement> parameters = ((J.MethodDeclaration) scopeTree).getParameters();
+            int declared = parameters.indexOf(declaration.get(0));
+            int asked = parameters.indexOf(at.get(0));
+            return declared >= 0 && asked > declared;
         }
         return isBody(scopeTree, at.get(0));
     }
@@ -211,7 +228,32 @@ public class ScopeService {
         if (isTypePosition(parentCursor, parent, ident) || isTypeName(ident) && !isVariableInScope(identifier)) {
             return Scope.Namespace.TYPE;
         }
-        return Scope.Namespace.VARIABLE;
+        return isPackage(parentCursor, ident) ? null : Scope.Namespace.VARIABLE;
+    }
+
+    /**
+     * Whether the identifier starts the package of a qualified type name, as {@code java} does in
+     * {@code java.util.List}. Attribution tells, as the names selected from it lead to a type of exactly that name.
+     */
+    private static boolean isPackage(Cursor parentCursor, J.Identifier ident) {
+        if (ident.getFieldType() != null || ident.getType() != null && !(ident.getType() instanceof JavaType.Unknown)) {
+            return false;
+        }
+        StringBuilder qualified = new StringBuilder(ident.getSimpleName());
+        Object selected = ident;
+        for (Cursor c = parentCursor; c.getValue() instanceof J.FieldAccess; c = c.getParentTreeCursor()) {
+            J.FieldAccess select = c.getValue();
+            if (select.getTarget() != selected) {
+                return false;
+            }
+            qualified.append('.').append(select.getSimpleName());
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(select.getType());
+            if (type != null && !(type instanceof JavaType.Unknown)) {
+                return type.getFullyQualifiedName().contentEquals(qualified);
+            }
+            selected = select;
+        }
+        return false;
     }
 
     /**
@@ -259,6 +301,7 @@ public class ScopeService {
     }
 
     private static void imports(Cursor scope, JavaSourceFile cu, List<Scope.Binding> bindings) {
+        List<Scope.Binding> onDemand = new ArrayList<>();
         for (J.Import anImport : cu.getImports()) {
             Cursor importCursor = new Cursor(scope, anImport);
             String name = anImport.getQualid().getSimpleName();
@@ -279,18 +322,19 @@ public class ScopeService {
                 }
                 continue;
             }
+            List<Scope.Binding> imported = "*".equals(name) ? onDemand : bindings;
             boolean found = false;
             for (JavaType.Variable field : membersOf(owner, null, true, JavaType.FullyQualified::getMembers,
                     JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
                 if ("*".equals(name) || field.getName().equals(name)) {
-                    bindings.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field));
                     found = true;
                 }
             }
             for (JavaType.Method method : membersOf(owner, null, true, JavaType.FullyQualified::getMethods,
                     JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
                 if (!method.isConstructor() && ("*".equals(name) || method.getName().equals(name))) {
-                    bindings.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method));
+                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method));
                     found = true;
                 }
             }
@@ -299,43 +343,35 @@ public class ScopeService {
                 bindings.add(new Scope.Binding(importCursor, name, Scope.Namespace.TYPE, scope, null));
             }
         }
+        // An import of one name shadows an on-demand import of it (JLS 6.4.1), so it is found first
+        bindings.addAll(onDemand);
     }
 
-    private static void inherited(Cursor scope, JavaType.@Nullable FullyQualified type, boolean includeSelf,
+    /**
+     * Binds the fields and methods the type has without its body declaring them. Some are inherited, and some only
+     * its attribution lists, as an enum's {@code values()}.
+     */
+    private static void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage,
                                   List<Scope.Binding> bindings) {
-        if (type == null) {
-            return;
-        }
         Set<String> declared = new HashSet<>();
         for (Scope.Binding binding : bindings) {
             declared.add(binding.getNamespace() + binding.getName());
         }
-        List<JavaType.FullyQualified> supertypes = new ArrayList<>();
-        if (includeSelf) {
-            supertypes.add(type);
-        } else {
-            if (type.getSupertype() != null) {
-                supertypes.add(type.getSupertype());
+        for (JavaType.Variable field : membersOf(type, fromPackage, false,
+                JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
+            if (declared.add(Scope.Namespace.VARIABLE + field.getName())) {
+                bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
             }
-            supertypes.addAll(type.getInterfaces());
         }
-        for (JavaType.FullyQualified supertype : supertypes) {
-            for (JavaType.Variable field : membersOf(supertype, type.getPackageName(), false,
-                    JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
-                if (declared.add(Scope.Namespace.VARIABLE + field.getName())) {
-                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
-                }
-            }
-            for (JavaType.Method method : membersOf(supertype, type.getPackageName(), false,
-                    JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
-                if (!method.isConstructor() && declared.add(Scope.Namespace.METHOD + method.getName())) {
-                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
-                }
+        for (JavaType.Method method : membersOf(type, fromPackage, false,
+                JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
+            if (!method.isConstructor() && declared.add(Scope.Namespace.METHOD + method.getName())) {
+                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
             }
         }
     }
 
-    private static void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, boolean includeSelf,
+    private static void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean includeSelf,
                                              List<Scope.Binding> bindings) {
         JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
         if (sourceFile == null) {
@@ -370,7 +406,7 @@ public class ScopeService {
             JavaType.FullyQualified member = TypeUtils.asFullyQualified(used);
             JavaType.FullyQualified owner = member == null ? null : member.getOwningClass();
             if (owner != null && supertypes.contains(owner.getFullyQualifiedName()) && !member.hasFlags(Flag.Private) &&
-                (member.hasFlags(Flag.Public) || member.hasFlags(Flag.Protected) || owner.getPackageName().equals(type.getPackageName()))) {
+                (member.hasFlags(Flag.Public) || member.hasFlags(Flag.Protected) || owner.getPackageName().equals(fromPackage))) {
                 String raw = member.getRawClassName();
                 String name = raw.substring(raw.lastIndexOf('$') + 1);
                 if (declared.add(name)) {

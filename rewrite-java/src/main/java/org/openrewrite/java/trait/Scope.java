@@ -477,7 +477,8 @@ public class Scope implements Trait<J> {
          */
         MEMBER,
         /**
-         * A member the class that binds it takes from a supertype.
+         * A member the class that binds it has without declaring it in its body. It is taken from a supertype, or
+         * only attribution lists it, as an enum's {@code values()}.
          */
         INHERITED,
         /**

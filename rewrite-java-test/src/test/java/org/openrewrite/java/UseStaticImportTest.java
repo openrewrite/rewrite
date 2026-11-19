@@ -527,4 +527,24 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepQualifiedWhereAnEnumHasTheMethodWithoutDeclaringIt() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.concurrent.TimeUnit values()")),
+          java(
+            """
+              import java.util.concurrent.TimeUnit;
+
+              enum Level {
+                  LOW, HIGH;
+
+                  static int units() {
+                      return TimeUnit.values().length;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

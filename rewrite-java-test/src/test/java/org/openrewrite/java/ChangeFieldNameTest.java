@@ -367,4 +367,43 @@ class ChangeFieldNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void qualifyInTheInitializerOfALocal() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "count", "n")),
+          java(
+            """
+              class Test {
+                  int count;
+
+                  int add(int n) {
+                      int sum = count + n;
+                      return sum;
+                  }
+
+                  int copy() {
+                      int n = count;
+                      return n;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int n;
+
+                  int add(int n) {
+                      int sum = this.n + n;
+                      return sum;
+                  }
+
+                  int copy() {
+                      int n = this.n;
+                      return n;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

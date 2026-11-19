@@ -93,7 +93,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private @Nullable Expression qualifierWhereShadowed(JavaType.Variable field) {
         Object parent = getCursor().getParentTreeCursor().getValue();
         if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == getCursor().getValue() ||
-            parent instanceof J.VariableDeclarations.NamedVariable ||
+            parent instanceof J.VariableDeclarations.NamedVariable &&
+            ((J.VariableDeclarations.NamedVariable) parent).getName() == getCursor().getValue() ||
             !Scope.at(getCursor()).lookup(toName).filter(Scope.Binding::isLocal).isPresent()) {
             return null;
         }
@@ -147,6 +148,12 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                         JLeftPadded.build(identifier.withPrefix(Space.EMPTY)), identifier.getType());
             }
             return identifier;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            // A variable's initializer is visited twice, which queues the same name twice
+            return fieldAccess.getName().getId().equals(name.getId()) ? fieldAccess : super.visitFieldAccess(fieldAccess, p);
         }
     }
 

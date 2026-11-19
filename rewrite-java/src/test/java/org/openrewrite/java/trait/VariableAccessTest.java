@@ -103,6 +103,22 @@ class VariableAccessTest implements RewriteTest {
     }
 
     @Test
+    void packageOfAQualifiedTypeNameIsNotAnAccess() {
+        rewriteRun(
+          spec -> spec.recipe(markVariableAccesses(new VariableAccess.Matcher())),
+          java(
+            """
+              class Test {
+                 Object test() {
+                   return java.util.Collections.emptyList();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void accessResolvesToItsDeclarationByPosition() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
