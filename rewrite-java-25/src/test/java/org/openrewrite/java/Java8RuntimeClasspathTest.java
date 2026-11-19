@@ -39,7 +39,9 @@ class Java8RuntimeClasspathTest implements RewriteTest {
         rtJar = temp.resolve("rt.jar");
         // Repackage Java 8 platform signatures so the tests need no separate JDK 8 installation.
         try (ZipFile symbols = new ZipFile(Path.of(System.getProperty("java.home"), "lib", "ct.sym").toFile());
-             ZipOutputStream jar = new ZipOutputStream(Files.newOutputStream(rtJar))) {
+             ZipOutputStream jar = new ZipOutputStream(Files.newOutputStream(rtJar));
+             ZipOutputStream jce = new ZipOutputStream(Files.newOutputStream(temp.resolve("jce.jar")));
+             ZipOutputStream jsse = new ZipOutputStream(Files.newOutputStream(temp.resolve("jsse.jar")))) {
             var entries = symbols.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
@@ -50,13 +52,35 @@ class Java8RuntimeClasspathTest implements RewriteTest {
                 }
                 String className = name.substring(name.indexOf('/', firstSlash + 1) + 1)
                   .replace(".sig", ".class");
-                jar.putNextEntry(new ZipEntry(className));
+                ZipOutputStream target = className.startsWith("javax/crypto/") ? jce :
+                  className.startsWith("javax/net/ssl/") ? jsse : jar;
+                target.putNextEntry(new ZipEntry(className));
                 try (var in = symbols.getInputStream(entry)) {
-                    in.transferTo(jar);
+                    in.transferTo(target);
                 }
-                jar.closeEntry();
+                target.closeEntry();
             }
         }
+    }
+
+    @Test
+    void includesTheSeparateJava8CryptoAndTlsLibraries() {
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().classpath(List.of(rtJar))),
+          java(
+            """
+              class LegacySecurity {
+                  javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec("password".toCharArray());
+                  javax.crypto.SecretKeyFactory factory() throws Exception {
+                      return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+                  }
+                  javax.net.ssl.SSLContext context() throws Exception {
+                      return javax.net.ssl.SSLContext.getDefault();
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test

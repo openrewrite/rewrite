@@ -56,6 +56,7 @@ import javax.tools.*;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -119,7 +120,7 @@ public class ReloadableJava25Parser implements JavaParser {
             // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
             pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
             if (rtJar != null) {
-                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, List.of(rtJar));
+                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, java8PlatformClasspath(rtJar));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -189,6 +190,24 @@ public class ReloadableJava25Parser implements JavaParser {
         }));
 
         compileDependencies();
+    }
+
+    private static List<Path> java8PlatformClasspath(Path rtJar) throws IOException {
+        List<Path> platform = new ArrayList<>();
+        for (String name : List.of("resources.jar", "rt.jar", "sunrsasign.jar", "jsse.jar", "jce.jar", "charsets.jar", "jfr.jar")) {
+            Path jar = rtJar.resolveSibling(name);
+            if (Files.isRegularFile(jar)) {
+                platform.add(jar);
+            }
+        }
+        Path extensions = rtJar.resolveSibling("ext");
+        if (Files.isDirectory(extensions)) {
+            try (Stream<Path> jars = Files.list(extensions)) {
+                jars.filter(path -> path.getFileName().toString().endsWith(".jar"))
+                        .sorted().forEach(platform::add);
+            }
+        }
+        return platform;
     }
 
     public static Builder builder() {
