@@ -79,7 +79,6 @@ public abstract class RewriteTest
             ? new CompileSetup(ResolveAssemblies(recipeSpec.ReferenceAssemblies).AddRange(recipeSpec.References),
                 recipeSpec.CompilationOptions, recipeSpec.ParseOptions)
             : null;
-        var projects = new TestProjects(specs);
 
         // 1. Parse all sources and validate round-trip
         var validations = recipeSpec.Validations;
@@ -87,12 +86,9 @@ public abstract class RewriteTest
 
         // Collect all csproj-related specs and parse them together in a shared temp directory
         // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
-        var csprojSpecs = specs.Where(s => s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
-        Dictionary<string, SourceFile>? csprojParsed = null;
-        if (csprojSpecs.Count > 0)
-        {
-            csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
-        }
+        var csprojSpecs = specs.Where(s => !s.PlainXml && s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
+        var csprojParsed = ParseCsprojFilesTogether(csprojSpecs, recipeSpec.ProjectRestore);
+        var projects = new TestProjects(specs);
 
         var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
         var compilations = new Dictionary<SyntaxTree, CSharpCompilation>();
@@ -123,23 +119,24 @@ public abstract class RewriteTest
                 ", so types the recipe looks at are missing or wrong");
         }
 
-        SourceFile BeforeRecipe(SourceSpec spec, SourceFile source)
-        {
-            if (projects.Of(spec) is { } project)
-            {
-                source = SourceSpec.AddMarker(source, project);
-            }
-            return spec.BeforeRecipeHooks.Aggregate(source, (s, adjust) => adjust(s));
-        }
+        SourceFile WithProject(SourceSpec spec, SourceFile source) =>
+            projects.Of(spec) is { } project ? SourceSpec.AddMarker(source, project) : source;
 
         foreach (var spec in specs)
         {
             SourceFile source;
             var isCsFile = spec.SourcePath != null &&
                            spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
-            if (spec.SourcePath != null && IsCsprojPath(spec.SourcePath) && csprojParsed != null)
+            if (csprojParsed.TryGetValue(spec, out var projectFile))
             {
-                source = csprojParsed[spec.SourcePath];
+                AssertPrintsAsParsed(spec, projectFile, validations);
+                parsed.Add((spec, WithProject(spec, projectFile)));
+                continue;
+            }
+            if (spec.PlainXml)
+            {
+                source = new XmlParser().Parse(spec.Before, spec.SourcePath!);
+                AssertPrintsAsParsed(spec, source, validations);
             }
             else if (spec.SourcePath != null && !isCsFile)
             {
@@ -202,7 +199,7 @@ public abstract class RewriteTest
                             (exception != null ? exception.Message : "no ParseExceptionResult marker"));
             }
 
-            parsed.Add((spec, BeforeRecipe(spec, source)));
+            parsed.Add((spec, SourceSpec.ApplyBeforeRecipe(spec, WithProject(spec, source))));
         }
 
         // 2. If recipe configured, run it and verify results
@@ -722,6 +719,17 @@ public abstract class RewriteTest
     }
 
     /// <summary>
+    /// An XML file as an XML parser parses it here, with no <see cref="MSBuildProject"/> and not written anywhere for a
+    /// restore, at any source path, such as a <c>nuget.config</c> or project file a recipe has to see as plain XML, or
+    /// one at a path that no build would read.
+    /// </summary>
+    protected static SourceSpec Xml([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null,
+        string sourcePath = "file.xml")
+    {
+        return new SourceSpec(before, after, sourcePath, XmlDocumentType) { PlainXml = true };
+    }
+
+    /// <summary>
     /// Parses C# source with a semantic model, returning the CompilationUnit.
     /// </summary>
     protected static CSharp.CompilationUnit Parse(string source)
@@ -768,7 +776,7 @@ public abstract class RewriteTest
         {
             PrintParseError(parseError, capture);
         }
-        else if (tree is Xml.Document)
+        else if (tree is global::OpenRewrite.Xml.Document)
         {
             new XmlPrinter<object>().Visit(tree, capture);
         }
@@ -816,15 +824,35 @@ public abstract class RewriteTest
         return CsprojParserInstance.Accept(path);
     }
 
-    private static Dictionary<string, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs)
+    /// <summary>
+    /// The project files and the files their build reads, parsed together and adjusted as their specs say before the
+    /// projects of the C# sources are read from them.
+    /// </summary>
+    private static Dictionary<SourceSpec, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs, bool restore)
     {
-        var files = specs.Select(s => (s.Before, s.SourcePath!)).ToList();
-        var docs = CsprojParserInstance.ParseAll(files);
-
-        var result = new Dictionary<string, SourceFile>();
+        var result = new Dictionary<SourceSpec, SourceFile>(ReferenceEqualityComparer.Instance);
+        if (specs.Count == 0)
+        {
+            return result;
+        }
+        var restored = specs.Where(s => restore && s.RestoresProject).Select(s => s.SourcePath!).ToHashSet();
+        var docs = CsprojParserInstance.ParseAll(specs.Select(s => (s.Before, s.SourcePath!)).ToList(),
+            restored.Contains);
         for (var i = 0; i < specs.Count; i++)
-            result[specs[i].SourcePath!] = docs[i];
+        {
+            result[specs[i]] = SourceSpec.ApplyBeforeRecipe(specs[i], docs[i]);
+        }
         return result;
+    }
+
+    private static void AssertPrintsAsParsed(SourceSpec spec, SourceFile source, Validations validations)
+    {
+        if (validations.PrintEqualsInput)
+        {
+            AssertContentEquals(spec.Before, PrintTree(source), source.SourcePath,
+                "The printed source didn't match the original source code. " +
+                "This means there is a bug in the parser implementation itself.");
+        }
     }
 
     private static void AssertContentEquals(string expected, string actual, string sourcePath,
@@ -850,6 +878,7 @@ public record SourceSpec(
     string? SourceFileType = null)
 {
     internal Func<string, string>? AfterFromActual { get; init; }
+    internal bool PlainXml { get; init; }
     internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
     internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];
     internal ImmutableArray<string>? ProjectTargetFrameworks { get; private init; }
@@ -870,9 +899,32 @@ public record SourceSpec(
             BeforeRecipeHooks = BeforeRecipeHooks.Add(source => adjust(As<T>(source, nameof(BeforeRecipe))))
         };
 
-    /// <summary>Adds markers to the parsed source before the recipe runs on it.</summary>
+    /// <summary>
+    /// Puts markers on the parsed source before the recipe runs on it, each in place of a marker of its type that the
+    /// source has, such as the <see cref="MSBuildProject"/> of a project file, which then isn't restored.
+    /// </summary>
     public SourceSpec AddMarkers(params Marker[] markers) =>
-        BeforeRecipe<SourceFile>(source => markers.Aggregate(source, AddMarker));
+        BeforeRecipe<SourceFile>(source => markers.Aggregate(source, SetMarker)) with
+        {
+            RestoresProject = RestoresProject && !markers.Any(m => m is MSBuildProject)
+        };
+
+    /// <summary>
+    /// Takes the markers of type <typeparamref name="T"/> off the parsed source before the recipe runs on it, such as
+    /// the <see cref="MSBuildProject"/> of a project file or a <c>Directory.Build.props</c>, to have the recipe see the
+    /// file as an XML parser parses it. A project file without its <see cref="MSBuildProject"/> isn't restored.
+    /// </summary>
+    public SourceSpec RemoveMarkers<T>() where T : Marker =>
+        BeforeRecipe<SourceFile>(source => WithMarkers(source, source.Markers.Remove<T>())) with
+        {
+            RestoresProject = RestoresProject && !typeof(T).IsAssignableFrom(typeof(MSBuildProject))
+        };
+
+    /// <summary>
+    /// Whether a project file among the sources gets its <see cref="MSBuildProject"/> from a NuGet restore, rather
+    /// than the test giving it one.
+    /// </summary>
+    internal bool RestoresProject { get; private init; } = true;
 
     /// <summary>
     /// Has the source's project target the given frameworks, as its <see cref="DotNetProject"/> marker says. A source
@@ -920,9 +972,18 @@ public record SourceSpec(
                 assertion(As<T>(before, nameof(AfterRecipe)), As<T>(after, nameof(AfterRecipe))))
         };
 
-    internal static SourceFile AddMarker(SourceFile source, Marker marker)
+    /// <summary>The source as the spec's <see cref="BeforeRecipe{T}"/> adjustments leave it.</summary>
+    internal static SourceFile ApplyBeforeRecipe(SourceSpec spec, SourceFile source) =>
+        spec.BeforeRecipeHooks.Aggregate(source, (s, adjust) => adjust(s));
+
+    internal static SourceFile AddMarker(SourceFile source, Marker marker) =>
+        WithMarkers(source, source.Markers.Add(marker));
+
+    private static SourceFile SetMarker(SourceFile source, Marker marker) =>
+        WithMarkers(source, source.Markers.SetByType(marker));
+
+    private static SourceFile WithMarkers(SourceFile source, Markers markers)
     {
-        var markers = source.Markers.Add(marker);
         if (source is J j)
         {
             return (SourceFile)J.SetMarkers(j, markers);
@@ -1000,6 +1061,20 @@ public class RecipeSpec
     public RecipeSpec ConfigureExecutionContext(Action<ExecutionContext> configure)
     {
         _executionContextSeeds.Add(configure);
+        return this;
+    }
+
+    /// <summary>
+    /// Whether the project files among the sources get their <see cref="MSBuildProject"/> from a NuGet restore of the
+    /// test's files, by default true. Without it they get the marker of their SDK only, as props and targets files do,
+    /// with no target frameworks or packages, so a test that only needs to know which files are build files doesn't
+    /// wait for the restore or depend on what a package feed serves.
+    /// </summary>
+    public bool ProjectRestore { get; private set; } = true;
+
+    public RecipeSpec SetProjectRestore(bool projectRestore)
+    {
+        ProjectRestore = projectRestore;
         return this;
     }
 
