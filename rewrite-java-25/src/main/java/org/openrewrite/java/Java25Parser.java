@@ -68,6 +68,11 @@ public class Java25Parser implements JavaParser {
         }
 
         @Override
+        protected boolean supportsLegacyRuntime() {
+            return true;
+        }
+
+        @Override
         protected boolean supportsSourceCompatibility(int majorVersion) {
             return majorVersion >= 8 && majorVersion <= 25;
         }
@@ -95,12 +100,12 @@ public class Java25Parser implements JavaParser {
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class, Path.class, Integer.class);
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class, Path.class, Integer.class, Path.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory(), java8Runtime, sourceCompatibility);
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory(), java8Runtime, sourceCompatibility, legacyRuntime);
 
                 return new Java25Parser(delegate);
             } catch (Exception e) {

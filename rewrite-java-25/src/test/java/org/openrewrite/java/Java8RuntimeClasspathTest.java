@@ -69,9 +69,32 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     }
 
     @Test
+    void aNewerBuildRuntimeKeepsItsOwnApisWithLegacySyntax() {
+        Path home = Path.of(System.getProperty("org.openrewrite.java17.home"));
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().legacyRuntime(home)),
+          java(
+            """
+              class BuiltOnJava17 {
+                  sun.misc.Unsafe unsafe;
+                  void stop(Thread thread) {
+                      thread.stop();
+                  }
+                  String _(String value) {
+                      return value.strip();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void unsupportedParserOptionsAreRejectedInsteadOfIgnored() {
         JavaParser.Builder<?, ?> unsupported = new UnsupportedBuilder();
         assertThatThrownBy(() -> unsupported.java8Runtime(rtJar))
+          .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> unsupported.legacyRuntime(Path.of("jdk")))
           .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> unsupported.sourceCompatibility(8))
           .isInstanceOf(UnsupportedOperationException.class);

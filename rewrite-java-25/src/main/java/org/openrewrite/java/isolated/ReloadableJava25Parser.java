@@ -57,6 +57,9 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.FileSystems;
+import java.nio.file.FileSystem;
+import java.util.concurrent.ConcurrentHashMap;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,6 +83,7 @@ public class ReloadableJava25Parser implements JavaParser {
     @Nullable
     private final Collection<Input> dependsOn;
 
+    private static final Map<Path, List<Path>> LEGACY_PLATFORMS = new ConcurrentHashMap<>();
     private final ByteArrayCapableJavacFileManager pfm;
     private final Context context;
     private final JavaCompiler compiler;
@@ -99,7 +103,8 @@ public class ReloadableJava25Parser implements JavaParser {
             JavaTypeCache typeCache,
             @Nullable JavaTypeFactory typeFactory,
             @Nullable Path java8Runtime,
-            @Nullable Integer sourceCompatibility) {
+            @Nullable Integer sourceCompatibility,
+            @Nullable Path legacyRuntime) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -109,10 +114,13 @@ public class ReloadableJava25Parser implements JavaParser {
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
-        if (java8Runtime != null && sourceCompatibility != null && sourceCompatibility > 8) {
-            throw new IllegalArgumentException("A Java 8 platform requires source compatibility 8");
+        if (java8Runtime != null && legacyRuntime != null) {
+            throw new IllegalArgumentException("Select only one runtime platform");
         }
-        Integer source = sourceCompatibility != null ? sourceCompatibility : java8Runtime != null ? 8 : null;
+        if ((java8Runtime != null || legacyRuntime != null) && sourceCompatibility != null && sourceCompatibility > 8) {
+            throw new IllegalArgumentException("A legacy runtime platform requires source compatibility 8");
+        }
+        Integer source = sourceCompatibility != null ? sourceCompatibility : (java8Runtime != null || legacyRuntime != null) ? 8 : null;
         if (source != null) {
             Options.instance(context).put(Option.SOURCE, source.toString());
             Options.instance(context).put(Option.TARGET, source.toString());
@@ -123,6 +131,8 @@ public class ReloadableJava25Parser implements JavaParser {
             pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
             if (java8Runtime != null) {
                 pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, java8PlatformClasspath(java8Runtime));
+            } else if (legacyRuntime != null) {
+                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, legacyPlatformClasspath(legacyRuntime));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -192,6 +202,25 @@ public class ReloadableJava25Parser implements JavaParser {
         }));
 
         compileDependencies();
+    }
+
+    private static List<Path> legacyPlatformClasspath(Path javaHome) {
+        // Keep runtime images open while their paths are used by parser file managers.
+        return LEGACY_PLATFORMS.computeIfAbsent(javaHome.toAbsolutePath().normalize(), home -> {
+            try {
+                for (Path rt : List.of(home.resolve("lib/rt.jar"), home.resolve("jre/lib/rt.jar"))) {
+                    if (Files.isRegularFile(rt)) {
+                        return java8PlatformClasspath(rt);
+                    }
+                }
+                FileSystem image = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of("java.home", home.toString()));
+                try (Stream<Path> modules = Files.list(image.getPath("/modules"))) {
+                    return modules.sorted().toList();
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
     }
 
     private static List<Path> java8PlatformClasspath(Path rtJar) throws IOException {
@@ -426,13 +455,18 @@ public class ReloadableJava25Parser implements JavaParser {
         }
 
         @Override
+        protected boolean supportsLegacyRuntime() {
+            return true;
+        }
+
+        @Override
         protected boolean supportsSourceCompatibility(int majorVersion) {
             return majorVersion >= 8 && majorVersion <= 25;
         }
 
         @Override
         public ReloadableJava25Parser build() {
-            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, java8Runtime, sourceCompatibility);
+            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, java8Runtime, sourceCompatibility, legacyRuntime);
         }
     }
 
