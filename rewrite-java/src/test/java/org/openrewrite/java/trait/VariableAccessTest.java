@@ -18,9 +18,11 @@ package org.openrewrite.java.trait;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -41,10 +43,13 @@ class VariableAccessTest implements RewriteTest {
           java(
             """
               class Test {
+                 int f;
                  int test(int p) {
                    int a = p;
                    p++;
-                   p = p+1;
+                   p += 2;
+                   (p) = p+1;
+                   this.f = 3;
                    int negP = -p;
                    return a+1;
                  }
@@ -52,27 +57,153 @@ class VariableAccessTest implements RewriteTest {
               """,
             """
               class Test {
+                 int f;
                  int test(int p) {
                    int a = /*~~(read p)~~>*/p;
-                   /*~~(write p)~~>*/p++;
-                   /*~~(write p)~~>*/p = /*~~(read p)~~>*/p+1;
+                   /*~~(read+write p)~~>*/p++;
+                   /*~~(read+write p)~~>*/p += 2;
+                   (/*~~(write p)~~>*/p) = /*~~(read p)~~>*/p+1;
+                   this./*~~(write f)~~>*/f = 3;
                    int negP = -/*~~(read p)~~>*/p;
                    return /*~~(read a)~~>*/a+1;
                  }
               }
               """,
             spec -> spec.afterRecipe(cu ->
-                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6))
+                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(8))
+          )
+        );
+    }
+
+    @Test
+    void patternVariableDeclarationIsNotAnAccess() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                 int test(Object o) {
+                   if (o instanceof String s) {
+                     return s.length();
+                   }
+                   return 0;
+                 }
+              }
+              """,
+            """
+              class Test {
+                 int test(Object o) {
+                   if (/*~~(read o)~~>*/o instanceof String s) {
+                     return /*~~(read s)~~>*/s.length();
+                   }
+                   return 0;
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageOfAQualifiedTypeNameIsNotAnAccess() {
+        rewriteRun(
+          spec -> spec.recipe(markVariableAccesses(new VariableAccess.Matcher())),
+          java(
+            """
+              class Test {
+                 Object test() {
+                   return java.util.Collections.emptyList();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void accessResolvesToItsDeclarationByPosition() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new VariableAccess.Matcher().asVisitor(va -> SearchResult.found(va.getTree(),
+              va.getBinding().map(b -> "declared in " + b.getScope().getTree().getClass().getSimpleName()).orElse("unbound"))))),
+          java(
+            """
+              class Test {
+                 static int n;
+                 Object test(int p, Test other) {
+                   { int n = p; this.n = n; other.n = n; Test.n = n; }
+                   return undefined;
+                 }
+              }
+              """,
+            """
+              class Test {
+                 static int n;
+                 Object test(int p, Test other) {
+                   { int n = /*~~(declared in MethodDeclaration)~~>*/p; this./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; /*~~(declared in MethodDeclaration)~~>*/other./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; Test./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; }
+                   return /*~~(unbound)~~>*/undefined;
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldSelectedFromSuperOrAnEnclosingInstanceResolvesToThatClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new VariableAccess.Matcher().asVisitor(va -> SearchResult.found(va.getTree(),
+            va.getBinding().map(b -> b.getKind() + " of " + ((J.ClassDeclaration) b.getScope().getTree()).getSimpleName() +
+                                      ", " + b.references().count() + " references").orElse("unbound"))))),
+          java(
+            """
+              class Base {
+                  int x;
+                  int inherited;
+              }
+              class Sub extends Base {
+                  int x;
+                  void m() {
+                      super.x = 1;
+                      this.x = 0;
+                      super.inherited = 2;
+                  }
+                  class Inner {
+                      int x;
+                      void m() {
+                          Sub.this.x = 3;
+                      }
+                  }
+              }
+              """,
+            """
+              class Base {
+                  int x;
+                  int inherited;
+              }
+              class Sub extends Base {
+                  int x;
+                  void m() {
+                      super./*~~(INHERITED of Sub, 1 references)~~>*/x = 1;
+                      this./*~~(MEMBER of Sub, 2 references)~~>*/x = 0;
+                      super./*~~(INHERITED of Sub, 1 references)~~>*/inherited = 2;
+                  }
+                  class Inner {
+                      int x;
+                      void m() {
+                          Sub.this./*~~(MEMBER of Sub, 2 references)~~>*/x = 3;
+                      }
+                  }
+              }
+              """
           )
         );
     }
 
     Recipe markVariableAccesses(VariableAccess.Matcher matcher) {
         return toRecipe(() -> matcher.asVisitor(va -> {
-            String op = va.isReadAccess() ? "read" : "write";
-            if (!(va.isReadAccess() ^ va.isWriteAccess())) {
-                op = "neither";
-            }
+            String op = va.isReadAccess() && va.isWriteAccess() ? "read+write" :
+              va.isReadAccess() ? "read" :
+                va.isWriteAccess() ? "write" : "neither";
             return SearchResult.found(va.getTree(),
               op + " " + va.getTree().getSimpleName());
         }));

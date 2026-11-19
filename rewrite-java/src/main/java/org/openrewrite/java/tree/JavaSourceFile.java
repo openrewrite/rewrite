@@ -78,6 +78,8 @@ public interface JavaSourceFile extends J, SourceFile {
                 return (T) service.getConstructor().newInstance();
             } else if (AnnotationService.class.getName().equals(service.getName())) {
                 return (T) service.getConstructor().newInstance();
+            } else if (ScopeService.class.getName().equals(service.getName())) {
+                return (T) service.getConstructor().newInstance();
             } else if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 // Only unit tests should need to use this service, so no classloading concerns
                 return (T) new JavaWhitespaceValidationService();

@@ -29,6 +29,66 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
     @DocumentExample
     @Test
+    void qualifyWhereALocalHasTheNewName() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+          java(
+            """
+              import static java.io.File.pathSeparator;
+
+              class Test {
+                  void foo(String separator) {
+                      System.out.println(pathSeparator + separator);
+                  }
+              }
+              """,
+            """
+              import java.io.File;
+
+              class Test {
+                  void foo(String separator) {
+                      System.out.println(File.separator + separator);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void bareNameWhereTheClassDeclaresTheNewConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.acme.Test.SEPARATOR")),
+          java(
+            """
+              package com.acme;
+
+              import static java.io.File.pathSeparator;
+
+              class Test {
+                  static final String SEPARATOR = ":";
+
+                  String foo() {
+                      return pathSeparator;
+                  }
+              }
+              """,
+            """
+              package com.acme;
+
+              class Test {
+                  static final String SEPARATOR = ":";
+
+                  String foo() {
+                      return SEPARATOR;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceConstant() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
