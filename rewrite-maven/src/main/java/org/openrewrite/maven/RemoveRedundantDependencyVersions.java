@@ -147,7 +147,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     /**
      * Removes the explicit version of each dependency in the pom's {@code <dependencies>} whose managed version comes
      * from the given BOM and equals that version. Managed dependencies and plugins are left alone, since a BOM import
-     * never overrides a pom's own or inherited dependency management and has no say over plugins.
+     * never overrides an entry the pom or its parents declare in dependencyManagement and has no say over plugins.
      */
     static TreeVisitor<?, ExecutionContext> versionsManagedByBom(String bomGroupId, String bomArtifactId) {
         return new RemoveRedundantDependencyVersions(null, null, null, null)
@@ -195,7 +195,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             matchesGroup(d) &&
                             matchesArtifact(d) &&
                             matchesVersion(d) &&
-                            isManagedByBom(d) &&
+                            matchesBom(d) &&
                             isNotExcepted(d.getGroupId(), d.getArtifactId())) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         return tag.withContent(withoutVersion(tag, version));
@@ -333,7 +333,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 return parentPom;
             }
 
-            private boolean isManagedByBom(ResolvedDependency d) {
+            private boolean matchesBom(ResolvedDependency d) {
                 if (managedByBom == null) {
                     return true;
                 }

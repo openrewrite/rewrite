@@ -206,8 +206,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 if (existing == null) {
                     return false;
                 }
-                // A pom must not manage the same coordinates twice, so a duplicate of its own entry always goes. An
-                // inherited or imported entry only stands in for the changed one if that declares nothing more.
+                // A pom must not manage the same coordinates twice, so a duplicate of its own entry goes even if it
+                // declares more. An inherited or imported entry only stands in for the changed one if that declares
+                // nothing more.
                 if (!pom.getRequested().getDependencyManagement().contains(existing.getRequested())) {
                     String scope = pom.getValue(changed.getChildValue("scope").orElse(null));
                     if (!RemoveRedundantDependencyVersions.declaresOnlyCoordinatesVersionAndScope(changed) ||
