@@ -311,6 +311,10 @@ public abstract class RewriteTest
                 {
                     UniqueIds.AssertUnique(recipeSpec.Recipe, results);
                 }
+                if (validations.SourceFileIdentity)
+                {
+                    global::OpenRewrite.Test.SourceFileIdentity.AssertKept(recipeSpec.Recipe, results);
+                }
                 EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
                 UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);
             }

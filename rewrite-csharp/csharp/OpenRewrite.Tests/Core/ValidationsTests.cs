@@ -45,8 +45,8 @@ public class ValidationsTests
     }
 
     [Fact]
-    public void TypesAttributedIsOptIn()
+    public void TypesAttributedAndSourceFileIdentityAreOptIn()
     {
-        Assert.False(Validations.All.TypesAttributed);
+        Assert.False(Validations.All.TypesAttributed || Validations.All.SourceFileIdentity);
     }
 }
