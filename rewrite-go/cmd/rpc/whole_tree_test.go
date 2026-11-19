@@ -19,7 +19,6 @@ package main
 import (
 	"encoding/json"
 	"reflect"
-
 	"testing"
 
 	"github.com/stretchr/testify/require"

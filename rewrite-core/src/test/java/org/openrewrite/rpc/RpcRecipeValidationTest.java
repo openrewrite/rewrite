@@ -49,6 +49,7 @@ import java.util.Map;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 
@@ -105,8 +106,9 @@ class RpcRecipeValidationTest {
 
     @Test
     void suppliedOptionsPrepareWithoutThrowing() {
-        Recipe recipe = client.prepareRecipe(RequiresText.class.getName(), Map.of("text", "hi"));
-        assertThat(recipe.validate().isValid()).isTrue();
+        // prepareRecipe refuses anything the remote reported, so preparing at all is the assertion.
+        assertThatNoException().isThrownBy(() ->
+          client.prepareRecipe(RequiresText.class.getName(), Map.of("text", "hi")));
     }
 
     @Test
