@@ -74,8 +74,14 @@ internal sealed class RunChecks : IRunObserver
         }
     }
 
-    public void ScanningEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators) =>
+    /// <summary>The accumulator of each scanning recipe once the first cycle scanned the sources.</summary>
+    public IReadOnlyDictionary<IScanningRecipe, object>? FirstScan { get; private set; }
+
+    public void ScanningEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators)
+    {
+        FirstScan ??= new Dictionary<IScanningRecipe, object>(accumulators);
         _accumulators?.Check(accumulators, "after scanning");
+    }
 
     public void EditingEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators) =>
         _accumulators?.Check(accumulators, "after editing");

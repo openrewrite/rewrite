@@ -244,6 +244,10 @@ public abstract class RewriteTest
                 {
                     assertion(results);
                 }
+                foreach (var assertion in recipeSpec.AccumulatorAssertions)
+                {
+                    assertion(checks.FirstScan ?? new Dictionary<IScanningRecipe, object>());
+                }
 
                 foreach (var (spec, source) in parsed)
                 {
@@ -1004,6 +1008,37 @@ public class RecipeSpec
         _references.AddRange(references);
         return this;
     }
+
+    private readonly List<Action<IReadOnlyDictionary<IScanningRecipe, object>>> _accumulatorAssertions = [];
+
+    internal IReadOnlyList<Action<IReadOnlyDictionary<IScanningRecipe, object>>> AccumulatorAssertions =>
+        _accumulatorAssertions;
+
+    /// <summary>
+    /// Assertions on what a scanning recipe of the run found, in each accumulator of a <typeparamref name="T"/> once
+    /// the first cycle scanned the sources, such as why the recipe leaves a file alone.
+    /// </summary>
+    public RecipeSpec ExpectAccumulator<T>(Action<T> assertion)
+    {
+        _accumulatorAssertions.Add(accumulators =>
+        {
+            var matching = accumulators.Values.OfType<T>().ToList();
+            if (matching.Count == 0)
+            {
+                var kept = accumulators.Count == 0
+                    ? "no scanning recipe ran"
+                    : "the scanning recipes keep " +
+                      string.Join(", ", accumulators.Values.Select(a => Name(a.GetType())));
+                Assert.Fail($"ExpectAccumulator<{Name(typeof(T))}> found no accumulator of that type: {kept}.");
+            }
+            matching.ForEach(assertion);
+        });
+        return this;
+    }
+
+    private static string Name(Type type) => type.IsGenericType
+        ? $"{type.Name[..type.Name.IndexOf('`')]}<{string.Join(", ", type.GetGenericArguments().Select(Name))}>"
+        : type.Name;
 
     private readonly List<OutputCompilation> _outputCompilations = [];
 
