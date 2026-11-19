@@ -184,7 +184,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (t != tag) {
                         maybeUpdateModel();
                         doAfterVisit(isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
-                                RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId) :
+                                RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId, null) :
                                 new RemoveRedundantDependencyVersions(changedGroupId, changedArtifactId, null, null).getVisitor());
                         if (checkIfNewDependencyPresent(changedGroupId, changedArtifactId, newVersion, t)) {
                             doAfterVisit(new RemoveContentVisitor<>(t, true, true));

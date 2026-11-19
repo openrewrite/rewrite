@@ -146,11 +146,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     /**
      * Removes the explicit version of each dependency in the pom's {@code <dependencies>} whose managed version comes
-     * from the given BOM and equals that version. Managed dependencies and plugins are left alone, since a BOM import
-     * never overrides an entry the pom or its parents declare in dependencyManagement and has no say over plugins.
+     * from the given BOM and equals that version, unless it matches a GAV in {@code except}. Managed dependencies and
+     * plugins are left alone, since a BOM import never overrides an entry the pom or its parents declare in
+     * dependencyManagement and has no say over plugins.
      */
-    static TreeVisitor<?, ExecutionContext> versionsManagedByBom(String bomGroupId, String bomArtifactId) {
-        return new RemoveRedundantDependencyVersions(null, null, null, null)
+    static TreeVisitor<?, ExecutionContext> versionsManagedByBom(String bomGroupId, String bomArtifactId,
+                                                                 @Nullable List<String> except) {
+        return new RemoveRedundantDependencyVersions(null, null, null, except)
                 .visitor(new GroupArtifact(bomGroupId, bomArtifactId));
     }
 
