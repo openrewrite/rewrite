@@ -299,6 +299,132 @@ class ScopeTraitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedClassReferencesAPropertyOfTheOuterOneOnlyIfInner() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("prop").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              class Outer {
+                  val prop = 1
+                  fun own() { here() }
+                  class Nested {
+                      fun m() { here() }
+                  }
+                  inner class Inner {
+                      fun m() { here() }
+                  }
+                  companion object {
+                      fun c() { here() }
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              class Outer {
+                  val prop = 1
+                  fun own() { /*~~(true)~~>*/here() }
+                  class Nested {
+                      fun m() { /*~~(false)~~>*/here() }
+                  }
+                  inner class Inner {
+                      fun m() { /*~~(true)~~>*/here() }
+                  }
+                  companion object {
+                      fun c() { /*~~(false)~~>*/here() }
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classSeesTheMembersOfItsCompanionObject() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> Stream.of(scope.lookup("logger"), scope.lookup("helper", Scope.Namespace.METHOD))
+            .map(found -> found.map(binding -> binding.getKind() + (scope.canReference(binding) ? "" : " out of reach")).orElse("unbound"))
+            .collect(joining(", ")))),
+          kotlin(
+            """
+              class A {
+                  companion object {
+                      private val logger = "log"
+                      fun helper() {}
+                  }
+                  fun f() { here() }
+                  class Nested {
+                      fun n() { here() }
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              class A {
+                  companion object {
+                      private val logger = "log"
+                      fun helper() {}
+                  }
+                  fun f() { /*~~(MEMBER, MEMBER)~~>*/here() }
+                  class Nested {
+                      fun n() { /*~~(MEMBER, MEMBER)~~>*/here() }
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void impliedLambdaParameterIsReferencedFromANestedLambda() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("it").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              fun f(xs: List<Int>) {
+                  xs.forEach { xs.map { y -> here() } }
+              }
+              fun here() {}
+              """,
+            """
+              fun f(xs: List<Int>) {
+                  xs.forEach { xs.map { y -> /*~~(true)~~>*/here() } }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classNestedInAnObjectReferencesTheObjectsMembers() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("prop").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              object O {
+                  val prop = 1
+                  class Nested {
+                      fun m() { here() }
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              object O {
+                  val prop = 1
+                  class Nested {
+                      fun m() { /*~~(true)~~>*/here() }
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
     private static Recipe atHere(Function<Scope, String> question) {
         return toRecipe(() -> new JavaIsoVisitor<>() {
             @Override

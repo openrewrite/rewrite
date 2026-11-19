@@ -13,8 +13,9 @@ renaming it, or moving this block, make some name read something else?
 Each recipe answered them on its own. `VariableNameUtils` walked the whole file per call.
 `RenameVariable` kept a stack of scopes. The template generator had its own test for whether a
 branch completes normally, to know which `instanceof` pattern variables are in scope. Recipe modules
-carried more copies. The copies disagreed, and most compared variables by type attribution, which
-cannot tell apart two locals of one name and type declared in sibling blocks.
+carried more copies. The copies disagreed, and most compared variables by type attribution, whose
+`equals` and `TypeUtils.isOfType` take two locals of one name and type declared in sibling blocks of
+a method for the same variable.
 
 The JavaScript module already has a scope model that answers these questions from the tree alone.
 Languages built on `J` (Kotlin, Scala, Groovy) share most of Java's rules and part from them in a
@@ -26,25 +27,29 @@ Add one API in `rewrite-java` that answers from the position of a name in the tr
 language supply the rules.
 
 `Scope` is what recipes use. `Scope.at(cursor)` is the innermost scope at a position, and answers
-what is visible there (`lookup`, `visible`, `isVisible`), whether a new name is free (`isFree`,
-`freeName`) and whether the scope's statements could stand elsewhere with every name meaning what
-it means now (`canMoveBefore`, `canMoveAfter`). Static queries take a cursor and need no scope:
+what is visible there (`lookup`, `visible`, `isVisible`), whether code there may refer to a binding
+in reach (`canReference`), whether a new name is free (`isFree`, `freeName`) and whether the scope's
+statements could stand elsewhere with every name meaning what it means now (`canMoveBefore`,
+`canMoveAfter`). Static queries take a cursor and need no scope:
 `bindingOf` a declaration, the bindings `declaredWithin` a tree, those `referencedWithin` it from
-outside, and whether a lambda written around some code could capture what it reads and assigns
-(`lambdaCanCapture`).
+outside, whether an expression would read the same if evaluated earlier in its block
+(`canEvaluateBefore`), and whether a lambda written around some code could capture what it reads and
+assigns (`lambdaCanCapture`).
 
-A recipe that moves code asks `canMoveBefore`, `canMoveAfter` or `lambdaCanCapture`, since each
-takes several rules to answer and recipes that put the answer together themselves left one out.
+A recipe that moves code asks `canMoveBefore`, `canMoveAfter`, `canEvaluateBefore` or
+`lambdaCanCapture`, since each takes several rules to answer and recipes that put the answer
+together themselves left one out.
 `cursorTo` gives the cursor of a tree the visitor has not reached, with every tree between, because
 a cursor that leaves one out hides what that tree binds.
 
 `Scope.Binding` is one declared name. It knows its `Kind` (local, parameter, member, inherited,
-imported) and `Namespace` (variable, method, type), its `references()`, whether it
-`isEffectivelyFinal()`, and whether it `canRenameTo` another name. Two bindings are equal when they
-come from the same declaration, so a binding is a stable key where attribution is not.
+imported) and `Namespace` (variable, method, type), the tree that declares it, its `references()`,
+whether it `isEffectivelyFinal()`, and whether it `canRenameTo` another name. Two bindings are equal
+when they come from the same declaration, so a binding is a stable key where attribution is not.
 
 `ScopeService` holds the rules: which trees open a scope, what each binds, where a binding is
-visible, which namespace an identifier is read in, which words are reserved. A source file hands out
+visible, which namespace an identifier is read in, which trees are a static context, which words are
+reserved. A source file hands out
 its language's service through `SourceFile.service(ScopeService.class)`, as it does for formatting.
 The Java service implements the Java Language Specification's rules, including flow scoping of
 pattern variables. The Kotlin, Scala and Groovy services extend it and override only where their
@@ -69,6 +74,10 @@ language now includes writing its `ScopeService`.
 The API answers for the tree its cursor holds. A visitor that renames or declares several names in
 one pass sees none of its own edits, and keeps track of the names it has handed out.
 
+A binding is one name in one scope. A field has a binding in its own class, another in each class
+that inherits it, and none where it is selected from an instance of a class that is not around the
+access. Across classes a field is identified by its `JavaType.Variable`.
+
 Type names are bound only in part. A type of the same package, one brought in by an on-demand
 import, and an inherited member type the file never names are not bound, because the type model
 cannot list them cheaply. No type binding therefore does not mean a simple type name is free.
@@ -78,6 +87,14 @@ no parameter has no `it`, so inside one the name resolves to that lambda and not
 
 `lambdaCanCapture` applies Java's rule in every language, so it says no for a capture that Kotlin,
 Scala or Groovy would allow.
+
+`canReference` asks each language what a static context is. It applies Java's rules for capturing a
+local, as `lambdaCanCapture` does, and for a forward reference to a field in every language. An enum constant's body binds none of the
+members it inherits from its enum, so `canReference` refuses a field of the enum there that the body
+could read.
+
+`canEvaluateBefore` looks at names and assignments only. It does not see a method called in between
+that changes a field or an object the expression reads, nor what the expression itself changes.
 
 `canMoveBefore` and `canMoveAfter` look for `this` only in code that leaves a class body. A Kotlin
 lambda with a receiver gives `this` another meaning too, which they do not see.

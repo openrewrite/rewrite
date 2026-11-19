@@ -17,7 +17,9 @@ package org.openrewrite.java.trait;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -46,17 +48,21 @@ import java.util.stream.Stream;
  * <li>The declaration an identifier reads: {@link VariableAccess#getBinding()}, or {@link #lookup(String)} from
  * its position.</li>
  * <li>The binding of a declaration at hand, and from it the scope declaring it: {@link #bindingOf(Cursor, J)}.</li>
+ * <li>The declaration of a binding at hand, to read its initializer or modifiers:
+ * {@link Binding#getDeclaration()}.</li>
  * <li>Whether a rename keeps every name reading what it reads now: {@link Binding#canRenameTo(String)}.</li>
  * <li>Whether a block's statements can move out of it: {@link #canMoveBefore(Cursor)} and
  * {@link #canMoveAfter(Cursor)}.</li>
+ * <li>Whether an expression can be evaluated earlier in its block, as an argument folded into an earlier call
+ * is: {@link #canEvaluateBefore(Cursor, Cursor)}.</li>
  * <li>Whether code can move into a lambda: {@link #lambdaCanCapture(Collection)}. That a local
  * {@link Binding#isEffectivelyFinal() is effectively final} does not tell, since a lambda cannot assign a local it
  * captures.</li>
- * <li>Whether a variable is ever written: a {@link VariableAccess#isWriteAccess() write} among its
- * {@link Binding#references()}.</li>
+ * <li>Whether a local or parameter is ever written: a {@link VariableAccess#isWriteAccess() write} among its
+ * {@link Binding#references()}. A field's references are only those of its own class.</li>
+ * <li>Whether code can use a variable or method already in reach: {@link #canReference(Binding)}. A visible name
+ * is not always one the code may use, as an instance field is visible in a static method that cannot read it.</li>
  * </ul>
- * A visible name is not always one the code may use. An instance field is visible in a static method, which cannot
- * read it.
  * <p>
  * Every question takes a cursor that holds each tree up to the source file. For a tree the visitor has not reached,
  * {@link #cursorTo(Cursor, J)} gives one.
@@ -87,6 +93,14 @@ public class Scope implements Trait<J> {
     Cursor position;
 
     /**
+     * The rules of the language of the source file the scope is in.
+     */
+    @Getter(AccessLevel.NONE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    ScopeService service;
+
+    /**
      * The innermost scope holding the position.
      */
     public static Scope at(Cursor position) {
@@ -95,15 +109,15 @@ public class Scope implements Trait<J> {
         if (scope == null) {
             throw new IllegalArgumentException("No scope encloses the cursor");
         }
-        return new Scope(scope, position);
+        return new Scope(scope, position, service);
     }
 
     /**
      * The scope around this one, asked from the same position.
      */
     public Optional<Scope> enclosing() {
-        Cursor scope = cursor.getParent() == null ? null : enclosingScope(service(cursor), cursor.getParent());
-        return scope == null ? Optional.empty() : Optional.of(new Scope(scope, position));
+        Cursor scope = cursor.getParent() == null ? null : enclosingScope(service, cursor.getParent());
+        return scope == null ? Optional.empty() : Optional.of(new Scope(scope, position, service));
     }
 
     /**
@@ -114,7 +128,7 @@ public class Scope implements Trait<J> {
         Map<Object, List<Binding>> bindings = perSourceFile(cursor).computeMessageIfAbsent(BINDINGS, k -> new IdentityHashMap<>());
         List<Binding> own = bindings.get(cursor.getValue());
         if (own == null) {
-            own = service(cursor).bindings(cursor);
+            own = service.bindings(cursor);
             bindings.put(cursor.getValue(), own);
         }
         return own;
@@ -125,7 +139,6 @@ public class Scope implements Trait<J> {
      * namespace shadows.
      */
     public Stream<Binding> visible() {
-        ScopeService service = service(position);
         Set<String> seen = new HashSet<>();
         List<Binding> visible = new ArrayList<>();
         for (Scope scope = this; scope != null; scope = scope.enclosing().orElse(null)) {
@@ -151,7 +164,6 @@ public class Scope implements Trait<J> {
      * bound, so no type binding does not mean the name is free.
      */
     public Optional<Binding> lookup(String name, Namespace namespace) {
-        ScopeService service = service(position);
         for (Scope scope = this; scope != null; scope = scope.enclosing().orElse(null)) {
             for (Binding binding : scope.getBindings()) {
                 if (binding.getNamespace() == namespace && binding.getName().equals(name) &&
@@ -167,13 +179,165 @@ public class Scope implements Trait<J> {
      * Whether a binding is in scope at the position.
      */
     public boolean isVisible(Binding binding) {
-        return service(position).isVisibleAt(binding, position);
+        return service.isVisibleAt(binding, position);
+    }
+
+    /**
+     * Whether an identifier written at the position could refer to the binding by its simple name, in code the
+     * language accepts. It could not where another binding shadows this one, where an instance member or a class's
+     * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, where an
+     * initializer names a field declared after it, or where a local that is not effectively final is read from
+     * inside a lambda or a class body. Whether a local declared without an initializer has been assigned by then is
+     * not checked.
+     */
+    public boolean canReference(Binding binding) {
+        Binding innermost = lookup(binding.name, binding.namespace).orElse(null);
+        // A scope binds each overload of a method, and a call by the name reaches any of them
+        if (innermost == null || !(innermost.equals(binding) ||
+                                   binding.namespace == Namespace.METHOD && isTree(innermost.scope, binding.scope) &&
+                                   isVisible(binding))) {
+            return false;
+        }
+        if (binding.isLocal()) {
+            return binding.namespace != Namespace.VARIABLE || canCapture(binding);
+        }
+        Object scopeTree = binding.scope.getValue();
+        boolean typeParameter = binding.getTree() instanceof J.Identifier &&
+                                binding.cursor.getParentTreeCursor().getValue() instanceof J.TypeParameter;
+        boolean needsInstance = (scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass) &&
+                                (binding.namespace == Namespace.TYPE ? typeParameter : !isStatic(binding));
+        return !isForwardReference(binding) && (!needsInstance || hasInstanceOf(binding.scope, !typeParameter));
+    }
+
+    /**
+     * Whether a read of the field at the position is a forward reference (JLS 8.3.3). It is one in an initializer
+     * of the field's own class that stands before the field's declaration or is the field's own, where both are
+     * static or neither is. A class body between the two lifts the restriction.
+     */
+    private boolean isForwardReference(Binding field) {
+        Cursor variable = field.getTree() instanceof J.Identifier ? field.cursor.getParentTreeCursor() : field.cursor;
+        if (!(variable.getValue() instanceof J.VariableDeclarations.NamedVariable)) {
+            return false;
+        }
+        Cursor declaration = variable.getParentTreeCursor();
+        Cursor body = declaration.getParentTreeCursor();
+        if (!(declaration.getValue() instanceof J.VariableDeclarations && body.getValue() instanceof J.Block)) {
+            return false;
+        }
+        J declarator = null;
+        J member = null;
+        for (Cursor c = position; c != null && !isTree(c, body); c = c.getParent()) {
+            if (c.getValue() instanceof J) {
+                if (c.getValue() instanceof J.ClassDeclaration ||
+                    c.getValue() instanceof J.NewClass && member == ((J.NewClass) c.getValue()).getBody()) {
+                    return false;
+                }
+                declarator = member;
+                member = c.getValue();
+            }
+        }
+        boolean initializesStatic;
+        if (member instanceof J.Block) {
+            initializesStatic = ((J.Block) member).isStatic();
+        } else if (member instanceof J.VariableDeclarations) {
+            initializesStatic = ((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+        } else if (member instanceof J.EnumValueSet) {
+            initializesStatic = true;
+        } else {
+            return false;
+        }
+        J.VariableDeclarations declared = declaration.getValue();
+        if (initializesStatic != declared.hasModifier(J.Modifier.Type.Static)) {
+            return false;
+        }
+        if (member.getId().equals(declared.getId())) {
+            return declarator instanceof J.VariableDeclarations.NamedVariable &&
+                   indexOf(declared.getVariables(), declarator) <=
+                   indexOf(declared.getVariables(), variable.getValue());
+        }
+        List<Statement> members = body.<J.Block>getValue().getStatements();
+        int at = indexOf(members, member);
+        return at >= 0 && at < indexOf(members, declared);
+    }
+
+    private static int indexOf(List<? extends J> trees, J tree) {
+        for (int i = 0; i < trees.size(); i++) {
+            if (trees.get(i).getId().equals(tree.getId())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Whether code at the position can read the local from where it stands. From inside a lambda or a class body
+     * the local must be effectively final, and a static class declared in a method reads none of the method's
+     * locals.
+     */
+    private boolean canCapture(Binding local) {
+        boolean captured = false;
+        for (Cursor c = position; c != null && !isTree(c, local.scope); c = c.getParent()) {
+            Object tree = c.getValue();
+            if (tree instanceof J.ClassDeclaration && service.isStaticContext(c)) {
+                return false;
+            }
+            captured |= tree instanceof J.Lambda || tree instanceof J.ClassDeclaration ||
+                        tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null;
+        }
+        return !captured || local.isEffectivelyFinal();
+    }
+
+    /**
+     * Whether code at the position runs with an instance of the class, which a static context between the two rules
+     * out. With {@code constructed}, the arguments of {@code this(..)} or {@code super(..)} rule it out too, since
+     * the object under construction is no instance yet.
+     */
+    private boolean hasInstanceOf(Cursor classScope, boolean constructed) {
+        boolean constructorCall = false;
+        for (Cursor c = position; c != null && !isTree(c, classScope); c = c.getParent()) {
+            Object tree = c.getValue();
+            if (service.isStaticContext(c)) {
+                return false;
+            } else if (tree instanceof J.ClassDeclaration) {
+                constructorCall = false;
+            } else if (tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getSelect() == null) {
+                String name = ((J.MethodInvocation) tree).getSimpleName();
+                constructorCall |= "this".equals(name) || "super".equals(name);
+            }
+        }
+        return !(constructed && constructorCall);
+    }
+
+    private static boolean isTree(Cursor cursor, Cursor other) {
+        return cursor.getValue() instanceof J && cursor.<J>getValue().getId().equals(other.<J>getValue().getId());
+    }
+
+    /**
+     * Whether the member needs no instance of the class binding it, going by its attributed flags or by a static
+     * context between its declaration and that class. A Kotlin companion object is such a context for its members.
+     */
+    private static boolean isStatic(Binding member) {
+        if (member.type instanceof JavaType.Variable && ((JavaType.Variable) member.type).hasFlags(Flag.Static) ||
+            member.type instanceof JavaType.Method && ((JavaType.Method) member.type).hasFlags(Flag.Static)) {
+            return true;
+        }
+        if (member.getTree() instanceof J.Identifier) {
+            for (Cursor c = member.cursor.getParent(); c != null && !isTree(c, member.scope); c = c.getParent()) {
+                if (member.service.isStaticContext(c)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
      * Whether a new variable declared at the position can take the name. It cannot take a reserved word, a name
-     * visible at the position, or any name this scope spells other than a member's name after a dot. The last keeps
-     * clear of later declarations in any language.
+     * visible at the position, a variable this scope binds, or any name this scope spells, whether or not anything
+     * declares it, other than a member's name after a dot. Counting what the scope spells keeps clear of later
+     * declarations in any language. Counting what it binds covers a name it never spells, as a class's inherited
+     * field, when asked from the class itself. A field of an enclosing class counts as taken, though a new field
+     * could take its name and hide it.
      */
     public boolean isFree(String name) {
         Map<Object, Set<String>> spelled = perSourceFile(cursor).computeMessageIfAbsent(SPELLED, k -> new IdentityHashMap<>());
@@ -182,13 +346,29 @@ public class Scope implements Trait<J> {
             inScope = namesSpelledWithin(cursor);
             spelled.put(cursor.getValue(), inScope);
         }
-        return !service(position).isReserved(name) && !inScope.contains(name) && !lookup(name).isPresent();
+        if (service.isReserved(name) || inScope.contains(name)) {
+            return false;
+        }
+        for (Binding binding : getBindings()) {
+            if (binding.namespace == Namespace.VARIABLE && binding.name.equals(name)) {
+                return false;
+            }
+        }
+        return !lookup(name).isPresent();
     }
 
     /**
      * A free name for a new variable declared at the position, which is {@code preferred} or that name with a
-     * number counted up. A name {@code alsoTaken} accepts is passed over, as one handed out earlier in the same
-     * visit is. Another way of making names can try its own candidates on {@link #isFree(String)}.
+     * number counted up. A preferred name that ends in digits counts on from them, so {@code oauth2} gives
+     * {@code oauth3}. Another way of making names can try its own candidates on {@link #isFree(String)}.
+     */
+    public String freeName(String preferred) {
+        return freeName(preferred, name -> false);
+    }
+
+    /**
+     * A free name as {@link #freeName(String)} gives, passing over any name {@code alsoTaken} accepts, as one handed
+     * out earlier in the same visit is.
      */
     public String freeName(String preferred, Predicate<String> alsoTaken) {
         Predicate<String> taken = name -> alsoTaken.test(name) || !isFree(name);
@@ -269,7 +449,6 @@ public class Scope implements Trait<J> {
         } else {
             position = inScope.get(0);
         }
-        ScopeService service = service(position);
         Cursor around = position.getParentTreeCursor();
         Scope destination = at(around).withPosition(position);
         Cursor into = enclosingScope(service, holder);
@@ -325,7 +504,8 @@ public class Scope implements Trait<J> {
      * A local declared without an initializer and assigned once is effectively final, yet a lambda cannot assign it.
      * A local declared in one of the regions is inside for all of them. The body of a local or anonymous class is
      * held to the same rule. Java's rule is applied in every language, so the answer may be no where a language's
-     * lambdas capture more.
+     * lambdas capture more. Only captures are looked at. Whether the code throws a checked exception that the
+     * lambda's functional interface does not declare is the caller's to check.
      */
     public static boolean lambdaCanCapture(Collection<Cursor> regions) {
         List<References> within = new ArrayList<>();
@@ -348,9 +528,82 @@ public class Scope implements Trait<J> {
     }
 
     /**
+     * Whether the expression, evaluated just before the statement instead of where it stands, would read the same
+     * variables with nothing having assigned them in between. The statement is one of a block around the
+     * expression, the one holding the expression or one before it. Either of these prevents it:
+     * <ul>
+     * <li>A name the expression reads is bound differently just before the statement, or not yet, as one is that
+     * the statement or a later one declares.</li>
+     * <li>A statement from that one to the expression's own assigns a variable the expression reads, by its simple
+     * name or as a field selected from a class around it, as {@code this.name} is.</li>
+     * <li>The expression names {@code this} or {@code super} of a class whose body lies between it and the
+     * block.</li>
+     * </ul>
+     * Only names are looked at. A method called in between may change a field or an object the expression reads,
+     * and what evaluating the expression earlier does to the statements it passes is the caller's to check.
+     */
+    public static boolean canEvaluateBefore(Cursor expression, Cursor statement) {
+        Cursor holder = statement.getParentTreeCursor();
+        if (!(holder.getValue() instanceof J.Block)) {
+            return false;
+        }
+        List<Statement> statements = holder.<J.Block>getValue().getStatements();
+        int from = indexOf(statements, statement.getValue());
+        int to = -1;
+        for (Cursor c = expression; c != null && to < 0 && !isTree(c, holder); c = c.getParent()) {
+            if (c.getValue() instanceof J) {
+                to = indexOf(statements, c.getValue());
+            }
+        }
+        if (from < 0 || to < from || crossesClassBody(expression, holder) && namesThisOrSuper(expression)) {
+            return false;
+        }
+        List<References> between = new ArrayList<>();
+        for (Statement passed : statements.subList(from, to + 1)) {
+            between.add(referencesWithin(new Cursor(holder, passed)));
+        }
+        Scope destination = at(holder).withPosition(statement);
+        for (Binding read : (Iterable<Binding>) referencedWithin(expression)::iterator) {
+            if (isUnder(read.cursor, statement.getValue()) ||
+                !destination.lookup(read.name, read.namespace).filter(read::equals).isPresent() ||
+                read.namespace == Namespace.VARIABLE &&
+                between.stream().anyMatch(references -> references.writesOf(read).findAny().isPresent())) {
+                return false;
+            }
+        }
+        for (Binding field : selectedWithin(expression)) {
+            if (between.stream().anyMatch(references -> references.writesOf(field).findAny().isPresent())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The fields of the classes around the region that its tree selects with a dot, as {@code this.name} does.
+     * {@link #referencedWithin(Cursor)} leaves them out, since such a name is not looked up in scope.
+     */
+    private static Set<Binding> selectedWithin(Cursor region) {
+        Set<Binding> selected = new LinkedHashSet<>();
+        new JavaIsoVisitor<Set<Binding>>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Set<Binding> found) {
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier) {
+                    new VariableAccess(getCursor()).getBinding().ifPresent(found::add);
+                }
+                return identifier;
+            }
+        }.visit(region.getValue(), selected, region.getParentOrThrow());
+        return selected;
+    }
+
+    /**
      * The cursor of a tree under the one the given cursor holds, with every tree between the two. A cursor built by
      * hand that leaves one out, as {@code new Cursor(methodBody, lambdaBody)} leaves out the lambda, hides what that
      * tree binds. The tree is found by its id, so it may be an edited copy, which the cursor returned then holds.
+     * The trees above it are those of the given cursor, so a visit method that has edited its tree passes the
+     * cursor {@code updateCursor} gives for the edited one.
      *
      * @throws IllegalArgumentException where the tree is not under the cursor's tree
      */
@@ -434,7 +687,9 @@ public class Scope implements Trait<J> {
             public @Nullable J preVisit(J tree, Integer p) {
                 boolean scope = service.isScope(getCursor());
                 if (tree == regionTree || scope) {
-                    List<Binding> bindings = scope ? new Scope(getCursor(), getCursor()).getBindings() : service.bindings(getCursor());
+                    List<Binding> bindings = scope ?
+                            new Scope(getCursor(), getCursor(), service).getBindings() :
+                            service.bindings(getCursor());
                     for (Binding binding : bindings) {
                         J anchor = binding.getTree();
                         if (anchor instanceof J.Identifier) {
@@ -598,16 +853,34 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * The source file's scope service, looked up once per traversal of that file.
+     * The scope service of the source file above the cursor, looked up once per traversal of that file. A recipe
+     * that asks the service itself, as whether a statement {@link ScopeService#completesNormally completes
+     * normally}, gets it here, since a source file class from a release without the service refuses it and this
+     * then gives Java's rules.
      */
-    static ScopeService service(Cursor cursor) {
+    public static ScopeService service(Cursor cursor) {
         for (Cursor c = cursor; c != null; c = c.getParent()) {
             if (c.getValue() instanceof JavaSourceFile) {
                 JavaSourceFile sourceFile = c.getValue();
-                return c.computeMessageIfAbsent(SERVICE, k -> sourceFile.service(ScopeService.class));
+                return c.computeMessageIfAbsent(SERVICE, k -> serviceOf(sourceFile));
             }
         }
         return new ScopeService();
+    }
+
+    /**
+     * The source file's own service, or Java's rules where the source file's class comes from a release that does
+     * not know the service and refuses it.
+     */
+    private static ScopeService serviceOf(JavaSourceFile sourceFile) {
+        try {
+            return sourceFile.service(ScopeService.class);
+        } catch (RuntimeException e) {
+            if (e instanceof UnsupportedOperationException || e.getCause() instanceof UnsupportedOperationException) {
+                return new ScopeService();
+            }
+            throw e;
+        }
     }
 
     /**
@@ -776,8 +1049,24 @@ public class Scope implements Trait<J> {
         @Nullable
         JavaType type;
 
+        /**
+         * The service that made the binding, whose rules its scope goes by.
+         */
+        @Getter(AccessLevel.NONE)
+        @ToString.Exclude
+        ScopeService service;
+
         public Scope getScope() {
-            return new Scope(scope, scope);
+            return new Scope(scope, scope, service);
+        }
+
+        /**
+         * The tree that declares the name: the named variable of a local, parameter or field, a method or class
+         * declaration, a type parameter, an enum constant, or the {@code instanceof} of a pattern variable. Empty
+         * for a name the scope's tree does not declare, which is inherited, imported or implied.
+         */
+        public Optional<Cursor> getDeclaration() {
+            return getTree() instanceof J.Identifier ? Optional.of(cursor.getParentTreeCursor()) : Optional.empty();
         }
 
         public Kind getKind() {
@@ -829,6 +1118,9 @@ public class Scope implements Trait<J> {
          * Where a class redeclares a member of its superclass, {@code super.name} refers to the inherited one, which
          * the class binds too. They are read from the scope's tree as it was when the binding was found, so a binding
          * found before an edit does not see it. Finding the binding again from a cursor on the edited tree does.
+         * <p>
+         * A field is read from outside its class too, and a subclass binds the field it inherits anew, so these are
+         * not every use of a field. The declaring identifier is not among them.
          */
         public Stream<Cursor> references() {
             return referencesInScope().of(this);
@@ -866,7 +1158,6 @@ public class Scope implements Trait<J> {
          */
         public boolean canRenameTo(String newName) {
             Scope declaring = getScope();
-            ScopeService service = service(scope);
             for (Binding sibling : declaring.getBindings()) {
                 if (sibling.namespace == namespace && sibling.name.equals(newName)) {
                     return false;
@@ -987,6 +1278,10 @@ public class Scope implements Trait<J> {
             }
             J anchor = getTree();
             if (!(anchor instanceof J.Identifier)) {
+                if (isLocal()) {
+                    // No identifier declares it, as with the parameter a lambda takes without naming it
+                    return !referencesInScope().writesOf(this).findAny().isPresent();
+                }
                 return type instanceof JavaType.Variable && ((JavaType.Variable) type).hasFlags(Flag.Final);
             }
             Cursor declaring = cursor.getParentTreeCursor();
@@ -1146,7 +1441,7 @@ public class Scope implements Trait<J> {
             for (Cursor scope = enclosingScope(service, from);
                  scope != null;
                  scope = scope.getParent() == null ? null : enclosingScope(service, scope.getParent())) {
-                for (Binding binding : new Scope(scope, scope).getBindings()) {
+                for (Binding binding : new Scope(scope, scope, service).getBindings()) {
                     if (binding.getTree() instanceof J.Identifier && binding.getTree().getId().equals(identifier.getId())) {
                         return binding;
                     }

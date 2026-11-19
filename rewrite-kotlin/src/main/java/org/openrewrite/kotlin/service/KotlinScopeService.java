@@ -22,6 +22,7 @@ import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.marker.KObject;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.tree.K;
 
@@ -49,9 +50,10 @@ public class KotlinScopeService extends ScopeService {
         List<Scope.Binding> bindings = new ArrayList<>(super.bindings(scope));
         Object tree = scope.getValue();
         if (tree instanceof J.Lambda && declaresNoParameter((J.Lambda) tree)) {
-            bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null));
+            bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null, this));
         } else if (tree instanceof J.ClassDeclaration) {
             properties(scope, (J.ClassDeclaration) tree, bindings);
+            companionMembers(scope, (J.ClassDeclaration) tree, bindings);
         } else if (tree instanceof J.MethodDeclaration &&
                    ((J.MethodDeclaration) tree).getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
             // The class binds a property parameter, where the whole body sees it
@@ -93,6 +95,21 @@ public class KotlinScopeService extends ScopeService {
     }
 
     @Override
+    public boolean isStaticContext(Cursor cursor) {
+        if (cursor.getValue() instanceof J.ClassDeclaration
+                && cursor.getParentTreeCursor().getValue() instanceof J.Block) {
+            Object outer = cursor.getParentTreeCursor().getParentTreeCursor().getValue();
+            if (outer instanceof J.ClassDeclaration) {
+                // A class or object nested in a class has an instance of the outer class only when declared `inner`.
+                // Nested in an object, it always has the one instance there is.
+                return !hasModifier(cursor.getValue(), "inner") &&
+                       !((J.ClassDeclaration) outer).getMarkers().findFirst(KObject.class).isPresent();
+            }
+        }
+        return super.isStaticContext(cursor);
+    }
+
+    @Override
     public boolean localMayShadowLocal() {
         return true;
     }
@@ -111,7 +128,34 @@ public class KotlinScopeService extends ScopeService {
         return true;
     }
 
-    private static void properties(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {
+    /**
+     * Binds the properties and functions of the class's companion object, which the whole class body sees. The
+     * class's own members come first, as one of them hides a companion member of its name.
+     */
+    private void companionMembers(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {
+        Cursor body = new Cursor(scope, classDeclaration.getBody());
+        for (Statement statement : classDeclaration.getBody().getStatements()) {
+            if (statement instanceof J.ClassDeclaration && hasModifier((J.ClassDeclaration) statement, "companion")) {
+                for (Scope.Binding member : bindings(new Cursor(body, statement))) {
+                    if (member.getTree() instanceof J.Identifier && member.getNamespace() != Scope.Namespace.TYPE) {
+                        bindings.add(new Scope.Binding(member.getCursor(), member.getName(), member.getNamespace(),
+                                scope, member.getType(), this));
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean hasModifier(J.ClassDeclaration classDeclaration, String keyword) {
+        for (J.Modifier modifier : classDeclaration.getModifiers()) {
+            if (keyword.equals(modifier.getKeyword())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void properties(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {
         Cursor body = new Cursor(scope, classDeclaration.getBody());
         for (Statement statement : classDeclaration.getBody().getStatements()) {
             if (!(statement instanceof J.MethodDeclaration) ||
@@ -127,7 +171,7 @@ public class KotlinScopeService extends ScopeService {
                 for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) parameter).getVariables()) {
                     Cursor name = new Cursor(new Cursor(declarations, variable), variable.getName());
                     bindings.add(new Scope.Binding(name, variable.getSimpleName(), Scope.Namespace.VARIABLE, scope,
-                            variable.getName().getFieldType()));
+                            variable.getName().getFieldType(), this));
                 }
             }
         }

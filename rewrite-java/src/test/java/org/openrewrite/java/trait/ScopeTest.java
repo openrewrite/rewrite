@@ -24,11 +24,15 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.service.ScopeService;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marketplace.RecipeClassLoader;
 import org.openrewrite.test.RewriteTest;
 
 import javax.tools.Diagnostic;
@@ -38,10 +42,13 @@ import javax.tools.SimpleJavaFileObject;
 import javax.tools.ToolProvider;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -769,7 +776,7 @@ class ScopeTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> Arrays.stream(new String[]{"x", "size", "f", "l", "y", "class"})
             .map(n -> n + "=" + scope.freeName(n, "y"::equals))
-            .collect(joining(", ")))),
+            .collect(joining(", ")) + ", with nothing else taken y=" + scope.freeName("y"))),
           java(
             """
               import java.util.*;
@@ -790,7 +797,7 @@ class ScopeTest implements RewriteTest {
               class A {
                   int f;
                   void m(List<String> l, Map<String, String> map) {
-                      /*~~(x=x2, size=size, f=f1, l=l1, y=y1, class=class1)~~>*/here();
+                      /*~~(x=x2, size=size, f=f1, l=l1, y=y1, class=class1, with nothing else taken y=y)~~>*/here();
                       int x = map.size();
                       l.forEach(x1 -> {});
                   }
@@ -959,6 +966,42 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void declarationIsTheTreeDeclaringTheNameWhereTheScopeHoldsOne() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> Stream.of(scope.lookup("local"), scope.lookup("inherited"), scope.lookup("m", Scope.Namespace.METHOD))
+            .map(binding -> binding.orElseThrow().getDeclaration().map(d -> d.getValue().getClass().getSimpleName()).orElse("none"))
+            .collect(joining(" ")))),
+          java(
+            """
+              class B {
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              class A extends B {
+                  void m() {
+                      int local = 0;
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A extends B {
+                  void m() {
+                      int local = 0;
+                      /*~~(NamedVariable none MethodDeclaration)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void blankLocalIsEffectivelyFinalWhereEachPathAssignsItOnce() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -1032,6 +1075,70 @@ class ScopeTest implements RewriteTest {
                   void m(int p) {
                       /*~~(here fresh)~~>*/here();
                       int later = 1;
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nameAClassBindsWithoutSpellingItIsTakenWhenAskedAtTheClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  Scope scope = Scope.at(getCursor());
+                  return "A".equals(classDecl.getSimpleName()) ?
+                    SearchResult.found(classDecl, Stream.of("inherited", "fresh").filter(scope::isFree).collect(joining(" "))) :
+                    classDecl;
+              }
+          })),
+          java(
+            """
+              class B {
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              class A extends B {
+              }
+              """,
+            """
+              /*~~(fresh)~~>*/class A extends B {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void classBindsAPrivateMemberOnlyAttributionLists() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok"))
+            .recipe(atHere(scope -> scope.lookup("log").map(b -> b.getKind().toString()).orElse("unbound"))),
+          java(
+            """
+              import lombok.extern.java.Log;
+
+              @Log
+              class A {
+                  void m() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              import lombok.extern.java.Log;
+
+              @Log
+              class A {
+                  void m() {
+                      /*~~(INHERITED)~~>*/here();
                   }
                   void here() {}
               }
@@ -1613,6 +1720,306 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void nameInScopeCannotBeReferencedAcrossAStaticContext() {
+        @Language("java") String source =
+          """
+            class B {
+                int inherited;
+            }
+            class A<T> extends B {
+                int inst;
+                static int stat;
+                int instMethod() { return 0; }
+                static int use(String row, Object read) { return 0; }
+                A() {
+                    this(use("constructorCallArgument", inst));
+                }
+                A(String s) {
+                    this(use("constructorCallNamesTypeParameter", (T) null));
+                }
+                A(int i) {}
+                int instanceMethod() {
+                    return use("instanceMethod", inst);
+                }
+                static int staticMethod() {
+                    return use("staticMethod", inst);
+                }
+                static int staticMethodReadsStaticField() {
+                    return use("staticMethodReadsStaticField", stat);
+                }
+                static int staticMethodReadsInheritedField() {
+                    return use("staticMethodReadsInheritedField", inherited);
+                }
+                static int staticMethodCallsInstanceMethod() {
+                    return use("staticMethodCallsInstanceMethod", instMethod());
+                }
+                static int staticMethodNamesClassTypeParameter() {
+                    return use("staticMethodNamesClassTypeParameter", (T) null);
+                }
+                static {
+                    use("staticInitializer", inst);
+                }
+                static int staticField =
+                        use("staticFieldInitializer", inst);
+                int instanceField =
+                        use("instanceFieldInitializer", inst);
+                class Inner {
+                    Inner() {
+                        this(use("innerConstructorCallReadsOuterField", inst));
+                    }
+                    Inner(int i) {}
+                    int m() {
+                        return use("innerClass", inst);
+                    }
+                }
+                static class Nested {
+                    int own;
+                    int m() {
+                        return use("staticNestedClassOwnField", own) +
+                               use("staticNestedClass", inst);
+                    }
+                }
+                record Rec(int component) {
+                    int m() {
+                        return use("nestedRecord", inst);
+                    }
+                }
+                static void localClassInStaticMethod() {
+                    class Local {
+                        int m() {
+                            return use("localClassInStaticMethod", inst);
+                        }
+                    }
+                }
+                enum E {
+                    X(use("enumConstantArgument", hidden)) {
+                        int m() {
+                            return use("enumConstantBodyReadsPrivateField", hidden);
+                        }
+                    };
+                    private int hidden;
+                    E(int i) {}
+                }
+                void local() {
+                    int local = 1;
+                    record LocalRec() {
+                        int m() {
+                            return use("localRecordReadsLocal", local);
+                        }
+                    }
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "constructorCallArgument",
+          "enumConstantArgument",
+          "enumConstantBodyReadsPrivateField",
+          "localClassInStaticMethod",
+          "localRecordReadsLocal",
+          "nestedRecord",
+          "staticFieldInitializer",
+          "staticInitializer",
+          "staticMethod",
+          "staticMethodCallsInstanceMethod",
+          "staticMethodNamesClassTypeParameter",
+          "staticMethodReadsInheritedField",
+          "staticNestedClass");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void initializerCannotReadAFieldDeclaredAtOrAfterIt() {
+        @Language("java") String source =
+          """
+            class A {
+                static int use(String row, Object read) { return 0; }
+                static {
+                    use("staticInitializerBeforeStaticField", LATER);
+                }
+                int early =
+                        use("fieldInitializerBeforeInstanceField", later);
+                {
+                    use("instanceInitializerBeforeStaticField", LATER);
+                }
+                Runnable lambda = () ->
+                        use("lambdaInInitializerBeforeField", later);
+                Object anonymous = new Object() {
+                    int m() {
+                        return use("anonymousClassInInitializerBeforeField", later);
+                    }
+                };
+                int method() {
+                    return use("methodBeforeField", later);
+                }
+                int own =
+                        use("ownInitializer", own);
+                int first =
+                        use("laterDeclaratorOfOneStatement", second), second =
+                        use("earlierDeclaratorOfOneStatement", first);
+                enum E {
+                    X(use("enumConstantBeforeStaticField", COUNT));
+                    static int COUNT = 1;
+                    E(int i) {}
+                }
+                static final int LATER = 1;
+                int later = 2;
+                static {
+                    use("staticInitializerAfterStaticField", LATER);
+                }
+                int after =
+                        use("fieldInitializerAfterInstanceField", later);
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "enumConstantBeforeStaticField",
+          "fieldInitializerBeforeInstanceField",
+          "lambdaInInitializerBeforeField",
+          "laterDeclaratorOfOneStatement",
+          "ownInitializer",
+          "staticInitializerBeforeStaticField");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void shadowedBindingCannotBeReferenced() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> {
+              Scope classScope = scope;
+              while (!(classScope.getTree() instanceof J.ClassDeclaration)) {
+                  classScope = classScope.enclosing().orElseThrow();
+              }
+              Scope.Binding field = classScope.getBindings().stream().filter(b -> "x".equals(b.getName())).findFirst().orElseThrow();
+              return String.valueOf(scope.canReference(field));
+          })),
+          java(
+            """
+              class A {
+                  int x;
+                  void shadows(int x) {
+                      here();
+                  }
+                  void reads() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A {
+                  int x;
+                  void shadows(int x) {
+                      /*~~(false)~~>*/here();
+                  }
+                  void reads() {
+                      /*~~(true)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void localIsReferencedFromALambdaOrClassBodyOnlyIfEffectivelyFinal() {
+        @Language("java") String source =
+          """
+            class A {
+                static int use(String row, Object read) { return 0; }
+                void m() {
+                    int constant = 1;
+                    int reassigned = 1;
+                    reassigned++;
+                    use("sameMethodReadsReassignedLocal", reassigned);
+                    Runnable lambda = () -> {
+                        use("lambdaReadsEffectivelyFinalLocal", constant);
+                        use("lambdaReadsReassignedLocal", reassigned);
+                    };
+                    new Object() {
+                        int m() {
+                            return use("anonymousClassReadsReassignedLocal", reassigned);
+                        }
+                    };
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly("anonymousClassReadsReassignedLocal", "lambdaReadsReassignedLocal");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void expressionCanBeEvaluatedEarlierWhereItReadsTheSameVariablesUnassigned() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  Cursor body = new Cursor(getCursor(), method.getBody());
+                  // Asks whether the argument of use() could be evaluated before the statement that calls before()
+                  Cursor[] earlier = {null};
+                  Cursor[] read = {null};
+                  for (Statement statement : method.getBody().getStatements()) {
+                      new JavaIsoVisitor<Integer>() {
+                          @Override
+                          public J.MethodInvocation visitMethodInvocation(J.MethodInvocation invocation, Integer p) {
+                              if ("before".equals(invocation.getSimpleName())) {
+                                  earlier[0] = new Cursor(body, statement);
+                              } else if ("use".equals(invocation.getSimpleName())) {
+                                  read[0] = Scope.cursorTo(body, invocation.getArguments().getFirst());
+                              }
+                              return super.visitMethodInvocation(invocation, p);
+                          }
+                      }.visit(statement, 0, body);
+                  }
+                  return read[0] == null ? method :
+                    SearchResult.found(method, Scope.canEvaluateBefore(read[0], earlier[0]) ? "yes" : "no");
+              }
+          })),
+          java(
+            """
+              class A {
+                  int field;
+                  void readsEarlierLocal(int p) { Object o = before(); use(p); }
+                  void readsLocalDeclaredBetween() { Object o = before(); int n = 1; use(n); }
+                  void readsWhatTheStatementDeclares() { Object o = before(); use(o); }
+                  void namesTheLocalClassTheStatementDeclares() { class L { Object o = before(); } use(new L()); }
+                  void readsLocalAssignedBetween(int p) { Object o = before(); p = 2; use(p); }
+                  void readsFieldAssignedBetween() { Object o = before(); this.field = 2; use(field); }
+                  void assignsInItsOwnStatement(int p) { Object o = before(); use(p = 3); }
+                  void readsQualifiedFieldAssignedBetween() { Object o = before(); field = 2; use(this.field); }
+                  void readsFieldWithACallBetween() { Object o = before(); other(); use(field); }
+                  void standsInTheStatementItself(int p) { use(before() == null ? p : 0); }
+                  void standsBeforeTheStatement(int p) { use(p); Object o = before(); }
+                  void namesThisOfAClassBetween() { Object o = before(); new Object() { void m() { use(this); } }; }
+                  Object before() { return null; }
+                  void other() {}
+                  void use(Object read) {}
+              }
+              """,
+            """
+              class A {
+                  int field;
+                  /*~~(yes)~~>*/void readsEarlierLocal(int p) { Object o = before(); use(p); }
+                  /*~~(no)~~>*/void readsLocalDeclaredBetween() { Object o = before(); int n = 1; use(n); }
+                  /*~~(no)~~>*/void readsWhatTheStatementDeclares() { Object o = before(); use(o); }
+                  /*~~(no)~~>*/void namesTheLocalClassTheStatementDeclares() { class L { Object o = before(); } use(new L()); }
+                  /*~~(no)~~>*/void readsLocalAssignedBetween(int p) { Object o = before(); p = 2; use(p); }
+                  /*~~(no)~~>*/void readsFieldAssignedBetween() { Object o = before(); this.field = 2; use(field); }
+                  /*~~(no)~~>*/void assignsInItsOwnStatement(int p) { Object o = before(); use(p = 3); }
+                  /*~~(no)~~>*/void readsQualifiedFieldAssignedBetween() { Object o = before(); field = 2; use(this.field); }
+                  /*~~(yes)~~>*/void readsFieldWithACallBetween() { Object o = before(); other(); use(field); }
+                  /*~~(yes)~~>*/void standsInTheStatementItself(int p) { use(before() == null ? p : 0); }
+                  /*~~(no)~~>*/void standsBeforeTheStatement(int p) { use(p); Object o = before(); }
+                  /*~~(no)~~>*/void namesThisOfAClassBetween() { Object o = before(); new Object() { void m() { use(this); } }; }
+                  Object before() { return null; }
+                  void other() {}
+                  void use(Object read) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void localOfAClassBodyMayTakeTheNameOfAnEnclosingLocal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -1764,10 +2171,152 @@ class ScopeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recipeSideTraitResolvesABindingAcrossTheRecipeClassLoader() throws Exception {
+        Cursor read = lastIdentifier(parse("class A { int x; void m() { x++; } }"), "x");
+        URL ownRewriteJava = Scope.class.getProtectionDomain().getCodeSource().getLocation();
+        try (RecipeClassLoader recipeLoader = new RecipeClassLoader(new URL[]{ownRewriteJava}, getClass().getClassLoader())) {
+            Class<?> recipeSide = recipeLoader.loadClass(VariableAccess.class.getName());
+            assertThat(recipeSide).isNotSameAs(VariableAccess.class);
+            Object binding = recipeSide.getMethod("getBinding").invoke(recipeSide.getConstructor(Cursor.class).newInstance(read));
+            assertThat((Optional<?>) binding).containsInstanceOf(Scope.Binding.class);
+        }
+    }
+
+    @Test
+    void recipeSideMatcherAsksTheHostScopeAcrossTheRecipeClassLoader() throws Exception {
+        // The class name carries no field type, so the matcher asks the scope service what it names
+        Cursor className = lastIdentifier(parse("class A {}"), "A");
+        URL ownRewriteJava = Scope.class.getProtectionDomain().getCodeSource().getLocation();
+        try (RecipeClassLoader recipeLoader = new RecipeClassLoader(new URL[]{ownRewriteJava}, getClass().getClassLoader())) {
+            Class<?> recipeSide = recipeLoader.loadClass(VariableAccess.Matcher.class.getName());
+            assertThat(recipeSide).isNotSameAs(VariableAccess.Matcher.class);
+            Object access = recipeSide.getMethod("get", Cursor.class).invoke(recipeSide.getConstructor().newInstance(), className);
+            assertThat((Optional<?>) access).isEmpty();
+        }
+    }
+
+    @Test
+    void overloadCanBeReferencedWhicheverIsDeclaredFirst() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> {
+              Scope classScope = scope;
+              while (!(classScope.getTree() instanceof J.ClassDeclaration)) {
+                  classScope = classScope.enclosing().orElseThrow();
+              }
+              return classScope.getBindings().stream()
+                .filter(b -> "overloaded".equals(b.getName()))
+                .map(b -> String.valueOf(scope.canReference(b)))
+                .collect(joining(", "));
+          })),
+          java(
+            """
+              class A {
+                  void overloaded() {}
+                  void overloaded(int i) {}
+                  void m() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A {
+                  void overloaded() {}
+                  void overloaded(int i) {}
+                  void m() {
+                      /*~~(true, true)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberOfAnInterfaceIsAStaticContextWithoutTheModifier() {
+        @Language("java") String source =
+          """
+            interface A {
+                static int use(String row, Object read) { return 0; }
+                int instMethod();
+                int CONSTANT =
+                        use("interfaceFieldInitializer", instMethod());
+                class Nested {
+                    int m() {
+                        return use("classNestedInInterface", instMethod());
+                    }
+                }
+                default int m() {
+                    return use("defaultMethod", instMethod());
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly("classNestedInInterface", "interfaceFieldInitializer");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void sourceFileThatRefusesTheServiceIsReadByJavaRules() {
+        JavaSourceFile cu = parse("class A { int x; }");
+        J.ClassDeclaration a = cu.getClasses().getFirst();
+        for (RuntimeException refusal : List.of(
+          new UnsupportedOperationException("Service not supported"),
+          // A Kotlin, Groovy or Scala source file wraps what it throws
+          new RuntimeException(new UnsupportedOperationException("Service not supported")))) {
+            JavaSourceFile refusing = (JavaSourceFile) Proxy.newProxyInstance(getClass().getClassLoader(),
+              new Class<?>[]{JavaSourceFile.class}, (proxy, method, args) -> {
+                  if ("service".equals(method.getName())) {
+                      throw refusal;
+                  }
+                  return method.invoke(cu, args);
+              });
+            Cursor body = new Cursor(new Cursor(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), refusing), a), a.getBody());
+            assertThat(Scope.at(body).lookup("x")).isPresent();
+        }
+    }
+
+    private static final Pattern USE_ROW = Pattern.compile("use\\(\"(\\w+)\"");
+
+    /**
+     * The rows of a source whose second argument to {@code use(row, read)} names something
+     * {@link Scope#canReference(Scope.Binding)} refuses there, in alphabetical order.
+     */
+    private static Set<String> readsRefused(@Language("java") String source) {
+        Set<String> refused = new TreeSet<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("use".equals(method.getSimpleName())) {
+                    Expression read = method.getArguments().get(1);
+                    J.Identifier name = read instanceof J.MethodInvocation call ? call.getName() :
+                      read instanceof J.TypeCast cast ? (J.Identifier) cast.getClazz().getTree() : (J.Identifier) read;
+                    Cursor at = Scope.cursorTo(getCursor(), name);
+                    Scope scope = Scope.at(at);
+                    Scope.Binding binding = scope.lookup(name.getSimpleName(), Scope.service(at).namespaceOf(at)).orElseThrow();
+                    if (!scope.canReference(binding)) {
+                        refused.add((String) ((J.Literal) method.getArguments().getFirst()).getValue());
+                    }
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(parse(source), 0);
+        return refused;
+    }
+
     /**
      * The names of the methods in which javac reports an error, in alphabetical order.
      */
     private static Set<String> methodsJavacRejects(@Language("java") String source) {
+        return rowsJavacRejects(source, Pattern.compile("void (\\w+)\\("));
+    }
+
+    /**
+     * The rows in which javac reports an error, in alphabetical order. A row starts at the line the pattern's first
+     * group names it on.
+     */
+    private static Set<String> rowsJavacRejects(@Language("java") String source, Pattern row) {
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         JavaFileObject file = new SimpleJavaFileObject(URI.create("string:///A.java"), JavaFileObject.Kind.SOURCE) {
             @Override
@@ -1782,12 +2331,11 @@ class ScopeTest implements RewriteTest {
             throw new UncheckedIOException(e);
         }
         String[] lines = source.split("\n");
-        Pattern method = Pattern.compile("void (\\w+)\\(");
         Set<String> rejected = new TreeSet<>();
         for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
             if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
                 for (int line = (int) diagnostic.getLineNumber() - 1; line >= 0; line--) {
-                    Matcher declared = method.matcher(lines[line]);
+                    Matcher declared = row.matcher(lines[line]);
                     if (declared.find()) {
                         rejected.add(declared.group(1));
                         break;
@@ -1796,6 +2344,24 @@ class ScopeTest implements RewriteTest {
             }
         }
         return rejected;
+    }
+
+    private static JavaSourceFile parse(@Language("java") String source) {
+        return (JavaSourceFile) JavaParser.fromJavaVersion().build().parse(source).findFirst().orElseThrow();
+    }
+
+    private static Cursor lastIdentifier(JavaSourceFile sourceFile, String name) {
+        Cursor[] found = {null};
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                if (identifier.getSimpleName().equals(name)) {
+                    found[0] = getCursor();
+                }
+                return identifier;
+            }
+        }.visit(sourceFile, 0);
+        return found[0];
     }
 
     private static Recipe referenceCounts() {
