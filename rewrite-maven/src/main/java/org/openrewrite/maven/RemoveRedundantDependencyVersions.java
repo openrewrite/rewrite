@@ -135,8 +135,31 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     private static final Set<String> REDUNDANT_MANAGED_DEPENDENCY_TAGS = new HashSet<>(Arrays.asList(
             "groupId", "artifactId", "version", "type", "classifier", "scope"));
 
+    /**
+     * Whether a managed dependency declares nothing but its coordinates, version and scope, so that another entry
+     * with the same coordinates and scope can stand in for it. Exclusions, optional or a systemPath would be lost.
+     */
+    static boolean declaresOnlyCoordinatesVersionAndScope(Xml.Tag managedDependency) {
+        return managedDependency.getChildren().stream()
+                .allMatch(t -> REDUNDANT_MANAGED_DEPENDENCY_TAGS.contains(t.getName()));
+    }
+
+    /**
+     * Removes the explicit version of each dependency in the pom's {@code <dependencies>} whose managed version comes
+     * from the given BOM and equals that version. Managed dependencies and plugins are left alone, since a BOM import
+     * never overrides a pom's own or inherited dependency management and has no say over plugins.
+     */
+    static TreeVisitor<?, ExecutionContext> versionsManagedByBom(String bomGroupId, String bomArtifactId) {
+        return new RemoveRedundantDependencyVersions(null, null, null, null)
+                .visitor(new GroupArtifact(bomGroupId, bomArtifactId));
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return visitor(null);
+    }
+
+    private TreeVisitor<?, ExecutionContext> visitor(@Nullable GroupArtifact managedByBom) {
         ArrayList<String> properties = new ArrayList<>();
         Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
@@ -172,11 +195,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             matchesGroup(d) &&
                             matchesArtifact(d) &&
                             matchesVersion(d) &&
+                            isManagedByBom(d) &&
                             isNotExcepted(d.getGroupId(), d.getArtifactId())) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         return tag.withContent(withoutVersion(tag, version));
                     }
-                } else if (isManagedDependencyTag()) {
+                } else if (managedByBom == null && isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findOwnManagedDependency(tag);
                     if (managed != null &&
                             matchesGroup(managed) &&
@@ -185,7 +209,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             isManagedTheSameByParent(tag, managed, ctx)) {
                         return null;
                     }
-                } else if (isPluginTag()) {
+                } else if (managedByBom == null && isPluginTag()) {
                     if (isManagedPluginTag()) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         if (version == null) {
@@ -272,9 +296,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
              * also declares exclusions, optional or a systemPath is kept, since removing it would drop those too.
              */
             private boolean isManagedTheSameByParent(Xml.Tag tag, ResolvedManagedDependency d, ExecutionContext ctx) {
-                if (d.getRequested().getVersion() == null ||
-                        !tag.getChildren().stream()
-                                .allMatch(t -> REDUNDANT_MANAGED_DEPENDENCY_TAGS.contains(t.getName()))) {
+                if (d.getRequested().getVersion() == null || !declaresOnlyCoordinatesVersionAndScope(tag)) {
                     return false;
                 }
                 ResolvedManagedDependency parent = findParentManagedDependency(d, ctx);
@@ -309,6 +331,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     }
                 }
                 return parentPom;
+            }
+
+            private boolean isManagedByBom(ResolvedDependency d) {
+                if (managedByBom == null) {
+                    return true;
+                }
+                ResolvedManagedDependency managed = getResolutionResult().getPom().getManagedDependency(d.getGroupId(),
+                        d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
+                ResolvedGroupArtifactVersion bomGav = managed == null ? null : managed.getBomGav();
+                return bomGav != null && managedByBom.equals(new GroupArtifact(bomGav.getGroupId(), bomGav.getArtifactId()));
             }
 
             private boolean matchesVersion(ResolvedDependency d) {

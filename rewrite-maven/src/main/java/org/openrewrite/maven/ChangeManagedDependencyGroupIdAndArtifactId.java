@@ -159,12 +159,14 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (newArtifactId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     }
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    String changedGroupId = pom.getValue(t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId));
+                    String changedArtifactId = pom.getValue(t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId));
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
                             if (versionTag.isPresent()) {
-                                ResolvedPom pom = getResolutionResult().getPom();
-                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId(t), resolvedArtifactId(t), pom.getValue(versionTag.get().getValue().orElse(null)));
+                                String resolvedNewVersion = resolveSemverVersion(ctx, changedGroupId, changedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
                                 String versionTagValue = t.getChildValue("version").orElse(null);
                                 if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                     t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
@@ -181,16 +183,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (t != tag) {
                         maybeUpdateModel();
-                        // A swapped BOM import changes the managed version of every artifact it manages, so the
-                        // explicit version of any of them may have become redundant. It changes nothing this pom
-                        // manages itself, as a pom's own dependencyManagement wins over its imports.
-                        doAfterVisit((isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
-                                new RemoveRedundantDependencyVersions(null, null, null, locallyManagedDependencies()) :
-                                new RemoveRedundantDependencyVersions(resolvedGroupId(t), resolvedArtifactId(t), null, null))
-                                .getVisitor());
-                        String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
-                        String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
-                        if (checkIfNewDependencyPresent(effectiveGroupId, effectiveArtifactId, newVersion)) {
+                        doAfterVisit(isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
+                                RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId) :
+                                new RemoveRedundantDependencyVersions(changedGroupId, changedArtifactId, null, null).getVisitor());
+                        if (checkIfNewDependencyPresent(changedGroupId, changedArtifactId, newVersion, t)) {
                             doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                             maybeUpdateModel();
                         }
@@ -199,39 +195,27 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
-            private String resolvedGroupId(Xml.Tag t) {
-                return resolvedChildValue(t, "groupId", newGroupId != null ? newGroupId : oldGroupId);
-            }
-
-            private String resolvedArtifactId(Xml.Tag t) {
-                return resolvedChildValue(t, "artifactId", newArtifactId != null ? newArtifactId : oldArtifactId);
-            }
-
-            private String resolvedChildValue(Xml.Tag t, String name, String fallback) {
-                return getResolutionResult().getPom().getValue(t.getChildValue(name).orElse(fallback));
-            }
-
-            private List<String> locallyManagedDependencies() {
+            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version, Xml.Tag changed) {
+                if (groupId == null || artifactId == null) {
+                    return false;
+                }
                 ResolvedPom pom = getResolutionResult().getPom();
-                List<String> managed = new ArrayList<>();
-                for (ManagedDependency md : pom.getRequested().getDependencyManagement()) {
-                    if (md instanceof ManagedDependency.Defined) {
-                        managed.add(pom.getValue(md.getGroupId()) + ':' + pom.getValue(md.getArtifactId()));
+                ResolvedManagedDependency existing = pom.getManagedDependency(groupId, artifactId,
+                        pom.getValue(changed.getChildValue("type").orElse(null)),
+                        pom.getValue(changed.getChildValue("classifier").orElse(null)));
+                if (existing == null) {
+                    return false;
+                }
+                // A pom must not manage the same coordinates twice, so a duplicate of its own entry always goes. An
+                // inherited or imported entry only stands in for the changed one if that declares nothing more.
+                if (!pom.getRequested().getDependencyManagement().contains(existing.getRequested())) {
+                    String scope = pom.getValue(changed.getChildValue("scope").orElse(null));
+                    if (!RemoveRedundantDependencyVersions.declaresOnlyCoordinatesVersionAndScope(changed) ||
+                        (scope == null ? null : Scope.fromName(scope)) != existing.getScope()) {
+                        return false;
                     }
                 }
-                return managed;
-            }
-
-            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
-                if ((groupId == null) || (artifactId == null)) {
-                    return false;
-                }
-                ResolvedManagedDependency managedDependency = findManagedDependency(groupId, artifactId);
-                if (managedDependency != null) {
-                    return compareVersions(version, managedDependency.getVersion());
-                } else {
-                    return false;
-                }
+                return compareVersions(version, existing.getVersion());
             }
 
             private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
