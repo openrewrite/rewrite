@@ -15,11 +15,15 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1127,6 +1131,247 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class InheritedConstant implements RewriteTest {
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(new ReplaceConstantWithAnotherConstant("example.Settings.OLD", "example.Settings.NEW"))
+              .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package example;
+                  public interface Settings {
+                      String OLD = "key";
+                      String NEW = "key";
+                      String OTHER = "other";
+                  }
+                  """,
+                """
+                  package example;
+                  public class Base {
+                      public static final String BASE_KEY = "base";
+                      public static String helper() { return "helper"; }
+                  }
+                  """,
+                """
+                  package example;
+                  public class Environment extends Base implements Settings {
+                      public static Environment create() { return null; }
+                  }
+                  """,
+                """
+                  package example;
+                  public class Outer {
+                      public static class Env implements Settings {}
+                  }
+                  """
+              ));
+        }
+
+        @ParameterizedTest
+        @CsvSource({"Environment, Environment", "Outer, Outer.Env", "Environment, example.Environment"})
+        void removeUnusedSubtypeImport(String importedType, String qualifier) {
+            rewriteRun(
+              java(
+                """
+                  import example.%s;
+
+                  class Test {
+                      String key = %s.OLD;
+                  }
+                  """.formatted(importedType, qualifier),
+                """
+                  import example.Settings;
+
+                  class Test {
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepStaticImportOfNestedSubtypeUsedElsewhere() {
+            rewriteRun(
+              java(
+                """
+                  import static example.Outer.Env;
+
+                  class Test {
+                      Env env;
+                      String key = Env.OLD;
+                  }
+                  """,
+                """
+                  import example.Settings;
+
+                  import static example.Outer.Env;
+
+                  class Test {
+                      Env env;
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepStaticImportThroughSubtype() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  import static example.Environment.OTHER;
+
+                  class Test {
+                      String key = Environment.OLD;
+                      String other = OTHER;
+                  }
+                  """,
+                """
+                  import example.Settings;
+
+                  import static example.Environment.OTHER;
+
+                  class Test {
+                      String key = Settings.NEW;
+                      String other = OTHER;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepStaticWildcardForInheritedFieldsAndMethod() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  import static example.Environment.*;
+
+                  class Test {
+                      String key = Environment.OLD;
+                      String other = OTHER + helper() + BASE_KEY;
+                  }
+                  """,
+                """
+                  import example.Settings;
+
+                  import static example.Environment.*;
+
+                  class Test {
+                      String key = Settings.NEW;
+                      String other = OTHER + helper() + BASE_KEY;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void importNewOwnerWithSameNameAsSubtype() {
+            rewriteRun(
+              spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Base.OLD", "b.Config.NEW"))
+                .parser(JavaParser.fromJavaVersion().dependsOn(
+                  """
+                    package a;
+                    public class Base {
+                        public static final String OLD = "key";
+                    }
+                    """,
+                  """
+                    package a;
+                    public class Config extends Base {}
+                    """,
+                  """
+                    package b;
+                    public class Config {
+                        public static final String NEW = "key";
+                    }
+                    """
+                )),
+              java(
+                """
+                  import a.Config;
+
+                  class Test {
+                      String key = Config.OLD;
+                  }
+                  """,
+                """
+                  import b.Config;
+
+                  class Test {
+                      String key = Config.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepSubtypeImportUsedElsewhere() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  class Test {
+                      Environment environment;
+                      String key = Environment.OLD;
+                  }
+                  """,
+                """
+                  import example.Environment;
+                  import example.Settings;
+
+                  class Test {
+                      Environment environment;
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepUnrelatedImportWhenAccessedThroughInstance() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  import static example.Environment.create;
+
+                  class Test {
+                      String key() {
+                          var instance = create();
+                          return instance.OLD;
+                      }
+                  }
+                  """,
+                """
+                  import example.Environment;
+                  import example.Settings;
+
+                  import static example.Environment.create;
+
+                  class Test {
+                      String key() {
+                          var instance = create();
+                          return Settings.NEW;
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 
     private static final String OLD = """

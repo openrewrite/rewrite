@@ -158,6 +158,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 String typeName = import_.getTypeName();
                 J.Identifier alias = import_.getAlias();
                 if (import_.isStatic()) {
+                    if (typeUsed && import_.getQualid().isFullyQualifiedClassReference(type)) {
+                        return import_;
+                    }
                     String imported = import_.getQualid().getSimpleName();
                     if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) &&
                             (force || !methodsAndFieldsUsed.contains(imported) && !fieldNamedLikeTypeUsed)) {
