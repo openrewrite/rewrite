@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -257,6 +258,51 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                     null, node.getModifiers(), node.getName(), null, null, null);
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
             variable.unsafeSet(type(node.getOwner()), type(node.getType()), annotations);
+            return variable;
+        });
+    }
+
+    /**
+     * A property that Groovy reads or writes through a getter or setter. Its name needs a variable like a field's,
+     * because an identifier with a type but no variable reads as a type name. A same-named private field is a
+     * different variable, so the signature differs from the field's.
+     */
+    public JavaType.@Nullable Variable variableType(String name, MethodNode accessor) {
+        JavaType.Method accessorType = methodType(accessor);
+        if (accessorType == null || accessorType.getDeclaringType() instanceof JavaType.Unknown) {
+            return null;
+        }
+        JavaType.FullyQualified owner = accessorType.getDeclaringType();
+        JavaType type = accessorType.getParameterTypes().isEmpty() ?
+                accessorType.getReturnType() : accessorType.getParameterTypes().get(0);
+        String signature = signatureBuilder.propertySignature(owner, name);
+        // An extension method is declared static whether it extends instances or the class
+        boolean isStatic = accessor instanceof ExtensionMethodNode ?
+                ((ExtensionMethodNode) accessor).isStaticExtension() : accessor.isStatic();
+        long flags = (accessor.getModifiers() & (Modifier.PUBLIC | Modifier.PROTECTED | Modifier.PRIVATE)) |
+                (isStatic ? Modifier.STATIC : 0);
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(null, flags, name, null, null, null);
+            variable.unsafeSet(owner, type, (List<JavaType.FullyQualified>) null);
+            return variable;
+        });
+    }
+
+    /**
+     * A key read as a property of a map. Its owner is the map's class, as a field's is its declaring class,
+     * but it is never a field of that class.
+     */
+    public JavaType.@Nullable Variable mapKeyVariableType(String name, ClassNode map, ClassNode valueType) {
+        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(map));
+        JavaType type = type(valueType);
+        if (owner == null || type == null) {
+            return null;
+        }
+        JavaType.FullyQualified ownerClass = owner instanceof JavaType.Parameterized ? ((JavaType.Parameterized) owner).getType() : owner;
+        String signature = signatureBuilder.mapKeySignature(ownerClass, name, valueType);
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(null, Modifier.PUBLIC, name, null, null, null);
+            variable.unsafeSet(ownerClass, type, (List<JavaType.FullyQualified>) null);
             return variable;
         });
     }

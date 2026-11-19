@@ -38,8 +38,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -126,17 +128,17 @@ class KotlinTypeMappingTest {
         J.MethodDeclaration getter = property.getAccessors().getElements().stream().filter(x -> "get".equals(x.getName().getSimpleName())).findFirst().orElse(null);
         JavaType.FullyQualified declaringType = getter.getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(getter.getMethodType().getName()).isEqualTo("get");
+        assertThat(getter.getMethodType().getName()).isEqualTo("getField");
         assertThat(getter.getMethodType().getReturnType()).isEqualTo(id.getType());
         assertThat(getter.getName().getType()).isEqualTo(getter.getMethodType());
-        assertThat(getter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=get,return=int,parameters=[]}");
+        assertThat(getter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=getField,return=int,parameters=[]}");
 
         J.MethodDeclaration setter = property.getAccessors().getElements().stream().filter(x -> "set".equals(x.getName().getSimpleName())).findFirst().orElse(null);
         declaringType = setter.getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(setter.getMethodType().getName()).isEqualTo("set");
+        assertThat(setter.getMethodType().getName()).isEqualTo("setField");
         assertThat(setter.getMethodType()).isEqualTo(setter.getName().getType());
-        assertThat(setter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=set,return=void,parameters=[int]}");
+        assertThat(setter.getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=setField,return=void,parameters=[int]}");
     }
 
     @Test
@@ -476,6 +478,38 @@ class KotlinTypeMappingTest {
     @Nested
     @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     class ParsingTest implements RewriteTest {
+
+        @Test
+        void accessorMethodTypesUseJvmNames() {
+            rewriteRun(
+              kotlin(
+                """
+                  class K {
+                      var isOpen: Boolean = false
+                          get() = field
+                          set(value) { field = value }
+
+                      @get:JvmName("named")
+                      @set:JvmName("assign")
+                      var j: Int = 0
+                          get() = field
+                          set(value) { field = value }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    List<String> names = new ArrayList<>();
+                    new KotlinIsoVisitor<List<String>>() {
+                        @Override
+                        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> names) {
+                            names.add(method.getMethodType().getName());
+                            return method;
+                        }
+                    }.visit(cu, names);
+                    assertThat(names).containsExactly("isOpen", "setOpen", "named", "assign");
+                })
+              )
+            );
+        }
 
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
         @Test
@@ -1376,10 +1410,10 @@ class KotlinTypeMappingTest {
                   }
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    var getMatcher = new MethodMatcher("Test get(..)");
+                    var getMatcher = new MethodMatcher("Test getStringRepresentation()");
                     var foundGet = new AtomicBoolean(false);
 
-                    var setMatcher = new MethodMatcher("Test set(..)");
+                    var setMatcher = new MethodMatcher("Test setStringRepresentation(..)");
                     var foundSet = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
@@ -2725,6 +2759,142 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void localUseHasSameOwnerAsDeclaration() {
+            rewriteRun(
+              kotlin(
+                """
+                  val top = 1
+                  class K2 {
+                      fun m(p: Int): Int {
+                          val local = 1
+                          val lam = { x: Int -> x + local + p + top }
+                          return local
+                      }
+                  }
+                  enum class E {
+                      A {
+                          init {
+                              val z = 1
+                              println(z)
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Set<String>> ownersByName = fieldOwnersByName(cu);
+
+                    // then
+                    String m = "K2{name=m,return=int,parameters=[int]}";
+                    assertThat(ownersByName).containsAllEntriesOf(Map.of(
+                      "top", Set.of("OpenRewriteFile0Kt"),
+                      "p", Set.of(m),
+                      "local", Set.of(m),
+                      "x", Set.of(m),
+                      "z", Set.of("<anonymous>{name=,return=void,parameters=[]}")
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
+        void initializerBlockLocalIsOwnedByTheInitializer() {
+            rewriteRun(
+              kotlin(
+                """
+                  class C {
+                      init { var block = 1; block++ }
+                      companion object {
+                          init { var sblock = 1; sblock++ }
+                      }
+                  }
+                  object O {
+                      init { var oblock = 1; oblock++ }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> assertThat(fieldOwnersByName(cu)).containsAllEntriesOf(Map.of(
+                  "block", Set.of("C{name=,return=void,parameters=[]}"),
+                  "sblock", Set.of("C$Companion{name=,return=void,parameters=[]}"),
+                  "oblock", Set.of("O{name=,return=void,parameters=[]}")
+                )))
+              )
+            );
+        }
+
+        @Test
+        void topLevelPropertyOwnerIsDeclaringFileFacade() {
+            rewriteRun(
+              kotlin(
+                """
+                  package a.b
+                  val TOP = 1
+                  """
+              ),
+              kotlin(
+                """
+                  package c
+                  import a.b.TOP
+                  import kotlin.math.PI
+                  fun f() = TOP + a.b.TOP + PI
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Set<String>> ownersByName = fieldOwnersByName(cu);
+
+                    // then
+                    assertThat(ownersByName).containsExactlyInAnyOrderEntriesOf(Map.of(
+                      "TOP", Set.of("a.b.OpenRewriteFile0Kt"),
+                      "PI", Set.of("kotlin.math.MathKt")
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
+        void localOutsideNamedFunctionIsNotOwnedByClass() {
+            rewriteRun(
+              kotlin(
+                """
+                  val t = 0
+                  val tp = run { val t = 1; t }
+                  class K {
+                      val x: Int = 0
+                      val p = run { val x = 2; x }
+                      val f = { x: Int -> x }
+                      val g: Int
+                          get() {
+                              val x = 3
+                              return x
+                          }
+                      init {
+                          println(this.x)
+                          val x = 1
+                          println(x)
+                      }
+                      constructor(a: Int) {
+                          val x = a
+                          println(x)
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, List<String>> ownersByName = variableOwnersByName(cu);
+
+                    // then
+                    assertThat(ownersByName.get("t")).containsExactlyInAnyOrder(
+                      "OpenRewriteFile0Kt", "OpenRewriteFile0Kt{name=,return=void,parameters=[]}");
+                    assertThat(ownersByName.get("x")).containsExactlyInAnyOrder(
+                      "K", "K{name=getG,return=int,parameters=[]}", "K{name=<constructor>,return=K,parameters=[int]}",
+                      "K{name=,return=void,parameters=[]}", "K{name=,return=void,parameters=[]}", "K{name=,return=void,parameters=[]}");
+                })
+              )
+            );
+        }
+
+        @Test
         void scriptDeclarationsAreNotStatic() {
             rewriteRun(
               kotlinScript(
@@ -2749,6 +2919,38 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        private static Map<String, Set<String>> fieldOwnersByName(K.CompilationUnit cu) {
+            return new KotlinIsoVisitor<Map<String, Set<String>>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Set<String>> acc) {
+                    JavaType.Variable fieldType = identifier.getFieldType();
+                    if (fieldType != null) {
+                        acc.computeIfAbsent(identifier.getSimpleName(), k -> new HashSet<>())
+                          .add(String.valueOf(fieldType.getOwner()));
+                    }
+                    return super.visitIdentifier(identifier, acc);
+                }
+            }.reduce(cu, new HashMap<>());
+        }
+
+        /**
+         * One owner per distinct variable type, so a declaration and its use sharing a variable type count once.
+         */
+        private static Map<String, List<String>> variableOwnersByName(K.CompilationUnit cu) {
+            Set<JavaType.Variable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+            return new KotlinIsoVisitor<Map<String, List<String>>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, List<String>> acc) {
+                    JavaType.Variable fieldType = identifier.getFieldType();
+                    if (fieldType != null && seen.add(fieldType)) {
+                        acc.computeIfAbsent(identifier.getSimpleName(), k -> new ArrayList<>())
+                          .add(String.valueOf(fieldType.getOwner()));
+                    }
+                    return super.visitIdentifier(identifier, acc);
+                }
+            }.reduce(cu, new HashMap<>());
         }
 
         private static Map<String, Boolean> staticFlagByElement(K.CompilationUnit cu) {

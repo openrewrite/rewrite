@@ -17,6 +17,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
@@ -24,14 +25,20 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import javax.tools.ToolProvider;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -361,6 +368,40 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                  { int block = 1; block++ }
+                  static { int sblock = 1; sblock++ }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> locals = new ArrayList<>();
+                new JavaIsoVisitor<List<J.Identifier>>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> found) {
+                        if (identifier.getSimpleName().endsWith("block")) {
+                            found.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, locals);
+
+                assertThat(locals).hasSize(4).allSatisfy(local ->
+                  assertThat(local.getFieldType().getOwner()).isInstanceOfSatisfying(JavaType.Method.class, owner -> {
+                      assertThat(owner.getDeclaringType().getFullyQualifiedName()).isEqualTo("C");
+                      assertThat(owner.getName()).isEmpty();
+                      assertThat(owner.getReturnType()).isEqualTo(JavaType.Primitive.Void);
+                      assertThat(owner.getParameterTypes()).isEmpty();
+                  }));
+            })
+          )
+        );
+    }
+
+    @Test
     void sameNamedLocalsInDifferentMethodsAreDistinctVariables() {
         rewriteRun(
           groovy(
@@ -457,6 +498,155 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(TypeUtils.isOfClassType(qualid.getType(), "java.util.concurrent.ConcurrentHashMap")).isTrue();
                 assertThat(TypeUtils.isOfClassType(qualid.getName().getType(), "java.util.concurrent.ConcurrentHashMap")).isTrue();
             })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedFieldReadHasTheFieldOfAQualifiedRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.out
+              import static java.io.File.*
+              def bare = out
+              def qualified = System.out
+              class U {
+                  def u() {
+                      def bareStar = separator
+                      def qualifiedStar = File.separator
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, J.Identifier> reads = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        J initializer = variable.getInitializer();
+                        reads.put(variable.getSimpleName(), initializer instanceof J.FieldAccess ?
+                          ((J.FieldAccess) initializer).getName() : (J.Identifier) initializer);
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                assertThat(TypeUtils.isOfClassType(reads.get("bare").getType(), "java.io.PrintStream")).isTrue();
+                assertThat(reads.get("bare").getFieldType()).isNotNull().isSameAs(reads.get("qualified").getFieldType());
+                assertThat(TypeUtils.isOfClassType(reads.get("bareStar").getType(), "java.lang.String")).isTrue();
+                assertThat(reads.get("bareStar").getFieldType()).isNotNull().isSameAs(reads.get("qualifiedStar").getFieldType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedGetterReadAsAPropertyHasThePropertyOfAQualifiedRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              def bare = runtime
+              def qualified = Runtime.runtime
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, J.VariableDeclarations.NamedVariable> variables = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        variables.put(variable.getSimpleName(), variable);
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                J.Identifier read = (J.Identifier) variables.get("bare").getInitializer();
+                J.FieldAccess qualifiedRead = (J.FieldAccess) variables.get("qualified").getInitializer();
+                assertThat(TypeUtils.isOfClassType(read.getType(), "java.lang.Runtime")).isTrue();
+                assertThat(read.getFieldType()).isNotNull().isSameAs(qualifiedRead.getName().getFieldType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedFieldIsTypedForTheTypeChecker() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.out
+              def x = out
+              out.println("hi")
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(variable.getVariableType().getType(), "java.io.PrintStream")).isTrue();
+                    return variable;
+                }
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(TypeUtils.isOfClassType(method.getMethodType().getDeclaringType(), "java.io.PrintStream")).isTrue();
+                    assertThat(method.getMethodType().getParameterTypes()).containsExactly(JavaType.ShallowClass.build("java.lang.String"));
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedMethodCallHasTheMethodType() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.singletonList as one
+              import static java.lang.Math.*
+              one("a")
+              max(1, 2)
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, JavaType.Method> calls = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        calls.put(method.getSimpleName(), method.getMethodType());
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(calls.get("one").getName()).isEqualTo("singletonList");
+                assertThat(TypeUtils.isOfClassType(calls.get("one").getDeclaringType(), "java.util.Collections")).isTrue();
+
+                assertThat(TypeUtils.isOfClassType(calls.get("max").getDeclaringType(), "java.lang.Math")).isTrue();
+                assertThat(calls.get("max").getParameterTypes()).containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticImportOfAClassMissingADependencyLeavesTheRestTyped(@TempDir Path classpath) throws Exception {
+        Path sources = Files.createDirectories(classpath.resolve("src/lib"));
+        Files.writeString(sources.resolve("Lib.java"), "package lib; public class Lib { public static Missing make() { return null; } }");
+        Files.writeString(sources.resolve("Missing.java"), "package lib; public class Missing {}");
+        assertThat(ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classpath.toString(),
+          sources.resolve("Lib.java").toString(), sources.resolve("Missing.java").toString())).isZero();
+        Files.delete(classpath.resolve("lib/Missing.class"));
+        rewriteRun(
+          spec -> spec.parser(GroovyParser.builder().classpath(List.of(classpath))),
+          groovy(
+            """
+              import static lib.Lib.*
+              def v = version
+              make()
+              def n = "s".length()
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("n".equals(variable.getSimpleName())) {
+                        assertThat(variable.getVariableType().getType()).isEqualTo(JavaType.Primitive.Int);
+                    }
+                    return variable;
+                }
+            }.visit(cu, 0))
           )
         );
     }
@@ -567,20 +757,142 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @Test
-    void mapPropertyIsAKeyNotAField() {
+    void accessorBackedPropertyIsAVariableDistinctFromASameNamedPrivateField() {
         rewriteRun(
           groovy(
             """
-              def m = new HashMap()
-              m.threshold
+              class Folder {
+                  private File root
+                  File getRoot() { root }
+                  void setLabel(String label) {}
+                  static String getKind() { "dir" }
+              }
+              def f = new Folder()
+              f.root
+              f.label = "a"
+              Folder.kind
+              new File("a").text
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
-                    assertThat(fieldAccess.getName().getFieldType()).isNull();
-                    return fieldAccess;
-                }
-            }.visit(cu, 0))
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> properties = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        properties.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(properties).satisfiesExactly(
+                  root -> {
+                      assertThat(root.getName()).isEqualTo("root");
+                      assertThat(TypeUtils.isOfClassType(root.getOwner(), "Folder")).isTrue();
+                      assertThat(TypeUtils.isOfClassType(root.getType(), "java.io.File")).isTrue();
+                      assertThat(root.hasFlags(Flag.Private)).isFalse();
+                  },
+                  label -> {
+                      assertThat(label.getName()).isEqualTo("label");
+                      assertThat(TypeUtils.isOfClassType(label.getType(), "java.lang.String")).isTrue();
+                  },
+                  kind -> assertThat(kind.hasFlags(Flag.Static)).isTrue(),
+                  text -> assertThat(text.hasFlags(Flag.Static)).isFalse()
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void propertyReadThroughASubclassIsTheSuperclassField() {
+        rewriteRun(
+          groovy(
+            """
+              class Base { File root }
+              class Sub extends Base {}
+              new Base().root
+              new Sub().root
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> roots = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        roots.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(roots).hasSize(2);
+                assertThat(roots.get(1)).isSameAs(roots.get(0));
+            })
+          )
+        );
+    }
+
+    @Test
+    void bareAccessorBackedPropertyIsTheVariableOfAQualifiedRead() {
+        rewriteRun(
+          groovy(
+            """
+              class Ext {
+                  File getOutDir() { null }
+              }
+              class Sub extends Ext {
+                  def m() {
+                      outDir
+                      this.outDir
+                  }
+              }
+              def ext(@DelegatesTo(Ext) Closure c) {}
+              ext { outDir }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> outDirs = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        if ("outDir".equals(identifier.getSimpleName())) {
+                            outDirs.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, 0);
+                assertThat(outDirs).hasSize(3).allSatisfy(outDir -> {
+                    assertThat(TypeUtils.isOfClassType(outDir.getType(), "java.io.File")).isTrue();
+                    assertThat(outDir.getFieldType()).isNotNull().isSameAs(outDirs.getFirst().getFieldType());
+                });
+            })
+          )
+        );
+    }
+
+    @Test
+    void mapPropertyIsAKeyOwnedByTheMapNotItsField() {
+        rewriteRun(
+          groovy(
+            """
+              def m = new HashMap<String, Integer>()
+              def n = new HashMap<String, File>()
+              m.threshold
+              n.threshold
+              m.@threshold
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> reads = new ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                        reads.add(fieldAccess.getName().getFieldType());
+                        return fieldAccess;
+                    }
+                }.visit(cu, 0);
+                assertThat(reads).satisfiesExactly(
+                  key -> {
+                      assertThat(TypeUtils.isOfClassType(key.getOwner(), "java.util.HashMap")).isTrue();
+                      assertThat(TypeUtils.isOfClassType(key.getType(), "java.lang.Integer")).isTrue();
+                  },
+                  otherValueType -> assertThat(TypeUtils.isOfClassType(otherValueType.getType(), "java.io.File")).isTrue(),
+                  field -> assertThat(field).isNotNull().isNotSameAs(reads.getFirst())
+                );
+            })
           )
         );
     }

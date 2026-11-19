@@ -103,6 +103,21 @@ class UnaryTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parenthesizedIncrementsAndDecrements() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = (y++) * 2
+              def b = ((--y))
+              def c = -(y--)
+              def d = [(++y): 1]
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1524")
     @SuppressWarnings("GroovyPointlessBoolean")
     @Test

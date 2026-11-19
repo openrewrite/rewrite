@@ -221,6 +221,18 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void tripleQuotedMethodName() {
+        rewriteRun(
+          groovy(
+            """
+              def 'foo bar'(int i) { i }
+              '''foo bar'''(1)
+              """
+          )
+        );
+    }
+
+    @Test
     void staticMethodPointer() {
         rewriteRun(
           groovy(

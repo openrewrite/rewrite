@@ -305,6 +305,40 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                  { int block = 1; block++; }
+                  static { int sblock = 1; sblock++; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> locals = new ArrayList<>();
+                new JavaIsoVisitor<List<J.Identifier>>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> found) {
+                        if (identifier.getSimpleName().endsWith("block")) {
+                            found.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, locals);
+
+                assertThat(locals).hasSize(4).allSatisfy(local ->
+                  assertThat(local.getFieldType().getOwner()).isInstanceOfSatisfying(JavaType.Method.class, owner -> {
+                      assertThat(owner.getDeclaringType().getFullyQualifiedName()).isEqualTo("C");
+                      assertThat(owner.getName()).isEmpty();
+                      assertThat(owner.getReturnType()).isEqualTo(JavaType.Primitive.Void);
+                      assertThat(owner.getParameterTypes()).isEmpty();
+                  }));
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2118")
     @Test
     void variousMethodScopeIdentifierTypes() {

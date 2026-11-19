@@ -36,9 +36,12 @@ import org.yaml.snakeyaml.parser.ParserException;
 import org.yaml.snakeyaml.parser.ParserImpl;
 import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
+import org.yaml.snakeyaml.scanner.ScannerException;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
+import org.yaml.snakeyaml.tokens.Token;
 
 import org.openrewrite.yaml.marker.OmitColon;
+import org.openrewrite.yaml.marker.TagBeforeAnchor;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -220,7 +223,11 @@ public class YamlParser implements org.openrewrite.Parser {
         String sourceText = yamlSourceWithPlaceholders.toString();
         Queue<List<Yaml.Directive>> documentDirectives = preScanDirectives(sourceText);
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(sourceText)) {
+        // SnakeYAML reads a copy with tab separators swapped for spaces, while the reader keeps the
+        // original text, from which every prefix and scalar value is taken
+        String scannableText = replaceTabSeparators(sourceText);
+
+        try (FormatPreservingReader reader = new FormatPreservingReader(sourceText, scannableText)) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -293,37 +300,48 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         MappingStartEvent mappingStartEvent = (MappingStartEvent) event;
                         Yaml.Anchor anchor = null;
-                        if (mappingStartEvent.getAnchor() != null) {
+                        Yaml.Tag tag = null;
+                        Markers markers = Markers.EMPTY;
+                        if (isTagBeforeAnchor(reader, event, mappingStartEvent.getAnchor(), mappingStartEvent.getTag())) {
+                            TagBeforeAnchorProperties properties = readTagBeforeAnchor(reader, event, mappingStartEvent.getAnchor(),
+                                    fmt.substring(anchorPrefixStart(fmt) + 1), false);
+                            anchor = properties.getAnchor();
+                            tag = properties.getTag();
+                            markers = properties.getMarkers();
+                            anchors.put(mappingStartEvent.getAnchor(), anchor);
+                            lastEnd = properties.getEnd();
+                        } else if (mappingStartEvent.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
                             anchors.put(mappingStartEvent.getAnchor(), anchor);
                             lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
-                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
-                        Yaml.Tag tag = null;
-                        if (mappingStartEvent.getTag() != null) {
-                            String prefixAfterColon = fullPrefix.substring(startIndex);
-                            final int tagStartIndex = prefixAfterColon.indexOf('!');
-                            String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
+                        int openingBraceIndex = commentAwareIndexOf('{', fullPrefix);
+                        int tagStartIndex = tag == null && mappingStartEvent.getTag() != null ? commentAwareIndexOf('!', fullPrefix) : -1;
+                        int propertiesStart = tagStartIndex != -1 ? tagStartIndex : openingBraceIndex != -1 ? openingBraceIndex : fullPrefix.length();
+                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix.substring(0, propertiesStart)) + 1;
+                        if (tagStartIndex != -1) {
                             int i = tagStartIndex;
-                            while (i < prefixAfterColon.length() && !Character.isWhitespace(prefixAfterColon.charAt(i))) {
+                            while (i < fullPrefix.length() && !Character.isWhitespace(fullPrefix.charAt(i)) && i != openingBraceIndex) {
                                 i++;
                             }
                             // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
-                            String tagName = prefixAfterColon.substring(tagStartIndex, i);
-                            String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
-                            tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
-                            lastEnd = lastEnd + startIndex + i + 1;
+                            String tagName = fullPrefix.substring(tagStartIndex, i);
+                            String afterTag = fullPrefix.substring(i, openingBraceIndex == -1 ? fullPrefix.length() : openingBraceIndex);
+                            // The indentation of a block mapping's first key belongs to its entry
+                            String tagSuffix = openingBraceIndex == -1 ? afterTag.substring(0, afterTag.lastIndexOf('\n') + 1) : afterTag;
+                            tag = createTag(fullPrefix.substring(startIndex, tagStartIndex), Markers.EMPTY, tagName, tagSuffix);
+                            startIndex = i + tagSuffix.length();
+                            lastEnd += fullPrefix.codePointCount(0, startIndex);
                         }
 
                         String startBracePrefix = null;
-                        int openingBraceIndex = commentAwareIndexOf('{', fullPrefix);
                         if (openingBraceIndex != -1) {
                             startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
-                        blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor, tag));
+                        blockStack.push(new MappingBuilder(fmt, markers, startBracePrefix, anchor, tag));
                         break;
                     }
                     case Scalar: {
@@ -332,8 +350,17 @@ public class YamlParser implements org.openrewrite.Parser {
                         ScalarEvent scalar = (ScalarEvent) event;
 
                         Yaml.Anchor anchor = null;
+                        Yaml.Tag tag = null;
+                        Markers markers = Markers.EMPTY;
                         int valueStart;
-                        if (scalar.getAnchor() != null) {
+                        if (isTagBeforeAnchor(reader, event, scalar.getAnchor(), scalar.getTag())) {
+                            TagBeforeAnchorProperties properties = readTagBeforeAnchor(reader, event, scalar.getAnchor(), "", true);
+                            anchor = properties.getAnchor();
+                            tag = properties.getTag();
+                            markers = properties.getMarkers();
+                            anchors.put(scalar.getAnchor(), anchor);
+                            valueStart = lastEnd + fmt.length() + properties.getSource().length();
+                        } else if (scalar.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, scalar.getAnchor(), event.getEndMark().getIndex(), true);
                             anchors.put(scalar.getAnchor(), anchor);
                             valueStart = lastEnd + fmt.length() + scalar.getAnchor().length() + 1 + anchor.getPostfix().length();
@@ -343,8 +370,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         valueStart -= newLine.length();
                         newLine = "";
 
-                        Yaml.Tag tag = null;
-                        if (scalar.getTag() != null) {
+                        if (tag == null && scalar.getTag() != null) {
                             String potentialScalarValue = reader.readStringFromBuffer(valueStart, event.getEndMark().getIndex() - 1);
                             assert (potentialScalarValue.contains("!"));
                             final int tagStartIndex = potentialScalarValue.indexOf('!');
@@ -411,7 +437,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 style = Yaml.Scalar.Style.PLAIN;
                                 break;
                         }
-                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, tag, scalarValue);
+                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, markers, style, anchor, tag, scalarValue);
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element
@@ -477,31 +503,48 @@ public class YamlParser implements org.openrewrite.Parser {
                         }
 
                         Yaml.Anchor anchor = null;
-                        if (sse.getAnchor() != null) {
+                        Yaml.Tag tag = null;
+                        Markers markers = Markers.EMPTY;
+                        if (isTagBeforeAnchor(reader, event, sse.getAnchor(), sse.getTag())) {
+                            int delimiterIndex = anchorPrefixStart(fmt);
+                            TagBeforeAnchorProperties properties = readTagBeforeAnchor(reader, event, sse.getAnchor(),
+                                    fmt.substring(delimiterIndex + 1), false);
+                            anchor = properties.getAnchor();
+                            tag = properties.getTag();
+                            markers = properties.getMarkers();
+                            anchors.put(sse.getAnchor(), anchor);
+                            lastEnd = properties.getEnd();
+                            fmt = fmt.substring(0, delimiterIndex + 1) + prefixBeforeDash(reader.readStringFromBuffer(lastEnd, nextLastEnd));
+                        } else if (sse.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), nextLastEnd, false);
                             anchors.put(sse.getAnchor(), anchor);
 
                             // The sequence's prefix keeps the delimiter: the enclosing builder locates it there to
                             // split the prefix and to decide whether a sequence entry has a dash.
                             int delimiterIndex = anchorPrefixStart(fmt);
-                            String prefixThroughDelimiter = delimiterIndex == -1 ? fmt : fmt.substring(0, delimiterIndex + 1);
+                            String prefixThroughDelimiter = fmt.substring(0, delimiterIndex + 1);
                             lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, nextLastEnd);
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
-                            if (dashPrefixIndex > -1) {
-                                fmt = fmt.substring(0, dashPrefixIndex);
-                            }
-                            fmt = prefixThroughDelimiter + fmt;
+                            fmt = prefixThroughDelimiter + prefixBeforeDash(reader.readStringFromBuffer(lastEnd, nextLastEnd));
                         }
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
-                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
+                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'),
+                                openingBracketIndex == -1 ? fullPrefix : fullPrefix.substring(0, openingBracketIndex)) + 1;
                         if (openingBracketIndex != -1) {
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
+                            int tagStartIndex = tag == null && sse.getTag() != null ? commentAwareIndexOf('!', startBracketPrefix) : -1;
+                            if (tagStartIndex != -1) {
+                                int i = tagStartIndex;
+                                while (i < startBracketPrefix.length() && !Character.isWhitespace(startBracketPrefix.charAt(i))) {
+                                    i++;
+                                }
+                                tag = createTag(startBracketPrefix.substring(0, tagStartIndex), Markers.EMPTY,
+                                        startBracketPrefix.substring(tagStartIndex, i), startBracketPrefix.substring(i));
+                                startBracketPrefix = "";
+                            }
                         }
-                        Yaml.Tag tag = null;
-                        if (sse.getTag() != null && startBracketPrefix == null) {
+                        if (tag == null && sse.getTag() != null && startBracketPrefix == null) {
                             // When the sequence is not the value of a mapping entry the delimiter found above is the sequence's
                             // own first dash, which comes after the tag, so the tag search must begin at the start of the prefix
                             int tagIndex = fullPrefix.indexOf('!');
@@ -529,7 +572,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             }
                         }
                         lastEnd = nextLastEnd;
-                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor, tag));
+                        blockStack.push(new SequenceBuilder(fmt, markers, startBracketPrefix, anchor, tag));
                         break;
                     }
                     case Alias: {
@@ -677,12 +720,63 @@ public class YamlParser implements org.openrewrite.Parser {
             postFix.append(c);
         }
 
-        String prefix = "";
-        if (!isForScalar) {
-            int prefixStart = anchorPrefixStart(eventPrefix);
-            prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
-        }
+        String prefix = isForScalar ? "" : eventPrefix.substring(anchorPrefixStart(eventPrefix) + 1);
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
+    }
+
+    private static boolean isTagBeforeAnchor(FormatPreservingReader reader, Event event, @Nullable String anchor, @Nullable String tag) {
+        int start = event.getStartMark().getIndex();
+        return anchor != null && tag != null && "!".equals(reader.readStringFromBuffer(start, start));
+    }
+
+    /**
+     * Reads the properties of a node whose tag is written before its anchor, as in {@code !!str &a value}. Each property
+     * owns the separation after it, so the node still prints valid YAML once one of them is removed or the
+     * {@link TagBeforeAnchor} marker is lost.
+     */
+    private TagBeforeAnchorProperties readTagBeforeAnchor(FormatPreservingReader reader, Event event, String anchorKey,
+                                                          String tagPrefix, boolean isForScalar) {
+        int start = event.getStartMark().getIndex();
+        String text = reader.readStringFromBuffer(start, event.getEndMark().getIndex() - 1);
+        int tagEnd = 0;
+        while (tagEnd < text.length() && !Character.isWhitespace(text.charAt(tagEnd))) {
+            tagEnd++;
+        }
+        int anchorStart = tagEnd + commentAwareIndexOf('&', text.substring(tagEnd));
+        int anchorEnd = anchorStart + 1 + anchorKey.length();
+        int postfixEnd = anchorEnd;
+        while (postfixEnd < text.length()) {
+            char c = text.charAt(postfixEnd);
+            if (c != ' ' && c != '\t' && !(isForScalar && (c == '\n' || c == '\r'))) {
+                break;
+            }
+            postfixEnd++;
+        }
+        String source = text.substring(0, postfixEnd);
+        return new TagBeforeAnchorProperties(
+                createTag(tagPrefix, Markers.EMPTY, text.substring(0, tagEnd), text.substring(tagEnd, anchorStart)),
+                new Yaml.Anchor(randomId(), "", text.substring(anchorEnd, postfixEnd), Markers.EMPTY, anchorKey),
+                Markers.build(singletonList(new TagBeforeAnchor(randomId()))),
+                source,
+                start + source.codePointCount(0, source.length()));
+    }
+
+    @Value
+    private static class TagBeforeAnchorProperties {
+        Yaml.Tag tag;
+        Yaml.Anchor anchor;
+        Markers markers;
+        String source;
+
+        /**
+         * The reader index just past {@link #source}, counted in code points like event marks.
+         */
+        int end;
+    }
+
+    private static String prefixBeforeDash(String prefix) {
+        int dashIndex = commentAwareIndexOf('-', prefix);
+        return dashIndex == -1 ? prefix : prefix.substring(0, dashIndex);
     }
 
     /**
@@ -945,6 +1039,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
     private static class MappingBuilder implements BlockBuilder {
         private final String prefix;
+        private final Markers markers;
 
         @Nullable
         private final String startBracePrefix;
@@ -958,8 +1053,9 @@ public class YamlParser implements org.openrewrite.Parser {
         @Nullable
         private YamlKey key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag) {
+        private MappingBuilder(String prefix, Markers markers, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag) {
             this.prefix = prefix;
+            this.markers = markers;
             this.startBracePrefix = startBracePrefix;
             this.anchor = anchor;
             this.tag = tag;
@@ -1009,12 +1105,13 @@ public class YamlParser implements org.openrewrite.Parser {
 
         @Override
         public MappingWithPrefix build() {
-            return new MappingWithPrefix(prefix, startBracePrefix, entries, null, anchor, tag);
+            return new MappingWithPrefix(prefix, markers, startBracePrefix, entries, null, anchor, tag);
         }
     }
 
     private static class SequenceBuilder implements BlockBuilder {
         private final String prefix;
+        private final Markers markers;
 
         @Nullable
         private final String startBracketPrefix;
@@ -1025,8 +1122,9 @@ public class YamlParser implements org.openrewrite.Parser {
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag) {
+        private SequenceBuilder(String prefix, Markers markers, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag) {
             this.prefix = prefix;
+            this.markers = markers;
             this.startBracketPrefix = startBracketPrefix;
             this.anchor = anchor;
             this.tag = tag;
@@ -1055,7 +1153,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
         @Override
         public SequenceWithPrefix build() {
-            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor, tag);
+            return new SequenceWithPrefix(prefix, markers, startBracketPrefix, entries, null, anchor, tag);
         }
     }
 
@@ -1079,8 +1177,8 @@ public class YamlParser implements org.openrewrite.Parser {
     private static class MappingWithPrefix extends Yaml.Mapping {
         private String prefix;
 
-        public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
-            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix, anchor, tag);
+        public MappingWithPrefix(String prefix, Markers markers, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            super(randomId(), markers, startBracePrefix, entries, endBracePrefix, anchor, tag);
             this.prefix = prefix;
         }
 
@@ -1114,8 +1212,8 @@ public class YamlParser implements org.openrewrite.Parser {
     private static class SequenceWithPrefix extends Yaml.Sequence {
         private String prefix;
 
-        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
-            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor, tag);
+        public SequenceWithPrefix(String prefix, Markers markers, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            super(randomId(), markers, startBracketPrefix, entries, endBracketPrefix, anchor, tag);
             this.prefix = prefix;
         }
 
@@ -1322,6 +1420,59 @@ public class YamlParser implements org.openrewrite.Parser {
         }
 
         return currentPrefix.toString();
+    }
+
+    /**
+     * YAML 1.2 allows tabs in the whitespace separating tokens, such as {@code key:\tvalue} or
+     * {@code -\titem}, and forbids them only in indentation. SnakeYAML follows YAML 1.1 and rejects a
+     * tab wherever it looks for the next token. Each such tab is swapped for a space, one rejection at
+     * a time, so only the tabs SnakeYAML trips on change. A tab in indentation is left alone, and the
+     * text comes back unchanged for SnakeYAML to report as before.
+     */
+    private static String replaceTabSeparators(String source) {
+        if (source.indexOf('\t') < 0) {
+            return source;
+        }
+        String scannable = source;
+        while (true) {
+            try {
+                Scanner scanner = new ScannerImpl(new StreamReader(scannable), new LoaderOptions());
+                while (!scanner.checkToken(Token.ID.StreamEnd)) {
+                    scanner.getToken();
+                }
+                return scannable;
+            } catch (ScannerException e) {
+                if (e.getProblemMark() == null || e.getProblem() == null ||
+                    !e.getProblem().contains("cannot start any token")) {
+                    return scannable;
+                }
+                // The mark counts code points, not chars
+                int tab = scannable.offsetByCodePoints(0, e.getProblemMark().getIndex());
+                if (tab >= scannable.length() || scannable.charAt(tab) != '\t' || isIndentation(scannable, tab)) {
+                    return scannable;
+                }
+                char[] chars = scannable.toCharArray();
+                for (int i = tab; i < chars.length && (chars[i] == '\t' || chars[i] == ' '); i++) {
+                    chars[i] = ' ';
+                }
+                scannable = new String(chars);
+            } catch (RuntimeException e) {
+                return scannable;
+            }
+        }
+    }
+
+    private static boolean isIndentation(String source, int index) {
+        for (int i = index - 1; i >= 0; i--) {
+            char c = source.charAt(i);
+            if (c == '\n' || c == '\r') {
+                return true;
+            }
+            if (c != ' ' && c != '\t') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Queue<List<Yaml.Directive>> preScanDirectives(String source) {

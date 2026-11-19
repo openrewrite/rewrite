@@ -2610,6 +2610,7 @@ def handle_generate(params: dict) -> dict:
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
+    from rewrite.rpc.receive_queue import get_java_type_name
     if isinstance(recipe, ScanningRecipe):
         # Use the persisted accumulator from the scan phase, or create new one if not available
         if recipe_id in _recipe_accumulators:
@@ -2626,7 +2627,10 @@ def handle_generate(params: dict) -> dict:
             sf_id = str(sf.id)
             local_objects[sf_id] = sf
             ids.append(sf_id)
-            source_file_types.append(sf.__class__.__module__ + '.' + sf.__class__.__name__)
+            # The host builds each file from this name, so it is the Java type the file is
+            # registered as, `org.openrewrite.python.tree.Py$CompilationUnit` for Python source.
+            source_file_types.append(get_java_type_name(type(sf))
+                                     or sf.__class__.__module__ + '.' + sf.__class__.__name__)
 
         return {'ids': ids, 'sourceFileTypes': source_file_types}
 

@@ -812,3 +812,45 @@ def test_source_path_is_not_relativized_against_an_inferred_project_root(tmp_pat
     # then
     assert server.local_objects[ids[0]].source_path == Path(source_path)
     assert observed["ty_root"] == str(tmp_path)
+
+
+def test_generate_names_a_python_file_by_its_java_type(monkeypatch):
+    """The host builds each generated file from the type the response names, so a Python source
+    file has to be named as the Java `Py$CompilationUnit` it is registered as. Named by its
+    Python class, the host read it as some other object and failed with `Expected
+    END_OF_OBJECT`, so no file a Python scanning recipe generated ever reached the run."""
+    import ast
+    from pathlib import Path
+
+    import rewrite.rpc.server as server
+    from rewrite import CategoryDescriptor, ScanningRecipe
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite.python._parser_visitor import ParserVisitor
+
+    class _WritesAModule(ScanningRecipe):
+        @property
+        def name(self): return "org.example.WritesAModule"
+        @property
+        def display_name(self): return "Writes a module"
+        @property
+        def description(self): return "Generates one Python source file."
+
+        def initial_value(self, ctx): return None
+
+        def scanner(self, acc):
+            from rewrite.visitor import TreeVisitor
+            return TreeVisitor.noop()
+
+        def generate(self, acc, ctx):
+            source = "x = 1\n"
+            cu = ParserVisitor(source, None, None).visit_Module(ast.parse(source))
+            return [cu.replace(_source_path=Path("pkg/generated.py"))]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_WritesAModule, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    prepared = server.handle_prepare_recipe({"id": "org.example.WritesAModule"})
+    response = server.handle_generate({"id": prepared["id"]})
+
+    assert response["sourceFileTypes"] == ["org.openrewrite.python.tree.Py$CompilationUnit"]

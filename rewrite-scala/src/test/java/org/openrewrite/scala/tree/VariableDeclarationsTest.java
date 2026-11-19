@@ -16,8 +16,18 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaParser;
+import org.openrewrite.scala.ScalaVisitor;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class VariableDeclarationsTest implements RewriteTest {
@@ -141,6 +151,95 @@ class VariableDeclarationsTest implements RewriteTest {
     void patternDeclaration() {
         rewriteRun(
           scala("val (a, b) = (1, 2)")
+        );
+    }
+
+    @Test
+    void commentsAroundPatternDefinition() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                private /* a /* b */ c */ val (a, b) /* d /* e */ f */ = /* g /* h */ i */ (1, 2)
+                private /* a /* b */ c */ lazy /* val */ val (c, d) = (1, 2)
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void patternDefinitionHoldingOnlyItsSourceTextStillPrints() {
+        String source = "object Test {\n  val (a, b) = (1, 2)\n}";
+        J cu = ScalaParser.builder().build().parse(source).map(J.class::cast).findFirst().orElseThrow();
+        J asWrittenBefore = new ScalaVisitor<Integer>() {
+            @Override
+            public J visitPatternDefinition(S.PatternDefinition patDef, Integer p) {
+                return new S.PatternDefinition(patDef.getId(), patDef.getPrefix(), patDef.getMarkers(),
+                  null, null, null, null, null, "val (a, b) = (1, 2)");
+            }
+        }.visitNonNull(cu, 0);
+
+        assertThat(((SourceFile) asWrittenBefore).printAll()).isEqualTo(source);
+        assertThat(new ScalaVisitor<Integer>().visitNonNull(asWrittenBefore, 0)).isSameAs(asWrittenBefore);
+    }
+
+    @Test
+    void patternDefinitionsHoldTheirPatternsAsTrees() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val (a, b) = (1, 2)
+                var Some(x) = Option(1)
+                private lazy val ((c, d), e) = ((1, 2), 3)
+                @deprecated val p @ (f, g) = (1, 2)
+                val h :: t = List(1, 2)
+                val K, L: Int = 3
+                val (m, n): (Int, Int) = (1, 2)
+                val _ = 4
+              }
+              trait Abstract {
+                val q, r: Int
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<String> shapes = new ArrayList<>();
+                List<String> boundTypes = new ArrayList<>();
+                new ScalaVisitor<Integer>() {
+                    @Override
+                    public J visitIdentifier(J.Identifier identifier, Integer p) {
+                        if (("a".equals(identifier.getSimpleName()) || "b".equals(identifier.getSimpleName())) &&
+                            identifier.getFieldType() != null) {
+                            boundTypes.add(identifier.getSimpleName() + ": " + identifier.getFieldType().getType());
+                        }
+                        return identifier;
+                    }
+
+                    @Override
+                    public J visitPatternDefinition(S.PatternDefinition patDef, Integer p) {
+                        shapes.add((patDef.getModifiers().getLast().getType() == J.Modifier.Type.Final ? "final " : "") +
+                                   patDef.getModifiers().getLast().getKeyword() + " " + patDef.getPatterns().stream()
+                          .map(pattern -> pattern.getClass().getSimpleName()).collect(Collectors.joining(",")) +
+                                   (patDef.getTypeExpression() == null ? "" : " :") + (patDef.getInitializer() == null ? "" : " ="));
+                        return super.visitPatternDefinition(patDef, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(boundTypes).containsExactly("a: int", "b: int");
+                assertThat(shapes).containsExactly(
+                  "final val TuplePattern =",
+                  "var DeconstructionPattern =",
+                  "final val TuplePattern =",
+                  "final val Binding =",
+                  "final val DeconstructionPattern =",
+                  "final val Identifier,Identifier : =",
+                  "final val TuplePattern : =",
+                  "final val Wildcard =",
+                  "final val Identifier,Identifier :"
+                );
+            })
+          )
         );
     }
 

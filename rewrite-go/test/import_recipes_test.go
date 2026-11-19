@@ -1132,3 +1132,263 @@ func TestRemoveUnusedImports_KeepsImportAddedByEarlierRecipe(t *testing.T) {
 	`
 	spec.RewriteRun(t, Golang(before, after))
 }
+
+func TestImportEditing_RemoveFirstSingle(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import "fmt"
+import "os"
+`, `package main
+
+import "os"
+`))
+}
+
+func TestImportEditing_RemoveFirstGrouped(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt"
+)
+import "os"
+`, `package main
+
+import "os"
+`))
+}
+
+func TestImportEditing_RemoveLaterHead(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import "os"
+import (
+ "fmt"
+ "strings"
+)
+`, `package main
+
+import "os"
+import (
+ "strings"
+)
+`))
+}
+
+func TestImportEditing_RemoveGroupTail(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "os"
+ "fmt"
+)
+import "strings"
+`, `package main
+
+import (
+ "os"
+)
+import "strings"
+`))
+}
+
+func TestImportEditing_RemoveLastSingle(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import "os"
+import "fmt"
+`, `package main
+
+import "os"
+`))
+}
+
+func TestImportEditing_RemoveMiddle(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "os"
+)
+import "fmt"
+import "strings"
+`, `package main
+
+import (
+ "os"
+)
+import "strings"
+`))
+}
+
+func TestImportEditing_Cgo(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"}).RewriteRun(t, Golang(`package main
+
+/*
+#include <stdlib.h>
+*/
+import "C"
+`, `package main
+
+/*
+#include <stdlib.h>
+*/
+import "C"
+
+import "fmt"
+`))
+}
+
+func TestImportEditing_OrderComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.OrderImports{}).RewriteRun(t, Golang(`package main
+
+import (
+ "strings" // strings comment
+ "fmt" // fmt comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+ "strings" // strings comment
+)
+`))
+}
+
+func TestImportEditing_AddComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt" // fmt comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+ "strings"
+)
+`))
+}
+
+func TestImportEditing_RemoveUnusedDeclarations(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt"
+)
+import (
+ "os"
+ "strings"
+)
+
+var _ = strings.TrimSpace
+`, `package main
+
+import (
+ "strings"
+)
+
+var _ = strings.TrimSpace
+`))
+}
+
+func TestImportEditing_RemoveComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt" // fmt comment
+ "strings" // strings comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+)
+`))
+}
+
+func TestImportEditing_AddWithCgoLast(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import "fmt"
+
+/* cgo preamble */
+import "C"
+`, `package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+/* cgo preamble */
+import "C"
+`))
+}
+
+func TestImportEditing_AddWithCgoFirst(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+/* cgo preamble */
+import "C"
+
+import "fmt"
+`, `package main
+
+/* cgo preamble */
+import "C"
+
+import (
+	"fmt"
+	"strings"
+)
+`))
+}
+
+func TestImportEditing_OrderLeadingAndTrailingComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.OrderImports{}).RewriteRun(t, Golang(`package main
+
+import (
+ // strings docs
+ "strings" // strings comment
+ // fmt docs
+ "fmt" // fmt comment
+)
+`, `package main
+
+import (
+ // fmt docs
+ "fmt" // fmt comment
+ // strings docs
+ "strings" // strings comment
+)
+`))
+}
+
+func TestImportEditing_ClosingComment(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt" // fmt comment
+ // closing comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+ "strings"
+ // closing comment
+)
+`))
+}
+
+func TestImportEditing_PromoteComment(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import "fmt" // fmt comment
+`, `package main
+
+import (
+	"fmt" // fmt comment
+	"strings"
+)
+`))
+}

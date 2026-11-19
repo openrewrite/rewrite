@@ -17,6 +17,7 @@
 package parser
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -517,6 +518,7 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		is := spec.(*ast.ImportSpec)
 		rp := java.RightPadded[*java.Import]{Element: ctx.mapImportSpec(is)}
 		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, first, i))
+		takeImportComment(ctx, &rp, is)
 		elements = append(elements, rp)
 	}
 
@@ -573,6 +575,7 @@ func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]java
 		}
 		rp := java.RightPadded[*java.Import]{Element: imp}
 		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, decl, j))
+		takeImportComment(ctx, &rp, is)
 		*elements = append(*elements, rp)
 	}
 }
@@ -594,7 +597,7 @@ func importSpecBoundary(ctx *parseContext, decl *ast.GenDecl, i int) int {
 // way closeSpecGroup does for a declaration group.
 func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java.Space) []java.RightPadded[*java.Import] {
 	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
-		elements[n-1].After = closeParen
+		elements[n-1].After = appendImportSpace(elements[n-1].After, closeParen)
 		return elements
 	}
 	if len(elements) == 0 && len(closeParen.Comments()) == 0 && closeParen.Whitespace() == "" {
@@ -604,6 +607,34 @@ func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java
 		Element: &java.Import{ID: uuid.New(), Qualid: importQualid(java.EmptySpace, "", nil)},
 		After:   closeParen,
 	})
+}
+
+func appendImportSpace(before, after java.Space) java.Space {
+	comments := append([]java.Comment(nil), before.Comments()...)
+	if len(comments) == 0 {
+		return after
+	}
+	comments[len(comments)-1].Suffix += after.Whitespace()
+	comments = append(comments, after.Comments()...)
+	return java.MakeSpace(comments, before.Whitespace())
+}
+
+func takeImportComment(ctx *parseContext, rp *java.RightPadded[*java.Import], spec *ast.ImportSpec) {
+	if spec.Comment == nil || java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+		return
+	}
+	end := ctx.file.Offset(spec.Comment.End())
+	last := spec.Comment.List[len(spec.Comment.List)-1]
+	if strings.HasPrefix(last.Text, "/*") {
+		start := ctx.file.Offset(last.Pos())
+		if close := bytes.Index(ctx.src[start:], []byte("*/")); close >= 0 {
+			end = start + close + 2
+		}
+	}
+	if end > ctx.cursor {
+		rp.After = java.ParseSpace(string(ctx.src[ctx.cursor:end]))
+		ctx.cursor = end
+	}
 }
 
 // mapImportSpec maps a single import spec.
@@ -2435,6 +2466,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 			Left:     left,
 			Operator: java.LeftPadded[golang.BinaryOperator]{Before: opPrefix, Element: golang.BinAndNot},
 			Right:    right,
+			Type:     ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -3371,6 +3403,7 @@ func (ctx *parseContext) mapKeyValueExpr(expr *ast.KeyValueExpr) java.Expression
 		Prefix: prefix,
 		Key:    key,
 		Value:  java.LeftPadded[java.Expression]{Before: colonPrefix, Element: value},
+		Type:   ctx.valueTypeOf(expr.Value),
 	}
 }
 
@@ -3429,6 +3462,7 @@ func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) java.Expression {
 		High:         java.RightPadded[java.Expression]{Element: high, After: colon2Prefix},
 		Max:          max,
 		CloseBracket: rbrackPrefix,
+		Type:         ctx.valueTypeOf(expr),
 	}
 }
 

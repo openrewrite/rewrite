@@ -17,6 +17,7 @@ package org.openrewrite.marketplace;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 
 import java.util.List;
@@ -92,6 +93,23 @@ class RecipeMarketplaceReaderTest {
             org.assertj.core.api.Assertions.tuple("groupId", "Group ID", "The group ID of the dependency", true, "org.openrewrite"),
             org.assertj.core.api.Assertions.tuple("artifactId", "Artifact ID", "The artifact ID of the dependency", false, null)
           );
+    }
+
+    @Test
+    void secretOptionRoundTripsMasked() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,options,category,ecosystem,packageName
+          org.example.Login,Login,"[{""name"":""password"",""type"":""String"",""displayName"":""Password"",""description"":""The password"",""required"":false,""secret"":true,""value"":""hunter2""}]",Example,maven,org.example:example
+          """);
+        assertThat(marketplace.getAllRecipes().iterator().next().getOptions().getFirst().isSecret()).isTrue();
+
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        assertThat(writtenCsv).doesNotContain("hunter2").contains("""
+          ""secret"":true""");
+        assertThat(new RecipeMarketplaceReader().fromCsv(writtenCsv).getAllRecipes().iterator().next()
+          .getOptions().getFirst())
+          .extracting("secret", "value")
+          .containsExactly(true, OptionDescriptor.REDACTED);
     }
 
     @Test

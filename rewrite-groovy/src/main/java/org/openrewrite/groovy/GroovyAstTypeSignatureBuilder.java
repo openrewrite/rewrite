@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import org.codehaus.groovy.ast.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
+import org.openrewrite.java.tree.JavaType;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -173,6 +174,17 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String variableSignature(String name) {
         return "{undefined}{name=" + name + '}';
+    }
+
+    public String propertySignature(JavaType.FullyQualified owner, String name) {
+        return owner.getFullyQualifiedName() + "{name=" + name + ",property}";
+    }
+
+    /**
+     * The value type tells apart same-named keys of maps of one class.
+     */
+    public String mapKeySignature(JavaType.FullyQualified owner, String name, ClassNode valueType) {
+        return owner.getFullyQualifiedName() + "{name=" + name + ",key,type=" + signature(valueType) + '}';
     }
 
     /**

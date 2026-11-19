@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,57 +16,93 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-class JavaTemplateTest8Test implements RewriteTest {
+@SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody", "UnusedAssignment", "ResultOfMethodCallIgnored"})
+class JavaTemplateContextSensitiveTest implements RewriteTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
-    void replaceMethodInvocationInsideReturn() {
+    void assignmentWithinIfPredicate() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("String.valueOf(#{any(String)})")
-                .build();
+              @Override
+              public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                  if ((assignment.getAssignment() instanceof J.Literal) &&
+                    ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
+                      return JavaTemplate.builder("value = 0")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), assignment.getCoordinates().replace());
+                  }
+                  return assignment;
+              }
+          })),
+          java(
+            """
+              class A {
+                  void foo() {
+                      double value = 0;
+                      if ((value = 1) == 0) {}
+                  }
+              }
+              """,
+            """
+              class A {
+                  void foo() {
+                      double value = 0;
+                      if ((value = 0) == 0) {}
+                  }
+              }
+              """
+          )
+        );
+    }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1092")
+    @Test
+    void methodInvocationReplacementHasContextAboutLocalVariables() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("toString")) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(),
-                        method.getSelect());
+                  if ("clear".equals(method.getSimpleName())) {
+                      return JavaTemplate.builder("words.add(\"jon\");")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
                   }
                   return method;
               }
           })),
           java(
             """
+              import java.util.List;
               class Test {
-                  String test(String s) {
-                      return s.toString();
+                  List<String> words;
+                  void test() {
+                      words.clear();
                   }
               }
               """,
             """
+              import java.util.List;
               class Test {
-                  String test(String s) {
-                      return String.valueOf(s);
+                  List<String> words;
+                  void test() {
+                      words.add("jon");
                   }
               }
               """
@@ -74,74 +110,50 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
     @Test
-    void replaceNewClassInsideReturn() {
+    void replaceExpressionInSwitchExpressionRuleArm() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("new StringBuilder(#{any(String)})")
-                .build();
-
-              @Override
-              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                  newClass = super.visitNewClass(newClass, ctx);
-                  if (newClass.getClazz() != null &&
-                      newClass.getClazz().toString().equals("StringBuffer") &&
-                      newClass.getArguments().size() == 1) {
-                      return t.apply(getCursor(), newClass.getCoordinates().replace(),
-                        newClass.getArguments().get(0));
-                  }
-                  return newClass;
-              }
-          })),
-          java(
-            """
-              class Test {
-                  CharSequence test(String s) {
-                      return new StringBuffer(s);
-                  }
-              }
-              """,
-            """
-              class Test {
-                  CharSequence test(String s) {
-                      return new StringBuilder(s);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/7153")
-    @Test
-    void replaceMethodInvocationInsideTypeCast() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("String.valueOf(#{any(String)})")
-                .build();
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("toString")) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(),
-                        method.getSelect());
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
                   }
-                  return method;
+                  return m;
               }
           })),
           java(
             """
-              class Test {
-                  Object test(String s) {
-                      return (Object) s.toString();
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Collections.emptyList();
+                          default -> null;
+                      };
                   }
               }
               """,
             """
-              class Test {
-                  Object test(String s) {
-                      return (Object) String.valueOf(s);
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> List.of();
+                          default -> null;
+                      };
                   }
               }
               """
@@ -149,38 +161,172 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/7153")
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
     @Test
-    void replaceNewClassInsideTypeCast() {
+    void replaceExpressionInSwitchExpressionColonArm() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("new StringBuilder(#{any(String)})")
-                .build();
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
 
               @Override
-              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                  newClass = super.visitNewClass(newClass, ctx);
-                  if (newClass.getClazz() != null &&
-                      newClass.getClazz().toString().equals("StringBuffer") &&
-                      newClass.getArguments().size() == 1) {
-                      return t.apply(getCursor(), newClass.getCoordinates().replace(),
-                        newClass.getArguments().get(0));
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0: yield Collections.emptyList();
+                          default: yield null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0: yield List.of();
+                          default: yield null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionPreservesUnrelatedArms() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Arrays.asList("a");
+                          case 1 -> Collections.emptyList();
+                          case 2 -> Arrays.asList("b");
+                          default -> null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Arrays.asList("a");
+                          case 1 -> List.of();
+                          case 2 -> Arrays.asList("b");
+                          default -> null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1339")
+    @Test
+    void templateStatementIsWithinTryWithResourcesBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                  var md = getCursor().firstEnclosing(J.MethodDeclaration.class);
+                  if (md != null && "createBis".equals(md.getSimpleName())) {
+                      return newClass;
+                  }
+                  if (newClass.getType() != null &&
+                      "java.io.ByteArrayInputStream".equals(TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName()) &&
+                      !newClass.getArguments().isEmpty()) {
+                      return JavaTemplate.builder("createBis(#{anyArray()})")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().getFirst());
                   }
                   return newClass;
               }
           })),
           java(
             """
+              import java.io.*;
+              import java.nio.charset.StandardCharsets;
+
               class Test {
-                  Object test(String s) {
-                      return (CharSequence) new StringBuffer(s);
+                  ByteArrayInputStream createBis(byte[] bytes) {
+                      return new ByteArrayInputStream(bytes);
+                  }
+
+                  void doSomething() {
+                      String sout = "";
+                      try (BufferedReader br = new BufferedReader(new FileReader("file.txt"))) {
+                          new ByteArrayInputStream("bytes".getBytes(StandardCharsets.UTF_8));
+                      } catch (IOException e) {
+                          e.printStackTrace();
+                      }
                   }
               }
               """,
             """
+              import java.io.*;
+              import java.nio.charset.StandardCharsets;
+
               class Test {
-                  Object test(String s) {
-                      return (CharSequence) new StringBuilder(s);
+                  ByteArrayInputStream createBis(byte[] bytes) {
+                      return new ByteArrayInputStream(bytes);
+                  }
+
+                  void doSomething() {
+                      String sout = "";
+                      try (BufferedReader br = new BufferedReader(new FileReader("file.txt"))) {
+                          createBis("bytes".getBytes(StandardCharsets.UTF_8));
+                      } catch (IOException e) {
+                          e.printStackTrace();
+                      }
                   }
               }
               """
@@ -500,150 +646,6 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void parameterizedMatch() {
-        JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<String>)}")
-          .build();
-
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
-                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
-                  if (template.matches(cursor)) {
-                      return SearchResult.found(nameTree);
-                  }
-                  return super.visitTypeName(nameTree, ctx);
-              }
-          })),
-          java(
-            """
-              import java.util.List;
-              class Test {
-                  List<Object> o;
-                  List<String> s;
-                  List<Number> n;
-                  List<Integer> i;
-                  List<java.lang.Object> qo;
-                  List<java.lang.String> qs;
-                  List<java.lang.Number> qn;
-                  List<java.lang.Integer> qi;
-              }
-              """,
-            """
-              import java.util.List;
-              class Test {
-                  List<Object> o;
-                  /*~~>*/List<String> s;
-                  List<Number> n;
-                  List<Integer> i;
-                  List<java.lang.Object> qo;
-                  /*~~>*/List<java.lang.String> qs;
-                  List<java.lang.Number> qn;
-                  List<java.lang.Integer> qi;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void parameterizedMatchWithBounds() {
-        JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<? extends java.lang.Number>)}")
-          .build();
-
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (getCursor().getValue() != nameTree && template.matches(new Cursor(getCursor(), nameTree))) {
-                      return SearchResult.found(nameTree);
-                  }
-                  return super.visitTypeName(nameTree, ctx);
-              }
-          })),
-          java(
-            """
-              import java.util.List;
-              class Test {
-                  List<Object> o;
-                  List<String> s;
-                  List<Number> n;
-                  List<Integer> i;
-                  List<java.lang.Object> qo;
-                  List<java.lang.String> qs;
-                  List<java.lang.Number> qn;
-                  List<java.lang.Integer> qi;
-              }
-              """,
-            """
-              import java.util.List;
-              class Test {
-                  List<Object> o;
-                  List<String> s;
-                  /*~~>*/List<Number> n;
-                  /*~~>*/List<Integer> i;
-                  List<java.lang.Object> qo;
-                  List<java.lang.String> qs;
-                  /*~~>*/List<java.lang.Number> qn;
-                  /*~~>*/List<java.lang.Integer> qi;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void parameterizedArrayMatch() {
-        JavaTemplate template = JavaTemplate.builder("#{anyArray(java.util.List<String>)}")
-          .build();
-
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
-                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
-                  if (template.matches(cursor)) {
-                      return SearchResult.found(nameTree);
-                  }
-                  return super.visitTypeName(nameTree, ctx);
-              }
-          })),
-          java(
-            """
-              import java.util.List;
-              class Test {
-                  List<Object>[] o;
-                  List<String>[] s;
-                  List<Number>[] n;
-                  List<Integer>[] i;
-                  List<java.lang.Object>[] qo;
-                  List<java.lang.String>[] qs;
-                  List<java.lang.Number>[] qn;
-                  List<java.lang.Integer>[] qi;
-              }
-              """,
-            """
-              import java.util.List;
-              class Test {
-                  List<Object>[] o;
-                  /*~~>*/List<String>[] s;
-                  List<Number>[] n;
-                  List<Integer>[] i;
-                  List<java.lang.Object>[] qo;
-                  /*~~>*/List<java.lang.String>[] qs;
-                  List<java.lang.Number>[] qn;
-                  List<java.lang.Integer>[] qi;
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void replaceContextSensitiveMethodInvocationInAssignmentWithLocalClassType() {
         rewriteRun(
@@ -706,212 +708,6 @@ class JavaTemplateTest8Test implements RewriteTest {
               """
           )
         );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/8327")
-    @Test
-    void unreachableCoordinatesFailLoudly() {
-        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
-          .parse(
-            """
-              class Test {
-                  void test() {
-                      int n = 1;
-                      System.out.println(hashCode());
-                  }
-              }
-              """
-          )
-          .map(J.CompilationUnit.class::cast)
-          .findFirst()
-          .orElseThrow();
-
-        // The coordinate names a statement that is not inside `scope`, so nothing can ever match it
-        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                if ("println".equals(method.getSimpleName())) {
-                    J.MethodDeclaration enclosing = getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class);
-                    Statement sibling = requireNonNull(enclosing.getBody()).getStatements().getFirst();
-                    return JavaTemplate.apply("0", getCursor(), sibling.getCoordinates().replace());
-                }
-                return super.visitMethodInvocation(method, p);
-            }
-        }.visit(cu, 0))
-          .rootCause()
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("JavaTemplate coordinates were never matched")
-          .hasMessageContaining(J.VariableDeclarations.class.getName());
-    }
-
-    @Test
-    void coordinatesNestedInArgumentsAreReachable() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("println".equals(method.getSimpleName()) && method.getArguments().getFirst() instanceof J.MethodInvocation) {
-                      return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
-          java(
-            """
-              class Test {
-                  void test() {
-                      System.out.println(hashCode());
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void test() {
-                      System.out.println(0);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addElseBranchToAnIfThatHasNone() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.If visitIf(J.If iff, ExecutionContext ctx) {
-                  if (iff.getElsePart() != null) {
-                      return iff;
-                  }
-                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
-              }
-          })),
-          java(
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      }
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      } else if (true) {
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addElseBranchExtendsAnExistingChain() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.If visitIf(J.If iff, ExecutionContext ctx) {
-                  // Only the head of the chain, and only while it still falls through to a plain else
-                  if (getCursor().getParentTreeCursor().getValue() instanceof J.If.Else ||
-                      iff.getElsePart() == null || !(iff.getElsePart().getBody() instanceof J.Block)) {
-                      return super.visitIf(iff, ctx);
-                  }
-                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
-              }
-          })),
-          java(
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      } else {
-                          System.out.println(n);
-                      }
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      } else if (true) {
-                      } else {
-                          System.out.println(n);
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addElseBranchWithABlockMakesAPlainElse() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.If visitIf(J.If iff, ExecutionContext ctx) {
-                  if (iff.getElsePart() != null) {
-                      return iff;
-                  }
-                  return JavaTemplate.apply("{\n    System.out.println(\"fallthrough\");\n}", getCursor(),
-                    iff.getCoordinates().addElseBranch());
-              }
-          })),
-          java(
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      }
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      } else {
-                          System.out.println("fallthrough");
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addElseBranchRejectsANonIfWhenAnElseAlreadyExists() {
-        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
-          .parse(
-            """
-              class Test {
-                  void test(int n) {
-                      if (n == 1) {
-                      } else {
-                      }
-                  }
-              }
-              """
-          )
-          .map(J.CompilationUnit.class::cast)
-          .findFirst()
-          .orElseThrow();
-
-        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
-            @Override
-            public J.If visitIf(J.If iff, Integer p) {
-                return JavaTemplate.apply("{\n}", getCursor(), iff.getCoordinates().addElseBranch());
-            }
-        }.visit(cu, 0))
-          .rootCause()
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("requires a template that produces an `if`");
     }
 
     @Test

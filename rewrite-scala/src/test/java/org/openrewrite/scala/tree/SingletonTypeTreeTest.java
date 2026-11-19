@@ -51,4 +51,18 @@ class SingletonTypeTreeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void literalTypeHasNoTypeSuffix() {
+        rewriteRun(
+          scala(
+            """
+              object O {
+                val s: "a=b" = "a=b"
+                def f(n: -1): -1 = n
+              }
+              """
+          )
+        );
+    }
 }
