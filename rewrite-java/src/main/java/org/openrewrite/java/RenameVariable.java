@@ -166,11 +166,37 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         /**
-         * Whether the identifier is in a Javadoc and is not the name of a method, as it is in {@code {@link #name()}}.
+         * Whether the identifier in a Javadoc links to the field. Attribution tells where it resolved the link.
+         * Where it did not, the link means the class its qualifier names, or without one a class it is written in.
          */
         private boolean isJavadocFieldReference(Cursor parent, J.Identifier ident) {
-            return getCursor().firstEnclosing(Javadoc.class) != null &&
-                   !(parent.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) parent.getValue()).getName() == ident);
+            JavaType.Variable field = renameVariable.getVariableType();
+            JavaType.FullyQualified owner = field == null ? null : TypeUtils.asFullyQualified(field.getOwner());
+            Object tree = parent.getValue();
+            if (owner == null || getCursor().firstEnclosing(Javadoc.class) == null ||
+                tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getName() == ident) {
+                return false;
+            }
+            if (tree instanceof J.MemberReference && ((J.MemberReference) tree).getReference() == ident) {
+                J.MemberReference link = (J.MemberReference) tree;
+                if (link.getVariableType() != null || link.getMethodType() != null) {
+                    return link.getVariableType() != null && TypeUtils.isOfType(link.getVariableType(), field);
+                }
+                Expression qualifier = link.getContaining();
+                if (!(qualifier instanceof J.Identifier && ((J.Identifier) qualifier).getSimpleName().isEmpty())) {
+                    JavaType.FullyQualified named = TypeUtils.asFullyQualified(qualifier.getType());
+                    return named != null && named.getFullyQualifiedName().equals(owner.getFullyQualifiedName());
+                }
+            }
+            for (Cursor c = parent; c != null; c = c.getParent()) {
+                if (c.getValue() instanceof J.ClassDeclaration) {
+                    JavaType.FullyQualified enclosing = ((J.ClassDeclaration) c.getValue()).getType();
+                    if (enclosing != null && enclosing.getFullyQualifiedName().equals(owner.getFullyQualifiedName())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /**

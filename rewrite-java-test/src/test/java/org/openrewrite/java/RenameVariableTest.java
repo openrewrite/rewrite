@@ -1756,6 +1756,61 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
+    void renamingAFieldFollowsOnlyTheJavadocLinksThatResolveToIt() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("count", "total", false)),
+          java(
+            """
+              /**
+               * Holds {@link #count}, unlike {@link Other#count}.
+               */
+              public class A<T> {
+                  int count;
+
+                  class Inner {
+                      /**
+                       * Reads {@link #count}.
+                       */
+                      void m() {
+                      }
+                  }
+              }
+
+              /**
+               * Reads {@link A#count}.
+               */
+              class Other {
+                  int count;
+              }
+              """,
+            """
+              /**
+               * Holds {@link #total}, unlike {@link Other#count}.
+               */
+              public class A<T> {
+                  int total;
+
+                  class Inner {
+                      /**
+                       * Reads {@link #total}.
+                       */
+                      void m() {
+                      }
+                  }
+              }
+
+              /**
+               * Reads {@link A#total}.
+               */
+              class Other {
+                  int count;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void renamingAFieldKeepsAJavadocLinkToAMethodOfItsName() {
         rewriteRun(
           spec -> spec.recipe(renameVariableTest("count", "total", false)),
