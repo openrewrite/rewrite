@@ -79,7 +79,8 @@ public class ScalaScopeService extends ScopeService {
                     String name = ((J.Import) statement).getQualid().getSimpleName();
                     if (!"_".equals(name) && !"*".equals(name)) {
                         for (Scope.Namespace namespace : Scope.Namespace.values()) {
-                            bindings.add(new Scope.Binding(anchor, name, namespace, scope, ((J.Import) statement).getQualid().getType(), this));
+                            bindings.add(new Scope.Binding(anchor, name, namespace, scope,
+                                    ((J.Import) statement).getQualid().getType(), this));
                         }
                     }
                 }
@@ -124,6 +125,15 @@ public class ScalaScopeService extends ScopeService {
             return null;
         }
         return super.namespaceOf(identifier);
+    }
+
+    /**
+     * Scala has no static context. A class, trait or object nested in a class has the instance of the outer one,
+     * and an object's members belong to the one instance there is.
+     */
+    @Override
+    public boolean isStaticContext(Cursor cursor) {
+        return false;
     }
 
     @Override

@@ -22,6 +22,7 @@ import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.marker.KObject;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.tree.K;
 
@@ -95,10 +96,15 @@ public class KotlinScopeService extends ScopeService {
 
     @Override
     public boolean isStaticContext(Cursor cursor) {
-        if (cursor.getValue() instanceof J.ClassDeclaration && cursor.getParentTreeCursor().getValue() instanceof J.Block &&
-            cursor.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
-            // A class or object nested in a class has an instance of the outer class only when declared `inner`
-            return !hasModifier(cursor.getValue(), "inner");
+        if (cursor.getValue() instanceof J.ClassDeclaration
+                && cursor.getParentTreeCursor().getValue() instanceof J.Block) {
+            Object outer = cursor.getParentTreeCursor().getParentTreeCursor().getValue();
+            if (outer instanceof J.ClassDeclaration) {
+                // A class or object nested in a class has an instance of the outer class only when declared `inner`.
+                // Nested in an object, it always has the one instance there is.
+                return !hasModifier(cursor.getValue(), "inner") &&
+                       !((J.ClassDeclaration) outer).getMarkers().findFirst(KObject.class).isPresent();
+            }
         }
         return super.isStaticContext(cursor);
     }
@@ -132,8 +138,8 @@ public class KotlinScopeService extends ScopeService {
             if (statement instanceof J.ClassDeclaration && hasModifier((J.ClassDeclaration) statement, "companion")) {
                 for (Scope.Binding member : bindings(new Cursor(body, statement))) {
                     if (member.getTree() instanceof J.Identifier && member.getNamespace() != Scope.Namespace.TYPE) {
-                        bindings.add(new Scope.Binding(member.getCursor(), member.getName(), member.getNamespace(), scope,
-                                member.getType(), this));
+                        bindings.add(new Scope.Binding(member.getCursor(), member.getName(), member.getNamespace(),
+                                scope, member.getType(), this));
                     }
                 }
             }

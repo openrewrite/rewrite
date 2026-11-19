@@ -1985,9 +1985,11 @@ class ScopeTest implements RewriteTest {
                   void readsLocalAssignedBetween(int p) { Object o = before(); p = 2; use(p); }
                   void readsFieldAssignedBetween() { Object o = before(); this.field = 2; use(field); }
                   void assignsInItsOwnStatement(int p) { Object o = before(); use(p = 3); }
+                  void readsQualifiedFieldAssignedBetween() { Object o = before(); field = 2; use(this.field); }
                   void readsFieldWithACallBetween() { Object o = before(); other(); use(field); }
                   void standsInTheStatementItself(int p) { use(before() == null ? p : 0); }
                   void standsBeforeTheStatement(int p) { use(p); Object o = before(); }
+                  void namesThisOfAClassBetween() { Object o = before(); new Object() { void m() { use(this); } }; }
                   Object before() { return null; }
                   void other() {}
                   void use(Object read) {}
@@ -2003,9 +2005,11 @@ class ScopeTest implements RewriteTest {
                   /*~~(no)~~>*/void readsLocalAssignedBetween(int p) { Object o = before(); p = 2; use(p); }
                   /*~~(no)~~>*/void readsFieldAssignedBetween() { Object o = before(); this.field = 2; use(field); }
                   /*~~(no)~~>*/void assignsInItsOwnStatement(int p) { Object o = before(); use(p = 3); }
+                  /*~~(no)~~>*/void readsQualifiedFieldAssignedBetween() { Object o = before(); field = 2; use(this.field); }
                   /*~~(yes)~~>*/void readsFieldWithACallBetween() { Object o = before(); other(); use(field); }
                   /*~~(yes)~~>*/void standsInTheStatementItself(int p) { use(before() == null ? p : 0); }
                   /*~~(no)~~>*/void standsBeforeTheStatement(int p) { use(p); Object o = before(); }
+                  /*~~(no)~~>*/void namesThisOfAClassBetween() { Object o = before(); new Object() { void m() { use(this); } }; }
                   Object before() { return null; }
                   void other() {}
                   void use(Object read) {}
@@ -2177,6 +2181,80 @@ class ScopeTest implements RewriteTest {
             Object binding = recipeSide.getMethod("getBinding").invoke(recipeSide.getConstructor(Cursor.class).newInstance(read));
             assertThat((Optional<?>) binding).containsInstanceOf(Scope.Binding.class);
         }
+    }
+
+    @Test
+    void recipeSideMatcherAsksTheHostScopeAcrossTheRecipeClassLoader() throws Exception {
+        // The class name carries no field type, so the matcher asks the scope service what it names
+        Cursor className = lastIdentifier(parse("class A {}"), "A");
+        URL ownRewriteJava = Scope.class.getProtectionDomain().getCodeSource().getLocation();
+        try (RecipeClassLoader recipeLoader = new RecipeClassLoader(new URL[]{ownRewriteJava}, getClass().getClassLoader())) {
+            Class<?> recipeSide = recipeLoader.loadClass(VariableAccess.Matcher.class.getName());
+            assertThat(recipeSide).isNotSameAs(VariableAccess.Matcher.class);
+            Object access = recipeSide.getMethod("get", Cursor.class).invoke(recipeSide.getConstructor().newInstance(), className);
+            assertThat((Optional<?>) access).isEmpty();
+        }
+    }
+
+    @Test
+    void overloadCanBeReferencedWhicheverIsDeclaredFirst() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> {
+              Scope classScope = scope;
+              while (!(classScope.getTree() instanceof J.ClassDeclaration)) {
+                  classScope = classScope.enclosing().orElseThrow();
+              }
+              return classScope.getBindings().stream()
+                .filter(b -> "overloaded".equals(b.getName()))
+                .map(b -> String.valueOf(scope.canReference(b)))
+                .collect(joining(", "));
+          })),
+          java(
+            """
+              class A {
+                  void overloaded() {}
+                  void overloaded(int i) {}
+                  void m() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A {
+                  void overloaded() {}
+                  void overloaded(int i) {}
+                  void m() {
+                      /*~~(true, true)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberOfAnInterfaceIsAStaticContextWithoutTheModifier() {
+        @Language("java") String source =
+          """
+            interface A {
+                static int use(String row, Object read) { return 0; }
+                int instMethod();
+                int CONSTANT =
+                        use("interfaceFieldInitializer", instMethod());
+                class Nested {
+                    int m() {
+                        return use("classNestedInInterface", instMethod());
+                    }
+                }
+                default int m() {
+                    return use("defaultMethod", instMethod());
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly("classNestedInInterface", "interfaceFieldInitializer");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
     }
 
     @Test

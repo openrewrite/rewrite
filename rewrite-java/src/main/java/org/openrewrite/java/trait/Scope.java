@@ -191,7 +191,11 @@ public class Scope implements Trait<J> {
      * not checked.
      */
     public boolean canReference(Binding binding) {
-        if (!lookup(binding.name, binding.namespace).filter(binding::equals).isPresent()) {
+        Binding innermost = lookup(binding.name, binding.namespace).orElse(null);
+        // A scope binds each overload of a method, and a call by the name reaches any of them
+        if (innermost == null || !(innermost.equals(binding) ||
+                                   binding.namespace == Namespace.METHOD && isTree(innermost.scope, binding.scope) &&
+                                   isVisible(binding))) {
             return false;
         }
         if (binding.isLocal()) {
@@ -248,7 +252,8 @@ public class Scope implements Trait<J> {
         }
         if (member.getId().equals(declared.getId())) {
             return declarator instanceof J.VariableDeclarations.NamedVariable &&
-                   indexOf(declared.getVariables(), declarator) <= indexOf(declared.getVariables(), variable.getValue());
+                   indexOf(declared.getVariables(), declarator) <=
+                   indexOf(declared.getVariables(), variable.getValue());
         }
         List<Statement> members = body.<J.Block>getValue().getStatements();
         int at = indexOf(members, member);
@@ -499,7 +504,8 @@ public class Scope implements Trait<J> {
      * A local declared without an initializer and assigned once is effectively final, yet a lambda cannot assign it.
      * A local declared in one of the regions is inside for all of them. The body of a local or anonymous class is
      * held to the same rule. Java's rule is applied in every language, so the answer may be no where a language's
-     * lambdas capture more.
+     * lambdas capture more. Only captures are looked at. Whether the code throws a checked exception that the
+     * lambda's functional interface does not declare is the caller's to check.
      */
     public static boolean lambdaCanCapture(Collection<Cursor> regions) {
         List<References> within = new ArrayList<>();
@@ -528,7 +534,10 @@ public class Scope implements Trait<J> {
      * <ul>
      * <li>A name the expression reads is bound differently just before the statement, or not yet, as one is that
      * the statement or a later one declares.</li>
-     * <li>A statement from that one to the expression's own assigns a variable the expression reads.</li>
+     * <li>A statement from that one to the expression's own assigns a variable the expression reads, by its simple
+     * name or as a field selected from a class around it, as {@code this.name} is.</li>
+     * <li>The expression names {@code this} or {@code super} of a class whose body lies between it and the
+     * block.</li>
      * </ul>
      * Only names are looked at. A method called in between may change a field or an object the expression reads,
      * and what evaluating the expression earlier does to the statements it passes is the caller's to check.
@@ -546,7 +555,7 @@ public class Scope implements Trait<J> {
                 to = indexOf(statements, c.getValue());
             }
         }
-        if (from < 0 || to < from) {
+        if (from < 0 || to < from || crossesClassBody(expression, holder) && namesThisOrSuper(expression)) {
             return false;
         }
         List<References> between = new ArrayList<>();
@@ -562,7 +571,31 @@ public class Scope implements Trait<J> {
                 return false;
             }
         }
+        for (Binding field : selectedWithin(expression)) {
+            if (between.stream().anyMatch(references -> references.writesOf(field).findAny().isPresent())) {
+                return false;
+            }
+        }
         return true;
+    }
+
+    /**
+     * The fields of the classes around the region that its tree selects with a dot, as {@code this.name} does.
+     * {@link #referencedWithin(Cursor)} leaves them out, since such a name is not looked up in scope.
+     */
+    private static Set<Binding> selectedWithin(Cursor region) {
+        Set<Binding> selected = new LinkedHashSet<>();
+        new JavaIsoVisitor<Set<Binding>>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Set<Binding> found) {
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier) {
+                    new VariableAccess(getCursor()).getBinding().ifPresent(found::add);
+                }
+                return identifier;
+            }
+        }.visit(region.getValue(), selected, region.getParentOrThrow());
+        return selected;
     }
 
     /**
@@ -654,7 +687,9 @@ public class Scope implements Trait<J> {
             public @Nullable J preVisit(J tree, Integer p) {
                 boolean scope = service.isScope(getCursor());
                 if (tree == regionTree || scope) {
-                    List<Binding> bindings = scope ? new Scope(getCursor(), getCursor(), service).getBindings() : service.bindings(getCursor());
+                    List<Binding> bindings = scope ?
+                            new Scope(getCursor(), getCursor(), service).getBindings() :
+                            service.bindings(getCursor());
                     for (Binding binding : bindings) {
                         J anchor = binding.getTree();
                         if (anchor instanceof J.Identifier) {
@@ -818,9 +853,12 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * The source file's scope service, looked up once per traversal of that file.
+     * The scope service of the source file above the cursor, looked up once per traversal of that file. A recipe
+     * that asks the service itself, as whether a statement {@link ScopeService#completesNormally completes
+     * normally}, gets it here, since a source file class from a release without the service refuses it and this
+     * then gives Java's rules.
      */
-    static ScopeService service(Cursor cursor) {
+    public static ScopeService service(Cursor cursor) {
         for (Cursor c = cursor; c != null; c = c.getParent()) {
             if (c.getValue() instanceof JavaSourceFile) {
                 JavaSourceFile sourceFile = c.getValue();
@@ -1240,6 +1278,10 @@ public class Scope implements Trait<J> {
             }
             J anchor = getTree();
             if (!(anchor instanceof J.Identifier)) {
+                if (isLocal()) {
+                    // No identifier declares it, as with the parameter a lambda takes without naming it
+                    return !referencesInScope().writesOf(this).findAny().isPresent();
+                }
                 return type instanceof JavaType.Variable && ((JavaType.Variable) type).hasFlags(Flag.Final);
             }
             Cursor declaring = cursor.getParentTreeCursor();

@@ -377,6 +377,54 @@ class ScopeTraitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void impliedLambdaParameterIsReferencedFromANestedLambda() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("it").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              fun f(xs: List<Int>) {
+                  xs.forEach { xs.map { y -> here() } }
+              }
+              fun here() {}
+              """,
+            """
+              fun f(xs: List<Int>) {
+                  xs.forEach { xs.map { y -> /*~~(true)~~>*/here() } }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classNestedInAnObjectReferencesTheObjectsMembers() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("prop").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              object O {
+                  val prop = 1
+                  class Nested {
+                      fun m() { here() }
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              object O {
+                  val prop = 1
+                  class Nested {
+                      fun m() { /*~~(true)~~>*/here() }
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
     private static Recipe atHere(Function<Scope, String> question) {
         return toRecipe(() -> new JavaIsoVisitor<>() {
             @Override

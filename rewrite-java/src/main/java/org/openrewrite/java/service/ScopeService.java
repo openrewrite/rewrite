@@ -196,19 +196,34 @@ public class ScopeService {
 
     /**
      * Whether the tree at the cursor is a static context (JLS 8.1.3), so that code under it runs with no instance
-     * of the class around it. An enum constant is one for its arguments and its body.
+     * of the class around it. An enum constant is one for its arguments and its body. A class or field an
+     * interface declares is one without the modifier (JLS 9.3 and 9.5), which its attribution tells.
      */
     public boolean isStaticContext(Cursor cursor) {
         Object tree = cursor.getValue();
         if (tree instanceof J.ClassDeclaration) {
             J.ClassDeclaration classDeclaration = (J.ClassDeclaration) tree;
             return classDeclaration.hasModifier(J.Modifier.Type.Static) ||
-                   classDeclaration.getKind() != J.ClassDeclaration.Kind.Type.Class;
+                   classDeclaration.getKind() != J.ClassDeclaration.Kind.Type.Class ||
+                   classDeclaration.getType() != null && classDeclaration.getType().hasFlags(Flag.Static);
         }
-        return tree instanceof J.MethodDeclaration && ((J.MethodDeclaration) tree).hasModifier(J.Modifier.Type.Static) ||
-               tree instanceof J.VariableDeclarations && ((J.VariableDeclarations) tree).hasModifier(J.Modifier.Type.Static) ||
+        return tree instanceof J.MethodDeclaration
+                && ((J.MethodDeclaration) tree).hasModifier(J.Modifier.Type.Static) ||
+               tree instanceof J.VariableDeclarations && isStaticField((J.VariableDeclarations) tree) ||
                tree instanceof J.Block && ((J.Block) tree).isStatic() ||
                tree instanceof J.EnumValue;
+    }
+
+    private static boolean isStaticField(J.VariableDeclarations declarations) {
+        if (declarations.hasModifier(J.Modifier.Type.Static)) {
+            return true;
+        }
+        for (J.VariableDeclarations.NamedVariable variable : declarations.getVariables()) {
+            if (variable.getVariableType() != null && variable.getVariableType().hasFlags(Flag.Static)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -357,14 +372,16 @@ public class ScopeService {
             for (JavaType.Variable field : membersOf(owner, true, null, true, JavaType.FullyQualified::getMembers,
                     JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
                 if ("*".equals(name) || field.getName().equals(name)) {
-                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field, this));
+                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope,
+                            field, this));
                     found = true;
                 }
             }
             for (JavaType.Method method : membersOf(owner, true, null, true, JavaType.FullyQualified::getMethods,
                     JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
                 if (!method.isConstructor() && ("*".equals(name) || method.getName().equals(name))) {
-                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method, this));
+                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope,
+                            method, this));
                     found = true;
                 }
             }
@@ -395,12 +412,14 @@ public class ScopeService {
             // processor generates
             for (JavaType.Variable field : type.getMembers()) {
                 if (fields.add(field.getName())) {
-                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field, this));
+                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field,
+                            this));
                 }
             }
             for (JavaType.Method method : type.getMethods()) {
                 if (!method.isConstructor() && methods.add(method.getName())) {
-                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method, this));
+                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method,
+                            this));
                 }
             }
         }
@@ -421,7 +440,8 @@ public class ScopeService {
                !Flag.hasFlags(flags, Flag.Private) && (fromPackage == null || fromPackage.equals(owner.getPackageName()));
     }
 
-    private void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean includeSelf,
+    private void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage,
+            boolean includeSelf,
                                              List<Scope.Binding> bindings) {
         JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
         if (sourceFile == null) {

@@ -185,6 +185,49 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     @Test
+    void nestingAndObjectsAreNoStaticContext() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (!"here".equals(m.getSimpleName())) {
+                      return m;
+                  }
+                  Scope scope = Scope.at(getCursor());
+                  return SearchResult.found(m, scope.lookup("prop").map(scope::canReference).map(String::valueOf).orElse("unbound"));
+              }
+          })),
+          scala(
+            """
+              class Outer {
+                val prop = 1
+                trait Inside {
+                  def m(): Unit = here()
+                }
+                def here(): Unit = ()
+              }
+              object Top extends Outer {
+                val copy = { here(); 1 }
+              }
+              """,
+            """
+              class Outer {
+                val prop = 1
+                trait Inside {
+                  def m(): Unit = /*~~(true)~~>*/here()
+                }
+                def here(): Unit = ()
+              }
+              object Top extends Outer {
+                val copy = { /*~~(true)~~>*/here(); 1 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void blockCanMoveAfterItsStatementUnlessALaterOneUsesItsNames() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
