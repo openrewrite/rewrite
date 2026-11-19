@@ -107,6 +107,12 @@ public class ReloadableJava25Parser implements JavaParser {
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
+        try {
+            // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
+            pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
