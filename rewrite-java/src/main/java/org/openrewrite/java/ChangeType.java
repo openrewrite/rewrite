@@ -534,14 +534,14 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         /**
-         * Whether changing this file would leave the original type's simple name spelled somewhere that no import
-         * binds. A file parsed without the original type on its classpath has use sites the LST gives no type, so
-         * they are not rewritten, while the import that binds their name is retired anyway - and the file then
-         * refers to a type it no longer imports. Such a file is left alone: its references cannot be seen, so there
-         * is nothing to migrate, and the missing attribution is the thing to fix.
+         * Whether changing this file would leave the original type's simple name spelled where no import binds it.
+         * A file parsed without the original type on its classpath has use sites the LST gives no type, so they are
+         * not rewritten while the import that binds their name is retired anyway, and the file is left referring to
+         * a type it no longer imports. Such a file is left alone; its references cannot be seen, so there is nothing
+         * to migrate.
          * <p>
-         * A target whose own or outermost simple name is the original's is no hazard, since its import binds the same
-         * name and the spelling keeps resolving. That is the case {@code #9889} covers.
+         * A target whose own or outermost simple name is the original's is no hazard: its import binds the same name,
+         * so the spelling keeps resolving. See https://github.com/openrewrite/rewrite/pull/9889.
          */
         private boolean wouldStrandTheOriginalName(JavaSourceFile cu) {
             String name = originalType.getClassName();
@@ -550,17 +550,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     name.equals(getTopLevelClassName(target).getClassName()))) {
                 return false;
             }
-            boolean importsOriginalByThatName = false;
-            for (J.Import anImport : cu.getImports()) {
-                if (!anImport.isStatic() && anImport.getAlias() == null &&
-                        name.equals(anImport.getQualid().getSimpleName()) &&
-                        TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(),
-                                originalType.getFullyQualifiedName())) {
-                    importsOriginalByThatName = true;
-                    break;
-                }
-            }
-            if (!importsOriginalByThatName) {
+            if (!importsOriginalAs(cu, name)) {
                 return false;
             }
             return new JavaIsoVisitor<AtomicBoolean>() {
@@ -579,6 +569,18 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     return ident;
                 }
             }.reduce(cu, new AtomicBoolean()).get();
+        }
+
+        private boolean importsOriginalAs(JavaSourceFile cu, String name) {
+            for (J.Import anImport : cu.getImports()) {
+                if (!anImport.isStatic() && anImport.getAlias() == null &&
+                        name.equals(anImport.getQualid().getSimpleName()) &&
+                        TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(),
+                                originalType.getFullyQualifiedName())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static boolean isDeclarationName(Object parent, J.Identifier ident) {

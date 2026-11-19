@@ -33,6 +33,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -4800,16 +4801,21 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
     /**
      * A source parsed without the original type on its classpath has use sites the LST gives no type, while its
-     * import still names the type. Strip the type from `@NotNull` to stand in for that.
+     * import still names the type. Strip the type from {@code @NotNull} to stand in for that.
+     *
+     * @param onlyTheFirst strip only the first, leaving the rest attributed, for a file the LST sees in part
      */
-    private static J.CompilationUnit withoutTypeOnNotNull(J.CompilationUnit cu) {
+    private static J.CompilationUnit withoutTypeOnNotNull(J.CompilationUnit cu, boolean onlyTheFirst) {
+        AtomicBoolean stripped = new AtomicBoolean();
         return (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, Integer p) {
                 if (annotation.getAnnotationType() instanceof J.Identifier &&
-                    "NotNull".equals(((J.Identifier) annotation.getAnnotationType()).getSimpleName())) {
+                    "NotNull".equals(((J.Identifier) annotation.getAnnotationType()).getSimpleName()) &&
+                    (!onlyTheFirst || stripped.compareAndSet(false, true))) {
                     return annotation.withAnnotationType(((J.Identifier) annotation.getAnnotationType()).withType(null));
                 }
                 return super.visitAnnotation(annotation, p);
@@ -4837,7 +4843,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.mapBeforeRecipe(ChangeTypeTest::withoutTypeOnNotNull)
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, false))
           )
         );
     }
@@ -4855,15 +4861,11 @@ class ChangeTypeTest implements RewriteTest {
               import org.jetbrains.annotations.NotNull;
 
               class A {
+                  private final @NotNull String unseen = "";
                   private final @NotNull String seen = "";
               }
               """,
-            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration m, Integer p) {
-                    return m;
-                }
-            }.visitNonNull(withoutTypeOnNotNull(cu), 0))
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, true))
           )
         );
     }
@@ -4883,7 +4885,7 @@ class ChangeTypeTest implements RewriteTest {
                   private final @NotNull String field = "";
               }
               """,
-            spec -> spec.mapBeforeRecipe(ChangeTypeTest::withoutTypeOnNotNull)
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, false))
           )
         );
     }
