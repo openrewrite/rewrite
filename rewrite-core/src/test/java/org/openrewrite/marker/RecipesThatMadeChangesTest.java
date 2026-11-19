@@ -106,6 +106,35 @@ class RecipesThatMadeChangesTest {
             tuple("filePattern", "**/*.java"));
     }
 
+    static class SecretOption extends Recipe {
+        @Option(displayName = "Password", description = "The password.", secret = true)
+        final String password;
+
+        SecretOption(String password) {
+            this.password = password;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Secret option";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Secret option.";
+        }
+    }
+
+    @Test
+    void secretOptionIsNotRecorded() {
+        Recipe received = roundTrip(RecipesThatMadeChanges.create(
+          List.of(new SecretOption("hunter2"))))
+          .getRecipes().iterator().next().get(0);
+
+        assertThat(received.getDescriptor().getOptions()).isEmpty();
+        assertThat(received.getInstanceName()).doesNotContain("hunter2");
+    }
+
     @Test
     void stackKeepsItsOrder() {
         RecipesThatMadeChanges marker = RecipesThatMadeChanges.create(
