@@ -20,8 +20,13 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -48,6 +53,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
     }
 
     private static class ReplaceConstantWithAnotherConstantVisitor extends JavaVisitor<ExecutionContext> {
+        private static final String OUTERMOST_NAME_TAKEN = "OUTERMOST_NAME_TAKEN";
 
         private final String existingOwningType;
         private final String constantName;
@@ -57,6 +63,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private final JavaType.FullyQualified newOwningEnumType;
         private final JavaType.FullyQualified newTargetType;
         private final String newConstantName;
+        private final JavaVisitor<ExecutionContext> shortenQualifiedReferences = new ShortenQualifiedReferences();
 
         public ReplaceConstantWithAnotherConstantVisitor(String existingFullyQualifiedConstantName, String fullyQualifiedConstantName) {
             this.existingOwningType = existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.'));
@@ -75,7 +82,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImports(sf, newOutermostType));
+                return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImports(sf, newOutermostType) &&
+                        !outermostNameTaken());
             }
             return super.visitFieldAccess(fieldAccess, ctx);
         }
@@ -107,20 +115,21 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
                     return identifier;
                 }
+                maybeShortenQualifiedReferences();
                 return new J.FieldAccess(Tree.randomId(), identifier.getPrefix(), Markers.EMPTY,
-                        FullyQualifyTypeReference.qualifiedName(newOwningType, Space.EMPTY, emptyList()),
+                        typeReference(newOwningType, Space.EMPTY, true),
                         JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOutermostType.getFullyQualifiedName(), false);
+                } else {
+                    maybeShortenQualifiedReferences();
                 }
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
-                Expression target = fieldAccess.getTarget();
+                Expression target = typeReference(newOwningType, fieldAccess.getTarget().getPrefix(),
+                        !hasNoConflictingImport);
                 J.Identifier name = fieldAccess.getName();
-                target = hasNoConflictingImport ?
-                        typeReference(newOwningType, target.getPrefix()) :
-                        FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
                 name = name
                         .withFieldType(newFieldType(fieldType))
                         .withSimpleName(newConstantName)
@@ -149,15 +158,65 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return fullyQualifiedName.substring(Math.max(fullyQualifiedName.lastIndexOf('.'), fullyQualifiedName.lastIndexOf('$')) + 1);
         }
 
-        private static Expression typeReference(JavaType.FullyQualified type, Space prefix) {
+        /// Every class in the reference is typed, which [ShortenFullyQualifiedTypeReferences] needs to recognize a
+        /// fully qualified outermost class.
+        private static Expression typeReference(JavaType.FullyQualified type, Space prefix, boolean fullyQualified) {
+            JavaType.FullyQualified owningClass = type.getOwningClass();
+            if (owningClass == null && fullyQualified) {
+                return FullyQualifyTypeReference.qualifiedName(type, prefix, emptyList());
+            }
             J.Identifier name = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                     simpleName(type.getFullyQualifiedName()), type, null);
-            JavaType.FullyQualified owningClass = type.getOwningClass();
             if (owningClass == null) {
                 return name.withPrefix(prefix);
             }
             return new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY,
-                    typeReference(owningClass, Space.EMPTY), JLeftPadded.build(name), type);
+                    typeReference(owningClass, Space.EMPTY, fullyQualified), JLeftPadded.build(name), type);
+        }
+
+        private void maybeShortenQualifiedReferences() {
+            if (!getAfterVisit().contains(shortenQualifiedReferences)) {
+                doAfterVisit(shortenQualifiedReferences);
+            }
+        }
+
+        /// Shortens the file's fully qualified references to the new outermost class when nothing else goes by its
+        /// name. It runs after the file's import removals, so the replacement that removes an old import's last use
+        /// also shortens what earlier replacements had to fully qualify. It checks for clashes itself, because
+        /// [ShortenFullyQualifiedTypeReferences] does not look at static imports.
+        private class ShortenQualifiedReferences extends JavaVisitor<ExecutionContext> {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof JavaSourceFile)) {
+                    return (J) tree;
+                }
+                JavaSourceFile sf = (JavaSourceFile) tree;
+                if (!hasNoConflictingImports(sf, newOutermostType) || otherClassTakesSimpleName(sf, newOutermostType)) {
+                    return sf;
+                }
+                List<J.FieldAccess> references = new ArrayList<>();
+                new JavaIsoVisitor<List<J.FieldAccess>>() {
+                    @Override
+                    public J.Import visitImport(J.Import import_, List<J.FieldAccess> found) {
+                        return import_;
+                    }
+
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, List<J.FieldAccess> found) {
+                        if (fieldAccess.isFullyQualifiedClassReference(newOutermostType.getFullyQualifiedName())) {
+                            found.add(fieldAccess);
+                            return fieldAccess;
+                        }
+                        return super.visitFieldAccess(fieldAccess, found);
+                    }
+                }.visit(sf, references);
+                ImportService importService = sf.service(ImportService.class);
+                J shortened = sf;
+                for (J.FieldAccess reference : references) {
+                    shortened = importService.shortenFullyQualifiedTypeReferencesIn(reference).visit(shortened, ctx);
+                }
+                return shortened;
+            }
         }
 
         private JavaType.Variable newFieldType(JavaType.Variable fieldType) {
@@ -182,6 +241,60 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         private boolean hasNoConflictingImports(@Nullable JavaSourceFile sf, JavaType.FullyQualified referencedType) {
             return hasNoConflictingImport(sf, referencedType) && hasNoConflictingImport(sf, newTargetType);
+        }
+
+        /// Kept on the source file's cursor, as the root cursor is shared by every file of a run.
+        private boolean outermostNameTaken() {
+            Cursor sfCursor = getCursor().dropParentUntil(t ->
+                    t instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(t));
+            return sfCursor.<Boolean>computeMessageIfAbsent(OUTERMOST_NAME_TAKEN, k -> otherClassTakesSimpleName(
+                    sfCursor.getValue() instanceof JavaSourceFile ? sfCursor.getValue() : null, newOutermostType));
+        }
+
+        /// Whether a class or type parameter the file declares, imports or uses already goes by `type`'s simple name,
+        /// also where [#hasNoConflictingImport] does not look, such as a class from the file's own package, a
+        /// statically imported nested class or a local class. Importing `type` would then clash with that class or
+        /// change what the name refers to. Types in use leave out imports, so an unused import is checked on its own.
+        private static boolean otherClassTakesSimpleName(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
+            if (sf == null) {
+                return false;
+            }
+            String simpleName = simpleName(type.getFullyQualifiedName());
+            for (J.Import anImport : sf.getImports()) {
+                if (anImport.getQualid().getSimpleName().equals(simpleName) &&
+                        !TypeUtils.isOfType(anImport.getQualid().getType(), type)) {
+                    return true;
+                }
+            }
+            for (JavaType typeInUse : sf.getTypesInUse().getTypesInUse()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeInUse);
+                if (fq != null && simpleName(fq.getFullyQualifiedName()).equals(simpleName) &&
+                        !TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(),
+                                type.getFullyQualifiedName())) {
+                    return true;
+                }
+            }
+            return new JavaIsoVisitor<AtomicBoolean>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
+                    if (classDecl.getSimpleName().equals(simpleName) &&
+                            !TypeUtils.isOfType(classDecl.getType(), type)) {
+                        found.set(true);
+                        return classDecl;
+                    }
+                    return super.visitClassDeclaration(classDecl, found);
+                }
+
+                @Override
+                public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, AtomicBoolean found) {
+                    if (typeParam.getName() instanceof J.Identifier &&
+                            ((J.Identifier) typeParam.getName()).getSimpleName().equals(simpleName)) {
+                        found.set(true);
+                        return typeParam;
+                    }
+                    return super.visitTypeParameter(typeParam, found);
+                }
+            }.reduce(sf, new AtomicBoolean()).get();
         }
 
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf, JavaType.FullyQualified targetType) {
