@@ -24,11 +24,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marketplace.RecipeClassLoader;
 import org.openrewrite.test.RewriteTest;
 
 import javax.tools.Diagnostic;
@@ -38,10 +41,13 @@ import javax.tools.SimpleJavaFileObject;
 import javax.tools.ToolProvider;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -1764,6 +1770,38 @@ class ScopeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recipeSideTraitResolvesABindingAcrossTheRecipeClassLoader() throws Exception {
+        Cursor read = lastIdentifier(parse("class A { int x; void m() { x++; } }"), "x");
+        URL ownRewriteJava = Scope.class.getProtectionDomain().getCodeSource().getLocation();
+        try (RecipeClassLoader recipeLoader = new RecipeClassLoader(new URL[]{ownRewriteJava}, getClass().getClassLoader())) {
+            Class<?> recipeSide = recipeLoader.loadClass(VariableAccess.class.getName());
+            assertThat(recipeSide).isNotSameAs(VariableAccess.class);
+            Object binding = recipeSide.getMethod("getBinding").invoke(recipeSide.getConstructor(Cursor.class).newInstance(read));
+            assertThat((Optional<?>) binding).containsInstanceOf(Scope.Binding.class);
+        }
+    }
+
+    @Test
+    void sourceFileThatRefusesTheServiceIsReadByJavaRules() {
+        JavaSourceFile cu = parse("class A { int x; }");
+        J.ClassDeclaration a = cu.getClasses().getFirst();
+        for (RuntimeException refusal : List.of(
+          new UnsupportedOperationException("Service not supported"),
+          // A Kotlin, Groovy or Scala source file wraps what it throws
+          new RuntimeException(new UnsupportedOperationException("Service not supported")))) {
+            JavaSourceFile refusing = (JavaSourceFile) Proxy.newProxyInstance(getClass().getClassLoader(),
+              new Class<?>[]{JavaSourceFile.class}, (proxy, method, args) -> {
+                  if ("service".equals(method.getName())) {
+                      throw refusal;
+                  }
+                  return method.invoke(cu, args);
+              });
+            Cursor body = new Cursor(new Cursor(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), refusing), a), a.getBody());
+            assertThat(Scope.at(body).lookup("x")).isPresent();
+        }
+    }
+
     /**
      * The names of the methods in which javac reports an error, in alphabetical order.
      */
@@ -1796,6 +1834,24 @@ class ScopeTest implements RewriteTest {
             }
         }
         return rejected;
+    }
+
+    private static JavaSourceFile parse(@Language("java") String source) {
+        return (JavaSourceFile) JavaParser.fromJavaVersion().build().parse(source).findFirst().orElseThrow();
+    }
+
+    private static Cursor lastIdentifier(JavaSourceFile sourceFile, String name) {
+        Cursor[] found = {null};
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                if (identifier.getSimpleName().equals(name)) {
+                    found[0] = getCursor();
+                }
+                return identifier;
+            }
+        }.visit(sourceFile, 0);
+        return found[0];
     }
 
     private static Recipe referenceCounts() {

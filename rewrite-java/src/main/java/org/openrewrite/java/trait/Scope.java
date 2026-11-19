@@ -604,10 +604,25 @@ public class Scope implements Trait<J> {
         for (Cursor c = cursor; c != null; c = c.getParent()) {
             if (c.getValue() instanceof JavaSourceFile) {
                 JavaSourceFile sourceFile = c.getValue();
-                return c.computeMessageIfAbsent(SERVICE, k -> sourceFile.service(ScopeService.class));
+                return c.computeMessageIfAbsent(SERVICE, k -> serviceOf(sourceFile));
             }
         }
         return new ScopeService();
+    }
+
+    /**
+     * The source file's own service, or Java's rules where the source file's class comes from a release that does
+     * not know the service and refuses it.
+     */
+    private static ScopeService serviceOf(JavaSourceFile sourceFile) {
+        try {
+            return sourceFile.service(ScopeService.class);
+        } catch (RuntimeException e) {
+            if (e instanceof UnsupportedOperationException || e.getCause() instanceof UnsupportedOperationException) {
+                return new ScopeService();
+            }
+            throw e;
+        }
     }
 
     /**

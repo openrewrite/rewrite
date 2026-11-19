@@ -106,6 +106,8 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.internal.JavaTypeFactory",
             "org.openrewrite.java.internal.ImportComments",
             "org.openrewrite.java.service",
+            // ScopeService creates and takes Scope.Binding, so the two classes come from one loader
+            "org.openrewrite.java.trait.Scope",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",
