@@ -52,6 +52,7 @@ public class KotlinScopeService extends ScopeService {
             bindings.add(new Scope.Binding(scope, "it", Scope.Namespace.VARIABLE, scope, null, this));
         } else if (tree instanceof J.ClassDeclaration) {
             properties(scope, (J.ClassDeclaration) tree, bindings);
+            companionMembers(scope, (J.ClassDeclaration) tree, bindings);
         } else if (tree instanceof J.MethodDeclaration &&
                    ((J.MethodDeclaration) tree).getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
             // The class binds a property parameter, where the whole body sees it
@@ -97,12 +98,7 @@ public class KotlinScopeService extends ScopeService {
         if (cursor.getValue() instanceof J.ClassDeclaration && cursor.getParentTreeCursor().getValue() instanceof J.Block &&
             cursor.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
             // A class or object nested in a class has an instance of the outer class only when declared `inner`
-            for (J.Modifier modifier : ((J.ClassDeclaration) cursor.getValue()).getModifiers()) {
-                if ("inner".equals(modifier.getKeyword())) {
-                    return false;
-                }
-            }
-            return true;
+            return !hasModifier(cursor.getValue(), "inner");
         }
         return super.isStaticContext(cursor);
     }
@@ -124,6 +120,33 @@ public class KotlinScopeService extends ScopeService {
             }
         }
         return true;
+    }
+
+    /**
+     * Binds the properties and functions of the class's companion object, which the whole class body sees. The
+     * class's own members come first, as one of them hides a companion member of its name.
+     */
+    private void companionMembers(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {
+        Cursor body = new Cursor(scope, classDeclaration.getBody());
+        for (Statement statement : classDeclaration.getBody().getStatements()) {
+            if (statement instanceof J.ClassDeclaration && hasModifier((J.ClassDeclaration) statement, "companion")) {
+                for (Scope.Binding member : bindings(new Cursor(body, statement))) {
+                    if (member.getTree() instanceof J.Identifier && member.getNamespace() != Scope.Namespace.TYPE) {
+                        bindings.add(new Scope.Binding(member.getCursor(), member.getName(), member.getNamespace(), scope,
+                                member.getType(), this));
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean hasModifier(J.ClassDeclaration classDeclaration, String keyword) {
+        for (J.Modifier modifier : classDeclaration.getModifiers()) {
+            if (keyword.equals(modifier.getKeyword())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void properties(Cursor scope, J.ClassDeclaration classDeclaration, List<Scope.Binding> bindings) {

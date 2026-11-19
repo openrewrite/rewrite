@@ -197,7 +197,7 @@ public class Scope implements Trait<J> {
         boolean typeParameter = binding.getTree() instanceof J.Identifier &&
                                 binding.cursor.getParentTreeCursor().getValue() instanceof J.TypeParameter;
         boolean needsInstance = (scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass) &&
-                                (binding.namespace == Namespace.TYPE ? typeParameter : !isStatic(binding.type));
+                                (binding.namespace == Namespace.TYPE ? typeParameter : !isStatic(binding));
         return !isForwardReference(binding) && (!needsInstance || hasInstanceOf(binding.scope, !typeParameter));
     }
 
@@ -303,18 +303,32 @@ public class Scope implements Trait<J> {
         return cursor.getValue() instanceof J && cursor.<J>getValue().getId().equals(other.<J>getValue().getId());
     }
 
-    private static boolean isStatic(@Nullable JavaType member) {
-        return member instanceof JavaType.Variable && ((JavaType.Variable) member).hasFlags(Flag.Static) ||
-               member instanceof JavaType.Method && ((JavaType.Method) member).hasFlags(Flag.Static);
+    /**
+     * Whether the member needs no instance of the class binding it, going by its attributed flags or by a static
+     * context between its declaration and that class. A Kotlin companion object is such a context for its members.
+     */
+    private static boolean isStatic(Binding member) {
+        if (member.type instanceof JavaType.Variable && ((JavaType.Variable) member.type).hasFlags(Flag.Static) ||
+            member.type instanceof JavaType.Method && ((JavaType.Method) member.type).hasFlags(Flag.Static)) {
+            return true;
+        }
+        if (member.getTree() instanceof J.Identifier) {
+            for (Cursor c = member.cursor.getParent(); c != null && !isTree(c, member.scope); c = c.getParent()) {
+                if (member.service.isStaticContext(c)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
      * Whether a new variable declared at the position can take the name. It cannot take a reserved word, a name
      * visible at the position, a variable this scope binds, or any name this scope spells, whether or not anything
      * declares it, other than a member's name after a dot. Counting what the scope spells keeps clear of later
-     * declarations in any language. Counting what
-     * it binds covers a name it never spells, as a class's inherited field, when asked from the class itself.
-     * A field of an enclosing class counts as taken, though a new field could take its name and hide it.
+     * declarations in any language. Counting what it binds covers a name it never spells, as a class's inherited
+     * field, when asked from the class itself. A field of an enclosing class counts as taken, though a new field
+     * could take its name and hide it.
      */
     public boolean isFree(String name) {
         Map<Object, Set<String>> spelled = perSourceFile(cursor).computeMessageIfAbsent(SPELLED, k -> new IdentityHashMap<>());

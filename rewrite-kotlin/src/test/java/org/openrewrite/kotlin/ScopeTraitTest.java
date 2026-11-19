@@ -340,6 +340,43 @@ class ScopeTraitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void classSeesTheMembersOfItsCompanionObject() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> Stream.of(scope.lookup("logger"), scope.lookup("helper", Scope.Namespace.METHOD))
+            .map(found -> found.map(binding -> binding.getKind() + (scope.canReference(binding) ? "" : " out of reach")).orElse("unbound"))
+            .collect(joining(", ")))),
+          kotlin(
+            """
+              class A {
+                  companion object {
+                      private val logger = "log"
+                      fun helper() {}
+                  }
+                  fun f() { here() }
+                  class Nested {
+                      fun n() { here() }
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              class A {
+                  companion object {
+                      private val logger = "log"
+                      fun helper() {}
+                  }
+                  fun f() { /*~~(MEMBER, MEMBER)~~>*/here() }
+                  class Nested {
+                      fun n() { /*~~(MEMBER, MEMBER)~~>*/here() }
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
     private static Recipe atHere(Function<Scope, String> question) {
         return toRecipe(() -> new JavaIsoVisitor<>() {
             @Override
