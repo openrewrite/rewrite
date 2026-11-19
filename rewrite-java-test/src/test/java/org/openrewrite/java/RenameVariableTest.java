@@ -1690,6 +1690,44 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
+    void renamingAParameterLeavesTheInheritedFieldAnAnonymousClassReads() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("node", "n", true)),
+          java(
+            """
+              class Base {
+                  protected int node;
+              }
+              """
+          ),
+          java(
+            """
+              public class A {
+                  Object m(int node) {
+                      return new Base() {
+                          int get() {
+                              return node;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              public class A {
+                  Object m(int n) {
+                      return new Base() {
+                          int get() {
+                              return node;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void renameWithinASubtreeVisitedOnItsOwn() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

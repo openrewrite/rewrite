@@ -25,6 +25,10 @@ import org.openrewrite.java.tree.*;
 import java.text.Normalizer;
 import java.util.*;
 
+/**
+ * Names for variables a recipe declares, answered from {@link Scope}. A recipe that needs more than a name, such as the
+ * declaration a name reads or whether a rename keeps every name reading the same thing, asks {@link Scope} directly.
+ */
 @Incubating(since = "7.25.0")
 @Value
 public class VariableNameUtils {
@@ -43,6 +47,9 @@ public class VariableNameUtils {
      * Since the client recipe may have modified the LST element represented by {@code scope}, this method will
      * visit the value held by {@code scope} once it encounters it in the tree. For this to work, the client recipe
      * must use {@link Cursor#Cursor(Cursor, Object)} to pass a cursor holding the modified LST element.
+     * <p>
+     * {@link Scope#freeName(String, java.util.function.Predicate)} answers the same question, and also passes over the
+     * names a visit has handed out but not yet written into the tree.
      *
      * @param baseName baseName for the variable.
      * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
@@ -93,6 +100,9 @@ public class VariableNameUtils {
      * Find the names of variables that already exist in the scope of a cursor.
      * A JavaSourceFile must be available in the Cursor path to account for all names
      * available in the cursor scope.
+     * <p>
+     * They include the names of the bindings {@link Scope#visible()} at the cursor and {@link Scope#declaredWithin(Cursor)
+     * declared within} its tree, which {@link Scope} gives with the declaration of each.
      *
      * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
      * @return Variable names available in the name scope of the cursor.
@@ -149,6 +159,9 @@ public class VariableNameUtils {
      * Collects class field names inherited from super classes.
      * <p>
      * Note: Does not currently account for {@link JavaType.Unknown}.
+     * <p>
+     * The {@link Scope} of a class lists its inherited fields as bindings of kind {@link Scope.Kind#INHERITED}, with
+     * those of its interfaces and its inherited methods.
      */
     public static Set<String> findInheritedNames(J.ClassDeclaration classDeclaration) {
         Set<String> names = new HashSet<>();
