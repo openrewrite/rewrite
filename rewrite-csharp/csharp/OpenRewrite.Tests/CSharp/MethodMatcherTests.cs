@@ -53,6 +53,55 @@ public class MethodMatcherTests
         Assert.True(mm.Matches(method));
     }
 
+    [Theory]
+    [InlineData(JavaType.PrimitiveKind.Boolean, "bool", "System.Boolean")]
+    [InlineData(JavaType.PrimitiveKind.Byte, "byte", "System.Byte")]
+    [InlineData(JavaType.PrimitiveKind.Char, "char", "System.Char")]
+    [InlineData(JavaType.PrimitiveKind.Double, "double", "System.Double")]
+    [InlineData(JavaType.PrimitiveKind.Float, "float", "System.Single")]
+    [InlineData(JavaType.PrimitiveKind.Int, "int", "System.Int32")]
+    [InlineData(JavaType.PrimitiveKind.Long, "long", "System.Int64")]
+    [InlineData(JavaType.PrimitiveKind.Short, "short", "System.Int16")]
+    [InlineData(JavaType.PrimitiveKind.String, "string", "System.String")]
+    public void MatchesPrimitiveParameterAliases(JavaType.PrimitiveKind kind, string keyword, string fqn)
+    {
+        var keywordMatcher = new MethodMatcher($"N.C M({keyword})");
+        var fqnMatcher = new MethodMatcher($"N.C M({fqn})");
+        foreach (var parameterKind in Enum.GetValues<JavaType.PrimitiveKind>())
+        {
+            var method = MakeMethod("N.C", "M", parameterTypes: [JavaType.Primitive.Of(parameterKind)]);
+            Assert.Equal(parameterKind == kind, keywordMatcher.Matches(method));
+            Assert.Equal(parameterKind == kind, fqnMatcher.Matches(method));
+        }
+    }
+
+    [Theory]
+    [InlineData("bool", "System.Boolean")]
+    [InlineData("byte", "System.Byte")]
+    [InlineData("sbyte", "System.SByte")]
+    [InlineData("char", "System.Char")]
+    [InlineData("decimal", "System.Decimal")]
+    [InlineData("double", "System.Double")]
+    [InlineData("float", "System.Single")]
+    [InlineData("int", "System.Int32")]
+    [InlineData("uint", "System.UInt32")]
+    [InlineData("long", "System.Int64")]
+    [InlineData("ulong", "System.UInt64")]
+    [InlineData("short", "System.Int16")]
+    [InlineData("ushort", "System.UInt16")]
+    [InlineData("string", "System.String")]
+    [InlineData("object", "System.Object")]
+    public void MatchesClassParameterAliases(string keyword, string fqn)
+    {
+        var method = MakeMethod("N.C", "M", parameterTypes: [MakeClass(fqn)]);
+        Assert.True(new MethodMatcher($"N.C M({keyword})").Matches(method));
+        Assert.True(new MethodMatcher($"N.C M({fqn})").Matches(method));
+        var otherMethod = MakeMethod("N.C", "M",
+            parameterTypes: [MakeClass(fqn == "System.Int32" ? "System.Int64" : "System.Int32")]);
+        Assert.False(new MethodMatcher($"N.C M({keyword})").Matches(otherMethod));
+        Assert.False(new MethodMatcher($"N.C M({fqn})").Matches(otherMethod));
+    }
+
     [Fact]
     public void DoesNotMatchWrongMethodName()
     {
@@ -234,6 +283,132 @@ public class MethodMatcherTests
         var method = MakeMethod("System.Security.Cryptography.Aes", "Create",
             parameterTypes: [MakeClass("System.String")]);
         Assert.True(mm.Matches(method));
+    }
+
+    // =============================================================
+    // Array arguments
+    // =============================================================
+
+    private static JavaType.Array ArrayOf(JavaType elemType) => new(elemType, null);
+
+    private static JavaType Int => JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+
+    [Theory]
+    [InlineData("string[]")]
+    [InlineData("System.String[]")]
+    [InlineData("String[]")]
+    [InlineData("*[]")]
+    [InlineData("System.*[]")]
+    public void MatchesStringArrayArg(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(MakeClass("System.String"))]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Theory]
+    [InlineData("string[]")]
+    [InlineData("System.String[]")]
+    public void MatchesArrayOfStringPrimitive(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M",
+            parameterTypes: [ArrayOf(JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String))]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Theory]
+    [InlineData("int[]")]
+    [InlineData("System.Int32[]")]
+    public void MatchesPrimitiveArrayArgRepresentedAsClass(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(MakeClass("System.Int32"))]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Theory]
+    [InlineData("int[]")]
+    [InlineData("System.Int32[]")]
+    public void MatchesPrimitiveArrayArg(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(Int)]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Fact]
+    public void MatchesJaggedArrayArg()
+    {
+        var mm = new MethodMatcher("N.C M(int[][], string[][][])");
+        var method = MakeMethod("N.C", "M", parameterTypes:
+        [
+            ArrayOf(ArrayOf(Int)),
+            ArrayOf(ArrayOf(ArrayOf(MakeClass("System.String"))))
+        ]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Theory]
+    [InlineData("string[]")]
+    [InlineData("int[][]")]
+    [InlineData("int")]
+    [InlineData("*")]
+    public void DoesNotMatchIntArrayArg(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(Int)]);
+        Assert.False(mm.Matches(method));
+    }
+
+    [Theory]
+    [InlineData("int[]")]
+    [InlineData("string[][]")]
+    [InlineData("string")]
+    public void DoesNotMatchStringArrayArg(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(MakeClass("System.String"))]);
+        Assert.False(mm.Matches(method));
+    }
+
+    [Theory]
+    [InlineData("string[]")]
+    [InlineData("*[]")]
+    public void ArrayPatternDoesNotMatchScalarArg(string arg)
+    {
+        var mm = new MethodMatcher($"N.C M({arg})");
+        var method = MakeMethod("N.C", "M", parameterTypes: [MakeClass("System.String")]);
+        Assert.False(mm.Matches(method));
+    }
+
+    [Fact]
+    public void ArrayPatternDoesNotMatchArrayWithoutElementType()
+    {
+        var mm = new MethodMatcher("N.C M(*[])");
+        var method = MakeMethod("N.C", "M", parameterTypes: [new JavaType.Array()]);
+        Assert.False(mm.Matches(method));
+    }
+
+    [Fact]
+    public void SelectsArrayOverloadOverScalarOverload()
+    {
+        var mm = new MethodMatcher("N.C M(string[])");
+        var arrayOverload = MakeMethod("N.C", "M", parameterTypes: [ArrayOf(MakeClass("System.String"))]);
+        var scalarOverload = MakeMethod("N.C", "M", parameterTypes: [MakeClass("System.String")]);
+        Assert.True(mm.Matches(arrayOverload));
+        Assert.False(mm.Matches(scalarOverload));
+    }
+
+    [Fact]
+    public void ArrayArgCombinesWithWildcardArgs()
+    {
+        var mm = new MethodMatcher("N.C M(.., string[])");
+        var method = MakeMethod("N.C", "M",
+            parameterTypes: [Int, MakeClass("System.String"), ArrayOf(MakeClass("System.String"))]);
+        Assert.True(mm.Matches(method));
+        Assert.True(new MethodMatcher("N.C M(..)").Matches(method));
+        Assert.False(new MethodMatcher("N.C M(.., string)").Matches(method));
     }
 
     [Fact]

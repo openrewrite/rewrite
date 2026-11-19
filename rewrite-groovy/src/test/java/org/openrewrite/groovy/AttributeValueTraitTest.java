@@ -27,10 +27,9 @@ import static org.openrewrite.groovy.Assertions.groovy;
  * The {@link org.openrewrite.java.trait.AttributeValue} behavior on Groovy sources,
  * asserting the same semantics the trait has on javac-attributed Java sources.
  * Tests annotated {@link ExpectedToFail} document known Groovy parser/type-mapping
- * gaps: property-access references carry no {@code fieldType}
- * ({@code GroovyParserVisitor#visitPropertyExpression}), no
- * {@code JavaType.Annotation} element values are built (no constant folding), and
- * list literals are {@code G.ListLiteral}, not {@code J.NewArray}.
+ * gaps: a bare class reference is untyped, no {@code JavaType.Annotation} element
+ * values are built (no constant folding), and list literals are
+ * {@code G.ListLiteral}, not {@code J.NewArray}.
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -160,7 +159,6 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression hard-codes fieldType=null on property-access references, so Flag.Enum is unavailable — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void enumConstant() {
         rewriteRun(

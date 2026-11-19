@@ -50,6 +50,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.list;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
 import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
@@ -1860,6 +1861,154 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               """,
             spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void selectsVersionFromSubprojectRepositoriesInRootSubprojectsBlock() {
+        rewriteRun(
+          // Without Maven settings, so that only the projects' own repositories are searched
+          spec -> spec.executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+              throw new AssertionError(t);
+          }))),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:29.0-jre'
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:30.1.1-jre'
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void selectsVersionFromSubprojectRepositoriesInRootAllprojectsBlock() {
+        rewriteRun(
+          spec -> spec.executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+              throw new AssertionError(t);
+          }))),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              allprojects {
+                  apply plugin: 'java-library'
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:29.0-jre'
+                  }
+              }
+
+              subprojects {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """,
+            """
+              allprojects {
+                  apply plugin: 'java-library'
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:30.1.1-jre'
+                  }
+              }
+
+              subprojects {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void selectsPropertyVersionFromSubprojectRepositoriesInRootSubprojectsBlock() {
+        rewriteRun(
+          spec -> spec.executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+              throw new AssertionError(t);
+          }))),
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation "com.google.guava:guava:$guavaVersion"
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
           )
         );
     }

@@ -23,11 +23,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
- * A type factory that shares the classes of {@code java.*} packages it maps with every parser of the same kind in the
- * JVM, which read them through the cache {@link #cacheForParser} gives. Test support turns it on.
+ * A type factory that shares the classes of {@code java.*} packages it maps, and those a parser kind names as library
+ * classes, with every parser of the same kind in the JVM, which read them through the cache {@link #cacheForParser}
+ * gives. Test support turns it on.
  * <p>
  * A class is shared with every type keyed while mapping it, such as its methods, so a call of one of them has the
  * method the class declares. They are shared when the factory's outermost call returns, as none of them is a stub then,
@@ -50,7 +52,7 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
     }
 
     /**
-     * Makes {@link #cacheForParser} and {@link #forParser} share JDK classes. Test support calls it.
+     * Makes {@link #cacheForParser} and {@link #forParser} share classes. Test support calls it.
      */
     public static void useForParsers() {
         forParsers = true;
@@ -60,17 +62,29 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
      * @param parserKind What tells apart parsers that map the same class differently, such as their builder's class.
      * @param configured Whether the parser builder's caller gave it a type cache or a type factory.
      * @return The cache a parser builder builds its parsers with: once {@link #useForParsers()} has been called, one
-     * that also reads the JDK classes parsers of the same kind have shared, unless the caller configured the builder's
+     * that also reads the classes parsers of the same kind have shared, unless the caller configured the builder's
      * types.
      */
     public static JavaTypeCache cacheForParser(JavaTypeCache cache, Object parserKind, boolean configured) {
+        return cacheForParser(cache, parserKind, configured, fqn -> false);
+    }
+
+    /**
+     * @param libraryClass Which classes other than the JDK's map the same way in every parse of this kind, and so are
+     *                     shared too, such as those of a language's standard library. A parser kind keeps the
+     *                     predicate of its first parser.
+     * @see #cacheForParser(JavaTypeCache, Object, boolean)
+     */
+    public static JavaTypeCache cacheForParser(JavaTypeCache cache, Object parserKind, boolean configured,
+                                               Predicate<String> libraryClass) {
         return forParsers && !configured && !(cache instanceof ReadingCache) ?
-                new ReadingCache(cache, SHARED_BY_PARSER_KIND.computeIfAbsent(parserKind, k -> new Shared())) :
+                new ReadingCache(cache,
+                        SHARED_BY_PARSER_KIND.computeIfAbsent(parserKind, k -> new Shared(libraryClass))) :
                 cache;
     }
 
     /**
-     * @return A factory that shares the JDK classes it maps, when the cache is one {@link #cacheForParser} gave, or
+     * @return A factory that shares the classes it maps, when the cache is one {@link #cacheForParser} gave, or
      * else null.
      */
     public static @Nullable JavaTypeFactory forParser(JavaTypeCache cache) {
@@ -89,7 +103,7 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
             if (known != null) {
                 return known;
             }
-            if (!isJdkClass(fqn)) {
+            if (!isJdkClass(fqn) && !shared.libraryClass.test(fqn)) {
                 return super.computeClass(fqn, flags, kind, initializer);
             }
             if (!locked) {
@@ -101,11 +115,11 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
                     return known;
                 }
             }
-            cache.jdkClassesBeingMapped++;
+            cache.sharedClassesBeingMapped++;
             try {
                 return super.computeClass(fqn, flags, kind, initializer);
             } finally {
-                cache.jdkClassesBeingMapped--;
+                cache.sharedClassesBeingMapped--;
             }
         });
     }
@@ -178,15 +192,20 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
     }
 
     /**
-     * The JDK classes parsers of one kind have shared, which one parser at a time adds to.
+     * The classes parsers of one kind have shared, which one parser at a time adds to.
      */
     private static class Shared {
         final Map<String, Object> types = new ConcurrentHashMap<>();
         final ReentrantLock lock = new ReentrantLock();
+        final Predicate<String> libraryClass;
+
+        Shared(Predicate<String> libraryClass) {
+            this.libraryClass = libraryClass;
+        }
     }
 
     /**
-     * A parser builder's cache that also reads the JDK classes parsers of its kind have shared.
+     * A parser builder's cache that also reads the classes parsers of its kind have shared.
      */
     private static class ReadingCache extends HashMapJavaTypeCache {
         private final Shared shared;
@@ -205,12 +224,12 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
     }
 
     /**
-     * A parser's cache that keeps what the parser puts while it maps a JDK class, for the factory to share.
+     * A parser's cache that keeps what the parser puts while it maps a class to share, for the factory to publish.
      */
     private static class RecordingCache extends JavaTypeCache {
         private final JavaTypeCache cache;
         private final Map<String, Object> mapped = new HashMap<>();
-        int jdkClassesBeingMapped;
+        int sharedClassesBeingMapped;
 
         RecordingCache(JavaTypeCache cache) {
             this.cache = cache;
@@ -224,7 +243,7 @@ public class JdkClassSharingTypeFactory extends DefaultJavaTypeFactory {
         @Override
         public void put(String signature, Object o) {
             cache.put(signature, o);
-            if (jdkClassesBeingMapped > 0) {
+            if (sharedClassesBeingMapped > 0) {
                 mapped.put(signature, o);
             }
         }

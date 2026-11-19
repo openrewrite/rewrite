@@ -525,6 +525,7 @@ val pythonPublishCgp = tasks.register("pythonPublishCgp") {
             ?: throw GradleException("cgpPublishToken property is required for Code Genome Project publishing")
         // A named repository rather than --repository-url, which twine resolves *instead of* the
         // config file (utils._config_from_repository_url) and so would force the token onto argv.
+        // This registry takes a token under the username `cgp`, where pypi.org takes `__token__`.
         val pypirc = temporaryDir.resolve("pypirc")
         pypirc.writeText("""
             [distutils]
@@ -532,7 +533,7 @@ val pythonPublishCgp = tasks.register("pythonPublishCgp") {
 
             [codegenome]
             repository = https://artifacts.codegenomeproject.org/pypi/
-            username = __token__
+            username = cgp
             password = $token
         """.trimIndent())
 

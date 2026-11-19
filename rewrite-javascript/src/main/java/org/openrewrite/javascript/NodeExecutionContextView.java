@@ -25,10 +25,8 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 
-/**
- * Lets a host inject npm registries and credentials for native lock regeneration, and shares one
- * {@link NpmRegistryClient} over the run's {@code HttpSender}, as {@code MavenExecutionContextView} does.
- */
+/// Lets a host inject npm registries, credentials and the run's [NpmRegistryClient] for native lock
+/// regeneration, as `MavenExecutionContextView` lets it inject the run's POM cache.
 public class NodeExecutionContextView extends DelegatingExecutionContext {
     private static final String REGISTRIES = "org.openrewrite.javascript.registries";
     private static final String CREDENTIALS = "org.openrewrite.javascript.registryCredentials";
@@ -111,12 +109,21 @@ public class NodeExecutionContextView extends DelegatingExecutionContext {
         return getMessage(LIBC);
     }
 
-    /**
-     * A per-run {@link NpmRegistryClient} over the run's {@code HttpSender}, lazily created and shared
-     * so its packument/manifest caches are reused across the execution.
-     */
+    /// Host-supplied client whose packument, manifest and tarball caches every lock regeneration in the run
+    /// shares. Set it before the run, over the run's `HttpSender`, with a fresh client per run: the tarball
+    /// cache is unbounded.
+    public NodeExecutionContextView setRegistryClient(NpmRegistryClient registryClient) {
+        putMessage(REGISTRY_CLIENT, registryClient);
+        return this;
+    }
+
+    /// The host-supplied client, or else a new one over the run's `HttpSender` that is not stored, so the
+    /// run's execution context stays unchanged and nothing is cached across lock regenerations.
     public NpmRegistryClient getRegistryClient() {
-        return computeMessageIfAbsent(REGISTRY_CLIENT,
-                k -> new NpmRegistryClient(HttpSenderExecutionContextView.view(this).getHttpSender()));
+        NpmRegistryClient client = getMessage(REGISTRY_CLIENT);
+        if (client == null) {
+            return new NpmRegistryClient(HttpSenderExecutionContextView.view(this).getHttpSender());
+        }
+        return client;
     }
 }

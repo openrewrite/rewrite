@@ -19,8 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
-import org.openrewrite.marker.AlreadyReplaced;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.xml.transform.Source;
@@ -32,9 +30,6 @@ import javax.xml.transform.stream.StreamSource;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Objects;
-
-import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
 @Incubating(since = "8.30.0")
@@ -44,18 +39,8 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
 
     @Override
     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-        for (Marker marker : document.getMarkers().getMarkers()) {
-            if (marker instanceof AlreadyReplaced) {
-                AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
-                if (Objects.equals(xslt, alreadyReplaced.getReplace())) {
-                    return document;
-                }
-            }
-        }
-
         Xml.Document d = (Xml.Document) super.visitDocument(document, executionContext);
-        d = transform(d, xslt);
-        return d.withMarkers(document.getMarkers().add(new AlreadyReplaced(randomId(), null, xslt)));
+        return transform(d, xslt);
     }
 
     private static Xml.Document transform(Xml.Document document, String xslt) {
@@ -67,7 +52,8 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
             Source text = new StreamSource(new ByteArrayInputStream(originalDocument.getBytes()));
             try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
                 transformer.transform(text, new StreamResult(os));
-                return document.withRoot(Xml.Tag.build(os.toString().replace("\r", "")));
+                Xml.Document transformed = document.withRoot(Xml.Tag.build(os.toString().replace("\r", "")));
+                return transformed.printAll().equals(originalDocument) ? document : transformed;
             }
         } catch (IOException | TransformerException e) {
             throw new RuntimeException("XSLT transformation exception: " + e.getMessage(), e);

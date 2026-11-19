@@ -1073,6 +1073,28 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `matcher on a top-level function names the facade kotlinc generates`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            fun legacy(s: String): String = s
+            val UseTrim = recipe("d", "desc") {
+                edit {
+                    rewrite { s: String -> legacy(s) } to { s -> s.trim() }
+                }
+            }
+            """.trimIndent(),
+            fileName = "my-recipes.kt",
+        )
+        check(result.exitOk()) { "compile failed:\n${result.messages}" }
+        val facade = result.classLoader.loadClass("My_recipesKt")
+        val r = facade.getDeclaredMethod("getUseTrim").invoke(null) as Recipe
+        val check = (r.getVisitor() as Preconditions.Check).check
+        assertThat((check as UsesMethod<*>).methodMatcher.toString())
+            .startsWith("${facade.name} legacy(")
+    }
+
+    @Test
     fun `property-access recipe is wrapped with UsesField precondition`() {
         val r = loadCompiledRecipe(
             source = """

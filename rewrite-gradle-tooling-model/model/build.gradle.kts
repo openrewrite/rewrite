@@ -103,6 +103,7 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     dependsOn(testManifestTask)
     val manifest = testManifestFile.get().asFile
+    val userHomesDir = temporaryDir.resolve("gradle-user-homes")
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         @get:Classpath
@@ -113,10 +114,16 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifestFile: File = manifest
 
+        // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi)
+        @get:Internal
+        val userHomes: File = userHomesDir
+
         override fun asArguments() = listOf(
-            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}",
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${userHomes.absolutePath}"
         )
     })
+    doFirst { userHomesDir.deleteRecursively() }
 }
 
 tasks.named("check").configure {

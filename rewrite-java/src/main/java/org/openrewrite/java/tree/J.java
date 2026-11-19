@@ -2947,7 +2947,9 @@ public interface J extends Tree {
 
                 // the compiler doesn't type attribute static imports of classes
                 Expression target = qualid.getTarget();
-                if (fq == null) {
+                // a member's owner may be typed without its members, as a Scala object is
+                boolean typedAsMember = qualid.getType() instanceof JavaType.Method || qualid.getType() instanceof JavaType.Variable;
+                if (fq == null && !typedAsMember) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
                     if ("*".equals(possibleInnerClassName)) {
@@ -6265,32 +6267,7 @@ public interface J extends Tree {
         @Getter
         Space varargs;
 
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public List<JLeftPadded<Space>> getDimensionsBeforeName() {
-            return emptyList();
-        }
-
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public VariableDeclarations withDimensionsBeforeName(List<JLeftPadded<Space>> dimensionsBeforeName) {
-            return this;
-        }
-
         List<JRightPadded<NamedVariable>> variables;
-
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public VariableDeclarations(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations, List<Modifier> modifiers, @Nullable TypeTree typeExpression, @Nullable Space varargs, @Nullable List<JLeftPadded<Space>> dimensionsBeforeName, List<JRightPadded<NamedVariable>> variables) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.leadingAnnotations = leadingAnnotations;
-            this.modifiers = modifiers;
-            this.typeExpression = typeExpression;
-            this.varargs = varargs;
-            this.variables = variables;
-        }
 
         public List<NamedVariable> getVariables() {
             return JRightPadded.getElements(variables);

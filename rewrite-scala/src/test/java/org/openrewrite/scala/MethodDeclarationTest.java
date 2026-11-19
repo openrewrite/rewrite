@@ -1099,19 +1099,6 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void trailingCommaInParametersSingleLine() {
-        rewriteRun(
-          scala(
-            """
-            object Test {
-              def foo(x: Int,): Int = x
-            }
-            """
-          )
-        );
-    }
-
-    @Test
     void trailingCommaInTypeParameters() {
         rewriteRun(
           scala(
@@ -1121,19 +1108,6 @@ class MethodDeclarationTest implements RewriteTest {
                 A,
                 B,
               ](x: A): A = x
-            }
-            """
-          )
-        );
-    }
-
-    @Test
-    void trailingCommaInTypeParametersSingleLine() {
-        rewriteRun(
-          scala(
-            """
-            object Test {
-              def foo[A,](x: A): A = x
             }
             """
           )

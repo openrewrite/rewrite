@@ -23,13 +23,3 @@ type: specs.openrewrite.org/v1beta/category
 name: Gradle Plugins
 packageName: org.openrewrite.gradle.plugins
 description: Recipes to add, remove, and upgrade [Gradle plugins](https://docs.gradle.org/current/userguide/plugins.html).
----
-type: specs.openrewrite.org/v1beta/category
-name: Gradle 8
-packageName: org.openrewrite.gradle.gradle8
-description: Recipes to migrate to [Gradle 8](https://docs.gradle.org/8.0/release-notes.html).
----
-type: specs.openrewrite.org/v1beta/category
-name: Gradle 9
-packageName: org.openrewrite.gradle.gradle9
-description: Recipes to migrate to [Gradle 9](https://docs.gradle.org/9.0.0/release-notes.html).

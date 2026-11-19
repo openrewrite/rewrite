@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -57,6 +58,12 @@ class GolangVisitorTypeTest {
             public J preVisit(J tree, Integer p) {
                 if (tree instanceof Go && declaresType(tree.getClass())) {
                     typedNodes.add(tree);
+                }
+                if (tree instanceof Go.Binary || tree instanceof Go.KeyValue || tree instanceof Go.SliceExpr) {
+                    Expression expression = (Expression) tree;
+                    assertThat(expression.getType()).isNotNull();
+                    Expression changed = expression.withType(JavaType.Primitive.String);
+                    assertThat(changed.getType()).isEqualTo(JavaType.Primitive.String);
                 }
                 return tree;
             }
@@ -102,6 +109,8 @@ class GolangVisitorTypeTest {
       	var x interface{} = s
       	_ = x.(S)
       	v := <-ch
+          _ = v &^ 1
+          _ = arr[1:]
       	v &^= 1
       	arr2 := [...]int{1, 2}
       	pair := Pair[int, string]
