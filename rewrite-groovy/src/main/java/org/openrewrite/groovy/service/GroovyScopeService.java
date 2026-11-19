@@ -35,7 +35,7 @@ import java.util.Set;
  * a script declares is local to the script's body, so it is visible after its declaration and not inside the
  * script's methods and classes.
  */
-@Incubating(since = "8.112.0")
+@Incubating(since = "8.113.0")
 public class GroovyScopeService extends ScopeService {
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList("as", "def", "in", "trait"));
 

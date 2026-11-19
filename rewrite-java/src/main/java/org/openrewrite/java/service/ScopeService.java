@@ -32,7 +32,7 @@ import java.util.function.ToLongFunction;
  * The name binding rules of one language, which {@link Scope} asks through the source file. This class holds
  * Java's rules, and a language built on {@link J} with rules of its own overrides it.
  */
-@Incubating(since = "8.112.0")
+@Incubating(since = "8.113.0")
 public class ScopeService {
 
     /**

@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  * come from the source file's {@link ScopeService}, so the same questions work for every language built on {@link J}
  * that supplies one.
  */
-@Incubating(since = "8.112.0")
+@Incubating(since = "8.113.0")
 @Value
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Scope implements Trait<J> {
@@ -453,7 +453,7 @@ public class Scope implements Trait<J> {
     /**
      * What a name denotes. Java looks variables, methods and types up separately, so one name can be bound in each.
      */
-    @Incubating(since = "8.112.0")
+    @Incubating(since = "8.113.0")
     public enum Namespace {
         VARIABLE,
         METHOD,
@@ -463,7 +463,7 @@ public class Scope implements Trait<J> {
     /**
      * Where a bound name comes from.
      */
-    @Incubating(since = "8.112.0")
+    @Incubating(since = "8.113.0")
     public enum Kind {
         /**
          * Declared in code: a local variable, a catch or loop variable, a pattern variable, a local class.
@@ -492,7 +492,7 @@ public class Scope implements Trait<J> {
      * One name a scope binds. It is anchored on its declaring identifier, or on the static import or inheriting
      * class when the field is declared elsewhere.
      */
-    @Incubating(since = "8.112.0")
+    @Incubating(since = "8.113.0")
     @Value
     public static class Binding implements Trait<J> {
         Cursor cursor;

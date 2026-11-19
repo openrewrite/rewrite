@@ -32,7 +32,7 @@ import java.util.*;
  * A lambda without parameters binds {@code it}. A {@code val} or {@code var} primary constructor parameter is a
  * property of its class.
  */
-@Incubating(since = "8.112.0")
+@Incubating(since = "8.113.0")
 public class KotlinScopeService extends ScopeService {
     private static final Set<String> HARD_KEYWORDS = new HashSet<>(Arrays.asList(
             "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "is",

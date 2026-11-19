@@ -32,7 +32,7 @@ import java.util.*;
  * pattern definition binds a variable. An import in a block binds its name for the rest of the block. A local
  * {@code def} is visible throughout its block.
  */
-@Incubating(since = "8.112.0")
+@Incubating(since = "8.113.0")
 public class ScalaScopeService extends ScopeService {
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
             "abstract", "case", "catch", "class", "def", "do", "else", "enum", "export", "extends", "false", "final",
