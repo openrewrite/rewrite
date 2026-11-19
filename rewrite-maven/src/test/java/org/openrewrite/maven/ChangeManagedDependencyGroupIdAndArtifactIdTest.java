@@ -1068,7 +1068,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void swappedBomImportRemovesVersionsItNowManagesButKeepsOtherManagedDependencies() {
+    void swappedBomImportRemovesOnlyVersionsTheNewBomManages() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson",
@@ -1095,8 +1095,24 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <artifactId>commons-pool</artifactId>
                               <version>1.6</version>
                           </dependency>
+                          <dependency>
+                              <groupId>org.apache.commons</groupId>
+                              <artifactId>commons-lang3</artifactId>
+                              <version>3.12.0</version>
+                          </dependency>
                       </dependencies>
                   </dependencyManagement>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.11.0</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
               </project>
               """
           ),
@@ -1110,6 +1126,9 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <version>1</version>
                   </parent>
                   <artifactId>child</artifactId>
+                  <properties>
+                      <junit.version>5.10.0</junit.version>
+                  </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -1130,9 +1149,25 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>org.junit.jupiter</groupId>
                           <artifactId>junit-jupiter-api</artifactId>
-                          <version>5.10.0</version>
+                          <version>${junit.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.12.0</version>
                       </dependency>
                   </dependencies>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.11.0</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
               </project>
               """,
             """
@@ -1165,10 +1200,334 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <groupId>org.junit.jupiter</groupId>
                           <artifactId>junit-jupiter-api</artifactId>
                       </dependency>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.12.0</version>
+                      </dependency>
                   </dependencies>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.11.0</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
               </project>
               """,
             spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void keepsTheChangedManagedDependencyWhoseScopeDiffersFromTheParentEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.persistence",
+            "javax.persistence-api",
+            "jakarta.persistence",
+            "jakarta.persistence-api",
+            "3.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.persistence</groupId>
+                              <artifactId>javax.persistence-api</artifactId>
+                              <version>2.2</version>
+                              <scope>provided</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                              <scope>provided</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void keepsTheChangedManagedDependencyThatDeclaresExclusions() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.persistence",
+            "javax.persistence-api",
+            "jakarta.persistence",
+            "jakarta.persistence-api",
+            "3.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.persistence</groupId>
+                              <artifactId>javax.persistence-api</artifactId>
+                              <version>2.2</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.example</groupId>
+                                      <artifactId>unwanted</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.example</groupId>
+                                      <artifactId>unwanted</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void keepsTheChangedManagedDependencyWhoseClassifierTheParentDoesNotManage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.persistence",
+            "javax.persistence-api",
+            "jakarta.persistence",
+            "jakarta.persistence-api",
+            "3.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.persistence</groupId>
+                              <artifactId>javax.persistence-api</artifactId>
+                              <version>2.2</version>
+                              <classifier>sources</classifier>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                              <classifier>sources</classifier>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void removesTheChangedManagedDependencyWhenThePomAlreadyManagesTheNewCoordinates() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.persistence",
+            "javax.persistence-api",
+            "jakarta.persistence",
+            "jakarta.persistence-api",
+            "3.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.persistence</groupId>
+                              <artifactId>javax.persistence-api</artifactId>
+                              <version>2.2</version>
+                              <scope>provided</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
           )
         );
     }
