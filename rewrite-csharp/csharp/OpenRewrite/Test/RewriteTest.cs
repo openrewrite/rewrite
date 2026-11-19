@@ -292,7 +292,7 @@ public abstract class RewriteTest
                 }
                 var fresh = results.Count > 0 &&
                             (cycles > expectedCycles || validations.ParserShapedTrees || validations.TypesAttributed)
-                    ? ParseAgain(run.Finals, setup, projects)
+                    ? ParseAgain(run.Finals, FreshParseSetup(recipeSpec, setup), projects)
                     : null;
                 if (cycles > expectedCycles && fresh != null)
                 {
@@ -357,21 +357,32 @@ public abstract class RewriteTest
             .ToList();
         foreach (var check in recipeSpec.OutputCompilations)
         {
-            var target = check.References ?? recipeSpec.ReferenceAssemblies ?? throw new ArgumentException(
-                "ExpectOutputCompiles compiles against the ReferenceAssemblies when it isn't given references, " +
-                "and they are not set.");
-            var outputSetup = new CompileSetup(
-                check.References == null && setup != null
-                    ? setup.References
-                    : ResolveAssemblies(target).AddRange(recipeSpec.References),
-                check.Options ?? recipeSpec.CompilationOptions,
-                check.ParseOptions ?? recipeSpec.ParseOptions);
+            var outputSetup = OutputSetup(recipeSpec, check, setup);
             var compilations = projects.Compile(
                 units.Select(u => (projects.Of(u.Unit), outputSetup.Parse(u.Text, u.Unit.SourcePath))), outputSetup);
             AssertCompiles(compilations.Values.Distinct(), check.Inspect == null ? [] : [check.Inspect],
-                $"The recipe's output doesn't compile against {target.TargetFramework}");
+                $"The recipe's output doesn't compile against {Target(recipeSpec, check).TargetFramework}");
         }
     }
+
+    /// <summary>
+    /// How the output is compiled when it is parsed again, as the first <see cref="RecipeSpec.ExpectOutputCompiles"/>
+    /// compiles it, or else as the input was.
+    /// </summary>
+    private static CompileSetup? FreshParseSetup(RecipeSpec recipeSpec, CompileSetup? setup) =>
+        recipeSpec.OutputCompilations is [var first, ..] ? OutputSetup(recipeSpec, first, setup) : setup;
+
+    private static CompileSetup OutputSetup(RecipeSpec recipeSpec, OutputCompilation check, CompileSetup? setup) =>
+        new(check.References == null && setup != null
+                ? setup.References
+                : ResolveAssemblies(Target(recipeSpec, check)).AddRange(recipeSpec.References),
+            check.Options ?? recipeSpec.CompilationOptions,
+            check.ParseOptions ?? recipeSpec.ParseOptions);
+
+    private static ReferenceAssemblies Target(RecipeSpec recipeSpec, OutputCompilation check) =>
+        check.References ?? recipeSpec.ReferenceAssemblies ?? throw new ArgumentException(
+            "ExpectOutputCompiles compiles against the ReferenceAssemblies when it isn't given references, " +
+            "and they are not set.");
 
     private static void AssertCompiles(IEnumerable<CSharpCompilation> compilations,
         IReadOnlyList<Action<CSharpCompilation>> inspections, string headline)
@@ -1225,7 +1236,9 @@ public class RecipeSpec
     /// <paramref name="parseOptions"/> when they differ from <see cref="CompilationOptions"/> and
     /// <see cref="ParseOptions"/>, such as to treat warnings as errors or build a console app.
     /// <paramref name="inspect"/> gets the compilation of each project, such as to emit and run the output. Call it
-    /// once for each way the output has to compile.
+    /// once for each way the output has to compile. The first call also says how the output is parsed again for the
+    /// checks that the recipe leaves it alone and builds the trees the parser builds, since the next run reads the
+    /// migrated code as the project the recipe migrated builds it.
     /// </summary>
     public RecipeSpec ExpectOutputCompiles(ReferenceAssemblies? references = null,
         Action<CSharpCompilation>? inspect = null, CSharpCompilationOptions? options = null,
