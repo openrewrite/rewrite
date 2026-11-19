@@ -52,8 +52,8 @@ import java.util.stream.Stream;
  * <li>Whether code can move into a lambda: {@link #lambdaCanCapture(Collection)}. That a local
  * {@link Binding#isEffectivelyFinal() is effectively final} does not tell, since a lambda cannot assign a local it
  * captures.</li>
- * <li>Whether a variable is ever written: a {@link VariableAccess#isWriteAccess() write} among its
- * {@link Binding#references()}.</li>
+ * <li>Whether a local or parameter is ever written: a {@link VariableAccess#isWriteAccess() write} among its
+ * {@link Binding#references()}. A field's references are only those of its own class.</li>
  * <li>Whether code can use a variable or method already in reach: {@link #canReference(Binding)}. A visible name
  * is not always one the code may use, as an instance field is visible in a static method that cannot read it.</li>
  * </ul>
@@ -247,6 +247,7 @@ public class Scope implements Trait<J> {
      * visible at the position, a variable this scope binds, or any name this scope spells other than a member's name
      * after a dot. Counting what the scope spells keeps clear of later declarations in any language. Counting what
      * it binds covers a name it never spells, as a class's inherited field, when asked from the class itself.
+     * A field of an enclosing class counts as taken, though a new field could take its name and hide it.
      */
     public boolean isFree(String name) {
         Map<Object, Set<String>> spelled = perSourceFile(cursor).computeMessageIfAbsent(SPELLED, k -> new IdentityHashMap<>());
@@ -432,6 +433,8 @@ public class Scope implements Trait<J> {
      * The cursor of a tree under the one the given cursor holds, with every tree between the two. A cursor built by
      * hand that leaves one out, as {@code new Cursor(methodBody, lambdaBody)} leaves out the lambda, hides what that
      * tree binds. The tree is found by its id, so it may be an edited copy, which the cursor returned then holds.
+     * The trees above it are those of the given cursor, so a visit method that has edited its tree passes the
+     * cursor {@code updateCursor} gives for the edited one.
      *
      * @throws IllegalArgumentException where the tree is not under the cursor's tree
      */
@@ -925,6 +928,9 @@ public class Scope implements Trait<J> {
          * Where a class redeclares a member of its superclass, {@code super.name} refers to the inherited one, which
          * the class binds too. They are read from the scope's tree as it was when the binding was found, so a binding
          * found before an edit does not see it. Finding the binding again from a cursor on the edited tree does.
+         * <p>
+         * A field is read from outside its class too, and a subclass binds the field it inherits anew, so these are
+         * not every use of a field.
          */
         public Stream<Cursor> references() {
             return referencesInScope().of(this);

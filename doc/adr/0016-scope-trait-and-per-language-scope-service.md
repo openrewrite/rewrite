@@ -13,8 +13,9 @@ renaming it, or moving this block, make some name read something else?
 Each recipe answered them on its own. `VariableNameUtils` walked the whole file per call.
 `RenameVariable` kept a stack of scopes. The template generator had its own test for whether a
 branch completes normally, to know which `instanceof` pattern variables are in scope. Recipe modules
-carried more copies. The copies disagreed, and most compared variables by type attribution, which
-cannot tell apart two locals of one name and type declared in sibling blocks.
+carried more copies. The copies disagreed, and most compared variables by type attribution, whose
+`equals` and `TypeUtils.isOfType` take two locals of one name and type declared in sibling blocks of
+a method for the same variable.
 
 The JavaScript module already has a scope model that answers these questions from the tree alone.
 Languages built on `J` (Kotlin, Scala, Groovy) share most of Java's rules and part from them in a
@@ -70,6 +71,10 @@ language now includes writing its `ScopeService`.
 
 The API answers for the tree its cursor holds. A visitor that renames or declares several names in
 one pass sees none of its own edits, and keeps track of the names it has handed out.
+
+A binding is one name in one scope. A field has a binding in its own class, another in each class
+that inherits it, and none where it is selected from an instance of a class that is not around the
+access. Across classes a field is identified by its `JavaType.Variable`.
 
 Type names are bound only in part. A type of the same package, one brought in by an on-demand
 import, and an inherited member type the file never names are not bound, because the type model
