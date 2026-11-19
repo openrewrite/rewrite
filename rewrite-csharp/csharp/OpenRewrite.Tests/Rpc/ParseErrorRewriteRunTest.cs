@@ -41,7 +41,10 @@ public class ParseErrorRewriteRunTest(RpcFixture fixture) : RpcRewriteTest(fixtu
             new SourceSpec("<root><closed/></root>", SourcePath: "valid.xml", SourceFileType: XmlDocument)
         );
     }
+}
 
+public class ParseErrorPrintTest : RewriteTest
+{
     [Fact]
     public void AParseErrorPrintsItsText()
     {
@@ -53,5 +56,19 @@ public class ParseErrorRewriteRunTest(RpcFixture fixture) : RpcRewriteTest(fixtu
 
         // then
         Assert.Equal("class {", printed);
+    }
+
+    [Fact]
+    public void AParseErrorPrintsItsSearchResult()
+    {
+        // given
+        var parseError = SearchResult.Found(
+            ParseError.Build("broken.cs", "class {", new InvalidOperationException("boom")), "failed to parse");
+
+        // when
+        var printed = PrintTree(parseError);
+
+        // then
+        Assert.Equal("~~(failed to parse)~~>class {", printed);
     }
 }

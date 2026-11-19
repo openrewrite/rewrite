@@ -537,12 +537,12 @@ public abstract class RewriteTest
         }
     }
 
-    internal static string PrintTree(SourceFile tree, IMarkerPrinter? markerPrinter = null)
+    protected static string PrintTree(SourceFile tree, IMarkerPrinter? markerPrinter = null)
     {
         var capture = new PrintOutputCapture<object>(null!, markerPrinter ?? MarkerPrinter.Default);
         if (tree is ParseError parseError)
         {
-            capture.Append(parseError.Text);
+            PrintParseError(parseError, capture);
         }
         else if (tree is Xml.Document)
         {
@@ -554,6 +554,28 @@ public abstract class RewriteTest
         }
         return capture.ToString();
     }
+
+    private static void PrintParseError(ParseError parseError, PrintOutputCapture<object> capture)
+    {
+        var cursor = new Cursor(new Cursor(), parseError);
+        var markers = parseError.Markers.MarkerList;
+        foreach (var marker in markers)
+        {
+            capture.Append(capture.MarkerPrinter.BeforePrefix(marker, new Cursor(cursor, marker), ParseErrorMarkerWrapper));
+        }
+        foreach (var marker in markers)
+        {
+            capture.Append(capture.MarkerPrinter.BeforeSyntax(marker, new Cursor(cursor, marker), ParseErrorMarkerWrapper));
+        }
+        capture.Append(parseError.Text);
+        foreach (var marker in markers)
+        {
+            capture.Append(capture.MarkerPrinter.AfterSyntax(marker, new Cursor(cursor, marker), ParseErrorMarkerWrapper));
+        }
+    }
+
+    private static string ParseErrorMarkerWrapper(string content) =>
+        "~~" + content + (content.Length == 0 ? "" : "~~") + ">";
 
     private static readonly CsprojParser CsprojParserInstance = new();
 
