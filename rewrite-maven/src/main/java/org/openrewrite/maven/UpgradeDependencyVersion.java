@@ -365,7 +365,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
                 MavenResolutionResult mrr = getResolutionResult();
                 ResolvedPom pom = mrr.getPom();
-                boolean directVersionsPlanned = false;
+                boolean upgraded = false;
+                List<ResolvedManagedDependency> forModules = new ArrayList<>();
+                MavenDownloadingException failure = null;
                 for (ManagedDependency requested : pom.getRequested().getDependencyManagement()) {
                     if (!(requested instanceof ManagedDependency.Imported)) {
                         continue;
@@ -382,28 +384,32 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             !Objects.equals(bomArtifact, oldBom.getArtifactId())) {
                             continue;
                         }
-                        String newerVersion = findNewerVersion(bomGroup, bomArtifact, oldBom.getVersion(), ctx);
-                        if (newerVersion != null) {
-                            // Plan against the old model before a version property's after-visitor can replace it.
-                            if (!directVersionsPlanned) {
-                                RetainVersions.plan(this, retainVersions).forEach(it -> doAfterVisit(it.getVisitor()));
-                                directVersionsPlanned = true;
-                            }
-                            if (!mrr.getModules().isEmpty()) {
-                                MavenPomDownloader downloader = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
-                                        MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
-                                ResolvedPom newBom = downloader.download(new GroupArtifactVersion(bomGroup, bomArtifact, newerVersion),
-                                                null, pom, pom.getRepositories())
-                                        .resolve(emptyList(), downloader, ctx);
-                                for (ResolvedManagedDependency dependency : RetainVersions.planForModules(mrr, oldBom, newBom, retainVersions)) {
-                                    doAfterVisit(new AddManagedDependencyVisitor(dependency.getGroupId(), dependency.getArtifactId(),
-                                            requireNonNull(dependency.getVersion()), dependency.getScope() == null ? null :
-                                            dependency.getScope().toString().toLowerCase(), dependency.getType(), dependency.getClassifier(), null));
+                        // One BOM failing to download must not stop the others' versions being retained.
+                        try {
+                            String newerVersion = findNewerVersion(bomGroup, bomArtifact, oldBom.getVersion(), ctx);
+                            if (newerVersion != null) {
+                                upgraded = true;
+                                if (!mrr.getModules().isEmpty()) {
+                                    MavenPomDownloader downloader = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
+                                            MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
+                                    ResolvedPom newBom = downloader.download(new GroupArtifactVersion(bomGroup, bomArtifact, newerVersion),
+                                                    null, pom, pom.getRepositories())
+                                            .resolve(emptyList(), downloader, ctx);
+                                    forModules.addAll(RetainVersions.planForModules(mrr, oldBom, newBom, retainVersions));
                                 }
                             }
+                        } catch (MavenDownloadingException e) {
+                            failure = e;
                         }
                         break;
                     }
+                }
+                if (upgraded) {
+                    // Plan against the old model before a version property's after-visitor can replace it.
+                    RetainVersions.plan(this, retainVersions, forModules).forEach(this::doAfterVisit);
+                }
+                if (failure != null) {
+                    throw failure;
                 }
             }
 
