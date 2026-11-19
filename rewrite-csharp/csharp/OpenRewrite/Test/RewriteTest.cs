@@ -115,6 +115,23 @@ public abstract class RewriteTest
             }
         }
 
+        var projects = new Dictionary<string, DotNetProject>();
+        SourceFile BeforeRecipe(SourceSpec spec, SourceFile source)
+        {
+            if (spec.ProjectTargetFrameworks is { } targetFrameworks)
+            {
+                var key = string.Join(";", targetFrameworks);
+                if (!projects.TryGetValue(key, out var project))
+                {
+                    var name = projects.Count == 0 ? "Test" : $"Test{projects.Count + 1}";
+                    project = new DotNetProject(Tree.RandomId(), name, [..targetFrameworks], "Microsoft.NET.Sdk");
+                    projects[key] = project;
+                }
+                source = SourceSpec.AddMarker(source, project);
+            }
+            return spec.BeforeRecipeHooks.Aggregate(source, (s, adjust) => adjust(s));
+        }
+
         foreach (var spec in specs)
         {
             SourceFile source;
@@ -178,7 +195,7 @@ public abstract class RewriteTest
                 }
             }
 
-            parsed.Add((spec, source));
+            parsed.Add((spec, BeforeRecipe(spec, source)));
         }
 
         // 2. If recipe configured, run it and verify results
@@ -219,6 +236,10 @@ public abstract class RewriteTest
                 {
                     afterRecipe(runCtx);
                 }
+                foreach (var assertion in recipeSpec.ResultAssertions)
+                {
+                    assertion(results);
+                }
 
                 foreach (var (spec, source) in parsed)
                 {
@@ -240,6 +261,7 @@ public abstract class RewriteTest
                         Assert.True(result == null || result.After == null || result.Before == result.After,
                             "Recipe made unexpected changes to a source file that was not expected to change.");
                     }
+                    AfterRecipe(spec, source, result == null ? source : result.After);
                 }
 
                 if (run.Unsettled is var (cycle, changes))
@@ -266,6 +288,33 @@ public abstract class RewriteTest
             {
                 WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
             }
+        }
+        else
+        {
+            foreach (var assertion in recipeSpec.ResultAssertions)
+            {
+                assertion([]);
+            }
+            foreach (var (spec, source) in parsed)
+            {
+                AfterRecipe(spec, source, source);
+            }
+        }
+    }
+
+    private static void AfterRecipe(SourceSpec spec, SourceFile before, SourceFile? after)
+    {
+        if (spec.AfterRecipeHooks.IsEmpty)
+        {
+            return;
+        }
+        if (after == null)
+        {
+            Assert.Fail($"The recipe deleted {before.SourcePath}, which has AfterRecipe assertions.");
+        }
+        foreach (var assertion in spec.AfterRecipeHooks)
+        {
+            assertion(before, after);
         }
     }
 
@@ -590,7 +639,80 @@ public record SourceSpec(
     string Before,
     string? After = null,
     string? SourcePath = null,
-    string? SourceFileType = null);
+    string? SourceFileType = null)
+{
+    internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
+    internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];
+    internal ImmutableArray<string>? ProjectTargetFrameworks { get; private init; }
+
+    /// <summary>
+    /// Adjusts the parsed source before the recipe runs on it, after the parse and print checks, as when a test needs
+    /// a tree the parser doesn't make. The adjustments run in the order they were added.
+    /// </summary>
+    public SourceSpec BeforeRecipe(Func<CompilationUnit, CompilationUnit> adjust) =>
+        BeforeRecipe<CompilationUnit>(adjust);
+
+    /// <inheritdoc cref="BeforeRecipe(Func{CompilationUnit, CompilationUnit})"/>
+    public SourceSpec BeforeRecipe<T>(Func<T, T> adjust) where T : class, SourceFile =>
+        this with
+        {
+            BeforeRecipeHooks = BeforeRecipeHooks.Add(source => adjust(As<T>(source, nameof(BeforeRecipe))))
+        };
+
+    /// <summary>Adds markers to the parsed source before the recipe runs on it.</summary>
+    public SourceSpec AddMarkers(params Marker[] markers) =>
+        BeforeRecipe<SourceFile>(source => markers.Aggregate(source, AddMarker));
+
+    /// <summary>
+    /// Puts the C# source in an SDK-style project that targets the given frameworks, with the
+    /// <see cref="DotNetProject"/> marker that <see cref="SolutionParser"/> gives it. The project is named
+    /// <c>Test</c>, as <see cref="SolutionParser"/> names the project of <c>Test.csproj</c>, and the sources of a test
+    /// that target the same frameworks share it.
+    /// </summary>
+    public SourceSpec TargetFrameworks(params string[] targetFrameworks) =>
+        this with { ProjectTargetFrameworks = [..targetFrameworks] };
+
+    /// <summary>
+    /// Assertions on the source after the recipe ran, which get the source as the last expected cycle left it, or as
+    /// it was parsed when the recipe didn't change it.
+    /// </summary>
+    public SourceSpec AfterRecipe(Action<CompilationUnit> assertion) => AfterRecipe<CompilationUnit>(assertion);
+
+    /// <inheritdoc cref="AfterRecipe(Action{CompilationUnit})"/>
+    public SourceSpec AfterRecipe<T>(Action<T> assertion) where T : class, SourceFile =>
+        AfterRecipe<T>((_, after) => assertion(after));
+
+    /// <summary>
+    /// Assertions on the source as it was before the recipe ran and as the last expected cycle left it, the same tree
+    /// twice when the recipe didn't change it, such as that a type the recipe kept is the same object as before.
+    /// </summary>
+    public SourceSpec AfterRecipe(Action<CompilationUnit, CompilationUnit> assertion) =>
+        AfterRecipe<CompilationUnit>(assertion);
+
+    /// <inheritdoc cref="AfterRecipe(Action{CompilationUnit, CompilationUnit})"/>
+    public SourceSpec AfterRecipe<T>(Action<T, T> assertion) where T : class, SourceFile =>
+        this with
+        {
+            AfterRecipeHooks = AfterRecipeHooks.Add((before, after) =>
+                assertion(As<T>(before, nameof(AfterRecipe)), As<T>(after, nameof(AfterRecipe))))
+        };
+
+    internal static SourceFile AddMarker(SourceFile source, Marker marker)
+    {
+        var markers = source.Markers.Add(marker);
+        if (source is J j)
+        {
+            return (SourceFile)J.SetMarkers(j, markers);
+        }
+        var withMarkers = source.GetType().GetMethod("WithMarkers", [typeof(Markers)]) ??
+                          throw new ArgumentException($"{source.GetType().Name} has no markers to add to.");
+        return (SourceFile)withMarkers.Invoke(source, [markers])!;
+    }
+
+    private static T As<T>(SourceFile source, string hook) where T : class, SourceFile =>
+        source as T ?? throw new ArgumentException(
+            $"{hook} takes a {typeof(T).Name}, but {source.SourcePath} is a {source.GetType().Name}.");
+}
 
 /// <summary>
 /// Specification for recipe configuration in a test.
@@ -656,6 +778,20 @@ public class RecipeSpec
             var rows = (store?.GetRows(name, group) ?? []).Cast<TRow>().ToList();
             assertion(rows);
         });
+        return this;
+    }
+
+    private readonly List<Action<IReadOnlyList<Result>>> _resultAssertions = [];
+
+    internal IReadOnlyList<Action<IReadOnlyList<Result>>> ResultAssertions => _resultAssertions;
+
+    /// <summary>
+    /// Assertions on the changes of the run: the source files the expected cycles changed, generated or deleted,
+    /// each from how it was parsed to how the last of those cycles left it.
+    /// </summary>
+    public RecipeSpec ExpectResults(Action<IReadOnlyList<Result>> assertion)
+    {
+        _resultAssertions.Add(assertion);
         return this;
     }
 
