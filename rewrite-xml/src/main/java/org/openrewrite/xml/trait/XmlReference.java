@@ -15,13 +15,31 @@
  */
 package org.openrewrite.xml.trait;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.regex.Pattern;
+
 public abstract class XmlReference implements Reference {
+    private static final Pattern REFERENCE_PATTERN = Pattern.compile(
+            "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                    "(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
+
+    static @Nullable Kind referenceKind(@Nullable String value, boolean requireQualifiedType) {
+        if (value == null || !REFERENCE_PATTERN.matcher(value).matches()) {
+            return null;
+        }
+        int lastDot = value.lastIndexOf('.');
+        boolean type = Character.isUpperCase(value.charAt(lastDot + 1));
+        if (requireQualifiedType && (lastDot < 0 || !type)) {
+            return null;
+        }
+        return type ? Kind.TYPE : Kind.PACKAGE;
+    }
 
     @Override
     public Tree getTree() {
