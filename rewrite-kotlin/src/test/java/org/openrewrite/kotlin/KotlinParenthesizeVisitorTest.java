@@ -23,7 +23,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -34,10 +33,7 @@ class KotlinParenthesizeVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec
-          .recipe(toRecipe(Reparenthesize::new))
-          // the visitor reparenthesizes trees with their parentheses stripped, which no parser makes
-          .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build());
+        spec.recipe(toRecipe(Reparenthesize::new));
     }
 
     @DocumentExample

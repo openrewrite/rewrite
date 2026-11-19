@@ -320,6 +320,40 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void qualifierWhoseNameHasNoTypeKeepsItsImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                  J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                  if ("Entry".equals(fa.getSimpleName()) && fa.getTarget() instanceof J.FieldAccess map &&
+                      map.getName().getType() != null) {
+                      // a qualified name a recipe builds can have its type on the field access only
+                      fa = fa.withTarget(map.withName(map.getName().withType(null)));
+                      doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                  }
+                  return fa;
+              }
+          })),
+          //language=java
+          java(
+            """
+              class T {
+                  java.util.Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class T {
+                  Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conflictWithLocalType() {
         rewriteRun(
           //language=java

@@ -880,6 +880,8 @@ export const isIf = (tree: any): tree is J.If => tree["kind"] === J.Kind.If;
 export const isImport = (tree: any): tree is J.Import => tree["kind"] === J.Kind.Import;
 export const isLambda = (tree: any): tree is J.Lambda => tree["kind"] === J.Kind.Lambda;
 export const isLiteral = (tree: any): tree is J.Literal => tree["kind"] === J.Kind.Literal;
+export const isStringLiteral = (tree: any): tree is J.Literal & {value: string} =>
+    tree?.kind === J.Kind.Literal && typeof tree.value === "string";
 export const isMethodDeclaration = (n: any): n is J.MethodDeclaration => n.kind === J.Kind.MethodDeclaration;
 export const isMethodInvocation = (n: any): n is J.MethodInvocation => n.kind === J.Kind.MethodInvocation;
 export const isNamedVariable = (n: any): n is J.VariableDeclarations.NamedVariable => n.kind === J.Kind.NamedVariable;

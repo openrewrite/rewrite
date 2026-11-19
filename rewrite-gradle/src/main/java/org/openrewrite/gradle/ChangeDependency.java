@@ -42,6 +42,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
@@ -175,6 +176,12 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
          * against.
          */
         AtomicReference<@Nullable ProjectRepositories> repositories = new AtomicReference<>();
+
+        /**
+         * The repositories of every project but the root, which a root {@code subprojects} or {@code allprojects}
+         * block's dependencies resolve from.
+         */
+        Set<MavenRepository> subprojectRepositories = Collections.synchronizedSet(new LinkedHashSet<>());
     }
 
     @Override
@@ -203,6 +210,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     if (acc.repositories.get() == null || ":".equals(gradleProject.getPath())) {
                         acc.repositories.set(ProjectRepositories.of(gradleProject));
+                    }
+                    if (!":".equals(gradleProject.getPath())) {
+                        acc.subprojectRepositories.addAll(gradleProject.getMavenRepositories());
                     }
                 }
                 return super.visit(tree, ctx);
@@ -386,7 +396,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return m;
                 }
                 try {
-                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                    String resolvedVersion = versionSelector(dep.getCursor())
                             .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()),
                                     dep.getConfigurationName(), newVersion, versionPattern, ctx);
                     if (resolvedVersion != null && !resolvedVersion.equals(declaredVersion) &&
@@ -397,6 +407,38 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return e.warn(m);
                 }
                 return m;
+            }
+
+            /**
+             * Gradle resolves a dependency declared in the root's {@code subprojects} or {@code allprojects} block in each
+             * subproject, against that subproject's repositories, which the root project often does not declare itself.
+             */
+            private DependencyVersionSelector versionSelector(Cursor cursor) {
+                String block = enclosingProjectsBlock(cursor);
+                if (block == null || !":".equals(gradleProject.getPath()) || acc.subprojectRepositories.isEmpty()) {
+                    return new DependencyVersionSelector(metadataFailures, gradleProject, null);
+                }
+                Set<MavenRepository> repositories = new LinkedHashSet<>();
+                if ("allprojects".equals(block)) {
+                    repositories.addAll(gradleProject.getMavenRepositories());
+                }
+                synchronized (acc.subprojectRepositories) {
+                    repositories.addAll(acc.subprojectRepositories);
+                }
+                return new DependencyVersionSelector(metadataFailures,
+                        gradleProject.withMavenRepositories(new ArrayList<>(repositories)), null);
+            }
+
+            private @Nullable String enclosingProjectsBlock(Cursor cursor) {
+                for (Cursor c = cursor.getParent(); c != null; c = c.getParent()) {
+                    if (c.getValue() instanceof J.MethodInvocation) {
+                        String name = ((J.MethodInvocation) c.getValue()).getSimpleName();
+                        if ("subprojects".equals(name) || "allprojects".equals(name)) {
+                            return name;
+                        }
+                    }
+                }
+                return null;
             }
 
             private boolean isDowngrade(@Nullable String currentVersion, String candidateVersion) {
@@ -456,7 +498,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(declaredVersion) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         String resolvedVersion;
                         try {
-                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                            resolvedVersion = versionSelector(dep.getCursor())
                                     .select(new GroupArtifact(
                                                     !StringUtils.isBlank(newGroupId) ? newGroupId : dep.getGroupId(),
                                                     !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId()),

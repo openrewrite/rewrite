@@ -23,15 +23,22 @@ namespace OpenRewrite.CSharp;
 /// <see cref="CompilationUnit"/>, the C# counterpart of Java's <c>AddImport</c>. Designed to run
 /// as an after-visitor via <see cref="CSharpVisitor{P}.MaybeAddUsing"/>: the directive is only
 /// added when the type is referenced by its simple name (unless <c>onlyIfReferenced</c> is
-/// false), never duplicated — a textually matching plain or <c>global</c> using anywhere in the
-/// file is a no-op — and declined when the file already binds the simple name to a different
-/// type (the CS0104 risk). <c>using static</c> and alias directives are out of scope.
+/// false), never duplicated — a textually matching plain or <c>global</c> using visible from
+/// every reference is a no-op — and declined when the file already binds the simple name to a
+/// different type (the CS0104 risk). <c>using static</c> and alias directives are out of scope.
+/// <para>
+/// Visibility follows C# scoping: a compilation unit using covers the whole file, a namespace
+/// using covers only that namespace declaration and the namespaces nested in it. Without a
+/// reference to anchor on, each top-level namespace (and the compilation unit itself, for
+/// members outside any namespace) has to see the using.
+/// </para>
 /// <para>
 /// Placement follows the file: the compilation unit's using list when it has one, otherwise the
-/// first block-scoped namespace that keeps usings, otherwise the compilation unit (file-scoped
-/// namespaces keep usings at the compilation unit level). A sorted list stays sorted — plain
-/// ordinal or Visual Studio's System-first order, whichever the file already satisfies — and an
-/// unsorted list appends after its last using.
+/// innermost namespace enclosing every reference that still lacks the using and keeps usings,
+/// otherwise — when the file keeps its usings inside namespaces — the first using of that
+/// innermost enclosing block-scoped namespace, otherwise the compilation unit. A sorted list
+/// stays sorted — plain ordinal or Visual Studio's System-first order, whichever the file
+/// already satisfies — and an unsorted list appends after its last using.
 /// </para>
 /// </summary>
 public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
@@ -62,24 +69,70 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             return tree;
         }
 
-        if (AddUsing.HasNamespaceUsing(cu, _namespace)
-            || (_onlyIfReferenced && !IsReferenced(cu))
-            || AddUsing.IsShadowedInFile(cu, _typeName, _fullyQualifiedTypeName))
+        if (AddUsing.IsNamespaceUsingVisible(cu, [], _namespace))
         {
             return cu;
         }
 
-        return Insert(cu);
+        var scopes = ReferenceScopes(cu);
+        if (scopes.Count == 0)
+        {
+            if (_onlyIfReferenced)
+            {
+                return cu;
+            }
+            scopes = TopLevelScopes(cu);
+        }
+
+        var missing = scopes.Where(scope => !AddUsing.IsNamespaceUsingVisible(cu, scope, _namespace)).ToList();
+        if (missing.Count == 0 || AddUsing.IsShadowedInFile(cu, _typeName, _fullyQualifiedTypeName))
+        {
+            return cu;
+        }
+
+        return Insert(cu, CommonScope(missing));
     }
 
-    private bool IsReferenced(CompilationUnit cu)
+    private List<IReadOnlyList<NamespaceDeclaration>> ReferenceScopes(CompilationUnit cu)
     {
         var finder = new FindSimpleNameReference(_typeName, _fullyQualifiedTypeName);
         finder.Visit(cu, 0);
-        return finder.Found;
+        return finder.Scopes;
     }
 
-    private CompilationUnit Insert(CompilationUnit cu)
+    private static List<IReadOnlyList<NamespaceDeclaration>> TopLevelScopes(CompilationUnit cu)
+    {
+        var scopes = new List<IReadOnlyList<NamespaceDeclaration>>();
+        foreach (var member in cu.Members)
+        {
+            if (member.Element is NamespaceDeclaration ns)
+            {
+                scopes.Add([ns]);
+            }
+        }
+        if (scopes.Count < cu.Members.Count || scopes.Count == 0)
+        {
+            scopes.Add([]);
+        }
+        return scopes;
+    }
+
+    private static IReadOnlyList<NamespaceDeclaration> CommonScope(List<IReadOnlyList<NamespaceDeclaration>> scopes)
+    {
+        var common = scopes[0];
+        foreach (var scope in scopes.Skip(1))
+        {
+            var length = 0;
+            while (length < common.Count && length < scope.Count && common[length].Id == scope[length].Id)
+            {
+                length++;
+            }
+            common = common.Take(length).ToList();
+        }
+        return common;
+    }
+
+    private CompilationUnit Insert(CompilationUnit cu, IReadOnlyList<NamespaceDeclaration> scope)
     {
         var newline = DetectNewline(cu);
 
@@ -88,17 +141,55 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             return cu.WithUsings(InsertInto(cu.Usings, newline));
         }
 
-        foreach (var ns in AddUsing.Namespaces(cu.Members))
+        for (var i = scope.Count - 1; i >= 0; i--)
         {
-            if (ns.Name.Markers.FindFirst<Semicolon>() == null &&
-                ns.Usings.Any(u => u.Element is UsingDirective))
+            if (scope[i].Usings.Any(u => u.Element is UsingDirective))
             {
-                return (CompilationUnit)new ReplaceNamespaceUsings(ns.Id, InsertInto(ns.Usings, newline))
-                    .Visit(cu, 0)!;
+                return ReplaceNamespace(cu, scope[i].WithUsings(InsertInto(scope[i].Usings, newline)));
             }
         }
 
+        if (scope.Count > 0
+            && scope[^1] is { Members.Count: > 0 } innermost
+            && innermost.Name.Markers.FindFirst<Semicolon>() == null
+            && AddUsing.Namespaces(cu.Members).Any(ns => ns.Usings.Any(u => u.Element is UsingDirective)))
+        {
+            return ReplaceNamespace(cu, InsertFirstNamespaceUsing(innermost, newline));
+        }
+
         return InsertFirstUsing(cu, newline);
+    }
+
+    private static CompilationUnit ReplaceNamespace(CompilationUnit cu, NamespaceDeclaration replacement) =>
+        (CompilationUnit)new NamespaceReplacer(replacement).Visit(cu, 0)!;
+
+    /// <summary>A namespace without usings gets its first one before its first member, on that
+    /// member's indentation and separated from it by a blank line when the namespace spans
+    /// lines.</summary>
+    private NamespaceDeclaration InsertFirstNamespaceUsing(NamespaceDeclaration ns, string newline)
+    {
+        var usings = new List<JRightPadded<Statement>>(ns.Usings);
+        var first = ns.Members[0];
+        var prefix = first.Element.Prefix;
+        var lineStart = prefix.Whitespace.LastIndexOf('\n');
+        if (lineStart < 0)
+        {
+            usings.Add(JRightPadded<Statement>.Build(CreateUsing(Space.Format(prefix.Whitespace))));
+            return ns.WithUsings(usings);
+        }
+
+        var indent = prefix.Whitespace[(lineStart + 1)..];
+        usings.Add(JRightPadded<Statement>.Build(CreateUsing(Space.Format(newline + indent))));
+        ns = ns.WithUsings(usings);
+        if (prefix.Whitespace.Count(c => c == '\n') >= 2)
+        {
+            return ns;
+        }
+        var members = new List<JRightPadded<Statement>>(ns.Members)
+        {
+            [0] = first.WithElement(J.SetPrefix(first.Element, prefix.WithWhitespace(newline + newline + indent))),
+        };
+        return ns.WithMembers(members);
     }
 
     private List<JRightPadded<Statement>> InsertInto(IList<JRightPadded<Statement>> list, string newline)
@@ -326,11 +417,10 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     public override bool Equals(object? obj) => Equals(obj as AddUsing<P>);
     public override int GetHashCode() => HashCode.Combine(_fullyQualifiedTypeName, _onlyIfReferenced);
 
-    private sealed class ReplaceNamespaceUsings(Guid namespaceId, IList<JRightPadded<Statement>> usings)
-        : CSharpVisitor<int>
+    private sealed class NamespaceReplacer(NamespaceDeclaration replacement) : CSharpVisitor<int>
     {
         public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, int p) =>
-            ns.Id == namespaceId ? ns.WithUsings(usings) : base.VisitNamespaceDeclaration(ns, p);
+            ns.Id == replacement.Id ? replacement : base.VisitNamespaceDeclaration(ns, p);
     }
 
     /// <summary>
@@ -338,25 +428,41 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     /// type is the requested one, or when it carries no attribution at all — recipes synthesize
     /// short-name identifiers whose types only materialize on the next parse. Qualified
     /// spellings (the name side of a member access) do not count: they resolve without the
-    /// using.
+    /// using. Each reference is recorded with the namespace declarations enclosing it, outermost
+    /// first, once per innermost scope.
     /// </summary>
     private sealed class FindSimpleNameReference(string simpleName, string fullyQualifiedName)
         : CSharpVisitor<int>
     {
-        internal bool Found { get; private set; }
+        private readonly List<NamespaceDeclaration> _enclosing = [];
+        private readonly HashSet<Guid?> _seen = [];
 
-        public override J? Visit(Tree? tree, int p) => Found ? tree as J : base.Visit(tree, p);
+        internal List<IReadOnlyList<NamespaceDeclaration>> Scopes { get; } = [];
 
         public override J VisitUsingDirective(UsingDirective usingDirective, int p) => usingDirective;
+
+        public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, int p)
+        {
+            _enclosing.Add(ns);
+            try
+            {
+                return base.VisitNamespaceDeclaration(ns, p);
+            }
+            finally
+            {
+                _enclosing.RemoveAt(_enclosing.Count - 1);
+            }
+        }
 
         public override J VisitIdentifier(Identifier identifier, int p)
         {
             if (string.Equals(identifier.SimpleName, simpleName, StringComparison.Ordinal)
                 && !(Cursor.ParentTree.Value is FieldAccess parent && ReferenceEquals(parent.Name.Element, identifier))
                 && (TypeUtils.GetFullyQualifiedName(identifier.Type) is not { Length: > 0 } resolved
-                    || string.Equals(resolved, fullyQualifiedName, StringComparison.Ordinal)))
+                    || string.Equals(resolved, fullyQualifiedName, StringComparison.Ordinal))
+                && _seen.Add(_enclosing.Count > 0 ? _enclosing[^1].Id : null))
             {
-                Found = true;
+                Scopes.Add(_enclosing.ToList());
             }
             return identifier;
         }
@@ -396,9 +502,20 @@ public static class AddUsing
 
     /// <summary>True when the file already has a plain (non-static, non-alias) using for
     /// <paramref name="ns"/> — at the compilation unit level or on any namespace declaration,
-    /// including <c>global using</c> directives.</summary>
+    /// including <c>global using</c> directives. This does not say the using is visible
+    /// everywhere: a namespace using only covers that namespace declaration.</summary>
     public static bool HasNamespaceUsing(CompilationUnit cu, string ns) =>
-        UsingLists(cu).SelectMany(list => list).Any(padded =>
+        UsingLists(cu).Any(list => HasPlainUsing(list, ns));
+
+    /// <summary>True when a plain using for <paramref name="ns"/> is visible to code nested in
+    /// <paramref name="enclosing"/> (outermost first): at the compilation unit level, including
+    /// <c>global using</c> directives, or on one of those namespace declarations.</summary>
+    internal static bool IsNamespaceUsingVisible(CompilationUnit cu, IReadOnlyList<NamespaceDeclaration> enclosing,
+        string ns) =>
+        HasPlainUsing(cu.Usings, ns) || enclosing.Any(declaration => HasPlainUsing(declaration.Usings, ns));
+
+    private static bool HasPlainUsing(IList<JRightPadded<Statement>> usings, string ns) =>
+        usings.Any(padded =>
             padded.Element is UsingDirective { IsStatic: false, Alias: null } directive
             && string.Equals(QualifiedNameOf(directive.NamespaceOrType), ns, StringComparison.Ordinal));
 

@@ -45,8 +45,6 @@ internal static class AddedMarkersCheck
     /// <summary>Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows.</summary>
     private static readonly HashSet<string> RewriteRecipeMarkers =
     [
-        "org.openrewrite.marker.AlreadyReplaced",
-        "org.openrewrite.maven.marker.AlreadyIncremented",
         "org.openrewrite.yaml.MultilineScalarChanged",
         "org.openrewrite.java.search.UsesMethod$MethodMatch"
     ];
@@ -167,7 +165,7 @@ internal static class AddedMarkersCheck
         _ => ShapeOf(node.GetType()).Markers?.GetValue(node) as Markers
     };
 
-    private static List<object> ChildrenOf(object node)
+    internal static List<object> ChildrenOf(object node)
     {
         var children = new List<object>();
         foreach (var (property, many) in ShapeOf(node.GetType()).Children)

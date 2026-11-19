@@ -99,12 +99,6 @@ final class NameMatching {
         this.parseCtx = parseCtx;
     }
 
-    private static boolean validatesTypes(TypeValidation validation) {
-        return validation.classDeclarations() && validation.identifiers() && validation.methodDeclarations() &&
-               validation.variableDeclarations() && validation.methodInvocations() &&
-               validation.constructorInvocations();
-    }
-
     /**
      * @return null when the test turned these checks off or its run can't be repeated faithfully.
      */
@@ -114,10 +108,26 @@ final class NameMatching {
         RecipeSpec methodSpec = context.getTestMethodSpec();
         RecipeSpec classSpec = context.getTestClassSpec();
         // the reruns are on type attributed code, so the test has to attribute what the recipe gets and makes
-        boolean typesValidated = validatesTypes(TypeValidation.before(methodSpec, classSpec)) &&
-                                 validatesTypes(TypeValidation.after(methodSpec, classSpec));
-        if (!RecipeQualityValidation.of(methodSpec, classSpec).matchByTypeNotName() || !typesValidated ||
-            recipe.equals(Recipe.noop()) ||
+        if (!RecipeQualityValidation.of(methodSpec, classSpec).matchByTypeNotName() ||
+            !TypeValidation.validatesTypes(methodSpec, classSpec)) {
+            return null;
+        }
+        return ignoringOptOuts(recipe, runner, context, parsed, parsersFor, relativeTo, parseCtx);
+    }
+
+    /**
+     * The checks of {@link #of} whatever the test's opt-outs, so that {@link UnneededOptOuts} can find whether they
+     * pass.
+     *
+     * @return null when the run can't be repeated faithfully.
+     */
+    static @Nullable NameMatching ignoringOptOuts(Recipe recipe, RewriteRunner runner, RewriteRunner.Context context,
+                                                  List<SourceFile> parsed,
+                                                  Function<SourceFile, List<Parser.Builder>> parsersFor,
+                                                  @Nullable Path relativeTo, ExecutionContext parseCtx) {
+        RecipeSpec methodSpec = context.getTestMethodSpec();
+        RecipeSpec classSpec = context.getTestClassSpec();
+        if (recipe.equals(Recipe.noop()) ||
             runner != RewriteRunner.IN_PROCESS ||
             methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
             !methodSpec.getBeforeRecipes().isEmpty() || !classSpec.getBeforeRecipes().isEmpty() ||

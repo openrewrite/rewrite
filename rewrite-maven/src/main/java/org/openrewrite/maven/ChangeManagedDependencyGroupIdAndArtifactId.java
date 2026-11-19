@@ -134,8 +134,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
+            private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
             private List<Xml.Tag> supersededEntries = new ArrayList<>();
 
@@ -170,20 +169,14 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     }
                     String renamedVersion = null;
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    String changedGroupId = pom.getValue(t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId));
+                    String changedArtifactId = pom.getValue(t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId));
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
                             if (versionTag.isPresent()) {
-                                ResolvedPom pom = getResolutionResult().getPom();
-                                String resolvedGroupId = t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId);
-                                String resolvedArtifactId = t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId);
-                                if (resolvedArtifactId.contains("${")) {
-                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, pom.getProperties()::get);
-                                }
-                                if (resolvedGroupId.contains("${")) {
-                                    resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, pom.getProperties()::get);
-                                }
-                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId, resolvedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
+                                String resolvedNewVersion = resolveSemverVersion(ctx, changedGroupId, changedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
                                 renamedVersion = resolvedNewVersion;
                                 String versionTagValue = t.getChildValue("version").orElse(null);
                                 if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
@@ -201,7 +194,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (t != tag) {
                         maybeUpdateModel();
-                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
+                        doAfterVisit(isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
+                                RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId, null) :
+                                new RemoveRedundantDependencyVersions(changedGroupId, changedArtifactId, null, null).getVisitor());
                         GroupArtifactClassifierType renamedKey = managementKey(t);
                         Xml.Tag duplicate = null;
                         Xml.Tag block = getCursor().getParentTreeCursor().getValue();
@@ -215,8 +210,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                             String duplicateVersion = getResolutionResult().getPom()
                                     .getValue(duplicate.getChildValue("version").orElse(null));
                             supersededEntries.add(renamedEntryWins(renamedVersion, duplicateVersion) ? duplicate : t);
-                        } else if (isManagedElsewhereAtNewVersion(renamedKey)) {
-                            supersededEntries.add(t);
+                        } else if (checkIfNewDependencyPresent(changedGroupId, changedArtifactId, newVersion, t)) {
+                            doAfterVisit(new RemoveContentVisitor<>(t, true, true));
+                            maybeUpdateModel();
                         }
                     }
                 }
@@ -254,13 +250,29 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                        Semver.validate(version, null).getValue() instanceof ExactVersion;
             }
 
-            private boolean isManagedElsewhereAtNewVersion(GroupArtifactClassifierType key) {
-                for (ResolvedManagedDependency managed : getResolutionResult().getPom().getDependencyManagement()) {
-                    if (managed.matches(key.getGroupId(), key.getArtifactId(), key.getType(), key.getClassifier())) {
-                        return compareVersions(newVersion, managed.getVersion());
+            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version, Xml.Tag changed) {
+                if (groupId == null || artifactId == null) {
+                    return false;
+                }
+                ResolvedPom pom = getResolutionResult().getPom();
+                ResolvedManagedDependency existing = pom.getManagedDependency(groupId, artifactId,
+                        pom.getValue(changed.getChildValue("type").orElse(null)),
+                        pom.getValue(changed.getChildValue("classifier").orElse(null)));
+                if (existing == null) {
+                    return false;
+                }
+                // Subject to compareVersions below, an entry in this pom's top-level dependencyManagement replaces
+                // the renamed one whatever else the renamed one declares, since a pom must not manage the same
+                // coordinates twice. Any other existing entry replaces it only if both declare the same scope and
+                // the renamed one declares no tags beyond groupId, artifactId, version, type, classifier and scope.
+                if (!pom.getRequested().getDependencyManagement().contains(existing.getRequested())) {
+                    String scope = pom.getValue(changed.getChildValue("scope").orElse(null));
+                    if (!RemoveRedundantDependencyVersions.declaresOnlyCoordinatesVersionAndScope(changed) ||
+                        (scope == null ? null : Scope.fromName(scope)) != existing.getScope()) {
+                        return false;
                     }
                 }
-                return false;
+                return compareVersions(version, existing.getVersion());
             }
 
             private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
@@ -295,15 +307,18 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
+                String key = groupId + ':' + artifactId;
+                List<String> versions = availableVersionsByArtifact.get(key);
+                if (versions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
+                    versions = mavenMetadata.getVersioning().getVersions();
+                    availableVersionsByArtifact.put(key, versions);
+                }
+                List<String> availableVersions = new ArrayList<>();
+                for (String v : versions) {
+                    if (versionComparator.isValid(finalCurrentVersion, v)) {
+                        availableVersions.add(v);
                     }
-
                 }
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }

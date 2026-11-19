@@ -175,7 +175,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         kv = (Go.KeyValue) tempExpression;
         kv = kv.withMarkers(visitMarkers(kv.getMarkers(), p));
         kv = kv.withKeyExpr((Expression) visitAndCast(kv.getKeyExpr(), p));
-        return kv.getPadding().withValue(visitLeftPadded(kv.getPadding().getValue(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        kv = kv.getPadding().withValue(visitLeftPadded(kv.getPadding().getValue(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return kv.withType(visitType(kv.getType(), p));
     }
 
     public J visitSliceExpr(Go.SliceExpr slice, P p) {
@@ -194,7 +195,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         if (s.getMax() != null) {
             s = s.withMax((Expression) visitAndCast(s.getMax(), p));
         }
-        return s.withCloseBracket(visitSpace(s.getCloseBracket(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withCloseBracket(visitSpace(s.getCloseBracket(), Space.Location.LANGUAGE_EXTENSION, p));
+        return s.withType(visitType(s.getType(), p));
     }
 
     public J visitGoArrayType(Go.ArrayType arrayType, P p) {
@@ -538,7 +540,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
         b = b.withLeft((Expression) visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return b.withRight((Expression) visitAndCast(b.getRight(), p));
+        b = b.withRight((Expression) visitAndCast(b.getRight(), p));
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, P p) {

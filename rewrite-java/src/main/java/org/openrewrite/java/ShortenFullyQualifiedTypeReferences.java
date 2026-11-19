@@ -176,13 +176,14 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
                 JavaType type = fieldAccess.getType();
                 if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null &&
+                    fieldAccess.getSimpleName().equals(((JavaType.Class) type).getClassName()) &&
                     !keepQualified.test(((JavaType.Class) type).getFullyQualifiedName())) {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();
                     JavaType usedType = usedTypes.get(simpleName);
                     if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
-                        return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
+                        return shorten(fieldAccess);
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
                         if ("java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
@@ -200,15 +201,17 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
             }
 
             private J shorten(J.FieldAccess fieldAccess) {
-                if (!fieldAccess.getName().getAnnotations().isEmpty()) {
-                    return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
+                // the name has the type of the qualified name it replaces, which keeps the import that provides it
+                J.Identifier name = fieldAccess.getName().withType(fieldAccess.getType());
+                if (!name.getAnnotations().isEmpty()) {
+                    return name.withAnnotations(ListUtils.map(name.getAnnotations(), (i, a) -> {
                         if (i == 0) {
                             return a.withPrefix(fieldAccess.getPrefix());
                         }
                         return a;
                     }));
                 }
-                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                return name.withPrefix(fieldAccess.getPrefix());
             }
 
             private boolean isAnnotationTypeName() {

@@ -306,11 +306,15 @@ public class Cursor implements Heavyweight {
     }
 
     public <T> T computeMessageIfAbsent(String key, Function<String, ? extends T> mappingFunction) {
-        if (messages == null) {
-            messages = new HashMap<>();
+        T message = getMessage(key);
+        if (message == null) {
+            // The mapping function may store other messages on this cursor, which HashMap.computeIfAbsent forbids
+            message = mappingFunction.apply(key);
+            if (message != null) {
+                putMessage(key, message);
+            }
         }
-        //noinspection unchecked
-        return (T) messages.computeIfAbsent(key, mappingFunction);
+        return message;
     }
 
     /**

@@ -18,6 +18,7 @@ export * from "./namespaces";
 export * from "./visitor";
 export * from "./assertions";
 export * from "./parser";
+export * from "./xpath";
 
 import "./print";
 import "./rpc";

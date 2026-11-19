@@ -281,4 +281,17 @@ class LambdaTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void straySemicolonInBody() {
+        rewriteRun(
+          kotlin(
+            """
+              val f = { ; }
+              val g = { println() ; ; }
+              val h = { x: Int -> ; x }
+              """
+          )
+        );
+    }
 }

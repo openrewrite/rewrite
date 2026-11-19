@@ -123,6 +123,43 @@ public class RecordDeclarationTests : RewriteTest
     }
 
     [Fact]
+    public void CommentBeforeClassKeywordOfRecordClass()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                record /* c */ class R(int x);
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void CommentBeforeStructKeywordOfRecordStruct()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                record /* c */ struct S(int x);
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void LineBreakBeforeStructKeywordOfRecordStruct()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                public record
+                    struct S(int x);
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void RecordWithInheritance()
     {
         RewriteRun(

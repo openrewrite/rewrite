@@ -273,6 +273,7 @@ def pattern(
             the pattern code for parsing.
         dependencies: Optional PyPI packages required by the pattern
             (``{package: ">=version"}``; bare versions default to ``>=``).
+            Without them only the standard library resolves.
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
@@ -332,6 +333,7 @@ def _check_type_hints_resolved(tree: J, captures: Dict[str, Capture]) -> None:
     if unresolved:
         raise ValueError(
             f"Capture type hints did not resolve to a type: {', '.join(unresolved)}. "
-            "Import what a hint names through the pattern's `context`, and check that "
+            "Import what a hint names through the pattern's `context`, declare its package "
+            "in `dependencies` unless it is in the standard library, and check that "
             "ty-types is installed."
         )

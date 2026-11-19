@@ -32,7 +32,6 @@ import static org.openrewrite.xml.Assertions.xml;
     @Test
     void removeMatchingElementInMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
           xml(
             """
               <beans>
@@ -69,7 +68,6 @@ import static org.openrewrite.xml.Assertions.xml;
     @Test
     void fileNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
           xml(
             """
               <beans>

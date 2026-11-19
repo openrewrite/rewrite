@@ -165,6 +165,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         {
             return trailingComma.WithSuffix(VisitSpace(trailingComma.Suffix, p));
         }
+        if (marker is Struct structMarker)
+        {
+            return structMarker.WithPrefix(VisitSpace(structMarker.Prefix, p));
+        }
+        if (marker is RecordClass recordClass)
+        {
+            return recordClass.WithPrefix(VisitSpace(recordClass.Prefix, p));
+        }
 
         return base.VisitMarker(marker, p);
     }

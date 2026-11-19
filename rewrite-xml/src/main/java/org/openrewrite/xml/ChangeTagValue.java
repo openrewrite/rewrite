@@ -19,14 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.marker.AlreadyReplaced;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.List;
 import java.util.regex.Pattern;
-
-import static java.util.Collections.singletonList;
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -69,6 +67,11 @@ public class ChangeTagValue extends Recipe {
     }
 
     @Override
+    public int maxCycles() {
+        return Boolean.TRUE.equals(regex) ? 1 : super.maxCycles();
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlVisitor<ExecutionContext>() {
             private final XPathMatcher xPathMatcher = new XPathMatcher(elementName);
@@ -105,29 +108,23 @@ public class ChangeTagValue extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, P p) {
             Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
+            // Only a tag without child tags holds a value; comments around the text don't make it a container
             if (scope.isScope(t) &&
                     t.getContent() != null &&
-                    t.getContent().size() == 1 &&
-                    t.getContent().get(0) instanceof Xml.CharData) {
-                return updateUsingRegex(t, (Xml.CharData) t.getContent().get(0));
+                    t.getContent().stream().noneMatch(Xml.Tag.class::isInstance)) {
+                //noinspection unchecked
+                return t.withContent(ListUtils.map((List<Content>) t.getContent(), c ->
+                        c instanceof Xml.CharData ? updateUsingRegex((Xml.CharData) c) : c));
             }
             return t;
         }
 
-        private Xml.Tag updateUsingRegex(Xml.Tag t, Xml.CharData content) {
+        private Xml.CharData updateUsingRegex(Xml.CharData content) {
             String text = content.getText();
             if (Pattern.compile(oldValue).matcher(text).find()) {
-                Markers oldMarkers = content.getMarkers();
-                if (oldMarkers
-                        .findAll(AlreadyReplaced.class)
-                        .stream()
-                        .noneMatch(m -> oldValue.equals(m.getFind()) && newValue.equals(m.getReplace()))) {
-                    return t.withContent(singletonList(content
-                            .withText(text.replaceAll(oldValue, newValue))
-                            .withMarkers(oldMarkers.add(new AlreadyReplaced(randomId(), oldValue, newValue)))));
-                }
+                return content.withText(text.replaceAll(oldValue, newValue));
             }
-            return t;
+            return content;
         }
     }
 }

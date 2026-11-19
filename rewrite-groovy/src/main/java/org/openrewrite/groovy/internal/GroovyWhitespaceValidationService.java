@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.GSpace;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.tree.Space;
@@ -29,19 +30,23 @@ public class GroovyWhitespaceValidationService implements WhitespaceValidationSe
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, GSpace.Location loc, ExecutionContext executionContext) {
-                if(!StringUtils.isBlank(space.getWhitespace())) {
-                    return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
-                }
-                return space;
+                return validate(space);
             }
 
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext executionContext) {
-                if(!StringUtils.isBlank(space.getWhitespace())) {
-                    return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
-                }
-                return space;
+                return validate(space);
             }
         };
+    }
+
+    private static Space validate(Space space) {
+        Space validated = space.withComments(ListUtils.map(space.getComments(), c -> StringUtils.isBlank(c.getSuffix()) ? c :
+                c.withSuffix(mark(c.getSuffix()))));
+        return StringUtils.isBlank(validated.getWhitespace()) ? validated : validated.withWhitespace(mark(validated.getWhitespace()));
+    }
+
+    private static String mark(String text) {
+        return "~~(non-whitespace)~~>" + text + "<~~";
     }
 }

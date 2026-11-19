@@ -96,7 +96,9 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
      * Changes only the version token, preserving the requirement's original
      * whitespace, extras, and environment marker; returns {@code spec} unchanged
      * when the version is already the target (ignoring formatting), so no edit is
-     * made for a whitespace-only difference. The version is normalized via
+     * made for a whitespace-only difference, or when the current constraint already
+     * starts at or above it (see {@link PyProjectHelper#startsAtOrAbove}), so an
+     * upgrade never lowers the minimum version. The version is normalized via
      * {@link PyProjectHelper#normalizeVersionConstraint(String)}, so both
      * {@code "2.31.0"} and {@code ">=2.31.0"} are accepted.
      */
@@ -119,7 +121,8 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
         String newConstraint = PyProjectHelper.normalizeVersionConstraint(newVersion);
 
         // No change when the version is already the target, ignoring whitespace.
-        if (constraint.replaceAll("\\s+", "").equals(newConstraint)) {
+        if (constraint.replaceAll("\\s+", "").equals(newConstraint) ||
+                PyProjectHelper.startsAtOrAbove(constraint, newConstraint)) {
             return spec;
         }
 

@@ -103,7 +103,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     public J visitKeyValue(Go.KeyValue keyValue, RpcReceiveQueue q) {
         return keyValue
                 .withKeyExpr(q.receive(keyValue.getKeyExpr(), expr -> (Expression) visitNonNull(expr, q)))
-                .getPadding().withValue(q.receive(keyValue.getPadding().getValue(), el -> visitLeftPadded(el, q)));
+                .getPadding().withValue(q.receive(keyValue.getPadding().getValue(), el -> visitLeftPadded(el, q)))
+                .withType(q.receive(keyValue.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -114,7 +115,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 .getPadding().withLow(q.receive(slice.getPadding().getLow(), el -> visitRightPadded(el, q)))
                 .getPadding().withHigh(q.receive(slice.getPadding().getHigh(), el -> visitRightPadded(el, q)))
                 .withMax(q.receive(slice.getMax(), expr -> (Expression) visitNonNull(expr, q)))
-                .withCloseBracket(q.receive(slice.getCloseBracket(), space -> visitSpace(space, q)));
+                .withCloseBracket(q.receive(slice.getCloseBracket(), space -> visitSpace(space, q)))
+                .withType(q.receive(slice.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -294,7 +296,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
         return binary
                 .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.Binary.Type.class))))
-                .withRight(q.receive(binary.getRight(), expr -> (Expression) visitNonNull(expr, q)));
+                .withRight(q.receive(binary.getRight(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(binary.getType(), type -> visitType(type, q)));
     }
 
     @Override

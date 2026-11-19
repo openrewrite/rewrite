@@ -17,6 +17,12 @@
 package template
 
 import (
+	"reflect"
+	"strings"
+
+	"github.com/google/uuid"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parenthesize"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -54,14 +60,36 @@ func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) jav
 	// lives on the first child (e.g., MethodInvocation's Select).
 	// The cursor here walks the template, so the position a capture lands in is
 	// the placeholder's own.
-	return parenthesized(setLeadingPrefix(val, ident.Prefix), v.Cursor())
+	out := parenthesized(setLeadingPrefix(val, withCommentsOf(ident.Prefix, val.GetPrefix())), v.Cursor())
+	// A slot that holds a name only, such as a selector's member or what a
+	// declaration declares, keeps the placeholder, which fails the
+	// substitution rather than the visit.
+	if slot := slotOf(v.Cursor()); slot != nil && !reflect.TypeOf(out).AssignableTo(slot) {
+		return ident
+	}
+	return out
+}
+
+// A placeholder written in statement position is an identifier the parser
+// wraps in an expression statement. A statement bound to it takes the wrapper's
+// place rather than land in it, an expression statement holding an expression.
+func (v *substitutionVisitor) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	name, ok := placeholderName(es)
+	if !ok {
+		return v.GoVisitor.VisitExpressionStatement(es, p)
+	}
+	val := v.values.Get(name)
+	if _, isStatement := val.(java.Statement); !isStatement {
+		return v.GoVisitor.VisitExpressionStatement(es, p)
+	}
+	return setLeadingPrefix(withFreshIDs(val), withCommentsOf(es.Prefix, val.GetPrefix()))
 }
 
 // A list binding expands within the list its placeholder sits in, so the
 // placeholder's own visit leaves it in place for the enclosing call or block to
 // replace. Get holds only single bindings, and returns nil for a list.
 func (v *substitutionVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
-	visited := v.GoVisitor.VisitMethodInvocation(mi, p)
+	visited := v.GoVisitor.VisitMethodInvocation(v.withCalleeSubstituted(mi), p)
 	call, ok := visited.(*java.MethodInvocation)
 	if !ok {
 		return visited
@@ -73,6 +101,55 @@ func (v *substitutionVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p
 	c := *call
 	c.Arguments.Elements = expanded
 	return &c
+}
+
+// withCalleeSubstituted splices what a placeholder callee is bound to into the
+// call the way the parser shapes one: an identifier is the call's name, a
+// selector splits into the select and the name, and anything else is the
+// select of a call with an empty name. The name slot holds an identifier only,
+// so the identifier visit cannot do this itself.
+func (v *substitutionVisitor) withCalleeSubstituted(mi *java.MethodInvocation) *java.MethodInvocation {
+	if mi.Select != nil || mi.Name == nil {
+		return mi
+	}
+	name, ok := FromPlaceholder(mi.Name.Name)
+	if !ok {
+		return mi
+	}
+	val := v.values.Get(name)
+	if val == nil {
+		return mi
+	}
+	callee, ok := withFreshIDs(val).(java.Expression)
+	if !ok {
+		return mi
+	}
+	callee = setLeadingPrefix(callee, withCommentsOf(mi.Name.Prefix, callee.GetPrefix())).(java.Expression)
+	c := *mi
+	switch f := callee.(type) {
+	case *java.Identifier:
+		c.Name = f
+	case *java.FieldAccess:
+		c.Select = &java.RightPadded[java.Expression]{Element: f.Target, After: f.Name.Before}
+		c.Name = f.Name.Element
+	default:
+		if needsDelimiting(callee) {
+			callee = parenthesize.Wrap(callee)
+		}
+		c.Select = &java.RightPadded[java.Expression]{Element: callee}
+		c.Name = &java.Identifier{ID: uuid.New()}
+	}
+	return &c
+}
+
+// needsDelimiting reports a callee Go's grammar does not admit unparenthesized
+// before a call's argument list.
+func needsDelimiting(e java.Expression) bool {
+	switch e.(type) {
+	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary:
+		return true
+	}
+	return false
 }
 
 func (v *substitutionVisitor) VisitBlock(block *java.Block, p any) java.J {
@@ -148,7 +225,7 @@ func expandList[T java.J](v *substitutionVisitor, elements []java.RightPadded[T]
 		for i, value := range values {
 			// Returning the list untouched leaves the placeholder
 			// standing, which substitute reads as the failure it is.
-			element, ok := setPrefix(withFreshIDs(value), sep(i, prefix)).(T)
+			element, ok := setPrefix(withFreshIDs(value), withCommentsOf(sep(i, prefix), value.GetPrefix())).(T)
 			if !ok {
 				return elements, false
 			}
@@ -190,6 +267,43 @@ func holdsPlaceholder(j java.J) bool {
 		return !found
 	})
 	return found
+}
+
+// withCommentsOf is the whitespace a substituted subtree takes from where it
+// lands, keeping the comments it led with where it came from, indented as
+// what they precede now is. A comment that ends a line stays behind unless the
+// subtree lands at the start of one, as the line break would end the statement
+// before it.
+func withCommentsOf(at, from java.Space) java.Space {
+	comments := from.Comments()
+	if len(comments) == 0 {
+		return at
+	}
+	lead := trailingWhitespace(at)
+	if !strings.Contains(lead, "\n") {
+		for _, c := range comments {
+			if !c.Multiline || strings.Contains(c.Suffix, "\n") {
+				return at
+			}
+		}
+	}
+	indent := lead[strings.LastIndex(lead, "\n")+1:]
+	merged := append([]java.Comment(nil), at.Comments()...)
+	for _, c := range comments {
+		if i := strings.LastIndex(c.Suffix, "\n"); i >= 0 {
+			c.Suffix = c.Suffix[:i+1] + indent
+		}
+		merged = append(merged, c)
+	}
+	return java.MakeSpace(merged, at.Whitespace())
+}
+
+// trailingWhitespace is what a space ends with after its last comment.
+func trailingWhitespace(s java.Space) string {
+	if comments := s.Comments(); len(comments) > 0 {
+		return comments[len(comments)-1].Suffix
+	}
+	return s.Whitespace()
 }
 
 func setPrefix(j java.J, prefix java.Space) java.J {

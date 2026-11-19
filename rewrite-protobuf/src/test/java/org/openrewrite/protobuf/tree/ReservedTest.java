@@ -71,6 +71,22 @@ class ReservedTest implements RewriteTest {
     }
 
     @Test
+    void inEnum() {
+        rewriteRun(
+          proto(
+            """
+              syntax = 'proto2';
+              enum MyEnum {
+                FIRST = 0;
+                reserved 2, 9 to 11, 40 to max;
+                reserved "SECOND";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void stringLiterals() {
         rewriteRun(
           proto(

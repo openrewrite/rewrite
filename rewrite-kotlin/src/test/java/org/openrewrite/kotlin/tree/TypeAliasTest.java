@@ -86,4 +86,18 @@ class TypeAliasTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedTypeAlias() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  typealias S = String
+                  val s: S = ""
+              }
+              val t: A.S = ""
+              """
+          )
+        );
+    }
 }

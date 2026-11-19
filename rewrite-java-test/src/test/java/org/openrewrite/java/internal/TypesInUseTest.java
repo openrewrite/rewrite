@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
@@ -176,6 +177,32 @@ class TypesInUseTest implements RewriteTest {
                 assertThat(tiu.getDeclaredMethods()).isSameAs(declaredMethods);
                 assertThat(tiu.getUsedMethods()).isSameAs(usedMethods);
                 assertThat(tiu.getVariables()).isSameAs(variables);
+            })
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralBeforeStringClassKeepsStringSupertypes() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  String s() { return "s"; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType stringClass = cu.getTypesInUse().getTypesInUse().stream()
+                  .filter(t -> TypeUtils.isOfClassType(t, "java.lang.String"))
+                  .findFirst().orElseThrow();
+                // `getTypesInUse()` is identity-hashed, so pin the order in which the literal comes first
+                Set<JavaType> types = new LinkedHashSet<>();
+                types.add(JavaType.Primitive.String);
+                types.add(stringClass);
+
+                TypesInUse tiu = TypesInUse.of(cu, types, emptySet(), emptySet(), emptySet());
+
+                assertThat(tiu.hasType("java.io.Serializable", false)).isTrue();
             })
           )
         );

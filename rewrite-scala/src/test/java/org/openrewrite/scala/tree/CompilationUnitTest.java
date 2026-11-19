@@ -16,8 +16,10 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaParser;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -672,5 +674,16 @@ class CompilationUnitTest implements RewriteTest {
                 """
             )
         );
+    }
+
+    @Test
+    void withClassesAppendsClassesBeyondTheExistingOnes() {
+        ScalaParser parser = ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build();
+        S.CompilationUnit one = (S.CompilationUnit) parser.parse("class A").toList().getFirst();
+        S.CompilationUnit two = (S.CompilationUnit) parser.parse("class A\nclass B").toList().getFirst();
+
+        S.CompilationUnit cu = one.withClasses(two.getClasses());
+
+        assertThat(cu.printAll()).isEqualTo("class A\nclass B");
     }
 }

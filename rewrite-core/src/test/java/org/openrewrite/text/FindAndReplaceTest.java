@@ -17,8 +17,10 @@ package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class FindAndReplaceTest implements RewriteTest {
@@ -123,6 +125,31 @@ class FindAndReplaceTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplace("test", "tested", false, null, null, null, null, null)),
           text("test", "tested")
+        );
+    }
+
+    @Test
+    void noRecursiveAcrossManyCycles() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace("test", "tested", false, null, null, null, null, null))
+            .cycles(3).expectedCyclesThatMakeChanges(1),
+          text("test", "tested")
+        );
+    }
+
+    @Test
+    void leavesMatchesThatALaterRecipeIntroduces() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindAndReplace("foo", "bar", false, null, null, null, null, null),
+            toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return text.getText().contains("foo") ? text : text.withText(text.getText() + "\nfoo");
+                }
+            })
+          ),
+          text("foo", "bar\nfoo")
         );
     }
 

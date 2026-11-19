@@ -27,12 +27,17 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.csharp.CSharpPrinter;
 import org.openrewrite.csharp.CSharpVisitor;
+import org.openrewrite.csharp.marker.RecordClass;
+import org.openrewrite.csharp.marker.Struct;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +120,42 @@ class CsSerializationTest {
         assertThat(print(old)).isEqualTo(" run");
         assertThat(old.getPrefix()).isEqualTo(Space.SINGLE_SPACE);
         assertThat(print(old.withPrefix(Space.EMPTY))).isEqualTo("run");
+    }
+
+    @Test
+    void recordClassMarkerSerializedBeforePrefix() throws Exception {
+        RecordClass marker = new RecordClass(randomId(), Space.format(" /* c */ "));
+        assertThat(print(record(marker))).isEqualTo("record /* c */ class R {}");
+
+        ObjectNode json = mapper.valueToTree(marker);
+        json.remove("prefix");
+        RecordClass old = mapper.treeToValue(json, RecordClass.class);
+        assertThat(old.getPrefix()).isSameAs(Space.EMPTY);
+        assertThat(print(record(old))).isEqualTo("record class R {}");
+        J.ClassDeclaration oldRecord = record(old);
+        assertThat(new CSharpVisitor<Integer>().visit(oldRecord, 0)).isSameAs(oldRecord);
+    }
+
+    @Test
+    void structMarkerSerializedBeforePrefix() throws Exception {
+        Struct marker = new Struct(randomId(), Space.format("\n    "));
+        assertThat(print(record(marker))).isEqualTo("record\n    struct R {}");
+
+        ObjectNode json = mapper.valueToTree(marker);
+        json.remove("prefix");
+        Struct old = mapper.treeToValue(json, Struct.class);
+        assertThat(old.getPrefix()).isSameAs(Space.EMPTY);
+        assertThat(print(record(old))).isEqualTo("record struct R {}");
+        J.ClassDeclaration oldRecord = record(old);
+        assertThat(new CSharpVisitor<Integer>().visit(oldRecord, 0)).isSameAs(oldRecord);
+    }
+
+    private static J.ClassDeclaration record(Marker keyword) {
+        return new J.ClassDeclaration(randomId(), Space.EMPTY, Markers.build(List.of(keyword)), emptyList(), emptyList(),
+          new J.ClassDeclaration.Kind(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), J.ClassDeclaration.Kind.Type.Record),
+          identifier("R").withPrefix(Space.SINGLE_SPACE), null, null, null, null, null,
+          new J.Block(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, JRightPadded.build(false), emptyList(), Space.EMPTY),
+          null);
     }
 
     private static J.Identifier identifier(String name) {

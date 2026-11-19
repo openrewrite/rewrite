@@ -45,9 +45,12 @@ public class TypeValidation {
     private boolean classDeclarations = true;
 
     /**
-     * Controls whether identifiers declarations are validated to have valid type metadata.
+     * Controls whether identifiers and field accesses, such as {@code x} and {@code this.x}, are validated to have
+     * valid type metadata.
      * Within even a well-formed Java LST not all identifiers typically have type metadata, so even when enabled some
      * identifiers are allowed to have null type.
+     * To allow only untyped field accesses, use
+     * {@code allowMissingType(r -> ((FindMissingTypes.MissingTypeResult) r).getJ() instanceof J.FieldAccess)}.
      */
     @Builder.Default
     private boolean identifiers = true;
@@ -188,6 +191,21 @@ public class TypeValidation {
         }
         // after type validation defaults to before type validation; possibly this will become stricter in the future
         return typeValidation != null ? typeValidation : before(testMethodSpec, testClassSpec);
+    }
+
+    /**
+     * Whether the test validates the type attribution of the recipe's input and output, which checks that compare
+     * the types of code need.
+     */
+    static boolean validatesTypes(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        return validatesTypes(before(testMethodSpec, testClassSpec)) &&
+               validatesTypes(after(testMethodSpec, testClassSpec));
+    }
+
+    private static boolean validatesTypes(TypeValidation validation) {
+        return validation.classDeclarations() && validation.identifiers() && validation.methodDeclarations() &&
+               validation.variableDeclarations() && validation.methodInvocations() &&
+               validation.constructorInvocations();
     }
 
     @SuppressWarnings("deprecation")

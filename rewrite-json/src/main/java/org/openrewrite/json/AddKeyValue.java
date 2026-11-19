@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -39,8 +40,9 @@ import static org.openrewrite.Tree.randomId;
 public class AddKeyValue extends Recipe {
 
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate the *parent* JSON entry.",
-            example = "'$.subjects.*' or '$' or '$.x[1].y.*' etc.")
+            description = "A JsonPath expression to locate the *parent* JSON object, either the object itself or the key holding it. " +
+                          "A trailing `.*` is ignored, so `$.x.y.*` is the same as `$.x.y`.",
+            example = "'$.subjects' or '$' or '$.x[1].y' etc.")
     String keyPath;
 
     @Option(displayName = "Key",
@@ -69,13 +71,14 @@ public class AddKeyValue extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JsonIsoVisitor<ExecutionContext>() {
-            private final JsonPathMatcher pathMatcher = new JsonPathMatcher(keyPath);
+            private final JsonPathMatcher pathMatcher = new JsonPathMatcher(
+                    keyPath.endsWith(".*") && !keyPath.endsWith("..*") ? keyPath.substring(0, keyPath.length() - 2) : keyPath);
 
             @Override
             public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext ctx) {
                 obj = super.visitObject(obj, ctx);
 
-                if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
+                if (matchesKeyPath() && objectDoesNotContainKey(obj, key)) {
                     List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
                     boolean jsonIsEmpty = members.isEmpty() || members.get(0).getElement() instanceof Json.Empty;
                     Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ?
@@ -99,6 +102,14 @@ public class AddKeyValue extends Recipe {
                             new JsonRightPadded<>(added, beforeClosingBrace, Markers.EMPTY)));
                 }
                 return obj;
+            }
+
+            private boolean matchesKeyPath() {
+                if (pathMatcher.matches(getCursor())) {
+                    return true;
+                }
+                Cursor parent = getCursor().getParentTreeCursor();
+                return parent.getValue() instanceof Json.Member && pathMatcher.matches(parent);
             }
 
             private JsonValue parsedValue() {

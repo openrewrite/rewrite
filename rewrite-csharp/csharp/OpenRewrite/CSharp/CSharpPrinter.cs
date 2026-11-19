@@ -1357,21 +1357,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         // Print class kind (class, struct, record, interface, etc.)
         VisitSpace(classDecl.ClassKind.Prefix, p);
-        var isStruct = classDecl.Markers.FindFirst<Struct>() != null;
-        var isRecordClass = classDecl.Markers.FindFirst<RecordClass>() != null;
+        var structMarker = classDecl.Markers.FindFirst<Struct>();
+        var recordClass = classDecl.Markers.FindFirst<RecordClass>();
         var isRecord = classDecl.ClassKind.Type == ClassDeclaration.KindType.Record;
 
-        if (isRecord && isStruct)
+        if (isRecord && structMarker != null)
         {
-            // record struct
-            p.Append("record struct");
+            p.Append("record");
+            VisitSpace(structMarker.Prefix.IsEmpty ? Space.SingleSpace : structMarker.Prefix, p);
+            p.Append("struct");
         }
-        else if (isRecord && isRecordClass)
+        else if (isRecord && recordClass != null)
         {
-            // record class (explicit class keyword)
-            p.Append("record class");
+            p.Append("record");
+            VisitSpace(recordClass.Prefix.IsEmpty ? Space.SingleSpace : recordClass.Prefix, p);
+            p.Append("class");
         }
-        else if (isStruct)
+        else if (structMarker != null)
         {
             // plain struct
             p.Append("struct");

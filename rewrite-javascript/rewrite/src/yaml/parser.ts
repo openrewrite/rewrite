@@ -417,9 +417,13 @@ class YamlCstReader {
         let pendingPrefix = "";
 
         for (const item of cst.items) {
-            const result = this.convertSequenceEntry(item, true, pendingPrefix);
-            entries.push(result.entry);
-            pendingPrefix = result.trailingContent;
+            if (item.value !== undefined || (item.start || []).some(t => t.type === 'seq-item-ind')) {
+                const result = this.convertSequenceEntry(item, true, pendingPrefix);
+                entries.push(result.entry);
+                pendingPrefix = result.trailingContent;
+            } else {
+                pendingPrefix += this.concatenateSources(item.start || []);
+            }
         }
 
         return {
@@ -588,7 +592,24 @@ class YamlCstReader {
             for (let i = 0; i < cst.items.length; i++) {
                 const item = cst.items[i];
                 const isLast = i === cst.items.length - 1;
-                const result = this.convertFlowSequenceEntry(item, isLast, pendingPrefix);
+                let start = item.start || [];
+                const comma = start.findIndex(token => token.type === 'comma');
+                if (comma >= 0) {
+                    if (comma > 0 && entries.length > 0) {
+                        const previous = entries[entries.length - 1];
+                        entries[entries.length - 1] = {
+                            ...previous,
+                            trailingCommaPrefix: (previous.trailingCommaPrefix ?? "") + this.concatenateSources(start.slice(0, comma))
+                        };
+                    }
+                    start = start.slice(comma + 1);
+                }
+                if (isLast && item.key === undefined && !item.value &&
+                    start.every(token => token.type === 'space' || token.type === 'newline' || token.type === 'comment')) {
+                    pendingPrefix += this.concatenateSources(start);
+                    break;
+                }
+                const result = this.convertFlowSequenceEntry({...item, start}, isLast, pendingPrefix);
                 entries.push(result.entry);
                 pendingPrefix = result.trailingContent;
             }
@@ -689,28 +710,13 @@ class YamlCstReader {
     }
 
     private convertFlowSequenceEntry(item: CstCollectionItem, isLast: boolean, pendingPrefix: string): {entry: Yaml.SequenceEntry, trailingContent: string} {
-        // Start tokens may include comma from previous item
+        const startTokens = item.start || [];
         let prefix = pendingPrefix;
-        let hasComma = false;
-
-        for (const token of item.start || []) {
-            if (token.type === 'comma') {
-                hasComma = true;
-            } else {
-                prefix += token.source;
-            }
-        }
-
         let block: Yaml.Block;
         let trailing = "";
 
-        if (item.value) {
-            const valueResult = this.convertTokenWithTrailing(item.value);
-            block = valueResult.node as Yaml.Block;
-            trailing = valueResult.trailing;
-        } else if (item.key !== undefined) {
-            // Flow sequence can contain mapping entries: [a: 1, b: 2]
-            const entryResult = this.convertFlowMappingEntry(item, "");
+        if (item.key !== undefined) {
+            const entryResult = this.convertFlowMappingEntry({...item, start: startTokens}, "");
             block = {
                 kind: Yaml.Kind.Mapping,
                 id: randomId(),
@@ -723,7 +729,13 @@ class YamlCstReader {
                 tag: undefined
             };
             trailing = entryResult.trailingContent;
+        } else if (item.value) {
+            prefix += this.concatenateSources(startTokens);
+            const valueResult = this.convertTokenWithTrailing(item.value);
+            block = valueResult.node as Yaml.Block;
+            trailing = valueResult.trailing;
         } else {
+            prefix += this.concatenateSources(startTokens);
             block = this.createEmptyScalar();
         }
 

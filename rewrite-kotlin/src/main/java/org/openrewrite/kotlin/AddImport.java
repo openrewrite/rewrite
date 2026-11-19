@@ -238,11 +238,13 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
     }
 
     private boolean isTypeReference(NameTree t) {
-        boolean isTypRef = true;
-        if (t instanceof J.FieldAccess) {
-            isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName);
+        if (!(t instanceof J.FieldAccess)) {
+            return true;
         }
-        return isTypRef;
+        // Only the type's simple name needs the type imported, not `Outer.Nested.CONST` or `node.next`
+        Expression target = ((J.FieldAccess) t).getTarget();
+        return target instanceof J.Identifier && ((J.Identifier) target).getFieldType() == null &&
+               isOfClassType(target.getType(), fullyQualifiedName);
     }
 
     private boolean simpleNameIsAmbiguous(K.CompilationUnit cu) {

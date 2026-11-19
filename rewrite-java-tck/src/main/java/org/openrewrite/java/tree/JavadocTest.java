@@ -2249,8 +2249,6 @@ class JavadocTest implements RewriteTest {
     @Test
     void varargsWithPrefix() {
         rewriteRun(
-          // for some reason the compiler AST's type attribution is incomplete here
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               class A {
@@ -2759,6 +2757,28 @@ class JavadocTest implements RewriteTest {
                *\ta
                *\t\tb
                * \t@param x y
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginBeforeHtmlElement() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * States: <br>
+               * <ol>
+               * \t<li> 1. Pending read
+               *  <li> 2. Header assembled
+               * </ol>
+               * <ul>
+               * \t<li><b>100:</b> Local storage</li>
+               * </ul>
+               * @author Someone
                */
               class Test {}
               """
@@ -3417,5 +3437,116 @@ class JavadocTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void aMarginStarOnTheOpeningLine() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**   * Get x
+                 * @return x
+                 **/  int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void withAClosingLine() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**   * Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void twoStars() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**  ** Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void oneLineParsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** * Get x */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void noMarginParsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void parsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /*** Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void aStarInTheText() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** a * b
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
     }
 }

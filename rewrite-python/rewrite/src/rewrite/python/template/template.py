@@ -401,6 +401,7 @@ def template(
             the template code for parsing.
         dependencies: Optional PyPI packages required by the template
             (``{package: ">=version"}``; bare versions default to ``>=``).
+            Without them only the standard library resolves.
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:

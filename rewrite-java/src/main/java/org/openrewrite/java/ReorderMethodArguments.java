@@ -25,7 +25,9 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
@@ -137,7 +139,9 @@ public class ReorderMethodArguments extends Recipe {
 
                 List<JRightPadded<Expression>> originalArgs = getPaddedArguments(m);
 
-                int resolvedParamCount = m.getMethodType().getParameterTypes().size();
+                // the reordered call invokes a method that declares these parameters in the new order
+                List<JavaType> paramTypes = m.getMethodType().getParameterTypes();
+                int resolvedParamCount = paramTypes.size();
 
                 int i = 0;
                 List<JRightPadded<Expression>> reordered = new ArrayList<>(originalArgs.size());
@@ -146,15 +150,29 @@ public class ReorderMethodArguments extends Recipe {
                 List<Space> formattings = new ArrayList<>(originalArgs.size());
                 List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
 
+                // a single argument in the varargs position is a varargs element unless it is the array itself
+                boolean varargsElements = originalArgs.size() > resolvedParamCount ||
+                        resolvedParamCount > 0 && originalArgs.size() == resolvedParamCount &&
+                        m.getMethodType().hasFlags(Flag.Varargs) &&
+                        !(originalArgs.get(resolvedParamCount - 1).getElement().getType() instanceof JavaType.Array);
+
                 for (String name : newParameterNames) {
                     int fromPos = paramNames.indexOf(name);
-                    if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
+                    if (varargsElements && fromPos == resolvedParamCount - 1) {
                         // this is a varargs argument
                         List<JRightPadded<Expression>> varargs = originalArgs.subList(fromPos, originalArgs.size());
                         reordered.addAll(varargs);
-                        for (int j = 0; j < varargs.size(); j++) {
-                            reorderedNames.add(name + j);
-                            reorderedTypes.add(varargs.get(j).getElement().getType());
+                        if (name.equals(newParameterNames[newParameterNames.length - 1])) {
+                            // still last, so the reordered method takes them as varargs too
+                            reorderedNames.add(name);
+                            reorderedTypes.add(paramTypes.get(fromPos));
+                        } else {
+                            JavaType.Array varargsType = TypeUtils.asArray(paramTypes.get(fromPos));
+                            for (int j = 0; j < varargs.size(); j++) {
+                                reorderedNames.add(name + j);
+                                reorderedTypes.add(varargsType == null ? varargs.get(j).getElement().getType() :
+                                        varargsType.getElemType());
+                            }
                         }
                         for (JRightPadded<Expression> exp : originalArgs.subList(i, (i++) + varargs.size())) {
                             formattings.add(exp.getElement().getPrefix());
@@ -164,7 +182,8 @@ public class ReorderMethodArguments extends Recipe {
                         JRightPadded<Expression> originalArg = originalArgs.get(fromPos);
                         reordered.add(originalArg);
                         reorderedNames.add(name);
-                        reorderedTypes.add(originalArg.getElement().getType());
+                        reorderedTypes.add(fromPos < resolvedParamCount ? paramTypes.get(fromPos) :
+                                originalArg.getElement().getType());
                         formattings.add(originalArgs.get(i).getElement().getPrefix());
                         rightFormattings.add(originalArgs.get(i++).getAfter());
                     }
@@ -187,6 +206,13 @@ public class ReorderMethodArguments extends Recipe {
                     JavaType.Method mt = m.getMethodType()
                             .withParameterNames(reorderedNames)
                             .withParameterTypes(reorderedTypes);
+                    if (mt.hasFlags(Flag.Varargs) &&
+                        paramNames.indexOf(newParameterNames[newParameterNames.length - 1]) != resolvedParamCount - 1) {
+                        // the varargs parameter moves off the last position
+                        Set<Flag> flags = EnumSet.copyOf(mt.getFlags());
+                        flags.remove(Flag.Varargs);
+                        mt = mt.withFlags(flags);
+                    }
                     m = withPaddedArguments(m, reordered)
                             .withMethodType(mt);
                     if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {

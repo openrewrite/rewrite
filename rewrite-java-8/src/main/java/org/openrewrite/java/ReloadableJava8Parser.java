@@ -22,6 +22,7 @@ import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import lombok.Getter;
@@ -97,6 +98,12 @@ class ReloadableJava8Parser implements JavaParser {
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
+        try {
+            // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
+            pfm.setLocation(StandardLocation.SOURCE_PATH, java.util.Collections.emptyList());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         context.put(JavaFileManager.class, this.pfm);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
@@ -169,7 +176,13 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        compilerLog.compilationErrors = ctx.getMessage(JavaParser.COMPILATION_ERRORS);
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus;
+        try {
+            cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        } finally {
+            compilerLog.compilationErrors = null;
+        }
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
@@ -232,7 +245,12 @@ class ReloadableJava8Parser implements JavaParser {
                 }
                 while (!delegate.todo.isEmpty()) {
                     try {
-                        delegate.attribute(delegate.todo);
+                        if (compilerLog.compilationErrors == null) {
+                            delegate.attribute(delegate.todo);
+                        } else {
+                            // javac reports some errors, such as an unreported exception, as it analyzes the flow
+                            delegate.flow(delegate.attribute(delegate.todo));
+                        }
                     } catch (Throwable t) {
                         handleParsingException(ctx, t);
                     }
@@ -301,8 +319,25 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     private static class ResettableLog extends Log {
+        @Nullable Collection<Diagnostic<? extends JavaFileObject>> compilationErrors;
+
         protected ResettableLog(Context context) {
             super(context);
+            // Installed first, it stays below the handlers that javac installs and removes, which pass on the
+            // errors of code that javac keeps and discard those of an attribution it only tries.
+            new DiagnosticHandler() {
+                {
+                    install(ResettableLog.this);
+                }
+
+                @Override
+                public void report(JCDiagnostic diagnostic) {
+                    if (compilationErrors != null && diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                        compilationErrors.add(diagnostic);
+                    }
+                    prev.report(diagnostic);
+                }
+            };
         }
 
         public void reset() {

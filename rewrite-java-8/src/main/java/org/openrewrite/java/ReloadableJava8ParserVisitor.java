@@ -1568,8 +1568,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
         }
 
-        List<JLeftPadded<Space>> beforeDimensions = emptyList();
-
         Space varargs = null;
         if (typeExpr != null) {
             int varargStart = indexOfNextNonWhitespace(cursor, source);
@@ -1608,7 +1606,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, beforeDimensions, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, vars);
     }
 
     private List<Tree> parametersWithReceiver(MethodTree node) {

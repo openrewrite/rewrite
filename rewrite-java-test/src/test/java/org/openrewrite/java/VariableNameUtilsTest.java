@@ -51,7 +51,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @SuppressWarnings("all")
@@ -98,6 +98,58 @@ class VariableNameUtilsTest implements RewriteTest {
                 return identifier;
             }
         }));
+    }
+
+    @Test
+    void namesOfTheWholeFileFromItsOwnCursor() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  assertThat(VariableNameUtils.findNamesInScope(getCursor())).containsExactlyInAnyOrder("field", "local");
+                  return cu;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  int field;
+                  void m() {
+                      int local;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inheritedNamesFromTheCursorOfTheClassItself() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if ("Test".equals(classDecl.getSimpleName())) {
+                      assertThat(VariableNameUtils.findNamesInScope(getCursor())).containsExactlyInAnyOrder("inherited", "field");
+                  }
+                  return classDecl;
+              }
+          })),
+          java(
+            """
+              class Base {
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              class Test extends Base {
+                  int field;
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -407,8 +459,8 @@ class VariableNameUtilsTest implements RewriteTest {
 
     @CsvSource(value = {
       "caseA:caseA,methodParam,methodBlockA",
-      "caseB:caseB,methodParam,methodBlockA",
-      "defaultBlock:defaultBlock,methodParam,methodBlockA"
+      "caseB:caseB,caseA,methodParam,methodBlockA",
+      "defaultBlock:defaultBlock,caseA,caseB,methodParam,methodBlockA"
     }, delimiter = ':')
     @ParameterizedTest
     @SuppressWarnings("DuplicateBranchesInSwitch")
@@ -442,9 +494,9 @@ class VariableNameUtilsTest implements RewriteTest {
     @CsvSource(value = {
       "resourceA:resourceA,methodBlockA",
       "tryBlock:tryBlock,methodBlockA,resourceA,resourceB",
-      "catchControl:catchControl,methodBlockA,resourceA,resourceB",
-      "catchBlock:catchBlock,methodBlockA,resourceA,resourceB,catchControl",
-      "finallyBlock:finallyBlock,methodBlockA,resourceA,resourceB"
+      "catchControl:catchControl,methodBlockA",
+      "catchBlock:catchBlock,methodBlockA,catchControl",
+      "finallyBlock:finallyBlock,methodBlockA"
     }, delimiter = ':')
     @ParameterizedTest
     void tryCatchFinally(String scope, String result) {
@@ -518,7 +570,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return lambda;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import java.util.function.Consumer;
@@ -567,7 +619,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
                   return identifier;
               }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+          })).typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               @SuppressWarnings("all")

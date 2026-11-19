@@ -176,6 +176,8 @@ func (s *GoSender) VisitGoBinary(b *golang.Binary, p any) java.J {
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSend(b, func(v any) any { return v.(*golang.Binary).Right },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(b, func(v any) any { return AsRef(v.(*golang.Binary).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return b
 }
 
@@ -230,6 +232,8 @@ func (s *GoSender) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(kv, func(v any) any { return v.(*golang.KeyValue).Value },
 		func(v any) { sendLeftPadded(s, v, q) })
+	q.GetAndSend(kv, func(v any) any { return AsRef(v.(*golang.KeyValue).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return kv
 }
 
@@ -258,6 +262,8 @@ func (s *GoSender) VisitSlice(sl *golang.Slice, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(sl, func(v any) any { return spaceRef(v.(*golang.Slice).CloseBracket) },
 		func(v any) { sendSpace(v.(java.Space), q) })
+	q.GetAndSend(sl, func(v any) any { return AsRef(v.(*golang.Slice).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return sl
 }
 

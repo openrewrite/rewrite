@@ -62,7 +62,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, string> _recipeOrigin = new();
 
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
-    private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    private readonly ConcurrentDictionary<string, (object Accumulator, bool EditedSinceScan)> _recipeAccumulators = new();
     // Visitor names (edit:<id>, scan:<id>) whose Check precondition the host evaluates, as hoisted by PrepareRecipe
     private readonly ConcurrentDictionary<string, bool> _hoistedVisitors = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
@@ -121,13 +121,13 @@ public class RewriteRpcServer
     internal int DependencyTypesBatchSize = 1000;
 
     /// <summary>
-    /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
-    /// to wire up an RPC connection to a Java process.
+    /// Connects this server to a remote JSON-RPC peer and starts listening. Pass a
+    /// <see cref="StringErrorDataJsonRpc"/>, which also runs each notification in arrival order.
     /// </summary>
     public void Connect(JsonRpc jsonRpc)
     {
         _jsonRpc = jsonRpc;
-        jsonRpc.SynchronizationContext = null;
+        jsonRpc.SynchronizationContext = new StringErrorDataJsonRpc.ReaderOrPool();
         jsonRpc.AddLocalRpcTarget(this);
         jsonRpc.StartListening();
     }
@@ -213,6 +213,11 @@ public class RewriteRpcServer
         // Marker type overrides for markers that live in Cs.java but map to marker package
         RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters");
+
+        RpcSendQueue.RegisterJavaTypeName(typeof(CSharpLanguageVersion.TargetFrameworkVersion),
+            "org.openrewrite.csharp.marker.CSharpLanguageVersion$TargetFrameworkVersion");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CSharpLanguageVersion),
+            "org.openrewrite.csharp.marker.CSharpLanguageVersion");
 
         // DotNetProject marker
         RpcSendQueue.RegisterJavaTypeName(typeof(DotNetProject),
@@ -1410,7 +1415,7 @@ public class RewriteRpcServer
         if (recipe is IScanningRecipe scanning)
         {
             var ctx = GetOrCreateExecutionContext(request.P);
-            var acc = GetOrCreateAccumulator(request.Id, scanning, ctx);
+            var acc = GetOrCreateAccumulator(request.Id, scanning, ctx, CyclePhase.Generate);
 
             var generated = scanning.Generate(acc, ctx);
 
@@ -1833,8 +1838,9 @@ public class RewriteRpcServer
         ITreeVisitor<ExecutionContext> visitor;
         if (recipe is IScanningRecipe scanning)
         {
-            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
-            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
+            visitor = phase == "scan"
+                ? scanning.Scanner(GetOrCreateAccumulator(recipeId, scanning, ctx, CyclePhase.Scan))
+                : scanning.Editor(GetOrCreateAccumulator(recipeId, scanning, ctx, CyclePhase.Edit));
         }
         else
         {
@@ -2015,14 +2021,8 @@ public class RewriteRpcServer
         }
 
         using var jsonRpc = new StringErrorDataJsonRpc(handler);
-        server._jsonRpc = jsonRpc;
         _current = server;
-        // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
-        // Without this, the default NonConcurrentSynchronizationContext serializes
-        // dispatch, blocking incoming GetObject requests while BatchVisit is in progress.
-        jsonRpc.SynchronizationContext = null;
-        jsonRpc.AddLocalRpcTarget(server);
-        jsonRpc.StartListening();
+        server.Connect(jsonRpc);
 
         try
         {
@@ -2238,18 +2238,22 @@ public class RewriteRpcServer
         }
     }
 
+    private enum CyclePhase { Scan, Generate, Edit }
+
     /// <summary>
-    /// Gets or creates the accumulator for a scanning recipe, storing it for reuse across scan/generate/edit phases.
+    /// A recipe's first scan after it edited starts a new cycle with a fresh accumulator, because the host scans
+    /// before it edits in every cycle. A cycle whose scan never reaches this server keeps the previous accumulator.
     /// </summary>
-    private object? GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx)
-    {
-        if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
-            return acc;
-        
-        acc = recipe.InitialValue(ctx);
-        _recipeAccumulators[recipeId] = acc;
-        return acc;
-    }
+    private object GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx,
+        CyclePhase phase) =>
+        _recipeAccumulators.AddOrUpdate(recipeId,
+            _ => (recipe.InitialValue(ctx), phase == CyclePhase.Edit),
+            (_, latest) => phase switch
+            {
+                CyclePhase.Scan when latest.EditedSinceScan => (recipe.InitialValue(ctx), false),
+                CyclePhase.Edit => (latest.Accumulator, true),
+                _ => latest
+            }).Accumulator;
 
     private class TreeCodec : IRpcCodec
     {
@@ -2403,14 +2407,58 @@ internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IJsonRpcMe
 }
 
 /// <summary>
-/// A JsonRpc subclass that ensures error.data is always a string,
+/// The connection to the Java peer. It ensures error.data is always a string,
 /// for compatibility with the Java io.moderne:jsonrpc library which
 /// expects error.detail.data to be a string, not a structured object.
+/// It also dispatches messages the way <see cref="DispatchRequestAsync"/> describes.
 /// </summary>
 internal class StringErrorDataJsonRpc : StreamJsonRpc.JsonRpc
 {
     public StringErrorDataJsonRpc(StreamJsonRpc.IJsonRpcMessageHandler handler) : base(handler)
     {
+    }
+
+    /// <summary>
+    /// Called on the thread that reads messages, in the order they arrive. A request runs on the
+    /// thread pool, so one that calls back into Java does not block reading the response. A
+    /// notification runs here, before the next message is read, because Java does not wait for it.
+    /// Java rolls back its own refs as it sends Evict and goes straight on to the next request.
+    /// A notification handler therefore must be synchronous and must not wait on Java.
+    /// </summary>
+    protected override ValueTask<JsonRpcMessage> DispatchRequestAsync(JsonRpcRequest request,
+        TargetMethod targetMethod, CancellationToken cancellationToken)
+    {
+        ReaderOrPool.OnReader = !request.IsResponseExpected;
+        try
+        {
+            return base.DispatchRequestAsync(request, targetMethod, cancellationToken);
+        }
+        finally
+        {
+            ReaderOrPool.OnReader = false;
+        }
+    }
+
+    /// <summary>
+    /// The context <see cref="RewriteRpcServer.Connect"/> installs. It runs a handler on the thread
+    /// pool, except for the one <see cref="DispatchRequestAsync"/> marks to run in place.
+    /// </summary>
+    internal sealed class ReaderOrPool : SynchronizationContext
+    {
+        [ThreadStatic] internal static bool OnReader;
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            if (OnReader)
+            {
+                OnReader = false;
+                d(state);
+            }
+            else
+            {
+                base.Post(d, state);
+            }
+        }
     }
 
     protected override StreamJsonRpc.Protocol.JsonRpcError.ErrorDetail CreateErrorDetails(

@@ -1022,6 +1022,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitParenthesizedTypeTree(ParenthesizedTypeTree parTree, PrintOutputCapture<P> p) {
+        beforeSyntax(parTree, Space.Location.PARENTHESES_PREFIX, p);
+        visit(parTree.getAnnotations(), p);
+        visit(parTree.getParenthesizedType(), p);
+        afterSyntax(parTree, p);
+        return parTree;
+    }
+
+    @Override
     public J visitReturn(Return return_, PrintOutputCapture<P> p) {
         beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
         p.append("return");

@@ -20,17 +20,13 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
-import org.openrewrite.marker.AlreadyReplaced;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
-import java.util.Objects;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -98,6 +94,11 @@ public class FindAndReplace extends Recipe {
     Boolean plaintextOnly;
 
     @Override
+    public int maxCycles() {
+        return 1;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -106,15 +107,6 @@ public class FindAndReplace extends Recipe {
                 if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }
-                for (Marker marker : sourceFile.getMarkers().getMarkers()) {
-                    if (marker instanceof AlreadyReplaced) {
-                        AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
-                        if (Objects.equals(find, alreadyReplaced.getFind()) && Objects.equals(replace, alreadyReplaced.getReplace())) {
-                            return sourceFile;
-                        }
-                    }
-                }
-
                 PlainText plainText = PlainTextParser.convert(sourceFile);
                 String replacement = replace == null ? "" : replace;
                 if (!Boolean.TRUE.equals(regex)) {
@@ -147,9 +139,7 @@ public class FindAndReplace extends Recipe {
                     return sourceFile;
                 }
 
-                return plainText
-                        .withText(newText)
-                        .withMarkers(plainText.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
+                return plainText.withText(newText);
             }
         };
 
