@@ -393,7 +393,7 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void unresolvedNameFirSource() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all().variableDeclarations(false)),
+          spec -> spec.typeValidationOptions(TypeValidation.all().variableDeclarations(false).identifiers(false)),
           kotlin(
             //language=none, disabled due to invalid code
             """

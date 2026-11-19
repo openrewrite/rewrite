@@ -301,7 +301,12 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        dependsOn(npmBuild, npmFixturesBuild)
+                        inputs.files(npmBuild)
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                            .withPropertyName("npmBuild")
+                        inputs.files(npmFixturesBuild)
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                            .withPropertyName("npmFixturesBuild")
                     }
                 }
             }

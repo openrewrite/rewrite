@@ -93,6 +93,28 @@ public class RecipeDescriptor {
     }
 
     /**
+     * @return This descriptor, with the values of secret options masked here and in every
+     * precondition and recipe it contains. See {@link OptionDescriptor#redacted()}.
+     */
+    public RecipeDescriptor redacted() {
+        List<OptionDescriptor> redactedOptions = new ArrayList<>(options.size());
+        for (OptionDescriptor option : options) {
+            redactedOptions.add(option.redacted());
+        }
+        return new RecipeDescriptor(name, displayName, instanceName, description, tags, estimatedEffortPerOccurrence,
+                redactedOptions, redact(preconditions), redact(recipeList), dataTables, maintainers, contributors,
+                examples, source);
+    }
+
+    private static List<RecipeDescriptor> redact(List<RecipeDescriptor> descriptors) {
+        List<RecipeDescriptor> redacted = new ArrayList<>(descriptors.size());
+        for (RecipeDescriptor descriptor : descriptors) {
+            redacted.add(descriptor.redacted());
+        }
+        return redacted;
+    }
+
+    /**
      * @param env Provides a source of category descriptors to build category names from more
      *            than just the name segments.
      * @return A list of category display names inferred from the structure of the recipe name,

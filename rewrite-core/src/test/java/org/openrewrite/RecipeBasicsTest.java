@@ -214,6 +214,45 @@ class RecipeBasicsTest {
         assertThat(opt.getValid()).containsExactly("RED", "GREEN");
     }
 
+    @Getter
+    static class RecipeWithSecretOption extends Recipe {
+        private final String displayName = "Secret option recipe";
+        private final String description = "Secret option recipe.";
+
+        @Option(displayName = "Password", description = "The password.", secret = true)
+        final String password;
+
+        public RecipeWithSecretOption(String password) {
+            this.password = password;
+        }
+    }
+
+    @Test
+    void secretOptionIsMarkedAndKeepsItsValueForTheRecipe() {
+        OptionDescriptor opt = new RecipeWithSecretOption("hunter2").getDescriptor().getOptions().getFirst();
+        assertThat(opt.isSecret()).isTrue();
+        assertThat(opt.getValue()).isEqualTo("hunter2");
+        assertThat(opt.getDisplayValue()).isEqualTo(OptionDescriptor.REDACTED);
+    }
+
+    @Test
+    void secretOptionIsNotShownInInstanceName() {
+        assertThat(new RecipeWithSecretOption("hunter2").getInstanceName()).isEqualTo("Secret option recipe");
+    }
+
+    @Test
+    void redactedDescriptorMasksSecretsOnly() {
+        RecipeDescriptor redacted = new RecipeWithSecretOption("hunter2").getDescriptor().redacted();
+        assertThat(redacted.getOptions().getFirst().getValue()).isEqualTo(OptionDescriptor.REDACTED);
+        assertThat(new ChangeText("hi").getDescriptor().redacted().getOptions().getFirst().getValue()).isEqualTo("hi");
+    }
+
+    @Test
+    void unsetSecretIsNotMasked() {
+        OptionDescriptor opt = new RecipeWithSecretOption(null).getDescriptor().getOptions().getFirst();
+        assertThat(opt.redacted().getValue()).isNull();
+    }
+
     @Test
     void withOptionsDeserializesCommaSeparatedStringToList() {
         // given
