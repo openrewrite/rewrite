@@ -393,52 +393,71 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * Every reference under the region's tree, resolved in one walk.
+     * Every identifier under the region's tree, grouped by name in one walk.
      */
     private static References referencesWithin(Cursor region) {
-        ScopeService service = service(region);
-        Map<String, List<References.Reference>> byName = new HashMap<>();
+        Map<String, List<Cursor>> byName = new HashMap<>();
         new JavaIsoVisitor<Integer>() {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-                Namespace namespace = service.namespaceOf(getCursor());
-                Binding binding = null;
-                if (namespace != null) {
-                    binding = at(getCursor()).lookup(identifier.getSimpleName(), namespace).orElse(null);
-                    if (binding == null) {
-                        return identifier;
-                    }
-                } else {
-                    Object parent = getCursor().getParentTreeCursor().getValue();
-                    if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier ||
-                          parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == identifier ||
-                          parent instanceof J.Case && ((J.Case) parent).getCaseLabels().contains(identifier))) {
-                        return identifier;
-                    }
-                }
-                byName.computeIfAbsent(identifier.getSimpleName(), n -> new ArrayList<>())
-                        .add(new References.Reference(getCursor(), binding));
+                byName.computeIfAbsent(identifier.getSimpleName(), n -> new ArrayList<>()).add(getCursor());
                 return identifier;
             }
         }.visit(region.getValue(), 0, region.getParentOrThrow());
-        return new References(byName);
+        return new References(service(region), byName);
     }
 
     /**
-     * The references found under one region, grouped so that each binding's are a lookup away.
+     * The identifiers under one region, grouped by name. A name's identifiers are resolved the first time a binding
+     * of that name asks, since a caller usually asks about few of the names a region spells.
      */
     @Value
     private static class References {
+        ScopeService service;
+
         @Getter(AccessLevel.NONE)
-        Map<String, List<Reference>> byName;
+        Map<String, List<Cursor>> identifiers;
+
+        @Getter(AccessLevel.NONE)
+        Map<String, List<Reference>> resolved = new HashMap<>();
 
         /**
          * The identifiers in the region that refer to the binding, in source order.
          */
         Stream<Cursor> of(Binding binding) {
-            return byName.getOrDefault(binding.getName(), Collections.emptyList()).stream()
+            List<Reference> named = resolved.get(binding.getName());
+            if (named == null) {
+                named = resolve(binding.getName());
+                resolved.put(binding.getName(), named);
+            }
+            return named.stream()
                     .filter(reference -> reference.binding != null ? reference.binding.equals(binding) : binding.selects(reference.cursor))
                     .map(reference -> reference.cursor);
+        }
+
+        private List<Reference> resolve(String name) {
+            List<Reference> references = new ArrayList<>();
+            List<Cursor> named = identifiers.remove(name);
+            for (Cursor identifier : named == null ? Collections.<Cursor>emptyList() : named) {
+                Namespace namespace = service.namespaceOf(identifier);
+                Binding binding = null;
+                if (namespace != null) {
+                    binding = at(identifier).lookup(name, namespace).orElse(null);
+                    if (binding == null) {
+                        continue;
+                    }
+                } else {
+                    Object parent = identifier.getParentTreeCursor().getValue();
+                    J.Identifier ident = identifier.getValue();
+                    if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == ident ||
+                          parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == ident ||
+                          parent instanceof J.Case && ((J.Case) parent).getCaseLabels().contains(ident))) {
+                        continue;
+                    }
+                }
+                references.add(new Reference(identifier, binding));
+            }
+            return references;
         }
 
         /**
@@ -565,7 +584,8 @@ public class Scope implements Trait<J> {
          * The identifiers in the binding's scope that refer to it, by its simple name, as {@code this.name} or
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
          * Where a class redeclares a member of its superclass, {@code super.name} refers to the inherited one, which
-         * the class binds too.
+         * the class binds too. They are read from the scope's tree as it was when the binding was found, so a binding
+         * found before an edit does not see it. Finding the binding again from a cursor on the edited tree does.
          */
         public Stream<Cursor> references() {
             // One walk of the scope answers for every binding in it
