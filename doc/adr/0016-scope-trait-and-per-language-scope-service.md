@@ -86,8 +86,8 @@ no parameter has no `it`, so inside one the name resolves to that lambda and not
 `lambdaCanCapture` applies Java's rule in every language, so it says no for a capture that Kotlin,
 Scala or Groovy would allow.
 
-`canReference` asks each language what a static context is, and applies Java's rule for capturing a
-local in every language, as `lambdaCanCapture` does. An enum constant's body binds none of the
+`canReference` asks each language what a static context is. It applies Java's rules for capturing a
+local, as `lambdaCanCapture` does, and for a forward reference to a field in every language. An enum constant's body binds none of the
 members it inherits from its enum, so `canReference` refuses a field of the enum there that the body
 could read.
 

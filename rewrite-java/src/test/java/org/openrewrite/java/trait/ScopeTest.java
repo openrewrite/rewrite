@@ -1792,6 +1792,59 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void initializerCannotReadAFieldDeclaredAtOrAfterIt() {
+        @Language("java") String source =
+          """
+            class A {
+                static int use(String row, Object read) { return 0; }
+                static {
+                    use("staticInitializerBeforeStaticField", LATER);
+                }
+                int early =
+                        use("fieldInitializerBeforeInstanceField", later);
+                {
+                    use("instanceInitializerBeforeStaticField", LATER);
+                }
+                Runnable lambda = () ->
+                        use("lambdaInInitializerBeforeField", later);
+                Object anonymous = new Object() {
+                    int m() {
+                        return use("anonymousClassInInitializerBeforeField", later);
+                    }
+                };
+                int method() {
+                    return use("methodBeforeField", later);
+                }
+                int own =
+                        use("ownInitializer", own);
+                int first =
+                        use("laterDeclaratorOfOneStatement", second), second =
+                        use("earlierDeclaratorOfOneStatement", first);
+                enum E {
+                    X(use("enumConstantBeforeStaticField", COUNT));
+                    static int COUNT = 1;
+                    E(int i) {}
+                }
+                static final int LATER = 1;
+                int later = 2;
+                static {
+                    use("staticInitializerAfterStaticField", LATER);
+                }
+                int after =
+                        use("fieldInitializerAfterInstanceField", later);
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "enumConstantBeforeStaticField",
+          "fieldInitializerBeforeInstanceField",
+          "lambdaInInitializerBeforeField",
+          "laterDeclaratorOfOneStatement",
+          "ownInitializer",
+          "staticInitializerBeforeStaticField");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
     void shadowedBindingCannotBeReferenced() {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> {

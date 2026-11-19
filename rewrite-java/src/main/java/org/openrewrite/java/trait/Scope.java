@@ -181,9 +181,10 @@ public class Scope implements Trait<J> {
     /**
      * Whether an identifier written at the position could refer to the binding by its simple name, in code the
      * language accepts. It could not where another binding shadows this one, where an instance member or a class's
-     * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, or where a local
-     * that is not effectively final is read from inside a lambda or a class body. Whether a local declared without
-     * an initializer has been assigned by then is not checked.
+     * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, where an
+     * initializer names a field declared after it, or where a local that is not effectively final is read from
+     * inside a lambda or a class body. Whether a local declared without an initializer has been assigned by then is
+     * not checked.
      */
     public boolean canReference(Binding binding) {
         if (!lookup(binding.name, binding.namespace).filter(binding::equals).isPresent()) {
@@ -197,7 +198,66 @@ public class Scope implements Trait<J> {
                                 binding.cursor.getParentTreeCursor().getValue() instanceof J.TypeParameter;
         boolean needsInstance = (scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass) &&
                                 (binding.namespace == Namespace.TYPE ? typeParameter : !isStatic(binding.type));
-        return !needsInstance || hasInstanceOf(binding.scope, !typeParameter);
+        return !isForwardReference(binding) && (!needsInstance || hasInstanceOf(binding.scope, !typeParameter));
+    }
+
+    /**
+     * Whether a read of the field at the position is a forward reference (JLS 8.3.3). It is one in an initializer
+     * of the field's own class that stands before the field's declaration or is the field's own, where both are
+     * static or neither is. A class body between the two lifts the restriction.
+     */
+    private boolean isForwardReference(Binding field) {
+        Cursor variable = field.getTree() instanceof J.Identifier ? field.cursor.getParentTreeCursor() : field.cursor;
+        if (!(variable.getValue() instanceof J.VariableDeclarations.NamedVariable)) {
+            return false;
+        }
+        Cursor declaration = variable.getParentTreeCursor();
+        Cursor body = declaration.getParentTreeCursor();
+        if (!(declaration.getValue() instanceof J.VariableDeclarations && body.getValue() instanceof J.Block)) {
+            return false;
+        }
+        J declarator = null;
+        J member = null;
+        for (Cursor c = position; c != null && !isTree(c, body); c = c.getParent()) {
+            if (c.getValue() instanceof J) {
+                if (c.getValue() instanceof J.ClassDeclaration ||
+                    c.getValue() instanceof J.NewClass && member == ((J.NewClass) c.getValue()).getBody()) {
+                    return false;
+                }
+                declarator = member;
+                member = c.getValue();
+            }
+        }
+        boolean initializesStatic;
+        if (member instanceof J.Block) {
+            initializesStatic = ((J.Block) member).isStatic();
+        } else if (member instanceof J.VariableDeclarations) {
+            initializesStatic = ((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+        } else if (member instanceof J.EnumValueSet) {
+            initializesStatic = true;
+        } else {
+            return false;
+        }
+        J.VariableDeclarations declared = declaration.getValue();
+        if (initializesStatic != declared.hasModifier(J.Modifier.Type.Static)) {
+            return false;
+        }
+        if (member.getId().equals(declared.getId())) {
+            return declarator instanceof J.VariableDeclarations.NamedVariable &&
+                   indexOf(declared.getVariables(), declarator) <= indexOf(declared.getVariables(), variable.getValue());
+        }
+        List<Statement> members = body.<J.Block>getValue().getStatements();
+        int at = indexOf(members, member);
+        return at >= 0 && at < indexOf(members, declared);
+    }
+
+    private static int indexOf(List<? extends J> trees, J tree) {
+        for (int i = 0; i < trees.size(); i++) {
+            if (trees.get(i).getId().equals(tree.getId())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -250,8 +310,9 @@ public class Scope implements Trait<J> {
 
     /**
      * Whether a new variable declared at the position can take the name. It cannot take a reserved word, a name
-     * visible at the position, a variable this scope binds, or any name this scope spells other than a member's name
-     * after a dot. Counting what the scope spells keeps clear of later declarations in any language. Counting what
+     * visible at the position, a variable this scope binds, or any name this scope spells, whether or not anything
+     * declares it, other than a member's name after a dot. Counting what the scope spells keeps clear of later
+     * declarations in any language. Counting what
      * it binds covers a name it never spells, as a class's inherited field, when asked from the class itself.
      * A field of an enclosing class counts as taken, though a new field could take its name and hide it.
      */
