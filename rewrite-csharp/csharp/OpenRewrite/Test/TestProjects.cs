@@ -1,0 +1,256 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+using System.Collections.Immutable;
+using System.Xml;
+using System.Xml.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using OpenRewrite.Core;
+using OpenRewrite.CSharp;
+
+namespace OpenRewrite.Test;
+
+/// <summary>
+/// The projects the sources of a test belong to, by <see cref="SourceSpec.InProject"/> and
+/// <see cref="SourceSpec.TargetFrameworks"/>, each compiled on its own against the projects it references. A project
+/// named by the path of a project file among the sources takes its frameworks, SDK and project references from it. The
+/// sources in no project compile together.
+/// </summary>
+internal sealed class TestProjects
+{
+    private sealed class Project(DotNetProject marker)
+    {
+        public DotNetProject Marker { get; set; } = marker;
+        public bool FrameworksStated { get; set; }
+        public HashSet<string> References { get; } = [];
+    }
+
+    private readonly Dictionary<string, Project> _byName = new();
+    private readonly Dictionary<ImmutableArray<string>, Project> _unnamed = new(new SequenceComparer());
+    private readonly Dictionary<SourceSpec, Project> _bySpec = new(ReferenceEqualityComparer.Instance);
+
+    public TestProjects(IEnumerable<SourceSpec> specs)
+    {
+        var all = specs.ToList();
+        foreach (var spec in all.Where(s => s.SourcePath != null && IsProjectFile(s.SourcePath)))
+        {
+            var path = Normalize(spec.SourcePath!);
+            _byName[path] = FromProjectFile(path, spec.Before);
+        }
+        foreach (var spec in all.Where(s => s.ProjectName != null))
+        {
+            _bySpec[spec] = Named(spec);
+        }
+        foreach (var spec in all.Where(s => s.ProjectName == null))
+        {
+            if (spec.ProjectTargetFrameworks is { } frameworks)
+            {
+                _bySpec[spec] = Unnamed(frameworks);
+            }
+        }
+        var compiled = new HashSet<Project>(_bySpec.Values);
+        var pending = new Queue<Project>(compiled);
+        while (pending.TryDequeue(out var project))
+        {
+            foreach (var reference in project.References)
+            {
+                if (!_byName.TryGetValue(reference, out var referenced))
+                {
+                    throw new ArgumentException(
+                        $"{project.Marker.ProjectName} references {reference}, which no source of the test is in.");
+                }
+                if (compiled.Add(referenced))
+                {
+                    pending.Enqueue(referenced);
+                }
+            }
+        }
+    }
+
+    private Project Named(SourceSpec spec)
+    {
+        var path = Normalize(spec.ProjectName!);
+        var name = _byName.ContainsKey(path) ? path : spec.ProjectName!;
+        if (!_byName.TryGetValue(name, out var project))
+        {
+            project = new Project(Marker(name, []));
+            _byName[name] = project;
+        }
+        project.References.UnionWith(spec.ProjectReferences);
+        if (spec.ProjectTargetFrameworks is { } frameworks)
+        {
+            if (project.FrameworksStated && !project.Marker.TargetFrameworks.SequenceEqual(frameworks))
+            {
+                throw new ArgumentException(
+                    $"The sources in {name} target {string.Join(";", project.Marker.TargetFrameworks)} and " +
+                    $"{string.Join(";", frameworks)}, and a project targets the same frameworks for all its sources.");
+            }
+            project.Marker = project.Marker.WithTargetFrameworks([..frameworks]);
+            project.FrameworksStated = true;
+        }
+        return project;
+    }
+
+    private Project Unnamed(ImmutableArray<string> frameworks)
+    {
+        if (!_unnamed.TryGetValue(frameworks, out var project))
+        {
+            var name = Enumerable.Range(1, int.MaxValue)
+                .Select(n => n == 1 ? "Test" : $"Test{n}")
+                .First(n => !_byName.ContainsKey(n) && _unnamed.Values.All(p => p.Marker.ProjectName != n));
+            project = new Project(Marker(name, frameworks));
+            _unnamed[frameworks] = project;
+        }
+        return project;
+    }
+
+    private static DotNetProject Marker(string name, IEnumerable<string> frameworks) =>
+        new(Tree.RandomId(), name, [..frameworks], "Microsoft.NET.Sdk");
+
+    /// <summary>A project as <see cref="SolutionParser"/> reads it from its project file.</summary>
+    private static Project FromProjectFile(string path, string content)
+    {
+        XElement? root = null;
+        try
+        {
+            root = XDocument.Parse(content).Root;
+        }
+        catch (XmlException)
+        {
+            // a test of a recipe on a broken project file still gets a project for its sources
+        }
+        var frameworks = new List<string>();
+        foreach (var element in root?.Elements("PropertyGroup").Elements() ?? [])
+        {
+            if (element.Name.LocalName is "TargetFramework" or "TargetFrameworks")
+            {
+                frameworks.AddRange(element.Value
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(f => !frameworks.Contains(f)));
+            }
+        }
+        var project = new Project(new DotNetProject(Tree.RandomId(), Path.GetFileNameWithoutExtension(path),
+            frameworks, root?.Attribute("Sdk")?.Value)) { FrameworksStated = frameworks.Count > 0 };
+        var directory = path.Contains('/') ? path[..path.LastIndexOf('/')] : "";
+        foreach (var reference in root?.Elements("ItemGroup").Elements("ProjectReference") ?? [])
+        {
+            if (reference.Attribute("Include")?.Value is { } include)
+            {
+                project.References.Add(Normalize(directory + "/" + include));
+            }
+        }
+        return project;
+    }
+
+    private static bool IsProjectFile(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".csproj" or ".vbproj" or ".fsproj";
+
+    /// <summary>A relative path with forward slashes and without <c>.</c> and <c>..</c> segments.</summary>
+    private static string Normalize(string path)
+    {
+        var segments = new List<string>();
+        foreach (var segment in path.Replace('\\', '/').Split('/'))
+        {
+            if (segment is "" or ".")
+            {
+                continue;
+            }
+            if (segment == ".." && segments.Count > 0 && segments[^1] != "..")
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+            else
+            {
+                segments.Add(segment);
+            }
+        }
+        return string.Join("/", segments);
+    }
+
+    /// <summary>The project marker of the spec's source, or null for a source in no project.</summary>
+    public DotNetProject? Of(SourceSpec spec) => _bySpec.TryGetValue(spec, out var project) ? project.Marker : null;
+
+    /// <summary>The project a source compiles in, by its marker, or null for the sources in no project.</summary>
+    public DotNetProject? Of(SourceFile source) =>
+        source.Markers.FindFirst<DotNetProject>() is { } marker &&
+        Projects.FirstOrDefault(p => p.Marker.Id == marker.Id) is { } project
+            ? project.Marker
+            : null;
+
+    private IEnumerable<Project> Projects => _byName.Values.Concat(_unnamed.Values);
+
+    /// <summary>
+    /// Compiles the syntax trees of each project after the projects it references, and those of no project together.
+    /// </summary>
+    public Dictionary<SyntaxTree, CSharpCompilation> Compile(
+        IEnumerable<(DotNetProject? Project, SyntaxTree Tree)> trees, CompileSetup setup)
+    {
+        var byProject = trees.GroupBy(t => t.Project?.Id ?? Guid.Empty)
+            .ToDictionary(g => g.Key, g => g.Select(t => t.Tree).ToList());
+        var compilations = new Dictionary<Guid, CSharpCompilation>();
+        var compiling = new HashSet<Guid>();
+
+        CSharpCompilation CompileProject(Guid id)
+        {
+            if (compilations.TryGetValue(id, out var done))
+            {
+                return done;
+            }
+            var project = Projects.FirstOrDefault(p => p.Marker.Id == id);
+            if (!compiling.Add(id))
+            {
+                throw new ArgumentException(
+                    $"{project?.Marker.ProjectName} references itself through its project references.");
+            }
+            var references = (project?.References ?? []).Select(name => _byName[name])
+                .Select(referenced => CompileProject(referenced.Marker.Id).ToMetadataReference());
+            var compilation = CSharpCompilation.Create(
+                    project == null ? "TestCompilation" : Path.GetFileNameWithoutExtension(project.Marker.ProjectName))
+                .WithOptions(setup.Options)
+                .AddReferences(setup.References)
+                .AddReferences(references)
+                .AddSyntaxTrees(byProject.GetValueOrDefault(id) ?? []);
+            compilations[id] = compilation;
+            return compilation;
+        }
+
+        var result = new Dictionary<SyntaxTree, CSharpCompilation>();
+        foreach (var (id, projectTrees) in byProject)
+        {
+            var compilation = CompileProject(id);
+            foreach (var tree in projectTrees)
+            {
+                result[tree] = compilation;
+            }
+        }
+        return result;
+    }
+
+    private sealed class SequenceComparer : IEqualityComparer<ImmutableArray<string>>
+    {
+        public bool Equals(ImmutableArray<string> x, ImmutableArray<string> y) => x.SequenceEqual(y);
+        public int GetHashCode(ImmutableArray<string> obj) => string.Join(";", obj).GetHashCode();
+    }
+}
+
+/// <summary>What the sources of a test compile against, and with which options.</summary>
+internal sealed record CompileSetup(
+    ImmutableArray<MetadataReference> References,
+    CSharpCompilationOptions Options,
+    CSharpParseOptions ParseOptions)
+{
+    public SyntaxTree Parse(string text, string path) => CSharpSyntaxTree.ParseText(text, ParseOptions, path);
+}
