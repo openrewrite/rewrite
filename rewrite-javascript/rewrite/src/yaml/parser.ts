@@ -590,8 +590,18 @@ class YamlCstReader {
             let pendingPrefix = "";
 
             for (let i = 0; i < cst.items.length; i++) {
-                const item = cst.items[i];
+                let item = cst.items[i];
                 const isLast = i === cst.items.length - 1;
+                const start = item.start || [];
+                const comma = start.findIndex(token => token.type === 'comma');
+                if (comma > 0 && entries.length > 0) {
+                    const previous = entries[entries.length - 1];
+                    entries[entries.length - 1] = {
+                        ...previous,
+                        trailingCommaPrefix: (previous.trailingCommaPrefix ?? "") + this.concatenateSources(start.slice(0, comma))
+                    };
+                    item = {...item, start: start.slice(comma)};
+                }
                 const result = this.convertFlowSequenceEntry(item, isLast, pendingPrefix);
                 entries.push(result.entry);
                 pendingPrefix = result.trailingContent;
@@ -693,28 +703,13 @@ class YamlCstReader {
     }
 
     private convertFlowSequenceEntry(item: CstCollectionItem, isLast: boolean, pendingPrefix: string): {entry: Yaml.SequenceEntry, trailingContent: string} {
-        // Start tokens may include comma from previous item
+        const startTokens = (item.start || []).filter(token => token.type !== 'comma');
         let prefix = pendingPrefix;
-        let hasComma = false;
-
-        for (const token of item.start || []) {
-            if (token.type === 'comma') {
-                hasComma = true;
-            } else {
-                prefix += token.source;
-            }
-        }
-
         let block: Yaml.Block;
         let trailing = "";
 
-        if (item.value) {
-            const valueResult = this.convertTokenWithTrailing(item.value);
-            block = valueResult.node as Yaml.Block;
-            trailing = valueResult.trailing;
-        } else if (item.key !== undefined) {
-            // Flow sequence can contain mapping entries: [a: 1, b: 2]
-            const entryResult = this.convertFlowMappingEntry(item, "");
+        if (item.key !== undefined) {
+            const entryResult = this.convertFlowMappingEntry({...item, start: startTokens}, "");
             block = {
                 kind: Yaml.Kind.Mapping,
                 id: randomId(),
@@ -727,7 +722,13 @@ class YamlCstReader {
                 tag: undefined
             };
             trailing = entryResult.trailingContent;
+        } else if (item.value) {
+            prefix += this.concatenateSources(startTokens);
+            const valueResult = this.convertTokenWithTrailing(item.value);
+            block = valueResult.node as Yaml.Block;
+            trailing = valueResult.trailing;
         } else {
+            prefix += this.concatenateSources(startTokens);
             block = this.createEmptyScalar();
         }
 
