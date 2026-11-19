@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Reflection;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
@@ -152,6 +154,145 @@ public class CompilesTests : RewriteTest
             spec => spec.SetReferenceAssemblies(null).ExpectOutputCompiles(),
             CSharp(Calls("Foo"))
         ));
+    }
+
+    [Fact]
+    public void WarningsFailTheOutputCompilationThatTreatsThemAsErrors()
+    {
+        var source = Calls("Foo").Replace("void Bar() { }", "void Bar() { int unused; }");
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCalls("Foo", "Bar"))
+                .ExpectOutputCompiles()
+                .ExpectOutputCompiles(options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    generalDiagnosticOption: ReportDiagnostic.Error)),
+            CSharp(source, source.Replace("Foo();", "Bar();"))
+        ));
+
+        Assert.Contains(
+            "source.cs(4,22): error CS0168: The variable 'unused' is declared but never used", failure.Message);
+    }
+
+    [Fact]
+    public void OutputCompilesAsAConsoleApp()
+    {
+        const string program =
+            """
+            class Program
+            {
+                static void Foo() { }
+                static void Bar() { }
+                static void Main() => Foo();
+            }
+            """;
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCalls("Foo", "Bar"))
+                .ExpectOutputCompiles(options: new CSharpCompilationOptions(OutputKind.ConsoleApplication)),
+            CSharp(program, program.Replace("=> Foo();", "=> Bar();"))
+        );
+    }
+
+    [Fact]
+    public void OutputCompilesWithTheLanguageVersionTheTestGives()
+    {
+        var source = Calls("Foo")
+            .Replace("void Bar() { }", "void Bar() { }\n    bool Check(object o) => o is not null;");
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCalls("Foo", "Bar"))
+                .ExpectOutputCompiles(
+                    parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp7_3)),
+            CSharp(source, source.Replace("Foo();", "Bar();"))
+        ));
+
+        Assert.Contains("error CS8370: Feature 'not pattern' is not available in C# 7.3", failure.Message);
+    }
+
+    [Fact]
+    public void TheInputAndOutputCompilationsShowWhatTheRecipeChangesInWhatTheCodeDoes()
+    {
+        const string values =
+            """
+            public static class Values
+            {
+                static int Foo() => 1;
+                static int Bar() => 2;
+                public static int M() => Foo();
+            }
+            """;
+        var results = new List<object?>();
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCalls("Foo", "Bar"))
+                .ExpectInputCompiles(compilation => results.Add(Run(compilation, "Values", "M")))
+                .ExpectOutputCompiles(inspect: compilation => results.Add(Run(compilation, "Values", "M"))),
+            CSharp(values, values.Replace("=> Foo();", "=> Bar();"))
+        );
+
+        Assert.Equal([1, 2], results);
+    }
+
+    [Fact]
+    public void CompilationOptionsApplyToTheInput()
+    {
+        const string pointers = "unsafe class C { int* p; }";
+        Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.ExpectInputCompiles(),
+            CSharp(pointers)
+        ));
+        RewriteRun(
+            spec => spec
+                .SetCompilationOptions(
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true))
+                .ExpectInputCompiles(),
+            CSharp(pointers)
+        );
+    }
+
+    [Fact]
+    public void ParseOptionsApplyToTheInput()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec
+                .SetParseOptions(CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp7_3))
+                .ExpectInputCompiles(),
+            CSharp("class C { bool M(object o) => o is not null; }")
+        ));
+
+        Assert.Contains("error CS8370: Feature 'not pattern' is not available in C# 7.3", failure.Message);
+    }
+
+    [Fact]
+    public void TheSourcesCompileAgainstTheReferencesTheTestAdds()
+    {
+        var library = CSharpCompilation.Create("Library",
+            [CSharpSyntaxTree.ParseText("public static class Library { public static int Foo() => 1; }")],
+            ReferenceAssemblies(Assemblies.Net90),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        const string source = "class C { int M() => Library.Foo(); }";
+        RewriteRun(
+            spec => spec
+                .AddReferences(library.ToMetadataReference())
+                .ExpectInputCompiles()
+                .ExpectOutputCompiles(Assemblies.Net100),
+            CSharp(source).AfterRecipe(cu =>
+            {
+                var foo = FindFirst<MethodInvocation>(cu)!;
+                Assert.Equal("Library", TypeUtils.GetFullyQualifiedName(foo.MethodType!.DeclaringType));
+            })
+        );
+    }
+
+    private static IEnumerable<MetadataReference> ReferenceAssemblies(
+        Microsoft.CodeAnalysis.Testing.ReferenceAssemblies assemblies) =>
+        assemblies.ResolveAsync(LanguageNames.CSharp, CancellationToken.None).GetAwaiter().GetResult();
+
+    private static object? Run(CSharpCompilation compilation, string type, string method)
+    {
+        using var image = new MemoryStream();
+        Assert.True(compilation.Emit(image).Success);
+        return Assembly.Load(image.ToArray()).GetType(type)!.GetMethod(method)!.Invoke(null, null);
     }
 
     private class RenameCalls(string from, string to) : global::OpenRewrite.Core.Recipe

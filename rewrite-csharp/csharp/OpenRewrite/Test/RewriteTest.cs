@@ -75,10 +75,11 @@ public abstract class RewriteTest
         var parser = new CSharpParser();
         var printer = new CSharpPrinter<object>();
 
-        // Resolve metadata references if ReferenceAssemblies is configured
-        ImmutableArray<MetadataReference>? metadataReferences = recipeSpec.ReferenceAssemblies != null
-            ? ResolveAssemblies(recipeSpec.ReferenceAssemblies)
+        var setup = recipeSpec.ReferenceAssemblies != null
+            ? new CompileSetup(ResolveAssemblies(recipeSpec.ReferenceAssemblies).AddRange(recipeSpec.References),
+                recipeSpec.CompilationOptions, recipeSpec.ParseOptions)
             : null;
+        var projects = new TestProjects(specs);
 
         // 1. Parse all sources and validate round-trip
         var validations = recipeSpec.Validations;
@@ -94,8 +95,8 @@ public abstract class RewriteTest
         }
 
         var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
-        CSharpCompilation? sharedCompilation = null;
-        if (metadataReferences != null)
+        var compilations = new Dictionary<SyntaxTree, CSharpCompilation>();
+        if (setup != null)
         {
             foreach (var spec in specs)
             {
@@ -104,15 +105,10 @@ public abstract class RewriteTest
                            spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
                 if (isCs && !isCsproj)
                 {
-                    sharedTrees[spec] = CSharpSyntaxTree.ParseText(
-                        spec.Before, path: spec.SourcePath ?? "source.cs");
+                    sharedTrees[spec] = setup.Parse(spec.Before, spec.SourcePath ?? "source.cs");
                 }
             }
-
-            if (sharedTrees.Count > 0)
-            {
-                sharedCompilation = Compile(metadataReferences.Value, sharedTrees.Values);
-            }
+            compilations = projects.Compile(sharedTrees.Select(t => (projects.Of(t.Key), t.Value)), setup);
         }
 
         if (recipeSpec.InputCompiles)
@@ -122,26 +118,15 @@ public abstract class RewriteTest
                 throw new ArgumentException(
                     "ExpectInputCompiles compiles against the ReferenceAssemblies, which are not set.");
             }
-            if (sharedCompilation != null)
-            {
-                AssertCompiles(sharedCompilation,
-                    $"The sources of the test don't compile against {recipeSpec.ReferenceAssemblies.TargetFramework}" +
-                    ", so types the recipe looks at are missing or wrong");
-            }
+            AssertCompiles(compilations.Values.Distinct(), recipeSpec.InputInspections,
+                $"The sources of the test don't compile against {recipeSpec.ReferenceAssemblies.TargetFramework}" +
+                ", so types the recipe looks at are missing or wrong");
         }
 
-        var projects = new Dictionary<string, DotNetProject>();
         SourceFile BeforeRecipe(SourceSpec spec, SourceFile source)
         {
-            if (spec.ProjectTargetFrameworks is { } targetFrameworks)
+            if (projects.Of(spec) is { } project)
             {
-                var key = string.Join(";", targetFrameworks);
-                if (!projects.TryGetValue(key, out var project))
-                {
-                    var name = projects.Count == 0 ? "Test" : $"Test{projects.Count + 1}";
-                    project = new DotNetProject(Tree.RandomId(), name, [..targetFrameworks], "Microsoft.NET.Sdk");
-                    projects[key] = project;
-                }
                 source = SourceSpec.AddMarker(source, project);
             }
             return spec.BeforeRecipeHooks.Aggregate(source, (s, adjust) => adjust(s));
@@ -173,9 +158,9 @@ public abstract class RewriteTest
                 // Local C# parsing
                 var localSourcePath = spec.SourcePath ?? "source.cs";
                 SemanticModel? semanticModel = null;
-                if (sharedCompilation != null && sharedTrees.TryGetValue(spec, out var syntaxTree))
+                if (sharedTrees.TryGetValue(spec, out var syntaxTree))
                 {
-                    semanticModel = sharedCompilation.GetSemanticModel(syntaxTree);
+                    semanticModel = compilations[syntaxTree].GetSemanticModel(syntaxTree);
                 }
 
                 var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
@@ -278,7 +263,7 @@ public abstract class RewriteTest
                     }
                     AfterRecipe(spec, source, result == null ? source : result.After);
                 }
-                AssertOutputCompiles(recipeSpec, run.Finals);
+                AssertOutputCompiles(recipeSpec, run.Finals, setup, projects);
 
                 if (run.Unsettled is var (cycle, changes))
                 {
@@ -286,7 +271,7 @@ public abstract class RewriteTest
                         $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
                 }
                 var fresh = results.Count > 0 && (cycles > expectedCycles || validations.ParserShapedTrees)
-                    ? ParseAgain(run.Finals, metadataReferences)
+                    ? ParseAgain(run.Finals, setup, projects)
                     : null;
                 if (cycles > expectedCycles && fresh != null)
                 {
@@ -315,7 +300,7 @@ public abstract class RewriteTest
             {
                 AfterRecipe(spec, source, source);
             }
-            AssertOutputCompiles(recipeSpec, parsed.Select(p => p.Source).ToList());
+            AssertOutputCompiles(recipeSpec, parsed.Select(p => p.Source).ToList(), setup, projects);
         }
     }
 
@@ -335,39 +320,53 @@ public abstract class RewriteTest
         }
     }
 
-    private static void AssertOutputCompiles(RecipeSpec recipeSpec, List<SourceFile> finals)
+    private static void AssertOutputCompiles(RecipeSpec recipeSpec, List<SourceFile> finals, CompileSetup? setup,
+        TestProjects projects)
     {
-        if (recipeSpec.OutputCompilations.Count == 0)
-        {
-            return;
-        }
-        var trees = finals.OfType<CSharp.CompilationUnit>()
-            .Select(unit => CSharpSyntaxTree.ParseText(PrintTree(unit, MarkerPrinter.Sanitized), path: unit.SourcePath))
+        var units = finals.OfType<CSharp.CompilationUnit>()
+            .Select(unit => (Unit: unit, Text: PrintTree(unit, MarkerPrinter.Sanitized)))
             .ToList();
-        foreach (var (references, inspect) in recipeSpec.OutputCompilations)
+        foreach (var check in recipeSpec.OutputCompilations)
         {
-            var target = references ?? recipeSpec.ReferenceAssemblies ?? throw new ArgumentException(
+            var target = check.References ?? recipeSpec.ReferenceAssemblies ?? throw new ArgumentException(
                 "ExpectOutputCompiles compiles against the ReferenceAssemblies when it isn't given references, " +
                 "and they are not set.");
-            var compilation = Compile(ResolveAssemblies(target), trees);
-            AssertCompiles(compilation, $"The recipe's output doesn't compile against {target.TargetFramework}");
-            inspect?.Invoke(compilation);
+            var outputSetup = new CompileSetup(
+                check.References == null && setup != null
+                    ? setup.References
+                    : ResolveAssemblies(target).AddRange(recipeSpec.References),
+                check.Options ?? recipeSpec.CompilationOptions,
+                check.ParseOptions ?? recipeSpec.ParseOptions);
+            var compilations = projects.Compile(
+                units.Select(u => (projects.Of(u.Unit), outputSetup.Parse(u.Text, u.Unit.SourcePath))), outputSetup);
+            AssertCompiles(compilations.Values.Distinct(), check.Inspect == null ? [] : [check.Inspect],
+                $"The recipe's output doesn't compile against {target.TargetFramework}");
         }
     }
 
-    private static void AssertCompiles(CSharpCompilation compilation, string headline)
+    private static void AssertCompiles(IEnumerable<CSharpCompilation> compilations,
+        IReadOnlyList<Action<CSharpCompilation>> inspections, string headline)
     {
-        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
-        if (errors.Count == 0)
+        var all = compilations.ToList();
+        var errors = all.SelectMany(c => c.GetDiagnostics())
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToList();
+        if (errors.Count > 0)
         {
-            return;
+            var failing = errors.Select(e => e.Location.SourceTree).OfType<SyntaxTree>().Distinct();
+            Assert.Fail(string.Join("\n", [
+                $"{headline}:",
+                ..errors.Select(e => $"  {e}"),
+                ..failing.Select(tree => $"{tree.FilePath}:\n{tree.GetText()}")
+            ]));
         }
-        var failing = errors.Select(e => e.Location.SourceTree).OfType<SyntaxTree>().Distinct();
-        Assert.Fail(string.Join("\n", [
-            $"{headline}:",
-            ..errors.Select(e => $"  {e}"),
-            ..failing.Select(tree => $"{tree.FilePath}:\n{tree.GetText()}")
-        ]));
+        foreach (var compilation in all)
+        {
+            foreach (var inspect in inspections)
+            {
+                inspect(compilation);
+            }
+        }
     }
 
     /// <param name="Changes">The changes of the expected cycles, from the parsed sources to the output of the last of them.</param>
@@ -502,18 +501,20 @@ public abstract class RewriteTest
     internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit);
 
     /// <summary>The printed text of each compilation unit the cycles left, parsed as the next run reads it.</summary>
-    private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals,
-        ImmutableArray<MetadataReference>? metadataReferences)
+    private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals, CompileSetup? setup,
+        TestProjects projects)
     {
         var units = finals.OfType<CompilationUnit>()
             .Select(unit =>
             {
                 var text = PrintTree(unit, MarkerPrinter.Sanitized);
-                return (Unit: unit, Text: text, Tree: CSharpSyntaxTree.ParseText(text, path: unit.SourcePath));
+                var tree = setup?.Parse(text, unit.SourcePath) ??
+                           CSharpSyntaxTree.ParseText(text, path: unit.SourcePath);
+                return (Unit: unit, Text: text, Tree: tree);
             })
             .ToList();
-        var compilation = metadataReferences != null && units.Count > 0
-            ? Compile(metadataReferences.Value, units.Select(u => u.Tree))
+        var compilations = setup != null
+            ? projects.Compile(units.Select(u => (projects.Of(u.Unit), u.Tree)), setup)
             : null;
 
         var parser = new CSharpParser();
@@ -524,7 +525,7 @@ public abstract class RewriteTest
             try
             {
                 reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
-                    semanticModel: compilation?.GetSemanticModel(tree));
+                    semanticModel: compilations?[tree].GetSemanticModel(tree));
                 if (PrintTree(reparsed, MarkerPrinter.Sanitized) != text)
                 {
                     reparsed = null;
@@ -559,15 +560,6 @@ public abstract class RewriteTest
             .ToList();
         ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, checks),
             "Running the recipe on a fresh parse of its output changed", sanitized: true);
-    }
-
-    private static CSharpCompilation Compile(ImmutableArray<MetadataReference> metadataReferences,
-        IEnumerable<SyntaxTree> syntaxTrees)
-    {
-        return CSharpCompilation.Create("TestCompilation")
-            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .AddReferences(metadataReferences)
-            .AddSyntaxTrees(syntaxTrees);
     }
 
     private static string PluralCycles(int count) => count == 1 ? "1 cycle" : $"{count} cycles";
@@ -696,6 +688,8 @@ public record SourceSpec(
     internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
     internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];
     internal ImmutableArray<string>? ProjectTargetFrameworks { get; private init; }
+    internal string? ProjectName { get; private init; }
+    internal ImmutableArray<string> ProjectReferences { get; private init; } = [];
 
     /// <summary>
     /// Adjusts the parsed source before the recipe runs on it, after the parse and print checks, as when a test needs
@@ -716,13 +710,23 @@ public record SourceSpec(
         BeforeRecipe<SourceFile>(source => markers.Aggregate(source, AddMarker));
 
     /// <summary>
-    /// Puts the C# source in an SDK-style project that targets the given frameworks, with the
-    /// <see cref="DotNetProject"/> marker that <see cref="SolutionParser"/> gives it. The project is named
-    /// <c>Test</c>, as <see cref="SolutionParser"/> names the project of <c>Test.csproj</c>, and the sources of a test
-    /// that target the same frameworks share it.
+    /// Has the source's project target the given frameworks, as its <see cref="DotNetProject"/> marker says. A source
+    /// in no <see cref="InProject">named project</see> goes in a project named <c>Test</c>, as
+    /// <see cref="SolutionParser"/> names the project of <c>Test.csproj</c>, which the sources of the test that target
+    /// the same frameworks share.
     /// </summary>
     public SourceSpec TargetFrameworks(params string[] targetFrameworks) =>
         this with { ProjectTargetFrameworks = [..targetFrameworks] };
+
+    /// <summary>
+    /// Puts the source in the named SDK-style project, with the <see cref="DotNetProject"/> marker that
+    /// <see cref="SolutionParser"/> gives it. The C# sources of each project compile on their own, against the projects
+    /// that any of its sources names in <paramref name="projectReferences"/>, and those in no project compile together.
+    /// To have sources compile together and still carry different markers, add the markers with
+    /// <see cref="AddMarkers"/> instead.
+    /// </summary>
+    public SourceSpec InProject(string projectName, params string[] projectReferences) =>
+        this with { ProjectName = projectName, ProjectReferences = [..projectReferences] };
 
     /// <summary>
     /// Assertions on the source after the recipe ran, which get the source as the last expected cycle left it, or as
@@ -847,6 +851,44 @@ public class RecipeSpec
         return this;
     }
 
+    /// <summary>The options the C# sources compile with, by default those of a library.</summary>
+    public CSharpCompilationOptions CompilationOptions { get; private set; } = new(OutputKind.DynamicallyLinkedLibrary);
+
+    /// <summary>
+    /// The options the C# sources are parsed with, such as the language version and preprocessor symbols.
+    /// </summary>
+    public CSharpParseOptions ParseOptions { get; private set; } = CSharpParseOptions.Default;
+
+    private readonly List<MetadataReference> _references = [];
+
+    /// <summary>
+    /// The references the C# sources compile against in addition to the <see cref="ReferenceAssemblies"/>.
+    /// </summary>
+    public IReadOnlyList<MetadataReference> References => _references;
+
+    public RecipeSpec SetCompilationOptions(CSharpCompilationOptions options)
+    {
+        CompilationOptions = options;
+        return this;
+    }
+
+    public RecipeSpec SetParseOptions(CSharpParseOptions options)
+    {
+        ParseOptions = options;
+        return this;
+    }
+
+    /// <summary>
+    /// Has the C# sources, and the output that <see cref="ExpectOutputCompiles"/> compiles, also compile against the
+    /// references, such as prebuilt DLLs, NuGet packages or a library compiled in memory, as with
+    /// <c>MetadataReference.CreateFromFile(path)</c> or <c>compilation.ToMetadataReference()</c>.
+    /// </summary>
+    public RecipeSpec AddReferences(params MetadataReference[] references)
+    {
+        _references.AddRange(references);
+        return this;
+    }
+
     private readonly List<OutputCompilation> _outputCompilations = [];
 
     internal IReadOnlyList<OutputCompilation> OutputCompilations => _outputCompilations;
@@ -854,26 +896,39 @@ public class RecipeSpec
     /// <summary>
     /// Expect the C# sources as the recipe left them to compile without errors, against
     /// <paramref name="references"/> when the output targets other frameworks than the input, and against
-    /// <see cref="ReferenceAssemblies"/> otherwise. <paramref name="inspect"/> gets the compilation, such as to emit
-    /// and run the output. Call it once for each set of references the output has to compile against.
+    /// <see cref="ReferenceAssemblies"/> otherwise, and with <paramref name="options"/> and
+    /// <paramref name="parseOptions"/> when they differ from <see cref="CompilationOptions"/> and
+    /// <see cref="ParseOptions"/>, such as to treat warnings as errors or build a console app.
+    /// <paramref name="inspect"/> gets the compilation of each project, such as to emit and run the output. Call it
+    /// once for each way the output has to compile.
     /// </summary>
     public RecipeSpec ExpectOutputCompiles(ReferenceAssemblies? references = null,
-        Action<CSharpCompilation>? inspect = null)
+        Action<CSharpCompilation>? inspect = null, CSharpCompilationOptions? options = null,
+        CSharpParseOptions? parseOptions = null)
     {
-        _outputCompilations.Add(new OutputCompilation(references, inspect));
+        _outputCompilations.Add(new OutputCompilation(references, inspect, options, parseOptions));
         return this;
     }
+
+    private readonly List<Action<CSharpCompilation>> _inputInspections = [];
+
+    internal IReadOnlyList<Action<CSharpCompilation>> InputInspections => _inputInspections;
 
     /// <summary>Whether the test expects the C# sources to compile without errors before the recipe runs.</summary>
     public bool InputCompiles { get; private set; }
 
     /// <summary>
-    /// Expect the C# sources to compile without errors against <see cref="ReferenceAssemblies"/> before the recipe
-    /// runs, so that the types the recipe sees are the ones the compiler resolved.
+    /// Expect the C# sources to compile without errors before the recipe runs, so that the types the recipe sees are
+    /// the ones the compiler resolved. <paramref name="inspect"/> gets the compilation of each project, such as to run
+    /// the input and compare what it does with what the output does.
     /// </summary>
-    public RecipeSpec ExpectInputCompiles()
+    public RecipeSpec ExpectInputCompiles(Action<CSharpCompilation>? inspect = null)
     {
         InputCompiles = true;
+        if (inspect != null)
+        {
+            _inputInspections.Add(inspect);
+        }
         return this;
     }
 
@@ -892,7 +947,13 @@ public class RecipeSpec
 
 /// <param name="References">The references to compile against, or null for the ones the input compiled against.</param>
 /// <param name="Inspect">What the test checks of the compilation.</param>
-internal sealed record OutputCompilation(ReferenceAssemblies? References, Action<CSharpCompilation>? Inspect);
+/// <param name="Options">The options to compile with, or null for the ones the input compiled with.</param>
+/// <param name="ParseOptions">The options to parse with, or null for the ones the input was parsed with.</param>
+internal sealed record OutputCompilation(
+    ReferenceAssemblies? References,
+    Action<CSharpCompilation>? Inspect,
+    CSharpCompilationOptions? Options,
+    CSharpParseOptions? ParseOptions);
 
 /// <summary>
 /// Pre-configured reference assemblies for common .NET SDK targets.
