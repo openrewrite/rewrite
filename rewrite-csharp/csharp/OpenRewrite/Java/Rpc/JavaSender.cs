@@ -839,7 +839,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     /// </summary>
     [ThreadStatic] private static HashSet<JavaType>? _typeSignatureStack;
 
-    private static object TypeSignature(JavaType type)
+    internal static object TypeSignature(JavaType type)
     {
         _typeSignatureStack ??= new HashSet<JavaType>(ReferenceEqualityComparer.Instance);
         if (!_typeSignatureStack.Add(type))

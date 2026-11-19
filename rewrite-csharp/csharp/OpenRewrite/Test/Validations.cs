@@ -90,18 +90,27 @@ public sealed class Validations
     /// </summary>
     public bool MinimalFormatting { get; init; } = true;
 
+    /// <summary>
+    /// Whether the sources the recipe changed are validated to survive a trip to the Java peer and back: Java prints
+    /// them as this side does and sends back the nodes, ids and types it was sent, as the Java recipes and the recipes
+    /// of other languages run after the recipe read them. It needs the Java peer, so only tests that extend
+    /// <see cref="RpcRewriteTest"/> make it. Default: enabled.
+    /// </summary>
+    public bool RpcRoundTrip { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
     /// <summary>
-    /// The parse, print and formatting reconciliation checks disabled, and the checks of what the recipe does, such
-    /// as <see cref="ReportingMarkersOnly"/>, left on.
+    /// The parse, print, formatting reconciliation and RPC round-trip checks disabled, and the checks of what the
+    /// recipe does, such as <see cref="ReportingMarkersOnly"/>, left on.
     /// </summary>
     public static Validations None { get; } = new()
     {
         WhitespaceInSpaces = false,
         PrintEqualsInput = false,
         PrintIdempotence = false,
-        FormattingReconciliation = false
+        FormattingReconciliation = false,
+        RpcRoundTrip = false
     };
 }
