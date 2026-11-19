@@ -258,6 +258,13 @@ public abstract class RewriteTest
                     else
                     {
                         // Expected no change
+                        if (result is { After: { } changed } && PrintTree(changed) == PrintTree(source))
+                        {
+                            Assert.Fail(
+                                "Return the tree the recipe was given when there is nothing to change.\n" +
+                                $"{recipeSpec.Recipe.Name} returned a new tree for {source.SourcePath} that prints " +
+                                "the same, so the run reports the source file as changed, with an empty diff.");
+                        }
                         Assert.True(result == null || result.After == null || result.Before == result.After,
                             "Recipe made unexpected changes to a source file that was not expected to change.");
                     }
