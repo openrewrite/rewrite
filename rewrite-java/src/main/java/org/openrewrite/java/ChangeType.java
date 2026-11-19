@@ -30,7 +30,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
-import java.lang.reflect.Method;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1059,45 +1058,36 @@ public class ChangeType extends Recipe implements RenamingRecipe {
     }
 
     /**
-     * Cheap pre-filter for {@link #containsClassDefinition}: a Java file can only declare a type
-     * whose package equals the file's package declaration, so a file whose package is not a prefix
-     * of the old type's name can skip the (potentially full-tree) definition scan entirely. This
-     * invariant is Java-specific, so it is only applied to {@link J.CompilationUnit}; other
-     * {@link JavaSourceFile} dialects (e.g. {@code K.CompilationUnit}, {@code G.CompilationUnit})
-     * always fall through to the scan.
-     *
-     * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
+     * Whether {@link TypesInUse} on the runtime classpath exposes {@link TypesInUse#hasDocReference}. Probed once at class
+     * load so an older parent-loaded {@code rewrite-java} doesn't trigger {@link NoSuchMethodError}.
      */
-    // Looked up reflectively because recipe modules built against this ChangeType may run alongside an
-    // older TypesInUse that predates the method, which would otherwise fail with NoSuchMethodError.
-    private static final @Nullable Method HAS_DOC_REFERENCE = findHasDocReference();
+    private static final boolean TYPES_IN_USE_HAS_DOC_REFERENCE = probeTypesInUseHasDocReference();
 
-    private static @Nullable Method findHasDocReference() {
+    private static boolean probeTypesInUseHasDocReference() {
         try {
-            return TypesInUse.class.getMethod("hasDocReference", String.class);
+            TypesInUse.class.getMethod("hasDocReference", String.class);
+            return true;
         } catch (NoSuchMethodException e) {
-            return null;
+            return false;
         }
     }
 
     private static boolean hasDocReference(TypesInUse typesInUse, String fullyQualifiedTypeName) {
-        if (HAS_DOC_REFERENCE == null) {
-            return false;
-        }
-        try {
-            return (Boolean) HAS_DOC_REFERENCE.invoke(typesInUse, fullyQualifiedTypeName);
-        } catch (ReflectiveOperationException e) {
-            return false;
-        }
+        return TYPES_IN_USE_HAS_DOC_REFERENCE && typesInUse.hasDocReference(fullyQualifiedTypeName);
     }
 
-    private static final @Nullable Method MAY_DECLARE_TYPE = findMayDeclareType();
+    /**
+     * Whether {@link TypesInUse} on the runtime classpath exposes {@link TypesInUse#mayDeclareType}. Probed once at class
+     * load so an older parent-loaded {@code rewrite-java} doesn't trigger {@link NoSuchMethodError}.
+     */
+    private static final boolean TYPES_IN_USE_HAS_MAY_DECLARE_TYPE = probeTypesInUseHasMayDeclareType();
 
-    private static @Nullable Method findMayDeclareType() {
+    private static boolean probeTypesInUseHasMayDeclareType() {
         try {
-            return TypesInUse.class.getMethod("mayDeclareType", String.class);
+            TypesInUse.class.getMethod("mayDeclareType", String.class);
+            return true;
         } catch (NoSuchMethodException e) {
-            return null;
+            return false;
         }
     }
 
@@ -1106,14 +1096,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
      * each type that is changed.
      */
     private static boolean mayDeclareType(TypesInUse typesInUse, String fullyQualifiedTypeName) {
-        if (MAY_DECLARE_TYPE == null) {
-            return true;
-        }
-        try {
-            return (Boolean) MAY_DECLARE_TYPE.invoke(typesInUse, fullyQualifiedTypeName);
-        } catch (ReflectiveOperationException e) {
-            return true;
-        }
+        return !TYPES_IN_USE_HAS_MAY_DECLARE_TYPE || typesInUse.mayDeclareType(fullyQualifiedTypeName);
     }
 
     /**
@@ -1132,6 +1115,16 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         return false;
     }
 
+    /**
+     * Cheap pre-filter for {@link #containsClassDefinition}: a Java file can only declare a type
+     * whose package equals the file's package declaration, so a file whose package is not a prefix
+     * of the old type's name can skip the (potentially full-tree) definition scan entirely. This
+     * invariant is Java-specific, so it is only applied to {@link J.CompilationUnit}; other
+     * {@link JavaSourceFile} dialects (e.g. {@code K.CompilationUnit}, {@code G.CompilationUnit})
+     * always fall through to the scan.
+     *
+     * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
+     */
     private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
         if (!(sourceFile instanceof J.CompilationUnit)) {
             return true;
