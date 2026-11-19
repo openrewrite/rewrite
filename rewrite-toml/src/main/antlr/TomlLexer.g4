@@ -38,7 +38,7 @@ fragment DIGIT : [0-9];
 fragment ALPHA : [A-Za-z];
 
 // strings
-fragment ESC     : '\\' (["\\/bfnrte] | HEX_ESC | UNICODE | EX_UNICODE); // \e and \xHH are TOML 1.1
+fragment ESC     : '\\' (["\\bfnrte] | HEX_ESC | UNICODE | EX_UNICODE); // \e and \xHH are TOML 1.1
 fragment HEX_ESC : 'x' HEX_DIGIT HEX_DIGIT;
 fragment UNICODE : 'u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT;
 fragment EX_UNICODE:
