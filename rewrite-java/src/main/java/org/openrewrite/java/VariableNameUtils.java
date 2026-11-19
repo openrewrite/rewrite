@@ -108,8 +108,26 @@ public class VariableNameUtils {
         Scope.declaredWithin(scope)
                 .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
                 .forEach(binding -> names.add(binding.getName()));
-        // A variable named like an enum the file uses would obscure that enum wherever it qualifies a constant (JLS 6.4.2).
-        Cursor sourceFile = scope.getValue() instanceof JavaSourceFile ? scope : scope.dropParentUntil(JavaSourceFile.class::isInstance);
+        // A class at or under the cursor has the fields it inherits too, which nothing under it declares.
+        new JavaIsoVisitor<Set<String>>() {
+            @Override
+            public J preVisit(J tree, Set<String> found) {
+                if (tree instanceof J.ClassDeclaration ||
+                    tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null) {
+                    for (Scope.Binding binding : Scope.at(getCursor()).getBindings()) {
+                        if (binding.getNamespace() == Scope.Namespace.VARIABLE &&
+                            binding.getKind() == Scope.Kind.INHERITED) {
+                            found.add(binding.getName());
+                        }
+                    }
+                }
+                return tree;
+            }
+        }.visit(scope.<J>getValue(), names, scope.getParentOrThrow());
+        // A variable named like an enum the file uses would obscure that enum wherever it qualifies a constant
+        // (JLS 6.4.2).
+        Cursor sourceFile = scope.getValue() instanceof JavaSourceFile ? scope :
+                scope.dropParentUntil(JavaSourceFile.class::isInstance);
         names.addAll(sourceFile.computeMessageIfAbsent(ENUM_NAMES, k -> {
             Set<String> enums = new HashSet<>();
             new JavaIsoVisitor<Set<String>>() {

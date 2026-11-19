@@ -124,6 +124,35 @@ class VariableNameUtilsTest implements RewriteTest {
     }
 
     @Test
+    void inheritedNamesFromTheCursorOfTheClassItself() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if ("Test".equals(classDecl.getSimpleName())) {
+                      assertThat(VariableNameUtils.findNamesInScope(getCursor())).containsExactlyInAnyOrder("inherited", "field");
+                  }
+                  return classDecl;
+              }
+          })),
+          java(
+            """
+              class Base {
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              class Test extends Base {
+                  int field;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotAddPackagePrivateNameFromSuperClass() {
         rewriteRun(
           baseTest("classBlock", "classBlock"),

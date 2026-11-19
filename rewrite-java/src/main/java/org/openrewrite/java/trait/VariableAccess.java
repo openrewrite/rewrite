@@ -107,7 +107,8 @@ public class VariableAccess implements Trait<J.Identifier> {
             if (self && (tree instanceof J.ClassDeclaration || tree instanceof J.NewClass) ||
                 tree instanceof J.ClassDeclaration && ((J.ClassDeclaration) tree).getSimpleName().equals(qualifier)) {
                 for (Scope.Binding binding : scope.getBindings()) {
-                    if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) && !binding.isLocal()) {
+                    if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) &&
+                        !binding.isLocal()) {
                         return Optional.of(binding);
                     }
                 }
@@ -161,7 +162,8 @@ public class VariableAccess implements Trait<J.Identifier> {
             J.Identifier ident = cursor.getValue();
             String name = ident.getSimpleName();
             if ("this".equals(name) || "super".equals(name) ||
-                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getName) ||
+                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class,
+                        J.VariableDeclarations.NamedVariable::getName) ||
                 checkNamePart(cursor, J.InstanceOf.class, J.InstanceOf::getPattern)) {
                 return null;
             }

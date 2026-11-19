@@ -280,6 +280,90 @@ class ChangeFieldNameTest implements RewriteTest {
     }
 
     @Test
+    void qualifyWhereANestedClassHasAFieldOfTheNewName() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "count", "n")),
+          java(
+            """
+              class Test {
+                  int count;
+
+                  class Inner {
+                      int n;
+
+                      int add() {
+                          return count + n;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int n;
+
+                  class Inner {
+                      int n;
+
+                      int add() {
+                          return Test.this.n + n;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importTheClassAStaticallyImportedFieldIsQualifiedWith() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("com.acme.Totals", "total", "n")),
+          java(
+            """
+              package com.acme;
+
+              public class Totals {
+                  public static int total;
+              }
+              """,
+            """
+              package com.acme;
+
+              public class Totals {
+                  public static int n;
+              }
+              """
+          ),
+          java(
+            """
+              package com.other;
+
+              import static com.acme.Totals.total;
+
+              class Test {
+                  int add(int n) {
+                      return total + n;
+                  }
+              }
+              """,
+            """
+              package com.other;
+
+              import com.acme.Totals;
+
+              import static com.acme.Totals.n;
+
+              class Test {
+                  int add(int n) {
+                      return Totals.n + n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void qualifyAStaticFieldWithItsClass() {
         rewriteRun(
           spec -> spec.recipe(changeFieldName("Test", "total", "n")),

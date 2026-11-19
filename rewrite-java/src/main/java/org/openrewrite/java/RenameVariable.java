@@ -77,21 +77,11 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         public @Nullable J visit(@Nullable Tree tree, P p) {
             if (!resolved && tree instanceof J) {
                 resolved = true;
-                new JavaIsoVisitor<Set<UUID>>() {
-                    @Override
-                    public J.Identifier visitIdentifier(J.Identifier identifier, Set<UUID> found) {
-                        Object parent = getCursor().getParentTreeCursor().getValue();
-                        if (parent instanceof J.VariableDeclarations.NamedVariable && parent.equals(renameVariable) &&
-                            ((J.VariableDeclarations.NamedVariable) parent).getName() == identifier) {
-                            Scope.bindingOf(getCursor(), identifier).ifPresent(binding -> {
-                                field = binding.getKind() == Scope.Kind.MEMBER;
-                                found.add(identifier.getId());
-                                binding.references().forEach(reference -> found.add(reference.<J>getValue().getId()));
-                            });
-                        }
-                        return identifier;
-                    }
-                }.visit(tree, renamed, getCursor());
+                Scope.bindingOf(new Cursor(getCursor(), tree), renameVariable).ifPresent(binding -> {
+                    field = binding.getKind() == Scope.Kind.MEMBER;
+                    renamed.add(renameVariable.getName().getId());
+                    binding.references().forEach(reference -> renamed.add(reference.<J>getValue().getId()));
+                });
             }
             return super.visit(tree, p);
         }

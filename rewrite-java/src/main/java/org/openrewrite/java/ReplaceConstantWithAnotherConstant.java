@@ -102,9 +102,9 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withSimpleName(newConstantName)
                         .withFieldType(newFieldType(fieldType))
                         .withType(newType(identifier.getType()));
-                // A local, parameter or field of the new name would capture the bare name
+                // A local, parameter or other field of the new name would capture the bare name
                 boolean captured = Scope.at(getCursor()).lookup(newConstantName)
-                        .filter(binding -> binding.getKind() != Scope.Kind.IMPORTED)
+                        .filter(binding -> binding.getKind() != Scope.Kind.IMPORTED && !isNewConstant(binding))
                         .isPresent();
                 if (hasNoConflictingImport && !captured) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
@@ -139,6 +139,16 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withName(name);
             }
             return expression;
+        }
+
+        /**
+         * Whether the binding is the new constant, which the bare name reads where its class declares or inherits it.
+         */
+        private boolean isNewConstant(Scope.Binding binding) {
+            JavaType owner = binding.getType() instanceof JavaType.Variable ?
+                    ((JavaType.Variable) binding.getType()).getOwner() : null;
+            return owner instanceof JavaType.FullyQualified &&
+                   TypeUtils.isOfClassType(owner, newOwningType.getFullyQualifiedName());
         }
 
         private JavaType.Variable newFieldType(JavaType.Variable fieldType) {

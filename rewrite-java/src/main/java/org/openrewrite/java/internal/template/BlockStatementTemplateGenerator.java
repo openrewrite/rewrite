@@ -696,7 +696,8 @@ public class BlockStatementTemplateGenerator {
         return sb.toString();
     }
 
-    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before) {
+    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock,
+                                                StringBuilder before) {
         for (Statement statement : containingBlock.getStatements()) {
             if (referToSameElement(current, statement)) {
                 break;
@@ -716,7 +717,8 @@ public class BlockStatementTemplateGenerator {
         if (referToSameElement(current, containingBlock)) {
             // Inserting into the block itself puts the template after its last statement.
             J.Empty end = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
-            blockCursor = new Cursor(cursor.getParentOrThrow(), containingBlock.withStatements(ListUtils.concat(containingBlock.getStatements(), end)));
+            blockCursor = new Cursor(cursor.getParentOrThrow(),
+                    containingBlock.withStatements(ListUtils.concat(containingBlock.getStatements(), end)));
             at = end;
         }
         Cursor position = new Cursor(blockCursor, at);
@@ -724,8 +726,9 @@ public class BlockStatementTemplateGenerator {
         for (Scope.Binding binding : scope.getBindings()) {
             String type = patternVariableType(binding);
             if (type != null && scope.isVisible(binding)) {
-                before.insert(0, "\n" + type + " " + binding.getName() + " = " + valueOfType(binding.getType() instanceof JavaType.Variable ?
-                        ((JavaType.Variable) binding.getType()).getType() : null) + ";\n");
+                JavaType variableType = binding.getType() instanceof JavaType.Variable ?
+                        ((JavaType.Variable) binding.getType()).getType() : null;
+                before.insert(0, "\n" + type + " " + binding.getName() + " = " + valueOfType(variableType) + ";\n");
             }
         }
     }
@@ -743,11 +746,13 @@ public class BlockStatementTemplateGenerator {
             J clazz = ((J.InstanceOf) declaring.getValue()).getClazz();
             return clazz.withPrefix(Space.EMPTY).printTrimmed(declaring);
         }
-        if (declaring.getValue() instanceof J.VariableDeclarations.NamedVariable) {
-            J.VariableDeclarations declarations = declaring.getParentTreeCursor().getValue();
-            TypeTree typeExpression = declarations.getTypeExpression();
+        Object declarations = declaring.getParentTreeCursor().getValue();
+        if (declaring.getValue() instanceof J.VariableDeclarations.NamedVariable &&
+            declarations instanceof J.VariableDeclarations) {
+            TypeTree typeExpression = ((J.VariableDeclarations) declarations).getTypeExpression();
             if (typeExpression == null || typeExpression.getMarkers().findFirst(JavaVarKeyword.class).isPresent()) {
-                return Substitutions.getTypeName(((J.VariableDeclarations.NamedVariable) declaring.getValue()).getType());
+                J.VariableDeclarations.NamedVariable variable = declaring.getValue();
+                return Substitutions.getTypeName(variable.getType());
             }
             return typeExpression.withPrefix(Space.EMPTY).printTrimmed(declaring);
         }

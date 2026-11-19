@@ -19,9 +19,14 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -76,7 +81,11 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                 J.Identifier renamed = i.withSimpleName(toName).withFieldType(varType.withName(toName));
                 Expression qualifier = qualifierWhereShadowed(varType);
                 if (qualifier != null) {
-                    doAfterVisit(new Qualify<>(renamed, qualifier));
+                    qualifyAfterVisit(renamed, qualifier);
+                    if (varType.hasFlags(Flag.Static) && getCursor().firstEnclosing(JavaSourceFile.class) != null) {
+                        // A static field read by its bare name may come from a class the file does not import
+                        maybeAddImport(TypeUtils.asFullyQualified(varType.getOwner()));
+                    }
                 }
                 return renamed;
             }
@@ -88,14 +97,14 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     /**
      * What the field has to be selected from at the cursor once it has its new name, or {@code null} where the bare
      * name still reads it or nothing names the instance holding it. A local variable of the new name would otherwise
-     * be read in its place.
+     * be read in its place, as would a field of that name in a class nested inside the field's own.
      */
     private @Nullable Expression qualifierWhereShadowed(JavaType.Variable field) {
         Object parent = getCursor().getParentTreeCursor().getValue();
         if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == getCursor().getValue() ||
             parent instanceof J.VariableDeclarations.NamedVariable &&
             ((J.VariableDeclarations.NamedVariable) parent).getName() == getCursor().getValue() ||
-            !Scope.at(getCursor()).lookup(toName).filter(Scope.Binding::isLocal).isPresent()) {
+            !isCaptured(Scope.at(getCursor()))) {
             return null;
         }
         JavaType.FullyQualified owner = TypeUtils.asFullyQualified(field.getOwner());
@@ -103,7 +112,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
             return null;
         }
         if (field.hasFlags(Flag.Static)) {
-            return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), owner.getClassName(), owner, null);
+            return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), owner.getClassName(), owner,
+                    null);
         }
         // The field belongs to the nearest enclosing class that declares or inherits it
         boolean innermost = true;
@@ -118,7 +128,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                 continue;
             }
             if (enclosing != null && TypeUtils.isAssignableTo(owner, enclosing)) {
-                J.Identifier this_ = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this", enclosing, null);
+                J.Identifier this_ = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this",
+                        enclosing, null);
                 if (innermost) {
                     return this_;
                 }
@@ -128,32 +139,66 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                 }
                 J.Identifier className = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                         ((J.ClassDeclaration) tree).getSimpleName(), enclosing, null);
-                return new J.FieldAccess(randomId(), Space.EMPTY, Markers.EMPTY, className, JLeftPadded.build(this_), enclosing);
+                return new J.FieldAccess(randomId(), Space.EMPTY, Markers.EMPTY, className,
+                        JLeftPadded.build(this_), enclosing);
             }
             innermost = false;
         }
         return null;
     }
 
-    @Value
-    @EqualsAndHashCode(callSuper = false)
+    /**
+     * Whether the new name, read from the scope's position, finds a local or a member of a class nested inside the
+     * one the old name finds the field in.
+     */
+    private boolean isCaptured(Scope scope) {
+        Scope.Binding capturing = scope.lookup(toName).orElse(null);
+        if (capturing == null || capturing.isLocal()) {
+            return capturing != null;
+        }
+        Scope.Binding current = scope.lookup(hasName).orElse(null);
+        if (current == null) {
+            return false;
+        }
+        J fieldScope = current.getScope().getTree();
+        for (Cursor c = capturing.getScope().getCursor().getParent(); c != null; c = c.getParent()) {
+            if (c.getValue() instanceof J && ((J) c.getValue()).getId().equals(fieldScope.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Records the qualifier on the single queued visitor that qualifies every shadowed name in one pass.
+     */
+    private void qualifyAfterVisit(J.Identifier name, Expression qualifier) {
+        Qualify<P> qualify = null;
+        for (TreeVisitor<?, P> queued : getAfterVisit()) {
+            if (queued instanceof Qualify) {
+                //noinspection unchecked
+                qualify = (Qualify<P>) queued;
+                break;
+            }
+        }
+        if (qualify == null) {
+            qualify = new Qualify<>();
+            doAfterVisit(qualify);
+        }
+        qualify.qualifiers.put(name.getId(), qualifier);
+    }
+
     private static class Qualify<P> extends JavaVisitor<P> {
-        J.Identifier name;
-        Expression qualifier;
+        private final Map<UUID, Expression> qualifiers = new HashMap<>();
 
         @Override
         public J visitIdentifier(J.Identifier identifier, P p) {
-            if (identifier.getId().equals(name.getId())) {
-                return new J.FieldAccess(randomId(), identifier.getPrefix(), Markers.EMPTY, qualifier,
-                        JLeftPadded.build(identifier.withPrefix(Space.EMPTY)), identifier.getType());
+            Expression qualifier = qualifiers.get(identifier.getId());
+            if (qualifier == null) {
+                return identifier;
             }
-            return identifier;
-        }
-
-        @Override
-        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
-            // A variable's initializer is visited twice, which queues the same name twice
-            return fieldAccess.getName().getId().equals(name.getId()) ? fieldAccess : super.visitFieldAccess(fieldAccess, p);
+            return new J.FieldAccess(randomId(), identifier.getPrefix(), Markers.EMPTY, qualifier,
+                    JLeftPadded.build(identifier.withPrefix(Space.EMPTY)), identifier.getType());
         }
     }
 
