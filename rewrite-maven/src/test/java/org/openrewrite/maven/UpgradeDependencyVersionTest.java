@@ -4572,6 +4572,89 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         }
 
         @Test
+        void consecutiveUpgradesOfBomVersionPropertyDeclaredByLocalParent() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.1", null, null, null),
+                new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.2", null, null, null)
+              ),
+              mavenProject("parent",
+                //language=xml
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <junit.version>5.10.0</junit.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.junit</groupId>
+                                    <artifactId>junit-bom</artifactId>
+                                    <version>${junit.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <junit.version>5.10.2</junit.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.junit</groupId>
+                                    <artifactId>junit-bom</artifactId>
+                                    <version>${junit.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("app",
+                  //language=xml
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>app</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.junit.jupiter</groupId>
+                                  <artifactId>junit-jupiter-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+        @Test
         void doesNotChangePropertyWhenBomCoordinatesDoNotMatch(@TempDir Path localRepository) throws IOException {
             ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
             rewriteRun(
