@@ -117,6 +117,10 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 }
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                 Expression target = fieldAccess.getTarget();
+                Expression targetName = target instanceof J.FieldAccess ? ((J.FieldAccess) target).getName() : target;
+                if (targetName instanceof J.Identifier && ((J.Identifier) targetName).getFieldType() == null) {
+                    maybeRemoveImport(TypeUtils.asFullyQualified(target.getType()));
+                }
                 J.Identifier name = fieldAccess.getName();
                 target = hasNoConflictingImport ?
                         typeReference(newOwningType, target.getPrefix()) :

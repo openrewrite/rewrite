@@ -15,11 +15,15 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -859,6 +863,152 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class InheritedConstant implements RewriteTest {
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(new ReplaceConstantWithAnotherConstant("example.Settings.OLD", "example.Settings.NEW"))
+              .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package example;
+                  public interface Settings {
+                      String OLD = "key";
+                      String NEW = "key";
+                  }
+                  """,
+                """
+                  package example;
+                  public class Environment implements Settings {
+                      public static Environment create() { return null; }
+                  }
+                  """
+              ));
+        }
+
+        @Test
+        void removeUnusedSubtypeImport() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  class Test {
+                      String key = Environment.OLD;
+                  }
+                  """,
+                """
+                  import example.Settings;
+
+                  class Test {
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepSubtypeImportUsedElsewhere() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  class Test {
+                      Environment environment;
+                      String key = Environment.OLD;
+                  }
+                  """,
+                """
+                  import example.Environment;
+                  import example.Settings;
+
+                  class Test {
+                      Environment environment;
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepUnrelatedImportWhenAccessedThroughInstance() {
+            rewriteRun(
+              java(
+                """
+                  import example.Environment;
+
+                  import static example.Environment.create;
+
+                  class Test {
+                      String key() {
+                          var instance = create();
+                          return instance.OLD;
+                      }
+                  }
+                  """,
+                """
+                  import example.Environment;
+                  import example.Settings;
+
+                  import static example.Environment.create;
+
+                  class Test {
+                      String key() {
+                          var instance = create();
+                          return Settings.NEW;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"example.Environment", "example.Settings"})
+        void fullyQualifiedAccess(String qualifier) {
+            rewriteRun(
+              java(
+                """
+                  import %1$s;
+
+                  class Test {
+                      String key = %1$s.OLD;
+                  }
+                  """.formatted(qualifier),
+                """
+                  import example.Settings;
+
+                  class Test {
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void accessInSamePackage() {
+            rewriteRun(
+              java(
+                """
+                  package example;
+                  class Test {
+                      String key = Environment.OLD;
+                  }
+                  """,
+                """
+                  package example;
+                  class Test {
+                      String key = Settings.NEW;
+                  }
+                  """
+              )
+            );
+        }
     }
 
     private static final String OLD = """
