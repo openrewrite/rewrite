@@ -63,12 +63,13 @@ public class UpdateScmFromGitOrigin extends Recipe {
                 Optional<GitOrigin> maybeOrigin = document.getMarkers().findFirst(GitProvenance.class)
                         .map(GitProvenance::getOrigin)
                         .map(GitOrigin::parseGitUrl);
-                if(!maybeOrigin.isPresent()) {
+                if (!maybeOrigin.isPresent()) {
                     return document;
                 }
                 gitOrigin = maybeOrigin.get();
 
-                if(!document.getRoot().getChild("scm").isPresent()) {
+                Xml.Tag root = Objects.requireNonNull(document.getRoot());
+                if (!root.getChild("scm").isPresent()) {
                     if (Boolean.TRUE.equals(addIfMissing)) {
                         // Only add SCM to root POMs (those without a parent)
                         boolean hasParent = document.getMarkers()
@@ -88,8 +89,8 @@ public class UpdateScmFromGitOrigin extends Recipe {
                                 "  <connection>scm:git:" + httpUrl + (httpUrl.endsWith(".git") ? "" : ".git") + "</connection>\n" +
                                 "  <developerConnection>scm:git:git@" + gitOrigin.getHost() + ":" + gitPath + ".git</developerConnection>\n" +
                                 "</scm>";
-                        document = (Xml.Document) new AddToTagVisitor<>(document.getRoot(), Xml.Tag.build(scmContent),
-                                new MavenTagInsertionComparator(document.getRoot().getChildren()))
+                        document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build(scmContent),
+                                new MavenTagInsertionComparator(root.getChildren()))
                                 .visitNonNull(document, ctx, Objects.requireNonNull(getCursor().getParent()));
 
                     }

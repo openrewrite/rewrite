@@ -38,7 +38,7 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
         Xml.Document d = super.visitDocument(document, ctx);
-        Xml.Tag root = d.getRoot();
+        Xml.Tag root = Objects.requireNonNull(d.getRoot());
         Optional<Xml.Tag> properties = root.getChild("properties");
         if (!properties.isPresent()) {
             Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");

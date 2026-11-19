@@ -47,7 +47,7 @@ public class OrderPomElements extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document mvn = super.visitDocument(document, ctx);
-                Xml.Tag root = mvn.getRoot();
+                Xml.Tag root = Objects.requireNonNull(mvn.getRoot());
                 if (root.getContent() != null) {
                     Map<String, List<Content>> groupedContents = new HashMap<>(root.getContent().size());
 

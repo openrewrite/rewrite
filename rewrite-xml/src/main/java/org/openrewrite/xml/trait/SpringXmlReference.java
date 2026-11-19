@@ -76,10 +76,11 @@ public class SpringXmlReference extends XmlReference {
         public boolean isAcceptable(SourceFile sourceFile) {
             if (sourceFile instanceof Xml.Document) {
                 Xml.Document doc = (Xml.Document) sourceFile;
-                //noinspection ConstantValue
-                if (doc.getRoot() != null) {
-                    for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
-                        if ("xsi:schemaLocation".equals(attrib.getKeyAsString()) && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                Xml.Tag root = doc.getRoot();
+                if (root != null) {
+                    for (Xml.Attribute attrib : root.getAttributes()) {
+                        if ("xsi:schemaLocation".equals(attrib.getKeyAsString()) &&
+                                attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
                             return true;
                         }
                     }

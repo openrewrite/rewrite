@@ -67,6 +67,9 @@ public class EnableDevelocityBuildCache extends Recipe {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag rootTag = document.getRoot();
+                if (rootTag == null) {
+                    return document;
+                }
 
                 if ("develocity".equals(rootTag.getName()) && !rootTag.getChild("buildCache").isPresent()) {
                     Xml.Tag tag = Xml.Tag.build(buildCacheConfig());

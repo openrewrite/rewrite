@@ -26,6 +26,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateProjectUrlFromGitOrigin extends Recipe {
@@ -42,7 +44,7 @@ public class UpdateProjectUrlFromGitOrigin extends Recipe {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml.Tag project = document.getRoot();
+                Xml.Tag project = requireNonNull(document.getRoot());
                 String originalUrl = project.getChildValue("url").orElse(null);
                 String originUrl = document.getMarkers().findFirst(GitProvenance.class)
                         .map(GitProvenance::getOrigin)

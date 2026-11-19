@@ -62,7 +62,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             null,
             _fileAttributes,
             (Prolog?)VisitProlog(ctx.prolog()),
-            (Tag)VisitElement(ctx.element()),
+            ctx.element() is { } element ? (Tag)VisitElement(element) : null,
             _source.Substring(_cursor))
         )!;
     }

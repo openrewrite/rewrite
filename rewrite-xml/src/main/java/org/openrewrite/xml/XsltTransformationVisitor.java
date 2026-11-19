@@ -17,8 +17,11 @@ package org.openrewrite.xml;
 
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.SourceFile;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.xml.transform.Source;
@@ -40,24 +43,9 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
     @Override
     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
         Xml.Document d = (Xml.Document) super.visitDocument(document, executionContext);
-        return transform(d, xslt);
-    }
-
-    private static Xml.Document transform(Xml.Document document, String xslt) {
-        try {
-            Source xsltSource = new StreamSource(new ByteArrayInputStream(xslt.getBytes()));
-            Transformer transformer = TransformerFactory.newInstance().newTransformer(xsltSource);
-
-            String originalDocument = document.printAll();
-            Source text = new StreamSource(new ByteArrayInputStream(originalDocument.getBytes()));
-            try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
-                transformer.transform(text, new StreamResult(os));
-                Xml.Document transformed = document.withRoot(Xml.Tag.build(os.toString().replace("\r", "")));
-                return transformed.printAll().equals(originalDocument) ? document : transformed;
-            }
-        } catch (IOException | TransformerException e) {
-            throw new RuntimeException("XSLT transformation exception: " + e.getMessage(), e);
-        }
+        String originalDocument = d.printAll();
+        Xml.Document transformed = d.withRoot(parseRoot(transform(originalDocument, xslt).replace("\r", "")));
+        return transformed.printAll().equals(originalDocument) ? d : transformed;
     }
 
     /**
@@ -65,10 +53,22 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
      *
      * @param xmlContent XML content to transform
      * @param xslt       XSLT transformation
-     * @return Transformed XML content
+     * @return The transformed element, or null if the stylesheet produces no element
      */
     @SuppressWarnings("unused")
-    public static Xml.Tag transformTag(@Language("xml") String xmlContent, @Language("xslt") String xslt) {
+    public static Xml.@Nullable Tag transformTag(@Language("xml") String xmlContent, @Language("xslt") String xslt) {
+        return parseRoot(transform(xmlContent, xslt));
+    }
+
+    private static Xml.@Nullable Tag parseRoot(String xml) {
+        SourceFile parsed = new XmlParser().parse(xml).findFirst().get();
+        if (parsed instanceof ParseError) {
+            throw new IllegalArgumentException("Malformed XML tag", ((ParseError) parsed).toException());
+        }
+        return ((Xml.Document) parsed).getRoot();
+    }
+
+    private static String transform(String xmlContent, String xslt) {
         try {
             Source xsltSource = new StreamSource(new ByteArrayInputStream(xslt.getBytes()));
             Transformer transformer = TransformerFactory.newInstance().newTransformer(xsltSource);
@@ -76,7 +76,7 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
             Source text = new StreamSource(new ByteArrayInputStream(xmlContent.getBytes()));
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                 transformer.transform(text, new StreamResult(baos));
-                return Xml.Tag.build(baos.toString());
+                return baos.toString();
             }
         } catch (IOException | TransformerException e) {
             throw new RuntimeException("XSLT transformation exception: " + e.getMessage(), e);

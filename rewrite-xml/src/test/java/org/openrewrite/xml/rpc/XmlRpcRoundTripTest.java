@@ -49,9 +49,19 @@ class XmlRpcRoundTripTest {
         Xml.Document received = sendAndReceive(document);
 
         // then
-        assertThat(received.getRoot().getContent()).hasSize(2);
+        Xml.Tag root = received.getRoot();
+        assertThat(root).isNotNull();
+        assertThat(root.getContent()).hasSize(2);
         assertThat(received.getProlog().getJspDirectives().get(0).getType()).isEqualTo("page");
         assertThat(received.printAll()).isEqualTo(jsp);
+    }
+
+    @Test
+    void documentWithoutRoot() {
+        String source = "<!-- no root -->\n";
+        Xml.Document received = sendAndReceive(parse(source, "file.xml"));
+        assertThat(received.getRoot()).isNull();
+        assertThat(received.printAll()).isEqualTo(source);
     }
 
     @Test

@@ -53,6 +53,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 
 
 @Value
@@ -178,7 +179,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                                 .isUseCRLFNewLines());
                         break;
                     case EXTENSIONS_XML_PATH:
-                        if (sourceFile instanceof Xml.Document) {
+                        if (sourceFile instanceof Xml.Document && ((Xml.Document) sourceFile).getRoot() != null) {
                             acc.setMatchingExtensionsXmlFile(sourceFile.getSourcePath());
                         } else {
                             acc.setUnreadableExtensionsXml(true);
@@ -419,7 +420,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
         @Language("xml")
         String tagSource = String.format(EXTENSION_TAG_FORMAT, extension, newVersion);
         AddToTagVisitor<ExecutionContext> addToTagVisitor = new AddToTagVisitor<>(
-                extensionsXml.getRoot(),
+                requireNonNull(extensionsXml.getRoot()),
                 Xml.Tag.build(tagSource));
         return (Xml.Document) addToTagVisitor.visitNonNull(extensionsXml, ctx);
     }

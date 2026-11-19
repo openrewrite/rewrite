@@ -47,13 +47,13 @@ public sealed class Document : Xml, SourceFile
     public Checksum? Checksum { get; }
     public OpenRewrite.Core.FileAttributes? FileAttributes { get; }
     public Prolog? Prolog { get; }
-    public Tag Root { get; }
+    public Tag? Root { get; }
     public string Eof { get; }
 
     public Document(
         Guid id, string sourcePath, string prefix, Markers markers,
         string? charsetName, bool charsetBomMarked, Checksum? checksum,
-        OpenRewrite.Core.FileAttributes? fileAttributes, Prolog? prolog, Tag root, string eof)
+        OpenRewrite.Core.FileAttributes? fileAttributes, Prolog? prolog, Tag? root, string eof)
     {
         Id = id;
         SourcePath = sourcePath;
@@ -77,7 +77,7 @@ public sealed class Document : Xml, SourceFile
     public Document WithChecksum(Checksum? checksum) => checksum == Checksum ? this : new Document(Id, SourcePath, Prefix, Markers, CharsetName, CharsetBomMarked, checksum, FileAttributes, Prolog, Root, Eof);
     public Document WithFileAttributes(OpenRewrite.Core.FileAttributes? fileAttributes) => fileAttributes == FileAttributes ? this : new Document(Id, SourcePath, Prefix, Markers, CharsetName, CharsetBomMarked, Checksum, fileAttributes, Prolog, Root, Eof);
     public Document WithProlog(Prolog? prolog) => ReferenceEquals(prolog, Prolog) ? this : new Document(Id, SourcePath, Prefix, Markers, CharsetName, CharsetBomMarked, Checksum, FileAttributes, prolog, Root, Eof);
-    public Document WithRoot(Tag root) => ReferenceEquals(root, Root) ? this : new Document(Id, SourcePath, Prefix, Markers, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Prolog, root, Eof);
+    public Document WithRoot(Tag? root) => ReferenceEquals(root, Root) ? this : new Document(Id, SourcePath, Prefix, Markers, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Prolog, root, Eof);
     public Document WithEof(string eof) => eof == Eof ? this : new Document(Id, SourcePath, Prefix, Markers, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Prolog, Root, eof);
 }
 

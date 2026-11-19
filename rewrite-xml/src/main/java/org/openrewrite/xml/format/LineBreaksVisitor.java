@@ -78,7 +78,7 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
     public Xml.Tag visitTag(Xml.Tag tag, P p) {
         Xml.Document doc = getCursor().firstEnclosingOrThrow(Xml.Document.class);
         Xml.Tag t = keepMaximumLines(minimumLines(super.visitTag(tag, p),
-                doc.getRoot().isScope(tag) &&
+                tag.isScope(doc.getRoot()) &&
                         doc.getProlog().getXmlDecl() == null &&
                         doc.getProlog().getMisc().isEmpty() ? 0 : 1), 2);
         if (t.getClosing() != null && !t.getChildren().isEmpty()) {

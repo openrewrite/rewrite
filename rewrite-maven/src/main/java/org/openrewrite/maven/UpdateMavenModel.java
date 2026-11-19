@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
@@ -45,7 +46,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         Pom requested = resolutionResult.getPom().getRequested();
         requested.getProperties().clear();
 
-        Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
+        Xml.Tag root = requireNonNull(document.getRoot());
+        Optional<Xml.Tag> properties = root.getChild("properties");
         if (properties.isPresent()) {
             for (final Xml.Tag propertyTag : properties.get().getChildren()) {
                 requested.getProperties().put(propertyTag.getName(),
@@ -58,7 +60,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested.getProperties().putAll(resolutionResult.getUserProperties());
         }
 
-        Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
+        Optional<Xml.Tag> parent = root.getChild("parent");
         if (parent.isPresent()) {
             Parent updatedParent = new Parent(new GroupArtifactVersion(
                     parent.get().getChildValue("groupId").orElse(null),
@@ -70,7 +72,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withParent(null);
         }
 
-        Optional<Xml.Tag> dependencies = document.getRoot().getChild("dependencies");
+        Optional<Xml.Tag> dependencies = root.getChild("dependencies");
         if (dependencies.isPresent()) {
             List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
             List<Dependency> requestedDependencies = new ArrayList<>(eachDependency.size());
@@ -94,7 +96,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withDependencies(emptyList());
         }
 
-        Optional<Xml.Tag> dependencyManagement = document.getRoot().getChild("dependencyManagement");
+        Optional<Xml.Tag> dependencyManagement = root.getChild("dependencyManagement");
         if (dependencyManagement.isPresent()) {
             dependencies = dependencyManagement.get().getChild("dependencies");
             if (dependencies.isPresent()) {
@@ -123,7 +125,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withDependencyManagement(emptyList());
         }
 
-        Optional<Xml.Tag> repos = document.getRoot().getChild("repositories");
+        Optional<Xml.Tag> repos = root.getChild("repositories");
         if (repos.isPresent()) {
             requested = requested.withRepositories(repos.get().getChildren("repository").stream().map(t -> new MavenRepository(
                     t.getChildValue("id").orElse(null),

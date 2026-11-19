@@ -17,10 +17,12 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.xml.tree.Xml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -30,6 +32,19 @@ class AddPropertyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AddProperty("key", "value", null, false));
+    }
+
+    @Test
+    void skipsResolvedPomWithoutRoot() {
+        Xml.Document pom = (Xml.Document) MavenParser.builder().build()
+          .parse("<project><groupId>com.acme</groupId><artifactId>app</artifactId><version>1</version></project>")
+          .findFirst().orElseThrow();
+        AddPropertyVisitor visitor = new AddPropertyVisitor("key", "value", false);
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        Xml.Document rootless = pom.withRoot(null);
+        assertThat(visitor.isAcceptable(pom, ctx)).isTrue();
+        assertThat(visitor.isAcceptable(rootless, ctx)).isFalse();
+        assertThat(visitor.visit(rootless, ctx)).isSameAs(rootless);
     }
 
     @DocumentExample

@@ -45,6 +45,15 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
         """
     );
 
+    @Test
+    void rootlessExtensionsFilePreventsConfigurationGeneration() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDevelocityMavenExtension("1.21", "https://foo", null, null, null, null)),
+          POM_XML_SOURCE_SPEC,
+          xml("<!-- extensions -->", spec -> spec.path(".mvn/extensions.xml"))
+        );
+    }
+
     @DocumentExample
     @Test
     void addGradleEnterpriseMavenExtensionToExistingExtensionsXmlFile() {

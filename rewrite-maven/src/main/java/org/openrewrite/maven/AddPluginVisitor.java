@@ -30,6 +30,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
@@ -76,18 +78,16 @@ public class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
 
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-        Xml.Tag root = document.getRoot();
+        Xml.Tag root = requireNonNull(document.getRoot());
         if (!root.getChild("build").isPresent()) {
-            document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<build/>"))
-                    .visitNonNull(document, ctx, getCursor().getParentOrThrow());
+            root = AddToTagVisitor.addToTag(root, Xml.Tag.build("<build/>"), getCursor());
         }
-        Xml.Tag build = document.getRoot().getChild("build").get(); // we know its there we add it one line above!
+        Xml.Tag build = root.getChild("build").get();
         if (asManagedPlugin && !build.getChild("pluginManagement").isPresent()) {
-            document = (Xml.Document) new AddToTagVisitor<>(build, Xml.Tag.build("<pluginManagement/>"))
-                    .visitNonNull(document, ctx, getCursor().getParentOrThrow());
+            root = AddToTagVisitor.addToTag(root, build, Xml.Tag.build("<pluginManagement/>"), getCursor());
         }
 
-        return super.visitDocument(document, ctx);
+        return super.visitDocument(document.withRoot(root), ctx);
     }
 
     @Override

@@ -95,7 +95,7 @@ public class XmlReceiver : XmlVisitor<RpcReceiveQueue>
             .WithChecksum(q.Receive(d.Checksum))
             .WithFileAttributes(q.Receive(d.FileAttributes))
             .WithProlog(q.Receive(d.Prolog, p => (Prolog)VisitNonNull(p, q)))
-            .WithRoot(q.Receive(d.Root, t => (Tag)VisitNonNull(t, q))!)
+            .WithRoot(q.Receive(d.Root, t => (Tag)VisitNonNull(t, q)))
             .WithEof(q.Receive(d.Eof)!);
     }
 

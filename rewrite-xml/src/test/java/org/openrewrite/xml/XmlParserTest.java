@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
@@ -34,6 +35,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.xml.format.AutoFormat;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -230,6 +232,43 @@ class XmlParserTest implements RewriteTest {
             spec -> spec.path("comment.jsp")
           )
         );
+    }
+
+    static Stream<Arguments> rootlessDocuments() {
+        return Stream.of(
+          Arguments.of("index.jsp", "<%@ page language=\"java\" %>"),
+          Arguments.of("document.xml", "<?xml version=\"1.0\"?>\n<!-- no root -->")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("rootlessDocuments")
+    void rootlessDocument(String path, String source) {
+        rewriteRun(
+          spec -> spec.recipes(new ChangeTagValue("/root", null, "changed", null), new AutoFormat()),
+          xml(source, spec -> spec.path(path).beforeRecipe(doc -> {
+              assertThat(doc.getRoot()).isNull();
+              assertThat(new XPathMatcher("/root").matches(new Cursor(null, doc))).isFalse();
+              assertThat(doc.printAll()).isEqualTo(source);
+              Xml.Document rooted = doc.withRoot(Xml.Tag.build("<root/>"));
+              assertThat(SemanticallyEqual.areEqual(doc, rooted)).isFalse();
+              assertThat(SemanticallyEqual.areEqual(rooted, doc)).isFalse();
+              assertThat(SemanticallyEqual.areEqual(doc, rooted.withRoot(null))).isTrue();
+          }))
+        );
+    }
+
+    @Test
+    void directiveOnlyDocumentsCompareTheirPrologs() {
+        XmlParser parser = new XmlParser();
+        Xml.Document first = (Xml.Document) parser.parse("<%@ page language='java' import='a.A' %>")
+          .findFirst().orElseThrow();
+        Xml.Document equivalent = (Xml.Document) parser
+          .parse("<!-- header --><%@ page import='a.A' language='java' %>").findFirst().orElseThrow();
+        Xml.Document different = (Xml.Document) parser.parse("<%@ page language='java' import='b.B' %>")
+          .findFirst().orElseThrow();
+        assertThat(SemanticallyEqual.areEqual(first, equivalent)).isTrue();
+        assertThat(SemanticallyEqual.areEqual(first, different)).isFalse();
     }
 
     @Test
@@ -563,7 +602,9 @@ class XmlParserTest implements RewriteTest {
           }), source)
           .findFirst().orElseThrow();
         assertThat(parsed).isInstanceOf(Xml.Document.class);
-        assertThat(((Xml.Document) parsed).getRoot().getAttributes().get(0).getValueAsString())
+        Xml.Tag root = ((Xml.Document) parsed).getRoot();
+        assertNotNull(root);
+        assertThat(root.getAttributes().get(0).getValueAsString())
           .contains("10.0.0.1")
           .endsWith("}");
     }

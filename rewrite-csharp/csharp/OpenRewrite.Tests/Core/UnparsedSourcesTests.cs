@@ -96,6 +96,15 @@ public class UnparsedSourcesTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void ScannerSkipsProjectWithoutRoot()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindRootNamespaces { ChecksWhatItsScannerFound = true }),
+            CsProj("<!-- no project -->", sourcePath: "Directory.Build.props")
+        );
+    }
+
     /// <summary>A probe of a recipe with its options runs once in the process, whether it passes or fails.</summary>
     [Fact]
     public void AProbeRunsOncePerProcess()
@@ -162,7 +171,7 @@ internal class FindRootNamespaces : ScanningRecipe<Dictionary<string, string>>
     {
         public override global::OpenRewrite.Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
         {
-            if (document.Root.GetChild("PropertyGroup")?.GetChild("RootNamespace")?.GetValue() is { } rootNamespace)
+            if (document.Root?.GetChild("PropertyGroup")?.GetChild("RootNamespace")?.GetValue() is { } rootNamespace)
             {
                 rootNamespaces[DirectoryOf(document)] = rootNamespace;
             }

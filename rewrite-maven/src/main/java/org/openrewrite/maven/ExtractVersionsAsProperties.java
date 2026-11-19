@@ -45,7 +45,7 @@ public class ExtractVersionsAsProperties extends Recipe {
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                propertyResolver = new PropertyResolver(document.getRoot());
+                propertyResolver = new PropertyResolver(Objects.requireNonNull(document.getRoot()));
                 return super.visitDocument(document, ctx);
             }
 

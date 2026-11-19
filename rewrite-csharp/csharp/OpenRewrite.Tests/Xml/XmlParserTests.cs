@@ -36,6 +36,28 @@ public class XmlParserTests
     }
 
     [Fact]
+    public void VisitDocumentWithoutRoot()
+    {
+        var document = _parser.Parse("<!-- prolog --><root/>").WithRoot(null);
+        Assert.Same(document, new XmlVisitor<int>().Visit(document, 0));
+        Assert.Equal("<!-- prolog -->", XmlParser.Print(document));
+    }
+
+    [Fact]
+    public void ParseDocumentWithoutRoot()
+    {
+        var document = _parser.Parse("<!-- prolog -->");
+        Assert.Null(document.Root);
+        Assert.Equal("<!-- prolog -->", XmlParser.Print(document));
+    }
+
+    [Fact]
+    public void BuildTagRequiresRoot()
+    {
+        Assert.Throws<ArgumentException>(() => TagExtensions.BuildTag("<!-- prolog -->"));
+    }
+
+    [Fact]
     public void Jsp()
     {
         AssertRoundTrip(

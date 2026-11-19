@@ -102,7 +102,7 @@ public class ChangeNamespaceValue extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document d = super.visitDocument(document, ctx);
-                if (d != document) {
+                if (d != document && d.getRoot() != null) {
                     d = d.withRoot(addOrUpdateSchemaLocation(d.getRoot()));
                 }
                 return d;

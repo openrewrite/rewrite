@@ -37,7 +37,9 @@ class ChangeTagValueVisitorTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(), "2.0"));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new ChangeTagValueVisitor<>(
+                    (Xml.Tag) requireNonNull(root.getContent()).getFirst(), "2.0"));
                   return super.visitDocument(x, ctx);
               }
           })),
@@ -62,7 +64,9 @@ class ChangeTagValueVisitorTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(), "2.0"));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new ChangeTagValueVisitor<>(
+                    (Xml.Tag) requireNonNull(root.getContent()).getFirst(), "2.0"));
                   return super.visitDocument(x, ctx);
               }
           })),
@@ -82,7 +86,9 @@ class ChangeTagValueVisitorTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).getFirst(), "3.0"));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new ChangeTagValueVisitor<>(
+                    (Xml.Tag) requireNonNull(root.getContent()).getFirst(), "3.0"));
                   return super.visitDocument(x, ctx);
               }
           })),
@@ -133,7 +139,8 @@ class ChangeTagValueVisitorTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  List<? extends Content> rootContent = x.getRoot().getContent();
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  List<? extends Content> rootContent = root.getContent();
                   Xml.Tag firstTag = rootContent != null && !rootContent.isEmpty() ? (Xml.Tag) rootContent.getFirst() : null;
                   doAfterVisit(new ChangeTagValueVisitor<>(firstTag, null));
                   return super.visitDocument(x, ctx);

@@ -16,7 +16,9 @@
 package org.openrewrite.xml;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.tree.Content;
+import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -54,8 +56,48 @@ public class SemanticallyEqual {
                 return null;
             }
             Xml.Document otherDocument = (Xml.Document)other;
-            visitTag(document.getRoot(), otherDocument.getRoot());
+            Xml.Tag root = document.getRoot();
+            Xml.Tag otherRoot = otherDocument.getRoot();
+            if (root == null || otherRoot == null) {
+                areEqual = root == otherRoot && equalPrologs(document.getProlog(), otherDocument.getProlog());
+            } else {
+                visitTag(root, otherRoot);
+            }
             return null;
+        }
+
+        private boolean equalPrologs(Xml.Prolog first, Xml.Prolog second) {
+            Xml.XmlDecl decl = first.getXmlDecl();
+            Xml.XmlDecl otherDecl = second.getXmlDecl();
+            if (decl == null || otherDecl == null) {
+                if (decl != otherDecl) {
+                    return false;
+                }
+            } else if (!decl.getName().equals(otherDecl.getName()) ||
+                    !equalAttributes(decl.getAttributes(), otherDecl.getAttributes())) {
+                return false;
+            }
+            List<Xml.JspDirective> directives = first.getJspDirectives();
+            List<Xml.JspDirective> otherDirectives = second.getJspDirectives();
+            if (directives.size() != otherDirectives.size()) {
+                return false;
+            }
+            for (int i = 0; i < directives.size(); i++) {
+                Xml.JspDirective directive = directives.get(i);
+                Xml.JspDirective other = otherDirectives.get(i);
+                if (!directive.getType().equals(other.getType()) ||
+                        !equalAttributes(directive.getAttributes(), other.getAttributes())) {
+                    return false;
+                }
+            }
+            return nonCommentMisc(first.getMisc()).equals(nonCommentMisc(second.getMisc()));
+        }
+
+        private List<String> nonCommentMisc(List<Misc> misc) {
+            return misc.stream()
+                    .filter(node -> !(node instanceof Xml.Comment))
+                    .map(node -> node.printTrimmed(new XmlPrinter<>()))
+                    .collect(toList());
         }
 
         @Override
@@ -72,21 +114,9 @@ public class SemanticallyEqual {
                 areEqual = false;
                 return null;
             }
-            if(tag.getAttributes().size() != otherTag.getAttributes().size()) {
+            if (!equalAttributes(tag.getAttributes(), otherTag.getAttributes())) {
                 areEqual = false;
                 return null;
-            }
-            List<Xml.Attribute> theseAttributes = tag.getAttributes().stream()
-                    .sorted(comparing(Xml.Attribute::getKeyAsString))
-                    .collect(toList());
-            List<Xml.Attribute> thoseAttributes = otherTag.getAttributes().stream()
-                    .sorted(comparing(Xml.Attribute::getKeyAsString))
-                    .collect(toList());
-            for(int i = 0; i < theseAttributes.size(); i++) {
-                visitAttribute(theseAttributes.get(i), thoseAttributes.get(i));
-                if(!areEqual) {
-                    return null;
-                }
             }
             if(bothNullOrEmpty(tag.getContent(), otherTag.getContent())) {
                 return null;
@@ -111,6 +141,23 @@ public class SemanticallyEqual {
                 }
             }
             return null;
+        }
+
+        private boolean equalAttributes(List<Xml.Attribute> first, List<Xml.Attribute> second) {
+            if (first.size() != second.size()) {
+                return false;
+            }
+            List<Xml.Attribute> left = first.stream()
+                    .sorted(comparing(Xml.Attribute::getKeyAsString)).collect(toList());
+            List<Xml.Attribute> right = second.stream()
+                    .sorted(comparing(Xml.Attribute::getKeyAsString)).collect(toList());
+            for (int i = 0; i < left.size(); i++) {
+                visitAttribute(left.get(i), right.get(i));
+                if (!areEqual) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override

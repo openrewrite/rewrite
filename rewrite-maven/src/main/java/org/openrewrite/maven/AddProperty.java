@@ -26,6 +26,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddProperty extends Recipe {
@@ -76,7 +78,7 @@ public class AddProperty extends Recipe {
                 }
 
                 // If there is a parent pom in the same project and the property already exists locally, consolidate it to the parent instead
-                if (parentValue != null && document.getRoot().getChild("parent")
+                if (parentValue != null && requireNonNull(document.getRoot()).getChild("parent")
                         .flatMap(tag -> tag.getChild("relativePath"))
                         .flatMap(Xml.Tag::getValue)
                         .flatMap(v -> v.trim().isEmpty() ? Optional.empty() : Optional.of(v))

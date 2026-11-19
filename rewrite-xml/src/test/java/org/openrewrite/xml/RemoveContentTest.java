@@ -34,7 +34,8 @@ class RemoveContentTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(1), false, true));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(root.getContent()).get(1), false, true));
                   return super.visitDocument(x, ctx);
               }
           }).withMaxCycles(1)),
@@ -60,7 +61,8 @@ class RemoveContentTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getChildren()).get(1)
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(root.getChildren()).get(1)
                     .getChildren().getFirst().getChildren().getFirst(), true, true));
                   return super.visitDocument(x, ctx);
               }
@@ -91,7 +93,8 @@ class RemoveContentTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getChildren()).getFirst()
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(root.getChildren()).getFirst()
                     .getChildren().getFirst().getChildren().getFirst(), true, true));
                   return super.visitDocument(x, ctx);
               }
@@ -119,7 +122,8 @@ class RemoveContentTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(1), false, false));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(root.getContent()).get(1), false, false));
                   return super.visitDocument(x, ctx);
               }
           }).withMaxCycles(1)),
@@ -146,7 +150,8 @@ class RemoveContentTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(2), false, true));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(root.getContent()).get(2), false, true));
                   return super.visitDocument(x, ctx);
               }
           }).withMaxCycles(1)),
@@ -172,7 +177,8 @@ class RemoveContentTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
               @Override
               public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(2), false, true));
+                  Xml.Tag root = requireNonNull(x.getRoot());
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(root.getContent()).get(2), false, true));
                   return super.visitDocument(x, ctx);
               }
           }).withMaxCycles(1)),

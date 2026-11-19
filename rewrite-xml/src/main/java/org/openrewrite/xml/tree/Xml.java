@@ -29,6 +29,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
@@ -143,7 +144,11 @@ public interface Xml extends Tree {
         @With
         Prolog prolog;
 
+        /**
+         * Absent in documents without an element, such as empty files, directive-only JSPs, and comment-only XML.
+         */
         @With
+        @Nullable
         Tag root;
 
         String eof;
@@ -327,11 +332,15 @@ public interface Xml extends Tree {
         String name;
 
         public static Xml.Tag build(@Language("xml") String tagSource) {
-            return new XmlParser().parse(tagSource)
-                    .findFirst()
-                    .map(Xml.Document.class::cast)
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"))
-                    .getRoot();
+            SourceFile parsed = new XmlParser().parse(tagSource).findFirst().get();
+            if (parsed instanceof ParseError) {
+                throw new IllegalArgumentException("Malformed XML tag", ((ParseError) parsed).toException());
+            }
+            Tag root = ((Document) parsed).getRoot();
+            if (root == null) {
+                throw new IllegalArgumentException("XML document has no root element");
+            }
+            return root;
         }
 
         public Tag withName(String name) {

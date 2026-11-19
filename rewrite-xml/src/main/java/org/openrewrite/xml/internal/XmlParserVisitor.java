@@ -94,7 +94,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 null,
                 fileAttributes,
                 visitProlog(ctx.prolog()),
-                visitElement(ctx.element()),
+                ctx.element() == null ? null : visitElement(ctx.element()),
                 source.substring(cursor))
         );
         if (unbalancedTag != null && (unclosedElement || !htmlMode)) {

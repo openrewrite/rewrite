@@ -21,9 +21,30 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
 class XsltTransformationTest implements RewriteTest {
+    private static final String DROP_ELEMENTS = """
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+        <xsl:template match="/"/>
+      </xsl:stylesheet>
+      """;
+
+    @Test
+    void transformToRootlessDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new XsltTransformation(DROP_ELEMENTS, null, "**/*.xml")),
+          xml("<!-- header --><a/>", "<!-- header -->", spec ->
+            spec.afterRecipe(doc -> assertThat(doc.getRoot()).isNull()))
+        );
+    }
+
+    @Test
+    void transformTagWithoutElement() {
+        assertThat(XsltTransformationVisitor.transformTag("<a/>", DROP_ELEMENTS)).isNull();
+    }
+
     @DocumentExample
     @Test
     void transformFromParameter() {

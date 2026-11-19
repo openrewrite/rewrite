@@ -30,7 +30,7 @@ public static class TagExtensions
     {
         var parser = new XmlParser();
         var doc = parser.Parse(xmlSource);
-        return doc.Root;
+        return doc.Root ?? throw new ArgumentException("XML document has no root element", nameof(xmlSource));
     }
 
     /// <summary>

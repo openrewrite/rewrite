@@ -61,7 +61,7 @@ public class XmlVisitor<P> : TreeVisitor<Xml, P>
         var d = document;
         if (d.Prolog != null)
             d = d.WithProlog(VisitAndCast(d.Prolog, p));
-        d = d.WithRoot((Tag)VisitNonNull(d.Root, p));
+        d = d.WithRoot(VisitAndCast(d.Root, p));
         return d;
     }
 

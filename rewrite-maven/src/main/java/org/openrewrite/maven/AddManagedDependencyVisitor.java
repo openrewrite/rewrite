@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 @RequiredArgsConstructor
 public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
@@ -61,7 +62,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
             return document;
         }
 
-        Xml.Tag root = document.getRoot();
+        Xml.Tag root = requireNonNull(document.getRoot());
         List<? extends Content> rootContent = root.getContent() != null ? root.getContent() : emptyList();
 
         Xml.Tag dependencyManagementTag = root.getChild("dependencyManagement").orElse(null);

@@ -55,6 +55,14 @@ class EnableDevelocityBuildCacheTest implements RewriteTest {
     }
 
     @Test
+    void rootlessConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new EnableDevelocityBuildCache("true", null, null)),
+          xml("<!-- configuration pending -->", spec -> spec.path(".mvn/develocity.xml"))
+        );
+    }
+
+    @Test
     void keepFormattingOfExistingConfiguration() {
         rewriteRun(
           spec -> spec.recipe(new EnableDevelocityBuildCache("true", null, null)),

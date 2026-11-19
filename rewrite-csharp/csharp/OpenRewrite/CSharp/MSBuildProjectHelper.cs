@@ -108,7 +108,7 @@ public static class MSBuildProjectHelper
     /// <param name="rootDir">Root directory the document's SourcePath is relative to.</param>
     public static MSBuildProject? CreateMarker(Document doc, string? rootDir = null)
     {
-        var sdk = doc.Root.GetAttributeValue("Sdk");
+        var sdk = doc.Root?.GetAttributeValue("Sdk");
 
         if (rootDir == null)
             return new MSBuildProject(Tree.RandomId(), sdk);
@@ -143,7 +143,7 @@ public static class MSBuildProjectHelper
     /// </summary>
     public static MSBuildProject CreateMarker(Document doc, LockFile lockFile, string projectDir)
     {
-        var sdk = doc.Root.GetAttributeValue("Sdk");
+        var sdk = doc.Root?.GetAttributeValue("Sdk");
         var projectPath = Path.GetFullPath(Path.Combine(projectDir, Path.GetFileName(doc.SourcePath)));
         return CreateFromLockFile(sdk, lockFile, projectDir,
             includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir),

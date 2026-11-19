@@ -94,7 +94,7 @@ public class AddParentPom extends Recipe {
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml.Tag root = document.getRoot();
+                Xml.Tag root = Objects.requireNonNull(document.getRoot());
                 if (!root.getChild("parent").isPresent()) {
                     return SearchResult.found(document);
                 }
@@ -107,7 +107,7 @@ public class AddParentPom extends Recipe {
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml.Tag root = document.getRoot();
+                Xml.Tag root = Objects.requireNonNull(document.getRoot());
                 assert !root.getChild("parent").isPresent();
 
                 try {
