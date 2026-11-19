@@ -106,10 +106,21 @@ public class ReloadableJava25Parser implements JavaParser {
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
+        Path rtJar = classpath == null ? null : classpath.stream()
+                .filter(path -> "rt.jar".equals(path.getFileName().toString()))
+                .findFirst().orElse(null);
+        if (rtJar != null) {
+            // An explicit Java 8 platform must supply javac's symbols as well as the mapped types.
+            Options.instance(context).put(Option.SOURCE, "8");
+            Options.instance(context).put(Option.TARGET, "8");
+        }
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
         try {
             // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
             pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
+            if (rtJar != null) {
+                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, List.of(rtJar));
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
