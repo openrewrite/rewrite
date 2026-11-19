@@ -141,7 +141,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends ScanningRecipe<Map<Pa
                 // When none of the relevant properties are explicitly configured Maven defaults to Java 8
                 // The release option was added in 9
                 if (getResolutionResult().getParent() == null && version >= 9 &&
-                    hasJavaCompilation(getResolutionResult()) &&
+                    shouldConfigureDefaultRelease(getResolutionResult()) &&
                     !propertiesToUpdateByPom.containsKey(document.getSourcePath()) && !usesJavaVersionProperty(pom) &&
                     !configuresCompilerLevel(compilerPluginConfigurations(pom))) {
                     d = (Xml.Document) new AddPropertyVisitor("maven.compiler.release", String.valueOf(version), null)
@@ -152,25 +152,34 @@ public class UpdateMavenProjectPropertyJavaVersion extends ScanningRecipe<Map<Pa
         };
     }
 
-    private static boolean hasJavaCompilation(MavenResolutionResult module) {
+    private static boolean shouldConfigureDefaultRelease(MavenResolutionResult module) {
         ResolvedPom pom = module.getPom();
         if (!"pom".equals(pom.getPackaging()) || !module.getModules().isEmpty() ||
             pom.getRequested().getSubprojects() != null && !pom.getRequested().getSubprojects().isEmpty()) {
             return true;
         }
-        // POM packaging has no default compiler lifecycle, but an explicit execution can add one.
+        // A parent published from its own repository need not have local modules. Management
+        // sections express that role, and an otherwise ambiguous POM must keep the old behavior.
+        if (!pom.getRequested().getPluginManagement().isEmpty() ||
+            !pom.getRequested().getDependencyManagement().isEmpty()) {
+            return true;
+        }
+        boolean runsRobot = false;
         for (Plugin plugin : pom.getPlugins()) {
-            if (Plugin.PLUGIN_DEFAULT_GROUPID.equals(plugin.getGroupId()) &&
-                "maven-compiler-plugin".equals(plugin.getArtifactId())) {
-                for (Plugin.Execution execution : plugin.getExecutions()) {
-                    List<String> goals = execution.getGoals();
-                    if (goals != null && (goals.contains("compile") || goals.contains("testCompile"))) {
-                        return true;
-                    }
+            // Recognize an actual non-Java execution, rather than treating an absence of
+            // compiler configuration as proof that this is not a parent for other projects.
+            if (!"org.robotframework".equals(plugin.getGroupId()) ||
+                !"robotframework-maven-plugin".equals(plugin.getArtifactId())) {
+                return true;
+            }
+            for (Plugin.Execution execution : plugin.getExecutions()) {
+                List<String> goals = execution.getGoals();
+                if (goals != null && goals.contains("run")) {
+                    runsRobot = true;
                 }
             }
         }
-        return false;
+        return !runsRobot;
     }
 
     // The topmost pom of the project when the property is inherited from outside of it

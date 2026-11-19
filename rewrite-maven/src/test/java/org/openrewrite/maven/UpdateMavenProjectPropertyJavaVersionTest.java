@@ -17,6 +17,8 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -27,6 +29,29 @@ import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.Assertions.withLocalRepository;
 
 class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "",
+      "<build><pluginManagement><plugins><plugin><artifactId>maven-compiler-plugin</artifactId><version>3.8.0</version></plugin></plugins></pluginManagement></build>",
+      "<dependencyManagement><dependencies><dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-api</artifactId><version>5.11.0</version></dependency></dependencies></dependencyManagement>",
+      "<build><plugins><plugin><artifactId>maven-compiler-plugin</artifactId><version>3.8.0</version><configuration><encoding>UTF-8</encoding></configuration></plugin></plugins></build>",
+      "<build><plugins><plugin><artifactId>maven-enforcer-plugin</artifactId><version>3.5.0</version><executions><execution><goals><goal>enforce</goal></goals></execution></executions></plugin></plugins></build>"
+    })
+    void standaloneParentStillGetsDefaultRelease(String parentConfiguration) {
+        String before = """
+          <project>
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>com.example</groupId>
+            <artifactId>standalone-parent</artifactId>
+            <version>1</version>
+            <packaging>pom</packaging>
+          """ + (parentConfiguration.isEmpty() ? "" : "  " + parentConfiguration + "\n") + "</project>";
+        rewriteRun(
+          pomXml(before, before.replace("  <packaging>pom</packaging>",
+            "  <packaging>pom</packaging>\n  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n  </properties>"))
+        );
+    }
 
     @Test
     void addsReleaseForPomPackagingWithExplicitCompilerExecution() {
@@ -75,6 +100,11 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <groupId>org.robotframework</groupId>
                       <artifactId>robotframework-maven-plugin</artifactId>
                       <version>1.7.1</version>
+                      <executions>
+                        <execution>
+                          <goals><goal>run</goal></goals>
+                        </execution>
+                      </executions>
                     </plugin>
                   </plugins>
                 </build>
