@@ -750,9 +750,10 @@ public class ScopeService {
     /**
      * Whether a {@code continue} in a loop's body continues that loop. With no label given, that is an unlabeled
      * {@code continue} outside any loop nested in the body. With the loop's label, it is a {@code continue} naming
-     * that label.
+     * that label. A {@code continue} in the body or a catch of a {@code try} whose {@code finally} cannot complete
+     * normally does not count, because that {@code finally} discards it.
      */
-    private static boolean continuesOwnLoop(Statement body, @Nullable String label) {
+    private boolean continuesOwnLoop(Statement body, @Nullable String label) {
         boolean[] found = {false};
         new JavaIsoVisitor<Integer>() {
             @Override
@@ -763,6 +764,15 @@ public class ScopeService {
                     stopAfterPreVisit();
                 }
                 return tree;
+            }
+
+            @Override
+            public J.Try visitTry(J.Try try_, Integer p) {
+                if (try_.getFinally() != null && !completesNormally(try_.getFinally())) {
+                    visit(try_.getFinally(), p);
+                    return try_;
+                }
+                return super.visitTry(try_, p);
             }
 
             @Override

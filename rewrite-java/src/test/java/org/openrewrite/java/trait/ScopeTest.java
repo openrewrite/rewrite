@@ -713,6 +713,7 @@ class ScopeTest implements RewriteTest {
                   void i(boolean c) { do { while (c) continue; return; } while (c); }
                   void j() { do { continue; } while (true); }
                   void k(boolean c) { M: do { L: while (c) continue L; return; } while (c); }
+                  void l(boolean c) { do { try { continue; } finally { return; } } while (c); }
               }
               """,
             """
@@ -728,6 +729,7 @@ class ScopeTest implements RewriteTest {
                   void i(boolean c) { /*~~(leaves)~~>*/do { while (c) continue; return; } while (c); }
                   void j() { /*~~(leaves)~~>*/do { continue; } while (true); }
                   void k(boolean c) { /*~~(leaves)~~>*/M: do { L: while (c) continue L; return; } while (c); }
+                  void l(boolean c) { /*~~(leaves)~~>*/do { try { continue; } finally { return; } } while (c); }
               }
               """
           )
