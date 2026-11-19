@@ -23,7 +23,7 @@ import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -50,6 +50,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
     }
 
     private static class ReplaceConstantWithAnotherConstantVisitor extends JavaVisitor<ExecutionContext> {
+        private static final String OUTERMOST_NAME_TAKEN = "OUTERMOST_NAME_TAKEN";
 
         private final String existingOwningType;
         private final String constantName;
@@ -78,7 +79,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
                 return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImports(sf, newOutermostType) &&
-                        !otherClassTakesSimpleName(sf, newOutermostType));
+                        !outermostNameTaken());
             }
             return super.visitFieldAccess(fieldAccess, ctx);
         }
@@ -187,14 +188,28 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return hasNoConflictingImport(sf, referencedType) && hasNoConflictingImport(sf, newTargetType);
         }
 
-        /// Whether a class the file declares or uses already goes by `type`'s simple name, also where
-        /// [#hasNoConflictingImport] does not look, such as a class from the file's own package. Importing `type` would
-        /// then clash with that class or change what the name refers to.
+        /// Kept on the source file's cursor, as the root cursor is shared by every file of a run.
+        private boolean outermostNameTaken() {
+            Cursor sfCursor = getCursor().dropParentUntil(t -> t instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(t));
+            return sfCursor.<Boolean>computeMessageIfAbsent(OUTERMOST_NAME_TAKEN, k -> otherClassTakesSimpleName(
+                    sfCursor.getValue() instanceof JavaSourceFile ? sfCursor.getValue() : null, newOutermostType));
+        }
+
+        /// Whether a class the file declares, imports or uses already goes by `type`'s simple name, also where
+        /// [#hasNoConflictingImport] does not look, such as a class from the file's own package, a statically imported
+        /// nested class or a local class. Importing `type` would then clash with that class or change what the name
+        /// refers to. Types in use leave out imports, so an unused import is checked on its own.
         private static boolean otherClassTakesSimpleName(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
             if (sf == null) {
                 return false;
             }
             String simpleName = simpleName(type.getFullyQualifiedName());
+            for (J.Import anImport : sf.getImports()) {
+                if (anImport.getQualid().getSimpleName().equals(simpleName) &&
+                        !TypeUtils.isOfType(anImport.getQualid().getType(), type)) {
+                    return true;
+                }
+            }
             for (JavaType typeInUse : sf.getTypesInUse().getTypesInUse()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeInUse);
                 if (fq != null && simpleName(fq.getFullyQualifiedName()).equals(simpleName) &&
@@ -203,22 +218,16 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     return true;
                 }
             }
-            return declaresOtherClass(sf.getClasses(), simpleName, type);
-        }
-
-        private static boolean declaresOtherClass(List<? extends Statement> statements, String simpleName,
-                                                  JavaType.FullyQualified type) {
-            for (Statement statement : statements) {
-                if (statement instanceof J.ClassDeclaration) {
-                    J.ClassDeclaration classDecl = (J.ClassDeclaration) statement;
-                    if ((classDecl.getSimpleName().equals(simpleName) &&
-                            !TypeUtils.isOfType(classDecl.getType(), type)) ||
-                            declaresOtherClass(classDecl.getBody().getStatements(), simpleName, type)) {
-                        return true;
+            return new JavaIsoVisitor<AtomicBoolean>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
+                    if (classDecl.getSimpleName().equals(simpleName) && !TypeUtils.isOfType(classDecl.getType(), type)) {
+                        found.set(true);
+                        return classDecl;
                     }
+                    return super.visitClassDeclaration(classDecl, found);
                 }
-            }
-            return false;
+            }.reduce(sf, new AtomicBoolean()).get();
         }
 
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf, JavaType.FullyQualified targetType) {

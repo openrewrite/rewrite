@@ -768,6 +768,13 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                 package c;
                 public class Outer {
                 }
+                """,
+              """
+                package d;
+                public class D {
+                    public static class Outer {
+                    }
+                }
                 """
             )),
           java(
@@ -827,6 +834,47 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
               class Test3 {
                   Outer outer;
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+
+              class Test4 {
+                  void m() {
+                      class Outer {
+                      }
+                      Object o = Old.A;
+                  }
+              }
+              """,
+            """
+              class Test4 {
+                  void m() {
+                      class Outer {
+                      }
+                      Object o = b.Outer.Inner.B;
+                  }
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+              import static d.D.Outer;
+
+              class Test5 {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import static d.D.Outer;
+
+              class Test5 {
                   Object o = b.Outer.Inner.B;
               }
               """
