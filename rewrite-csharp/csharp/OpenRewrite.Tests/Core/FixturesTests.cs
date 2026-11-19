@@ -80,6 +80,32 @@ public class FixturesTests : RewriteTest
         Assert.Contains("OpenRewrite.Tests.Core.Fixtures.Fixture.cs.txt", failure.Message);
     }
 
+    [Fact]
+    public void AProjectFileComesFromAResourceAndSaysWhatItsSourcesTarget()
+    {
+        var projects = new List<DotNetProject>();
+        RewriteRun(
+            XmlFromResource("App.csproj.txt", sourcePath: "src/App/App.csproj")
+                .AfterRecipe((OpenRewrite.Xml.Document doc) =>
+                    Assert.NotNull(doc.Markers.FindFirst<MSBuildProject>())),
+            CSharpFromResource("Fixture.cs.txt", sourcePath: "src/App/Fixture.cs").InProject("src/App/App.csproj")
+                .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
+        );
+
+        Assert.Equal("App", Assert.Single(projects).ProjectName);
+        Assert.Equal(["net6.0"], projects[0].TargetFrameworks);
+    }
+
+    [Fact]
+    public void AProjectFileComesFromAFileNamedAfterIt()
+    {
+        RewriteRun(
+            XmlFromFile("Core/Fixtures/App.csproj.txt",
+                    sha256: "c351dc93f6d2e288b203db2963cb3161ae06162f2939c6b7fe0b9e764e1b5289")
+                .AfterRecipe((OpenRewrite.Xml.Document doc) => Assert.Equal("App.csproj", doc.SourcePath))
+        );
+    }
+
     private class RenameCalls : global::OpenRewrite.Core.Recipe
     {
         public override string DisplayName => "Rename calls";

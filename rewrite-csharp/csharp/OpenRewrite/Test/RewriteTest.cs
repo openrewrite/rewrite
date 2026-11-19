@@ -609,13 +609,15 @@ public abstract class RewriteTest
     /// <summary>
     /// A C# source read from a file, such as a fixture the test project copies to its output directory, by its path
     /// or a path relative to that directory. A <c>.txt</c> suffix that keeps the fixture out of the test project's
-    /// build is not part of its source path. <paramref name="sha256"/>, when given, is the hex SHA-256 the file has to
-    /// have, as for code taken from a project the test cites.
+    /// build is not part of its source path, unless the test gives it another <paramref name="sourcePath"/>.
+    /// <paramref name="sha256"/>, when given, is the hex SHA-256 the file has to have, as for code taken from a
+    /// project the test cites.
     /// </summary>
-    protected static SourceSpec CSharpFromFile(string path, string? after = null, string? sha256 = null)
+    protected static SourceSpec CSharpFromFile(string path, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
     {
-        var bytes = File.ReadAllBytes(Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path));
-        return Fixture(bytes, Path.GetFileName(path), after, sha256);
+        var text = FixtureText(ReadFixtureFile(path), path, sha256);
+        return new SourceSpec(text, after, sourcePath ?? CSharpPath(FixturePath(path)));
     }
 
     /// <summary>
@@ -624,7 +626,43 @@ public abstract class RewriteTest
     /// <c>Fixture.cs.txt</c> as the Czech culture and puts the resource in a satellite assembly unless the
     /// <c>EmbeddedResource</c> item says <c>WithCulture="false"</c>.
     /// </summary>
-    protected SourceSpec CSharpFromResource(string name, string? after = null, string? sha256 = null)
+    protected SourceSpec CSharpFromResource(string name, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureResource(name), name, sha256);
+        return new SourceSpec(text, after, sourcePath ?? CSharpPath(FixturePath(name)));
+    }
+
+    /// <summary>
+    /// An XML source, such as a project file, <c>Directory.Build.props</c> or <c>packages.config</c>, read from a file
+    /// as <see cref="CSharpFromFile"/> reads a C# source. Its source path is where the test puts it, such as
+    /// <c>src/App/App.csproj</c>, or else the file's name. Project files and the files their build reads parse here, as
+    /// <see cref="CsProj"/> sources do, and other XML over RPC.
+    /// </summary>
+    protected static SourceSpec XmlFromFile(string path, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureFile(path), path, sha256);
+        return new SourceSpec(text, after, sourcePath ?? FixturePath(path), XmlDocumentType);
+    }
+
+    /// <summary>
+    /// An XML source read from a resource embedded in the test's assembly, as <see cref="CSharpFromResource"/> reads a
+    /// C# source, otherwise as <see cref="XmlFromFile"/>.
+    /// </summary>
+    protected SourceSpec XmlFromResource(string name, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureResource(name), name, sha256);
+        return new SourceSpec(text, after, sourcePath ?? FixturePath(name), XmlDocumentType);
+    }
+
+    private const string XmlDocumentType = "org.openrewrite.xml.tree.Xml$Document";
+
+    private static byte[] ReadFixtureFile(string path) =>
+        File.ReadAllBytes(Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path));
+
+    private byte[] ReadFixtureResource(string name)
     {
         var assembly = GetType().Assembly;
         var names = assembly.GetManifestResourceNames();
@@ -638,10 +676,10 @@ public abstract class RewriteTest
         using var stream = assembly.GetManifestResourceStream(matches[0])!;
         using var bytes = new MemoryStream();
         stream.CopyTo(bytes);
-        return Fixture(bytes.ToArray(), name, after, sha256);
+        return bytes.ToArray();
     }
 
-    private static SourceSpec Fixture(byte[] bytes, string name, string? after, string? sha256)
+    private static string FixtureText(byte[] bytes, string name, string? sha256)
     {
         if (sha256 != null)
         {
@@ -649,14 +687,22 @@ public abstract class RewriteTest
             if (!actual.Equals(sha256, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException(
-                    $"{name} has the SHA-256 {actual}, not {sha256}, so it isn't the code the test cites.");
+                    $"{Path.GetFileName(name)} has the SHA-256 {actual}, not {sha256}, so it isn't the code the test " +
+                    "cites.");
             }
         }
         using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
-        var sourcePath = name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
-        return new SourceSpec(reader.ReadToEnd(), after,
-            sourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? sourcePath : null);
+        return reader.ReadToEnd();
     }
+
+    private static string FixturePath(string name)
+    {
+        var fileName = Path.GetFileName(name);
+        return fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ? fileName[..^4] : fileName;
+    }
+
+    private static string? CSharpPath(string path) =>
+        path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? path : null;
 
     /// <summary>
     /// An .editorconfig of the project the test's sources belong to. The C# sources take the style it sets for their
@@ -669,7 +715,7 @@ public abstract class RewriteTest
 
     protected static SourceSpec CsProj([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null, string sourcePath = "project.csproj")
     {
-        return new SourceSpec(before, after, sourcePath, "org.openrewrite.xml.tree.Xml$Document");
+        return new SourceSpec(before, after, sourcePath, XmlDocumentType);
     }
 
     /// <summary>
