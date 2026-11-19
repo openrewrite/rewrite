@@ -590,19 +590,26 @@ class YamlCstReader {
             let pendingPrefix = "";
 
             for (let i = 0; i < cst.items.length; i++) {
-                let item = cst.items[i];
+                const item = cst.items[i];
                 const isLast = i === cst.items.length - 1;
-                const start = item.start || [];
+                let start = item.start || [];
                 const comma = start.findIndex(token => token.type === 'comma');
-                if (comma > 0 && entries.length > 0) {
-                    const previous = entries[entries.length - 1];
-                    entries[entries.length - 1] = {
-                        ...previous,
-                        trailingCommaPrefix: (previous.trailingCommaPrefix ?? "") + this.concatenateSources(start.slice(0, comma))
-                    };
-                    item = {...item, start: start.slice(comma)};
+                if (comma >= 0) {
+                    if (comma > 0 && entries.length > 0) {
+                        const previous = entries[entries.length - 1];
+                        entries[entries.length - 1] = {
+                            ...previous,
+                            trailingCommaPrefix: (previous.trailingCommaPrefix ?? "") + this.concatenateSources(start.slice(0, comma))
+                        };
+                    }
+                    start = start.slice(comma + 1);
                 }
-                const result = this.convertFlowSequenceEntry(item, isLast, pendingPrefix);
+                if (isLast && item.key === undefined && !item.value &&
+                    start.every(token => token.type === 'space' || token.type === 'newline' || token.type === 'comment')) {
+                    pendingPrefix += this.concatenateSources(start);
+                    break;
+                }
+                const result = this.convertFlowSequenceEntry({...item, start}, isLast, pendingPrefix);
                 entries.push(result.entry);
                 pendingPrefix = result.trailingContent;
             }
@@ -703,7 +710,7 @@ class YamlCstReader {
     }
 
     private convertFlowSequenceEntry(item: CstCollectionItem, isLast: boolean, pendingPrefix: string): {entry: Yaml.SequenceEntry, trailingContent: string} {
-        const startTokens = (item.start || []).filter(token => token.type !== 'comma');
+        const startTokens = item.start || [];
         let prefix = pendingPrefix;
         let block: Yaml.Block;
         let trailing = "";

@@ -795,9 +795,11 @@ describe('Flow sequence of pairs', () => {
     test('pair followed by a trailing comma', () => spec.rewriteRun({
         ...yaml(`f: [a: 1, ]`),
         afterRecipe: docs => {
-            const [first] = flowSequence(docs).entries;
-            expect(pair(first)).toEqual(["a", "1"]);
-            expect(first.trailingCommaPrefix).toBe("");
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect(pair(sequence.entries[0])).toEqual(["a", "1"]);
+            expect(sequence.entries[0].trailingCommaPrefix).toBe("");
+            expect(sequence.closingBracketPrefix).toBe(" ");
         }
     }));
 
@@ -824,6 +826,44 @@ describe('Flow sequence of pairs', () => {
             expect(first.trailingCommaPrefix).toBe(" # one\n  ");
             expect(pair(second)).toEqual(["b", "2"]);
             expect(second.prefix).toBe("");
+        }
+    }));
+});
+
+describe('Flow sequence without a trailing entry', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    test('blank sequence has no entries', () => spec.rewriteRun({
+        ...yaml(`f: [ ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(0);
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('trailing comma followed by a comment adds no entry', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a , # c
+              ]
+        `),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect((sequence.entries[0].block as Yaml.Scalar).value).toBe("a");
+            expect(sequence.entries[0].trailingCommaPrefix).toBe(" ");
+            expect(sequence.closingBracketPrefix).toBe(" # c\n  ");
+        }
+    }));
+
+    test('trailing anchored null is still an entry', () => spec.rewriteRun({
+        ...yaml(`f: [a, &x ]`),
+        afterRecipe: docs => {
+            expect(flowSequence(docs).entries).toHaveLength(2);
         }
     }));
 });
