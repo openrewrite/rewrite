@@ -708,6 +708,18 @@ class ScopeTest implements RewriteTest {
                   void d() { L: while (true) { break L; } }
                   void e() { System.exit(1); }
                   void f() { try { return; } finally { } }
+                  void g(boolean c) { do { if (c) continue; return; } while (c); }
+                  void h(boolean c) { L: do { while (c) continue L; return; } while (c); }
+                  void i(boolean c) { do { while (c) continue; return; } while (c); }
+                  void j() { do { continue; } while (true); }
+                  void k(boolean c) { M: do { L: while (c) continue L; return; } while (c); }
+                  void l(boolean c) { do { try { continue; } finally { return; } } while (c); }
+                  void m(boolean c) { do { try { break; } finally { return; } } while (c); }
+                  void n(boolean c) { do { X: while (c) break X; return; } while (c); }
+                  void o() { do { } while ((true)); }
+                  void p() { while (true) { L: { break L; } } }
+                  void q(boolean c, int x) { do { switch (x) { case 1: continue; } return; } while (c); }
+                  void r(boolean c, int x) { do { switch (x) { case 1: break; } return; } while (c); }
               }
               """,
             """
@@ -718,6 +730,18 @@ class ScopeTest implements RewriteTest {
                   void d() { /*~~(completes)~~>*/L: while (true) { break L; } }
                   void e() { /*~~(completes)~~>*/System.exit(1); }
                   void f() { /*~~(leaves)~~>*/try { return; } finally { } }
+                  void g(boolean c) { /*~~(completes)~~>*/do { if (c) continue; return; } while (c); }
+                  void h(boolean c) { /*~~(completes)~~>*/L: do { while (c) continue L; return; } while (c); }
+                  void i(boolean c) { /*~~(leaves)~~>*/do { while (c) continue; return; } while (c); }
+                  void j() { /*~~(leaves)~~>*/do { continue; } while (true); }
+                  void k(boolean c) { /*~~(leaves)~~>*/M: do { L: while (c) continue L; return; } while (c); }
+                  void l(boolean c) { /*~~(leaves)~~>*/do { try { continue; } finally { return; } } while (c); }
+                  void m(boolean c) { /*~~(leaves)~~>*/do { try { break; } finally { return; } } while (c); }
+                  void n(boolean c) { /*~~(leaves)~~>*/do { X: while (c) break X; return; } while (c); }
+                  void o() { /*~~(leaves)~~>*/do { } while ((true)); }
+                  void p() { /*~~(leaves)~~>*/while (true) { L: { break L; } } }
+                  void q(boolean c, int x) { /*~~(completes)~~>*/do { switch (x) { case 1: continue; } return; } while (c); }
+                  void r(boolean c, int x) { /*~~(leaves)~~>*/do { switch (x) { case 1: break; } return; } while (c); }
               }
               """
           )
@@ -1068,6 +1092,20 @@ class ScopeTest implements RewriteTest {
                       if (o instanceof String && here()) { here(); }
                       here();
                   }
+                  void breaksOuterLoop(Object o, boolean c) {
+                      L: while (c) {
+                          while (!(o instanceof String)) { break L; }
+                          here();
+                      }
+                  }
+                  void breaksOwnLabel(Object o) {
+                      L: while (!(o instanceof String)) { break L; }
+                      here();
+                  }
+                  void breakDiscardedByFinally(Object o) {
+                      while (!(o instanceof String)) { try { break; } finally { return; } }
+                      here();
+                  }
                   boolean here() { return true; }
               }
               """,
@@ -1083,6 +1121,20 @@ class ScopeTest implements RewriteTest {
                   }
                   void conjunction(Object o) {
                       if (o instanceof String && /*~~(matched)~~>*/here()) { /*~~(matched)~~>*/here(); }
+                      /*~~(open)~~>*/here();
+                  }
+                  void breaksOuterLoop(Object o, boolean c) {
+                      L: while (c) {
+                          while (!(o instanceof String)) { break L; }
+                          /*~~(matched)~~>*/here();
+                      }
+                  }
+                  void breaksOwnLabel(Object o) {
+                      L: while (!(o instanceof String)) { break L; }
+                      /*~~(open)~~>*/here();
+                  }
+                  void breakDiscardedByFinally(Object o) {
+                      while (!(o instanceof String)) { try { break; } finally { return; } }
                       /*~~(open)~~>*/here();
                   }
                   boolean here() { return true; }
