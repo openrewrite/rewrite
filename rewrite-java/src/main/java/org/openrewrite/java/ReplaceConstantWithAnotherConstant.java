@@ -20,9 +20,12 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -60,6 +63,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private final JavaType.FullyQualified newOwningEnumType;
         private final JavaType.FullyQualified newTargetType;
         private final String newConstantName;
+        private final JavaVisitor<ExecutionContext> shortenQualifiedReferences = new ShortenQualifiedReferences();
 
         public ReplaceConstantWithAnotherConstantVisitor(String existingFullyQualifiedConstantName, String fullyQualifiedConstantName) {
             this.existingOwningType = existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.'));
@@ -111,20 +115,21 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
                     return identifier;
                 }
+                maybeShortenQualifiedReferences();
                 return new J.FieldAccess(Tree.randomId(), identifier.getPrefix(), Markers.EMPTY,
-                        FullyQualifyTypeReference.qualifiedName(newOwningType, Space.EMPTY, emptyList()),
+                        typeReference(newOwningType, Space.EMPTY, true),
                         JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOutermostType.getFullyQualifiedName(), false);
+                } else {
+                    maybeShortenQualifiedReferences();
                 }
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
-                Expression target = fieldAccess.getTarget();
+                Expression target = typeReference(newOwningType, fieldAccess.getTarget().getPrefix(),
+                        !hasNoConflictingImport);
                 J.Identifier name = fieldAccess.getName();
-                target = hasNoConflictingImport ?
-                        typeReference(newOwningType, target.getPrefix()) :
-                        FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
                 name = name
                         .withFieldType(newFieldType(fieldType))
                         .withSimpleName(newConstantName)
@@ -153,15 +158,64 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return fullyQualifiedName.substring(Math.max(fullyQualifiedName.lastIndexOf('.'), fullyQualifiedName.lastIndexOf('$')) + 1);
         }
 
-        private static Expression typeReference(JavaType.FullyQualified type, Space prefix) {
+        /// Every class in the reference is typed, which [ShortenFullyQualifiedTypeReferences] needs to recognize a
+        /// fully qualified outermost class.
+        private static Expression typeReference(JavaType.FullyQualified type, Space prefix, boolean fullyQualified) {
+            JavaType.FullyQualified owningClass = type.getOwningClass();
+            if (owningClass == null && fullyQualified) {
+                return FullyQualifyTypeReference.qualifiedName(type, prefix, emptyList());
+            }
             J.Identifier name = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                     simpleName(type.getFullyQualifiedName()), type, null);
-            JavaType.FullyQualified owningClass = type.getOwningClass();
             if (owningClass == null) {
                 return name.withPrefix(prefix);
             }
             return new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY,
-                    typeReference(owningClass, Space.EMPTY), JLeftPadded.build(name), type);
+                    typeReference(owningClass, Space.EMPTY, fullyQualified), JLeftPadded.build(name), type);
+        }
+
+        private void maybeShortenQualifiedReferences() {
+            if (!getAfterVisit().contains(shortenQualifiedReferences)) {
+                doAfterVisit(shortenQualifiedReferences);
+            }
+        }
+
+        /// Shortens the file's fully qualified references to the new outermost class when nothing else goes by its
+        /// name. It runs after the file's import removals, so the replacement that removes an old import's last use
+        /// also shortens what earlier replacements had to fully qualify. It checks for clashes itself, because
+        /// [ShortenFullyQualifiedTypeReferences] does not look at static imports.
+        private class ShortenQualifiedReferences extends JavaVisitor<ExecutionContext> {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof JavaSourceFile)) {
+                    return (J) tree;
+                }
+                JavaSourceFile sf = (JavaSourceFile) tree;
+                if (!hasNoConflictingImports(sf, newOutermostType) || otherClassTakesSimpleName(sf, newOutermostType)) {
+                    return sf;
+                }
+                List<J.FieldAccess> references = new ArrayList<>();
+                new JavaIsoVisitor<List<J.FieldAccess>>() {
+                    @Override
+                    public J.Import visitImport(J.Import import_, List<J.FieldAccess> found) {
+                        return import_;
+                    }
+
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, List<J.FieldAccess> found) {
+                        if (fieldAccess.isFullyQualifiedClassReference(newOutermostType.getFullyQualifiedName())) {
+                            found.add(fieldAccess);
+                            return fieldAccess;
+                        }
+                        return super.visitFieldAccess(fieldAccess, found);
+                    }
+                }.visit(sf, references);
+                ImportService importService = sf.service(ImportService.class);
+                for (J.FieldAccess reference : references) {
+                    sf = (JavaSourceFile) importService.shortenFullyQualifiedTypeReferencesIn(reference).visit(sf, ctx);
+                }
+                return sf;
+            }
         }
 
         private JavaType.Variable newFieldType(JavaType.Variable fieldType) {

@@ -263,8 +263,10 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               }
               """,
             """
+              import neu.core.json.WriteFeature;
+
               class Test {
-                  Object o = neu.core.json.WriteFeature.QUOTE_PROPERTY_NAMES;
+                  Object o = WriteFeature.QUOTE_PROPERTY_NAMES;
               }
               """
           )
@@ -876,6 +878,68 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
               class Test5 {
                   Object o = b.Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importOuterClassOnceTheOldOwnerOfThatNameIsNoLongerImported() {
+        rewriteRun(
+          spec -> spec.recipes(
+              new ReplaceConstantWithAnotherConstant("a.Holder.X", "b.Holder$Kind.X"),
+              new ReplaceConstantWithAnotherConstant("a.Holder.Y", "b.Holder$Kind.Y"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class Holder {
+                    public static final int X = 0;
+                    public static final int Y = 1;
+                }
+                """,
+              """
+                package b;
+                public class Holder {
+                    public static class Kind {
+                        public static final int X = 0;
+                        public static final int Y = 1;
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import a.Holder;
+
+              class Test {
+                  Object x = Holder.X;
+                  Object y = Holder.Y;
+              }
+              """,
+            """
+              import b.Holder;
+
+              class Test {
+                  Object x = Holder.Kind.X;
+                  Object y = Holder.Kind.Y;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Holder;
+
+              class Test2 {
+                  Object x = Holder.X;
+              }
+              """,
+            """
+              import b.Holder;
+
+              class Test2 {
+                  Object x = Holder.Kind.X;
               }
               """
           )
