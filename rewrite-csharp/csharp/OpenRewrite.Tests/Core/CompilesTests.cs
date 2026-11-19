@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.Core;
@@ -225,8 +224,9 @@ public class CompilesTests : RewriteTest
         RewriteRun(
             spec => spec
                 .SetRecipe(new RenameCalls("Foo", "Bar"))
-                .ExpectInputCompiles(compilation => results.Add(Run(compilation, "Values", "M")))
-                .ExpectOutputCompiles(inspect: compilation => results.Add(Run(compilation, "Values", "M"))),
+                .ExpectInputCompiles(compilation => results.Add(CompiledCode.Invoke(compilation, "Values", "M")))
+                .ExpectOutputCompiles(
+                    inspect: compilation => results.Add(CompiledCode.Invoke(compilation, "Values", "M"))),
             CSharp(values, values.Replace("=> Foo();", "=> Bar();"))
         );
 
@@ -287,13 +287,6 @@ public class CompilesTests : RewriteTest
     private static IEnumerable<MetadataReference> ReferenceAssemblies(
         Microsoft.CodeAnalysis.Testing.ReferenceAssemblies assemblies) =>
         assemblies.ResolveAsync(LanguageNames.CSharp, CancellationToken.None).GetAwaiter().GetResult();
-
-    private static object? Run(CSharpCompilation compilation, string type, string method)
-    {
-        using var image = new MemoryStream();
-        Assert.True(compilation.Emit(image).Success);
-        return Assembly.Load(image.ToArray()).GetType(type)!.GetMethod(method)!.Invoke(null, null);
-    }
 
     private class RenameCalls(string from, string to) : global::OpenRewrite.Core.Recipe
     {
