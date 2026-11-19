@@ -21,6 +21,9 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NodeExecutionContextViewTest {
@@ -33,5 +36,15 @@ class NodeExecutionContextViewTest {
         NodeExecutionContextView.view(ctx).setRegistryClient(client);
 
         assertThat(NodeExecutionContextView.view(ctx).getRegistryClient()).isSameAs(client);
+    }
+
+    @Test
+    void registryClientIsNotStoredWhenNoneIsSupplied() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        Map<String, Object> before = new HashMap<>(ctx.getMessages());
+
+        NodeExecutionContextView.view(ctx).getRegistryClient();
+
+        assertThat(ctx.getMessages()).isEqualTo(before);
     }
 }
