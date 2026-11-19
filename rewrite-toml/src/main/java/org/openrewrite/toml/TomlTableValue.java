@@ -142,14 +142,41 @@ public final class TomlTableValue {
         Toml.Identifier identifier = new Toml.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, key, key);
         Toml.Literal literal = new Toml.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                 TomlType.Primitive.String, "\"" + value + "\"", value);
-        Toml.KeyValue keyValue = new Toml.KeyValue(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
-                new TomlRightPadded<>(identifier, Space.SINGLE_SPACE, Markers.EMPTY), literal);
+        List<TomlRightPadded<Toml>> padded = table.getPadding().getValues();
+        // The space before `}`, which can hold a comment
+        Space beforeClose = padded.isEmpty() ? Space.EMPTY : padded.get(padded.size() - 1).getAfter();
         // Drop the placeholder an empty `{ }` or a trailing comma leaves, so the new property follows a real one
-        List<TomlRightPadded<Toml>> values = ListUtils.filter(table.getPadding().getValues(),
-                padded -> !(padded.getElement() instanceof Toml.Empty));
+        List<TomlRightPadded<Toml>> values = ListUtils.filter(padded, p -> !(p.getElement() instanceof Toml.Empty));
+
+        Space prefix = Space.SINGLE_SPACE;
+        Space after = Space.SINGLE_SPACE;
+        String lastWhitespace = beforeClose.getLastWhitespace();
+        int newline = lastWhitespace.lastIndexOf('\n');
+        if (newline >= 0) {
+            // A table spanning lines: the new property gets a line of its own, after any comment, and `}` keeps its line
+            String closeIndent = lastWhitespace.substring(newline + 1);
+            String indent;
+            if (!values.isEmpty()) {
+                indent = values.get(values.size() - 1).getElement().getPrefix().getIndent();
+            } else if (beforeClose.getWhitespace().contains("\n")) {
+                // Indented like the comment that opens an otherwise empty table
+                indent = Space.format(beforeClose.getWhitespace()).getIndent();
+            } else {
+                indent = closeIndent + "    ";
+            }
+            prefix = withLastWhitespace(beforeClose, lastWhitespace.substring(0, newline) + "\n" + indent);
+            after = Space.format("\n" + closeIndent);
+        }
+        Toml.KeyValue keyValue = new Toml.KeyValue(randomId(), prefix, Markers.EMPTY,
+                new TomlRightPadded<>(identifier, Space.SINGLE_SPACE, Markers.EMPTY), literal);
         return table.getPadding().withValues(ListUtils.concat(
-                ListUtils.mapLast(values, padded -> padded.withAfter(Space.EMPTY)),
-                new TomlRightPadded<>(keyValue, Space.SINGLE_SPACE, Markers.EMPTY)));
+                ListUtils.mapLast(values, p -> p.withAfter(Space.EMPTY)),
+                new TomlRightPadded<>(keyValue, after, Markers.EMPTY)));
+    }
+
+    private static Space withLastWhitespace(Space space, String whitespace) {
+        return space.getComments().isEmpty() ? space.withWhitespace(whitespace) :
+                space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix(whitespace)));
     }
 
     private static Toml.Table withStringProperty(Toml.Table table, String key,
