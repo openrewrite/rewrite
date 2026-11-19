@@ -145,7 +145,7 @@ public abstract class Recipe implements Cloneable {
             }
 
             List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors());
-            options.removeIf(opt -> !opt.isRequired());
+            options.removeIf(opt -> !opt.isRequired() || opt.isSecret());
             if (options.isEmpty()) {
                 return getDisplayName();
             }
@@ -276,7 +276,8 @@ public abstract class Recipe implements Cloneable {
                         option.example().isEmpty() ? null : option.example(),
                         validValues(option, field.getType()),
                         option.required(),
-                        value));
+                        value,
+                        option.secret()));
             }
         }
         // Option annotations can be placed on fields, bean-style getters, or on the primary constructor
@@ -291,7 +292,8 @@ public abstract class Recipe implements Cloneable {
                             option.example().isEmpty() ? null : option.example(),
                             validValues(option, method.getReturnType()),
                             option.required(),
-                            null));
+                            null,
+                            option.secret()));
                 }
             }
         }
@@ -307,7 +309,8 @@ public abstract class Recipe implements Cloneable {
                             option.example().isEmpty() ? null : option.example(),
                             validValues(option, parameter.getType()),
                             option.required(),
-                            null));
+                            null,
+                            option.secret()));
                 }
             }
         } catch (RecipeIntrospectionException ignored) {
