@@ -1940,4 +1940,277 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveHeaderCommentBeforeFirstImportInDifferentBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.apache.commons.lang3.StringUtils", null, false))),
+          java(
+            """
+              package a;
+
+              /*
+               * This is a comment
+               */
+
+              import java.util.UUID;
+
+              class Test {
+              }
+              """,
+            """
+              package a;
+
+              /*
+               * This is a comment
+               */
+
+              import org.apache.commons.lang3.StringUtils;
+
+              import java.util.UUID;
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveHeaderCommentWhenInsertedFirstInCustomBlockOrder() {
+        ImportLayoutStyle style = ImportLayoutStyle.builder()
+          .importPackage("java.*")
+          .blankLine()
+          .importAllOthers()
+          .blankLine()
+          .importStaticAllOthers()
+          .build();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.apache.commons.lang3.StringUtils", null, false))),
+          java(
+            """
+              package org.apache.maven.report.projectinfo;
+
+              /*
+               * Licensed to the Apache Software Foundation (ASF)
+               */
+
+              import org.apache.maven.doxia.sink.Sink;
+              import java.util.List;
+
+              class MailingListsReport {
+              }
+              """,
+            """
+              package org.apache.maven.report.projectinfo;
+
+              /*
+               * Licensed to the Apache Software Foundation (ASF)
+               */
+
+              import org.apache.commons.lang3.StringUtils;
+              import org.apache.maven.doxia.sink.Sink;
+              import java.util.List;
+
+              class MailingListsReport {
+              }
+              """,
+            spec -> spec.markers(new NamedStyles(
+              Tree.randomId(), "test", "Test", "Test", emptySet(), singletonList(style)))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveFirstImportCommentWithoutPackage() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new RemoveImport<>("org.codehaus.plexus.util.StringUtils", true)),
+            toRecipe(() -> new AddImport<>("org.apache.commons.lang3.StringUtils", null, false))
+          ),
+          java(
+            """
+              import org.codehaus.plexus.util.StringUtils;
+              // Do not lose this comment
+              import org.apache.maven.doxia.sink.Sink;
+
+              class Test {
+              }
+              """,
+            """
+              // Do not lose this comment
+              import org.apache.commons.lang3.StringUtils;
+              import org.apache.maven.doxia.sink.Sink;
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveLeadingCommentBeforeInteriorImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Calendar", null, false))),
+          java(
+            """
+              package a;
+
+              import java.util.Arrays;
+              // Collection utilities
+              import java.util.List;
+
+              class Test {
+              }
+              """,
+            """
+              package a;
+
+              import java.util.Arrays;
+              import java.util.Calendar;
+              // Collection utilities
+              import java.util.List;
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveLeadingCommentBeforeInteriorImportInNewBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.example.Helper", null, false))),
+          java(
+            """
+              package a;
+
+              import com.example.First;
+              // Standard library
+              import java.util.List;
+
+              class Test {
+              }
+              """,
+            """
+              package a;
+
+              import com.example.First;
+              import org.example.Helper;
+
+              // Standard library
+              import java.util.List;
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveTrailingEndOfLineCommentBetweenImportsAndAfterLastImport() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new AddImport<>("java.util.List", null, false)),
+            toRecipe(() -> new AddImport<>("java.util.UUID", null, false))
+          ),
+          java(
+            """
+              package a;
+
+              import java.util.Arrays; // Arrays
+              import java.util.Set; // Sets
+
+              class Test {
+              }
+              """,
+            """
+              package a;
+
+              import java.util.Arrays; // Arrays
+              import java.util.List;
+              import java.util.Set; // Sets
+              import java.util.UUID;
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveCommentsWhenAddingImportTriggersStarFold() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.AbstractList", null, false))),
+          java(
+            """
+              package a;
+
+              // Util types
+              import java.util.ArrayList; // ArrayList
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List; // List
+
+              class Test {
+              }
+              """,
+            """
+              package a;
+
+              // Util types
+              // List
+              import java.util.*; // ArrayList
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Test
+    void preserveCommentsWhenInteriorStarFoldTriggered() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.ArrayList", null, false))),
+          java(
+            """
+              package a;
+
+              import java.io.File;
+              // Util types
+              import java.util.Arrays; // Arrays
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Set; // Set
+
+              class Test {
+              }
+              """,
+            """
+              package a;
+
+              import java.io.File;
+              // Util types
+              // Set
+              import java.util.*; // Arrays
+
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
 }
