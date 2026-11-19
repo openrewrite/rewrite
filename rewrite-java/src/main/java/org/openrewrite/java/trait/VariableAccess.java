@@ -87,7 +87,8 @@ public class VariableAccess implements Trait<J.Identifier> {
      * The variable this access reads or writes, found by its position in the tree rather than by its type
      * attribution, so it tells apart two locals of one name, type and method declared in sibling blocks.
      * A field selected from an instance of a class that is not around the access has no binding here.
-     * {@link J.Identifier#getFieldType()} identifies such a field.
+     * {@link J.Identifier#getFieldType()} identifies such a field. An identifier that declares a variable is no
+     * access, and {@link Scope#bindingOf(Cursor, J)} gives its binding.
      */
     @Incubating(since = "8.113.0")
     public Optional<Scope.Binding> getBinding() {

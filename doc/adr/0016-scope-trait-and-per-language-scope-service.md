@@ -41,9 +41,9 @@ takes several rules to answer and recipes that put the answer together themselve
 a cursor that leaves one out hides what that tree binds.
 
 `Scope.Binding` is one declared name. It knows its `Kind` (local, parameter, member, inherited,
-imported) and `Namespace` (variable, method, type), its `references()`, whether it
-`isEffectivelyFinal()`, and whether it `canRenameTo` another name. Two bindings are equal when they
-come from the same declaration, so a binding is a stable key where attribution is not.
+imported) and `Namespace` (variable, method, type), the tree that declares it, its `references()`,
+whether it `isEffectivelyFinal()`, and whether it `canRenameTo` another name. Two bindings are equal
+when they come from the same declaration, so a binding is a stable key where attribution is not.
 
 `ScopeService` holds the rules: which trees open a scope, what each binds, where a binding is
 visible, which namespace an identifier is read in, which trees are a static context, which words are

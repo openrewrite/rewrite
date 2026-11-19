@@ -776,7 +776,7 @@ class ScopeTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> Arrays.stream(new String[]{"x", "size", "f", "l", "y", "class"})
             .map(n -> n + "=" + scope.freeName(n, "y"::equals))
-            .collect(joining(", ")))),
+            .collect(joining(", ")) + ", with nothing else taken y=" + scope.freeName("y"))),
           java(
             """
               import java.util.*;
@@ -797,7 +797,7 @@ class ScopeTest implements RewriteTest {
               class A {
                   int f;
                   void m(List<String> l, Map<String, String> map) {
-                      /*~~(x=x2, size=size, f=f1, l=l1, y=y1, class=class1)~~>*/here();
+                      /*~~(x=x2, size=size, f=f1, l=l1, y=y1, class=class1, with nothing else taken y=y)~~>*/here();
                       int x = map.size();
                       l.forEach(x1 -> {});
                   }
@@ -957,6 +957,42 @@ class ScopeTest implements RewriteTest {
                       } catch (RuntimeException caught) {
                           /*~~(param=PARAMETER local=LOCAL caught=LOCAL field=MEMBER inherited=INHERITED max=IMPORTED)~~>*/here();
                       }
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declarationIsTheTreeDeclaringTheNameWhereTheScopeHoldsOne() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> Stream.of(scope.lookup("local"), scope.lookup("inherited"), scope.lookup("m", Scope.Namespace.METHOD))
+            .map(binding -> binding.orElseThrow().getDeclaration().map(d -> d.getValue().getClass().getSimpleName()).orElse("none"))
+            .collect(joining(" ")))),
+          java(
+            """
+              class B {
+                  protected int inherited;
+              }
+              """
+          ),
+          java(
+            """
+              class A extends B {
+                  void m() {
+                      int local = 0;
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A extends B {
+                  void m() {
+                      int local = 0;
+                      /*~~(NamedVariable none MethodDeclaration)~~>*/here();
                   }
                   void here() {}
               }

@@ -48,6 +48,8 @@ import java.util.stream.Stream;
  * <li>The declaration an identifier reads: {@link VariableAccess#getBinding()}, or {@link #lookup(String)} from
  * its position.</li>
  * <li>The binding of a declaration at hand, and from it the scope declaring it: {@link #bindingOf(Cursor, J)}.</li>
+ * <li>The declaration of a binding at hand, to read its initializer or modifiers:
+ * {@link Binding#getDeclaration()}.</li>
  * <li>Whether a rename keeps every name reading what it reads now: {@link Binding#canRenameTo(String)}.</li>
  * <li>Whether a block's statements can move out of it: {@link #canMoveBefore(Cursor)} and
  * {@link #canMoveAfter(Cursor)}.</li>
@@ -350,8 +352,16 @@ public class Scope implements Trait<J> {
 
     /**
      * A free name for a new variable declared at the position, which is {@code preferred} or that name with a
-     * number counted up. A name {@code alsoTaken} accepts is passed over, as one handed out earlier in the same
-     * visit is. Another way of making names can try its own candidates on {@link #isFree(String)}.
+     * number counted up. A preferred name that ends in digits counts on from them, so {@code oauth2} gives
+     * {@code oauth3}. Another way of making names can try its own candidates on {@link #isFree(String)}.
+     */
+    public String freeName(String preferred) {
+        return freeName(preferred, name -> false);
+    }
+
+    /**
+     * A free name as {@link #freeName(String)} gives, passing over any name {@code alsoTaken} accepts, as one handed
+     * out earlier in the same visit is.
      */
     public String freeName(String preferred, Predicate<String> alsoTaken) {
         Predicate<String> taken = name -> alsoTaken.test(name) || !isFree(name);
@@ -966,6 +976,15 @@ public class Scope implements Trait<J> {
             return new Scope(scope, scope, service);
         }
 
+        /**
+         * The tree that declares the name: the named variable of a local, parameter or field, a method or class
+         * declaration, a type parameter, an enum constant, or the {@code instanceof} of a pattern variable. Empty
+         * for a name the scope's tree does not declare, which is inherited, imported or implied.
+         */
+        public Optional<Cursor> getDeclaration() {
+            return getTree() instanceof J.Identifier ? Optional.of(cursor.getParentTreeCursor()) : Optional.empty();
+        }
+
         public Kind getKind() {
             J tree = getTree();
             Object scopeTree = scope.getValue();
@@ -1017,7 +1036,7 @@ public class Scope implements Trait<J> {
          * found before an edit does not see it. Finding the binding again from a cursor on the edited tree does.
          * <p>
          * A field is read from outside its class too, and a subclass binds the field it inherits anew, so these are
-         * not every use of a field.
+         * not every use of a field. The declaring identifier is not among them.
          */
         public Stream<Cursor> references() {
             return referencesInScope().of(this);
