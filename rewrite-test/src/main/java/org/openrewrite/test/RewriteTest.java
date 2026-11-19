@@ -428,6 +428,7 @@ public interface RewriteTest extends SourceSpecs {
         AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ||
                                                   unneededOptOuts.runsOnTheSide("lightweightAccumulators") ?
                 new AccumulatorContents() : null;
+        RecipeFields recipeFields = new RecipeFields();
         Collection<String> scannerEdits = unneededOptOuts.runsOnTheSide("noEditsInScanningPhase") ?
                 new CopyOnWriteArrayList<>() : null;
 
@@ -439,7 +440,7 @@ public interface RewriteTest extends SourceSpecs {
         } else {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles,
                     quality.reportingMarkersOnly() ? addedMarkers : null, unchangedTreeIdentity, accumulatorContents,
-                    scannerEdits);
+                    recipeFields, scannerEdits);
         }
 
         recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
@@ -471,6 +472,8 @@ public interface RewriteTest extends SourceSpecs {
         unchangedTreeIdentity.assertNoneFound();
         unneededOptOuts.check("lightweightAccumulators", quality.lightweightAccumulators(), () ->
                 requireNonNull(accumulatorContents).assertNoneFound());
+        unneededOptOuts.check("lightweightRecipeFields", quality.lightweightRecipeFields(), () ->
+                recipeFields.assertLightweight(recipe));
         boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
         unneededOptOuts.checkOnTheSideLater("noEditsInScanningPhase", () -> {
             // only an in-process run of this source set reports the edits of its scanners
@@ -752,7 +755,7 @@ public interface RewriteTest extends SourceSpecs {
         unneededOptOuts.check("orderStepsForEarlierChanges", quality.orderStepsForEarlierChanges(), () ->
                 CompositeOrder.assertOrdered(recipe));
         unneededOptOuts.check("noStaticVisitors", quality.noStaticVisitors(), () ->
-                StaticVisitors.assertNoneKept(recipe));
+                RecipeFields.assertNoStaticVisitors(recipe));
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);

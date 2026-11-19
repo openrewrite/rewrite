@@ -26,6 +26,48 @@ import static org.openrewrite.java.Assertions.java;
 class ChangeMethodTargetToStaticTest implements RewriteTest {
 
     @Test
+    void preserveCommentBeforeImportFollowingNewTarget() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodTargetToStatic("java.nio.file.Paths get(..)", "java.nio.file.Path", null, null),
+            new ChangeMethodName("java.nio.file.Path get(..)", "of", null, null)
+          ),
+          java(
+            """
+              package example;
+
+              import java.nio.file.Files;
+              import java.nio.file.Paths;
+
+               //           import java.io.PrintStream;  //Never used?
+                            import java.util.List;
+
+              class T {
+                  boolean exists(List<String> paths) {
+                      return Files.exists(Paths.get(paths.get(0)));
+                  }
+              }
+              """,
+            """
+              package example;
+
+              import java.nio.file.Files;
+              import java.nio.file.Path;
+
+               //           import java.io.PrintStream;  //Never used?
+                            import java.util.List;
+
+              class T {
+                  boolean exists(List<String> paths) {
+                      return Files.exists(Path.of(paths.get(0)));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void targetToStatic() {
         rewriteRun(
           spec -> spec.recipes(

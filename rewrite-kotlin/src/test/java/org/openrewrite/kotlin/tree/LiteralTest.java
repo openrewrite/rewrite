@@ -194,7 +194,7 @@ class LiteralTest implements RewriteTest {
     void integerLiteralArithmeticInUnresolvedCall() {
         AtomicInteger asserted = new AtomicInteger();
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all().variableDeclarations(false)),
+          spec -> spec.typeValidationOptions(TypeValidation.all().variableDeclarations(false).identifiers(false)),
           kotlin(
             //language=none
             """

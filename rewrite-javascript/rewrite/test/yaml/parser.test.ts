@@ -736,3 +736,134 @@ describe('Comment after the last entry of a block sequence', () => {
             )
         ));
 });
+
+describe('Flow sequence of pairs', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    function pair(entry: Yaml.SequenceEntry): [string, string] {
+        expect(isMapping(entry.block)).toBe(true);
+        const mapping = entry.block as Yaml.Mapping;
+        expect(mapping.openingBracePrefix).toBeUndefined();
+        expect(mapping.closingBracePrefix).toBeUndefined();
+        expect(mapping.entries).toHaveLength(1);
+        const mappingEntry = mapping.entries[0];
+        expect(mappingEntry.prefix).not.toContain(",");
+        return [(mappingEntry.key as Yaml.Scalar).value, (mappingEntry.value as Yaml.Scalar).value];
+    }
+
+    test('each pair is a single-entry mapping', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1, b: 2]`),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(pair(first)).toEqual(["a", "1"]);
+            expect(first.trailingCommaPrefix).toBe("");
+            expect(pair(second)).toEqual(["b", "2"]);
+            expect(second.prefix).toBe("");
+            expect(second.trailingCommaPrefix).toBeUndefined();
+        }
+    }));
+
+    test('single pair', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1]`),
+        afterRecipe: docs => {
+            const entries = flowSequence(docs).entries;
+            expect(entries).toHaveLength(1);
+            expect(pair(entries[0])).toEqual(["a", "1"]);
+        }
+    }));
+
+    test('scalar followed by a pair', () => spec.rewriteRun({
+        ...yaml(`f: [x, a: 1]`),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect((first.block as Yaml.Scalar).value).toBe("x");
+            expect(pair(second)).toEqual(["a", "1"]);
+        }
+    }));
+
+    test('pair without a value', () => spec.rewriteRun({
+        ...yaml(`f: [a:]`),
+        afterRecipe: docs => {
+            expect(pair(flowSequence(docs).entries[0])).toEqual(["a", ""]);
+        }
+    }));
+
+    test('pair followed by a trailing comma', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1, ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect(pair(sequence.entries[0])).toEqual(["a", "1"]);
+            expect(sequence.entries[0].trailingCommaPrefix).toBe("");
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('pairs spread over lines with extra spaces', () => spec.rewriteRun({
+        ...yaml(`
+            f: [ a : 1 ,
+               b:  2 ]
+        `),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(pair(first)).toEqual(["a", "1"]);
+            expect(first.trailingCommaPrefix).toBe(" ");
+            expect(pair(second)).toEqual(["b", "2"]);
+        }
+    }));
+
+    test('comma on the line after a pair and its comment', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a: 1 # one
+              , b: 2]
+        `),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(first.trailingCommaPrefix).toBe(" # one\n  ");
+            expect(pair(second)).toEqual(["b", "2"]);
+            expect(second.prefix).toBe("");
+        }
+    }));
+});
+
+describe('Flow sequence without a trailing entry', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    test('blank sequence has no entries', () => spec.rewriteRun({
+        ...yaml(`f: [ ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(0);
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('trailing comma followed by a comment adds no entry', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a , # c
+              ]
+        `),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect((sequence.entries[0].block as Yaml.Scalar).value).toBe("a");
+            expect(sequence.entries[0].trailingCommaPrefix).toBe(" ");
+            expect(sequence.closingBracketPrefix).toBe(" # c\n  ");
+        }
+    }));
+
+    test('trailing anchored null is still an entry', () => spec.rewriteRun({
+        ...yaml(`f: [a, &x ]`),
+        afterRecipe: docs => {
+            expect(flowSequence(docs).entries).toHaveLength(2);
+        }
+    }));
+});

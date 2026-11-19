@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.parser;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.java.JavaParser;
 
 import java.lang.reflect.InvocationTargetException;
@@ -25,8 +26,10 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
- * This class is used to find the caller of {@link JavaParser#dependenciesFromResources(ExecutionContext, String...)},
- * which is used to load classpath resources for {@link JavaParser}.
+ * Finds the class whose class loader {@link JavaParser#dependenciesFromResources(ExecutionContext, String...)} reads
+ * type tables from. It is the first class on the stack after the parsers and parser builders that led to the call,
+ * so a recipe in its own class loader reads its own type tables through a parser shared from a host process.
+ * A parser that reads its own type tables calls from a class that is not a parser.
  */
 class JavaParserCaller {
     private JavaParserCaller() {
@@ -58,11 +61,7 @@ class JavaParserCaller {
 
                         @Override
                         public boolean test(Class<?> c1) {
-                            if (c1.getName().equals(JavaParser.class.getName()) ||
-                                c1.getName().equals(JavaParser.Builder.class.getName()) ||
-                                // FIXME this is a hack
-                                "org.openrewrite.gradle.GradleParser".equals(c1.getName()) ||
-                                "org.openrewrite.gradle.GradleParser$Builder".equals(c1.getName())) {
+                            if (Parser.class.isAssignableFrom(c1) || Parser.Builder.class.isAssignableFrom(c1)) {
                                 parserOrBuilderFound = true;
                                 return false;
                             }

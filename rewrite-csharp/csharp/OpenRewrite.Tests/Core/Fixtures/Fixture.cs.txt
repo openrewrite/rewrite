@@ -1,0 +1,9 @@
+class Fixture
+{
+    void Foo() { }
+    void Bar() { }
+    void M()
+    {
+        Foo();
+    }
+}
