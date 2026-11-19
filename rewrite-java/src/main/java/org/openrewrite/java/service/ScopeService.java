@@ -560,10 +560,11 @@ public class ScopeService {
                 if (whenTrue) {
                     return contains(at, loop.getBody());
                 }
-                return !breaksOut(loop.getBody()) && followedBy(declaration, i, scopeTree, at);
+                return !breaksTo(declaration, i, loop.getBody()) && followedBy(declaration, i, scopeTree, at);
             } else if (parent instanceof J.DoWhileLoop) {
                 J.DoWhileLoop loop = (J.DoWhileLoop) parent;
-                return loop.getWhileCondition() == child && !whenTrue && !breaksOut(loop.getBody()) && followedBy(declaration, i, scopeTree, at);
+                return loop.getWhileCondition() == child && !whenTrue && !breaksTo(declaration, i, loop.getBody()) &&
+                       followedBy(declaration, i, scopeTree, at);
             } else if (parent instanceof J.ForLoop.Control) {
                 // The loop is its own scope, so a binding of it is never visible after the loop.
                 J.ForLoop.Control control = (J.ForLoop.Control) parent;
@@ -578,6 +579,22 @@ public class ScopeService {
                 return false;
             }
             child = parent;
+        }
+        return false;
+    }
+
+    /**
+     * Whether a {@code break} in the body of the loop at {@code declaration.get(loop)} targets that loop, unlabeled or
+     * by a label on it. JLS 6.3.2 counts one that a {@code finally} discards.
+     */
+    private boolean breaksTo(List<J> declaration, int loop, Statement body) {
+        if (jumpsTo(body, null, J.Break.class, true)) {
+            return true;
+        }
+        for (int i = loop - 1; i >= 0 && declaration.get(i) instanceof J.Label; i--) {
+            if (jumpsTo(body, ((J.Label) declaration.get(i)).getLabel().getSimpleName(), J.Break.class, true)) {
+                return true;
+            }
         }
         return false;
     }
@@ -609,7 +626,8 @@ public class ScopeService {
 
     /**
      * Whether a statement can complete normally (JLS 14.22), read from its shape alone. Only the literal
-     * {@code true} counts as a constant loop condition, so a loop on {@code 1 == 1} is taken to complete.
+     * {@code true}, parenthesized or not, counts as a constant loop condition, so a loop on {@code 1 == 1} is taken
+     * to complete.
      */
     public boolean completesNormally(@Nullable Statement statement) {
         if (statement == null) {
@@ -630,25 +648,27 @@ public class ScopeService {
                    completesNormally(if_.getElsePart().getBody());
         } else if (statement instanceof J.WhileLoop) {
             J.WhileLoop loop = (J.WhileLoop) statement;
-            return !isTrue(loop.getCondition().getTree()) || breaksOut(loop.getBody());
+            return !isTrue(loop.getCondition().getTree()) || jumpsTo(loop.getBody(), null, J.Break.class, false);
         } else if (statement instanceof J.DoWhileLoop) {
             J.DoWhileLoop loop = (J.DoWhileLoop) statement;
-            return breaksOut(loop.getBody()) || !isTrue(loop.getWhileCondition().getTree()) &&
-                   (completesNormally(loop.getBody()) || continuesOwnLoop(loop.getBody(), null));
+            return jumpsTo(loop.getBody(), null, J.Break.class, false) || !isTrue(loop.getWhileCondition().getTree()) &&
+                   (completesNormally(loop.getBody()) || jumpsTo(loop.getBody(), null, J.Continue.class, false));
         } else if (statement instanceof J.ForLoop) {
             J.ForLoop loop = (J.ForLoop) statement;
             Expression condition = loop.getControl().getCondition();
-            return !(condition instanceof J.Empty || isTrue(condition)) || breaksOut(loop.getBody());
+            return !(condition instanceof J.Empty || isTrue(condition)) ||
+                   jumpsTo(loop.getBody(), null, J.Break.class, false);
         } else if (statement instanceof J.Label) {
             J.Label label = (J.Label) statement;
             Statement labeled = label.getStatement();
-            if (completesNormally(labeled) || breaksOut(labeled)) {
+            String name = label.getLabel().getSimpleName();
+            if (completesNormally(labeled) || jumpsTo(labeled, name, J.Break.class, false)) {
                 return true;
             }
             if (labeled instanceof J.DoWhileLoop) {
                 J.DoWhileLoop loop = (J.DoWhileLoop) labeled;
                 return !isTrue(loop.getWhileCondition().getTree()) &&
-                       continuesOwnLoop(loop.getBody(), label.getLabel().getSimpleName());
+                       jumpsTo(loop.getBody(), name, J.Continue.class, false);
             }
             return false;
         } else if (statement instanceof J.Try) {
@@ -679,12 +699,13 @@ public class ScopeService {
             }
             if (case_.getType() == J.Case.Type.Rule) {
                 J body = case_.getBody();
-                if (!(body instanceof Statement) || completesNormally((Statement) body) || breaksOut((Statement) body)) {
+                if (!(body instanceof Statement) || completesNormally((Statement) body) ||
+                    jumpsTo((Statement) body, null, J.Break.class, false)) {
                     return true;
                 }
             } else {
                 for (Statement s : case_.getStatements()) {
-                    if (breaksOut(s)) {
+                    if (jumpsTo(s, null, J.Break.class, false)) {
                         return true;
                     }
                 }
@@ -702,63 +723,21 @@ public class ScopeService {
     }
 
     /**
-     * Whether a {@code break} in the statement leaves the loop or switch holding it. A {@code break} inside a nested
-     * loop or switch leaves that one instead, and a labeled one is taken to leave the statement too.
+     * Whether a {@code break} or {@code continue}, as {@code jump} says, in the body of a statement targets that
+     * statement (JLS 14.15 and 14.16). With no label given, that is an unlabeled one that targets no loop nested in
+     * the body, nor any switch when it is a {@code break}. With the statement's label, it is one naming that label.
+     * A {@code finally} that cannot complete normally discards a jump from its {@code try} block or catches, and such
+     * a jump counts only with {@code countDiscarded}.
      */
-    private static boolean breaksOut(@Nullable Statement statement) {
-        if (statement == null) {
-            return false;
-        }
-        boolean[] found = {false};
-        new JavaIsoVisitor<Integer>() {
-            @Override
-            public @Nullable J preVisit(J tree, Integer depth) {
-                if (tree != statement && (tree instanceof Loop || tree instanceof J.Switch || tree instanceof J.SwitchExpression)) {
-                    new JavaIsoVisitor<Integer>() {
-                        @Override
-                        public J.Break visitBreak(J.Break breakStatement, Integer p) {
-                            found[0] |= breakStatement.getLabel() != null;
-                            return breakStatement;
-                        }
-
-                        @Override
-                        public J.Lambda visitLambda(J.Lambda lambda, Integer p) {
-                            return lambda;
-                        }
-
-                        @Override
-                        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
-                            return classDecl;
-                        }
-                    }.visit(tree, 0, getCursor().getParentOrThrow());
-                    stopAfterPreVisit();
-                } else if (tree instanceof J.Lambda || tree instanceof J.ClassDeclaration || tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null) {
-                    stopAfterPreVisit();
-                }
-                return tree;
-            }
-
-            @Override
-            public J.Break visitBreak(J.Break breakStatement, Integer depth) {
-                found[0] = true;
-                return breakStatement;
-            }
-        }.visit(statement, 0);
-        return found[0];
-    }
-
-    /**
-     * Whether a {@code continue} in a loop's body continues that loop. With no label given, that is an unlabeled
-     * {@code continue} outside any loop nested in the body. With the loop's label, it is a {@code continue} naming
-     * that label. A {@code continue} in the body or a catch of a {@code try} whose {@code finally} cannot complete
-     * normally does not count, because that {@code finally} discards it.
-     */
-    private boolean continuesOwnLoop(Statement body, @Nullable String label) {
+    private boolean jumpsTo(Statement body, @Nullable String label, Class<? extends Statement> jump,
+                            boolean countDiscarded) {
         boolean[] found = {false};
         new JavaIsoVisitor<Integer>() {
             @Override
             public @Nullable J preVisit(J tree, Integer p) {
-                if (tree instanceof Loop && label == null ||
+                boolean takesUnlabeled = tree instanceof Loop || jump == J.Break.class &&
+                                         (tree instanceof J.Switch || tree instanceof J.SwitchExpression);
+                if (label == null && takesUnlabeled ||
                     tree instanceof J.Lambda || tree instanceof J.ClassDeclaration ||
                     tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null) {
                     stopAfterPreVisit();
@@ -768,7 +747,7 @@ public class ScopeService {
 
             @Override
             public J.Try visitTry(J.Try try_, Integer p) {
-                if (try_.getFinally() != null && !completesNormally(try_.getFinally())) {
+                if (!countDiscarded && try_.getFinally() != null && !completesNormally(try_.getFinally())) {
                     visit(try_.getFinally(), p);
                     return try_;
                 }
@@ -776,17 +755,27 @@ public class ScopeService {
             }
 
             @Override
+            public J.Break visitBreak(J.Break breakStatement, Integer p) {
+                found[0] |= jump == J.Break.class && targets(breakStatement.getLabel());
+                return breakStatement;
+            }
+
+            @Override
             public J.Continue visitContinue(J.Continue continueStatement, Integer p) {
-                J.Identifier target = continueStatement.getLabel();
-                found[0] |= target == null ? label == null : target.getSimpleName().equals(label);
+                found[0] |= jump == J.Continue.class && targets(continueStatement.getLabel());
                 return continueStatement;
+            }
+
+            private boolean targets(J.@Nullable Identifier target) {
+                return target == null ? label == null : target.getSimpleName().equals(label);
             }
         }.visit(body, 0);
         return found[0];
     }
 
     private static boolean isTrue(@Nullable Expression condition) {
-        return condition instanceof J.Literal && Boolean.TRUE.equals(((J.Literal) condition).getValue());
+        Expression unwrapped = Expression.unwrap(condition);
+        return unwrapped instanceof J.Literal && Boolean.TRUE.equals(((J.Literal) unwrapped).getValue());
     }
 
     private static boolean isColonCase(J tree) {
