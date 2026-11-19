@@ -27,9 +27,16 @@ language supply the rules.
 
 `Scope` is what recipes use. `Scope.at(cursor)` is the innermost scope at a position, and answers
 what is visible there (`lookup`, `visible`, `isVisible`), whether a new name is free (`isFree`,
-`freeName`) and whether a scope's names would clash if they were in scope elsewhere
-(`collidesAcross`). Three static queries take a cursor and need no scope: `bindingOf` a declaration,
-the bindings `declaredWithin` a tree, and those `referencedWithin` it from outside.
+`freeName`) and whether the scope's statements could stand elsewhere with every name meaning what
+it means now (`canMoveBefore`, `canMoveAfter`). Static queries take a cursor and need no scope:
+`bindingOf` a declaration, the bindings `declaredWithin` a tree, those `referencedWithin` it from
+outside, and whether a lambda written around some code could capture what it reads and assigns
+(`lambdaCanCapture`).
+
+A recipe that moves code asks `canMoveBefore`, `canMoveAfter` or `lambdaCanCapture`, since each
+takes several rules to answer and recipes that put the answer together themselves left one out.
+`cursorTo` gives the cursor of a tree the visitor has not reached, with every tree between, because
+a cursor that leaves one out hides what that tree binds.
 
 `Scope.Binding` is one declared name. It knows its `Kind` (local, parameter, member, inherited,
 imported) and `Namespace` (variable, method, type), its `references()`, whether it
@@ -68,6 +75,12 @@ cannot list them cheaply. No type binding therefore does not mean a simple type 
 
 Kotlin's implicit `it` is bound by every lambda that declares no parameters. A lambda with a receiver or with
 no parameter has no `it`, so inside one the name resolves to that lambda and not to the one around it.
+
+`lambdaCanCapture` applies Java's rule in every language, so it says no for a capture that Kotlin,
+Scala or Groovy would allow.
+
+`canMoveBefore` and `canMoveAfter` look for `this` only in code that leaves a class body. A Kotlin
+lambda with a receiver gives `this` another meaning too, which they do not see.
 
 `isEffectivelyFinal` counts assignments per path through the tree. It is not a data-flow analysis.
 An analysis that is one can filter the same streams of bindings and references, without `Scope`

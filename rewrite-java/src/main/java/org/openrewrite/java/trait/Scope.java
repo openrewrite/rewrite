@@ -24,9 +24,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
@@ -38,9 +40,30 @@ import java.util.stream.Stream;
  * come from the source file's {@link ScopeService}, so the same questions work for every language built on {@link J}
  * that supplies one.
  * <p>
- * Answers are kept in the messages of the source file's cursor. A caller that keeps its own answer there computes it
- * before storing it, since asking from inside {@link Cursor#computeMessageIfAbsent} on that cursor modifies the map
- * being computed into.
+ * Which question to ask:
+ * <ul>
+ * <li>A name for a variable the recipe declares: {@link #freeName(String, Predicate)}.</li>
+ * <li>The declaration an identifier reads: {@link VariableAccess#getBinding()}, or {@link #lookup(String)} from
+ * its position.</li>
+ * <li>The binding of a declaration at hand, and from it the scope declaring it: {@link #bindingOf(Cursor, J)}.</li>
+ * <li>Whether a rename keeps every name reading what it reads now: {@link Binding#canRenameTo(String)}.</li>
+ * <li>Whether a block's statements can move out of it: {@link #canMoveBefore(Cursor)} and
+ * {@link #canMoveAfter(Cursor)}.</li>
+ * <li>Whether code can move into a lambda: {@link #lambdaCanCapture(Collection)}. That a local
+ * {@link Binding#isEffectivelyFinal() is effectively final} does not tell, since a lambda cannot assign a local it
+ * captures.</li>
+ * <li>Whether a variable is ever written: a {@link VariableAccess#isWriteAccess() write} among its
+ * {@link Binding#references()}.</li>
+ * </ul>
+ * A visible name is not always one the code may use. An instance field is visible in a static method, which cannot
+ * read it.
+ * <p>
+ * Every question takes a cursor that holds each tree up to the source file. For a tree the visitor has not reached,
+ * {@link #cursorTo(Cursor, J)} gives one.
+ * <p>
+ * {@link Binding#references()} walks the binding's whole scope, which for a field is its class, and
+ * {@link #referencedWithin(Cursor)} resolves every name in its region. A recipe that can often decide from the tree
+ * at hand asks them only where it cannot.
  */
 @Incubating(since = "8.113.0")
 @Value
@@ -190,30 +213,200 @@ public class Scope implements Trait<J> {
     }
 
     /**
-     * Whether the names this scope binds itself would be in the way were they in scope across the given regions too,
-     * as when a block's statements move into the block around it. A region is in the way where it declares one of
-     * the names, or reads one from outside itself, which the moved declaration would then capture.
+     * Whether this scope's statements could stand just before the statement, with every name meaning what it means
+     * now. The rules are those of {@link #canMoveAfter(Cursor)}, and the statement itself counts among those the
+     * moved names come into scope for, apart from the part of it that is this scope.
      */
-    public boolean collidesAcross(Collection<Cursor> regions) {
-        Set<String> own = new HashSet<>();
-        for (Binding binding : getBindings()) {
-            own.add(binding.getNamespace() + " " + binding.getName());
-        }
-        if (own.isEmpty()) {
-            return false;
-        }
-        for (Cursor region : regions) {
-            if (Stream.concat(declaredWithin(region), referencedWithin(region))
-                    .anyMatch(binding -> own.contains(binding.getNamespace() + " " + binding.getName()))) {
-                return true;
-            }
-        }
-        return false;
+    public boolean canMoveBefore(Cursor statement) {
+        return canMove(statement, false);
     }
 
     /**
-     * The binding a declaration introduces, found from a cursor on the declaration or above it. The declaration is
-     * a named variable, a method or a class, or the identifier that names one.
+     * Whether this scope's statements could stand just after the statement, which is a statement of a block, with
+     * every name meaning what it means now. Any of these prevents it:
+     * <ul>
+     * <li>A name this scope binds meets a local there that the language forbids declaring again. So does a local
+     * declared deeper in the moved code, where that code leaves a class body.</li>
+     * <li>A statement from there to the end of the block declares one of those names, or reads one from outside
+     * itself.</li>
+     * <li>The moved code reads a name that is bound differently there, as a member of an anonymous class it leaves
+     * is, or names {@code this} or {@code super} of a class it leaves.</li>
+     * </ul>
+     * Only names are looked at, so a {@code return} or {@code break} among the statements is the caller's to check.
+     * <p>
+     * To ask about some of a block's statements, ask the scope of a copy of the block that holds only those.
+     */
+    public boolean canMoveAfter(Cursor statement) {
+        return canMove(statement, true);
+    }
+
+    private boolean canMove(Cursor statement, boolean after) {
+        Cursor holder = statement.getParentTreeCursor();
+        if (!(holder.getValue() instanceof J.Block)) {
+            return false;
+        }
+        J.Block block = holder.getValue();
+        List<Statement> statements = block.getStatements();
+        int index = 0;
+        while (index < statements.size() && !statements.get(index).getId().equals(statement.<J>getValue().getId())) {
+            index++;
+        }
+        if (index == statements.size()) {
+            return false;
+        }
+        List<Cursor> inScope = new ArrayList<>();
+        if (!after) {
+            inScope.add(statement);
+        }
+        for (Statement later : statements.subList(index + 1, statements.size())) {
+            inScope.add(new Cursor(holder, later));
+        }
+        Cursor position;
+        if (inScope.isEmpty()) {
+            // Nothing follows the statement, so a statement added to a copy of the block stands for the place after it
+            J.Empty end = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
+            position = new Cursor(new Cursor(holder.getParentOrThrow(), block.withStatements(ListUtils.concat(statements, end))), end);
+        } else {
+            position = inScope.get(0);
+        }
+        ScopeService service = service(position);
+        Cursor around = position.getParentTreeCursor();
+        Scope destination = at(around).withPosition(position);
+        Cursor into = enclosingScope(service, holder);
+        if (into == null) {
+            return false;
+        }
+        J moving = getTree();
+        Set<String> own = new HashSet<>();
+        Set<String> names = new HashSet<>();
+        for (Binding binding : getBindings()) {
+            own.add(binding.namespace + " " + binding.name);
+            names.add(binding.name);
+            Binding met = destination.lookup(binding.name, binding.namespace).orElse(null);
+            // The class body is looked for from the block, since the statement at the position may itself be a class
+            if (met != null && (met.scope.<J>getValue().getId().equals(into.<J>getValue().getId()) ||
+                                met.isLocal() && !service.localMayShadowLocal() && !crossesClassBody(around, met.scope))) {
+                return false;
+            }
+        }
+        if (!service.localMayShadowLocal() && crossesClassBody(cursor, into)) {
+            // Inside the class body a local at any depth could shadow one outside it, which it cannot once moved.
+            // One declared in a class body deeper still is refused too, though it could stay.
+            for (Binding nested : (Iterable<Binding>) declaredWithin(cursor)::iterator) {
+                if (nested.isLocal() && destination.lookup(nested.name, nested.namespace)
+                        .filter(met -> met.isLocal() && !crossesClassBody(around, met.scope)).isPresent()) {
+                    return false;
+                }
+            }
+        }
+        if (!own.isEmpty()) {
+            for (Cursor region : inScope) {
+                if (declaredWithin(region).anyMatch(binding -> own.contains(binding.namespace + " " + binding.name) &&
+                                                               !isUnder(binding.cursor, moving)) ||
+                    referenced(region, names).anyMatch(binding -> own.contains(binding.namespace + " " + binding.name))) {
+                    return false;
+                }
+            }
+        }
+        for (Binding read : (Iterable<Binding>) referencedWithin(cursor)::iterator) {
+            // What the statement declares is not in scope before it, though a local class is visible at its own
+            // declaration
+            if (!after && isUnder(read.cursor, statement.getValue()) ||
+                !destination.lookup(read.name, read.namespace).filter(read::equals).isPresent()) {
+                return false;
+            }
+        }
+        return !(crossesClassBody(cursor, into) && namesThisOrSuper(cursor));
+    }
+
+    /**
+     * Whether the regions could be the body of a lambda written where they stand, going by the locals they read and
+     * assign from outside themselves. Each such local must be effectively final, and the regions must not assign it.
+     * A local declared without an initializer and assigned once is effectively final, yet a lambda cannot assign it.
+     * A local declared in one of the regions is inside for all of them. The body of a local or anonymous class is
+     * held to the same rule. Java's rule is applied in every language, so the answer may be no where a language's
+     * lambdas capture more.
+     */
+    public static boolean lambdaCanCapture(Collection<Cursor> regions) {
+        List<References> within = new ArrayList<>();
+        for (Cursor region : regions) {
+            within.add(referencesWithin(region));
+        }
+        for (Cursor region : regions) {
+            for (Binding binding : (Iterable<Binding>) referencedWithin(region)::iterator) {
+                if (binding.namespace != Namespace.VARIABLE || !binding.isLocal() ||
+                    regions.stream().anyMatch(other -> isUnder(binding.cursor, other.getValue()))) {
+                    continue;
+                }
+                if (within.stream().anyMatch(references -> references.writesOf(binding).findAny().isPresent()) ||
+                    !binding.isEffectivelyFinal()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The cursor of a tree under the one the given cursor holds, with every tree between the two. A cursor built by
+     * hand that leaves one out, as {@code new Cursor(methodBody, lambdaBody)} leaves out the lambda, hides what that
+     * tree binds. The tree is found by its id, so it may be an edited copy, which the cursor returned then holds.
+     *
+     * @throws IllegalArgumentException where the tree is not under the cursor's tree
+     */
+    public static Cursor cursorTo(Cursor from, J tree) {
+        Cursor found = find(from, tree);
+        if (found == null) {
+            throw new IllegalArgumentException("The tree is not under the cursor's tree");
+        }
+        return found.getValue() == tree ? found : new Cursor(found.getParent(), tree);
+    }
+
+    /**
+     * The cursor of the tree with the given tree's id, at or under the cursor's tree.
+     */
+    private static @Nullable Cursor find(Cursor from, J tree) {
+        if (!(from.getValue() instanceof Tree)) {
+            return null;
+        }
+        if (from.<Tree>getValue().getId().equals(tree.getId())) {
+            return from;
+        }
+        Cursor[] found = {null};
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree visited, Integer p) {
+                return found[0] == null ? super.visit(visited, p) : (J) visited;
+            }
+
+            @Override
+            public @Nullable J preVisit(J visited, Integer p) {
+                if (visited.getId().equals(tree.getId())) {
+                    found[0] = getCursor();
+                    stopAfterPreVisit();
+                }
+                return visited;
+            }
+        }.visit(from.getValue(), 0, from.getParentOrThrow());
+        if (found[0] == null) {
+            return null;
+        }
+        // The visitor makes a cursor of its own for the given cursor's tree. The path is rebuilt on the given one,
+        // so that its messages are reached from the cursor returned.
+        Deque<Object> below = new ArrayDeque<>();
+        for (Cursor c = found[0]; c.getValue() != from.getValue(); c = c.getParentOrThrow()) {
+            below.push(c.getValue());
+        }
+        Cursor cursor = from;
+        for (Object value : below) {
+            cursor = new Cursor(cursor, value);
+        }
+        return cursor;
+    }
+
+    /**
+     * The binding a declaration introduces, found from a cursor on the declaration, above it, or anywhere in the
+     * scope that binds it. The declaration is a named variable, a method or a class, or the identifier that names one.
      */
     public static Optional<Binding> bindingOf(Cursor cursor, J declaration) {
         J.Identifier name = declaration instanceof J.Identifier ? (J.Identifier) declaration :
@@ -223,22 +416,8 @@ public class Scope implements Trait<J> {
         if (name == null) {
             return Optional.empty();
         }
-        Cursor[] found = {null};
-        new JavaIsoVisitor<Integer>() {
-            @Override
-            public @Nullable J visit(@Nullable Tree tree, Integer p) {
-                return found[0] == null ? super.visit(tree, p) : (J) tree;
-            }
-
-            @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-                if (identifier.isScope(name)) {
-                    found[0] = getCursor();
-                }
-                return identifier;
-            }
-        }.visit(cursor.getValue(), 0, cursor.getParentOrThrow());
-        return found[0] == null ? Optional.empty() : Optional.ofNullable(Binding.declaredBy(found[0]));
+        Cursor found = find(cursor, name);
+        return Optional.ofNullable(found != null ? Binding.declaredBy(found) : Binding.declaredBy(cursor, name));
     }
 
     /**
@@ -298,6 +477,14 @@ public class Scope implements Trait<J> {
      * These are what code moved elsewhere still needs to reach. A name bound nowhere has no binding to report.
      */
     public static Stream<Binding> referencedWithin(Cursor region) {
+        return referenced(region, null);
+    }
+
+    /**
+     * Those of the bindings {@link #referencedWithin(Cursor)} the region that have one of the names, where names
+     * are given, so that no other name is resolved.
+     */
+    private static Stream<Binding> referenced(Cursor region, @Nullable Set<String> names) {
         J regionTree = region.getValue();
         ScopeService service = service(region);
         Set<String> seen = new HashSet<>();
@@ -305,7 +492,8 @@ public class Scope implements Trait<J> {
         new JavaIsoVisitor<List<Binding>>() {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, List<Binding> found) {
-                Namespace namespace = service.namespaceOf(getCursor());
+                Namespace namespace = names == null || names.contains(identifier.getSimpleName()) ?
+                        service.namespaceOf(getCursor()) : null;
                 if (namespace != null) {
                     at(getCursor()).lookup(identifier.getSimpleName(), namespace)
                             .filter(binding -> !isUnder(binding.getCursor(), regionTree))
@@ -370,6 +558,36 @@ public class Scope implements Trait<J> {
         return false;
     }
 
+    /**
+     * Whether the region's code names {@code this} or {@code super} of the class around it, which a class body
+     * inside the region does not.
+     */
+    private static boolean namesThisOrSuper(Cursor region) {
+        boolean[] named = {false};
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public @Nullable J preVisit(J tree, Integer p) {
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (tree instanceof J.Block && tree != region.getValue() &&
+                    (parent instanceof J.ClassDeclaration || parent instanceof J.NewClass)) {
+                    stopAfterPreVisit();
+                }
+                return tree;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (("this".equals(identifier.getSimpleName()) || "super".equals(identifier.getSimpleName())) &&
+                    !(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier)) {
+                    named[0] = true;
+                }
+                return identifier;
+            }
+        }.visit(region.getValue(), 0, region.getParentOrThrow());
+        return named[0];
+    }
+
     private static boolean isUnder(Cursor cursor, J tree) {
         for (Cursor c = cursor; c != null; c = c.getParent()) {
             if (c.getValue() instanceof J && ((J) c.getValue()).getId().equals(tree.getId())) {
@@ -430,34 +648,59 @@ public class Scope implements Trait<J> {
                 named = resolve(binding.getName());
                 resolved.put(binding.getName(), named);
             }
-            return named.stream()
-                    .filter(reference -> reference.binding != null ? reference.binding.equals(binding) : binding.selects(reference.cursor))
-                    .map(reference -> reference.cursor);
+            return named.stream().filter(reference -> refersTo(reference, binding)).map(reference -> reference.cursor);
+        }
+
+        /**
+         * The identifiers in the region that assign the binding, in source order. An identifier's parent tells
+         * whether it is assigned, so of a name not resolved yet only the assigned identifiers are resolved.
+         */
+        Stream<Cursor> writesOf(Binding binding) {
+            String name = binding.getName();
+            List<Reference> named = resolved.get(name);
+            Stream<Reference> assigned = named != null ?
+                    named.stream().filter(reference -> Binding.isAssigned(reference.cursor)) :
+                    identifiers.getOrDefault(name, Collections.emptyList()).stream()
+                            .filter(Binding::isAssigned)
+                            .map(identifier -> resolve(name, identifier))
+                            .filter(Objects::nonNull);
+            return assigned.filter(reference -> refersTo(reference, binding)).map(reference -> reference.cursor);
+        }
+
+        private static boolean refersTo(Reference reference, Binding binding) {
+            return reference.binding != null ? reference.binding.equals(binding) : binding.selects(reference.cursor);
         }
 
         private List<Reference> resolve(String name) {
             List<Reference> references = new ArrayList<>();
             List<Cursor> named = identifiers.remove(name);
             for (Cursor identifier : named == null ? Collections.<Cursor>emptyList() : named) {
-                Namespace namespace = service.namespaceOf(identifier);
-                Binding binding = null;
-                if (namespace != null) {
-                    binding = at(identifier).lookup(name, namespace).orElse(null);
-                    if (binding == null) {
-                        continue;
-                    }
-                } else {
-                    Object parent = identifier.getParentTreeCursor().getValue();
-                    J.Identifier ident = identifier.getValue();
-                    if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == ident ||
-                          parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == ident ||
-                          parent instanceof J.Case && ((J.Case) parent).getCaseLabels().contains(ident))) {
-                        continue;
-                    }
+                Reference reference = resolve(name, identifier);
+                if (reference != null) {
+                    references.add(reference);
                 }
-                references.add(new Reference(identifier, binding));
             }
             return references;
+        }
+
+        private @Nullable Reference resolve(String name, Cursor identifier) {
+            Namespace namespace = service.namespaceOf(identifier);
+            Binding binding = null;
+            if (namespace != null) {
+                binding = at(identifier).lookup(name, namespace).orElse(null);
+                if (binding == null) {
+                    return null;
+                }
+            } else {
+                Object parent = identifier.getParentTreeCursor().getValue();
+                J.Identifier ident = identifier.getValue();
+                if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == ident ||
+                      parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == ident ||
+                      parent instanceof J.Case && ((J.Case) parent).getCaseLabels().contains(ident))) {
+                    return null;
+                }
+            }
+            return new Reference(identifier, binding);
         }
 
         /**
@@ -588,22 +831,28 @@ public class Scope implements Trait<J> {
          * found before an edit does not see it. Finding the binding again from a cursor on the edited tree does.
          */
         public Stream<Cursor> references() {
-            // One walk of the scope answers for every binding in it
+            return referencesInScope().of(this);
+        }
+
+        /**
+         * The identifiers under the region's tree that refer to the binding, as {@link #references()} tells them.
+         * They are read from the region's own tree, which may be an edited copy the binding's scope does not hold.
+         */
+        public Stream<Cursor> references(Cursor region) {
+            return referencesWithin(region).of(this);
+        }
+
+        /**
+         * The identifiers of the binding's scope, which one walk gathers for every binding in it.
+         */
+        private References referencesInScope() {
             Map<Object, References> references = perSourceFile(scope).computeMessageIfAbsent(REFERENCES, k -> new IdentityHashMap<>());
             References inScope = references.get(scope.getValue());
             if (inScope == null) {
                 inScope = referencesWithin(scope);
                 references.put(scope.getValue(), inScope);
             }
-            return inScope.of(this);
-        }
-
-        /**
-         * Those of the {@link #references()} that are under the region's tree.
-         */
-        public Stream<Cursor> references(Cursor region) {
-            J regionTree = region.getValue();
-            return references().filter(reference -> isUnder(reference, regionTree));
+            return inScope;
         }
 
         /**
@@ -733,10 +982,6 @@ public class Scope implements Trait<J> {
          * final counts as assigned, since code outside its scope may assign it. A method or type is never assigned.
          */
         public boolean isEffectivelyFinal() {
-            return isEffectivelyFinal(references());
-        }
-
-        private boolean isEffectivelyFinal(Stream<Cursor> references) {
             if (namespace != Namespace.VARIABLE) {
                 return true;
             }
@@ -770,13 +1015,12 @@ public class Scope implements Trait<J> {
                             ((J.VariableDeclarations.NamedVariable) declaring.getValue()).getInitializer() == null &&
                             declaring.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Block;
             Set<UUID> assignments = new HashSet<>();
-            for (Cursor reference : (Iterable<Cursor>) references::iterator) {
-                if (isAssigned(reference)) {
-                    if (!blank || !isSimpleAssignment(reference) || isInLoopBelow(reference, scope)) {
-                        return false;
-                    }
-                    assignments.add(((J) reference.getValue()).getId());
+            // The checks above read the declaration alone, and the scope is walked where they do not decide
+            for (Cursor write : (Iterable<Cursor>) referencesInScope().writesOf(this)::iterator) {
+                if (!blank || !isSimpleAssignment(write) || isInLoopBelow(write, scope)) {
+                    return false;
                 }
+                assignments.add(((J) write.getValue()).getId());
             }
             // A local declared without an initializer may be assigned once on each path (JLS 4.12.4).
             return assignments.size() <= 1 || mostOnOnePath(scope.getValue(), assignments) <= 1;
@@ -890,12 +1134,16 @@ public class Scope implements Trait<J> {
          * The binding an identifier declares, looked for in each scope around it.
          */
         private static @Nullable Binding declaredBy(Cursor cursor) {
-            if (!(cursor.getValue() instanceof J.Identifier)) {
-                return null;
-            }
-            J.Identifier identifier = cursor.getValue();
-            ScopeService service = service(cursor);
-            for (Cursor scope = cursor.getParent() == null ? null : enclosingScope(service, cursor.getParent());
+            return cursor.getValue() instanceof J.Identifier && cursor.getParent() != null ?
+                    declaredBy(cursor.getParent(), cursor.getValue()) : null;
+        }
+
+        /**
+         * The binding an identifier declares, looked for in each scope around the cursor.
+         */
+        private static @Nullable Binding declaredBy(Cursor from, J.Identifier identifier) {
+            ScopeService service = service(from);
+            for (Cursor scope = enclosingScope(service, from);
                  scope != null;
                  scope = scope.getParent() == null ? null : enclosingScope(service, scope.getParent())) {
                 for (Binding binding : new Scope(scope, scope).getBindings()) {

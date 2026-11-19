@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.trait;
 
+import com.sun.source.util.JavacTask;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
@@ -29,13 +31,27 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+import javax.tools.ToolProvider;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -1025,7 +1041,7 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
-    void bindingOfADeclarationFromItsOwnCursorOrOneAbove() {
+    void bindingOfADeclarationFromItsOwnCursorOrOneAboveOrBelow() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
@@ -1033,7 +1049,8 @@ class ScopeTest implements RewriteTest {
                   J.VariableDeclarations parameter = (J.VariableDeclarations) method.getParameters().get(0);
                   return SearchResult.found(method, Stream.of(
                       Scope.bindingOf(getCursor(), method),
-                      Scope.bindingOf(getCursor(), parameter.getVariables().get(0)))
+                      Scope.bindingOf(getCursor(), parameter.getVariables().get(0)),
+                      Scope.bindingOf(new Cursor(getCursor(), method.getBody()), parameter.getVariables().get(0)))
                     .map(b -> b.map(binding -> binding.getName() + ":" + binding.getNamespace() + ":" + binding.getKind()).orElse("?"))
                     .collect(joining(" ")));
               }
@@ -1047,7 +1064,7 @@ class ScopeTest implements RewriteTest {
               """,
             """
               class A {
-                  /*~~(m:METHOD:MEMBER p:VARIABLE:PARAMETER)~~>*/void m(int p) {
+                  /*~~(m:METHOD:MEMBER p:VARIABLE:PARAMETER p:VARIABLE:PARAMETER)~~>*/void m(int p) {
                   }
               }
               """
@@ -1216,71 +1233,383 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
-    void blockCollidesAcrossLaterStatementsThatDeclareOrReadItsNames() {
+    void cursorToATreeBelowHoldsEveryTreeBetween() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                  J.Block b = super.visitBlock(block, ctx);
-                  Cursor parent = getCursor().getParentTreeCursor();
-                  if (!(parent.getValue() instanceof J.Block)) {
-                      return b;
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.VariableDeclarations c = (J.VariableDeclarations) method.getBody().getStatements().getFirst();
+                  J.Block lambdaBody = (J.Block) ((J.Lambda) c.getVariables().getFirst().getInitializer()).getBody();
+                  J.Block edited = lambdaBody.withEnd(Space.SINGLE_SPACE);
+                  getCursor().putMessage("given", true);
+                  Cursor copy = Scope.cursorTo(getCursor(), edited);
+                  // Cursors are equal by value, so only a message tells the given cursor from another on its tree
+                  assertThat(copy.<Boolean>getNearestMessage("given")).isTrue();
+                  assertThatThrownBy(() -> Scope.cursorTo(new Cursor(getCursor(), method.getBody()), method.getName()))
+                    .isInstanceOf(IllegalArgumentException.class);
+                  // The parent of a method's cursor holds padding and no tree
+                  assertThatThrownBy(() -> Scope.cursorTo(getCursor().getParentOrThrow(), method.getName()))
+                    .isInstanceOf(IllegalArgumentException.class);
+                  // A cursor on the lambda's body that left out the lambda would find the field
+                  return SearchResult.found(method, Stream.of(Scope.cursorTo(getCursor(), lambdaBody), copy)
+                    .map(body -> Scope.at(body).lookup("p").map(b -> b.getKind().toString()).orElse("?"))
+                    .collect(joining(" ")) + (copy.getValue() == edited ? " on the copy" : ""));
+              }
+          })),
+          java(
+            """
+              import java.util.function.Consumer;
+
+              class A {
+                  String p;
+                  void m() {
+                      Consumer<String> c = p -> { System.out.println(p); };
                   }
-                  List<Statement> statements = parent.<J.Block>getValue().getStatements();
-                  List<Cursor> later = new ArrayList<>();
-                  for (Statement statement : statements.subList(statements.indexOf(block) + 1, statements.size())) {
-                      later.add(new Cursor(parent, statement));
+              }
+              """,
+            """
+              import java.util.function.Consumer;
+
+              class A {
+                  String p;
+                  /*~~(PARAMETER PARAMETER on the copy)~~>*/void m() {
+                      Consumer<String> c = p -> { System.out.println(p); };
                   }
-                  return SearchResult.found(b, Scope.at(getCursor()).collidesAcross(later) ? "collides" : "free");
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void referencesWithinAnEditedRegionComeFromTheCopy() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  List<Statement> statements = method.getBody().getStatements();
+                  J.Assignment assignsY = (J.Assignment) statements.get(2);
+                  // A recipe mid-visit holds a copy that assigns x where the method still assigns y.
+                  J.Assignment assignsX = assignsY.withVariable(((J.Identifier) assignsY.getVariable()).withSimpleName("x"));
+                  Cursor copy = new Cursor(new Cursor(getCursor(), method.getBody()), assignsX);
+                  return SearchResult.found(method, Scope.bindingOf(getCursor(), ((J.VariableDeclarations) statements.getFirst()).getVariables().getFirst())
+                    .map(x -> x.references().count() + " in the method, " + x.references(copy).count() + " in the copy")
+                    .orElse("?"));
               }
           })),
           java(
             """
               class A {
+                  void m() {
+                      int x = 0;
+                      int y = 0;
+                      y = 1;
+                  }
+              }
+              """,
+            """
+              class A {
+                  /*~~(0 in the method, 1 in the copy)~~>*/void m() {
+                      int x = 0;
+                      int y = 0;
+                      y = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockCanMoveWhereEveryNameKeepsItsMeaning() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (!method.getSimpleName().startsWith("before") && !method.getSimpleName().startsWith("after")) {
+                      return method;
+                  }
+                  Cursor body = new Cursor(getCursor(), method.getBody());
+                  // The block to move is the last one of the first statement that has a block
+                  for (Statement statement : method.getBody().getStatements()) {
+                      List<J.Block> blocks = new JavaIsoVisitor<List<J.Block>>() {
+                          @Override
+                          public J.Block visitBlock(J.Block block, List<J.Block> found) {
+                              found.add(block);
+                              return super.visitBlock(block, found);
+                          }
+
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, List<J.Block> found) {
+                              return classDecl == statement ? super.visitClassDeclaration(classDecl, found) : classDecl;
+                          }
+                      }.reduce(statement, new ArrayList<>());
+                      if (!blocks.isEmpty()) {
+                          Cursor destination = new Cursor(body, statement);
+                          Scope moving = Scope.at(Scope.cursorTo(body, blocks.getLast()));
+                          boolean moves = method.getSimpleName().startsWith("before") ?
+                            moving.canMoveBefore(destination) : moving.canMoveAfter(destination);
+                          return SearchResult.found(method, moves ? "moves" : "stays");
+                      }
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.function.IntConsumer;
+
+              class A {
                   int field;
-                  void declaredLater() {
-                      { int x = 1; }
+                  void beforeDeclaredLater() {
+                      { int x = 1; use(x); }
                       for (int x = 0; x < 1; x++) { }
                   }
-                  void readLater() {
-                      { int field = 1; }
+                  void beforeReadLater() {
+                      { int field = 1; use(field); }
                       use(field);
                   }
-                  void untouched() {
-                      { int y = 1; }
+                  void beforeUntouched() {
+                      { int y = 1; use(y); }
                       use(field);
                   }
-                  void localClass() {
+                  void beforeLocalClassLater() {
                       { class Helper {} }
                       class Helper {}
                   }
+                  void beforeRestOfStatement() {
+                      apply(() -> { int v = 1; use(v); }, v -> use(v));
+                  }
+                  void beforeVisibleLocal() {
+                      int x = 0;
+                      new Object() {{ int x = 1; use(x); }};
+                  }
+                  void beforeOwnMember() {
+                      new Object() {{ use(hashCode()); }};
+                  }
+                  void beforeThis() {
+                      new Object() {{ use(this.hashCode()); }};
+                  }
+                  void beforeNestedParameter() {
+                      int x = 0;
+                      new Object() {{ IntConsumer c = x -> use(x); c.accept(1); }};
+                  }
+                  void beforeItsOwnLocalClass() {
+                      class Node {{ Node next = null; use(next == null ? 0 : 1); }}
+                  }
+                  void afterThenDeclaresTheName(boolean c) {
+                      if (c) { int n = 1; use(n); return; } else { int n = 2; use(n); }
+                  }
+                  void afterPatternInScope(Object o) {
+                      if (!(o instanceof String s)) { return; } else { use(s.length()); }
+                  }
+                  void afterDeclaredByStatement() {
+                      Object list = new Object() {{ int list = 1; use(list); }};
+                  }
+                  void afterParameterBeforeLocalClass(int x) {
+                      new Object() {{ int x = 1; use(x); }};
+                      class Local {}
+                  }
+                  void use(int i) {}
+                  void apply(Runnable r, IntConsumer c) {}
+              }
+              """,
+            """
+              import java.util.function.IntConsumer;
+
+              class A {
+                  int field;
+                  /*~~(stays)~~>*/void beforeDeclaredLater() {
+                      { int x = 1; use(x); }
+                      for (int x = 0; x < 1; x++) { }
+                  }
+                  /*~~(stays)~~>*/void beforeReadLater() {
+                      { int field = 1; use(field); }
+                      use(field);
+                  }
+                  /*~~(moves)~~>*/void beforeUntouched() {
+                      { int y = 1; use(y); }
+                      use(field);
+                  }
+                  /*~~(stays)~~>*/void beforeLocalClassLater() {
+                      { class Helper {} }
+                      class Helper {}
+                  }
+                  /*~~(stays)~~>*/void beforeRestOfStatement() {
+                      apply(() -> { int v = 1; use(v); }, v -> use(v));
+                  }
+                  /*~~(stays)~~>*/void beforeVisibleLocal() {
+                      int x = 0;
+                      new Object() {{ int x = 1; use(x); }};
+                  }
+                  /*~~(stays)~~>*/void beforeOwnMember() {
+                      new Object() {{ use(hashCode()); }};
+                  }
+                  /*~~(stays)~~>*/void beforeThis() {
+                      new Object() {{ use(this.hashCode()); }};
+                  }
+                  /*~~(stays)~~>*/void beforeNestedParameter() {
+                      int x = 0;
+                      new Object() {{ IntConsumer c = x -> use(x); c.accept(1); }};
+                  }
+                  /*~~(stays)~~>*/void beforeItsOwnLocalClass() {
+                      class Node {{ Node next = null; use(next == null ? 0 : 1); }}
+                  }
+                  /*~~(moves)~~>*/void afterThenDeclaresTheName(boolean c) {
+                      if (c) { int n = 1; use(n); return; } else { int n = 2; use(n); }
+                  }
+                  /*~~(moves)~~>*/void afterPatternInScope(Object o) {
+                      if (!(o instanceof String s)) { return; } else { use(s.length()); }
+                  }
+                  /*~~(stays)~~>*/void afterDeclaredByStatement() {
+                      Object list = new Object() {{ int list = 1; use(list); }};
+                  }
+                  /*~~(stays)~~>*/void afterParameterBeforeLocalClass(int x) {
+                      new Object() {{ int x = 1; use(x); }};
+                      class Local {}
+                  }
+                  void use(int i) {}
+                  void apply(Runnable r, IntConsumer c) {}
+              }
+              """
+          )
+        );
+        // The same methods with each block moved. javac rejects those that stay, apart from beforeReadLater,
+        // beforeOwnMember and beforeThis, which compile and read something else.
+        assertThat(methodsJavacRejects(
+          """
+            import java.util.function.IntConsumer;
+
+            class A {
+                int field;
+                void beforeDeclaredLater() {
+                    int x = 1; use(x);
+                    for (int x = 0; x < 1; x++) { }
+                }
+                void beforeReadLater() {
+                    int field = 1; use(field);
+                    use(field);
+                }
+                void beforeUntouched() {
+                    int y = 1; use(y);
+                    use(field);
+                }
+                void beforeLocalClassLater() {
+                    class Helper {}
+                    class Helper {}
+                }
+                void beforeRestOfStatement() {
+                    int v = 1; use(v);
+                    apply(() -> { }, v -> use(v));
+                }
+                void beforeVisibleLocal() {
+                    int x = 0;
+                    int x = 1; use(x);
+                    new Object() {{ }};
+                }
+                void beforeOwnMember() {
+                    use(hashCode());
+                    new Object() {{ }};
+                }
+                void beforeThis() {
+                    use(this.hashCode());
+                    new Object() {{ }};
+                }
+                void beforeNestedParameter() {
+                    int x = 0;
+                    IntConsumer c = x -> use(x); c.accept(1);
+                    new Object() {{ }};
+                }
+                void beforeItsOwnLocalClass() {
+                    Node next = null; use(next == null ? 0 : 1);
+                    class Node {{ }}
+                }
+                void afterThenDeclaresTheName(boolean c) {
+                    if (c) { int n = 1; use(n); return; }
+                    int n = 2; use(n);
+                }
+                void afterPatternInScope(Object o) {
+                    if (!(o instanceof String s)) { return; }
+                    use(s.length());
+                }
+                void afterDeclaredByStatement() {
+                    Object list = new Object() {{ }};
+                    int list = 1; use(list);
+                }
+                void afterParameterBeforeLocalClass(int x) {
+                    new Object() {{ }};
+                    int x = 1; use(x);
+                    class Local {}
+                }
+                void use(int i) {}
+                void apply(Runnable r, IntConsumer c) {}
+            }
+            """
+        )).containsExactly("afterDeclaredByStatement", "afterParameterBeforeLocalClass", "beforeDeclaredLater",
+          "beforeItsOwnLocalClass", "beforeLocalClassLater", "beforeNestedParameter", "beforeRestOfStatement",
+          "beforeVisibleLocal");
+    }
+
+    @Test
+    void lambdaCanCaptureEffectivelyFinalLocalsItDoesNotAssign() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  Cursor body = new Cursor(getCursor(), method.getBody());
+                  // The statements after expect() are the ones to wrap in a lambda
+                  List<Cursor> regions = null;
+                  for (Statement statement : method.getBody().getStatements()) {
+                      if (regions != null) {
+                          regions.add(new Cursor(body, statement));
+                      } else if (statement instanceof J.MethodInvocation invocation && "expect".equals(invocation.getSimpleName())) {
+                          regions = new ArrayList<>();
+                      }
+                  }
+                  return regions == null ? method : SearchResult.found(method, Scope.lambdaCanCapture(regions) ? "captures" : "refuses");
+              }
+          })),
+          java(
+            """
+              class A {
+                  int f;
+                  void readsFinal(int p) { expect(); use(p); }
+                  void readsReassigned() { int i = 0; i++; expect(); use(i); }
+                  void assignsBlank() { int r; expect(); r = 1; use(r); }
+                  void declaresItsOwn() { expect(); int n = 0; n++; use(n); }
+                  void assignsField() { expect(); f = 1; }
+                  void expect() {}
                   void use(int i) {}
               }
               """,
             """
               class A {
-                  int field;
-                  void declaredLater() {
-                      /*~~(collides)~~>*/{ int x = 1; }
-                      for (int x = 0; x < 1; x++) { }
-                  }
-                  void readLater() {
-                      /*~~(collides)~~>*/{ int field = 1; }
-                      use(field);
-                  }
-                  void untouched() {
-                      /*~~(free)~~>*/{ int y = 1; }
-                      use(field);
-                  }
-                  void localClass() {
-                      /*~~(collides)~~>*/{ class Helper {} }
-                      class Helper {}
-                  }
+                  int f;
+                  /*~~(captures)~~>*/void readsFinal(int p) { expect(); use(p); }
+                  /*~~(refuses)~~>*/void readsReassigned() { int i = 0; i++; expect(); use(i); }
+                  /*~~(refuses)~~>*/void assignsBlank() { int r; expect(); r = 1; use(r); }
+                  /*~~(captures)~~>*/void declaresItsOwn() { expect(); int n = 0; n++; use(n); }
+                  /*~~(captures)~~>*/void assignsField() { expect(); f = 1; }
+                  void expect() {}
                   void use(int i) {}
               }
               """
           )
         );
+        assertThat(methodsJavacRejects(
+          """
+            class A {
+                int f;
+                void readsFinal(int p) { run(() -> { use(p); }); }
+                void readsReassigned() { int i = 0; i++; run(() -> { use(i); }); }
+                void assignsBlank() { int r; run(() -> { r = 1; use(r); }); }
+                void declaresItsOwn() { run(() -> { int n = 0; n++; use(n); }); }
+                void assignsField() { run(() -> { f = 1; }); }
+                void run(Runnable r) {}
+                void use(int i) {}
+            }
+            """
+        )).containsExactly("assignsBlank", "readsReassigned");
     }
 
     @Test
@@ -1433,6 +1762,40 @@ class ScopeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * The names of the methods in which javac reports an error, in alphabetical order.
+     */
+    private static Set<String> methodsJavacRejects(@Language("java") String source) {
+        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        JavaFileObject file = new SimpleJavaFileObject(URI.create("string:///A.java"), JavaFileObject.Kind.SOURCE) {
+            @Override
+            public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+                return source;
+            }
+        };
+        try {
+            ((JavacTask) ToolProvider.getSystemJavaCompiler()
+              .getTask(null, null, diagnostics, List.of("-proc:none"), null, List.of(file))).analyze();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        String[] lines = source.split("\n");
+        Pattern method = Pattern.compile("void (\\w+)\\(");
+        Set<String> rejected = new TreeSet<>();
+        for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
+            if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                for (int line = (int) diagnostic.getLineNumber() - 1; line >= 0; line--) {
+                    Matcher declared = method.matcher(lines[line]);
+                    if (declared.find()) {
+                        rejected.add(declared.group(1));
+                        break;
+                    }
+                }
+            }
+        }
+        return rejected;
     }
 
     private static Recipe referenceCounts() {
