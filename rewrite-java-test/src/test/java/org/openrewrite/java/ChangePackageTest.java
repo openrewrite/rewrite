@@ -2118,6 +2118,42 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void changePackageInSpringXmlLeavesPomAndPropertyKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
+          xml(
+            """
+              <project>
+                <groupId>test.type</groupId>
+                <artifactId>app</artifactId>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          xml(
+            """
+              <beans xmlns="http://www.springframework.org/schema/beans">
+                <bean class="test.type.A">
+                  <property name="delegate" value="test.type.B"/>
+                  <property name="messageKey" value="test.type.error.title"/>
+                  <property name="basename" value="test.type.Messages"/>
+                </bean>
+              </beans>
+              """,
+            """
+              <beans xmlns="http://www.springframework.org/schema/beans">
+                <bean class="test.test.type.A">
+                  <property name="delegate" value="test.test.type.B"/>
+                  <property name="messageKey" value="test.type.error.title"/>
+                  <property name="basename" value="test.type.Messages"/>
+                </bean>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeTypeInPropertiesFile() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),

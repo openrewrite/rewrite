@@ -19,6 +19,8 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindTypes;
@@ -3778,6 +3780,90 @@ class ChangeTypeTest implements RewriteTest {
               </beans>
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans.dtd'>",
+      "<!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN 2.0//EN' 'spring-beans-2.0.dtd'>",
+      "<!DOCTYPE beans SYSTEM 'http://springframework.org/dtd/spring-beans.dtd'>",
+      "<!DOCTYPE beans SYSTEM 'classpath:org/springframework/beans/factory/xml/spring-beans.dtd'>",
+      "<!DOCTYPE beans SYSTEM 'C:\\schemas\\spring-beans.dtd'>",
+      "<!DOCTYPE beans SYSTEM 'https://example.com/dtd/custom-spring-beans-v3.dtd'>",
+      "<!DOCTYPE beans PUBLIC 'custom' 'spring-beans.dtd'>",
+      "<!DOCTYPE beans SYSTEM 'spring-beans.dtd'>",
+      "<!DOCTYPE beans SYSTEM '../dtd/spring-beans-2.0.dtd'>",
+      "<!DOCTYPE beans SYSTEM 'https://www.springframework.org/dtd/spring-beans-2.0.dtd'>"
+    })
+    void springBeansDtd(String doctype) {
+        rewriteRun(xml(doctype + "<beans><bean class='a.A1'/></beans>",
+                       doctype + "<beans><bean class='a.A2'/></beans>"));
+    }
+
+    @Test
+    void springPropertyValues() {
+        String source = """
+          <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+            <bean class="a.A1">
+              <constructor-arg value="a.A1"/>
+              <property name="implementation" value="a.A1"/>
+              <property name="mapping">
+                <map><entry key="impl" value="a.A1"/></map>
+              </property>
+              <property name="options">
+                <props><prop key="implementation">a.A1</prop></props>
+              </property>
+              <property name="clazz"><value>a.A1</value></property>
+            </bean>
+          </beans>
+          """;
+        rewriteRun(xml(source, source.replace("a.A1", "a.A2")));
+    }
+
+    @Test
+    void prefixedSpringElements() {
+        String source = """
+          <beans:beans xmlns:beans="http://www.springframework.org/schema/beans">
+            <beans:bean class="a.A1">
+              <beans:constructor-arg type="a.A1" value="a.A1"/>
+              <beans:property value="a.A1"/>
+              <beans:property><beans:value>a.A1</beans:value></beans:property>
+              <beans:map key-type="a.A1" value-type="a.A1">
+                <beans:entry key="a.A1" value="a.A1"/>
+              </beans:map>
+              <beans:props><beans:prop key="a.A1">a.A1</beans:prop></beans:props>
+            </beans:bean>
+          </beans:beans>
+          """;
+        rewriteRun(xml(source, source.replace("a.A1", "a.A2")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"web-app", "web-fragment"})
+    void servletDeploymentDescriptor(String root) {
+        String source = """
+          <%1$s xmlns="https://jakarta.ee/xml/ns/jakartaee">
+            <filter><filter-class>a.A1</filter-class></filter>
+            <servlet><servlet-class>a.A1</servlet-class></servlet>
+            <listener><listener-class>a.A1</listener-class></listener>
+            <error-page><exception-type>a.A1</exception-type></error-page>
+          </%1$s>
+          """.formatted(root);
+        rewriteRun(xml(source, source.replace("a.A1", "a.A2"),
+          spec -> spec.path("web-app".equals(root) ? "WEB-INF/web.xml" : "META-INF/web-fragment.xml")));
+    }
+
+    @Test
+    void unrelatedDocuments() {
+        rewriteRun(
+          xml("<!DOCTYPE beans SYSTEM 'https://example.com/spring-beans/other.dtd'>" +
+              "<beans><bean class='a.A1'/></beans>"),
+          xml("<web-fragment><listener><listener-class>a.A1</listener-class></listener></web-fragment>",
+            spec -> spec.path("WEB-INF/web.xml")),
+          xml("<web-fragment><exception-type>a.A1</exception-type></web-fragment>",
+            spec -> spec.path("META-INF/web-fragment.xml")),
+          xml("<config><listener-class>a.A1</listener-class></config>", spec -> spec.path("web.xml"))
         );
     }
 
