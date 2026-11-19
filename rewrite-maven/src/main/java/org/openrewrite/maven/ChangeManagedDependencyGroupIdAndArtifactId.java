@@ -158,9 +158,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             /**
-             * In each dependencyManagement block, one entry per management key that this pass changed: the entry
-             * already at those coordinates, or else the first, unless another one replaces it by version. When every
-             * entry for a key was renamed, an entry managed elsewhere at the new version supersedes them all.
+             * The entries to remove so that each management key this pass changed has at most one entry per
+             * dependencyManagement block. The one kept is the entry already at those coordinates, or else the first, unless another one
+             * replaces it by version.
              */
             private List<Xml.Tag> supersededEntries(Xml.Document document) {
                 List<Xml.Tag> blocks = new ArrayList<>();
@@ -174,8 +174,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 List<Xml.Tag> superseded = new ArrayList<>();
                 for (Xml.Tag block : blocks) {
                     Map<GroupArtifactClassifierType, List<Xml.Tag>> byKey = new LinkedHashMap<>();
-                    for (Xml.Tag dependency : block.getChildren("dependency")) {
-                        byKey.computeIfAbsent(managementKey(dependency), k -> new ArrayList<>()).add(dependency);
+                    List<Xml.Tag> dependencies = block.getChildren("dependency");
+                    if (dependencies.stream().noneMatch(d -> changedVersions.containsKey(d.getId()))) {
+                        continue;
+                    }
+                    for (Xml.Tag dependency : dependencies) {
+                        byKey.computeIfAbsent(managementKey(pom, dependency), k -> new ArrayList<>()).add(dependency);
                     }
                     for (Map.Entry<GroupArtifactClassifierType, List<Xml.Tag>> group : byKey.entrySet()) {
                         List<Xml.Tag> entries = group.getValue();
@@ -184,8 +188,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         }
                         Xml.Tag kept = entries.stream().filter(e -> !renamed.contains(e.getId())).findFirst().orElse(null);
                         if (kept == null) {
-                            kept = entries.get(0);
-                            if (checkIfNewDependencyPresent(group.getKey().getGroupId(), group.getKey().getArtifactId(), newVersion, kept)) {
+                            // Any entry left in this block overrides the one managed elsewhere, so that entry replaces
+                            // the renamed ones only if it can replace each of them. Otherwise one it cannot replace is kept.
+                            kept = entries.stream().filter(e -> !checkIfNewDependencyPresent(
+                                    group.getKey().getGroupId(), group.getKey().getArtifactId(), newVersion, e)).findFirst().orElse(null);
+                            if (kept == null) {
                                 superseded.addAll(entries);
                                 continue;
                             }
@@ -258,7 +265,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId, null) :
                                 new RemoveRedundantDependencyVersions(changedGroupId, changedArtifactId, null, null).getVisitor());
                         changedVersions.put(t.getId(), renamedVersion);
-                        if (!managementKey(t).equals(managementKey(tag))) {
+                        if (!managementKey(pom, t).equals(managementKey(pom, tag))) {
                             renamed.add(t.getId());
                         }
                     }
@@ -266,8 +273,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 return t;
             }
 
-            private GroupArtifactClassifierType managementKey(Xml.Tag dependency) {
-                ResolvedPom pom = getResolutionResult().getPom();
+            private GroupArtifactClassifierType managementKey(ResolvedPom pom, Xml.Tag dependency) {
                 return new GroupArtifactClassifierType(
                         pom.getValue(dependency.getChildValue("groupId").orElse(null)),
                         pom.getValue(dependency.getChildValue("artifactId").orElse(null)),
@@ -280,8 +286,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
              * exact one. An exact new version counts even when it is not published. A selector that matched nothing
              * published keeps the kept entry, as does a kept version that is a range or placeholder.
              *
-             * @param version the entry's version: for an entry this pass changed, the resolved new version, or null
-             *                when the recipe has no new version or the entry has no {@code <version>}
+             * @param version the resolved new version of an entry this pass changed, or else the entry's own version.
+             *                Null when that version is unknown, as for a renamed entry when the recipe has no new version.
              */
             private boolean replacesKept(@Nullable String version, @Nullable String keptVersion) {
                 if (!isExact(version)) {

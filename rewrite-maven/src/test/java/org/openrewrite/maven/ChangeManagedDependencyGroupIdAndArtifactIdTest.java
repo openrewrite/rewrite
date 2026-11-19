@@ -795,6 +795,88 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void renamedEntriesStayWhenTheParentEntryCannotReplaceThemAll() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.hamcrest", "hamcrest-*", "org.hamcrest", "hamcrest", null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>my-app</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest</artifactId>
+                              <version>2.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.hamcrest</groupId>
+                                <artifactId>hamcrest-core</artifactId>
+                                <version>1.3</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.hamcrest</groupId>
+                                <artifactId>hamcrest-library</artifactId>
+                                <version>1.3</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.hamcrest</groupId>
+                                <artifactId>hamcrest</artifactId>
+                                <version>1.3</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void inheritedEntryReplacesRenamedOneWithoutStrippingDirectVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
