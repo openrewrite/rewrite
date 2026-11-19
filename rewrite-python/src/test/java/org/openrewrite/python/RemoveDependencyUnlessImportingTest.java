@@ -21,6 +21,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.toml.ChangeValue;
+import org.openrewrite.toml.tree.Toml;
 
 import java.util.List;
 
@@ -238,6 +242,116 @@ class RemoveDependencyUnlessImportingTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /// Dependency recipes share the `pyproject.toml` each one edited, so a recipe that visits the lock before
+    /// `pyproject.toml` builds on the recipes before it. Removing `six` publishes the text it edited in cycle 1;
+    /// `ChangeValue` then raises `requires-python` without publishing. `iniconfig` is only removed in cycle 2, once the
+    /// rename leaves no import of it, and its lock must be built from what cycle 2 scanned, not what cycle 1 published.
+    @Test
+    void lockRegeneratedInALaterCycleIncludesEditsFromEarlierCycles() {
+        rewriteRun(
+          spec -> spec
+            .recipes(new RenameModule("iniconfig", "configparser"),
+              new RemoveDependency("six", null, null, null),
+              new RemoveDependency("iniconfig", null, null, List.of("iniconfig")),
+              new ChangeValue("project.requires-python", "\">=3.13\""))
+            .expectedCyclesThatMakeChanges(2),
+          python(
+            """
+              import iniconfig
+              """,
+            """
+              import configparser
+              """
+          ),
+          lockVisitedBeforePyproject(
+            """
+              version = 1
+              revision = 3
+              requires-python = ">=3.12"
+
+              [[package]]
+              name = "myapp"
+              version = "0.1.0"
+              source = { virtual = "." }
+              dependencies = [
+                  { name = "iniconfig" },
+                  { name = "six" },
+              ]
+
+              [package.metadata]
+              requires-dist = [
+                  { name = "iniconfig", specifier = ">=2.0" },
+                  { name = "six", specifier = ">=1.16" },
+              ]
+
+              [[package]]
+              name = "iniconfig"
+              version = "2.3.0"
+              source = { registry = "https://pypi.org/simple" }
+              sdist = { url = "https://files.pythonhosted.org/packages/iniconfig-2.3.0.tar.gz", hash = "sha256:aaaa", size = 1, upload-time = "2025-10-18T21:55:43.219Z" }
+              wheels = [
+                  { url = "https://files.pythonhosted.org/packages/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:bbbb", size = 1, upload-time = "2025-10-18T21:55:41.639Z" },
+              ]
+
+              [[package]]
+              name = "six"
+              version = "1.17.0"
+              source = { registry = "https://pypi.org/simple" }
+              sdist = { url = "https://files.pythonhosted.org/packages/six-1.17.0.tar.gz", hash = "sha256:cccc", size = 1, upload-time = "2024-12-04T17:35:28.174Z" }
+              wheels = [
+                  { url = "https://files.pythonhosted.org/packages/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:dddd", size = 1, upload-time = "2024-12-04T17:35:26.475Z" },
+              ]
+              """,
+            """
+              version = 1
+              revision = 3
+              requires-python = ">=3.13"
+
+              [[package]]
+              name = "myapp"
+              version = "0.1.0"
+              source = { virtual = "." }
+              """
+          ),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "0.1.0"
+              requires-python = ">=3.12"
+              dependencies = [
+                  "iniconfig>=2.0",
+                  "six>=1.16",
+              ]
+
+              [tool.uv]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "0.1.0"
+              requires-python = ">=3.13"
+              dependencies = [
+              ]
+
+              [tool.uv]
+              """
+          )
+        );
+    }
+
+    /// RewriteTest visits sources grouped by parser, in no fixed order between groups. Parsing the lock with the
+    /// pyproject parser puts it in the same group as `pyproject.toml`, where sources keep the order they are listed in.
+    private static SourceSpecs lockVisitedBeforePyproject(String before, String after) {
+        SourceSpec<Toml.Document> lock = new SourceSpec<>(Toml.Document.class, null, PyProjectTomlParser.builder(),
+          before, SourceSpec.ValidateSource.noop, ctx -> {
+        });
+        lock.path("uv.lock");
+        lock.noTrim();
+        lock.after(actual -> after);
+        return lock;
     }
 
     /**
