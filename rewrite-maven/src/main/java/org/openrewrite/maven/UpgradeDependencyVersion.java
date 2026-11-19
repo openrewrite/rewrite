@@ -342,10 +342,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (isManagedDependencyImportTag(groupId, artifactId)) {
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, retainVersions).getVisitor());
+                                ResolvedPom pom = getResolutionResult().getPom();
+                                String bomGroupId = pom.getValue(t.getChildValue("groupId").orElse(groupId));
+                                String bomArtifactId = pom.getValue(t.getChildValue("artifactId").orElse(artifactId));
+                                doAfterVisit(RemoveRedundantDependencyVersions.versionsManagedByBom(bomGroupId, bomArtifactId, retainVersions));
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
+                                doAfterVisit(RemoveRedundantDependencyVersions.versionsManagedByBom(bomGroupId, bomArtifactId, null));
                             }
                         }
                     } catch (MavenDownloadingException e) {
