@@ -62,6 +62,10 @@ public class Java25Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java25Parser, Builder> {
+        @Override
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return sourceVersion == null || sourceVersion >= 8 && sourceVersion <= 25;
+        }
 
         @Nullable
         private static ClassLoader moduleClassLoader;
@@ -85,12 +89,12 @@ public class Java25Parser implements JavaParser {
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class, Path.class, Integer.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory());
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory(), javaPlatform, sourceCompatibility);
 
                 return new Java25Parser(delegate);
             } catch (Exception e) {
