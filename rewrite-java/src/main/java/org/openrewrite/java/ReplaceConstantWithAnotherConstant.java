@@ -27,7 +27,6 @@ import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -206,7 +205,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     return (J) tree;
                 }
                 JavaSourceFile sf = (JavaSourceFile) tree;
-                if (!hasNoConflictingImports(sf, newOutermostType) || otherClassTakesSimpleName(sf, newOutermostType)) {
+                if (!hasNoConflictingImports(sf, newOutermostType) ||
+                    otherClassTakesSimpleName(new Cursor(getCursor(), sf), newOutermostType)) {
                     return sf;
                 }
                 List<J.FieldAccess> references = new ArrayList<>();
@@ -262,18 +262,24 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private boolean outermostNameTaken() {
             Cursor sfCursor = getCursor().dropParentUntil(t ->
                     t instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(t));
-            return sfCursor.<Boolean>computeMessageIfAbsent(OUTERMOST_NAME_TAKEN, k -> otherClassTakesSimpleName(
-                    sfCursor.getValue() instanceof JavaSourceFile ? sfCursor.getValue() : null, newOutermostType));
+            Boolean taken = sfCursor.getMessage(OUTERMOST_NAME_TAKEN);
+            if (taken == null) {
+                // Scope keeps its answers on the same cursor, so this is computed before it is stored
+                taken = otherClassTakesSimpleName(sfCursor, newOutermostType);
+                sfCursor.putMessage(OUTERMOST_NAME_TAKEN, taken);
+            }
+            return taken;
         }
 
         /// Whether a class or type parameter the file declares, imports or uses already goes by `type`'s simple name,
         /// also where [#hasNoConflictingImport] does not look, such as a class from the file's own package, a
         /// statically imported nested class or a local class. Importing `type` would then clash with that class or
         /// change what the name refers to. Types in use leave out imports, so an unused import is checked on its own.
-        private static boolean otherClassTakesSimpleName(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
-            if (sf == null) {
+        private static boolean otherClassTakesSimpleName(Cursor sourceFile, JavaType.FullyQualified type) {
+            if (!(sourceFile.getValue() instanceof JavaSourceFile)) {
                 return false;
             }
+            JavaSourceFile sf = sourceFile.getValue();
             String simpleName = simpleName(type.getFullyQualifiedName());
             for (J.Import anImport : sf.getImports()) {
                 if (anImport.getQualid().getSimpleName().equals(simpleName) &&
@@ -289,27 +295,10 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                     return true;
                 }
             }
-            return new JavaIsoVisitor<AtomicBoolean>() {
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
-                    if (classDecl.getSimpleName().equals(simpleName) &&
-                            !TypeUtils.isOfType(classDecl.getType(), type)) {
-                        found.set(true);
-                        return classDecl;
-                    }
-                    return super.visitClassDeclaration(classDecl, found);
-                }
-
-                @Override
-                public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, AtomicBoolean found) {
-                    if (typeParam.getName() instanceof J.Identifier &&
-                            ((J.Identifier) typeParam.getName()).getSimpleName().equals(simpleName)) {
-                        found.set(true);
-                        return typeParam;
-                    }
-                    return super.visitTypeParameter(typeParam, found);
-                }
-            }.reduce(sf, new AtomicBoolean()).get();
+            return Scope.declaredWithin(sourceFile)
+                    .anyMatch(declared -> declared.getNamespace() == Scope.Namespace.TYPE &&
+                                          declared.getName().equals(simpleName) &&
+                                          !TypeUtils.isOfType(declared.getType(), type));
         }
 
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf, JavaType.FullyQualified targetType) {

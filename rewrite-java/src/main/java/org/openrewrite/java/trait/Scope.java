@@ -37,6 +37,10 @@ import java.util.stream.Stream;
  * One lexical scope of the tree, asked about the names visible from a position inside it. The binding rules
  * come from the source file's {@link ScopeService}, so the same questions work for every language built on {@link J}
  * that supplies one.
+ * <p>
+ * Answers are kept in the messages of the source file's cursor. A caller that keeps its own answer there computes it
+ * before storing it, since asking from inside {@link Cursor#computeMessageIfAbsent} on that cursor modifies the map
+ * being computed into.
  */
 @Incubating(since = "8.113.0")
 @Value
