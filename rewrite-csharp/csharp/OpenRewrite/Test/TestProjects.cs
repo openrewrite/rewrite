@@ -42,13 +42,15 @@ internal sealed class TestProjects
     private readonly Dictionary<ImmutableArray<string>, Project> _unnamed = new(new SequenceComparer());
     private readonly Dictionary<SourceSpec, Project> _bySpec = new(ReferenceEqualityComparer.Instance);
 
-    public TestProjects(IEnumerable<SourceSpec> specs)
+    /// <param name="specs">The sources of the test.</param>
+    /// <param name="projectMarker">The <see cref="MSBuildProject"/> a project file among them was parsed with.</param>
+    public TestProjects(IEnumerable<SourceSpec> specs, Func<SourceSpec, MSBuildProject?> projectMarker)
     {
         var all = specs.ToList();
         foreach (var spec in all.Where(s => s.SourcePath != null && IsProjectFile(s.SourcePath)))
         {
             var path = Normalize(spec.SourcePath!);
-            _byName[path] = FromProjectFile(path, spec.Before);
+            _byName[path] = FromProjectFile(path, spec.Before, projectMarker(spec));
         }
         foreach (var spec in all.Where(s => s.ProjectName != null))
         {
@@ -120,8 +122,11 @@ internal sealed class TestProjects
     private static DotNetProject Marker(string name, IEnumerable<string> frameworks) =>
         new(Tree.RandomId(), name, [..frameworks], "Microsoft.NET.Sdk");
 
-    /// <summary>A project as <see cref="SolutionParser"/> reads it from its project file.</summary>
-    private static Project FromProjectFile(string path, string content)
+    /// <summary>
+    /// A project as <see cref="SolutionParser"/> reads it from its project file, with the frameworks and SDK of the
+    /// file's <see cref="MSBuildProject"/> when it has them, as the build that reads its imports evaluates them.
+    /// </summary>
+    private static Project FromProjectFile(string path, string content, MSBuildProject? marker)
     {
         XElement? root = null;
         try
@@ -142,8 +147,14 @@ internal sealed class TestProjects
                     .Where(f => !frameworks.Contains(f)));
             }
         }
+        if (marker?.TargetFrameworks is { Count: > 0 } evaluated)
+        {
+            // A restore lists the frameworks in its own order, and a project file in the one its sources target them
+            var monikers = evaluated.Select(f => f.TargetFrameworkMoniker).Distinct().ToList();
+            frameworks = frameworks.Where(monikers.Contains).Concat(monikers.Except(frameworks)).ToList();
+        }
         var project = new Project(new DotNetProject(Tree.RandomId(), Path.GetFileNameWithoutExtension(path),
-            frameworks, root?.Attribute("Sdk")?.Value)) { FrameworksStated = frameworks.Count > 0 };
+            frameworks, marker?.Sdk ?? root?.Attribute("Sdk")?.Value)) { FrameworksStated = frameworks.Count > 0 };
         var directory = path.Contains('/') ? path[..path.LastIndexOf('/')] : "";
         foreach (var reference in root?.Elements("ItemGroup").Elements("ProjectReference") ?? [])
         {

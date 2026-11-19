@@ -88,7 +88,8 @@ public abstract class RewriteTest
         // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
         var csprojSpecs = specs.Where(s => !s.PlainXml && s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
         var csprojParsed = ParseCsprojFilesTogether(csprojSpecs, recipeSpec.ProjectRestore);
-        var projects = new TestProjects(specs);
+        var projects = new TestProjects(specs,
+            spec => csprojParsed.GetValueOrDefault(spec)?.Markers.FindFirst<MSBuildProject>());
 
         var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
         var compilations = new Dictionary<SyntaxTree, CSharpCompilation>();

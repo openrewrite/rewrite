@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -23,7 +24,7 @@ namespace OpenRewrite.Tests.Core;
 
 /// <summary>
 /// A test of a recipe on project files says which <see cref="MSBuildProject"/> each of them has, from a restore, from
-/// the test or none at all.
+/// the test or none at all, and which project its C# sources are in.
 /// </summary>
 public class ProjectFileMarkersTests : RewriteTest
 {
@@ -52,6 +53,19 @@ public class ProjectFileMarkersTests : RewriteTest
             <LangVersion>latest</LangVersion>
           </PropertyGroup>
         </Project>
+        """;
+
+    private const string Calls =
+        """
+        class C
+        {
+            void Foo() { }
+            void Bar() { }
+            void M()
+            {
+                Foo();
+            }
+        }
         """;
 
     private static MSBuildProject Restored(string framework, params ResolvedPackage[] packages) =>
@@ -116,6 +130,48 @@ public class ProjectFileMarkersTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void ACSharpSourceInAProjectTargetsTheFrameworksOfTheProjectFileMarker()
+    {
+        var projects = new List<DotNetProject>();
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCallsInProjectsTargeting("net10.0")),
+            CsProj(Project, sourcePath: "src/App/App.csproj").AddMarkers(Restored("net10.0")),
+            CSharp(Calls, Calls.Replace("Foo();", "Bar();")).InProject("src/App/App.csproj")
+                .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
+        );
+
+        Assert.Equal(["net10.0"], Assert.Single(projects).TargetFrameworks);
+    }
+
+    [Fact]
+    public void ACSharpSourceInAProjectTargetsTheFrameworksItsImportsSet()
+    {
+        var projects = new List<DotNetProject>();
+        RewriteRun(
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
+                  </PropertyGroup>
+                </Project>
+                """, sourcePath: "src/App/App.csproj"),
+            CsProj(
+                """
+                <Project>
+                  <PropertyGroup>
+                    <TargetFrameworks>net6.0;net8.0;net48</TargetFrameworks>
+                  </PropertyGroup>
+                </Project>
+                """, sourcePath: "Directory.Build.targets"),
+            CSharp(Calls).InProject("src/App/App.csproj")
+                .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
+        );
+
+        Assert.Equal(["net8.0", "net6.0", "net48"], Assert.Single(projects).TargetFrameworks);
+    }
+
     /// <summary>Marks the build files, which are the XML files with an <see cref="MSBuildProject"/>.</summary>
     private class FindBuildFiles : global::OpenRewrite.Core.Recipe
     {
@@ -147,6 +203,28 @@ public class ProjectFileMarkersTests : RewriteTest
                     .Any(p => p.Name == package && p.Depth > 0) == true
                     ? SearchResult.Found(document)
                     : document;
+        }
+    }
+
+    /// <summary>Renames calls to Foo in the sources of projects that target the framework.</summary>
+    private class RenameCallsInProjectsTargeting(string framework) : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Rename calls in projects targeting a framework";
+        public override string Description => "Renames calls to Foo to Bar in projects targeting the framework.";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor(framework);
+
+        private class Visitor(string framework) : CSharpVisitor<ExecutionContext>
+        {
+            public override J VisitMethodInvocation(MethodInvocation method, ExecutionContext ctx)
+            {
+                var visited = base.VisitMethodInvocation(method, ctx);
+                var targets = Cursor.FirstEnclosing<CompilationUnit>()?.Markers.FindFirst<DotNetProject>()
+                    ?.TargetFrameworks.Contains(framework) == true;
+                return targets && visited is MethodInvocation { Name.SimpleName: "Foo" } call
+                    ? call.WithName(call.Name.WithSimpleName("Bar"))
+                    : visited;
+            }
         }
     }
 }
