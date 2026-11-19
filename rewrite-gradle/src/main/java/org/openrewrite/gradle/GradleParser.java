@@ -301,9 +301,9 @@ public class GradleParser implements Parser {
 
     /**
      * Calls {@link JavaParser#dependenciesFromResources}, which reads the type tables of its caller's class loader and
-     * skips {@link GradleParser} when it looks for the caller. From here it reads this jar's table, which matches the
-     * artifact names this parser asks for. Whatever calls the parser may come from another jar, as {@link Parser#parse}
-     * comes from the host process under a recipe class loader.
+     * skips parsers and parser builders when it looks for the caller. From here it reads this jar's table, which matches
+     * the artifact names this parser asks for. Whatever calls the parser may come from another jar, such as a recipe in
+     * its own class loader.
      */
     private static final class OwnTypeTable {
         static List<Path> load(ExecutionContext ctx, String... artifactNames) {
