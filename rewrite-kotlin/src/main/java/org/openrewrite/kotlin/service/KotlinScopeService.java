@@ -93,6 +93,21 @@ public class KotlinScopeService extends ScopeService {
     }
 
     @Override
+    public boolean isStaticContext(Cursor cursor) {
+        if (cursor.getValue() instanceof J.ClassDeclaration && cursor.getParentTreeCursor().getValue() instanceof J.Block &&
+            cursor.getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
+            // A class or object nested in a class has an instance of the outer class only when declared `inner`
+            for (J.Modifier modifier : ((J.ClassDeclaration) cursor.getValue()).getModifiers()) {
+                if ("inner".equals(modifier.getKeyword())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return super.isStaticContext(cursor);
+    }
+
+    @Override
     public boolean localMayShadowLocal() {
         return true;
     }

@@ -26,6 +26,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.service.ScopeService;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
@@ -1683,6 +1684,181 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void nameInScopeCannotBeReferencedAcrossAStaticContext() {
+        @Language("java") String source =
+          """
+            class B {
+                int inherited;
+            }
+            class A<T> extends B {
+                int inst;
+                static int stat;
+                int instMethod() { return 0; }
+                static int use(String row, Object read) { return 0; }
+                A() {
+                    this(use("constructorCallArgument", inst));
+                }
+                A(String s) {
+                    this(use("constructorCallNamesTypeParameter", (T) null));
+                }
+                A(int i) {}
+                int instanceMethod() {
+                    return use("instanceMethod", inst);
+                }
+                static int staticMethod() {
+                    return use("staticMethod", inst);
+                }
+                static int staticMethodReadsStaticField() {
+                    return use("staticMethodReadsStaticField", stat);
+                }
+                static int staticMethodReadsInheritedField() {
+                    return use("staticMethodReadsInheritedField", inherited);
+                }
+                static int staticMethodCallsInstanceMethod() {
+                    return use("staticMethodCallsInstanceMethod", instMethod());
+                }
+                static int staticMethodNamesClassTypeParameter() {
+                    return use("staticMethodNamesClassTypeParameter", (T) null);
+                }
+                static {
+                    use("staticInitializer", inst);
+                }
+                static int staticField =
+                        use("staticFieldInitializer", inst);
+                int instanceField =
+                        use("instanceFieldInitializer", inst);
+                class Inner {
+                    Inner() {
+                        this(use("innerConstructorCallReadsOuterField", inst));
+                    }
+                    Inner(int i) {}
+                    int m() {
+                        return use("innerClass", inst);
+                    }
+                }
+                static class Nested {
+                    int own;
+                    int m() {
+                        return use("staticNestedClassOwnField", own) +
+                               use("staticNestedClass", inst);
+                    }
+                }
+                record Rec(int component) {
+                    int m() {
+                        return use("nestedRecord", inst);
+                    }
+                }
+                static void localClassInStaticMethod() {
+                    class Local {
+                        int m() {
+                            return use("localClassInStaticMethod", inst);
+                        }
+                    }
+                }
+                enum E {
+                    X(use("enumConstantArgument", hidden)) {
+                        int m() {
+                            return use("enumConstantBodyReadsPrivateField", hidden);
+                        }
+                    };
+                    private int hidden;
+                    E(int i) {}
+                }
+                void local() {
+                    int local = 1;
+                    record LocalRec() {
+                        int m() {
+                            return use("localRecordReadsLocal", local);
+                        }
+                    }
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "constructorCallArgument",
+          "enumConstantArgument",
+          "enumConstantBodyReadsPrivateField",
+          "localClassInStaticMethod",
+          "localRecordReadsLocal",
+          "nestedRecord",
+          "staticFieldInitializer",
+          "staticInitializer",
+          "staticMethod",
+          "staticMethodCallsInstanceMethod",
+          "staticMethodNamesClassTypeParameter",
+          "staticMethodReadsInheritedField",
+          "staticNestedClass");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void shadowedBindingCannotBeReferenced() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> {
+              Scope classScope = scope;
+              while (!(classScope.getTree() instanceof J.ClassDeclaration)) {
+                  classScope = classScope.enclosing().orElseThrow();
+              }
+              Scope.Binding field = classScope.getBindings().stream().filter(b -> "x".equals(b.getName())).findFirst().orElseThrow();
+              return String.valueOf(scope.canReference(field));
+          })),
+          java(
+            """
+              class A {
+                  int x;
+                  void shadows(int x) {
+                      here();
+                  }
+                  void reads() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              class A {
+                  int x;
+                  void shadows(int x) {
+                      /*~~(false)~~>*/here();
+                  }
+                  void reads() {
+                      /*~~(true)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void localIsReferencedFromALambdaOrClassBodyOnlyIfEffectivelyFinal() {
+        @Language("java") String source =
+          """
+            class A {
+                static int use(String row, Object read) { return 0; }
+                void m() {
+                    int constant = 1;
+                    int reassigned = 1;
+                    reassigned++;
+                    use("sameMethodReadsReassignedLocal", reassigned);
+                    Runnable lambda = () -> {
+                        use("lambdaReadsEffectivelyFinalLocal", constant);
+                        use("lambdaReadsReassignedLocal", reassigned);
+                    };
+                    new Object() {
+                        int m() {
+                            return use("anonymousClassReadsReassignedLocal", reassigned);
+                        }
+                    };
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly("anonymousClassReadsReassignedLocal", "lambdaReadsReassignedLocal");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
     void localOfAClassBodyMayTakeTheNameOfAnEnclosingLocal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -1866,10 +2042,46 @@ class ScopeTest implements RewriteTest {
         }
     }
 
+    private static final Pattern USE_ROW = Pattern.compile("use\\(\"(\\w+)\"");
+
+    /**
+     * The rows of a source whose second argument to {@code use(row, read)} names something
+     * {@link Scope#canReference(Scope.Binding)} refuses there, in alphabetical order.
+     */
+    private static Set<String> readsRefused(@Language("java") String source) {
+        Set<String> refused = new TreeSet<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("use".equals(method.getSimpleName())) {
+                    Expression read = method.getArguments().get(1);
+                    J.Identifier name = read instanceof J.MethodInvocation call ? call.getName() :
+                      read instanceof J.TypeCast cast ? (J.Identifier) cast.getClazz().getTree() : (J.Identifier) read;
+                    Cursor at = Scope.cursorTo(getCursor(), name);
+                    Scope scope = Scope.at(at);
+                    Scope.Binding binding = scope.lookup(name.getSimpleName(), Scope.service(at).namespaceOf(at)).orElseThrow();
+                    if (!scope.canReference(binding)) {
+                        refused.add((String) ((J.Literal) method.getArguments().getFirst()).getValue());
+                    }
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(parse(source), 0);
+        return refused;
+    }
+
     /**
      * The names of the methods in which javac reports an error, in alphabetical order.
      */
     private static Set<String> methodsJavacRejects(@Language("java") String source) {
+        return rowsJavacRejects(source, Pattern.compile("void (\\w+)\\("));
+    }
+
+    /**
+     * The rows in which javac reports an error, in alphabetical order. A row starts at the line the pattern's first
+     * group names it on.
+     */
+    private static Set<String> rowsJavacRejects(@Language("java") String source, Pattern row) {
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         JavaFileObject file = new SimpleJavaFileObject(URI.create("string:///A.java"), JavaFileObject.Kind.SOURCE) {
             @Override
@@ -1884,12 +2096,11 @@ class ScopeTest implements RewriteTest {
             throw new UncheckedIOException(e);
         }
         String[] lines = source.split("\n");
-        Pattern method = Pattern.compile("void (\\w+)\\(");
         Set<String> rejected = new TreeSet<>();
         for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
             if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
                 for (int line = (int) diagnostic.getLineNumber() - 1; line >= 0; line--) {
-                    Matcher declared = method.matcher(lines[line]);
+                    Matcher declared = row.matcher(lines[line]);
                     if (declared.find()) {
                         rejected.add(declared.group(1));
                         break;

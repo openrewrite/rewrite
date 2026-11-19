@@ -195,6 +195,23 @@ public class ScopeService {
     }
 
     /**
+     * Whether the tree at the cursor is a static context (JLS 8.1.3), so that code under it runs with no instance
+     * of the class around it. An enum constant is one for its arguments and its body.
+     */
+    public boolean isStaticContext(Cursor cursor) {
+        Object tree = cursor.getValue();
+        if (tree instanceof J.ClassDeclaration) {
+            J.ClassDeclaration classDeclaration = (J.ClassDeclaration) tree;
+            return classDeclaration.hasModifier(J.Modifier.Type.Static) ||
+                   classDeclaration.getKind() != J.ClassDeclaration.Kind.Type.Class;
+        }
+        return tree instanceof J.MethodDeclaration && ((J.MethodDeclaration) tree).hasModifier(J.Modifier.Type.Static) ||
+               tree instanceof J.VariableDeclarations && ((J.VariableDeclarations) tree).hasModifier(J.Modifier.Type.Static) ||
+               tree instanceof J.Block && ((J.Block) tree).isStatic() ||
+               tree instanceof J.EnumValue;
+    }
+
+    /**
      * The namespace the identifier at the cursor refers into, or null where it declares a name or names a member
      * selected with a dot, an enum constant in a case label, a label or a package. An ambiguous name such as
      * {@code A} in {@code A.b} reads a type only where attribution marks it one and no variable of its name is in

@@ -26,9 +26,10 @@ Add one API in `rewrite-java` that answers from the position of a name in the tr
 language supply the rules.
 
 `Scope` is what recipes use. `Scope.at(cursor)` is the innermost scope at a position, and answers
-what is visible there (`lookup`, `visible`, `isVisible`), whether a new name is free (`isFree`,
-`freeName`) and whether the scope's statements could stand elsewhere with every name meaning what
-it means now (`canMoveBefore`, `canMoveAfter`). Static queries take a cursor and need no scope:
+what is visible there (`lookup`, `visible`, `isVisible`), whether code there may refer to a binding
+in reach (`canReference`), whether a new name is free (`isFree`, `freeName`) and whether the scope's
+statements could stand elsewhere with every name meaning what it means now (`canMoveBefore`,
+`canMoveAfter`). Static queries take a cursor and need no scope:
 `bindingOf` a declaration, the bindings `declaredWithin` a tree, those `referencedWithin` it from
 outside, and whether a lambda written around some code could capture what it reads and assigns
 (`lambdaCanCapture`).
@@ -44,7 +45,8 @@ imported) and `Namespace` (variable, method, type), its `references()`, whether 
 come from the same declaration, so a binding is a stable key where attribution is not.
 
 `ScopeService` holds the rules: which trees open a scope, what each binds, where a binding is
-visible, which namespace an identifier is read in, which words are reserved. A source file hands out
+visible, which namespace an identifier is read in, which trees are a static context, which words are
+reserved. A source file hands out
 its language's service through `SourceFile.service(ScopeService.class)`, as it does for formatting.
 The Java service implements the Java Language Specification's rules, including flow scoping of
 pattern variables. The Kotlin, Scala and Groovy services extend it and override only where their
@@ -78,6 +80,11 @@ no parameter has no `it`, so inside one the name resolves to that lambda and not
 
 `lambdaCanCapture` applies Java's rule in every language, so it says no for a capture that Kotlin,
 Scala or Groovy would allow.
+
+`canReference` asks each language what a static context is, and applies Java's rule for capturing a
+local in every language, as `lambdaCanCapture` does. An enum constant's body binds none of the
+members it inherits from its enum, so `canReference` refuses a field of the enum there that the body
+could read.
 
 `canMoveBefore` and `canMoveAfter` look for `this` only in code that leaves a class body. A Kotlin
 lambda with a receiver gives `this` another meaning too, which they do not see.

@@ -299,6 +299,47 @@ class ScopeTraitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedClassReferencesAPropertyOfTheOuterOneOnlyIfInner() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("prop").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              class Outer {
+                  val prop = 1
+                  fun own() { here() }
+                  class Nested {
+                      fun m() { here() }
+                  }
+                  inner class Inner {
+                      fun m() { here() }
+                  }
+                  companion object {
+                      fun c() { here() }
+                  }
+              }
+              fun here() {}
+              """,
+            """
+              class Outer {
+                  val prop = 1
+                  fun own() { /*~~(true)~~>*/here() }
+                  class Nested {
+                      fun m() { /*~~(false)~~>*/here() }
+                  }
+                  inner class Inner {
+                      fun m() { /*~~(true)~~>*/here() }
+                  }
+                  companion object {
+                      fun c() { /*~~(false)~~>*/here() }
+                  }
+              }
+              fun here() {}
+              """
+          )
+        );
+    }
+
     private static Recipe atHere(Function<Scope, String> question) {
         return toRecipe(() -> new JavaIsoVisitor<>() {
             @Override

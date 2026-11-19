@@ -54,9 +54,9 @@ import java.util.stream.Stream;
  * captures.</li>
  * <li>Whether a variable is ever written: a {@link VariableAccess#isWriteAccess() write} among its
  * {@link Binding#references()}.</li>
+ * <li>Whether code can use a variable or method already in reach: {@link #canReference(Binding)}. A visible name
+ * is not always one the code may use, as an instance field is visible in a static method that cannot read it.</li>
  * </ul>
- * A visible name is not always one the code may use. An instance field is visible in a static method, which cannot
- * read it.
  * <p>
  * Every question takes a cursor that holds each tree up to the source file. For a tree the visitor has not reached,
  * {@link #cursorTo(Cursor, J)} gives one.
@@ -168,6 +168,78 @@ public class Scope implements Trait<J> {
      */
     public boolean isVisible(Binding binding) {
         return service(position).isVisibleAt(binding, position);
+    }
+
+    /**
+     * Whether an identifier written at the position could refer to the binding by its simple name, in code the
+     * language accepts. It could not where another binding shadows this one, where an instance member or a class's
+     * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, or where a local
+     * that is not effectively final is read from inside a lambda or a class body. Whether a local declared without
+     * an initializer has been assigned by then is not checked.
+     */
+    public boolean canReference(Binding binding) {
+        if (!lookup(binding.name, binding.namespace).filter(binding::equals).isPresent()) {
+            return false;
+        }
+        if (binding.isLocal()) {
+            return binding.namespace != Namespace.VARIABLE || canCapture(binding);
+        }
+        Object scopeTree = binding.scope.getValue();
+        boolean typeParameter = binding.getTree() instanceof J.Identifier &&
+                                binding.cursor.getParentTreeCursor().getValue() instanceof J.TypeParameter;
+        boolean needsInstance = (scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass) &&
+                                (binding.namespace == Namespace.TYPE ? typeParameter : !isStatic(binding.type));
+        return !needsInstance || hasInstanceOf(binding.scope, !typeParameter);
+    }
+
+    /**
+     * Whether code at the position can read the local from where it stands. From inside a lambda or a class body
+     * the local must be effectively final, and a static class declared in a method reads none of the method's
+     * locals.
+     */
+    private boolean canCapture(Binding local) {
+        ScopeService service = service(position);
+        boolean captured = false;
+        for (Cursor c = position; c != null && !isTree(c, local.scope); c = c.getParent()) {
+            Object tree = c.getValue();
+            if (tree instanceof J.ClassDeclaration && service.isStaticContext(c)) {
+                return false;
+            }
+            captured |= tree instanceof J.Lambda || tree instanceof J.ClassDeclaration ||
+                        tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null;
+        }
+        return !captured || local.isEffectivelyFinal();
+    }
+
+    /**
+     * Whether code at the position runs with an instance of the class, which a static context between the two rules
+     * out. With {@code constructed}, the arguments of {@code this(..)} or {@code super(..)} rule it out too, since
+     * the object under construction is no instance yet.
+     */
+    private boolean hasInstanceOf(Cursor classScope, boolean constructed) {
+        ScopeService service = service(position);
+        boolean constructorCall = false;
+        for (Cursor c = position; c != null && !isTree(c, classScope); c = c.getParent()) {
+            Object tree = c.getValue();
+            if (service.isStaticContext(c)) {
+                return false;
+            } else if (tree instanceof J.ClassDeclaration) {
+                constructorCall = false;
+            } else if (tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getSelect() == null) {
+                String name = ((J.MethodInvocation) tree).getSimpleName();
+                constructorCall |= "this".equals(name) || "super".equals(name);
+            }
+        }
+        return !(constructed && constructorCall);
+    }
+
+    private static boolean isTree(Cursor cursor, Cursor other) {
+        return cursor.getValue() instanceof J && cursor.<J>getValue().getId().equals(other.<J>getValue().getId());
+    }
+
+    private static boolean isStatic(@Nullable JavaType member) {
+        return member instanceof JavaType.Variable && ((JavaType.Variable) member).hasFlags(Flag.Static) ||
+               member instanceof JavaType.Method && ((JavaType.Method) member).hasFlags(Flag.Static);
     }
 
     /**
