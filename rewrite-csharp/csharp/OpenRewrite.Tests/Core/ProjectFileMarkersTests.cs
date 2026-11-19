@@ -192,8 +192,55 @@ public class ProjectFileMarkersTests : RewriteTest
                 .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
         );
 
-        Assert.Equal(["net8.0", "net6.0", "net48"], Assert.Single(projects).TargetFrameworks);
+        Assert.Equal(["net6.0", "net8.0", "net48"], Assert.Single(projects).TargetFrameworks);
     }
+
+    [Theory]
+    [InlineData("net6.0", null, null, "net6.0")]
+    [InlineData("net6.0", "net8.0", null, "net8.0")]
+    [InlineData("net6.0", "net8.0", "net48;net9.0", "net48;net9.0")]
+    public void WithoutProjectRestoreACSharpSourceTargetsTheFrameworksItsImportsSet(string props, string? project,
+        string? targets, string expected)
+    {
+        var projects = new List<DotNetProject>();
+        RewriteRun(
+            spec => spec.SetProjectRestore(false),
+            [
+                CsProj(BuildFile(props), sourcePath: "Directory.Build.props"),
+                CsProj(BuildFile(project, "Microsoft.NET.Sdk"), sourcePath: "src/App/App.csproj"),
+                ..targets == null ? [] : new[] { CsProj(BuildFile(targets), sourcePath: "Directory.Build.targets") },
+                CSharp(Calls).InProject("src/App/App.csproj")
+                    .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
+            ]
+        );
+
+        Assert.Equal(expected.Split(';'), Assert.Single(projects).TargetFrameworks);
+    }
+
+    [Fact]
+    public void ACSharpSourceTargetsTheFrameworksOfTheNearestProps()
+    {
+        var projects = new List<DotNetProject>();
+        RewriteRun(
+            spec => spec.SetProjectRestore(false),
+            CsProj(BuildFile("net48"), sourcePath: "Directory.Build.props"),
+            CsProj(BuildFile("net6.0;net8.0"), sourcePath: "src/Directory.Build.props"),
+            CsProj(BuildFile(null, "Microsoft.NET.Sdk"), sourcePath: "src/App/App.csproj"),
+            CSharp(Calls).InProject("src/App/App.csproj")
+                .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
+        );
+
+        Assert.Equal(["net6.0", "net8.0"], Assert.Single(projects).TargetFrameworks);
+    }
+
+    private static string BuildFile(string? frameworks, string? sdk = null) =>
+        $"""
+         <Project{(sdk == null ? "" : $" Sdk=\"{sdk}\"")}>
+           <PropertyGroup>
+             {(frameworks == null ? "<LangVersion>latest</LangVersion>" : $"<TargetFrameworks>{frameworks}</TargetFrameworks>")}
+           </PropertyGroup>
+         </Project>
+         """;
 
     /// <summary>Marks the build files, which are the XML files with an <see cref="MSBuildProject"/>.</summary>
     private class FindBuildFiles : global::OpenRewrite.Core.Recipe

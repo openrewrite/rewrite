@@ -47,10 +47,15 @@ internal sealed class TestProjects
     public TestProjects(IEnumerable<SourceSpec> specs, Func<SourceSpec, MSBuildProject?> projectMarker)
     {
         var all = specs.ToList();
+        var buildFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var spec in all.Where(s => s.SourcePath != null && IsImportedBuildFile(s.SourcePath)))
+        {
+            buildFiles[Normalize(spec.SourcePath!)] = spec.Before;
+        }
         foreach (var spec in all.Where(s => s.SourcePath != null && IsProjectFile(s.SourcePath)))
         {
             var path = Normalize(spec.SourcePath!);
-            _byName[path] = FromProjectFile(path, spec.Before, projectMarker(spec));
+            _byName[path] = FromProjectFile(path, spec.Before, projectMarker(spec), buildFiles);
         }
         foreach (var spec in all.Where(s => s.ProjectName != null))
         {
@@ -123,20 +128,62 @@ internal sealed class TestProjects
         new(Tree.RandomId(), name, [..frameworks], "Microsoft.NET.Sdk");
 
     /// <summary>
-    /// A project as <see cref="SolutionParser"/> reads it from its project file, with the frameworks and SDK of the
-    /// file's <see cref="MSBuildProject"/> when it has them, as the build that reads its imports evaluates them.
+    /// A project as <see cref="SolutionParser"/> reads it from its project file, with the frameworks the nearest
+    /// <c>Directory.Build.props</c> sets unless the project file sets them, those the nearest
+    /// <c>Directory.Build.targets</c> sets over both, and the frameworks and SDK of the file's
+    /// <see cref="MSBuildProject"/> when it has them, as the build that reads its imports evaluates them.
     /// </summary>
-    private static Project FromProjectFile(string path, string content, MSBuildProject? marker)
+    private static Project FromProjectFile(string path, string content, MSBuildProject? marker,
+        IReadOnlyDictionary<string, string> buildFiles)
     {
-        XElement? root = null;
+        var root = Root(content);
+        var directory = path.Contains('/') ? path[..path.LastIndexOf('/')] : "";
+        var frameworks = Frameworks(Root(Nearest(buildFiles, directory, "Directory.Build.targets")));
+        if (frameworks.Count == 0)
+        {
+            frameworks = Frameworks(root);
+        }
+        if (frameworks.Count == 0)
+        {
+            frameworks = Frameworks(Root(Nearest(buildFiles, directory, "Directory.Build.props")));
+        }
+        if (marker?.TargetFrameworks is { Count: > 0 } evaluated)
+        {
+            // A restore lists the frameworks in its own order, and a project file in the one its sources target them
+            var monikers = evaluated.Select(f => f.TargetFrameworkMoniker).Distinct().ToList();
+            frameworks = frameworks.Where(monikers.Contains).Concat(monikers.Except(frameworks)).ToList();
+        }
+        var project = new Project(new DotNetProject(Tree.RandomId(), Path.GetFileNameWithoutExtension(path),
+            frameworks, marker?.Sdk ?? root?.Attribute("Sdk")?.Value)) { FrameworksStated = frameworks.Count > 0 };
+        foreach (var reference in root?.Elements("ItemGroup").Elements("ProjectReference") ?? [])
+        {
+            if (reference.Attribute("Include")?.Value is { } include)
+            {
+                project.References.Add(Normalize(directory + "/" + include));
+            }
+        }
+        return project;
+    }
+
+    private static XElement? Root(string? content)
+    {
+        if (content == null)
+        {
+            return null;
+        }
         try
         {
-            root = XDocument.Parse(content).Root;
+            return XDocument.Parse(content).Root;
         }
         catch (XmlException)
         {
-            // a test of a recipe on a broken project file still gets a project for its sources
+            // a test of a recipe on a broken build file still gets a project for its sources
+            return null;
         }
+    }
+
+    private static List<string> Frameworks(XElement? root)
+    {
         var frameworks = new List<string>();
         foreach (var element in root?.Elements("PropertyGroup").Elements() ?? [])
         {
@@ -147,24 +194,28 @@ internal sealed class TestProjects
                     .Where(f => !frameworks.Contains(f)));
             }
         }
-        if (marker?.TargetFrameworks is { Count: > 0 } evaluated)
-        {
-            // A restore lists the frameworks in its own order, and a project file in the one its sources target them
-            var monikers = evaluated.Select(f => f.TargetFrameworkMoniker).Distinct().ToList();
-            frameworks = frameworks.Where(monikers.Contains).Concat(monikers.Except(frameworks)).ToList();
-        }
-        var project = new Project(new DotNetProject(Tree.RandomId(), Path.GetFileNameWithoutExtension(path),
-            frameworks, marker?.Sdk ?? root?.Attribute("Sdk")?.Value)) { FrameworksStated = frameworks.Count > 0 };
-        var directory = path.Contains('/') ? path[..path.LastIndexOf('/')] : "";
-        foreach (var reference in root?.Elements("ItemGroup").Elements("ProjectReference") ?? [])
-        {
-            if (reference.Attribute("Include")?.Value is { } include)
-            {
-                project.References.Add(Normalize(directory + "/" + include));
-            }
-        }
-        return project;
+        return frameworks;
     }
+
+    /// <summary>The build file of the name in the directory or the closest directory above it, as MSBuild imports it.</summary>
+    private static string? Nearest(IReadOnlyDictionary<string, string> buildFiles, string directory, string name)
+    {
+        while (true)
+        {
+            if (buildFiles.TryGetValue(directory == "" ? name : directory + "/" + name, out var content))
+            {
+                return content;
+            }
+            if (directory == "")
+            {
+                return null;
+            }
+            directory = directory.Contains('/') ? directory[..directory.LastIndexOf('/')] : "";
+        }
+    }
+
+    private static bool IsImportedBuildFile(string path) =>
+        Path.GetFileName(path).ToLowerInvariant() is "directory.build.props" or "directory.build.targets";
 
     private static bool IsProjectFile(string path) =>
         Path.GetExtension(path).ToLowerInvariant() is ".csproj" or ".vbproj" or ".fsproj";
