@@ -603,6 +603,58 @@ public abstract class RewriteTest
     }
 
     /// <summary>
+    /// A C# source read from a file, such as a fixture the test project copies to its output directory, by its path
+    /// or a path relative to that directory. A <c>.txt</c> suffix that keeps the fixture out of the test project's
+    /// build is not part of its source path. <paramref name="sha256"/>, when given, is the hex SHA-256 the file has to
+    /// have, as for code taken from a project the test cites.
+    /// </summary>
+    protected static SourceSpec CSharpFromFile(string path, string? after = null, string? sha256 = null)
+    {
+        var bytes = File.ReadAllBytes(Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path));
+        return Fixture(bytes, Path.GetFileName(path), after, sha256);
+    }
+
+    /// <summary>
+    /// A C# source read from a resource embedded in the test's assembly, by its manifest name or the end of it, such as
+    /// <c>Fixture.cs.txt</c>, otherwise as <see cref="CSharpFromFile"/>. MSBuild reads the <c>cs</c> of
+    /// <c>Fixture.cs.txt</c> as the Czech culture and puts the resource in a satellite assembly unless the
+    /// <c>EmbeddedResource</c> item says <c>WithCulture="false"</c>.
+    /// </summary>
+    protected SourceSpec CSharpFromResource(string name, string? after = null, string? sha256 = null)
+    {
+        var assembly = GetType().Assembly;
+        var names = assembly.GetManifestResourceNames();
+        var matches = names.Where(n => n == name || n.EndsWith("." + name, StringComparison.Ordinal)).ToList();
+        if (matches.Count != 1)
+        {
+            var count = matches.Count == 0 ? "no" : matches.Count.ToString();
+            throw new ArgumentException($"{assembly.GetName().Name} embeds {count} resources named {name}, and has: " +
+                                        $"{string.Join(", ", names)}.");
+        }
+        using var stream = assembly.GetManifestResourceStream(matches[0])!;
+        using var bytes = new MemoryStream();
+        stream.CopyTo(bytes);
+        return Fixture(bytes.ToArray(), name, after, sha256);
+    }
+
+    private static SourceSpec Fixture(byte[] bytes, string name, string? after, string? sha256)
+    {
+        if (sha256 != null)
+        {
+            var actual = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+            if (!actual.Equals(sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    $"{name} has the SHA-256 {actual}, not {sha256}, so it isn't the code the test cites.");
+            }
+        }
+        using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
+        var sourcePath = name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
+        return new SourceSpec(reader.ReadToEnd(), after,
+            sourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? sourcePath : null);
+    }
+
+    /// <summary>
     /// An .editorconfig of the project the test's sources belong to. The C# sources take the style it sets for their
     /// paths, as <see cref="SolutionParser"/> gives them, and no recipe runs on it.
     /// </summary>
