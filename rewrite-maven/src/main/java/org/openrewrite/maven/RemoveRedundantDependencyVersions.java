@@ -141,8 +141,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         ArrayList<String> properties = new ArrayList<>();
         Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
+            private @Nullable ResolvedPom parentPom;
+            private boolean parentPomResolved;
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                parentPom = null;
+                parentPomResolved = false;
                 Xml.Document d = super.visitDocument(document, ctx);
                 if (d != document) {
                     d = (Xml.Document) new RemoveEmptyDependenciesTags().visitNonNull(d, ctx);
@@ -282,19 +287,28 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
             private @Nullable ResolvedManagedDependency findParentManagedDependency(ResolvedManagedDependency d,
                                                                                     ExecutionContext ctx) {
-                MavenResolutionResult mrr = getResolutionResult();
-                if (mrr.getPom().getRequested().getParent() == null) {
-                    return null;
+                ResolvedPom parent = resolveParentPom(ctx);
+                return parent == null ? null :
+                        parent.getManagedDependency(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+            }
+
+            private @Nullable ResolvedPom resolveParentPom(ExecutionContext ctx) {
+                if (!parentPomResolved) {
+                    parentPomResolved = true;
+                    MavenResolutionResult mrr = getResolutionResult();
+                    Parent parent = mrr.getPom().getRequested().getParent();
+                    if (parent != null) {
+                        try {
+                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
+                                    MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
+                            parentPom = mpd.download(parent.getGav(), null, mrr.getPom(), mrr.getPom().getRepositories())
+                                    .resolve(emptyList(), mpd, ctx);
+                        } catch (Exception e) {
+                            parentPom = null;
+                        }
+                    }
                 }
-                try {
-                    GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
-                    MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
-                    ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
-                            .resolve(emptyList(), mpd, ctx);
-                    return parentPom.getManagedDependency(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
-                } catch (Exception e) {
-                    return null;
-                }
+                return parentPom;
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
@@ -321,25 +335,20 @@ public class RemoveRedundantDependencyVersions extends Recipe {
              * could be left to the parent.
              */
             private boolean matchesManagedVersion(Plugin p, ExecutionContext ctx) {
-                MavenResolutionResult mrr = getResolutionResult();
-                if (p.getVersion() == null || mrr.getPom().getRequested().getParent() == null) {
+                if (p.getVersion() == null) {
                     return false;
                 }
-                try {
-                    GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
-                    MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
-                    ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
-                            .resolve(emptyList(), mpd, ctx);
-                    return parentPom.getPluginManagement().stream()
-                            .filter(plugin -> !"false".equals(plugin.getInherited()))
-                            .filter(plugin -> plugin.getGroupId().equals(p.getGroupId()) && plugin.getArtifactId().equals(p.getArtifactId()))
-                            .findFirst()
-                            .map(Plugin::getVersion)
-                            .map(versionAccordingToParent -> matchesComparator(parentPom.getValue(versionAccordingToParent), p.getVersion()))
-                            .orElse(false);
-                } catch (Exception e) {
+                ResolvedPom parent = resolveParentPom(ctx);
+                if (parent == null) {
                     return false;
                 }
+                return parent.getPluginManagement().stream()
+                        .filter(plugin -> !"false".equals(plugin.getInherited()))
+                        .filter(plugin -> plugin.getGroupId().equals(p.getGroupId()) && plugin.getArtifactId().equals(p.getArtifactId()))
+                        .findFirst()
+                        .map(Plugin::getVersion)
+                        .map(versionAccordingToParent -> matchesComparator(parent.getValue(versionAccordingToParent), p.getVersion()))
+                        .orElse(false);
             }
 
             private boolean matchesComparator(@Nullable String managedVersion, String requestedVersion) {
