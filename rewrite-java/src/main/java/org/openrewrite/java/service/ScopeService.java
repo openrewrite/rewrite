@@ -122,7 +122,7 @@ public class ScopeService {
             JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
             String fromPackage = sourceFile == null ? inheriting.getPackageName() :
                     sourceFile.getPackageDeclaration() == null ? "" : sourceFile.getPackageDeclaration().getPackageName();
-            inherited(scope, inheriting, fromPackage, bindings);
+            inherited(scope, inheriting, fromPackage, scopeTree instanceof J.NewClass, bindings);
             inheritedMemberTypes(scope, inheriting, fromPackage, scopeTree instanceof J.NewClass, bindings);
         }
         return bindings;
@@ -324,14 +324,14 @@ public class ScopeService {
             }
             List<Scope.Binding> imported = "*".equals(name) ? onDemand : bindings;
             boolean found = false;
-            for (JavaType.Variable field : membersOf(owner, null, true, JavaType.FullyQualified::getMembers,
+            for (JavaType.Variable field : membersOf(owner, true, null, true, JavaType.FullyQualified::getMembers,
                     JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
                 if ("*".equals(name) || field.getName().equals(name)) {
                     imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field));
                     found = true;
                 }
             }
-            for (JavaType.Method method : membersOf(owner, null, true, JavaType.FullyQualified::getMethods,
+            for (JavaType.Method method : membersOf(owner, true, null, true, JavaType.FullyQualified::getMethods,
                     JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
                 if (!method.isConstructor() && ("*".equals(name) || method.getName().equals(name))) {
                     imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method));
@@ -348,49 +348,46 @@ public class ScopeService {
     }
 
     /**
-     * Binds the fields and methods the type has without its body declaring them. Some are inherited, and some only
-     * its attribution lists, as an enum's {@code values()}.
+     * Binds the fields and methods the class has without its body declaring them. Those of its supertypes come
+     * after the ones the class declares, so a lookup by name finds the declared one and {@code super} still reaches
+     * the inherited one it hides. A named class also has members only its attribution lists, as an enum's
+     * {@code values()}. An anonymous class is given by the type it extends, whose members it all inherits.
      */
-    private static void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage,
+    private static void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean anonymous,
                                   List<Scope.Binding> bindings) {
-        Set<String> declared = new HashSet<>();
-        for (Scope.Binding binding : bindings) {
-            declared.add(binding.getNamespace() + binding.getName());
-        }
-        Set<String> hiding = new HashSet<>(declared);
-        for (JavaType.Variable field : membersOf(type, fromPackage, false,
-                JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
-            if (declared.add(Scope.Namespace.VARIABLE + field.getName())) {
-                bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+        if (!anonymous) {
+            Set<String> fields = new HashSet<>();
+            Set<String> methods = new HashSet<>();
+            for (Scope.Binding binding : bindings) {
+                (binding.getNamespace() == Scope.Namespace.METHOD ? methods : fields).add(binding.getName());
             }
-        }
-        for (JavaType.Method method : membersOf(type, fromPackage, false,
-                JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
-            if (!method.isConstructor() && declared.add(Scope.Namespace.METHOD + method.getName())) {
-                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
-            }
-        }
-        // A member the body declares hides the inherited one of its name, which `super` still reaches. It is bound
-        // after the one hiding it, so a lookup by name never finds it.
-        List<JavaType.FullyQualified> supertypes = new ArrayList<>(type.getInterfaces());
-        if (type.getSupertype() != null) {
-            supertypes.add(0, type.getSupertype());
-        }
-        for (JavaType.FullyQualified supertype : supertypes) {
-            for (JavaType.Variable field : membersOf(supertype, fromPackage, false,
-                    JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
-                if (hiding.contains(Scope.Namespace.VARIABLE + field.getName()) && hiding.add("super " + Scope.Namespace.VARIABLE + field.getName())) {
+            for (JavaType.Variable field : type.getMembers()) {
+                if (isVisibleFrom(field.getFlagsBitMap(), type, fromPackage) && fields.add(field.getName())) {
                     bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
                 }
             }
-            for (JavaType.Method method : membersOf(supertype, fromPackage, false,
-                    JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
-                if (!method.isConstructor() && hiding.contains(Scope.Namespace.METHOD + method.getName()) &&
-                    hiding.add("super " + Scope.Namespace.METHOD + method.getName())) {
+            for (JavaType.Method method : type.getMethods()) {
+                if (!method.isConstructor() && isVisibleFrom(method.getFlagsBitMap(), type, fromPackage) &&
+                    methods.add(method.getName())) {
                     bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
                 }
             }
         }
+        for (JavaType.Variable field : membersOf(type, anonymous, fromPackage, false,
+                JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
+            bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+        }
+        for (JavaType.Method method : membersOf(type, anonymous, fromPackage, false,
+                JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
+            if (!method.isConstructor()) {
+                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+            }
+        }
+    }
+
+    private static boolean isVisibleFrom(long flags, JavaType.FullyQualified owner, @Nullable String fromPackage) {
+        return Flag.hasFlags(flags, Flag.Public) || Flag.hasFlags(flags, Flag.Protected) ||
+               !Flag.hasFlags(flags, Flag.Private) && (fromPackage == null || fromPackage.equals(owner.getPackageName()));
     }
 
     private static void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean includeSelf,
@@ -439,10 +436,12 @@ public class ScopeService {
     }
 
     /**
-     * The fields or methods of a type and its supertypes that are visible from a package, or only the static ones
-     * where {@code onlyStatic} asks for those, one per name and nearest declaration first.
+     * The fields or methods of a type's supertypes, and of the type itself where {@code includeSelf} asks, that are
+     * visible from a package, or only the static ones where {@code onlyStatic} asks for those, one per name and
+     * nearest declaration first.
      */
-    private static <M> List<M> membersOf(JavaType.FullyQualified type, @Nullable String fromPackage, boolean onlyStatic,
+    private static <M> List<M> membersOf(JavaType.FullyQualified type, boolean includeSelf, @Nullable String fromPackage,
+                                         boolean onlyStatic,
                                          Function<JavaType.FullyQualified, List<M>> members,
                                          ToLongFunction<M> flags, Function<M, String> name) {
         List<M> found = new ArrayList<>();
@@ -455,11 +454,10 @@ public class ScopeService {
             if (next instanceof JavaType.Unknown || !visited.add(next.getFullyQualifiedName())) {
                 continue;
             }
-            for (M member : members.apply(next)) {
+            for (M member : includeSelf || next != type ? members.apply(next) : Collections.<M>emptyList()) {
                 long bits = flags.applyAsLong(member);
-                boolean visible = Flag.hasFlags(bits, Flag.Public) || Flag.hasFlags(bits, Flag.Protected) ||
-                                  !Flag.hasFlags(bits, Flag.Private) && (fromPackage == null || fromPackage.equals(next.getPackageName()));
-                if (visible && (!onlyStatic || Flag.hasFlags(bits, Flag.Static)) && seen.add(name.apply(member))) {
+                if (isVisibleFrom(bits, next, fromPackage) && (!onlyStatic || Flag.hasFlags(bits, Flag.Static)) &&
+                    seen.add(name.apply(member))) {
                     found.add(member);
                 }
             }
