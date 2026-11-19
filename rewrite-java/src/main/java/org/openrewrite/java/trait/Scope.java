@@ -355,6 +355,16 @@ public class Scope implements Trait<J> {
         return null;
     }
 
+    private static boolean crossesClassBody(Cursor inner, Cursor outer) {
+        for (Cursor c = inner; c != null && c.getValue() != outer.getValue(); c = c.getParent()) {
+            if (c.getValue() instanceof J.ClassDeclaration ||
+                c.getValue() instanceof J.Block && c.getParentTreeCursor().getValue() instanceof J.NewClass) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isUnder(Cursor cursor, J tree) {
         for (Cursor c = cursor; c != null; c = c.getParent()) {
             if (c.getValue() instanceof J && ((J) c.getValue()).getId().equals(tree.getId())) {
@@ -574,7 +584,8 @@ public class Scope implements Trait<J> {
          * Whether renaming this binding to {@code newName} keeps every name in the file reading what it reads now.
          * It does not where its own scope already binds the name, where a nearer binding of the name would take one
          * of its references, where it would take a reference that now reads a binding further out or none, or where
-         * a local would come to share its name with another local in reach and the language forbids that.
+         * a local would come to share its name with another local in reach, with no class body between them, and the
+         * language forbids that.
          * The answer is for the tree the cursor holds, so a visitor renaming several bindings keeps track of the
          * names it has handed out.
          */
@@ -608,9 +619,11 @@ public class Scope implements Trait<J> {
                 return false;
             }
             if (namespace == Namespace.VARIABLE && isLocal() && !service.localMayShadowLocal()) {
-                // A local may not share its name with a local declared inside its scope or visible where it is declared
-                return !at(cursor).lookup(newName).filter(Binding::isLocal).isPresent() &&
-                       declaredWithin(scope).noneMatch(inner -> inner.namespace == namespace && inner.name.equals(newName));
+                // A local may not share its name with a local declared inside its scope or visible where it is
+                // declared, unless a class body lies between the two
+                return !at(cursor).lookup(newName).filter(outer -> outer.isLocal() && !crossesClassBody(cursor, outer.scope)).isPresent() &&
+                       declaredWithin(scope).noneMatch(inner -> inner.namespace == namespace && inner.name.equals(newName) &&
+                                                                !crossesClassBody(inner.cursor, scope));
             }
             return true;
         }

@@ -1074,6 +1074,69 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void localOfAClassBodyMayTakeTheNameOfAnEnclosingLocal() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  return Scope.bindingOf(getCursor(), identifier)
+                    .filter(b -> b.getName().endsWith("_"))
+                    .map(b -> SearchResult.found(identifier, b.canRenameTo("taken") ? "safe" : "unsafe"))
+                    .orElse(identifier);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m() {
+                      int taken = 1;
+                      Runnable lambda = () -> {
+                          int inLambda_ = 2;
+                      };
+                      Runnable anonymous = new Runnable() {
+                          public void run() {
+                              int inClassBody_ = 3;
+                          }
+                      };
+                  }
+                  void outer() {
+                      int enclosing_ = 1;
+                      new Object() {
+                          void inner() {
+                              int taken = 2;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              class A {
+                  void m() {
+                      int taken = 1;
+                      Runnable lambda = () -> {
+                          int /*~~(unsafe)~~>*/inLambda_ = 2;
+                      };
+                      Runnable anonymous = new Runnable() {
+                          public void run() {
+                              int /*~~(safe)~~>*/inClassBody_ = 3;
+                          }
+                      };
+                  }
+                  void outer() {
+                      int /*~~(safe)~~>*/enclosing_ = 1;
+                      new Object() {
+                          void inner() {
+                              int taken = 2;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void renameIsSafeUnlessANameWouldReadSomethingElse() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
