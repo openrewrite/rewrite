@@ -206,9 +206,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 if (existing == null) {
                     return false;
                 }
-                // A pom must not manage the same coordinates twice, so a duplicate of its own entry goes even if it
-                // declares more. An inherited or imported entry only stands in for the changed one if that declares
-                // nothing more.
+                // Subject to compareVersions below, an entry in this pom's top-level dependencyManagement replaces
+                // the renamed one whatever else the renamed one declares, since a pom must not manage the same
+                // coordinates twice. Any other existing entry replaces it only if both declare the same scope and
+                // the renamed one declares no tags beyond groupId, artifactId, version, type, classifier and scope.
                 if (!pom.getRequested().getDependencyManagement().contains(existing.getRequested())) {
                     String scope = pom.getValue(changed.getChildValue("scope").orElse(null));
                     if (!RemoveRedundantDependencyVersions.declaresOnlyCoordinatesVersionAndScope(changed) ||
