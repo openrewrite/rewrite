@@ -21,14 +21,120 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("CheckTagEmptyBody")
 class AddToTagTest implements RewriteTest {
+
+    @Test
+    void expandsEmptyTagAtItsExistingIndentation() {
+        rewriteRun(
+          spec -> spec
+            .allSources(source -> source.markers(new NamedStyles(randomId(), "spaces", "Spaces", null,
+              emptySet(), singletonList(TabsAndIndentsStyle.DEFAULT))))
+            .recipe(toRecipe(() -> new XmlVisitor<>() {
+                @Override
+                public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                    if ("configuration".equals(tag.getName())) {
+                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<release>25</release>")));
+                    }
+                    return super.visitTag(tag, ctx);
+                }
+            })),
+          xml(
+            "<project>\n  <build>\n\t        <configuration/>\n  </build>\n</project>",
+            "<project>\n  <build>\n\t        <configuration>\n" +
+            "\t          <release>25</release>\n\t        </configuration>\n  </build>\n</project>"
+          )
+        );
+    }
+
+    @Test
+    void replacementKeepsExistingIndentation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                  if ("configuration".equals(tag.getName())) {
+                      doAfterVisit(new AddOrUpdateChild<>(tag, Xml.Tag.build("<release>25</release>")));
+                  }
+                  return super.visitTag(tag, ctx);
+              }
+          })),
+          xml(
+            "<project>\n  <configuration>\n\t    <release>17</release>\n  </configuration>\n</project>",
+            "<project>\n  <configuration>\n\t    <release>25</release>\n  </configuration>\n</project>"
+          )
+        );
+    }
+
+    @Test
+    void followsSpaceIndentedNeighboursInTabStyledDocument() {
+        rewriteRun(
+          spec -> spec
+            .allSources(source -> source.markers(new NamedStyles(randomId(), "tabs", "Tabs", null,
+              emptySet(), singletonList(TabsAndIndentsStyle.DEFAULT.withUseTabCharacter(true)))))
+            .recipe(toRecipe(() -> new XmlVisitor<>() {
+                @Override
+                public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                    if ("dependencies".equals(tag.getName())) {
+                        doAfterVisit(new AddToTagVisitor<>(tag,
+                          Xml.Tag.build("<dependency><artifactId>new</artifactId></dependency>")));
+                    }
+                    return super.visitTag(tag, ctx);
+                }
+            })),
+          xml(
+            "<project>\n" +
+            "\t<untouched>\n\t\t<value/>\n\t</untouched>\n" +
+            "  <dependencies>\n" +
+            "    <dependency>\n      <artifactId>old</artifactId>\n    </dependency>\n" +
+            "  </dependencies>\n</project>",
+            "<project>\n" +
+            "\t<untouched>\n\t\t<value/>\n\t</untouched>\n" +
+            "  <dependencies>\n" +
+            "    <dependency>\n      <artifactId>old</artifactId>\n    </dependency>\n" +
+            "    <dependency>\n      <artifactId>new</artifactId>\n    </dependency>\n" +
+            "  </dependencies>\n</project>"
+          )
+        );
+    }
+
+    @Test
+    void followsMixedTabAndSpaceNeighboursAtTheirActualDepth() {
+        rewriteRun(
+          spec -> spec
+            .allSources(source -> source.markers(new NamedStyles(randomId(), "spaces", "Spaces", null,
+              emptySet(), singletonList(TabsAndIndentsStyle.DEFAULT))))
+            .recipe(toRecipe(() -> new XmlVisitor<>() {
+                @Override
+                public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                    if ("configuration".equals(tag.getName())) {
+                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<release>25</release>")));
+                    }
+                    return super.visitTag(tag, ctx);
+                }
+            })),
+          xml(
+            "<project>\n  <build>\n\t        <configuration>\n" +
+            "\t          <encoding>UTF-8</encoding>\n" +
+            "\t        </configuration>\n  </build>\n</project>",
+            "<project>\n  <build>\n\t        <configuration>\n" +
+            "\t          <encoding>UTF-8</encoding>\n" +
+            "\t          <release>25</release>\n" +
+            "\t        </configuration>\n  </build>\n</project>"
+          )
+        );
+    }
 
     @DocumentExample
     @Test

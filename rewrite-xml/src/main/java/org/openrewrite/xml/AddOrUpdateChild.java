@@ -21,7 +21,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-import static org.openrewrite.xml.AddToTagVisitor.addToTag;
 import static org.openrewrite.xml.MapTagChildrenVisitor.mapChildren;
 import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
@@ -42,12 +41,17 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
                 }
                 t = mapChildren(t, it -> {
                     if (it == maybeChild.get()) {
-                        return autoFormat(child.withPrefix(maybeChild.get().getPrefix()), p, getCursor());
+                        return AddToTagVisitor.matchIndentation(
+                                autoFormat(child.withPrefix(maybeChild.get().getPrefix()), p, getCursor()),
+                                tag, maybeChild.get());
                     }
                     return it;
                 });
             } else {
-                t = addToTag(t, child, getCursor().getParentOrThrow());
+                // Keep the original scope as the indentation reference even if another visitor
+                // has just removed all of its children (for example source/target -> release).
+                t = (Xml.Tag) new AddToTagVisitor<P>(scope, child)
+                        .visitNonNull(t, p, getCursor().getParentOrThrow());
             }
         }
         return t;

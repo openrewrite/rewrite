@@ -30,6 +30,53 @@ import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
+
+    @Test
+    void keepsLocalIndentationWhenAllConfigurationChildrenAreReplaced() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                            <source>1.8</source>
+                            <target>1.8</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                            <release>11</release>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11));
