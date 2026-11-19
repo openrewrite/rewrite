@@ -178,6 +178,13 @@ public abstract class RewriteTest
                 }
             }
 
+            if (source is ParseError parseError)
+            {
+                var exception = parseError.Markers.FindFirst<ParseExceptionResult>();
+                Assert.Fail($"Parsed source contains a ParseError at {parseError.SourcePath}: " +
+                            (exception != null ? exception.Message : "no ParseExceptionResult marker"));
+            }
+
             parsed.Add((spec, source));
         }
 
@@ -530,10 +537,14 @@ public abstract class RewriteTest
         }
     }
 
-    private static string PrintTree(SourceFile tree, IMarkerPrinter? markerPrinter = null)
+    internal static string PrintTree(SourceFile tree, IMarkerPrinter? markerPrinter = null)
     {
         var capture = new PrintOutputCapture<object>(null!, markerPrinter ?? MarkerPrinter.Default);
-        if (tree is Xml.Document)
+        if (tree is ParseError parseError)
+        {
+            capture.Append(parseError.Text);
+        }
+        else if (tree is Xml.Document)
         {
             new XmlPrinter<object>().Visit(tree, capture);
         }
