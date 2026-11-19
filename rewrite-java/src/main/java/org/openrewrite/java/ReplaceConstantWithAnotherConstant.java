@@ -75,7 +75,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(fieldAccess, fieldType, hasNoConflictingImports(sf, newOutermostType));
+                return replaceFieldAccess(fieldAccess, fieldType, qualifiedReferenceImport(sf));
             }
             return super.visitFieldAccess(fieldAccess, ctx);
         }
@@ -85,12 +85,24 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaType.Variable fieldType = ident.getFieldType();
             if (isConstant(fieldType)) {
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
-                return replaceFieldAccess(ident, fieldType, hasNoConflictingImports(sf, newOwningType));
+                return replaceFieldAccess(ident, fieldType, hasNoConflictingImports(sf, newOwningType) ? newOwningType : null);
             }
             return super.visitIdentifier(ident, ctx);
         }
 
-        private J replaceFieldAccess(Expression expression, JavaType.Variable fieldType, boolean hasNoConflictingImport) {
+        /// The class to import and start a qualified reference from, or null to fully qualify it. The owner stands in when
+        /// an import takes the outermost class's name, for instance the import of an old owner of that name.
+        private JavaType.@Nullable FullyQualified qualifiedReferenceImport(@Nullable JavaSourceFile sf) {
+            if (hasNoConflictingImports(sf, newOutermostType)) {
+                return newOutermostType;
+            }
+            if (hasNoConflictingImports(sf, newOwningType) && !importsOtherClassOfSameSimpleName(sf, newOwningType)) {
+                return newOwningType;
+            }
+            return null;
+        }
+
+        private J replaceFieldAccess(Expression expression, JavaType.Variable fieldType, JavaType.@Nullable FullyQualified importedType) {
             JavaType owner = fieldType.getOwner();
             while (owner instanceof JavaType.FullyQualified) {
                 maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
@@ -103,7 +115,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withSimpleName(newConstantName)
                         .withFieldType(newFieldType(fieldType))
                         .withType(newType(identifier.getType()));
-                if (hasNoConflictingImport) {
+                if (importedType != null) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
                     return identifier;
                 }
@@ -112,14 +124,14 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
-                if (hasNoConflictingImport) {
-                    maybeAddImport(newOutermostType.getFullyQualifiedName(), false);
+                if (importedType != null) {
+                    maybeAddImport(importedType.getFullyQualifiedName(), false);
                 }
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                 Expression target = fieldAccess.getTarget();
                 J.Identifier name = fieldAccess.getName();
-                target = hasNoConflictingImport ?
-                        typeReference(newOwningType, target.getPrefix()) :
+                target = importedType != null ?
+                        typeReference(newOwningType, importedType, target.getPrefix()) :
                         FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
                 name = name
                         .withFieldType(newFieldType(fieldType))
@@ -149,15 +161,16 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return fullyQualifiedName.substring(Math.max(fullyQualifiedName.lastIndexOf('.'), fullyQualifiedName.lastIndexOf('$')) + 1);
         }
 
-        private static Expression typeReference(JavaType.FullyQualified type, Space prefix) {
+        /// A reference to `type` starting from `importedType`, which is `type` or one of its enclosing classes.
+        private static Expression typeReference(JavaType.FullyQualified type, JavaType.FullyQualified importedType, Space prefix) {
             J.Identifier name = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                     simpleName(type.getFullyQualifiedName()), type, null);
             JavaType.FullyQualified owningClass = type.getOwningClass();
-            if (owningClass == null) {
+            if (owningClass == null || TypeUtils.isOfType(type, importedType)) {
                 return name.withPrefix(prefix);
             }
             return new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY,
-                    typeReference(owningClass, Space.EMPTY), JLeftPadded.build(name), type);
+                    typeReference(owningClass, importedType, Space.EMPTY), JLeftPadded.build(name), type);
         }
 
         private JavaType.Variable newFieldType(JavaType.Variable fieldType) {
@@ -182,6 +195,22 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         private boolean hasNoConflictingImports(@Nullable JavaSourceFile sf, JavaType.FullyQualified referencedType) {
             return hasNoConflictingImport(sf, referencedType) && hasNoConflictingImport(sf, newTargetType);
+        }
+
+        /// [#hasNoConflictingImport] compares class names, which for a nested class include its enclosing classes. So it
+        /// misses that `Outer.Inner` clashes with an import of another `Inner`.
+        private static boolean importsOtherClassOfSameSimpleName(@Nullable JavaSourceFile sf, JavaType.FullyQualified type) {
+            if (sf == null) {
+                return false;
+            }
+            String simpleName = simpleName(type.getFullyQualifiedName());
+            for (J.Import anImport : sf.getImports()) {
+                if (!anImport.isStatic() && anImport.getQualid().getSimpleName().equals(simpleName) &&
+                        !TypeUtils.isOfType(anImport.getQualid().getType(), type)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf, JavaType.FullyQualified targetType) {
