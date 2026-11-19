@@ -129,6 +129,61 @@ public class ProjectsTests : RewriteTest
         Assert.EndsWith("references itself through its project references.", failure.Message);
     }
 
+    [Fact]
+    public void AProjectFileSaysWhatItsSourcesTargetAndReference()
+    {
+        var projects = new List<DotNetProject>();
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")).ExpectInputCompiles().ExpectOutputCompiles(),
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFrameworks>net6.0;net48</TargetFrameworks>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="..\Lib\Lib.csproj" />
+                  </ItemGroup>
+                </Project>
+                """, sourcePath: "src/App/App.csproj"),
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net6.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """, sourcePath: "src/Lib/Lib.csproj"),
+            CSharp(App, App.Replace("Foo()", "Bar()")).InProject("src/App/App.csproj")
+                .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!)),
+            CSharp(Library).InProject("src/Lib/Lib.csproj")
+                .AfterRecipe(cu => projects.Add(cu.Markers.FindFirst<DotNetProject>()!))
+        );
+
+        Assert.Equal(["App", "Lib"], projects.Select(p => p.ProjectName));
+        Assert.Equal(["net6.0", "net48"], projects[0].TargetFrameworks);
+        Assert.Equal(["net6.0"], projects[1].TargetFrameworks);
+        Assert.Equal("Microsoft.NET.Sdk", projects[0].Sdk);
+    }
+
+    [Fact]
+    public void AProjectFileReferenceToAProjectNotInTheTestIsRejected()
+    {
+        var failure = Assert.Throws<ArgumentException>(() => RewriteRun(
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <ItemGroup>
+                    <ProjectReference Include="../Lib/Lib.csproj" />
+                  </ItemGroup>
+                </Project>
+                """, sourcePath: "src/App/App.csproj"),
+            CSharp(App).InProject("src/App/App.csproj")
+        ));
+
+        Assert.Equal("App references src/Lib/Lib.csproj, which no source of the test is in.", failure.Message);
+    }
+
     private class RenameCalls(string from, string to) : global::OpenRewrite.Core.Recipe
     {
         public override string DisplayName => "Rename calls";

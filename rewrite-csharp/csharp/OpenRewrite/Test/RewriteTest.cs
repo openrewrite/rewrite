@@ -813,7 +813,9 @@ public record SourceSpec(
     /// <see cref="SolutionParser"/> gives it. The C# sources of each project compile on their own, against the projects
     /// that any of its sources names in <paramref name="projectReferences"/>, and those in no project compile together.
     /// To have sources compile together and still carry different markers, add the markers with
-    /// <see cref="AddMarkers"/> instead.
+    /// <see cref="AddMarkers"/> instead. A project named by the path of a project file among the test's sources, such
+    /// as <c>src/App/App.csproj</c>, is named, targets the frameworks, uses the SDK and references the projects that
+    /// project file says, as <see cref="SolutionParser"/> reads them.
     /// </summary>
     public SourceSpec InProject(string projectName, params string[] projectReferences) =>
         this with { ProjectName = projectName, ProjectReferences = [..projectReferences] };

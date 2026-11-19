@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 using System.Collections.Immutable;
+using System.Xml;
+using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.Core;
@@ -23,8 +25,9 @@ namespace OpenRewrite.Test;
 
 /// <summary>
 /// The projects the sources of a test belong to, by <see cref="SourceSpec.InProject"/> and
-/// <see cref="SourceSpec.TargetFrameworks"/>, each compiled on its own against the projects it references. The sources
-/// in no project compile together.
+/// <see cref="SourceSpec.TargetFrameworks"/>, each compiled on its own against the projects it references. A project
+/// named by the path of a project file among the sources takes its frameworks, SDK and project references from it. The
+/// sources in no project compile together.
 /// </summary>
 internal sealed class TestProjects
 {
@@ -42,6 +45,11 @@ internal sealed class TestProjects
     public TestProjects(IEnumerable<SourceSpec> specs)
     {
         var all = specs.ToList();
+        foreach (var spec in all.Where(s => s.SourcePath != null && IsProjectFile(s.SourcePath)))
+        {
+            var path = Normalize(spec.SourcePath!);
+            _byName[path] = FromProjectFile(path, spec.Before);
+        }
         foreach (var spec in all.Where(s => s.ProjectName != null))
         {
             _bySpec[spec] = Named(spec);
@@ -53,19 +61,29 @@ internal sealed class TestProjects
                 _bySpec[spec] = Unnamed(frameworks);
             }
         }
-        foreach (var project in _byName.Values)
+        var compiled = new HashSet<Project>(_bySpec.Values);
+        var pending = new Queue<Project>(compiled);
+        while (pending.TryDequeue(out var project))
         {
-            foreach (var reference in project.References.Where(r => !_byName.ContainsKey(r)))
+            foreach (var reference in project.References)
             {
-                throw new ArgumentException(
-                    $"{project.Marker.ProjectName} references {reference}, which no source of the test is in.");
+                if (!_byName.TryGetValue(reference, out var referenced))
+                {
+                    throw new ArgumentException(
+                        $"{project.Marker.ProjectName} references {reference}, which no source of the test is in.");
+                }
+                if (compiled.Add(referenced))
+                {
+                    pending.Enqueue(referenced);
+                }
             }
         }
     }
 
     private Project Named(SourceSpec spec)
     {
-        var name = spec.ProjectName!;
+        var path = Normalize(spec.ProjectName!);
+        var name = _byName.ContainsKey(path) ? path : spec.ProjectName!;
         if (!_byName.TryGetValue(name, out var project))
         {
             project = new Project(Marker(name, []));
@@ -101,6 +119,66 @@ internal sealed class TestProjects
 
     private static DotNetProject Marker(string name, IEnumerable<string> frameworks) =>
         new(Tree.RandomId(), name, [..frameworks], "Microsoft.NET.Sdk");
+
+    /// <summary>A project as <see cref="SolutionParser"/> reads it from its project file.</summary>
+    private static Project FromProjectFile(string path, string content)
+    {
+        XElement? root = null;
+        try
+        {
+            root = XDocument.Parse(content).Root;
+        }
+        catch (XmlException)
+        {
+            // a test of a recipe on a broken project file still gets a project for its sources
+        }
+        var frameworks = new List<string>();
+        foreach (var element in root?.Elements("PropertyGroup").Elements() ?? [])
+        {
+            if (element.Name.LocalName is "TargetFramework" or "TargetFrameworks")
+            {
+                frameworks.AddRange(element.Value
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(f => !frameworks.Contains(f)));
+            }
+        }
+        var project = new Project(new DotNetProject(Tree.RandomId(), Path.GetFileNameWithoutExtension(path),
+            frameworks, root?.Attribute("Sdk")?.Value)) { FrameworksStated = frameworks.Count > 0 };
+        var directory = path.Contains('/') ? path[..path.LastIndexOf('/')] : "";
+        foreach (var reference in root?.Elements("ItemGroup").Elements("ProjectReference") ?? [])
+        {
+            if (reference.Attribute("Include")?.Value is { } include)
+            {
+                project.References.Add(Normalize(directory + "/" + include));
+            }
+        }
+        return project;
+    }
+
+    private static bool IsProjectFile(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".csproj" or ".vbproj" or ".fsproj";
+
+    /// <summary>A relative path with forward slashes and without <c>.</c> and <c>..</c> segments.</summary>
+    private static string Normalize(string path)
+    {
+        var segments = new List<string>();
+        foreach (var segment in path.Replace('\\', '/').Split('/'))
+        {
+            if (segment is "" or ".")
+            {
+                continue;
+            }
+            if (segment == ".." && segments.Count > 0 && segments[^1] != "..")
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+            else
+            {
+                segments.Add(segment);
+            }
+        }
+        return string.Join("/", segments);
+    }
 
     /// <summary>The project marker of the spec's source, or null for a source in no project.</summary>
     public DotNetProject? Of(SourceSpec spec) => _bySpec.TryGetValue(spec, out var project) ? project.Marker : null;
