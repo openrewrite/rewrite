@@ -253,6 +253,7 @@ public interface JavaParser extends Parser {
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
         private boolean typeCacheConfigured;
+        protected @Nullable Path java8Runtime;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -267,6 +268,25 @@ public interface JavaParser extends Parser {
 
         public Builder() {
             super(J.CompilationUnit.class);
+        }
+
+        /**
+         * Select a Java 8 runtime jar and its adjacent platform libraries.
+         * Parsers that cannot select this platform reject a non-null value.
+         */
+        public B java8Runtime(@Nullable Path rtJar) {
+            if (rtJar != null && !supportsJava8Runtime()) {
+                throw new UnsupportedOperationException(getClass().getName() + " does not support a Java 8 platform");
+            }
+            if (!Objects.equals(java8Runtime, rtJar) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            java8Runtime = rtJar;
+            return (B) this;
+        }
+
+        protected boolean supportsJava8Runtime() {
+            return false;
         }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -401,14 +421,14 @@ public interface JavaParser extends Parser {
          * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            if (javaTypeFactory != null || typeCacheConfigured) {
+            if (javaTypeFactory != null || typeCacheConfigured || java8Runtime != null) {
                 return javaTypeFactory;
             }
             return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            boolean configured = typeCacheConfigured || javaTypeFactory != null;
+            boolean configured = typeCacheConfigured || javaTypeFactory != null || java8Runtime != null;
             javaTypeCache = HashMapJavaTypeCache.forParser(
                     JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;

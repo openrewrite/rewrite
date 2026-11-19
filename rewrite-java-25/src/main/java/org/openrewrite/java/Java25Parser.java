@@ -62,15 +62,9 @@ public class Java25Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java25Parser, Builder> {
-        private @Nullable Path java8Runtime;
-
-        /**
-         * Use this Java 8 runtime jar and its adjacent boot and extension libraries as javac's platform.
-         * Leaving this unset keeps the parser's current JDK platform, regardless of dependency jar names.
-         */
-        public Builder java8Runtime(@Nullable Path rtJar) {
-            this.java8Runtime = rtJar;
-            return this;
+        @Override
+        protected boolean supportsJava8Runtime() {
+            return true;
         }
 
 

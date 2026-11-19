@@ -19,6 +19,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +31,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class Java8RuntimeClasspathTest implements RewriteTest {
     @TempDir
@@ -61,6 +65,23 @@ class Java8RuntimeClasspathTest implements RewriteTest {
                 target.closeEntry();
             }
         }
+    }
+
+    @Test
+    void hostAndJava8PlatformsDoNotShareJdkClasses() {
+        JdkClassSharingTypeFactory.useForParsers();
+        Java25Parser.Builder builder = Java25Parser.builder();
+        assertThat(stringType(builder.build()).getMethods()).extracting(JavaType.Method::getName).contains("strip");
+        assertThat(stringType(builder.java8Runtime(rtJar).build()).getMethods())
+          .extracting(JavaType.Method::getName).doesNotContain("strip");
+        assertThat(stringType(builder.java8Runtime(null).build()).getMethods())
+          .extracting(JavaType.Method::getName).contains("strip");
+    }
+
+    private static JavaType.FullyQualified stringType(JavaParser parser) {
+        J.CompilationUnit cu = (J.CompilationUnit) parser.parse("class PlatformTypes { String text; }").findFirst().orElseThrow();
+        J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+        return (JavaType.FullyQualified) field.getType();
     }
 
     @Test

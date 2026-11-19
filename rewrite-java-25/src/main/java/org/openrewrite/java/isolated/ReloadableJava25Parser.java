@@ -416,11 +416,9 @@ public class ReloadableJava25Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<ReloadableJava25Parser, Builder> {
-        private @Nullable Path java8Runtime;
-
-        public Builder java8Runtime(@Nullable Path rtJar) {
-            this.java8Runtime = rtJar;
-            return this;
+        @Override
+        protected boolean supportsJava8Runtime() {
+            return true;
         }
 
         @Override
