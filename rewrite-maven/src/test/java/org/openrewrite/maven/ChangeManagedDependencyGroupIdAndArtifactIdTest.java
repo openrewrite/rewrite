@@ -998,7 +998,77 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void swappedBomImportStillRemovesVersionsItNowManages() {
+    void removesTheChangedManagedDependencyWhenItRepeatsTheParentVersionThroughABuiltInProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "com.mycompany.app",
+            "old-lib",
+            null,
+            "new-lib",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>new-lib</artifactId>
+                              <version>1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>${project.groupId}</groupId>
+                              <artifactId>old-lib</artifactId>
+                              <version>1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void swappedBomImportRemovesVersionsItNowManagesButKeepsOtherManagedDependencies() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson",
@@ -1010,9 +1080,36 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           pomXml(
             """
               <project>
+                  <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
-                  <artifactId>sample</artifactId>
+                  <artifactId>parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-pool</groupId>
+                              <artifactId>commons-pool</artifactId>
+                              <version>1.6</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -1021,6 +1118,11 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <version>2.15.0</version>
                               <type>pom</type>
                               <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>commons-pool</groupId>
+                              <artifactId>commons-pool</artifactId>
+                              <version>1.6</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -1035,9 +1137,13 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """,
             """
               <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>sample</artifactId>
-                  <version>1</version>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -1046,6 +1152,11 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <version>5.10.0</version>
                               <type>pom</type>
                               <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>commons-pool</groupId>
+                              <artifactId>commons-pool</artifactId>
+                              <version>1.6</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -1056,7 +1167,8 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-              """
+              """,
+            spec -> spec.path("child/pom.xml")
           )
         );
     }

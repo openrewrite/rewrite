@@ -181,13 +181,13 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (t != tag) {
                         maybeUpdateModel();
-                        // A swapped BOM import changes the managed version of every artifact it manages,
-                        // so the explicit version of any of them may have become redundant.
-                        boolean bomImport = isManagedDependencyImportTag(oldGroupId, oldArtifactId);
-                        doAfterVisit(new RemoveRedundantDependencyVersions(
-                                bomImport ? null : resolvedGroupId(t),
-                                bomImport ? null : resolvedArtifactId(t),
-                                null, null).getVisitor());
+                        // A swapped BOM import changes the managed version of every artifact it manages, so the
+                        // explicit version of any of them may have become redundant. It changes nothing this pom
+                        // manages itself, as a pom's own dependencyManagement wins over its imports.
+                        doAfterVisit((isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
+                                new RemoveRedundantDependencyVersions(null, null, null, locallyManagedDependencies()) :
+                                new RemoveRedundantDependencyVersions(resolvedGroupId(t), resolvedArtifactId(t), null, null))
+                                .getVisitor());
                         String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
                         String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
                         if (checkIfNewDependencyPresent(effectiveGroupId, effectiveArtifactId, newVersion)) {
@@ -208,10 +208,18 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             private String resolvedChildValue(Xml.Tag t, String name, String fallback) {
-                String value = t.getChildValue(name).orElse(fallback);
-                return value.contains("${") ?
-                        ResolvedPom.placeholderHelper.replacePlaceholders(value, getResolutionResult().getPom().getProperties()::get) :
-                        value;
+                return getResolutionResult().getPom().getValue(t.getChildValue(name).orElse(fallback));
+            }
+
+            private List<String> locallyManagedDependencies() {
+                ResolvedPom pom = getResolutionResult().getPom();
+                List<String> managed = new ArrayList<>();
+                for (ManagedDependency md : pom.getRequested().getDependencyManagement()) {
+                    if (md instanceof ManagedDependency.Defined) {
+                        managed.add(pom.getValue(md.getGroupId()) + ':' + pom.getValue(md.getArtifactId()));
+                    }
+                }
+                return managed;
             }
 
             private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
