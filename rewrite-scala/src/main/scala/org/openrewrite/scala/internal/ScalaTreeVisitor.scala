@@ -2555,6 +2555,7 @@ class ScalaTreeVisitor(
 
           // Convert body statements
           val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
+          Option(selfType(template)).foreach(self => statementPaddings.add(JRightPadded.build[Statement](self)))
           val bodyEnd = if (newTree.span.exists) Math.max(0, newTree.span.end - offsetAdjustment) else source.length
           if (!isBraceless) {
             consumeEmptyStatements(bodyEnd, statementPaddings)
@@ -4323,6 +4324,7 @@ class ScalaTreeVisitor(
 
         // Create a block from the template body
         val statements = new util.ArrayList[JRightPadded[Statement]]()
+        Option(selfType(tmpl)).foreach(self => statements.add(JRightPadded.build[Statement](self)))
         val visitedSpans = new java.util.HashSet[Int]()
         // Sort by source position to preserve source order (Dotty may reorder imports)
         val sortedBody = tmpl.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
@@ -5890,6 +5892,51 @@ class ScalaTreeVisitor(
   }
 
   /**
+   * The self type opening the template's body, or null when it has none. The cursor must be just past what opens
+   * the body.
+   */
+  private def selfType(template: Trees.Template[?]): S.SelfType = {
+    val self = template.self
+    if (self.isEmpty || !self.span.exists) return null
+    val prefix = extractPrefix(self.span)
+    // Dotty names the self of `this: T =>` `_`
+    val (name, nameEnd, quoted) =
+      if (self.name.toString == "_") ("this", cursor + "this".length, false)
+      else if (source.charAt(cursor) == '`') (self.name.toString, source.indexOf('`', cursor + 1) + 1, true)
+      else (self.name.toString, cursor + self.name.toString.length, false)
+    cursor = nameEnd
+    val variableType = Option(variableTypeAt(self)).map(_.withName(name)).orNull
+    val (beforeColon, typeExpression) =
+      if (self.tpt.isEmpty || !self.tpt.span.exists) (null, null)
+      else {
+        val beforeColon = sourceBefore(":")
+        val typeExpression = visitTypeTree(self.tpt)
+        updateCursor(self.tpt.span.end)
+        (if (beforeColon.isEmpty) null else beforeColon, typeExpression)
+      }
+    val variable = new J.VariableDeclarations.NamedVariable(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      ident(name, Space.EMPTY, if (variableType == null) null else variableType.getType, variableType, quoted),
+      Collections.emptyList(),
+      null,
+      variableType
+    )
+    val declaration = new J.VariableDeclarations(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      Collections.emptyList(),
+      typeExpression,
+      beforeColon,
+      Collections.singletonList(JRightPadded.build(variable))
+    )
+    S.SelfType.build(Tree.randomId(), prefix, Markers.EMPTY, new JRightPadded(declaration, sourceBefore("=>"), Markers.EMPTY))
+  }
+
+  /**
    * The body of a class or `given`, from the cursor just past what opens it to the end of `span`.
    * An indentation-based body gets `IndentedSyntax` added to `markers`.
    */
@@ -5897,6 +5944,7 @@ class ScalaTreeVisitor(
                            isClassBraceless: Boolean, markers: Markers): J.Block = {
     // Visit the template body to get statements
     val statements = new util.ArrayList[JRightPadded[Statement]]()
+    Option(selfType(template)).foreach(self => statements.add(JRightPadded.build[Statement](self)))
     
     // Visit each statement in the template body.
     // When traversing the typed tree, the compiler duplicates constructor params
@@ -8153,7 +8201,7 @@ class ScalaTreeVisitor(
   }
 
   private def visitSingletonTypeTree(stt: Trees.SingletonTypeTree[?]): S.SingletonType = {
-    // Singleton type reference: `None.type`, `obj.type`, `foo.bar.type`
+    // Singleton type reference: `None.type`, `obj.type`, `foo.bar.type`, or a literal type like `"a"`
     val prefix = extractPrefix(stt.span)
     val qualifier = visitTree(stt.ref) match {
       case e: Expression => e
@@ -8161,8 +8209,8 @@ class ScalaTreeVisitor(
       case null => throw new UnsupportedOperationException(
         s"SingletonTypeTree.ref did not produce an Expression: ${stt.ref.getClass.getSimpleName}")
     }
-    // After visiting qualifier, cursor is at the end of qualifier.
-    // The remaining source should be whitespace followed by ".type".
+    // After visiting qualifier, cursor is at the end of qualifier. The remaining source is
+    // whitespace followed by ".type", or empty for a literal type.
     val endPos = Math.max(0, stt.span.end - offsetAdjustment)
     val between = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
     val dotIdx = positionOfNextIn(between, ".", 0)
@@ -9083,20 +9131,14 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Visit a single union operand as an `Expression`. Most operands are types
-   * (identifiers, parameterized types) that are also `Expression`s. Singleton
-   * literal types like `"resize"` are parsed by Dotty as `SingletonTypeTree(Literal)`;
-   * the literal itself *is* the type (there is no `.type` suffix in source), so we
-   * visit the inner literal directly rather than producing an `S.SingletonType`
-   * (which would print a spurious `.type`). Returns null for an operand that cannot
-   * be represented as an `Expression` (e.g. a nested intersection), signalling the
-   * caller to fall back to source preservation.
+   * Visit a single union operand as an `Expression`. Most operands are types that are also
+   * `Expression`s. A bare `Literal` is an `Expression` but not a `TypeTree`, so it is visited
+   * directly. Returns null for an operand that cannot be represented as an `Expression`
+   * (e.g. a nested intersection), signalling the caller to fall back to source preservation.
    */
   private def visitUnionOperand(tree: Trees.Tree[?]): Expression = tree match {
     case _: Trees.Literal[?] =>
       asExpression(visitTree(tree))
-    case stt: Trees.SingletonTypeTree[?] if stt.ref.isInstanceOf[Trees.Literal[?]] =>
-      asExpression(visitTree(stt.ref))
     case _ =>
       visitTypeTree(tree) match {
         case e: Expression => e
