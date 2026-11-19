@@ -34,7 +34,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -301,8 +300,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         try {
                             MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
                                     MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
-                            parentPom = mpd.download(parent.getGav(), null, mrr.getPom(), mrr.getPom().getRepositories())
-                                    .resolve(emptyList(), mpd, ctx);
+                            parentPom = mpd.download(parent.getGav(), parent.getRelativePath(), mrr.getPom(),
+                                            mrr.getPom().getRepositories())
+                                    .resolve(mrr.getActiveProfiles(), mpd, ctx);
                         } catch (Exception e) {
                             parentPom = null;
                         }

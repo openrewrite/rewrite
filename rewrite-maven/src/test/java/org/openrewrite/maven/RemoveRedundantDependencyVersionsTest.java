@@ -1071,6 +1071,71 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void givenParentDmOverriddenByActiveProfileThenKeepOwnEntry() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().activeProfiles("newer-guava")),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <profiles>
+                      <profile>
+                          <id>newer-guava</id>
+                          <dependencyManagement>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>com.google.guava</groupId>
+                                      <artifactId>guava</artifactId>
+                                      <version>31.0-jre</version>
+                                  </dependency>
+                              </dependencies>
+                          </dependencyManagement>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                    <project>
+                        <parent>
+                            <groupId>org.example</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1.0-SNAPSHOT</version>
+                        </parent>
+                        <artifactId>child</artifactId>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                    <version>30.0-jre</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void givenOwnDmDeclaresClassifierParentDmDoesNotThenKeepIt() {
         rewriteRun(
           pomXml(
