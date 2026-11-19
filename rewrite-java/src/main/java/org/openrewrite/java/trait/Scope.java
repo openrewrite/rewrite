@@ -53,6 +53,8 @@ import java.util.stream.Stream;
  * <li>Whether a rename keeps every name reading what it reads now: {@link Binding#canRenameTo(String)}.</li>
  * <li>Whether a block's statements can move out of it: {@link #canMoveBefore(Cursor)} and
  * {@link #canMoveAfter(Cursor)}.</li>
+ * <li>Whether an expression can be evaluated earlier in its block, as an argument folded into an earlier call
+ * is: {@link #canEvaluateBefore(Cursor, Cursor)}.</li>
  * <li>Whether code can move into a lambda: {@link #lambdaCanCapture(Collection)}. That a local
  * {@link Binding#isEffectivelyFinal() is effectively final} does not tell, since a lambda cannot assign a local it
  * captures.</li>
@@ -514,6 +516,50 @@ public class Scope implements Trait<J> {
                     !binding.isEffectivelyFinal()) {
                     return false;
                 }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether the expression, evaluated just before the statement instead of where it stands, would read the same
+     * variables with nothing having assigned them in between. The statement is one of a block around the
+     * expression, the one holding the expression or one before it. Either of these prevents it:
+     * <ul>
+     * <li>A name the expression reads is bound differently just before the statement, or not yet, as one is that
+     * the statement or a later one declares.</li>
+     * <li>A statement from that one to the expression's own assigns a variable the expression reads.</li>
+     * </ul>
+     * Only names are looked at. A method called in between may change a field or an object the expression reads,
+     * and what evaluating the expression earlier does to the statements it passes is the caller's to check.
+     */
+    public static boolean canEvaluateBefore(Cursor expression, Cursor statement) {
+        Cursor holder = statement.getParentTreeCursor();
+        if (!(holder.getValue() instanceof J.Block)) {
+            return false;
+        }
+        List<Statement> statements = holder.<J.Block>getValue().getStatements();
+        int from = indexOf(statements, statement.getValue());
+        int to = -1;
+        for (Cursor c = expression; c != null && to < 0 && !isTree(c, holder); c = c.getParent()) {
+            if (c.getValue() instanceof J) {
+                to = indexOf(statements, c.getValue());
+            }
+        }
+        if (from < 0 || to < from) {
+            return false;
+        }
+        List<References> between = new ArrayList<>();
+        for (Statement passed : statements.subList(from, to + 1)) {
+            between.add(referencesWithin(new Cursor(holder, passed)));
+        }
+        Scope destination = at(holder).withPosition(statement);
+        for (Binding read : (Iterable<Binding>) referencedWithin(expression)::iterator) {
+            if (isUnder(read.cursor, statement.getValue()) ||
+                !destination.lookup(read.name, read.namespace).filter(read::equals).isPresent() ||
+                read.namespace == Namespace.VARIABLE &&
+                between.stream().anyMatch(references -> references.writesOf(read).findAny().isPresent())) {
+                return false;
             }
         }
         return true;

@@ -32,11 +32,13 @@ in reach (`canReference`), whether a new name is free (`isFree`, `freeName`) and
 statements could stand elsewhere with every name meaning what it means now (`canMoveBefore`,
 `canMoveAfter`). Static queries take a cursor and need no scope:
 `bindingOf` a declaration, the bindings `declaredWithin` a tree, those `referencedWithin` it from
-outside, and whether a lambda written around some code could capture what it reads and assigns
-(`lambdaCanCapture`).
+outside, whether an expression would read the same if evaluated earlier in its block
+(`canEvaluateBefore`), and whether a lambda written around some code could capture what it reads and
+assigns (`lambdaCanCapture`).
 
-A recipe that moves code asks `canMoveBefore`, `canMoveAfter` or `lambdaCanCapture`, since each
-takes several rules to answer and recipes that put the answer together themselves left one out.
+A recipe that moves code asks `canMoveBefore`, `canMoveAfter`, `canEvaluateBefore` or
+`lambdaCanCapture`, since each takes several rules to answer and recipes that put the answer
+together themselves left one out.
 `cursorTo` gives the cursor of a tree the visitor has not reached, with every tree between, because
 a cursor that leaves one out hides what that tree binds.
 
@@ -90,6 +92,9 @@ Scala or Groovy would allow.
 local, as `lambdaCanCapture` does, and for a forward reference to a field in every language. An enum constant's body binds none of the
 members it inherits from its enum, so `canReference` refuses a field of the enum there that the body
 could read.
+
+`canEvaluateBefore` looks at names and assignments only. It does not see a method called in between
+that changes a field or an object the expression reads, nor what the expression itself changes.
 
 `canMoveBefore` and `canMoveAfter` look for `this` only in code that leaves a class body. A Kotlin
 lambda with a receiver gives `this` another meaning too, which they do not see.

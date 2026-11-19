@@ -1948,6 +1948,74 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void expressionCanBeEvaluatedEarlierWhereItReadsTheSameVariablesUnassigned() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  Cursor body = new Cursor(getCursor(), method.getBody());
+                  // Asks whether the argument of use() could be evaluated before the statement that calls before()
+                  Cursor[] earlier = {null};
+                  Cursor[] read = {null};
+                  for (Statement statement : method.getBody().getStatements()) {
+                      new JavaIsoVisitor<Integer>() {
+                          @Override
+                          public J.MethodInvocation visitMethodInvocation(J.MethodInvocation invocation, Integer p) {
+                              if ("before".equals(invocation.getSimpleName())) {
+                                  earlier[0] = new Cursor(body, statement);
+                              } else if ("use".equals(invocation.getSimpleName())) {
+                                  read[0] = Scope.cursorTo(body, invocation.getArguments().getFirst());
+                              }
+                              return super.visitMethodInvocation(invocation, p);
+                          }
+                      }.visit(statement, 0, body);
+                  }
+                  return read[0] == null ? method :
+                    SearchResult.found(method, Scope.canEvaluateBefore(read[0], earlier[0]) ? "yes" : "no");
+              }
+          })),
+          java(
+            """
+              class A {
+                  int field;
+                  void readsEarlierLocal(int p) { Object o = before(); use(p); }
+                  void readsLocalDeclaredBetween() { Object o = before(); int n = 1; use(n); }
+                  void readsWhatTheStatementDeclares() { Object o = before(); use(o); }
+                  void namesTheLocalClassTheStatementDeclares() { class L { Object o = before(); } use(new L()); }
+                  void readsLocalAssignedBetween(int p) { Object o = before(); p = 2; use(p); }
+                  void readsFieldAssignedBetween() { Object o = before(); this.field = 2; use(field); }
+                  void assignsInItsOwnStatement(int p) { Object o = before(); use(p = 3); }
+                  void readsFieldWithACallBetween() { Object o = before(); other(); use(field); }
+                  void standsInTheStatementItself(int p) { use(before() == null ? p : 0); }
+                  void standsBeforeTheStatement(int p) { use(p); Object o = before(); }
+                  Object before() { return null; }
+                  void other() {}
+                  void use(Object read) {}
+              }
+              """,
+            """
+              class A {
+                  int field;
+                  /*~~(yes)~~>*/void readsEarlierLocal(int p) { Object o = before(); use(p); }
+                  /*~~(no)~~>*/void readsLocalDeclaredBetween() { Object o = before(); int n = 1; use(n); }
+                  /*~~(no)~~>*/void readsWhatTheStatementDeclares() { Object o = before(); use(o); }
+                  /*~~(no)~~>*/void namesTheLocalClassTheStatementDeclares() { class L { Object o = before(); } use(new L()); }
+                  /*~~(no)~~>*/void readsLocalAssignedBetween(int p) { Object o = before(); p = 2; use(p); }
+                  /*~~(no)~~>*/void readsFieldAssignedBetween() { Object o = before(); this.field = 2; use(field); }
+                  /*~~(no)~~>*/void assignsInItsOwnStatement(int p) { Object o = before(); use(p = 3); }
+                  /*~~(yes)~~>*/void readsFieldWithACallBetween() { Object o = before(); other(); use(field); }
+                  /*~~(yes)~~>*/void standsInTheStatementItself(int p) { use(before() == null ? p : 0); }
+                  /*~~(no)~~>*/void standsBeforeTheStatement(int p) { use(p); Object o = before(); }
+                  Object before() { return null; }
+                  void other() {}
+                  void use(Object read) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void localOfAClassBodyMayTakeTheNameOfAnEnclosingLocal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
