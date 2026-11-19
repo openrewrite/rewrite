@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -27,11 +28,15 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.max;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
@@ -264,7 +269,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        return new MavenVisitor<ExecutionContext>() {
+        MavenVisitor<ExecutionContext> pomWithModel = new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
@@ -582,6 +587,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 return latestMatching(versionComparator, currentVersion, versions);
             }
         };
+        PomWithoutModelVisitor pomWithoutModel = new PomWithoutModelVisitor();
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return pomWithModel.isAcceptable(sourceFile, ctx) || pomWithoutModel.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                return pomWithoutModel.visit(pomWithModel.visit(tree, ctx, getCursor()), ctx, getCursor());
+            }
+        };
     }
 
     private String latestMatching(VersionComparator versionComparator, @Nullable String currentVersion, List<String> versions) {
@@ -616,6 +633,119 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
                 "</exclusion>"))
                 .visitNonNull(exclusions, ctx, parent);
+    }
+
+    private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    private static final XPathMatcher PROFILE_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencies/dependency");
+    private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    private static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
+    private static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("//plugins/plugin/dependencies/dependency");
+    private static final XPathMatcher ANNOTATION_PROCESSOR_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
+
+    /**
+     * Changes a `pom.xml` that has no Maven model, because its parent or one of its dependencies could not be resolved
+     * when it was parsed. Without a model only literal coordinates can be matched and properties can't be evaluated:
+     * a declared version is replaced with the new one, and a dependency without one is left to the dependency
+     * management that sets it. The `MavenVisitor` matchers are not reused because they are package-private, which
+     * fails when a recipe jar ships this class but the host loads `MavenVisitor`.
+     */
+    private class PomWithoutModelVisitor extends XmlIsoVisitor<ExecutionContext> {
+        @Nullable
+        private final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
+        private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            return sourceFile instanceof Xml.Document &&
+                   sourceFile.getSourcePath().endsWith("pom.xml") &&
+                   !isUnderSourceDirectory(sourceFile.getSourcePath()) &&
+                   !sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+        }
+
+        /**
+         * A `pom.xml` under `src/main`, `src/test` or `src/it` is a test fixture or an integration test project rather
+         * than a module of the build.
+         */
+        private boolean isUnderSourceDirectory(Path sourcePath) {
+            String previous = null;
+            for (Path element : sourcePath) {
+                String name = element.toString();
+                if ("src".equals(previous) && ("main".equals(name) || "test".equals(name) || "it".equals(name))) {
+                    return true;
+                }
+                previous = name;
+            }
+            return false;
+        }
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            boolean pluginDependency = "dependency".equals(tag.getName()) && PLUGIN_DEPENDENCY_MATCHER.matches(getCursor());
+            if (pluginDependency && Boolean.FALSE.equals(changePluginDependencies)) {
+                return tag;
+            }
+            Xml.Tag t = super.visitTag(tag, ctx);
+            if ("exclusions".equals(t.getName())) {
+                return withNewExclusion(t, getCursor().getParentOrThrow(), ctx);
+            }
+            if (!"dependency".equals(t.getName()) && !"path".equals(t.getName()) ||
+                !matchesGlob(t.getChildValue("groupId").orElse(null), oldGroupId) ||
+                !matchesGlob(t.getChildValue("artifactId").orElse(null), oldArtifactId) ||
+                !(pluginDependency || isDependencyOrPath())) {
+                return t;
+            }
+            if (newGroupId != null) {
+                t = t.withChildValue("groupId", newGroupId);
+            }
+            if (newArtifactId != null) {
+                t = t.withChildValue("artifactId", newArtifactId);
+            }
+            if (newVersion == null) {
+                return t;
+            }
+            String groupId = t.getChildValue("groupId").orElse(oldGroupId);
+            String artifactId = t.getChildValue("artifactId").orElse(oldArtifactId);
+            String currentVersion = t.getChildValue("version").orElse(null);
+            try {
+                if (currentVersion == null) {
+                    // the management of the old coordinates is kept, so nothing manages the new ones
+                    if (Boolean.TRUE.equals(overrideManagedVersion) || Boolean.FALSE.equals(changeManagedDependency)) {
+                        return (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + resolveVersion(groupId, artifactId, null, ctx) + "</version>"),
+                                new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                    }
+                    return t;
+                }
+                // a property may be inherited or shared with other dependencies, so the dependency gets a literal version
+                return t.withChildValue("version", resolveVersion(groupId, artifactId,
+                        ResolvedPom.placeholderHelper.hasPlaceholders(currentVersion) ? null : currentVersion, ctx));
+            } catch (MavenDownloadingException e) {
+                return isGlobPattern() ? tag : e.warn(tag);
+            }
+        }
+
+        private boolean isDependencyOrPath() {
+            Cursor cursor = getCursor();
+            if (MANAGED_DEPENDENCY_MATCHER.matches(cursor) || PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(cursor)) {
+                return !Boolean.FALSE.equals(changeManagedDependency);
+            }
+            return DEPENDENCY_MATCHER.matches(cursor) || PROFILE_DEPENDENCY_MATCHER.matches(cursor) ||
+                   ANNOTATION_PROCESSOR_PATH_MATCHER.matches(cursor);
+        }
+
+        private String resolveVersion(String groupId, String artifactId, @Nullable String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
+            if (versionComparator == null) {
+                return newVersion;
+            }
+            String key = groupId + ':' + artifactId;
+            List<String> versions = availableVersionsByArtifact.get(key);
+            if (versions == null) {
+                MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+                versions = metadataFailures.insertRows(ctx, () -> new MavenPomDownloader(emptyMap(), ctx, mctx.getSettings(), mctx.getActiveProfiles())
+                        .downloadMetadata(new GroupArtifact(groupId, artifactId), null, emptyList())).getVersioning().getVersions();
+                availableVersionsByArtifact.put(key, versions);
+            }
+            return latestMatching(versionComparator, currentVersion, versions);
+        }
     }
 
     @Value

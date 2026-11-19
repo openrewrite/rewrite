@@ -28,12 +28,14 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.xml.Assertions.xml;
 
 class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @DocumentExample
@@ -4530,6 +4532,289 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 spec -> spec.path("sub-project/pom.xml")
               )
             )
+          )
+        );
+    }
+
+    @Test
+    void moduleWithoutMavenModel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "rome", "rome",
+            "com.rometools", null,
+            "1.5.x", null))
+            .executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>web</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>rome</groupId>
+                                <artifactId>rome</artifactId>
+                                <version>1.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>web</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.rometools</groupId>
+                                <artifactId>rome</artifactId>
+                                <version>1.5.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("web",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0</version>
+                      </parent>
+                      <artifactId>web</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>rome</groupId>
+                              <artifactId>rome</artifactId>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>does-not-exist</artifactId>
+                              <version>1.0</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>rome</groupId>
+                                      <artifactId>rome</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0</version>
+                      </parent>
+                      <artifactId>web</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.rometools</groupId>
+                              <artifactId>rome</artifactId>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>does-not-exist</artifactId>
+                              <version>1.0</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>rome</groupId>
+                                      <artifactId>rome</artifactId>
+                                  </exclusion>
+                                  <exclusion>
+                                      <groupId>com.rometools</groupId>
+                                      <artifactId>rome</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void literalVersionInPomWithoutMavenModel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "rome", "rome",
+            "com.rometools", null,
+            "1.5.x", null))
+            .executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                      <rome.version>1.0</rome.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>rome</groupId>
+                              <artifactId>rome</artifactId>
+                              <version>1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>rome</groupId>
+                          <artifactId>rome</artifactId>
+                          <version>${rome.version}</version>
+                          <scope>test</scope>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.example</groupId>
+                          <artifactId>does-not-exist</artifactId>
+                          <version>1.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                      <rome.version>1.0</rome.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.rometools</groupId>
+                              <artifactId>rome</artifactId>
+                              <version>1.5.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.rometools</groupId>
+                          <artifactId>rome</artifactId>
+                          <version>1.5.1</version>
+                          <scope>test</scope>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.example</groupId>
+                          <artifactId>does-not-exist</artifactId>
+                          <version>1.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void xmlFilesOtherThanModulePoms() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "rome", "rome",
+            "com.rometools", null,
+            null, null)),
+          xml(
+            """
+              <project>
+                  <dependencies>
+                      <dependency>
+                          <groupId>rome</groupId>
+                          <artifactId>rome</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.path("src/main/resources/dependencies.xml")
+          ),
+          xml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>fixture</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>rome</groupId>
+                          <artifactId>rome</artifactId>
+                          <version>1.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.path("src/it/fixture/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void versionOfUnmanagedNewCoordinatesInPomWithoutMavenModel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "rome", "rome",
+            "com.rometools", null,
+            "1.5.x", null, false, false))
+            .executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>does-not-exist</artifactId>
+                      <version>1.0</version>
+                  </parent>
+                  <artifactId>app</artifactId>
+                  <dependencies>
+                      <dependency>
+                          <groupId>rome</groupId>
+                          <artifactId>rome</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>does-not-exist</artifactId>
+                      <version>1.0</version>
+                  </parent>
+                  <artifactId>app</artifactId>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.rometools</groupId>
+                          <artifactId>rome</artifactId>
+                          <version>1.5.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
