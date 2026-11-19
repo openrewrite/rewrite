@@ -133,6 +133,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return Comparator.EQ;
     }
 
+    private static final Set<String> REDUNDANT_MANAGED_DEPENDENCY_TAGS = new HashSet<>(Arrays.asList(
+            "groupId", "artifactId", "version", "type", "classifier", "scope"));
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         ArrayList<String> properties = new ArrayList<>();
@@ -170,15 +173,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         return tag.withContent(withoutVersion(tag, version));
                     }
                 } else if (isManagedDependencyTag()) {
-                    ResolvedManagedDependency managed = findManagedDependency(tag);
+                    ResolvedManagedDependency managed = findOwnManagedDependency(tag);
                     if (managed != null &&
                             matchesGroup(managed) &&
                             matchesArtifact(managed) &&
-                            matchesVersion(managed, ctx) &&
-                            isNotExcepted(managed.getGroupId(), managed.getArtifactId())) {
-                        if (tag.getChild("exclusions").isPresent()) {
-                            return tag;
-                        }
+                            isNotExcepted(managed.getGroupId(), managed.getArtifactId()) &&
+                            isManagedTheSameByParent(tag, managed, ctx)) {
                         return null;
                     }
                 } else if (isPluginTag()) {
@@ -247,34 +247,53 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             /**
-             * This compares a managed dependency version to the version which would be used if only the parent's
-             * dependency management were in effect. This enables detection of managed dependency versions which
-             * could be left to the parent.
+             * An absent type means "jar" here. {@link #findManagedDependency(Xml.Tag)} matches any type, so it can
+             * return an entry the parent manages for another type.
              */
-            private boolean matchesVersion(ResolvedManagedDependency d, ExecutionContext ctx) {
-                MavenResolutionResult mrr = getResolutionResult();
-                if (d.getRequested().getVersion() == null || mrr.getPom().getRequested().getParent() == null) {
+            private @Nullable ResolvedManagedDependency findOwnManagedDependency(Xml.Tag tag) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                String groupId = pom.getValue(tag.getChildValue("groupId").orElse(pom.getGroupId()));
+                String artifactId = pom.getValue(tag.getChildValue("artifactId").orElse(null));
+                if (groupId == null || artifactId == null) {
+                    return null;
+                }
+                return pom.getManagedDependency(groupId, artifactId,
+                        pom.getValue(tag.getChildValue("type").orElse(null)),
+                        pom.getValue(tag.getChildValue("classifier").orElse(null)));
+            }
+
+            /**
+             * Whether removing this managed dependency leaves the parent's entry for the same groupId, artifactId,
+             * type and classifier in effect, with a version the comparator accepts and the same scope. An entry that
+             * also declares exclusions, optional or a systemPath is kept, since removing it would drop those too.
+             */
+            private boolean isManagedTheSameByParent(Xml.Tag tag, ResolvedManagedDependency d, ExecutionContext ctx) {
+                if (d.getRequested().getVersion() == null ||
+                        !tag.getChildren().stream()
+                                .allMatch(t -> REDUNDANT_MANAGED_DEPENDENCY_TAGS.contains(t.getName()))) {
                     return false;
+                }
+                ResolvedManagedDependency parent = findParentManagedDependency(d, ctx);
+                return parent != null &&
+                        parent.getVersion() != null &&
+                        matchesComparator(parent.getVersion(), d.getRequested().getVersion()) &&
+                        parent.getScope() == d.getScope();
+            }
+
+            private @Nullable ResolvedManagedDependency findParentManagedDependency(ResolvedManagedDependency d,
+                                                                                    ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                if (mrr.getPom().getRequested().getParent() == null) {
+                    return null;
                 }
                 try {
                     GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
                     MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
                     ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
                             .resolve(emptyList(), mpd, ctx);
-                    ResolvedManagedDependency parentManagedVersion = parentPom.getDependencyManagement().stream()
-                            .filter(dep -> dep.getGroupId().equals(d.getGroupId()) && dep.getArtifactId().equals(d.getArtifactId()))
-                            .findFirst()
-                            .orElse(null);
-                    if (parentManagedVersion == null) {
-                        return false;
-                    }
-                    String versionAccordingToParent = parentManagedVersion.getVersion();
-                    if (versionAccordingToParent == null) {
-                        return false;
-                    }
-                    return matchesComparator(versionAccordingToParent, d.getRequested().getVersion());
+                    return parentPom.getManagedDependency(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
                 } catch (Exception e) {
-                    return false;
+                    return null;
                 }
             }
 
