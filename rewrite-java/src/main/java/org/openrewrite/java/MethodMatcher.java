@@ -304,7 +304,7 @@ public class MethodMatcher {
     }
 
     public boolean matches(JavaType.@Nullable Method type) {
-        if (type == null) {
+        if (type == null || type.getName() == null) {
             return false;
         }
         if (!matchesMethodName(type.getName())) {
