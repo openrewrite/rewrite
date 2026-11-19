@@ -36,6 +36,46 @@ import static org.openrewrite.xml.Assertions.xml;
 class AddToTagTest implements RewriteTest {
 
     @Test
+    void prefersElementIndentationToATrailingComment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                  if ("local".equals(tag.getName())) {
+                      doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<new><nested/></new>")));
+                  }
+                  return super.visitTag(tag, ctx);
+              }
+          })),
+          xml(
+            "<project>\n    <other>\n        <child/>\n    </other>\n" +
+            "\t    <local>\n\t      <existing/>\n\t    <!-- closing comment -->\n\t    </local>\n</project>",
+            "<project>\n    <other>\n        <child/>\n    </other>\n" +
+            "\t    <local>\n\t      <existing/>\n\t    <!-- closing comment -->\n" +
+            "\t      <new>\n\t        <nested/>\n\t      </new>\n\t    </local>\n</project>"
+          )
+        );
+    }
+
+    @Test
+    void insertionUsesPrecedingElementBeforeADifferentlyIndentedSection() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                  doAfterVisit(new AddToTagVisitor<>(document.getRoot(),
+                    Xml.Tag.build("<beta><child/></beta>"), new TagNameComparator()));
+                  return super.visitDocument(document, ctx);
+              }
+          })),
+          xml(
+            "<project>\n  <alpha/>\n\n\t<zeta/>\n</project>",
+            "<project>\n  <alpha/>\n  <beta>\n    <child/>\n  </beta>\n\n\t<zeta/>\n</project>"
+          )
+        );
+    }
+
+    @Test
     void expandsEmptyTagAtItsExistingIndentation() {
         rewriteRun(
           spec -> spec

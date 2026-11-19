@@ -106,21 +106,27 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             // adjacent children are a better guide, and none of them need to be reformatted.
             Xml.Tag indentationScope = content.isEmpty() ? scope : t;
             List<? extends Content> neighbours = indentationScope.getContent();
+            boolean matched = false;
             if (neighbours != null && !neighbours.isEmpty()) {
-                int nearest = Math.min(insertionIndex, neighbours.size() - 1);
-                for (int distance = 0; distance < neighbours.size(); distance++) {
-                    int index = nearest - distance;
-                    if (index >= 0 && indentation(neighbours.get(index).getPrefix()) != null) {
-                        formattedTagToAdd = matchIndentation(formattedTagToAdd, indentationScope, neighbours.get(index));
-                        break;
-                    }
-                    index = nearest + distance;
-                    if (index < neighbours.size() && indentation(neighbours.get(index).getPrefix()) != null) {
-                        formattedTagToAdd = matchIndentation(formattedTagToAdd, indentationScope, neighbours.get(index));
-                        break;
+                int nearest = Math.max(0, Math.min(insertionIndex - 1, neighbours.size() - 1));
+                for (int pass = 0; pass < 2 && !matched; pass++) {
+                    for (int distance = 0; distance < neighbours.size(); distance++) {
+                        int index = nearest - distance;
+                        if (index >= 0 && isIndentationReference(neighbours.get(index), pass == 0, parentIndent)) {
+                            formattedTagToAdd = matchIndentation(formattedTagToAdd, indentationScope, neighbours.get(index));
+                            matched = true;
+                            break;
+                        }
+                        index = nearest + distance;
+                        if (index < neighbours.size() && isIndentationReference(neighbours.get(index), pass == 0, parentIndent)) {
+                            formattedTagToAdd = matchIndentation(formattedTagToAdd, indentationScope, neighbours.get(index));
+                            matched = true;
+                            break;
+                        }
                     }
                 }
-            } else if (parentIndent != null) {
+            }
+            if (!matched && parentIndent != null) {
                 Xml.Document doc = getCursor().firstEnclosingOrThrow(Xml.Document.class);
                 TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, doc,
                         () -> Autodetect.detector().sample(doc).build().getStyle(TabsAndIndentsStyle.class));
@@ -134,6 +140,12 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
         }
 
         return super.visitTag(t, p);
+    }
+
+    private static boolean isIndentationReference(Content content, boolean tagsOnly, @Nullable String parentIndent) {
+        String indent = indentation(content.getPrefix());
+        return indent != null && (content instanceof Xml.Tag || !tagsOnly && parentIndent != null &&
+                indent.startsWith(parentIndent) && indent.length() > parentIndent.length());
     }
 
     static Xml.Tag matchIndentation(Xml.Tag formatted, Xml.Tag parent, Content neighbour) {
