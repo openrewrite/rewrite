@@ -136,19 +136,76 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
-            private List<Xml.Tag> supersededEntries = new ArrayList<>();
+            // The resolved version of each entry this pass changed, by tag id, and the ids of those it renamed.
+            private Map<UUID, @Nullable String> changedVersions = new HashMap<>();
+            private Set<UUID> renamed = new HashSet<>();
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
-                supersededEntries = new ArrayList<>();
+                changedVersions = new HashMap<>();
+                renamed = new HashSet<>();
                 Xml.Document d = super.visitDocument(document, ctx);
                 // Removed before the model update and the redundant-version pass run, so that neither sees two
                 // managed entries for the same coordinates.
-                for (Xml.Tag superseded : supersededEntries) {
+                for (Xml.Tag superseded : supersededEntries(d)) {
                     d = (Xml.Document) new RemoveContentVisitor<>(superseded, true, true).visitNonNull(d, ctx);
                 }
                 return d;
+            }
+
+            /**
+             * In each dependencyManagement block, one entry per management key that this pass changed: the entry
+             * already at those coordinates, or else the first, unless another one replaces it by version. A renamed
+             * entry alone at its coordinates is superseded by an entry managed elsewhere at the new version.
+             */
+            private List<Xml.Tag> supersededEntries(Xml.Document document) {
+                List<Xml.Tag> blocks = new ArrayList<>();
+                document.getRoot().getChild("dependencyManagement").flatMap(dm -> dm.getChild("dependencies")).ifPresent(blocks::add);
+                document.getRoot().getChild("profiles").ifPresent(profiles -> {
+                    for (Xml.Tag profile : profiles.getChildren("profile")) {
+                        profile.getChild("dependencyManagement").flatMap(dm -> dm.getChild("dependencies")).ifPresent(blocks::add);
+                    }
+                });
+                ResolvedPom pom = getResolutionResult().getPom();
+                List<Xml.Tag> superseded = new ArrayList<>();
+                for (Xml.Tag block : blocks) {
+                    Map<GroupArtifactClassifierType, List<Xml.Tag>> byKey = new LinkedHashMap<>();
+                    for (Xml.Tag dependency : block.getChildren("dependency")) {
+                        byKey.computeIfAbsent(managementKey(dependency), k -> new ArrayList<>()).add(dependency);
+                    }
+                    for (List<Xml.Tag> entries : byKey.values()) {
+                        if (entries.stream().noneMatch(e -> changedVersions.containsKey(e.getId()))) {
+                            continue;
+                        }
+                        if (entries.size() == 1) {
+                            Xml.Tag entry = entries.get(0);
+                            if (renamed.contains(entry.getId()) && checkIfNewDependencyPresent(
+                                    pom.getValue(entry.getChildValue("groupId").orElse(null)),
+                                    pom.getValue(entry.getChildValue("artifactId").orElse(null)), newVersion, entry)) {
+                                superseded.add(entry);
+                            }
+                            continue;
+                        }
+                        Xml.Tag kept = entries.stream().filter(e -> !renamed.contains(e.getId())).findFirst().orElse(entries.get(0));
+                        for (Xml.Tag entry : entries) {
+                            if (entry != kept && replacesKept(version(pom, entry), version(pom, kept))) {
+                                kept = entry;
+                            }
+                        }
+                        for (Xml.Tag entry : entries) {
+                            if (entry != kept) {
+                                superseded.add(entry);
+                            }
+                        }
+                    }
+                }
+                return superseded;
+            }
+
+            private @Nullable String version(ResolvedPom pom, Xml.Tag entry) {
+                return changedVersions.containsKey(entry.getId()) ? changedVersions.get(entry.getId()) :
+                        pom.getValue(entry.getChildValue("version").orElse(null));
             }
 
             @Override
@@ -197,22 +254,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         doAfterVisit(isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
                                 RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId, null) :
                                 new RemoveRedundantDependencyVersions(changedGroupId, changedArtifactId, null, null).getVisitor());
-                        GroupArtifactClassifierType renamedKey = managementKey(t);
-                        Xml.Tag duplicate = null;
-                        Xml.Tag block = getCursor().getParentTreeCursor().getValue();
-                        for (Xml.Tag sibling : block.getChildren("dependency")) {
-                            if (sibling != tag && renamedKey.equals(managementKey(sibling))) {
-                                duplicate = sibling;
-                                break;
-                            }
-                        }
-                        if (duplicate != null) {
-                            String duplicateVersion = getResolutionResult().getPom()
-                                    .getValue(duplicate.getChildValue("version").orElse(null));
-                            supersededEntries.add(renamedEntryWins(renamedVersion, duplicateVersion) ? duplicate : t);
-                        } else if (checkIfNewDependencyPresent(changedGroupId, changedArtifactId, newVersion, t)) {
-                            doAfterVisit(new RemoveContentVisitor<>(t, true, true));
-                            maybeUpdateModel();
+                        changedVersions.put(t.getId(), renamedVersion);
+                        if (!managementKey(t).equals(managementKey(tag))) {
+                            renamed.add(t.getId());
                         }
                     }
                 }
@@ -229,25 +273,28 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             /**
-             * The renamed entry wins only when its resolved new version is exact and the duplicate has no version or a
-             * lower exact one. An exact new version counts even when it is not published. A selector that matched
-             * nothing published keeps the duplicate, as does a duplicate version that is a range or placeholder.
+             * An entry replaces the kept one only when its version is exact and the kept one has no version or a lower
+             * exact one. An exact new version counts even when it is not published. A selector that matched nothing
+             * published keeps the kept entry, as does a kept version that is a range or placeholder.
              *
-             * @param renamedVersion the resolved new version, or null when the recipe has no new version or the
-             *                       entry has no {@code <version>}
+             * @param version the entry's version: for an entry this pass changed, the resolved new version, or null
+             *                when the recipe has no new version or the entry has no {@code <version>}
              */
-            private boolean renamedEntryWins(@Nullable String renamedVersion, @Nullable String duplicateVersion) {
-                if (!isExact(renamedVersion)) {
+            private boolean replacesKept(@Nullable String version, @Nullable String keptVersion) {
+                if (!isExact(version)) {
                     return false;
                 }
-                return duplicateVersion == null ||
-                       isExact(duplicateVersion) &&
-                       new Version(renamedVersion).compareTo(new Version(duplicateVersion)) > 0;
+                return keptVersion == null ||
+                       isExact(keptVersion) &&
+                       new Version(version).compareTo(new Version(keptVersion)) > 0;
             }
 
             private boolean isExact(@Nullable String version) {
-                return version != null && !version.contains("${") &&
-                       Semver.validate(version, null).getValue() instanceof ExactVersion;
+                if (version == null || version.contains("${")) {
+                    return false;
+                }
+                Validated<VersionComparator> comparator = Semver.validate(version, null);
+                return comparator.isValid() && comparator.getValue() instanceof ExactVersion;
             }
 
             private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version, Xml.Tag changed) {

@@ -569,6 +569,240 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+
+        // Semver.validate accepts no selector for this version at all.
+        rewriteRun(
+          spec -> spec.recipe(toJackson3),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.19.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.0.0.experimental</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.0.0.experimental</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void entriesAGlobRenamesOntoTheSameCoordinatesAreNotDuplicated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.hamcrest", "hamcrest-*", "org.hamcrest", "hamcrest", "2.2")),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest-core</artifactId>
+                              <version>1.3</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest-library</artifactId>
+                              <version>1.3</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest</artifactId>
+                              <version>2.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void entryAlreadyAtTheTargetCoordinatesWinsOverEntriesRenamedOntoIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.hamcrest", "hamcrest*", "org.hamcrest", "hamcrest", "2.2")),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest-core</artifactId>
+                              <version>1.3</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest</artifactId>
+                              <version>1.0</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.example</groupId>
+                                      <artifactId>unwanted</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.hamcrest</groupId>
+                              <artifactId>hamcrest</artifactId>
+                              <version>2.2</version>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.example</groupId>
+                                      <artifactId>unwanted</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void inheritedEntryReplacesRenamedOneWithoutStrippingDirectVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "3.0.0 - 3.0.1")),
+          // The selector resolves to 3.0.1, which the parent's 3.0.0 also satisfies. The direct dependency keeps
+          // its version because once the renamed entry is gone, the parent manages 3.0.0.
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>my-app</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.fasterxml.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>2.19.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>tools.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>3.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>tools.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>3.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
     }
 
     @Test
