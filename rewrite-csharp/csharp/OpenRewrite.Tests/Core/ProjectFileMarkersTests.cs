@@ -18,6 +18,7 @@ using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
 using OpenRewrite.Xml;
+using Xunit.Sdk;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Core;
@@ -128,6 +129,28 @@ public class ProjectFileMarkersTests : RewriteTest
                 Assert.Equal(["net8.0"], doc.Markers.FindFirst<MSBuildProject>()!.TargetFrameworks
                     .Select(f => f.TargetFrameworkMoniker)))
         );
+    }
+
+    [Fact]
+    public void AnAfterFunctionAssertsOnWhatTheRecipePrintedOfAProjectFile()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindBuildFiles()).SetProjectRestore(false),
+            CsProj(Project, actual =>
+            {
+                Assert.StartsWith("<!--~~>-->", actual);
+                return actual;
+            })
+        );
+    }
+
+    [Fact]
+    public void AnAfterFunctionThatReturnsOtherTextFailsTheTest()
+    {
+        Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new FindBuildFiles()).SetProjectRestore(false),
+            CsProj(Project, actual => actual.Replace("net8.0", "net10.0"))
+        ));
     }
 
     [Fact]

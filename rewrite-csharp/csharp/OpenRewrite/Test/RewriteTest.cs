@@ -720,6 +720,17 @@ public abstract class RewriteTest
     }
 
     /// <summary>
+    /// A project file the recipe changes, whose expected text <paramref name="afterFromActual"/> makes of what the
+    /// recipe printed, as <see cref="CSharp(string, Func{string, string})"/> does for a C# source. It isn't named
+    /// <c>after</c>, so that <c>CsProj(before, after: null)</c> still means a project file the recipe leaves alone.
+    /// </summary>
+    protected static SourceSpec CsProj([LanguageInjection("xml")]string before, Func<string, string> afterFromActual,
+        string sourcePath = "project.csproj")
+    {
+        return new SourceSpec(before, null, sourcePath, XmlDocumentType) { AfterFromActual = afterFromActual };
+    }
+
+    /// <summary>
     /// An XML file as an XML parser parses it here, with no <see cref="MSBuildProject"/> and not written anywhere for a
     /// restore, at any source path, such as a <c>nuget.config</c> or project file a recipe has to see as plain XML, or
     /// one at a path that no build would read.
@@ -728,6 +739,16 @@ public abstract class RewriteTest
         string sourcePath = "file.xml")
     {
         return new SourceSpec(before, after, sourcePath, XmlDocumentType) { PlainXml = true };
+    }
+
+    /// <summary>
+    /// An XML file the recipe changes, parsed as <see cref="Xml(string, string?, string)"/> does, whose expected text
+    /// <paramref name="afterFromActual"/> makes of what the recipe printed.
+    /// </summary>
+    protected static SourceSpec Xml([LanguageInjection("xml")]string before, Func<string, string> afterFromActual,
+        string sourcePath = "file.xml")
+    {
+        return new SourceSpec(before, null, sourcePath, XmlDocumentType) { PlainXml = true, AfterFromActual = afterFromActual };
     }
 
     /// <summary>
