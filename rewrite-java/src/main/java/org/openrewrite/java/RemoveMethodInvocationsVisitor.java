@@ -25,8 +25,6 @@ import org.openrewrite.java.tree.*;
 import java.util.*;
 import java.util.function.Predicate;
 
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 /**
@@ -62,16 +60,8 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         }
 
         J j = removeMethods(m, 0, isLambdaBody(), new Stack<>());
-        if (j != null) {
-            j = j.withPrefix(m.getPrefix());
-            // There should always be
-            if (!m.getArguments().isEmpty() && m.getArguments().stream().allMatch(this::isToBeRemoved)) {
-                return toBeRemoved(j);
-            }
-        }
-
         //noinspection DataFlowIssue allow returning null to remove the element
-        return j;
+        return j == null ? null : j.withPrefix(m.getPrefix());
     }
 
     private @Nullable J removeMethods(@Nullable Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter) {
@@ -109,7 +99,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                     if (isStatement) {
                         return null;
                     } else if (isLambdaBody) {
-                        return toBeRemoved(J.Block.createEmptyBlock());
+                        return J.Block.createEmptyBlock();
                     } else {
                         return m.getSelect();
                     }
@@ -212,48 +202,12 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     }
 
     @Override
-    public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
-        lambda = (J.Lambda) super.visitLambda(lambda, ctx);
-        J body = lambda.getBody();
-        if (body instanceof J.MethodInvocation && isToBeRemoved(body)) {
-            Expression select = ((J.MethodInvocation) body).getSelect();
-            List<J> parameters = lambda.getParameters().getParameters();
-            if (select instanceof J.Identifier && !parameters.isEmpty() && parameters.get(0) instanceof J.VariableDeclarations) {
-                J.VariableDeclarations declarations = (J.VariableDeclarations) parameters.get(0);
-                if (((J.Identifier) select).getSimpleName().equals(declarations.getVariables().get(0).getSimpleName())) {
-                    return toBeRemoved(lambda);
-                }
-            } else if (select instanceof J.MethodInvocation) {
-                return lambda.withBody(select.withPrefix(body.getPrefix()));
-            }
-        } else if (body instanceof J.Block && isToBeRemoved(body)) {
-            return toBeRemoved(lambda);
-        }
-        return lambda;
-    }
-
-    @Override
     public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
         int statementsCount = block.getStatements().size();
 
         block = (J.Block) super.visitBlock(block, ctx);
-        List<Statement> statements = block.getStatements();
-        if (!statements.isEmpty() && statements.stream().allMatch(this::isToBeRemoved)) {
-            return toBeRemoved(block.withStatements(emptyList()));
-        }
-
-        if (statementsCount > 0 && statements.isEmpty()) {
-            return toBeRemoved(block.withStatements(emptyList()));
-        }
-
-        if (statements.stream().anyMatch(this::isToBeRemoved)) {
-            //noinspection DataFlowIssue
-            return block.withStatements(statements.stream()
-                .filter(s -> !isToBeRemoved(s) || s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSelect() instanceof J.MethodInvocation)
-                .map(s -> s instanceof J.MethodInvocation && isToBeRemoved(s) ? ((J.MethodInvocation) s).getSelect().withPrefix(s.getPrefix()) : s)
-                .collect(toList()));
-        }
-        return block;
+        block = block.withStatements(ListUtils.filter(block.getStatements(), s -> !isToBeRemoved(s)));
+        return statementsCount > 0 && block.getStatements().isEmpty() ? toBeRemoved(block) : block;
     }
 
     /**

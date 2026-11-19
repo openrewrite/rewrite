@@ -411,10 +411,106 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
               public class Test {
                   public void method() throws Exception {
+                      this.customize(sb -> {}
+                      );
                   }
 
                   public void customize(Consumer<StringBuilder> securityContextCustomizer) {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepEnclosingCallWhenBlockLambdaBecomesEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+
+              public class Test {
+                  void method(List<String> names, StringBuilder sb) {
+                      names.forEach(name -> {
+                          sb.append(name);
+                      });
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  void method(List<String> names, StringBuilder sb) {
+                      names.forEach(name -> {
+                      });
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepEnclosingCallWhenExpressionLambdaBecomesEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
+          java(
+            """
+              import java.util.concurrent.ExecutorService;
+
+              public class Test {
+                  void method(ExecutorService executor, StringBuilder sb) {
+                      executor.execute(() -> sb.append("x"));
+                  }
+              }
+              """,
+            """
+              import java.util.concurrent.ExecutorService;
+
+              public class Test {
+                  void method(ExecutorService executor, StringBuilder sb) {
+                      executor.execute(() -> {});
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepEnclosingCallsOfNestedLambdas() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.function.Consumer;
+
+              public class Test {
+                  void method() {
+                      this.consume(names -> names.forEach(name -> {
+                          new StringBuilder().append(name);
+                      }));
+                  }
+                  void consume(Consumer<List<String>> consumer) {}
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.function.Consumer;
+
+              public class Test {
+                  void method() {
+                      this.consume(names -> names.forEach(name -> {
+                      }));
+                  }
+                  void consume(Consumer<List<String>> consumer) {}
               }
               """
           )
