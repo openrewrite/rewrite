@@ -59,8 +59,6 @@ public class YamlParser implements org.openrewrite.Parser {
     private static final Path GITHUB_ACTIONS_LOCKFILE = Paths.get(".github", "workflows", "actions.lock");
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
-    // Only match single-line Helm templates that don't span multiple lines
-    private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
@@ -69,6 +67,8 @@ public class YamlParser implements org.openrewrite.Parser {
     // Match placeholder values starting with multiple asterisks like "*** REMOVED ***"
     // These are invalid YAML aliases but used as credential placeholders
     private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
+
+    private static final int UUID_LENGTH = 36;
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -149,17 +149,17 @@ public class YamlParser implements org.openrewrite.Parser {
         Map<String, String> helmTemplateByUuid = new HashMap<>();
         Map<String, String> singleBraceTemplateByUuid = new HashMap<>();
 
-        // First, replace all Helm templates with UUIDs
-        String processedSource = yamlSource;
-        Matcher helmMatcher = HELM_TEMPLATE_PATTERN.matcher(processedSource);
-        StringBuffer helmBuffer = new StringBuffer();
-        while (helmMatcher.find()) {
+        // First, replace all Helm templates, including those spanning lines, with UUIDs
+        StringBuilder helmBuffer = new StringBuilder();
+        int helmPos = 0;
+        for (HelmTemplateScanner.Span span : HelmTemplateScanner.scan(yamlSource)) {
             String uuid = UUID.randomUUID().toString();
-            helmTemplateByUuid.put(uuid, helmMatcher.group());
-            helmMatcher.appendReplacement(helmBuffer, uuid);
+            helmTemplateByUuid.put(uuid, yamlSource.substring(span.getStart(), span.getEnd()));
+            helmBuffer.append(yamlSource, helmPos, span.getStart()).append(uuid);
+            helmPos = span.getEnd();
         }
-        helmMatcher.appendTail(helmBuffer);
-        processedSource = helmBuffer.toString();
+        helmBuffer.append(yamlSource, helmPos, yamlSource.length());
+        String processedSource = helmBuffer.toString();
 
         // Convert standalone Helm template lines (lines where a UUID is the only content)
         // to YAML comments so they don't create structurally invalid YAML
@@ -852,16 +852,20 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            if (helmUuids.contains(trimmed)) {
-                result.append(lineContent, 0, indent);
+            String firstUuid = onlyHelmUuids(trimmed, helmUuids);
+            if (firstUuid != null) {
+                // Comment out the line in place, so whitespace around the templates is kept. Only the first
+                // placeholder takes the #; any others on the line are restored as usual
+                int start = lineContent.indexOf(firstUuid);
+                result.append(lineContent, 0, start);
                 result.append('#');
-                result.append(trimmed);
-                commentedUuids.add(trimmed);
+                result.append(lineContent, start, lineContent.length());
+                commentedUuids.add(firstUuid);
             } else {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
                     inBlockScalar = true;
-                    blockScalarBaseIndent = indent;
+                    blockScalarBaseIndent = blockScalarParentIndent(lineContent);
                 }
             }
 
@@ -869,6 +873,53 @@ public class YamlParser implements org.openrewrite.Parser {
         }
 
         return result.toString();
+    }
+
+    /**
+     * @return the first placeholder on a line holding only Helm placeholders, optionally separated by whitespace,
+     * or null if the line holds anything else
+     */
+    private static @Nullable String onlyHelmUuids(String trimmedLine, Set<String> helmUuids) {
+        String first = null;
+        int i = 0;
+        while (i < trimmedLine.length()) {
+            if (Character.isWhitespace(trimmedLine.charAt(i))) {
+                i++;
+                continue;
+            }
+            int end = i + UUID_LENGTH;
+            if (end > trimmedLine.length() || !helmUuids.contains(trimmedLine.substring(i, end))) {
+                return null;
+            }
+            if (first == null) {
+                first = trimmedLine.substring(i, end);
+            }
+            i = end;
+        }
+        return first;
+    }
+
+    /**
+     * The indent a block scalar's content must exceed, given the line holding its header. That is the column of the
+     * key the scalar belongs to, such as {@code expr} in {@code - expr: |-}, or of the last dash when the scalar is a
+     * sequence entry itself, as in {@code - |}.
+     */
+    private static int blockScalarParentIndent(String line) {
+        int i = leadingSpaceCount(line);
+        int lastDash = -1;
+        while (i < line.length() && line.charAt(i) == '-' &&
+               (i + 1 == line.length() || line.charAt(i + 1) == ' ' || line.charAt(i + 1) == '\t')) {
+            lastDash = i;
+            i++;
+            while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+                i++;
+            }
+        }
+        if (lastDash == -1) {
+            return leadingSpaceCount(line);
+        }
+        char next = i < line.length() ? line.charAt(i) : '|';
+        return next == '|' || next == '>' ? lastDash : i;
     }
 
     private static int appendNewline(String source, int lineEnd, StringBuilder result) {
