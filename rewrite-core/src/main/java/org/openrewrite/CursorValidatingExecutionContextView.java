@@ -140,7 +140,6 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                key.startsWith(Singleton.class.getName()) ||
                "org.openrewrite.python.liveDeps".equals(key) ||
                "org.openrewrite.javascript.packageManagerFileEditors".equals(key) ||
-               "org.openrewrite.javascript.registryClient".equals(key) ||
                key.startsWith("org.openrewrite.remote.") ||
                key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
                || key.startsWith("io.moderne"); // We ought to know what we're doing
