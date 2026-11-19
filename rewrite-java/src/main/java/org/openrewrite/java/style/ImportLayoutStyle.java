@@ -214,12 +214,14 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         AtomicBoolean isNewBlock = new AtomicBoolean(false);
+        boolean movedFirstPrefix = false;
         if (!(insertPosition == 0 && pkg == null)) {
             if (before == null) {
                 //noinspection ConstantValue
                 if (pkg != null) {
                     Space prefix = originalImports.get(0).getElement().getPrefix();
                     paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
+                    movedFirstPrefix = true;
                 }
             } else if (block(before) != addToBlock) {
                 boolean isFound = false;
@@ -292,7 +294,14 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         if (after != null) {
-            if (block(after) == addToBlock) {
+            // Ideal ordering is only used to find the insertion point. Retain comments and
+            // their whitespace from the original follower, unless its prefix moved to the first import.
+            int followerIndex = starFold.get() ? starFoldTo.get() : insertPosition;
+            JRightPadded<J.Import> originalAfter = followerIndex < originalImports.size() ? originalImports.get(followerIndex) : after;
+            if (!movedFirstPrefix && originalAfter.getElement().isScope(after.getElement()) &&
+                    !originalAfter.getElement().getPrefix().getComments().isEmpty()) {
+                after = originalAfter;
+            } else if (block(after) == addToBlock) {
                 after = after.withElement(after.getElement().withPrefix(Space.format("\n")));
             } else if (!isNewBlock.get() && after.getElement().getPrefix().getLastWhitespace().chars()
                     .filter(c -> c == '\n').count() < 2) {
