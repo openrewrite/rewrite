@@ -216,6 +216,10 @@ public abstract class RewriteTest
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
             var checks = new RunChecks(validations);
             var runCtx = checks.Ctx;
+            foreach (var seed in recipeSpec.ExecutionContextSeeds)
+            {
+                checks.Seed(seed);
+            }
             var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
             try
             {
@@ -848,6 +852,21 @@ public class RecipeSpec
             throw new ArgumentException("SetRecipes takes the recipes to run, and none were given.");
         }
         Recipe = recipes.Length == 1 ? recipes[0] : new RecipeSteps(recipes);
+        return this;
+    }
+
+    private readonly List<Action<ExecutionContext>> _executionContextSeeds = [];
+
+    internal IReadOnlyList<Action<ExecutionContext>> ExecutionContextSeeds => _executionContextSeeds;
+
+    /// <summary>
+    /// Puts what the recipe expects to find on the execution context before it runs, such as the build files a
+    /// <see cref="DotNetBuildContext"/> captured earlier in the run, which the
+    /// <see cref="Validations.ExecutionContextUnchanged"/> check then counts as there from the start.
+    /// </summary>
+    public RecipeSpec ConfigureExecutionContext(Action<ExecutionContext> configure)
+    {
+        _executionContextSeeds.Add(configure);
         return this;
     }
 

@@ -36,6 +36,19 @@ internal sealed class RunChecks : IRunObserver
 
     public ExecutionContext Ctx { get; }
 
+    /// <summary>Has the test put what it likes on the context before the recipe runs.</summary>
+    public void Seed(Action<ExecutionContext> seed)
+    {
+        if (Ctx is UnchangedExecutionContext unchanged)
+        {
+            unchanged.Seed(seed);
+        }
+        else
+        {
+            seed(Ctx);
+        }
+    }
+
     /// <summary>The recipe the scheduler last called into.</summary>
     public Recipe? Recipe { get; private set; }
 

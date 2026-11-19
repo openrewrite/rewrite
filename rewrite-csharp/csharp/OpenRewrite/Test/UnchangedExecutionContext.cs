@@ -33,10 +33,25 @@ internal sealed class UnchangedExecutionContext(RunChecks checks) : ExecutionCon
     ];
 
     private string? _failure;
+    private bool _seeding;
+
+    /// <summary>Lets the test put what it likes on the context before the recipe runs.</summary>
+    public void Seed(Action<ExecutionContext> seed)
+    {
+        _seeding = true;
+        try
+        {
+            seed(this);
+        }
+        finally
+        {
+            _seeding = false;
+        }
+    }
 
     public override void PutMessage(string key, object value)
     {
-        if (!SdkKeys.Contains(key))
+        if (!_seeding && !SdkKeys.Contains(key))
         {
             var message = Message(key);
             _failure ??= message;
