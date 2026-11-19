@@ -481,6 +481,45 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     }
 
     @Test
+    void addFieldAnnotationKeepsLocalIndentAndJavadoc() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations field, ExecutionContext ctx) {
+                  if (field.getVariables().getFirst().getSimpleName().equals("value") && field.getLeadingAnnotations().isEmpty()) {
+                      return JavaTemplate.apply("@Deprecated", getCursor(),
+                        field.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  }
+                  return field;
+              }
+          })),
+          java(
+            """
+              class T {
+                  int first;
+              \t/**
+              \t * A field.
+              \t */
+              \tprivate int value;
+                  int last;
+              }
+              """,
+            """
+              class T {
+                  int first;
+              \t/**
+              \t * A field.
+              \t */
+              \t@Deprecated
+              \tprivate int value;
+                  int last;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addVariableAnnotationsToVariableAlreadyAnnotated() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

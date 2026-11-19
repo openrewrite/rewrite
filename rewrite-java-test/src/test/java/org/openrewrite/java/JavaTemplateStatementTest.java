@@ -20,10 +20,12 @@ import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
@@ -69,6 +71,79 @@ class JavaTemplateStatementTest implements RewriteTest {
                   void m2() {
                       hashCode();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStatementKeepsItsLocalIndent() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("hashCode")) {
+                      return JavaTemplate.apply("toString()", getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+              \tvoid m() {
+                    hashCode();
+                    notify();
+              \t}
+              }
+              """,
+            """
+              class T {
+              \tvoid m() {
+                    toString();
+                    notify();
+              \t}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStatementIndentsGeneratedBlockLocally() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(singletonList(IntelliJ.defaults())))
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitIf(J.If iff, ExecutionContext ctx) {
+                  return JavaTemplate.apply("switch (0) { default -> {} }", getCursor(), iff.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              class T {
+                  int first;
+                  int last;
+              \tvoid m() {
+              \t\tif (true) {
+              \t\t\tnotify();
+              \t\t}
+              \t\tnotify();
+              \t}
+              }
+              """,
+            """
+              class T {
+                  int first;
+                  int last;
+              \tvoid m() {
+              \t\tswitch (0) {
+              \t\t\tdefault -> {
+              \t\t\t}
+              \t\t}
+              \t\tnotify();
+              \t}
               }
               """
           )

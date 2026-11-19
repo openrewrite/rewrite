@@ -17,13 +17,18 @@ package org.openrewrite.java.internal.template;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.SourceFileStatementService;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +46,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.repeat;
 import static org.openrewrite.java.tree.Space.Location.*;
 
 /**
@@ -148,7 +154,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 for (int i = 0; i < gen.size(); i++) {
                     Statement s = gen.get(i);
                     if (anchorBeginsLine) {
-                        gen.set(i, autoFormat(i == 0 ? s.withPrefix(firstPrefix(anchor)) : s, p, parent));
+                        Space prefix = i == 0 ? firstPrefix(anchor) : firstPrefixForInsertion(anchor.getPrefix());
+                        gen.set(i, formatAtAnchor(i == 0 ? s.withPrefix(prefix) : s, null, prefix,
+                                i == 0 && mode == JavaCoordinates.Mode.REPLACEMENT &&
+                                        !(s instanceof J.MethodDeclaration || s instanceof J.ClassDeclaration), p, parent));
                     } else {
                         gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
                     }
@@ -175,8 +184,17 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                     return replacedPrefix(anchor);
                 }
-                String whitespace = anchor.getPrefix().getWhitespace();
-                return Space.format("\n" + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
+                return firstPrefixForInsertion(anchor.getPrefix());
+            }
+
+            private Space firstPrefixForInsertion(Space prefix) {
+                String whitespace = prefix.getLastWhitespace();
+                if (whitespace.indexOf('\n') < 0) {
+                    whitespace = prefix.getWhitespace();
+                }
+                int lineBreak = whitespace.lastIndexOf('\n');
+                int start = lineBreak > 0 && whitespace.charAt(lineBreak - 1) == '\r' ? lineBreak - 1 : lineBreak;
+                return Space.format(whitespace.substring(start));
             }
 
             private Space leadingPrefix(Statement anchor, int i) {
@@ -255,7 +273,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
+                            return formatAtAnchor(c, c.getName(), classDecl.getPrefix(), true, p,
+                                    getCursor().getParentOrThrow());
                         }
                         case EXTENDS: {
                             TypeTree anExtends = unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));
@@ -442,7 +461,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(m, m.getName(), p,
+                            return formatAtAnchor(m, m.getName(), method.getPrefix(), true, p,
                                     getCursor().getParentOrThrow());
                         }
                         case BLOCK_PREFIX: {
@@ -690,11 +709,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                                                ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
                                                                "\nStatement:\n" + statement);
                         }
-                        if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
+                        Cursor parent = getCursor().getParentTreeCursor();
+                        if (parent.getValue() instanceof J.Block) {
                             //noinspection unchecked
                             replacement = (J3) substitutions.toStatement(replacement);
                         }
-                        return autoFormat(replacement.withPrefix(statement.getPrefix()), p);
+                        return formatAtAnchor(replacement.withPrefix(statement.getPrefix()), null, statement.getPrefix(),
+                                !(replacement instanceof J.MethodDeclaration || replacement instanceof J.ClassDeclaration),
+                                p, parent);
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }
@@ -720,11 +742,78 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                         getComparatorOrThrow()));
                             }
                         }
-                        return autoFormat(v, v.getTypeExpression(), p,
+                        return formatAtAnchor(v, v.getTypeExpression(), multiVariable.getPrefix(), true, p,
                                 getCursor().getParentOrThrow());
                     }
                 }
                 return super.visitVariableDeclarations(multiVariable, p);
+            }
+
+            /**
+             * AutoFormat supplies layout and relative indentation. A line-anchored edit takes its
+             * base indentation from the existing source, even in a file with a different style.
+             */
+            @SuppressWarnings("unchecked")
+            private <J2 extends J> J2 formatAtAnchor(J2 tree, @Nullable J stopAfter, Space anchor, boolean preservePrefix,
+                                                   Integer p, Cursor parent) {
+                J2 formatted = autoFormat(tree, stopAfter, p, parent);
+                if (formatted == tree || !(parent.firstEnclosing(JavaSourceFile.class) instanceof J.CompilationUnit) ||
+                        anchor.getLastWhitespace().indexOf('\n') < 0 ||
+                        formatted.getPrefix().getLastWhitespace().indexOf('\n') < 0) {
+                    return formatted;
+                }
+
+                String formattedIndent = formatted.getPrefix().getIndent();
+                String localIndent = anchor.getIndent();
+                if (!formattedIndent.equals(localIndent)) {
+                    JavaSourceFile source = parent.firstEnclosingOrThrow(JavaSourceFile.class);
+                    TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, source, IntelliJ::tabsAndIndents);
+                    int tabSize = style.getTabSize() > 0 ? style.getTabSize() : IntelliJ.tabsAndIndents().getTabSize();
+                    boolean localTabs = localIndent.indexOf('\t') >= 0;
+                    formatted = (J2) new JavaIsoVisitor<Integer>() {
+                        private boolean stopped;
+
+                        @Override
+                        public @Nullable J visit(@Nullable Tree t, Integer p) {
+                            return stopped ? (J) t : super.visit(t, p);
+                        }
+
+                        @Override
+                        public J postVisit(J t, Integer p) {
+                            if (stopAfter != null && stopAfter.isScope(t)) {
+                                stopped = true;
+                            }
+                            return t;
+                        }
+
+                        @Override
+                        public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                            return stopped ? space : space.withWhitespace(rebase(space.getWhitespace()))
+                                    .withComments(ListUtils.map(space.getComments(), comment ->
+                                            comment.withSuffix(rebase(comment.getSuffix()))));
+                        }
+
+                        private String rebase(String whitespace) {
+                            int start = whitespace.lastIndexOf('\n') + 1;
+                            if (start == 0 || !whitespace.startsWith(formattedIndent, start)) {
+                                return whitespace;
+                            }
+                            int columns = 0;
+                            for (int i = start + formattedIndent.length(); i < whitespace.length(); i++) {
+                                char ch = whitespace.charAt(i);
+                                if (ch != '\t' && ch != ' ') {
+                                    return whitespace;
+                                }
+                                columns += ch == '\t' ? tabSize : 1;
+                            }
+                            String relative = localTabs ? repeat("\t", columns / tabSize) +
+                                    repeat(" ", columns % tabSize) : repeat(" ", columns);
+                            return whitespace.substring(0, start) + localIndent + relative;
+                        }
+                    }.visitNonNull(formatted, p, parent.fork());
+                }
+
+                return preservePrefix ? formatted.withPrefix(anchor) : formatted;
             }
 
             private boolean isScope(J test) {

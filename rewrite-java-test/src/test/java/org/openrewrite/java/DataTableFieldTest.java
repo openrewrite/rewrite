@@ -56,7 +56,7 @@ class DataTableFieldTest implements RewriteTest {
                   private Date today;
 
                   public Test() {
-                      this.today = new Date();
+                     this.today = new Date();
                   }
               }
               """,
