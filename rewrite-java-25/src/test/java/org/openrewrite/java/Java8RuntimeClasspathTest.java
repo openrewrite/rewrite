@@ -64,9 +64,42 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     }
 
     @Test
-    void includesTheSeparateJava8CryptoAndTlsLibraries() {
+    void rtJarOnTheDependencyClasspathDoesNotSelectThePlatform() {
         rewriteRun(
           spec -> spec.parser(Java25Parser.builder().classpath(List.of(rtJar))),
+          java(
+            """
+              record CurrentPlatform(String text) {
+                  String cleaned() {
+                      return text.strip();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anExplicitPlatformDoesNotDependOnItsFilename() throws Exception {
+        Path renamed = Files.copy(rtJar, temp.resolve("legacy-platform.jar"));
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().java8Runtime(renamed)),
+          java(
+            """
+              class LegacyTable extends javax.swing.JTable {
+                  LegacyTable(java.util.Vector<?> rows, java.util.Vector<?> columns) {
+                      super(rows, columns);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void includesTheSeparateJava8CryptoAndTlsLibraries() {
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().java8Runtime(rtJar)),
           java(
             """
               class LegacySecurity {
@@ -86,7 +119,7 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     @Test
     void usesTheJava8PlatformConstructorSignature() {
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().classpath(List.of(rtJar))),
+          spec -> spec.parser(Java25Parser.builder().java8Runtime(rtJar)),
           java(
             """
               class LegacyTable extends javax.swing.JTable {
@@ -102,7 +135,7 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     @Test
     void underscoreIdentifiersAreAttributed() {
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().classpath(List.of(rtJar))),
+          spec -> spec.parser(Java25Parser.builder().java8Runtime(rtJar)),
           java(
             """
               class LegacyNames {

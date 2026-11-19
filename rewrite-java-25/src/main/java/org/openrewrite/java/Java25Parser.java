@@ -62,6 +62,17 @@ public class Java25Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java25Parser, Builder> {
+        private @Nullable Path java8Runtime;
+
+        /**
+         * Use this Java 8 runtime jar and its adjacent boot and extension libraries as javac's platform.
+         * Leaving this unset keeps the parser's current JDK platform, regardless of dependency jar names.
+         */
+        public Builder java8Runtime(@Nullable Path rtJar) {
+            this.java8Runtime = rtJar;
+            return this;
+        }
+
 
         @Nullable
         private static ClassLoader moduleClassLoader;
@@ -85,12 +96,12 @@ public class Java25Parser implements JavaParser {
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class, Path.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory());
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory(), java8Runtime);
 
                 return new Java25Parser(delegate);
             } catch (Exception e) {

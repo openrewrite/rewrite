@@ -97,7 +97,8 @@ public class ReloadableJava25Parser implements JavaParser {
             Charset charset,
             Collection<NamedStyles> styles,
             JavaTypeCache typeCache,
-            @Nullable JavaTypeFactory typeFactory) {
+            @Nullable JavaTypeFactory typeFactory,
+            @Nullable Path java8Runtime) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -107,10 +108,7 @@ public class ReloadableJava25Parser implements JavaParser {
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
-        Path rtJar = classpath == null ? null : classpath.stream()
-                .filter(path -> "rt.jar".equals(path.getFileName().toString()))
-                .findFirst().orElse(null);
-        if (rtJar != null) {
+        if (java8Runtime != null) {
             // An explicit Java 8 platform must supply javac's symbols as well as the mapped types.
             Options.instance(context).put(Option.SOURCE, "8");
             Options.instance(context).put(Option.TARGET, "8");
@@ -119,8 +117,8 @@ public class ReloadableJava25Parser implements JavaParser {
         try {
             // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
             pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
-            if (rtJar != null) {
-                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, java8PlatformClasspath(rtJar));
+            if (java8Runtime != null) {
+                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, java8PlatformClasspath(java8Runtime));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -194,7 +192,8 @@ public class ReloadableJava25Parser implements JavaParser {
 
     private static List<Path> java8PlatformClasspath(Path rtJar) throws IOException {
         List<Path> platform = new ArrayList<>();
-        for (String name : List.of("resources.jar", "rt.jar", "sunrsasign.jar", "jsse.jar", "jce.jar", "charsets.jar", "jfr.jar")) {
+        platform.add(rtJar);
+        for (String name : List.of("resources.jar", "sunrsasign.jar", "jsse.jar", "jce.jar", "charsets.jar", "jfr.jar")) {
             Path jar = rtJar.resolveSibling(name);
             if (Files.isRegularFile(jar)) {
                 platform.add(jar);
@@ -417,9 +416,16 @@ public class ReloadableJava25Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<ReloadableJava25Parser, Builder> {
+        private @Nullable Path java8Runtime;
+
+        public Builder java8Runtime(@Nullable Path rtJar) {
+            this.java8Runtime = rtJar;
+            return this;
+        }
+
         @Override
         public ReloadableJava25Parser build() {
-            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory);
+            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, java8Runtime);
         }
     }
 
