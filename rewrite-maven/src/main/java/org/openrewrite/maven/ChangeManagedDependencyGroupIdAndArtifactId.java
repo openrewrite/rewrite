@@ -158,9 +158,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             /**
-             * The entries to remove so that each management key this pass changed has at most one entry per
-             * dependencyManagement block. The one kept is the entry already at those coordinates, or else the first, unless another one
-             * replaces it by version.
+             * The entries to remove so that each management key this pass changed has one entry per
+             * dependencyManagement block, or none when an entry managed elsewhere replaces them all. The one kept is the
+             * entry already at those coordinates, or else the first, unless another one replaces it by version.
              */
             private List<Xml.Tag> supersededEntries(Xml.Document document) {
                 List<Xml.Tag> blocks = new ArrayList<>();
