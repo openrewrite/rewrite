@@ -818,4 +818,93 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepsOtherManagedDependenciesThatRepeatTheParentVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "javax.persistence",
+            "javax.persistence-api",
+            "jakarta.persistence",
+            "jakarta.persistence-api",
+            "3.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-pool</groupId>
+                              <artifactId>commons-pool</artifactId>
+                              <version>1.6</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.persistence</groupId>
+                              <artifactId>javax.persistence-api</artifactId>
+                              <version>2.2</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>commons-pool</groupId>
+                              <artifactId>commons-pool</artifactId>
+                              <version>1.6</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.persistence</groupId>
+                              <artifactId>jakarta.persistence-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>commons-pool</groupId>
+                              <artifactId>commons-pool</artifactId>
+                              <version>1.6</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
 }

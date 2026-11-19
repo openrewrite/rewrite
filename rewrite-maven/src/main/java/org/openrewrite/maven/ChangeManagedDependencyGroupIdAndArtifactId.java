@@ -189,7 +189,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (t != tag) {
                         maybeUpdateModel();
-                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
+                        doAfterVisit(new RemoveRedundantDependencyVersions(
+                                newGroupId != null ? newGroupId : oldGroupId,
+                                newArtifactId != null ? newArtifactId : oldArtifactId,
+                                null, null).getVisitor());
                         String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
                         String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
                         if (checkIfNewDependencyPresent(effectiveGroupId, effectiveArtifactId, newVersion)) {
