@@ -102,9 +102,8 @@ public class ReloadableJava25Parser implements JavaParser {
             Collection<NamedStyles> styles,
             JavaTypeCache typeCache,
             @Nullable JavaTypeFactory typeFactory,
-            @Nullable Path java8Runtime,
-            @Nullable Integer sourceCompatibility,
-            @Nullable Path legacyRuntime) {
+            @Nullable Path javaPlatform,
+            @Nullable Integer sourceCompatibility) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -114,25 +113,26 @@ public class ReloadableJava25Parser implements JavaParser {
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
-        if (java8Runtime != null && legacyRuntime != null) {
-            throw new IllegalArgumentException("Select only one runtime platform");
+        Path runtimeJar = javaPlatform == null ? null : java8RuntimeJar(javaPlatform);
+        if (runtimeJar != null && sourceCompatibility != null && sourceCompatibility > 8) {
+            throw new IllegalArgumentException("A Java 8 platform requires source compatibility 8");
         }
-        if ((java8Runtime != null || legacyRuntime != null) && sourceCompatibility != null && sourceCompatibility > 8) {
-            throw new IllegalArgumentException("A legacy runtime platform requires source compatibility 8");
-        }
-        Integer source = sourceCompatibility != null ? sourceCompatibility : (java8Runtime != null || legacyRuntime != null) ? 8 : null;
+        Integer source = sourceCompatibility != null ? sourceCompatibility : runtimeJar != null ? 8 : null;
         if (source != null) {
             Options.instance(context).put(Option.SOURCE, source.toString());
             Options.instance(context).put(Option.TARGET, source.toString());
         }
+        compilerLog.enforcedSource = source;
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
         try {
             // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
             pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
-            if (java8Runtime != null) {
-                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, java8PlatformClasspath(java8Runtime));
-            } else if (legacyRuntime != null) {
-                pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, legacyPlatformClasspath(legacyRuntime));
+            if (javaPlatform != null) {
+                if (source != null && source <= 8) {
+                    pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, platformClasspath(javaPlatform));
+                } else {
+                    pfm.setLocationFromPaths(StandardLocation.SYSTEM_MODULES, List.of(javaPlatform));
+                }
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -204,14 +204,22 @@ public class ReloadableJava25Parser implements JavaParser {
         compileDependencies();
     }
 
-    private static List<Path> legacyPlatformClasspath(Path javaHome) {
+    private static @Nullable Path java8RuntimeJar(Path home) {
+        for (Path rt : List.of(home.resolve("lib/rt.jar"), home.resolve("jre/lib/rt.jar"))) {
+            if (Files.isRegularFile(rt)) {
+                return rt;
+            }
+        }
+        return null;
+    }
+
+    private static List<Path> platformClasspath(Path javaHome) {
         // Keep runtime images open while their paths are used by parser file managers.
         return LEGACY_PLATFORMS.computeIfAbsent(javaHome.toAbsolutePath().normalize(), home -> {
             try {
-                for (Path rt : List.of(home.resolve("lib/rt.jar"), home.resolve("jre/lib/rt.jar"))) {
-                    if (Files.isRegularFile(rt)) {
-                        return java8PlatformClasspath(rt);
-                    }
+                Path runtimeJar = java8RuntimeJar(home);
+                if (runtimeJar != null) {
+                    return java8PlatformClasspath(runtimeJar);
                 }
                 FileSystem image = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of("java.home", home.toString()));
                 try (Stream<Path> modules = Files.list(image.getPath("/modules"))) {
@@ -249,6 +257,7 @@ public class ReloadableJava25Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        compilerLog.incompatibleSources.clear();
         compilerLog.compilationErrors = ctx.getMessage(JavaParser.COMPILATION_ERRORS);
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus;
         try {
@@ -260,6 +269,11 @@ public class ReloadableJava25Parser implements JavaParser {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
             try {
+                List<String> incompatible = compilerLog.incompatibleSources.get(cuByPath.getValue().sourcefile.toUri());
+                if (incompatible != null) {
+                    throw new IllegalArgumentException("Source is incompatible with Java " + compilerLog.enforcedSource +
+                            ": " + String.join("; ", incompatible));
+                }
                 ReloadableJava25ParserVisitor parser = new ReloadableJava25ParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
@@ -423,6 +437,8 @@ public class ReloadableJava25Parser implements JavaParser {
 
     private static class ResettableLog extends Log {
         @Nullable Collection<Diagnostic<? extends JavaFileObject>> compilationErrors;
+        @Nullable Integer enforcedSource;
+        final Map<URI, List<String>> incompatibleSources = new HashMap<>();
 
         protected ResettableLog(Context context) {
             super(context);
@@ -431,6 +447,13 @@ public class ReloadableJava25Parser implements JavaParser {
             new DiagnosticHandler() {
                 @Override
                 public void report(JCDiagnostic diagnostic) {
+                    if (enforcedSource != null && diagnostic.getKind() == Diagnostic.Kind.ERROR && diagnostic.getSource() != null &&
+                            (diagnostic.getCode().startsWith("compiler.err.feature.not.supported.in.source") ||
+                                    diagnostic.getCode().startsWith("compiler.err.cant.resolve") &&
+                                            Arrays.stream(diagnostic.getArgs()).anyMatch(arg -> "var".equals(String.valueOf(arg))))) {
+                        incompatibleSources.computeIfAbsent(diagnostic.getSource().toUri(), key -> new ArrayList<>())
+                                .add(diagnostic.getMessage(Locale.ROOT));
+                    }
                     if (compilationErrors != null && diagnostic.getKind() == Diagnostic.Kind.ERROR) {
                         compilationErrors.add(diagnostic);
                     }
@@ -450,23 +473,13 @@ public class ReloadableJava25Parser implements JavaParser {
 
     public static class Builder extends JavaParser.Builder<ReloadableJava25Parser, Builder> {
         @Override
-        protected boolean supportsJava8Runtime() {
-            return true;
-        }
-
-        @Override
-        protected boolean supportsLegacyRuntime() {
-            return true;
-        }
-
-        @Override
-        protected boolean supportsSourceCompatibility(int majorVersion) {
-            return majorVersion >= 8 && majorVersion <= 25;
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return sourceVersion == null || sourceVersion >= 8 && sourceVersion <= 25;
         }
 
         @Override
         public ReloadableJava25Parser build() {
-            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, java8Runtime, sourceCompatibility, legacyRuntime);
+            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, javaPlatform, sourceCompatibility);
         }
     }
 

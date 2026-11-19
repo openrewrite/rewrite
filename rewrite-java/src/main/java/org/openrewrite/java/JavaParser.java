@@ -253,8 +253,7 @@ public interface JavaParser extends Parser {
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
         private boolean typeCacheConfigured;
-        protected @Nullable Path java8Runtime;
-        protected @Nullable Path legacyRuntime;
+        protected @Nullable Path javaPlatform;
         protected @Nullable Integer sourceCompatibility;
 
         @Nullable
@@ -272,40 +271,26 @@ public interface JavaParser extends Parser {
             super(J.CompilationUnit.class);
         }
 
-        /**
-         * Select a Java 8 runtime jar and its adjacent platform libraries.
-         * Parsers that cannot select this platform reject a non-null value.
-         */
-        public B java8Runtime(@Nullable Path rtJar) {
-            if (rtJar != null && !supportsJava8Runtime()) {
-                throw new UnsupportedOperationException(getClass().getName() + " does not support a Java 8 platform");
+        /** Select the JDK home whose platform classes javac resolves, including internal APIs. */
+        public B javaPlatform(@Nullable Path javaHome) {
+            if (javaHome != null && !supportsCompilerConfiguration(null)) {
+                throw new UnsupportedOperationException(getClass().getName() + " does not support selecting a Java platform");
             }
-            if (!Objects.equals(java8Runtime, rtJar) && !typeCacheConfigured && javaTypeFactory == null) {
+            if (!Objects.equals(javaPlatform, javaHome) && !typeCacheConfigured && javaTypeFactory == null) {
                 javaTypeCache = new JavaTypeCache();
             }
-            java8Runtime = rtJar;
+            javaPlatform = javaHome;
             return (B) this;
         }
 
-        /** Select the build JDK's platform while parsing legacy Java 8 syntax, including internal APIs. */
-        public B legacyRuntime(@Nullable Path javaHome) {
-            if (javaHome != null && !supportsLegacyRuntime()) {
-                throw new UnsupportedOperationException(getClass().getName() + " does not support a legacy runtime platform");
-            }
-            if (!Objects.equals(legacyRuntime, javaHome) && !typeCacheConfigured && javaTypeFactory == null) {
-                javaTypeCache = new JavaTypeCache();
-            }
-            legacyRuntime = javaHome;
-            return (B) this;
-        }
-
-        protected boolean supportsLegacyRuntime() {
+        /** Whether this parser supports platform selection and, when supplied, this source version. */
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
             return false;
         }
 
         /** Select source syntax independently of the runtime API; null keeps the parser's default. */
         public B sourceCompatibility(@Nullable Integer majorVersion) {
-            if (majorVersion != null && !supportsSourceCompatibility(majorVersion)) {
+            if (majorVersion != null && !supportsCompilerConfiguration(majorVersion)) {
                 throw new UnsupportedOperationException(getClass().getName() +
                         " does not support source compatibility " + majorVersion);
             }
@@ -314,14 +299,6 @@ public interface JavaParser extends Parser {
             }
             sourceCompatibility = majorVersion;
             return (B) this;
-        }
-
-        protected boolean supportsSourceCompatibility(int majorVersion) {
-            return false;
-        }
-
-        protected boolean supportsJava8Runtime() {
-            return false;
         }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -456,14 +433,14 @@ public interface JavaParser extends Parser {
          * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            if (javaTypeFactory != null || typeCacheConfigured || java8Runtime != null || legacyRuntime != null || sourceCompatibility != null) {
+            if (javaTypeFactory != null || typeCacheConfigured || javaPlatform != null || sourceCompatibility != null) {
                 return javaTypeFactory;
             }
             return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            boolean configured = typeCacheConfigured || javaTypeFactory != null || java8Runtime != null || legacyRuntime != null || sourceCompatibility != null;
+            boolean configured = typeCacheConfigured || javaTypeFactory != null || javaPlatform != null || sourceCompatibility != null;
             javaTypeCache = HashMapJavaTypeCache.forParser(
                     JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;

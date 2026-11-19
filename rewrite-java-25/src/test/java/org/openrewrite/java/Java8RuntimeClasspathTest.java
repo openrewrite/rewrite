@@ -38,15 +38,18 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     @TempDir
     static Path temp;
     static Path rtJar;
+    static Path javaHome;
 
     @BeforeAll
     static void java8Platform() throws Exception {
-        rtJar = temp.resolve("rt.jar");
+        javaHome = Files.createDirectories(temp.resolve("jdk8"));
+        Path libraries = Files.createDirectories(javaHome.resolve("jre/lib"));
+        rtJar = libraries.resolve("rt.jar");
         // Repackage Java 8 platform signatures so the tests need no separate JDK 8 installation.
         try (ZipFile symbols = new ZipFile(Path.of(System.getProperty("java.home"), "lib", "ct.sym").toFile());
              ZipOutputStream jar = new ZipOutputStream(Files.newOutputStream(rtJar));
-             ZipOutputStream jce = new ZipOutputStream(Files.newOutputStream(temp.resolve("jce.jar")));
-             ZipOutputStream jsse = new ZipOutputStream(Files.newOutputStream(temp.resolve("jsse.jar")))) {
+             ZipOutputStream jce = new ZipOutputStream(Files.newOutputStream(libraries.resolve("jce.jar")));
+             ZipOutputStream jsse = new ZipOutputStream(Files.newOutputStream(libraries.resolve("jsse.jar")))) {
             var entries = symbols.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
@@ -72,7 +75,7 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     void aNewerBuildRuntimeKeepsItsOwnApisWithLegacySyntax() {
         Path home = Path.of(System.getProperty("org.openrewrite.java17.home"));
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().legacyRuntime(home)),
+          spec -> spec.parser(Java25Parser.builder().javaPlatform(home).sourceCompatibility(8)),
           java(
             """
               class BuiltOnJava17 {
@@ -90,17 +93,59 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     }
 
     @Test
+    void anExplicitSourceLevelRejectsNewerSyntax() {
+        for (String source : List.of(
+          "record NewerSyntax(int value) {}",
+          "class NewerSyntax { String text = \"\"\"\ntext\n\"\"\"; }",
+          "class NewerSyntax { void method() { var value = 1; } }")) {
+            var errors = new java.util.ArrayList<javax.tools.Diagnostic<? extends javax.tools.JavaFileObject>>();
+            var ctx = new org.openrewrite.InMemoryExecutionContext();
+            ctx.putMessage(JavaParser.COMPILATION_ERRORS, errors);
+            var parsed = Java25Parser.builder().sourceCompatibility(8).build().parse(ctx, source).findFirst().orElseThrow();
+            assertThat(parsed).withFailMessage(() -> errors.stream().map(d -> d.getCode() + ": " + d).toList().toString())
+              .isInstanceOf(org.openrewrite.tree.ParseError.class);
+        }
+    }
+
+    @Test
+    void aLegacyTypeNamedVarRemainsValidAtSource8() {
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().sourceCompatibility(8)),
+          java("class var {}"),
+          java("class UsesVar { var value; }")
+        );
+    }
+
+    @Test
+    void modularPlatformAndSourceLevelAreIndependent() {
+        Path home = Path.of(System.getProperty("org.openrewrite.java17.home"));
+        rewriteRun(
+          spec -> spec.parser(Java25Parser.builder().javaPlatform(home).sourceCompatibility(17)),
+          java(
+            """
+              record BuiltOnJava17(String value) {
+                  void stop(Thread thread) {
+                      thread.stop();
+                  }
+                  String clean() {
+                      return value.strip();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void unsupportedParserOptionsAreRejectedInsteadOfIgnored() {
         JavaParser.Builder<?, ?> unsupported = new UnsupportedBuilder();
-        assertThatThrownBy(() -> unsupported.java8Runtime(rtJar))
-          .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> unsupported.legacyRuntime(Path.of("jdk")))
+        assertThatThrownBy(() -> unsupported.javaPlatform(javaHome))
           .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> unsupported.sourceCompatibility(8))
           .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> Java25Parser.builder().sourceCompatibility(7))
           .isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> Java25Parser.builder().java8Runtime(rtJar).sourceCompatibility(17).build())
+        assertThatThrownBy(() -> Java25Parser.builder().javaPlatform(javaHome).sourceCompatibility(17).build())
           .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 
@@ -134,9 +179,9 @@ class Java8RuntimeClasspathTest implements RewriteTest {
         JdkClassSharingTypeFactory.useForParsers();
         JavaParser.Builder<?, ?> builder = Java25Parser.builder();
         assertThat(stringType(builder.build()).getMethods()).extracting(JavaType.Method::getName).contains("strip");
-        assertThat(stringType(builder.java8Runtime(rtJar).build()).getMethods())
+        assertThat(stringType(builder.javaPlatform(javaHome).build()).getMethods())
           .extracting(JavaType.Method::getName).doesNotContain("strip");
-        assertThat(stringType(builder.java8Runtime(null).build()).getMethods())
+        assertThat(stringType(builder.javaPlatform(null).build()).getMethods())
           .extracting(JavaType.Method::getName).contains("strip");
     }
 
@@ -164,9 +209,10 @@ class Java8RuntimeClasspathTest implements RewriteTest {
 
     @Test
     void anExplicitPlatformDoesNotDependOnItsFilename() throws Exception {
-        Path renamed = Files.copy(rtJar, temp.resolve("legacy-platform.jar"));
+        Path renamed = Files.createDirectories(temp.resolve("another-distribution/lib"));
+        Files.copy(rtJar, renamed.resolve("rt.jar"));
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().java8Runtime(renamed)),
+          spec -> spec.parser(Java25Parser.builder().javaPlatform(renamed.getParent())),
           java(
             """
               class LegacyTable extends javax.swing.JTable {
@@ -182,7 +228,7 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     @Test
     void includesTheSeparateJava8CryptoAndTlsLibraries() {
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().java8Runtime(rtJar)),
+          spec -> spec.parser(Java25Parser.builder().javaPlatform(javaHome)),
           java(
             """
               class LegacySecurity {
@@ -202,7 +248,7 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     @Test
     void usesTheJava8PlatformConstructorSignature() {
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().java8Runtime(rtJar)),
+          spec -> spec.parser(Java25Parser.builder().javaPlatform(javaHome)),
           java(
             """
               class LegacyTable extends javax.swing.JTable {
@@ -218,7 +264,7 @@ class Java8RuntimeClasspathTest implements RewriteTest {
     @Test
     void underscoreIdentifiersAreAttributed() {
         rewriteRun(
-          spec -> spec.parser(Java25Parser.builder().java8Runtime(rtJar)),
+          spec -> spec.parser(Java25Parser.builder().javaPlatform(javaHome)),
           java(
             """
               class LegacyNames {
