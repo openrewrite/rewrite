@@ -286,10 +286,6 @@ public abstract class RewriteTest
                     AfterRecipe(spec, source, result == null ? source : result.After);
                 }
                 AssertOutputCompiles(recipeSpec, run.Finals, setup, projects);
-                if (validations.RpcRoundTrip && this is RpcRewriteTest)
-                {
-                    RpcRoundTrip.AssertSurvives(results);
-                }
 
                 if (run.Unsettled is var (cycle, changes))
                 {

@@ -2105,32 +2105,6 @@ public class RewriteRpcServer
         return (Tree)_localObjects[treeId]!;
     }
 
-    /// <summary>
-    /// Has the Java peer print the source file with its own printer, after it fetches what it doesn't have of it yet.
-    /// </summary>
-    public string PrintOnRemote(SourceFile sourceFile)
-    {
-        var id = sourceFile.Id.ToString();
-        StoreLocalObject(id, sourceFile);
-        return _jsonRpc!.InvokeWithParameterObjectAsync<string>(
-            "Print",
-            new PrintRequest { TreeId = id, SourceFileType = RpcSendQueue.ToJavaTypeName(sourceFile.GetType()) }
-        ).GetAwaiter().GetResult();
-    }
-
-    /// <summary>
-    /// Has the Java peer send back whole the source file it holds by the id of <paramref name="sourceFile"/>, rather
-    /// than what changed since it last sent it, so that every node and type of it is read again from what Java sends.
-    /// </summary>
-    public SourceFile ResendFromRemote(SourceFile sourceFile)
-    {
-        var id = sourceFile.Id.ToString();
-        _jsonRpc!.InvokeWithParameterObjectAsync<bool>("AbortGetObject", new AbortGetObjectRequest { Id = id })
-            .GetAwaiter().GetResult();
-        return (SourceFile)GetObjectFromRemoteAsync(id, RpcSendQueue.ToJavaTypeName(sourceFile.GetType()))
-            .GetAwaiter().GetResult();
-    }
-
     [JsonRpcMethod("SetDataTableStore", UseSingleObjectParameterDeserialization = true)]
     public Task<bool> SetDataTableStore(SetDataTableStoreRequest request)
     {

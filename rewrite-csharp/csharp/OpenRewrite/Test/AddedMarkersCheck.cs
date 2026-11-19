@@ -283,7 +283,7 @@ internal static class AddedMarkersCheck
         return $"{name[..name.IndexOf('`')]}<{string.Join(", ", type.GetGenericArguments().Select(TypeName))}>";
     }
 
-    internal static string Print(Tree tree, IMarkerPrinter markerPrinter)
+    private static string Print(Tree tree, IMarkerPrinter markerPrinter)
     {
         var capture = new PrintOutputCapture<object>(null!, markerPrinter);
         if (tree is Xml.Xml)

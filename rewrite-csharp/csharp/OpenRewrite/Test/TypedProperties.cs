@@ -17,7 +17,6 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using OpenRewrite.Core;
 using OpenRewrite.Java;
-using OpenRewrite.Java.Rpc;
 
 namespace OpenRewrite.Test;
 
@@ -36,5 +35,18 @@ internal static class TypedProperties
             .Select(p => (p.Name, p.GetValue(tree) as JavaType))
             .ToList();
 
-    public static string Signature(JavaType type) => JavaSender.TypeSignature(type).ToString() ?? "";
+    /// <summary>The type as a failure message names it, such as <c>C{name=Bar,return=void,parameters=[]}</c>.</summary>
+    public static string Signature(JavaType? type) => type switch
+    {
+        JavaType.Primitive p => p.Keyword,
+        JavaType.Class c => c.FullyQualifiedName,
+        JavaType.Parameterized p =>
+            $"{Signature(p.Type)}<{string.Join(", ", (p.TypeParameters ?? []).Select(Signature))}>",
+        JavaType.GenericTypeVariable g => $"Generic{{{g.Name}}}",
+        JavaType.Array a => $"{Signature(a.ElemType)}[]",
+        JavaType.Method m => $"{Signature(m.DeclaringType)}{{name={m.Name},return={Signature(m.ReturnType)}," +
+                             $"parameters=[{string.Join(",", (m.ParameterTypes ?? []).Select(Signature))}]}}",
+        JavaType.Variable v => $"{Signature(v.Owner)}{{name={v.Name},type={Signature(v.Type)}}}",
+        _ => "{undefined}"
+    };
 }

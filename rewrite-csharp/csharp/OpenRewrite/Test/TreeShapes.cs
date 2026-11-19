@@ -160,7 +160,7 @@ internal static class TreeShapes
                 if (!Resolved(type) && Resolved(parsedType))
                 {
                     problems.Add($"{node} has no {property} where the compiler resolves " +
-                                 TypedProperties.Signature(parsedType!));
+                                 TypedProperties.Signature(parsedType));
                     break;
                 }
             }
