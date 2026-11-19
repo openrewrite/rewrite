@@ -146,8 +146,9 @@ public class SemanticallyEqual {
             }
             Toml.Array otherArray = (Toml.Array) other;
 
-            List<Toml> values1 = array.getValues();
-            List<Toml> values2 = otherArray.getValues();
+            // A trailing comma leaves a placeholder as the last element
+            List<Toml> values1 = withoutEmpty(array.getValues());
+            List<Toml> values2 = withoutEmpty(otherArray.getValues());
 
             if (values1.size() != values2.size()) {
                 areEqual = false;
