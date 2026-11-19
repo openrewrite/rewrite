@@ -28,6 +28,62 @@ import static org.openrewrite.maven.Assertions.withLocalRepository;
 
 class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
 
+    @Test
+    void addsReleaseForPomPackagingWithExplicitCompilerExecution() {
+        String before = """
+          <project>
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>com.example</groupId>
+            <artifactId>custom-compiler</artifactId>
+            <version>1</version>
+            <packaging>pom</packaging>
+            <build>
+              <plugins>
+                <plugin>
+                  <artifactId>maven-compiler-plugin</artifactId>
+                  <version>3.8.0</version>
+                  <executions>
+                    <execution>
+                      <goals><goal>compile</goal></goals>
+                    </execution>
+                  </executions>
+                </plugin>
+              </plugins>
+            </build>
+          </project>
+          """;
+        rewriteRun(
+          pomXml(before, before.replace("  <build>",
+            "  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n  </properties>\n  <build>"))
+        );
+    }
+
+    @Test
+    void doesNotAddCompilerPropertiesToStandalonePomPackaging() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>acceptance-tests</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.robotframework</groupId>
+                      <artifactId>robotframework-maven-plugin</artifactId>
+                      <version>1.7.1</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UpdateMavenProjectPropertyJavaVersion(17));

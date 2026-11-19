@@ -141,6 +141,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends ScanningRecipe<Map<Pa
                 // When none of the relevant properties are explicitly configured Maven defaults to Java 8
                 // The release option was added in 9
                 if (getResolutionResult().getParent() == null && version >= 9 &&
+                    hasJavaCompilation(getResolutionResult()) &&
                     !propertiesToUpdateByPom.containsKey(document.getSourcePath()) && !usesJavaVersionProperty(pom) &&
                     !configuresCompilerLevel(compilerPluginConfigurations(pom))) {
                     d = (Xml.Document) new AddPropertyVisitor("maven.compiler.release", String.valueOf(version), null)
@@ -149,6 +150,27 @@ public class UpdateMavenProjectPropertyJavaVersion extends ScanningRecipe<Map<Pa
                 return d;
             }
         };
+    }
+
+    private static boolean hasJavaCompilation(MavenResolutionResult module) {
+        ResolvedPom pom = module.getPom();
+        if (!"pom".equals(pom.getPackaging()) || !module.getModules().isEmpty() ||
+            pom.getRequested().getSubprojects() != null && !pom.getRequested().getSubprojects().isEmpty()) {
+            return true;
+        }
+        // POM packaging has no default compiler lifecycle, but an explicit execution can add one.
+        for (Plugin plugin : pom.getPlugins()) {
+            if (Plugin.PLUGIN_DEFAULT_GROUPID.equals(plugin.getGroupId()) &&
+                "maven-compiler-plugin".equals(plugin.getArtifactId())) {
+                for (Plugin.Execution execution : plugin.getExecutions()) {
+                    List<String> goals = execution.getGoals();
+                    if (goals != null && (goals.contains("compile") || goals.contains("testCompile"))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     // The topmost pom of the project when the property is inherited from outside of it
