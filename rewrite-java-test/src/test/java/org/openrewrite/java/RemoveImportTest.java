@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -318,6 +320,239 @@ class RemoveImportTest implements RewriteTest {
               class A {}
               """,
             "class A {}"
+          )
+        );
+    }
+
+    @Test
+    void keepStaticWildcardSupplyingNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map")),
+          java(
+            """
+              import static java.util.Map.*;
+
+              class Test {
+                  Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void countInheritedNestedTypeTowardStaticWildcardThreshold() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("example.Sub.UNUSED")),
+          java(
+            """
+              package example;
+              public class Base {
+                  public static class Nested {}
+              }
+              """
+          ),
+          java(
+            """
+              package example;
+              public class Sub extends Base {
+                  public static int first() { return 1; }
+                  public static int second() { return 2; }
+              }
+              """
+          ),
+          java(
+            """
+              import static example.Sub.*;
+
+              class Test {
+                  Nested nested;
+                  int sum = first() + second();
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"import", "import static"})
+    void removeStaticWildcardWhenNestedTypeHasItsOwnImport(String importPrefix) {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map")),
+          java(
+            """
+              %s java.util.Map.Entry;
+
+              import static java.util.Map.*;
+
+              class Test {
+                  Entry<String, String> entry;
+              }
+              """.formatted(importPrefix),
+            """
+              %s java.util.Map.Entry;
+
+              class Test {
+                  Entry<String, String> entry;
+              }
+              """.formatted(importPrefix)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"protected", "public"})
+    void removeStaticWildcardWhenNestedTypeIsInherited(String visibility) {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("example.Base")),
+          java(
+            """
+              package example;
+              public class Base {
+                  %s static class Nested {}
+              }
+              """.formatted(visibility)
+          ),
+          java(
+            """
+              import example.Base;
+
+              import static example.Base.*;
+
+              class Test extends Base {
+                  Nested nested;
+              }
+              """,
+            """
+              import example.Base;
+
+              class Test extends Base {
+                  Nested nested;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Base", "Sub"})
+    void removeStaticWildcardWhenInheritedNestedTypeHasItsOwnImport(String wildcardOwner) {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("example." + wildcardOwner + ".UNUSED"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              "package example; public class Base { public static class Nested {} }",
+              "package example; public class Sub extends Base {}"
+            )),
+          java(
+            """
+              import static example.Sub.Nested;
+              import static example.%s.*;
+
+              class Test {
+                  Nested nested;
+              }
+              """.formatted(wildcardOwner),
+            """
+              import static example.Sub.Nested;
+
+              class Test {
+                  Nested nested;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepWildcardForPackagePrivateNestedTypeOutsideItsInheritancePath() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("example.Base.UNUSED"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              "package example; public class Base { static class Nested {} }",
+              "package other; public class Middle extends example.Base {}"
+            )),
+          java(
+            """
+              package example;
+
+              import static example.Base.*;
+
+              class Test extends other.Middle {
+                  Nested nested;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticWildcardForUseOutsideSubclass() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("example.Base.UNUSED"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              "package example; public class Base { public static class Nested {} }"
+            )),
+          java(
+            """
+              import example.Base;
+
+              import static example.Base.*;
+
+              class Sub extends Base {
+                  class Inner { Nested inherited; }
+              }
+
+              class Other { Nested imported; }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepOnlyTheStaticWildcardSupplyingTheNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("example.Base.Sub"))
+            .parser(JavaParser.fromJavaVersion().dependsOn("""
+              package example;
+              public class Base {
+                  public static class Sub {
+                      public static class Nested {}
+                  }
+              }
+              """)),
+          java(
+            """
+              import static example.Base.*;
+              import static example.Base.Sub.*;
+
+              class Test { Nested nested; }
+              """,
+            """
+              import static example.Base.Sub.*;
+
+              class Test { Nested nested; }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeStaticWildcardWhenNestedTypeIsQualified() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map")),
+          java(
+            """
+              import static java.util.Map.*;
+
+              class Test {
+                  java.util.Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              class Test {
+                  java.util.Map.Entry<String, String> entry;
+              }
+              """
           )
         );
     }

@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -68,23 +69,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
             Set<String> methodsAndFieldsUsed = new HashSet<>();
             Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
-            Set<String> originalImports = new HashSet<>();
-            boolean starImportOfOwner = false;
-            boolean memberImportOfType = false;
-            for (J.Import cuImport : cu.getImports()) {
-                JavaType.FullyQualified importedType = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
-                if (importedType != null) {
-                    originalImports.add(importedType.getFullyQualifiedName().replace("$", "."));
-                }
-                if (isMemberImportOf(cuImport)) {
-                    memberImportOfType = true;
-                }
-                if (!cuImport.isStatic() && "*".equals(cuImport.getClassName()) &&
-                        cuImport.getPackageName().equals(owner)) {
-                    starImportOfOwner = true;
-                }
-            }
-
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
                 if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type) ||
@@ -114,10 +98,44 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
+            int memberCount = methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size();
+            Set<J.Import> staticWildcardsToChange = new HashSet<>();
+            Set<String> originalImports = new HashSet<>();
+            boolean starImportOfOwner = false;
+            boolean memberImportOfType = false;
+            for (J.Import cuImport : cu.getImports()) {
+                JavaType.FullyQualified importedType = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
+                if (importedType != null) {
+                    originalImports.add(importedType.getFullyQualifiedName().replace("$", "."));
+                }
+                if (cuImport.isStatic() && "*".equals(cuImport.getQualid().getSimpleName())) {
+                    String importedFrom = cuImport.getTypeName();
+                    if ((TypeUtils.fullyQualifiedNamesAreEqual(importedFrom, type) ||
+                            TypeUtils.fullyQualifiedNamesAreEqual(importedFrom, owner)) &&
+                            (memberCount == 0 || memberCount < importLayoutStyle.getNameCountToUseStarImport() &&
+                             !isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), cuImport))) {
+                        staticWildcardsToChange.add(cuImport);
+                    }
+                }
+                if (isMemberImportOf(cuImport)) {
+                    memberImportOfType = true;
+                }
+                if (!cuImport.isStatic() && "*".equals(cuImport.getClassName()) &&
+                        cuImport.getPackageName().equals(owner)) {
+                    starImportOfOwner = true;
+                }
+            }
+
+            boolean hasStaticNestedType = false;
             boolean typeInUse = false;
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
+                    if (!hasStaticNestedType && !staticWildcardsToChange.isEmpty() &&
+                            fullyQualified.getOwningClass() != null && fullyQualified.hasFlags(Flag.Static)) {
+                        hasStaticNestedType = staticWildcardsToChange.stream().anyMatch(wildcard ->
+                                hasMemberType(wildcard.getQualid().getTarget().getType(), fullyQualified));
+                    }
                     if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), type)) {
                         typeInUse = true;
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner) ||
@@ -136,11 +154,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
-            // The names only confirm an attributed type or its alias and filter a star import's unfold candidates.
             boolean typeImportMayStay = !force && typeInUse;
-            Set<String> namesInSource = typeImportMayStay || !force && memberImportOfType ||
-                    starImportOfOwner && !otherTypesInPackageUsed.isEmpty() ?
-                    namesInSource(cu) : Collections.emptySet();
+            boolean checkNames = typeImportMayStay || !force && memberImportOfType ||
+                    starImportOfOwner && !otherTypesInPackageUsed.isEmpty();
+            Set<String> namesInSource = checkNames || hasStaticNestedType ?
+                    namesInSource(cu, hasStaticNestedType ? staticWildcardsToChange : Collections.emptySet()) :
+                    Collections.emptySet();
             boolean typeUsed = typeImportMayStay && namesInSource.contains(simpleName);
             otherTypesInPackageUsed.retainAll(namesInSource);
 
@@ -164,15 +183,15 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
-                            !owner.isEmpty() && TypeUtils.fullyQualifiedNamesAreEqual(typeName, owner))) {
-                        if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
-                            spaceForNextImport.set(import_.getPrefix());
-                            return null;
-                        } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
-                                methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
-                            methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
-                            return unfoldStarImport(import_, methodsAndFieldsUsed, cu);
+                    } else if ("*".equals(imported)) {
+                        if (staticWildcardsToChange.contains(import_)) {
+                            if (memberCount == 0) {
+                                spaceForNextImport.set(import_.getPrefix());
+                                return null;
+                            }
+                            Set<String> membersUsed = new HashSet<>(methodsAndFieldsUsed);
+                            membersUsed.addAll(otherMethodsAndFieldsInTypeUsed);
+                            return unfoldStarImport(import_, membersUsed, cu);
                         }
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
@@ -250,6 +269,22 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
      * such as the inferred type of a {@code var} or of a variable read, needs no import.
      */
     static Set<String> namesInSource(JavaSourceFile cu) {
+        return namesInSource(cu, Collections.emptySet());
+    }
+
+    private static Set<String> namesInSource(JavaSourceFile cu, Set<J.Import> staticWildcardsToChange) {
+        Map<String, List<JavaType>> singleImportOwners = new HashMap<>();
+        if (!staticWildcardsToChange.isEmpty()) {
+            for (J.Import i : cu.getImports()) {
+                JavaType target = i.getQualid().getTarget().getType();
+                if (target != null && !"*".equals(i.getQualid().getSimpleName())) {
+                    String name = i.getAlias() == null ? i.getQualid().getSimpleName() : i.getAlias().getSimpleName();
+                    singleImportOwners.computeIfAbsent(name, k -> new ArrayList<>()).add(target);
+                }
+            }
+        }
+        J.Package pkg = cu.getPackageDeclaration();
+        String packageName = staticWildcardsToChange.isEmpty() || pkg == null ? "" : pkg.getPackageName();
         return new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.Import visitImport(J.Import import_, Set<String> names) {
@@ -259,9 +294,64 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
                 names.add(identifier.getSimpleName());
+                if (!staticWildcardsToChange.isEmpty() && identifier.getFieldType() == null) {
+                    retainRequiredWildcards(identifier, getCursor(), packageName, singleImportOwners, staticWildcardsToChange);
+                }
                 return super.visitIdentifier(identifier, names);
             }
         }.reduce(cu, new HashSet<>());
+    }
+
+    private static void retainRequiredWildcards(J.Identifier identifier, Cursor cursor, String packageName,
+                                                Map<String, List<JavaType>> singleImportOwners,
+                                                Set<J.Import> wildcardsToChange) {
+        JavaType.FullyQualified nested = TypeUtils.asFullyQualified(identifier.getType());
+        if (nested == null || nested.getOwningClass() == null || !nested.hasFlags(Flag.Static) ||
+                nested.hasFlags(Flag.Private) || !nested.hasFlags(Flag.Public) && !nested.getPackageName().equals(packageName) ||
+                !nested.getClassName().endsWith("." + identifier.getSimpleName())) {
+            return;
+        }
+
+        Object parent = cursor.getParentTreeCursor().getValue();
+        if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == identifier ||
+                isInheritingScope(cursor, nested)) {
+            return;
+        }
+        List<JavaType> owners = singleImportOwners.get(identifier.getSimpleName());
+        if (owners != null && owners.stream().anyMatch(t -> hasMemberType(t, nested))) {
+            return;
+        }
+        wildcardsToChange.removeIf(wildcard ->
+                hasMemberType(wildcard.getQualid().getTarget().getType(), nested));
+    }
+
+    private static boolean isInheritingScope(Cursor cursor, JavaType.FullyQualified nested) {
+        for (Iterator<Cursor> blocks = cursor.getPathAsCursors(c -> c.getValue() instanceof J.Block); blocks.hasNext();) {
+            Object parent = blocks.next().getParentTreeCursor().getValue();
+            if ((parent instanceof J.ClassDeclaration || parent instanceof J.NewClass) &&
+                    hasMemberType(((TypedTree) parent).getType(), nested)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasMemberType(@Nullable JavaType from, JavaType.FullyQualified nested) {
+        JavaType.FullyQualified owner = nested.getOwningClass();
+        if (owner == null) {
+            return false;
+        }
+        if (nested.hasFlags(Flag.Public) || nested.hasFlags(Flag.Protected)) {
+            return TypeUtils.isAssignableTo(owner.getFullyQualifiedName(), from);
+        }
+        // A package-private member stops being inherited at the first superclass outside its package.
+        for (JavaType.FullyQualified t = TypeUtils.asFullyQualified(from);
+             t != null && owner.getPackageName().equals(t.getPackageName()); t = t.getSupertype()) {
+            if (TypeUtils.isOfClassType(t, owner.getFullyQualifiedName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private long countTrailingLinebreaks(Space space) {
