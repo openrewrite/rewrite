@@ -164,15 +164,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
                             if (versionTag.isPresent()) {
                                 ResolvedPom pom = getResolutionResult().getPom();
-                                String resolvedGroupId = t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId);
-                                String resolvedArtifactId = t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId);
-                                if (resolvedArtifactId.contains("${")) {
-                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, pom.getProperties()::get);
-                                }
-                                if (resolvedGroupId.contains("${")) {
-                                    resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, pom.getProperties()::get);
-                                }
-                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId, resolvedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
+                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId(t), resolvedArtifactId(t), pom.getValue(versionTag.get().getValue().orElse(null)));
                                 String versionTagValue = t.getChildValue("version").orElse(null);
                                 if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                     t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
@@ -189,9 +181,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (t != tag) {
                         maybeUpdateModel();
+                        // A swapped BOM import changes the managed version of every artifact it manages,
+                        // so the explicit version of any of them may have become redundant.
+                        boolean bomImport = isManagedDependencyImportTag(oldGroupId, oldArtifactId);
                         doAfterVisit(new RemoveRedundantDependencyVersions(
-                                newGroupId != null ? newGroupId : oldGroupId,
-                                newArtifactId != null ? newArtifactId : oldArtifactId,
+                                bomImport ? null : resolvedGroupId(t),
+                                bomImport ? null : resolvedArtifactId(t),
                                 null, null).getVisitor());
                         String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
                         String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
@@ -202,6 +197,21 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                 }
                 return t;
+            }
+
+            private String resolvedGroupId(Xml.Tag t) {
+                return resolvedChildValue(t, "groupId", newGroupId != null ? newGroupId : oldGroupId);
+            }
+
+            private String resolvedArtifactId(Xml.Tag t) {
+                return resolvedChildValue(t, "artifactId", newArtifactId != null ? newArtifactId : oldArtifactId);
+            }
+
+            private String resolvedChildValue(Xml.Tag t, String name, String fallback) {
+                String value = t.getChildValue(name).orElse(fallback);
+                return value.contains("${") ?
+                        ResolvedPom.placeholderHelper.replacePlaceholders(value, getResolutionResult().getPom().getProperties()::get) :
+                        value;
             }
 
             private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
