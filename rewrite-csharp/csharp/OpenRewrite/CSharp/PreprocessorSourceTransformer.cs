@@ -375,11 +375,9 @@ public static class PreprocessorSourceTransformer
                 if (dir.Kind == PreprocessorDirectiveKind.If)
                 {
                     var condition = StripLineComment(ExtractConditionFromDirectiveText(dir.Text));
-                    if (IsTautologicalCondition(condition) &&
-                        (groupDirs.Count > 2 || !EvaluateCondition(condition, [])))
+                    if (IsTautologicalCondition(condition) && groupDirs.Count > 2)
                     {
-                        // This #if has a literal condition and there are other branches, or a false one whose
-                        // content no other permutation reaches
+                        // This #if has a literal condition and there are other branches
                         tautologicalIfLines.Add(dir.LineNumber);
                         hasTautologicalIf = true;
                     }

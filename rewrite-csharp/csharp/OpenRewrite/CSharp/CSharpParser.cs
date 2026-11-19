@@ -34,7 +34,7 @@ public class CSharpParser
     {
         _charsetBomMarked = charsetBomMarked;
         var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
-        if (symbols.Count == 0 && PreprocessorSourceTransformer.GetDirectivePositions(source).Count == 0)
+        if (symbols.Count == 0)
             return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
         var cu = ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
