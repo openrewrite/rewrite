@@ -3278,9 +3278,28 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
-        void acceptVisitorAndTreeShortOfSourceFileKeptInFields() {
+        void rejectTreesCollectedFromEachSourceFile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsClassesItVisits()),
+              java("class A {}")
+            ));
+            assertThat(e).hasMessageContaining("KeepsClassesItVisits.classes[0] -> J.ClassDeclaration");
+        }
+
+        @Test
+        void rejectSourceFilesCollectedByVisitorKeptInField() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsCollectingVisitorInAField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsCollectingVisitorInAField.visitor.visited[0] -> PlainText foo.txt");
+        }
+
+        @Test
+        void acceptOneTreeToAFieldAndVisitorKeptInFields() {
             rewriteRun(
-              spec -> spec.recipe(new KeepsPreconditionAndSnippetInFields()),
+              spec -> spec.recipe(new KeepsOneTreeToAFieldAndAPrecondition()),
               text("foo")
             );
         }
@@ -4470,11 +4489,11 @@ class ListsNewKeepsWhatItVisitsInAField extends Recipe {
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
 @Value
-class KeepsPreconditionAndSnippetInFields extends Recipe {
+class KeepsOneTreeToAFieldAndAPrecondition extends Recipe {
 
-    String displayName = "Keeps a precondition and a snippet in fields";
+    String displayName = "Keeps one tree to a field and a precondition";
 
-    String description = "Keeps a visitor and a tree short of a source file in fields of the recipe.";
+    String description = "Keeps a visitor, a snippet and a whole source file, each in a field of the recipe.";
 
     @Getter(AccessLevel.NONE)
     transient TreeVisitor<?, ExecutionContext> precondition = new PlainTextVisitor<>();
@@ -4482,9 +4501,65 @@ class KeepsPreconditionAndSnippetInFields extends Recipe {
     @Getter(AccessLevel.NONE)
     transient PlainText.Snippet snippet = new PlainText.Snippet(Tree.randomId(), Markers.EMPTY, "foo");
 
+    @Getter(AccessLevel.NONE)
+    transient PlainText template = PlainText.builder().sourcePath(Path.of("template.txt")).text("foo").build();
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(precondition, new PlainTextVisitor<>());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsClassesItVisits extends Recipe {
+
+    String displayName = "Keeps the classes it visits";
+
+    String description = "Keeps each class declaration it visits in a field of the recipe.";
+
+    transient List<J.ClassDeclaration> classes = new ArrayList<>();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                classes.add(classDecl);
+                return super.visitClassDeclaration(classDecl, ctx);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsCollectingVisitorInAField extends Recipe {
+
+    String displayName = "Keeps a visitor that collects source files";
+
+    String description = "Keeps a visitor in a field of the recipe that keeps each source file it visits.";
+
+    @Getter(AccessLevel.NONE)
+    transient Collecting visitor = new Collecting();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return visitor;
+    }
+
+    static class Collecting extends TreeVisitor<Tree, ExecutionContext> {
+        final List<SourceFile> visited = new ArrayList<>();
+
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof SourceFile s) {
+                visited.add(s);
+            }
+            return tree;
+        }
     }
 }
 

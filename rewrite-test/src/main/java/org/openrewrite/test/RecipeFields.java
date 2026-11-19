@@ -119,38 +119,36 @@ final class RecipeFields {
             if (classes.isEmpty()) {
                 continue;
             }
-            try {
-                Heavyweights.Walk walk = heavyweights.walk(r.getName(), null, true);
-                String name = AddedMarkers.typeName(r.getClass());
-                for (Class<?> c = r.getClass(); c != Recipe.class && c != ScanningRecipe.class; c = c.getSuperclass()) {
-                    for (Field field : FIELDS.get(c)) {
-                        if (!Modifier.isStatic(field.getModifiers())) {
-                            walk.from(read(field, r), name + "." + field.getName());
-                        }
+            Heavyweights.Walk walk = heavyweights.walk(r.getName(), null, true);
+            String name = AddedMarkers.typeName(r.getClass());
+            for (Class<?> c = r.getClass(); c != Recipe.class && c != ScanningRecipe.class; c = c.getSuperclass()) {
+                for (Field field : FIELDS.get(c)) {
+                    if (!Modifier.isStatic(field.getModifiers())) {
+                        walk.from(read(field, r), name + "." + field.getName());
                     }
                 }
-                for (Class<?> c : classes) {
-                    if (walkedStatics.add(c)) {
-                        for (Field field : FIELDS.get(c)) {
-                            if (Modifier.isStatic(field.getModifiers())) {
-                                walk.from(read(field, null), AddedMarkers.typeName(c) + "." + field.getName());
-                            }
-                        }
-                    }
-                }
-                walk.drain();
-            } catch (RuntimeException ignored) {
-                // a recipe the walk can't read is left alone
             }
+            for (Class<?> c : classes) {
+                if (walkedStatics.add(c)) {
+                    for (Field field : FIELDS.get(c)) {
+                        if (Modifier.isStatic(field.getModifiers())) {
+                            walk.from(read(field, null), AddedMarkers.typeName(c) + "." + field.getName());
+                        }
+                    }
+                }
+            }
+            walk.drain();
         }
         if (!heavyweights.isEmpty()) {
             fail("A recipe should keep in its fields, and in the static fields of the classes nested in it, what it " +
-                 "is configured with and none of the Heavyweight objects it visits, such as source files, cursors, " +
-                 "the ExecutionContext and build models:\n" + heavyweights.report() +
+                 "is configured with, and no collection of the trees it visits nor any cursor, ExecutionContext or " +
+                 "build model:\n" + heavyweights.report() +
                  "A recipe stays in memory for the whole run, and a static field for as long as its class, so what " +
-                 "they keep for each source file adds up over a large repository. Keep what is needed across source " +
-                 "files in a ScanningRecipe's accumulator, as values such as paths and ids. A recipe that must keep " +
-                 "a Heavyweight object in a field opts out with " +
+                 "they keep for each source file adds up over a large repository. Keep what one source file needs " +
+                 "in the fields of the visitor that getVisitor() creates for it, and what is needed across source " +
+                 "files in a ScanningRecipe's accumulator, as values such as paths and ids. Moving a static field " +
+                 "to another class, such as a visitor's, keeps the same objects in memory and is not a fix. When " +
+                 "what the recipe keeps doesn't grow with the number of source files, opt out with " +
                  "RecipeQualityValidation.builder().lightweightRecipeFields(false).");
         }
     }

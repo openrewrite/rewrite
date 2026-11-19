@@ -108,9 +108,10 @@ final class Heavyweights {
     private final Map<String, Map<String, Finding>> findings = new LinkedHashMap<>();
 
     /// @param when         the point of the run the walk looks at, or `null` when that doesn't matter
-    /// @param keptByRecipe whether the walk starts from a recipe's own fields, which may keep a visitor, such as a
-    ///                     precondition's, and a tree short of a whole source file, such as one parsed from an
-    ///                     option: neither grows with the source files the recipe visits
+    /// @param keptByRecipe whether the walk starts from a recipe's own fields, which may keep a tree that no
+    ///                     collection, map or array holds, such as one parsed from an option, since one such tree to a
+    ///                     field can't grow with the source files the recipe visits. The fields of a visitor the
+    ///                     recipe keeps are walked like the recipe's own.
     Walk walk(String recipe, @Nullable String when, boolean keptByRecipe) {
         return new Walk(recipe, when, keptByRecipe);
     }
@@ -215,11 +216,15 @@ final class Heavyweights {
 
         /// @param step how the parent reaches the value: a field, an index, a [Key] or the text of the step
         private void visit(@Nullable Object value, @Nullable Node parent, Object step) {
-            if (!walks(value) || keptByRecipe && (value instanceof TreeVisitor ||
-                                                  value instanceof Tree && !(value instanceof SourceFile))) {
+            if (!walks(value) || keptByRecipe && value instanceof Tree && !inContainer(parent)) {
                 return;
             }
-            if (KINDS.get(value.getClass()) == Kind.RETAINED) {
+            if (keptByRecipe && (value instanceof TreeVisitor || isRootCursor(value))) {
+                if (budget > 0 && visited.add(value)) {
+                    budget--;
+                    queue.add(new Node(value, parent, step));
+                }
+            } else if (KINDS.get(value.getClass()) == Kind.RETAINED) {
                 found(new Node(value, parent, step));
             } else if (budget > 0 && visited.add(value)) {
                 budget--;
@@ -233,6 +238,22 @@ final class Heavyweights {
             findings.computeIfAbsent(recipe, r -> new LinkedHashMap<>()).putIfAbsent(
                     KEY_OR_INDEX.matcher(path).replaceAll("[]") + " -> " + what, new Finding(path, what, when));
         }
+    }
+
+    /// Whether the way to a value passes through a collection, map or array, which can grow with each source file.
+    private static boolean inContainer(@Nullable Node parent) {
+        for (Node node = parent; node != null; node = node.parent) {
+            Kind kind = KINDS.get(node.getValue().getClass());
+            if (kind == Kind.COLLECTION || kind == Kind.MAP || kind == Kind.ARRAY) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A visitor at rest is back at the root cursor, which keeps no tree.
+    private static boolean isRootCursor(Object value) {
+        return value instanceof Cursor && ((Cursor) value).getParent() == null && ((Cursor) value).isRoot();
     }
 
     private static boolean walks(@Nullable Object value) {

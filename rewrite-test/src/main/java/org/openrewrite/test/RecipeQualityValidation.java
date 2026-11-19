@@ -143,8 +143,9 @@ public class RecipeQualityValidation {
     private boolean noStaticVisitors = true;
 
     /**
-     * Controls whether the recipe is validated to keep no {@link org.openrewrite.Heavyweight} objects such as source
-     * files in its fields or in the static fields of the classes nested in it, which would stay in memory all run.
+     * Controls whether the recipe is validated to keep no collection of the trees it visits, nor any other
+     * {@link org.openrewrite.Heavyweight} object such as a cursor, in its fields or in the static fields of the classes
+     * nested in it, which would stay in memory all run. A field may keep one tree, such as one parsed from an option.
      * Recipes a composite lists from dependency jars are left to the builds of the projects that own them.
      */
     @Builder.Default
