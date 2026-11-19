@@ -560,8 +560,8 @@ public class Scope implements Trait<J> {
         /**
          * The identifiers in the binding's scope that refer to it, by its simple name, as {@code this.name} or
          * {@code super.name} in its own class, or for a field as {@code other.name} where attribution says so.
-         * Where a class redeclares a field of its superclass, {@code super.name} reads the inherited one and is
-         * still listed.
+         * Where a class redeclares a member of its superclass, {@code super.name} reads the inherited one and is not
+         * listed.
          */
         public Stream<Cursor> references() {
             // One walk of the scope answers for every binding in it
@@ -675,8 +675,12 @@ public class Scope implements Trait<J> {
                                 ((J.FieldAccess) parent).getName() == identifier.getValue() ? ((J.FieldAccess) parent).getTarget() :
                     parent instanceof J.MethodInvocation && namespace == Namespace.METHOD &&
                     ((J.MethodInvocation) parent).getName() == identifier.getValue() ? ((J.MethodInvocation) parent).getSelect() : null;
-            if (!(select instanceof J.Identifier) ||
-                !"this".equals(((J.Identifier) select).getSimpleName()) && !"super".equals(((J.Identifier) select).getSimpleName())) {
+            if (!(select instanceof J.Identifier)) {
+                return false;
+            }
+            String qualifier = ((J.Identifier) select).getSimpleName();
+            // `super` reaches past a member the class declares itself, to the one it inherits
+            if (!"this".equals(qualifier) && !("super".equals(qualifier) && getKind() == Kind.INHERITED)) {
                 return false;
             }
             for (Cursor c = identifier.getParent(); c != null; c = c.getParent()) {

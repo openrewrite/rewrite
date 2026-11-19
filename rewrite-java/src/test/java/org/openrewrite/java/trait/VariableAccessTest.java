@@ -18,6 +18,7 @@ package org.openrewrite.java.trait;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -138,9 +139,57 @@ class VariableAccessTest implements RewriteTest {
               class Test {
                  static int n;
                  Object test(int p, Test other) {
-                   { int n = /*~~(declared in MethodDeclaration)~~>*/p; this./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; /*~~(declared in MethodDeclaration)~~>*/other./*~~(unbound)~~>*/n = /*~~(declared in Block)~~>*/n; Test./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; }
+                   { int n = /*~~(declared in MethodDeclaration)~~>*/p; this./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; /*~~(declared in MethodDeclaration)~~>*/other./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; Test./*~~(declared in ClassDeclaration)~~>*/n = /*~~(declared in Block)~~>*/n; }
                    return /*~~(unbound)~~>*/undefined;
                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldSelectedFromSuperOrAnEnclosingInstanceResolvesToThatClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new VariableAccess.Matcher().asVisitor(va -> SearchResult.found(va.getTree(),
+            va.getBinding().map(b -> b.getKind() + " of " + ((J.ClassDeclaration) b.getScope().getTree()).getSimpleName()).orElse("unbound"))))),
+          java(
+            """
+              class Base {
+                  int x;
+                  int inherited;
+              }
+              class Sub extends Base {
+                  int x;
+                  void m() {
+                      super.x = 1;
+                      super.inherited = 2;
+                  }
+                  class Inner {
+                      int x;
+                      void m() {
+                          Sub.this.x = 3;
+                      }
+                  }
+              }
+              """,
+            """
+              class Base {
+                  int x;
+                  int inherited;
+              }
+              class Sub extends Base {
+                  int x;
+                  void m() {
+                      super./*~~(unbound)~~>*/x = 1;
+                      super./*~~(INHERITED of Sub)~~>*/inherited = 2;
+                  }
+                  class Inner {
+                      int x;
+                      void m() {
+                          Sub.this./*~~(MEMBER of Sub)~~>*/x = 3;
+                      }
+                  }
               }
               """
           )

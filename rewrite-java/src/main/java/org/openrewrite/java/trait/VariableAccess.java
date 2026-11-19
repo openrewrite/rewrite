@@ -94,24 +94,35 @@ public class VariableAccess implements Trait<J.Identifier> {
         if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == getTree())) {
             return Scope.at(cursor).lookup(name);
         }
-        // A field selected from `this` or `super` belongs to the innermost class, and one selected from the name of an
-        // enclosing class belongs to that class. Another instance's is not bound here.
+        // A field selected with a dot belongs to a class around the access. Attribution tells which one, and where
+        // it is missing the qualifier does. A field of a class that is not around the access is not bound here.
         Expression target = ((J.FieldAccess) parent).getTarget();
-        if (!(target instanceof J.Identifier)) {
+        JavaType.Variable attributed = getTree().getFieldType();
+        String qualifier = target instanceof J.Identifier ? ((J.Identifier) target).getSimpleName() :
+                target instanceof J.FieldAccess && "this".equals(((J.FieldAccess) target).getSimpleName()) &&
+                ((J.FieldAccess) target).getTarget() instanceof J.Identifier ?
+                        ((J.Identifier) ((J.FieldAccess) target).getTarget()).getSimpleName() : null;
+        if (attributed == null && qualifier == null) {
             return Optional.empty();
         }
-        String qualifier = ((J.Identifier) target).getSimpleName();
-        boolean self = "this".equals(qualifier) || "super".equals(qualifier);
+        boolean viaSuper = target instanceof J.Identifier && "super".equals(qualifier);
+        boolean innermost = target instanceof J.Identifier && ("this".equals(qualifier) || viaSuper);
         for (Scope scope = Scope.at(cursor); scope != null; scope = scope.enclosing().orElse(null)) {
             J tree = scope.getTree();
-            if (self && (tree instanceof J.ClassDeclaration || tree instanceof J.NewClass) ||
-                tree instanceof J.ClassDeclaration && ((J.ClassDeclaration) tree).getSimpleName().equals(qualifier)) {
-                for (Scope.Binding binding : scope.getBindings()) {
-                    if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) &&
-                        !binding.isLocal()) {
-                        return Optional.of(binding);
-                    }
+            if (!(tree instanceof J.ClassDeclaration || tree instanceof J.NewClass) ||
+                attributed == null && !innermost &&
+                !(tree instanceof J.ClassDeclaration && ((J.ClassDeclaration) tree).getSimpleName().equals(qualifier))) {
+                continue;
+            }
+            for (Scope.Binding binding : scope.getBindings()) {
+                if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) &&
+                    !binding.isLocal() &&
+                    (attributed != null ? TypeUtils.isOfType(binding.getType(), attributed) :
+                            !viaSuper || binding.getKind() == Scope.Kind.INHERITED)) {
+                    return Optional.of(binding);
                 }
+            }
+            if (attributed == null) {
                 return Optional.empty();
             }
         }

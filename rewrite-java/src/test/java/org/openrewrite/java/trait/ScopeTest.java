@@ -400,6 +400,49 @@ class ScopeTest implements RewriteTest {
     }
 
     @Test
+    void superSelectsTheInheritedMemberAndNotTheOneRedeclared() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  return Scope.bindingOf(getCursor(), identifier)
+                    .filter(b -> b.getName().endsWith("_"))
+                    .map(b -> SearchResult.found(identifier, b.references().count() + " references"))
+                    .orElse(identifier);
+              }
+          })),
+          java(
+            """
+              class Base {
+                  int x_;
+                  void m_() {}
+              }
+              class Sub extends Base {
+                  int x_;
+                  void m_() {
+                      super.x_ = this.x_;
+                      super.m_();
+                  }
+              }
+              """,
+            """
+              class Base {
+                  int /*~~(0 references)~~>*/x_;
+                  void /*~~(0 references)~~>*/m_() {}
+              }
+              class Sub extends Base {
+                  int /*~~(1 references)~~>*/x_;
+                  void /*~~(0 references)~~>*/m_() {
+                      super.x_ = this.x_;
+                      super.m_();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void bindingKnowsItsReferencesAndWhetherItIsEffectivelyFinal() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
