@@ -202,9 +202,7 @@ public class ScopeService {
      */
     public Scope.@Nullable Namespace namespaceOf(Cursor identifier) {
         J.Identifier ident = identifier.getValue();
-        if ("this".equals(ident.getSimpleName()) || "super".equals(ident.getSimpleName()) ||
-            identifier.firstEnclosing(J.Import.class) != null || identifier.firstEnclosing(J.Package.class) != null ||
-            identifier.firstEnclosing(Javadoc.class) != null) {
+        if ("this".equals(ident.getSimpleName()) || "super".equals(ident.getSimpleName()) || isInImportPackageOrJavadoc(identifier)) {
             return null;
         }
         Cursor parentCursor = identifier.getParentTreeCursor();
@@ -229,6 +227,21 @@ public class ScopeService {
             return Scope.Namespace.TYPE;
         }
         return isPackage(parentCursor, ident) ? null : Scope.Namespace.VARIABLE;
+    }
+
+    /**
+     * The walk stops at the first block, as none of the three can hold one.
+     */
+    private static boolean isInImportPackageOrJavadoc(Cursor identifier) {
+        for (Cursor c = identifier.getParent(); c != null; c = c.getParent()) {
+            Object tree = c.getValue();
+            if (tree instanceof J.Import || tree instanceof J.Package || tree instanceof Javadoc) {
+                return true;
+            } else if (tree instanceof J.Block) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /**
