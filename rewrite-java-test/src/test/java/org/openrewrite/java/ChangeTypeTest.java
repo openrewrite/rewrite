@@ -4800,4 +4800,92 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+    /**
+     * A source parsed without the original type on its classpath has use sites the LST gives no type, while its
+     * import still names the type. Strip the type from `@NotNull` to stand in for that.
+     */
+    private static J.CompilationUnit withoutTypeOnNotNull(J.CompilationUnit cu) {
+        return (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, Integer p) {
+                if (annotation.getAnnotationType() instanceof J.Identifier &&
+                    "NotNull".equals(((J.Identifier) annotation.getAnnotationType()).getSimpleName())) {
+                    return annotation.withAnnotationType(((J.Identifier) annotation.getAnnotationType()).withType(null));
+                }
+                return super.visitAnnotation(annotation, p);
+            }
+        }.visitNonNull(cu, 0);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void importIsKeptWhereTheUseSitesHaveNoType() {
+        // retiring the import would leave `@NotNull` bound to nothing, so the file is left alone
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  private final @NotNull String field = "";
+
+                  public @NotNull String get(final @NotNull String in) {
+                      return in;
+                  }
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(ChangeTypeTest::withoutTypeOnNotNull)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aUseSiteWithoutATypeIsNotHalfMigratedAlongsideOneWithAType() {
+        // the attributed use is left alone too: migrating only what can be seen is what breaks the file
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  private final @NotNull String seen = "";
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration m, Integer p) {
+                    return m;
+                }
+            }.visitNonNull(withoutTypeOnNotNull(cu), 0))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aStarImportDoesNotBindTheNameSoTheFileIsLeftAlone() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import org.jetbrains.annotations.*;
+
+              class A {
+                  private final @NotNull String field = "";
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(ChangeTypeTest::withoutTypeOnNotNull)
+          )
+        );
+    }
+
 }

@@ -215,6 +215,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 if (!(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
                     targetType = targetType(cu);
                 }
+                if (wouldStrandTheOriginalName(cu)) {
+                    return cu;
+                }
                 keepsDefinition = ignoreDefinition ||
                         declaresNestedTypeThatStays(cu, originalType.getFullyQualifiedName(), newFullyQualifiedTypeName);
                 if (!keepsDefinition) {
@@ -528,6 +531,54 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             }
             ident = ident.withType(updateType(ident.getType()));
             return visitAndCast(ident, ctx, super::visitIdentifier);
+        }
+
+        /**
+         * Whether changing this file would leave the original type's simple name spelled somewhere that no import
+         * binds. A file parsed without the original type on its classpath has use sites the LST gives no type, so
+         * they are not rewritten, while the import that binds their name is retired anyway - and the file then
+         * refers to a type it no longer imports. Such a file is left alone: its references cannot be seen, so there
+         * is nothing to migrate, and the missing attribution is the thing to fix.
+         * <p>
+         * A target whose own or outermost simple name is the original's is no hazard, since its import binds the same
+         * name and the spelling keeps resolving. That is the case {@code #9889} covers.
+         */
+        private boolean wouldStrandTheOriginalName(JavaSourceFile cu) {
+            String name = originalType.getClassName();
+            JavaType.FullyQualified target = TypeUtils.asFullyQualified(targetType);
+            if (target != null && (name.equals(target.getClassName()) ||
+                    name.equals(getTopLevelClassName(target).getClassName()))) {
+                return false;
+            }
+            boolean importsOriginalByThatName = false;
+            for (J.Import anImport : cu.getImports()) {
+                if (!anImport.isStatic() && anImport.getAlias() == null &&
+                        name.equals(anImport.getQualid().getSimpleName()) &&
+                        TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(),
+                                originalType.getFullyQualifiedName())) {
+                    importsOriginalByThatName = true;
+                    break;
+                }
+            }
+            if (!importsOriginalByThatName) {
+                return false;
+            }
+            return new JavaIsoVisitor<AtomicBoolean>() {
+                @Override
+                public J.Import visitImport(J.Import anImport, AtomicBoolean unresolved) {
+                    return anImport; // the import binds the name, it does not use it
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier ident, AtomicBoolean unresolved) {
+                    JavaType type = ident.getType();
+                    if (ident.getFieldType() == null && name.equals(ident.getSimpleName()) &&
+                            (type == null || type instanceof JavaType.Unknown)) {
+                        unresolved.set(true);
+                    }
+                    return ident;
+                }
+            }.reduce(cu, new AtomicBoolean()).get();
         }
 
         private static boolean isDeclarationName(Object parent, J.Identifier ident) {
