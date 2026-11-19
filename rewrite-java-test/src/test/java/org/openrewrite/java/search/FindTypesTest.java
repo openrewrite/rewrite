@@ -618,7 +618,6 @@ class FindTypesTest implements RewriteTest {
     @Test
     void springXml() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("a.A1", false)),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>

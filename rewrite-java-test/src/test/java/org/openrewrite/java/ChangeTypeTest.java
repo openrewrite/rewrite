@@ -2149,7 +2149,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocLink() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -2180,7 +2179,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocSee() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -2211,7 +2209,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocMemberLink() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -3086,7 +3083,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void noChangeToVariableNameWithoutChangeToType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -4763,6 +4759,44 @@ class ChangeTypeTest implements RewriteTest {
                   Outer.New o;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void changeAnnotationOnRecordComponentWhenBlankLinesPrecedePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.springframework.lang.Nullable", "org.jspecify.annotations.Nullable", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package org.springframework.lang;
+                public @interface Nullable {}
+                """,
+              """
+                package org.jspecify.annotations;
+                public @interface Nullable {}
+                """
+            )),
+          java(
+            """
+
+              package com.example;
+
+              import org.springframework.lang.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            """
+
+              package com.example;
+
+              import org.jspecify.annotations.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            SourceSpec::noTrim
           )
         );
     }

@@ -17,9 +17,13 @@ package org.openrewrite.scala.internal.template;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.AnnotationTemplateGenerator;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ScalaAnnotationTemplateGenerator extends AnnotationTemplateGenerator {
 
@@ -35,7 +39,32 @@ public class ScalaAnnotationTemplateGenerator extends AnnotationTemplateGenerato
     }
 
     @Override
+    protected void addDummyMethod(StringBuilder after) {
+        after.insert(0, " def $method(): Unit = {}");
+    }
+
+    @Override
+    protected void addDummyVariable(StringBuilder after) {
+        after.insert(0, " val $variable: Int = 0");
+    }
+
+    @Override
     protected void addDummyAnnotationType(StringBuilder after) {
         after.append("\nclass $Placeholder extends scala.annotation.StaticAnnotation {}");
+    }
+
+    @Override
+    protected String openMethodBody() {
+        return " = {";
+    }
+
+    @Override
+    protected String variable(J.VariableDeclarations variable, Cursor cursor) {
+        String names = variable.getVariables().stream()
+                .map(J.VariableDeclarations.NamedVariable::getSimpleName)
+                .collect(Collectors.joining(", "));
+        TypeTree type = variable.getTypeExpression();
+        // A val without a declared type doesn't parse without an initializer
+        return "val " + names + (type == null ? "" : ": " + type.withPrefix(Space.EMPTY).printTrimmed(cursor)) + " = ???";
     }
 }

@@ -81,3 +81,27 @@ func TestLoopBodyIsPaddedLikeAnIfBody(t *testing.T) {
 	require.True(t, ok)
 	require.IsType(t, &java.Block{}, each.Body.Element)
 }
+
+func TestImportTrailingCommentsRoundTrip(t *testing.T) {
+	for _, declaration := range []string{
+		"import \"fmt\" /* one\r\n two */",
+		"import (\r\n \"fmt\" /* one\r\n two */\r\n)",
+		"import \"os\"\r\nimport \"fmt\" /* one\r\n two */",
+		"import \"os\"\r\nimport (\r\n \"fmt\" /* one\r\n two */\r\n)",
+		"import \"fmt\" /* one\r\n two */ /* three\r\n four */",
+		"import \"fmt\" // trailing\r",
+		"import \"fmt\" // one\rtwo",
+	} {
+		t.Run(declaration, func(t *testing.T) {
+			// given
+			source := "package main\r\n\r\n" + declaration + "\r\n"
+
+			// when
+			cu, err := parser.NewGoParser().Parse("imports.go", source)
+
+			// then
+			require.NoError(t, err)
+			require.Equal(t, source, printer.Print(cu))
+		})
+	}
+}

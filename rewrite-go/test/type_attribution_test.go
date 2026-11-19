@@ -474,6 +474,77 @@ func TestTypeAttributionLocalOwner(t *testing.T) {
 	}
 }
 
+func TestTypeAttributionCapturedLocalOwner(t *testing.T) {
+	// given
+	src := `package main
+
+func f() int {
+	x := 1
+	read := func() int {
+		return x
+	}
+	return x + read()
+}
+`
+
+	// when
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	require.NoError(t, err)
+	var variables []*java.JavaTypeVariable
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.Name == "x" {
+			variables = append(variables, i.FieldType)
+		}
+	})
+
+	// then
+	require.Len(t, variables, 3)
+	for index, variable := range variables {
+		require.NotNil(t, variable, "x occurrence %d", index)
+		assert.Equal(t, "method:f", describeOwner(variable.Owner), "x occurrence %d", index)
+		if variable != variables[0] {
+			t.Errorf("x occurrence %d has a different JavaTypeVariable from its declaration", index)
+		}
+	}
+}
+
+func TestTypeAttributionCapturedShadowedParameterOwner(t *testing.T) {
+	// given
+	src := `package main
+
+func f(x int) func() int {
+	return func() int {
+		x := x + 1
+		return func() int {
+			return x
+		}()
+	}
+}
+`
+
+	// when
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	require.NoError(t, err)
+	var variables []*java.JavaTypeVariable
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.Name == "x" {
+			variables = append(variables, i.FieldType)
+		}
+	})
+
+	// then
+	require.Len(t, variables, 4)
+	for index, variable := range variables {
+		require.NotNil(t, variable, "x occurrence %d", index)
+	}
+	assert.Equal(t, "method:f", describeOwner(variables[0].Owner))
+	assert.Equal(t, "method:", describeOwner(variables[1].Owner))
+	assert.NotSame(t, variables[0], variables[1])
+	assert.Same(t, variables[0], variables[2])
+	assert.Same(t, variables[1], variables[3])
+	assert.NotSame(t, variables[0].Owner, variables[1].Owner)
+}
+
 func TestTypeAttributionNamedFuncTypeDeclaringType(t *testing.T) {
 	src := "package main\n\ntype optionFunc func(a int)\n\nfunc f(o optionFunc, g func(a int)) {\n\to(1)\n\tg(2)\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)

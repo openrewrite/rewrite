@@ -583,7 +583,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                         Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
                         // Only primitive types and strings can be ConstantValue attributes
                         if (isValidConstantValueType(parsedValue)) {
-                            constantValue = parsedValue;
+                            constantValue = toConstantPoolValue(parsedValue);
                         }
                     }
 
@@ -684,6 +684,18 @@ public class TypeTable implements JavaParserClasspathLoader {
                 value instanceof Float || value instanceof Double ||
                 value instanceof Boolean || value instanceof Character ||
                 value instanceof Byte || value instanceof Short;
+    }
+
+    /// The `ConstantValue` attribute stores `boolean`, `char`, `byte` and `short` constants as `int`.
+    private static Object toConstantPoolValue(Object value) {
+        if (value instanceof Boolean) {
+            return (Boolean) value ? 1 : 0;
+        } else if (value instanceof Character) {
+            return (int) (Character) value;
+        } else if (value instanceof Byte || value instanceof Short) {
+            return ((Number) value).intValue();
+        }
+        return value;
     }
 
 

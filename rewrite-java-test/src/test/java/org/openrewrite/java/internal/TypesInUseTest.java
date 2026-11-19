@@ -27,12 +27,48 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("ConstantConditions")
 class TypesInUseTest implements RewriteTest {
+
+    @Test
+    void methodIndexIgnoresUnknownDeclaringTypes() {
+        rewriteRun(
+          java(
+            "class A { void known() {} }",
+            spec -> spec.afterRecipe(cu -> {
+                // Foreign-language method types can have no Java declaring type.
+                var unknown = new JavaType.Method(null, 0, null, "rubyCall", JavaType.Primitive.Void,
+                  emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList()) {
+                    @Override
+                    public JavaType.FullyQualified getDeclaringType() {
+                        return null;
+                    }
+                };
+                var known = cu.getTypesInUse().getDeclaredMethods().stream()
+                  .filter(method -> "known".equals(method.getName())).findFirst().orElseThrow();
+                Set<JavaType.Method> methods = new LinkedHashSet<>();
+                methods.add(unknown);
+                methods.add(known);
+                TypesInUse types = TypesInUse.of(cu, emptySet(), methods, methods, emptySet());
+
+                assertThat(types.hasMethodUse(new MethodMatcher("java.lang.Runtime exec(..)"))).isFalse();
+                assertThat(types.declaresMethod(new MethodMatcher("java.lang.Runtime exec(..)"))).isFalse();
+                assertThat(types.hasMethodUse(new MethodMatcher("A known()"))).isTrue();
+                assertThat(types.declaresMethod(new MethodMatcher("A known()"))).isTrue();
+
+                methods.remove(known);
+                TypesInUse onlyUnknown = TypesInUse.of(cu, emptySet(), methods, methods, emptySet());
+                assertThat(onlyUnknown.hasMethodUse(new MethodMatcher("java.lang.Runtime exec(..)"))).isFalse();
+                assertThat(onlyUnknown.declaresMethod(new MethodMatcher("A known()"))).isFalse();
+            })
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/617")
     @Test

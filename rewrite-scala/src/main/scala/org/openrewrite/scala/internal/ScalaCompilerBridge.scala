@@ -25,13 +25,14 @@ import dotty.tools.dotc.core.Phases.Phase
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.{NoSymbol, Symbol}
 import dotty.tools.dotc.typer.TyperPhase
-import dotty.tools.dotc.parsing.{Parser, Parsers}
+import dotty.tools.dotc.parsing.{Parser, Parsers, Scanners, Tokens}
 import dotty.tools.dotc.util.SourceFile
 import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
 import scala.annotation.nowarn
+import scala.jdk.CollectionConverters.*
 import scala.collection.mutable.ListBuffer
 import scala.util.control.NonFatal
 import java.io.File
@@ -292,7 +293,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
                                      comp: ScalaCompiler,
                                      runId: Periods.RunId): Typing =
     try {
-      typing.run.compileUnits(toScalaList(typing.units))
+      compile(typing, comp)
       typing
     } catch {
       // The overflow's context is that of the unit whose trees were being typed, even when
@@ -310,6 +311,25 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     }
 
   /**
+   * Runs all compiler phases over the units of the typing. A crash once the typer trees of
+   * all units are captured is tolerated, as type attribution reads only those trees.
+   */
+  private def compile(typing: Typing, comp: ScalaCompiler): Unit = {
+    // Dotty prints a crash report to standard output before rethrowing, which a tolerated crash mustn't leave behind
+    val out = new java.io.ByteArrayOutputStream()
+    try {
+      Console.withOut(out)(typing.run.compileUnits(toScalaList(typing.units)))
+      Console.out.write(out.toByteArray)
+    } catch {
+      case NonFatal(_) if typing.units.stream().allMatch(u => typing.typerTrees.containsKey(u)) =>
+        comp.reusable = false
+      case t: Throwable =>
+        Console.out.write(out.toByteArray)
+        throw t
+    }
+  }
+
+  /**
    * Type-check the sources once more in a fresh run, leaving out the given imports, so
    * that names they shadowed resolve again.
    */
@@ -320,7 +340,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
                                    runId: Periods.RunId): Option[Typing] =
     try {
       val typing = newTyping(entries, imports, ctx0, comp, runId)
-      typing.run.compileUnits(toScalaList(typing.units))
+      compile(typing, comp)
       Some(typing)
     } catch {
       case NonFatal(_) =>
@@ -435,9 +455,11 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
 
     // Each attempt parses under its own reporter so a failed attempt's syntax
     // errors don't surface on the file when a later attempt parses cleanly.
-    def attempt(sourceVersion: Option[String]): (ParsedUnit, List[Diagnostic]) = {
+    val parseable = hideExistentialKeywords(path, content)
+
+    def attempt(wrapping: Wrapping, sourceVersion: Option[String]): (ParsedUnit, List[Diagnostic]) = {
       val reporter = new StoreReporter(null)
-      val source = SourceFile.virtual(path, wrapping.wrap(content))
+      val source = SourceFile.virtual(path, wrapping.wrap(parseable))
       val unit = CompilationUnit(source)
       val pctx = ctx.fresh.setCompilationUnit(unit).setReporter(reporter)
       sourceVersion.foreach(v => pctx.setSetting(pctx.settings.source, v))
@@ -449,6 +471,7 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
       }
       (ParsedUnit(rawTree, finalTree, unit, wrapping), reporter.removeBufferedMessages(using pctx))
     }
+    def syntaxErrors(diags: List[Diagnostic]): List[Diagnostic] = diags.filter(_.level >= 2)
     def hasSyntaxErrors(diags: List[Diagnostic]): Boolean = diags.exists(_.level >= 2)
 
     // Parse under the configured source version first. On syntax errors, retry
@@ -456,15 +479,52 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
     // `enum`, `given` and `erased` as plain identifiers — Scala 2 sources
     // legitimately use them as names. Keep the first attempt when the retry
     // doesn't parse cleanly either.
-    val (first, firstDiags) = attempt(None)
-    val (chosen, chosenDiags) =
+    def parseWrapped(wrapping: Wrapping): (ParsedUnit, List[Diagnostic]) = {
+      val (first, firstDiags) = attempt(wrapping, None)
       if (hasSyntaxErrors(firstDiags)) {
-        val (second, secondDiags) = attempt(Some("3.0-migration"))
+        val (second, secondDiags) = attempt(wrapping, Some("3.0-migration"))
         if (hasSyntaxErrors(secondDiags)) (first, firstDiags) else (second, secondDiags)
       } else (first, firstDiags)
+    }
+
+    // `isSimpleExpression` only guesses: a one-line definition it doesn't recognize,
+    // such as `sealed trait A`, is not an expression and parses unwrapped.
+    val (chosen, chosenDiags) = {
+      val wrapped @ (_, wrappedDiags) = parseWrapped(wrapping)
+      if (wrapping == Wrapping.Expression && hasSyntaxErrors(wrappedDiags)) {
+        val unwrapped @ (_, unwrappedDiags) = parseWrapped(Wrapping.None)
+        if (hasSyntaxErrors(unwrappedDiags)) wrapped else unwrapped
+      } else wrapped
+    }
 
     if (reportDiagnostics) chosenDiags.foreach(d => ctx.reporter.report(d))
-    chosen
+    chosen.copy(syntaxErrors = syntaxErrors(chosenDiags))
+  }
+
+  /**
+   * Replaces each `forSome` keyword token with spaces. Dotty rejects existential types, and its
+   * error recovery discards the code after the clause. Without the keyword it parses the clause as
+   * a refinement at the same offsets, which `ScalaTreeVisitor` turns into an `S.ExistentialType`.
+   */
+  private def hideExistentialKeywords(path: String, content: String)(using ctx: Context): String = {
+    if (!content.contains("forSome")) return content
+    try {
+      val source = SourceFile.virtual(path, content)
+      val scanCtx = ctx.fresh.setCompilationUnit(CompilationUnit(source)).setReporter(new StoreReporter(null))
+      val scanner = new Scanners.Scanner(source)(using scanCtx)
+      val chars = content.toCharArray
+      var hidden = false
+      while (scanner.token != Tokens.EOF) {
+        if (scanner.token == Tokens.FORSOME) {
+          java.util.Arrays.fill(chars, scanner.offset, scanner.offset + "forSome".length, ' ')
+          hidden = true
+        }
+        scanner.nextToken()
+      }
+      if (hidden) new String(chars) else content
+    } catch {
+      case NonFatal(_) => content
+    }
   }
 
   private def buildResult(parsed: ParsedUnit, warnings: JList[ScalaWarning])(using ctx: Context): ScalaParseResult =
@@ -472,7 +532,8 @@ class ScalaCompilerBridge(compilers: ScalaCompilerCache) {
       parsed.finalTree, None, warnings,
       wasWrapped = parsed.wrapping == Wrapping.Expression,
       wasObjectWrapped = parsed.wrapping == Wrapping.ObjectScript,
-      context = ctx
+      context = ctx,
+      syntaxErrors = parsed.syntaxErrors.map(toScalaWarning).asJava
     )
 
   private def extractExpression(tree: untpd.Tree)(using Context): Option[untpd.Tree] = tree match {
@@ -823,13 +884,15 @@ case class SourceEntry(path: String, content: String)
  * Output of the bridge's shared parsing path: the raw parsed tree (what Dotty
  * produced — keeps the wrapper if there was one, needed by the typer), the
  * unwrapped tree visible to downstream consumers, the underlying Dotty
- * `CompilationUnit`, and the wrapping strategy that was applied.
+ * `CompilationUnit`, the wrapping strategy that was applied, and the
+ * error-level diagnostics of the parse attempt that was kept.
  */
 private[internal] case class ParsedUnit(
   rawTree: untpd.Tree,
   finalTree: untpd.Tree,
   unit: dotty.tools.dotc.CompilationUnit,
-  wrapping: Wrapping
+  wrapping: Wrapping,
+  syntaxErrors: List[Diagnostic] = Nil
 )
 
 /**
@@ -860,6 +923,9 @@ private[internal] enum Wrapping:
  *                         (e.g. a `.sbt` file) as `object __SbtScript__ { ... }`.
  *                         The wrapper is still present in `tree`; the
  *                         converter is responsible for lifting its body.
+ * @param syntaxErrors     the parser's error-level diagnostics, which `warnings`
+ *                         also holds. Dotty recovers from them with a tree that
+ *                         need not reflect the source.
  */
 case class ScalaParseResult(
   tree: untpd.Tree,
@@ -868,7 +934,8 @@ case class ScalaParseResult(
   wasWrapped: Boolean = false,
   wasObjectWrapped: Boolean = false,
   context: Context,
-  typedNodes: TypedNodes = TypedNodes.empty
+  typedNodes: TypedNodes = TypedNodes.empty,
+  syntaxErrors: JList[ScalaWarning] = Collections.emptyList()
 )
 
 private[internal] object ScalaParseResultConstants:

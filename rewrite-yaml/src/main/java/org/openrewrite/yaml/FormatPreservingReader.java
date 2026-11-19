@@ -30,6 +30,10 @@ import java.util.ArrayList;
 class FormatPreservingReader extends Reader {
     private final Reader delegate;
 
+    // the original text, buffered in place of what the delegate hands to SnakeYAML
+    private final String source;
+    private int sourceIndex;
+
     // whether the source has multi bytes (> 2 bytes) unicode characters
     private final boolean hasMultiBytesUnicode;
     // Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
@@ -43,7 +47,18 @@ class FormatPreservingReader extends Reader {
     private int bufferIndex = 0;
 
     FormatPreservingReader(String source) {
-        this.delegate = new StringReader(source);
+        this(source, source);
+    }
+
+    /**
+     * @param source          The original text, from which prefixes and values are read.
+     * @param scannableSource The text handed to SnakeYAML: the same length as {@code source}, with
+     *                        characters SnakeYAML can't scan swapped for equivalent ones.
+     */
+    FormatPreservingReader(String source, String scannableSource) {
+        assert source.length() == scannableSource.length();
+        this.delegate = new StringReader(scannableSource);
+        this.source = source;
 
         boolean hasUnicodes = false;
         int[] pos = new int[source.length() + 1];
@@ -119,8 +134,7 @@ class FormatPreservingReader extends Reader {
         if (read > 0) {
             buffer.ensureCapacity(buffer.size() + read);
             for (int i = 0; i < read; i++) {
-                char e = cbuf[off + i];
-                buffer.add(e);
+                buffer.add(source.charAt(sourceIndex++));
             }
         }
         return read;

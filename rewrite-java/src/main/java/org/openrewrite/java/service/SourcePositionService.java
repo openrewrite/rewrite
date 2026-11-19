@@ -134,7 +134,14 @@ public class SourcePositionService {
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded || (it instanceof J && ((J) it).getPrefix().getWhitespace().contains("\n"))))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+            Cursor parent = cursor.getParent();
+            while (parent != null && isPassedOver(parent.getValue())) {
+                parent = parent.getParent();
+            }
+            if (parent == null) {
+                // The top of a cursor made without a root, like new Cursor(null, cu), ends the walk as the root does
+                return cursor;
+            }
             while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
                 parent = parent.getParent();
             }
@@ -147,6 +154,14 @@ public class SourcePositionService {
         }
 
         return cursor;
+    }
+
+    /**
+     * A newline in the method chain after the current cursor does not count as a newLinedCursorElement.
+     */
+    private static boolean isPassedOver(Object value) {
+        return value instanceof J.MethodInvocation || value instanceof JRightPadded || value instanceof JLeftPadded ||
+               (value instanceof J && ((J) value).getPrefix().getWhitespace().contains("\n"));
     }
 
     /**

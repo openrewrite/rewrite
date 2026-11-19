@@ -24,6 +24,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
@@ -50,6 +51,11 @@ import static org.openrewrite.test.SourceSpecs.text;
         "closure-unchanged-upgrade overlay parity check recorded against a real package manager.")
 class AddDependencyResolvedOverlayTest implements RewriteTest {
 
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(new AddDependency("lodash", "^4.17.21", "dependencies"));
+  }
+
     private static final String PACKAGE_JSON = "{\n" +
             "  \"name\": \"x\",\n" +
             "  \"dependencies\": {\n" +
@@ -72,7 +78,6 @@ class AddDependencyResolvedOverlayTest implements RewriteTest {
         AtomicReference<NodeResolutionResult> capturedAfterMarker = new AtomicReference<>();
 
         rewriteRun(
-                spec -> spec.recipe(new AddDependency("lodash", "^4.17.21", "dependencies")),
                 npm(tempDir,
                         packageJson(
                                 PACKAGE_JSON,
@@ -127,7 +132,6 @@ class AddDependencyResolvedOverlayTest implements RewriteTest {
         AtomicReference<NodeResolutionResult> capturedAfterMarker = new AtomicReference<>();
 
         rewriteRun(
-                spec -> spec.recipe(new AddDependency("lodash", "^4.17.21", "dependencies")),
                 yarnBerry(tempDir,
                         packageJson(
                                 packageJsonContent,
@@ -179,7 +183,6 @@ class AddDependencyResolvedOverlayTest implements RewriteTest {
         AtomicReference<NodeResolutionResult> capturedAfterMarker = new AtomicReference<>();
 
         rewriteRun(
-                spec -> spec.recipe(new AddDependency("lodash", "^4.17.21", "dependencies")),
                 pnpm(tempDir,
                         packageJson(
                                 packageJsonContent,

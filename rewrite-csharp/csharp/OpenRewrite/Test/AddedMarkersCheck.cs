@@ -165,7 +165,7 @@ internal static class AddedMarkersCheck
         _ => ShapeOf(node.GetType()).Markers?.GetValue(node) as Markers
     };
 
-    private static List<object> ChildrenOf(object node)
+    internal static List<object> ChildrenOf(object node)
     {
         var children = new List<object>();
         foreach (var (property, many) in ShapeOf(node.GetType()).Children)

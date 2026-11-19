@@ -36,6 +36,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
 import org.jetbrains.kotlin.fir.unwrapFakeOverrides
+import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaAnnotation
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
@@ -49,6 +50,7 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.internal.expandedAliasType
 import org.openrewrite.kotlin.internal.facadeFqn
 import org.openrewrite.kotlin.internal.isFromLibrary
+import org.openrewrite.kotlin.internal.jvmName
 import org.openrewrite.kotlin.internal.namedClassSymbol
 import java.util.*
 
@@ -539,6 +541,18 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 oSig
             }
 
+            isFileFacadeMember(property.symbol) -> when (val source = property.containerSource) {
+                is JvmPackagePartSource -> source.facadeFqn
+                else -> fileSignature(property.symbol.getContainingFile() ?: firFile)
+            }
+
+            initializerScope(parent) != null -> {
+                // All initializer locals of a class share one owner, so where they are declared tells them apart.
+                return initializerSignature(initializerScope(parent)!!) +
+                        "{name=${variableName(property.name.asString())}" +
+                        ",type=${signature(property.returnTypeRef)},pos=${property.source?.startOffset}}"
+            }
+
             parent is FirFunction -> methodSignature(parent, null)
             parent is FirFile -> fileSignature(parent)
             parent is FirClass -> classSignature(parent)
@@ -548,6 +562,15 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         sig.append("{name=${variableName(property.name.asString())}")
         sig.append(",type=${signature(property.returnTypeRef)}}")
         return sig.toString()
+    }
+
+    fun initializerSignature(scope: FirDeclaration): String {
+        val container = when (val c = initializerContainer(scope)) {
+            null -> fileSignature(firFile)
+            is FirAnonymousObject -> signature(c)
+            else -> classSignature(c)
+        }
+        return "$container{name=,return=void,parameters=[]}"
     }
 
     @OptIn(SymbolInternals::class)
@@ -724,14 +747,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             return convertKotlinFqToJavaFq(classId.toString())
         }
 
-        fun fileSignature(file: FirFile): String {
-            val sig = StringBuilder()
-            if (file.packageFqName.asString().isNotEmpty()) {
-                sig.append("${file.packageFqName.asString()}.")
-            }
-            sig.append(file.name.replace("/", ".").replace("\\", ".").replace(".kt", "Kt"))
-            return sig.toString()
-        }
+        fun fileSignature(file: FirFile): String = file.facadeFqn
 
         fun convertKotlinFqToJavaFq(kotlinFqn: String): String {
             val cleanedFqn = kotlinFqn
@@ -743,11 +759,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
         fun methodName(function: FirFunction): String {
             return when (function) {
-                is FirPropertyAccessor -> when {
-                    function.isGetter -> "get"
-                    function.isSetter -> "set"
-                    else -> function.symbol.name.asString()
-                }
+                is FirPropertyAccessor -> function.jvmName
+                    ?: function.propertySymbol.name.asString().let {
+                        if (function.isGetter) JvmAbi.getterName(it) else JvmAbi.setterName(it)
+                    }
                 else -> function.symbol.name.asString()
             }
         }

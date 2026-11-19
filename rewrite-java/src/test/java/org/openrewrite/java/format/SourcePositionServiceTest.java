@@ -29,10 +29,12 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
@@ -333,6 +335,35 @@ class SourcePositionServiceTest implements RewriteTest {
             "\t}\n" +
             "\tint y = 2;\n" +
             "}\n"
+          )
+        );
+    }
+
+    @Test
+    void cursorWithoutRootGivesSameColumns() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+                  SourcePositionService service = cu.service(SourcePositionService.class);
+                  JContainer<Statement> components = requireNonNull(classDecl.getPadding().getPrimaryConstructor());
+                  // given a cursor that ends at a compilation unit with a newline in its prefix
+                  Cursor withoutRoot = new Cursor(new Cursor(null, cu), classDecl);
+                  assertThat(service.columnsOf(withoutRoot, components))
+                    .isEqualTo(service.columnsOf(getCursor(), components));
+                  return classDecl;
+              }
+          })),
+          java(
+            """
+
+              package com.example;
+
+              record Pair(String key, String value) {
+              }
+              """,
+            SourceSpec::noTrim
           )
         );
     }

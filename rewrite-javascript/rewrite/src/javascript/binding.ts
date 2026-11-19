@@ -24,7 +24,7 @@ import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
     isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindGroup, RebindImport, requireBinds,
-    requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
+    requireDeclarationOf, requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget, sameAttributes
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {RenameMemberSpellings} from "./member-spellings";
@@ -427,17 +427,31 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
                 new RebindGroup(statement.id, statement as JS.Import);
             group.add(existing.localName, boundName, options.to, existing.typeOnly);
         }
-        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, group));
+        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, group,
+            keptModuleObjects(cu, options)));
     }
     queueRenameMemberSpellings(visitor, cu, options);
     return boundName;
 }
 
+function keptModuleObjects(cu: JS.CompilationUnit, options: MaybeRebindOptions): ReadonlySet<string> {
+    return bindingShape(options.from.member) !== "named" || sameModule(options.from.module, options.to.module) ?
+        new Set() : moduleObjectsOf(cu, options.from.module, false);
+}
+
+function moduleObjectsOf(cu: JS.CompilationUnit, module: string, neverAssigned: boolean): Set<string> {
+    const root = new Cursor(cu);
+    return new Set(moduleObjectBindings(cu)
+        .filter(b => b.shape !== "default" && sameModule(b.module, module) &&
+            !(neverAssigned && b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
+        .map(b => b.name));
+}
+
 /**
  * Queues one {@link RenameMemberSpellings} per move of a named member, after any `RebindImport` of the move.
  * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
- * Skips a `let` or `var` `NS` of the module that the file assigns to: after `NS = other`, `NS.Old` may not
- * read the module. Only those are looked for, since finding an assignment reads the whole file.
+ * Within one module, skips a `let` or `var` `NS` of the module that the file assigns to: after `NS = other`,
+ * `NS.Old` may not read the module. Only those are looked for, since finding an assignment reads the whole file.
  */
 function queueRenameMemberSpellings(
     visitor: JavaScriptVisitor<any>,
@@ -451,13 +465,9 @@ function queueRenameMemberSpellings(
             sameModule(v.from.module, options.from.module) && v.to.member === to && sameModule(v.to.module, options.to.module))) {
         return;
     }
-    const root = new Cursor(cu);
-    const moduleObjects = new Set(moduleObjectBindings(cu)
-        .filter(b => b.shape !== "default" && sameModule(b.module, options.from.module) &&
-            !(b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
-        .map(b => b.name));
-    visitor.afterVisit.push(new RenameMemberSpellings(
-        {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));
+    visitor.afterVisit.push(new RenameMemberSpellings({module: options.from.module, member: from},
+        {module: options.to.module, member: to},
+        moduleObjectsOf(cu, options.from.module, sameModule(options.from.module, options.to.module))));
 }
 
 /**
@@ -498,7 +508,10 @@ function sharesNameWithValue(cu: JS.CompilationUnit, existing: ExistingImportBin
 
 const noNames: ReadonlySet<string> = new Set();
 
-/** Whether the moved binding can merge into a value import of `to`'s named member that `name` binds. */
+/**
+ * Whether the moved binding can merge into a value import of `to`'s named member that `name` binds,
+ * loaded with the same attributes.
+ */
 function reusesTargetImport(
     cu: JS.CompilationUnit,
     name: string,
@@ -512,7 +525,13 @@ function reusesTargetImport(
     const joined = !moved.viaRequire || (!moved.reassignable && joinTarget !== undefined &&
         requireBinds(joinTarget, to.module, to.member) === name);
     return target?.localName === name && target.viaRequire === moved.viaRequire && joined &&
-        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
+        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly &&
+        sameAttributes(attributesOf(target), attributesOf(moved)) && onlyReferences(cu, name);
+}
+
+/** The `with {…}` clause of the import that binds it. A `require` has none. */
+function attributesOf(binding: ExistingImportBinding): JS.ImportAttributes | undefined {
+    return binding.statement.kind === JS.Kind.Import ? binding.statement.attributes : undefined;
 }
 
 /**

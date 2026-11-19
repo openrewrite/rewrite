@@ -17,6 +17,7 @@ package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -243,7 +244,7 @@ public class XRange extends LatestRelease {
                 return -1;
             }
 
-            int compare = xrangeV1.major.compareTo(xrangeV2.major);
+            int compare = compareSegment(xrangeV1.major, xrangeV2.major);
             if (compare != 0) {
                 return compare;
             }
@@ -256,7 +257,7 @@ public class XRange extends LatestRelease {
                 return -1;
             }
 
-            compare =  xrangeV1.minor.compareTo(xrangeV2.minor);
+            compare = compareSegment(xrangeV1.minor, xrangeV2.minor);
             if (compare != 0) {
                 return compare;
             }
@@ -270,7 +271,7 @@ public class XRange extends LatestRelease {
             }
 
             // Micro is guaranteed to be the same, so we can stop here
-            return xrangeV1.patch.compareTo(xrangeV2.patch);
+            return compareSegment(xrangeV1.patch, xrangeV2.patch);
         } else if (maybeXRangeV1.isValid()) {
             if (!isVersion(v2)) {
                 return 1;
@@ -284,19 +285,19 @@ public class XRange extends LatestRelease {
             ParsedVersion gav = ParsedVersion.parse(normalizeVersion(v2));
 
             if (!xrangeV1.major.equals(gav.group(1))) {
-                return xrangeV1.major.compareTo(gav.group(1));
+                return compareSegment(xrangeV1.major, gav.group(1));
             }
 
             if ("*".equals(xrangeV1.minor)) {
                 return 0;
             } else if (gav.group(2) == null || !xrangeV1.minor.equals(gav.group(2))) {
-                return xrangeV1.minor.compareTo(gav.group(2));
+                return compareSegment(xrangeV1.minor, gav.group(2));
             }
 
             if ("*".equals(xrangeV1.patch)) {
                 return 0;
             } else if (gav.group(3) == null || !xrangeV1.patch.equals(gav.group(3))) {
-                return xrangeV1.patch.compareTo(gav.group(3));
+                return compareSegment(xrangeV1.patch, gav.group(3));
             }
 
             return 0;
@@ -314,26 +315,48 @@ public class XRange extends LatestRelease {
 
             String major = gav.group(1);
             if (!xrangeV2.major.equals(major)) {
-                return requireNonNull(major).compareTo(xrangeV2.major);
+                return compareSegment(requireNonNull(major), xrangeV2.major);
             }
 
             String minor = gav.group(2);
             if ("*".equals(xrangeV2.minor)) {
                 return 0;
             } else if (minor == null || !minor.equals(xrangeV2.minor)) {
-                return requireNonNull(minor).compareTo(xrangeV2.minor);
+                return compareSegment(requireNonNull(minor), xrangeV2.minor);
             }
 
             String patch = gav.group(3);
             if ("*".equals(xrangeV2.patch)) {
                 return 0;
             } else if (patch == null || !patch.equals(xrangeV2.patch)) {
-                return requireNonNull(patch).compareTo(xrangeV2.patch);
+                return compareSegment(requireNonNull(patch), xrangeV2.patch);
             }
 
             return 0;
         }
 
         return super.compare(currentVersion, v1, v2);
+    }
+
+    /**
+     * Compares a major, minor or patch segment. When both segments are numeric they are compared by numeric
+     * value (so "5" sorts before "14"), otherwise they are compared as strings.
+     */
+    private static int compareSegment(String s1, @Nullable String s2) {
+        if (s2 != null && StringUtils.isNumeric(s1) && StringUtils.isNumeric(s2)) {
+            String n1 = stripLeadingZeros(s1);
+            String n2 = stripLeadingZeros(s2);
+            // Compare by digit count first so that arbitrarily long segments cannot overflow
+            return n1.length() != n2.length() ? Integer.compare(n1.length(), n2.length()) : n1.compareTo(n2);
+        }
+        return s1.compareTo(s2);
+    }
+
+    private static String stripLeadingZeros(String s) {
+        int i = 0;
+        while (i < s.length() - 1 && s.charAt(i) == '0') {
+            i++;
+        }
+        return s.substring(i);
     }
 }

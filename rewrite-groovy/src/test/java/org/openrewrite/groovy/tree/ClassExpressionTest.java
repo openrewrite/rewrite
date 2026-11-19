@@ -16,8 +16,10 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class ClassExpressionTest implements RewriteTest {
@@ -104,6 +106,24 @@ class ClassExpressionTest implements RewriteTest {
             """
               def x = ArrayList<String>.class
               """
+          )
+        );
+    }
+
+    @Test
+    void arrayClassLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              def a = String[].class
+              def b = int[][].class
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.FieldAccess b = (J.FieldAccess) ((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().get(0).getInitializer();
+                assertThat(b.getSimpleName()).isEqualTo("class");
+                assertThat(b.getTarget()).isInstanceOf(J.ArrayType.class);
+            })
           )
         );
     }

@@ -16,8 +16,15 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 /**
@@ -30,7 +37,23 @@ class UnionTypeTest implements RewriteTest {
     @Test
     void methodParameterUnionLiteralType() {
         rewriteRun(
-          scala("def display(operation: \"resize\" | \"thumbnail\") = 1\n")
+          scala(
+            "def display(operation: \"resize\" | \"thumbnail\") = 1\n",
+            spec -> spec.afterRecipe(cu -> {
+                List<Expression> operands = new ArrayList<>();
+                new ScalaIsoVisitor<Integer>() {
+                    @Override
+                    public J visitUnionType(S.UnionType unionType, Integer p) {
+                        operands.addAll(unionType.getTypes());
+                        return unionType;
+                    }
+                }.visit(cu, 0);
+                assertThat(operands).hasSize(2).allSatisfy(operand -> {
+                    assertThat(operand).isInstanceOf(S.SingletonType.class);
+                    assertThat(((S.SingletonType) operand).getQualifier()).isInstanceOf(J.Literal.class);
+                });
+            })
+          )
         );
     }
 

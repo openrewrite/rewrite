@@ -194,6 +194,62 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `property-access rewrite on a generic receiver types the property with its type argument`() {
+        val r = loadCompiledRecipe(
+            source = """
+                package demo
+                import org.openrewrite.recipe
+                class Box<T>(private val t: T) {
+                    val first: T get() = t
+                    val second: T get() = t
+                }
+                val UseSecond = recipe(
+                    displayName = "Use Box.second",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { b: Box<String> -> b.first } to { b -> b.second }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseSecond",
+            packageName = "demo",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                package demo
+                class Box<T>(private val t: T) {
+                    val first: T get() = t
+                    val second: T get() = t
+                }
+                fun use(b: Box<String>): String = b.first
+                """,
+                """
+                package demo
+                class Box<T>(private val t: T) {
+                    val first: T get() = t
+                    val second: T get() = t
+                }
+                fun use(b: Box<String>): String = b.second
+                """,
+            ) { spec ->
+                spec.afterRecipe { cu ->
+                    val types = mutableListOf<String>()
+                    object : org.openrewrite.kotlin.KotlinIsoVisitor<Int>() {
+                        override fun visitFieldAccess(fieldAccess: org.openrewrite.java.tree.J.FieldAccess, p: Int): org.openrewrite.java.tree.J.FieldAccess {
+                            types.add(fieldAccess.type.toString())
+                            return super.visitFieldAccess(fieldAccess, p)
+                        }
+                    }.visit(cu, 0)
+                    assertThat(types).containsExactly("kotlin.String")
+                }
+            },
+        )
+    }
+
+    @Test
     fun `property-access after-template FQN is shortened and imported`() {
         val r = loadCompiledRecipe(
             source = """
@@ -1070,6 +1126,28 @@ class RecipePluginRewriteTest : RewriteTest {
         assertThat(check).isInstanceOf(UsesMethod::class.java)
         assertThat((check as UsesMethod<*>).methodMatcher.toString())
             .contains("lowercase")
+    }
+
+    @Test
+    fun `matcher on a top-level function names the facade kotlinc generates`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.recipe
+            fun legacy(s: String): String = s
+            val UseTrim = recipe("d", "desc") {
+                edit {
+                    rewrite { s: String -> legacy(s) } to { s -> s.trim() }
+                }
+            }
+            """.trimIndent(),
+            fileName = "my-recipes.kt",
+        )
+        check(result.exitOk()) { "compile failed:\n${result.messages}" }
+        val facade = result.classLoader.loadClass("My_recipesKt")
+        val r = facade.getDeclaredMethod("getUseTrim").invoke(null) as Recipe
+        val check = (r.getVisitor() as Preconditions.Check).check
+        assertThat((check as UsesMethod<*>).methodMatcher.toString())
+            .startsWith("${facade.name} legacy(")
     }
 
     @Test

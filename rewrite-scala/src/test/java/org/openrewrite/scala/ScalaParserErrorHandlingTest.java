@@ -17,6 +17,8 @@ package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.ParseWarning;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
@@ -66,6 +68,25 @@ class ScalaParserErrorHandlingTest {
         // If the overflow escaped the batch, every input would fall back to a per-file parse without types.
         assertGoodIsTyped(parsed.get(0));
         assertThat(parsed.get(1)).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void syntaxErrorProducesParseError() {
+        // Dotty recovers with a tree that prints back unchanged, so the print check can't catch it
+        List<SourceFile> parsed = ScalaParser.builder().build().parse("object A { val = }").collect(Collectors.toList());
+
+        assertThat(parsed).singleElement().isInstanceOfSatisfying(ParseError.class, error ->
+          assertThat(error.getMarkers().findFirst(ParseExceptionResult.class))
+            .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("identifier expected")));
+    }
+
+    @Test
+    void typerErrorsStayMarkers() {
+        List<SourceFile> parsed = ScalaParser.builder().build().parse("object A { val x = y }").collect(Collectors.toList());
+
+        assertThat(parsed).singleElement().isInstanceOfSatisfying(S.CompilationUnit.class, cu ->
+          assertThat(cu.getMarkers().findAll(ParseWarning.class))
+            .anySatisfy(w -> assertThat(w.getMessage()).contains("Not found: y")));
     }
 
     @Test

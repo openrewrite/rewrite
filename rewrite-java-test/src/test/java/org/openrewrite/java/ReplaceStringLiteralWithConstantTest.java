@@ -20,16 +20,27 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ReplaceStringLiteralWithConstantTest implements RewriteTest {
 
     public static String EXAMPLE_STRING_CONSTANT = "Hello World!";
     public static String EXAMPLE_STRING_FQN = ReplaceStringLiteralWithConstantTest.class.getName() + ".EXAMPLE_STRING_CONSTANT";
+
+    public interface Constants {
+        String INHERITED_CONSTANT = "Inherited";
+    }
+
+    public static class ConstantsHolder implements Constants {
+    }
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -58,6 +69,47 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void attributesInheritedConstantOfNestedClassAsDeclared() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(null,
+            ReplaceStringLiteralWithConstantTest.class.getName() + ".ConstantsHolder.INHERITED_CONSTANT")),
+          java(
+            """
+              package org.openrewrite.java;
+
+              class Test {
+                  Object o = "Inherited";
+              }
+              """,
+            """
+              package org.openrewrite.java;
+
+              import org.openrewrite.java.ReplaceStringLiteralWithConstantTest.ConstantsHolder;
+
+              class Test {
+                  Object o = ConstantsHolder.INHERITED_CONSTANT;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                    if ("INHERITED_CONSTANT".equals(fieldAccess.getSimpleName())) {
+                        JavaType.Variable field = fieldAccess.getName().getFieldType();
+                        assertThat(field).isNotNull();
+                        assertThat(((JavaType.FullyQualified) field.getOwner()).getFullyQualifiedName())
+                          .isEqualTo(Constants.class.getName());
+                        assertThat(field.getFlags()).contains(Flag.Public, Flag.Static, Flag.Final);
+                        assertThat(TypeUtils.asFullyQualified(fieldAccess.getTarget().getType()).getFullyQualifiedName())
+                          .isEqualTo(ConstantsHolder.class.getName());
+                    }
+                    return super.visitFieldAccess(fieldAccess, p);
+                }
+            }.visit(cu, 0))
           )
         );
     }

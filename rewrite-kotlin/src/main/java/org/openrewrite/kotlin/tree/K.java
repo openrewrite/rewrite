@@ -26,11 +26,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
+import org.openrewrite.kotlin.service.KotlinScopeService;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
@@ -359,6 +361,10 @@ public interface K extends J {
                     serviceClass = service;
                 } else if (ImportService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinImportService.class.getName());
+                } else if (KotlinScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinScopeService.class.getName());
                 } else if (KotlinAutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
