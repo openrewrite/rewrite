@@ -246,14 +246,14 @@ public abstract class RewriteTest
                     var result = results.FirstOrDefault(r =>
                         r.Before != null && r.Before.Id == source.Id);
 
-                    if (spec.After != null)
+                    if (spec.After != null || spec.AfterFromActual != null)
                     {
                         // Expected a change
                         Assert.True(result != null && result.After != null,
                             $"Recipe was expected to make changes but did not modify the source file.");
                         var afterPrinted = PrintTree(result.After);
-                        AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
-                            "Unexpected result from recipe");
+                        AssertContentEquals(spec.AfterFromActual?.Invoke(afterPrinted) ?? spec.After!, afterPrinted,
+                            result.After.SourcePath, "Unexpected result from recipe");
                     }
                     else
                     {
@@ -583,6 +583,15 @@ public abstract class RewriteTest
     }
 
     /// <summary>
+    /// A C# source the recipe changes, whose expected text <paramref name="after"/> makes of what the recipe printed,
+    /// such as to assert on parts of a large output and return it, or to compute it from the parts that vary.
+    /// </summary>
+    protected static SourceSpec CSharp(string before, Func<string, string> after)
+    {
+        return new SourceSpec(before) { AfterFromActual = after };
+    }
+
+    /// <summary>
     /// An .editorconfig of the project the test's sources belong to. The C# sources take the style it sets for their
     /// paths, as <see cref="SolutionParser"/> gives them, and no recipe runs on it.
     /// </summary>
@@ -698,6 +707,7 @@ public record SourceSpec(
     string? SourcePath = null,
     string? SourceFileType = null)
 {
+    internal Func<string, string>? AfterFromActual { get; init; }
     internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
     internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];
     internal ImmutableArray<string>? ProjectTargetFrameworks { get; private init; }

@@ -200,6 +200,42 @@ public class SourceSpecHooksTests : RewriteTest
         Assert.Equal("BeforeRecipe takes a Document, but source.cs is a CompilationUnit.", failure.Message);
     }
 
+    [Fact]
+    public void AnAfterFunctionAssertsOnWhatTheRecipePrinted()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Foo"), actual =>
+            {
+                Assert.Contains("        Bar();", actual);
+                Assert.DoesNotContain("        Foo();", actual);
+                return actual;
+            })
+        );
+    }
+
+    [Fact]
+    public void AnAfterFunctionComputesTheExpectedText()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Foo"), actual => actual.Replace("Bar();", "Baz();"))
+        ));
+
+        Assert.StartsWith("Unexpected result from recipe \"source.cs\":", failure.Message);
+    }
+
+    [Fact]
+    public void AnAfterFunctionExpectsAChange()
+    {
+        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Bar"), actual => actual)
+        ));
+
+        Assert.StartsWith("Recipe was expected to make changes but did not modify the source file.", failure.Message);
+    }
+
     private static MethodInvocation Call(global::OpenRewrite.Core.Tree tree, string name) =>
         Nodes(tree).OfType<MethodInvocation>().First(call => call.Name.SimpleName == name);
 
