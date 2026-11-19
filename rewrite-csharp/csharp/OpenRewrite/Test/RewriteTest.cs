@@ -274,7 +274,8 @@ public abstract class RewriteTest
                     ExpectNoFurtherChanges(changes,
                         $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
                 }
-                var fresh = results.Count > 0 && (cycles > expectedCycles || validations.ParserShapedTrees)
+                var fresh = results.Count > 0 &&
+                            (cycles > expectedCycles || validations.ParserShapedTrees || validations.TypesAttributed)
                     ? ParseAgain(run.Finals, setup, projects)
                     : null;
                 if (cycles > expectedCycles && fresh != null)
@@ -285,6 +286,14 @@ public abstract class RewriteTest
                 if (validations.ParserShapedTrees && fresh != null)
                 {
                     TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
+                }
+                if (validations.TypesAttributed && fresh != null)
+                {
+                    TreeShapes.AssertTyped(recipeSpec.Recipe, results, fresh);
+                }
+                if (validations.UniqueIds)
+                {
+                    UniqueIds.AssertUnique(recipeSpec.Recipe, results);
                 }
                 EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
                 UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);

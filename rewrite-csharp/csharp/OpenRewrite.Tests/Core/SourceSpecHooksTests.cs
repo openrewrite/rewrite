@@ -96,10 +96,10 @@ public class SourceSpecHooksTests : RewriteTest
     [Fact]
     public void AFailingAfterRecipeAssertionFailsTheTest()
     {
-        Assert.Throws<EmptyException>(() => RewriteRun(
+        Assert.Throws<DoesNotContainException>(() => RewriteRun(
             spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
             CSharp(Calls("Foo"), Calls("Bar")).AfterRecipe(cu =>
-                Assert.Empty(Nodes(cu).OfType<MethodInvocation>().Where(call => call.Name.SimpleName == "Bar")))
+                Assert.DoesNotContain(Nodes(cu).OfType<MethodInvocation>(), call => call.Name.SimpleName == "Bar"))
         ));
     }
 

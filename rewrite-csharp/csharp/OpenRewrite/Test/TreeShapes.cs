@@ -74,6 +74,109 @@ internal static class TreeShapes
         }
     }
 
+    /// <param name="fresh">A fresh parse of each compilation unit the recipe left, by the recipe's output.</param>
+    public static void AssertTyped(Recipe recipe, IEnumerable<Result> results,
+        IReadOnlyDictionary<SourceFile, RewriteTest.FreshParse> fresh)
+    {
+        var found = new StringBuilder();
+        foreach (var (before, after) in results)
+        {
+            if (after is not CompilationUnit cu || !fresh.TryGetValue(after, out var parse) || parse.Unit == null)
+            {
+                continue;
+            }
+            var typedBefore = new HashSet<Guid>();
+            if (before is CompilationUnit original)
+            {
+                CollectTyped(Skeleton(original), typedBefore);
+            }
+            var untyped = new List<string>();
+            CompareTypes(Skeleton(cu), Skeleton(parse.Unit), typedBefore, Ids(before), untyped);
+            if (untyped.Count == 0)
+            {
+                continue;
+            }
+            found.Append("  ").Append(after.SourcePath).Append(":\n");
+            foreach (var problem in untyped)
+            {
+                found.Append("    ").Append(problem).Append('\n');
+            }
+        }
+
+        if (found.Length > 0)
+        {
+            Assert.Fail(
+                "Give the nodes the recipe makes the types the compiler resolves for them.\n" +
+                $"The output of {recipe.Name} holds nodes without the types the compiler resolves for the text they " +
+                "print:\n" +
+                found +
+                "A recipe that runs after it, and a Java recipe that matches types, misses a node without its type. " +
+                "If the output is meant to lack them, opt out with " +
+                "spec.SetValidations(new Validations { TypesAttributed = false }).");
+        }
+    }
+
+    /// <summary>The ids of the nodes of a source file.</summary>
+    private static HashSet<Guid> Ids(SourceFile? source)
+    {
+        var ids = new HashSet<Guid>();
+        if (source is CompilationUnit cu)
+        {
+            CollectIds(Skeleton(cu), ids);
+        }
+        return ids;
+    }
+
+    private static void CollectIds(Node node, HashSet<Guid> ids)
+    {
+        ids.Add(node.Tree.Id);
+        node.Children.ForEach(child => CollectIds(child, ids));
+    }
+
+    /// <summary>The ids of the nodes that hold every type the compiler gave them.</summary>
+    private static void CollectTyped(Node node, HashSet<Guid> typed)
+    {
+        if (TypedProperties.Of(node.Tree).All(t => Resolved(t.Type)))
+        {
+            typed.Add(node.Tree.Id);
+        }
+        node.Children.ForEach(child => CollectTyped(child, typed));
+    }
+
+    private static void CompareTypes(Node node, Node parsed, HashSet<Guid> typedBefore, HashSet<Guid> idsBefore,
+        List<string> problems)
+    {
+        if (problems.Count >= MaxPerFile || node.Tree.GetType() != parsed.Tree.GetType())
+        {
+            return;
+        }
+        // a node the recipe kept from code that lacked the type stays as untyped as the input was
+        var made = !idsBefore.Contains(node.Tree.Id) || typedBefore.Contains(node.Tree.Id);
+        if (made)
+        {
+            var parsedTypes = TypedProperties.Of(parsed.Tree);
+            foreach (var ((property, type), (_, parsedType)) in TypedProperties.Of(node.Tree).Zip(parsedTypes))
+            {
+                if (!Resolved(type) && Resolved(parsedType))
+                {
+                    problems.Add($"{node} has no {property} where the compiler resolves " +
+                                 TypedProperties.Signature(parsedType!));
+                    break;
+                }
+            }
+        }
+        if (node.Children.Count != parsed.Children.Count)
+        {
+            return;
+        }
+        for (var i = 0; i < node.Children.Count; i++)
+        {
+            CompareTypes(node.Children[i], parsed.Children[i], typedBefore, idsBefore, problems);
+        }
+    }
+
+    private static bool Resolved(JavaType? type) => type is not null and not JavaType.Unknown;
+
     private static List<string> Problems(SourceFile? before, CompilationUnit after, RewriteTest.FreshParse parse)
     {
         var problems = new List<string>();

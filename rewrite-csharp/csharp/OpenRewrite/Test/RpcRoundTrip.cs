@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Collections.Concurrent;
-using System.Reflection;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
-using OpenRewrite.Java.Rpc;
 
 namespace OpenRewrite.Test;
 
@@ -30,8 +27,6 @@ namespace OpenRewrite.Test;
 internal static class RpcRoundTrip
 {
     private const int MaxReported = 5;
-
-    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> TypeProperties = new();
 
     public static void AssertSurvives(IEnumerable<Result> results)
     {
@@ -68,8 +63,9 @@ internal static class RpcRoundTrip
 
     private sealed record Node(Tree Tree, List<(string Property, JavaType Type)> Types)
     {
-        public string Describe() => $"{Tree.GetType().Name} {Tree.Id}" +
-                                    string.Concat(Types.Select(t => $" {t.Property}={Signature(t.Type)}"));
+        public string Describe() =>
+            $"{Tree.GetType().Name} {Tree.Id}" +
+            string.Concat(Types.Select(t => $" {t.Property}={TypedProperties.Signature(t.Type)}"));
     }
 
     private static IEnumerable<string> Mismatches(List<Node> sent, List<Node> received)
@@ -100,7 +96,10 @@ internal static class RpcRoundTrip
             var node = pending.Pop();
             if (node is Tree tree)
             {
-                nodes.Add(new Node(tree, TypesOf(tree)));
+                nodes.Add(new Node(tree, TypedProperties.Of(tree)
+                    .Where(t => t.Type != null)
+                    .Select(t => (t.Property, t.Type!))
+                    .ToList()));
             }
             var children = AddedMarkersCheck.ChildrenOf(node);
             for (var i = children.Count - 1; i >= 0; i--)
@@ -111,16 +110,4 @@ internal static class RpcRoundTrip
         return nodes;
     }
 
-    private static List<(string, JavaType)> TypesOf(Tree tree) =>
-        TypeProperties.GetOrAdd(tree.GetType(), type => type
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.GetIndexParameters().Length == 0 && typeof(JavaType).IsAssignableFrom(p.PropertyType))
-                .OrderBy(p => p.Name, StringComparer.Ordinal)
-                .ToArray())
-            .Select(p => (p.Name, p.GetValue(tree) as JavaType))
-            .Where(t => t.Item2 != null)
-            .Select(t => (t.Name, t.Item2!))
-            .ToList();
-
-    private static string Signature(JavaType type) => JavaSender.TypeSignature(type).ToString() ?? "";
 }
