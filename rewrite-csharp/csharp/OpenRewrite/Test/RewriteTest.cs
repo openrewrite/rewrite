@@ -259,14 +259,16 @@ public abstract class RewriteTest
                     var result = results.FirstOrDefault(r =>
                         r.Before != null && r.Before.Id == source.Id);
 
-                    if (spec.After != null || spec.AfterFromActual != null)
+                    var expected = spec.AfterFromActual != null
+                        ? spec.AfterFromActual(result?.After is { } printed ? PrintTree(printed) : spec.Before)
+                        : spec.After;
+                    if (expected != null)
                     {
                         // Expected a change
                         Assert.True(result != null && result.After != null,
                             $"Recipe was expected to make changes but did not modify the source file.");
-                        var afterPrinted = PrintTree(result.After);
-                        AssertContentEquals(spec.AfterFromActual?.Invoke(afterPrinted) ?? spec.After!, afterPrinted,
-                            result.After.SourcePath, "Unexpected result from recipe");
+                        AssertContentEquals(expected, PrintTree(result.After), result.After.SourcePath,
+                            "Unexpected result from recipe");
                     }
                     else
                     {
@@ -618,10 +620,12 @@ public abstract class RewriteTest
     }
 
     /// <summary>
-    /// A C# source the recipe changes, whose expected text <paramref name="after"/> makes of what the recipe printed,
-    /// such as to assert on parts of a large output and return it, or to compute it from the parts that vary.
+    /// A C# source whose expected text <paramref name="after"/> makes of what the recipe printed, such as to assert on
+    /// parts of a large output and return it, or to compute it from the parts that vary. It gets the source as it was
+    /// when the recipe leaves it alone, and returns null when the recipe is to leave it alone, such as where the data
+    /// of a theory decides whether the recipe changes anything.
     /// </summary>
-    protected static SourceSpec CSharp(string before, Func<string, string> after, string? sourcePath = null)
+    protected static SourceSpec CSharp(string before, Func<string, string?> after, string? sourcePath = null)
     {
         return new SourceSpec(before, null, CSharpSourcePath(sourcePath)) { AfterFromActual = after };
     }
@@ -746,10 +750,10 @@ public abstract class RewriteTest
 
     /// <summary>
     /// A project file the recipe changes, whose expected text <paramref name="afterFromActual"/> makes of what the
-    /// recipe printed, as <see cref="CSharp(string, Func{string, string})"/> does for a C# source. It isn't named
+    /// recipe printed, as <see cref="CSharp(string, Func{string, string?}, string?)"/> does for a C# source. It isn't named
     /// <c>after</c>, so that <c>CsProj(before, after: null)</c> still means a project file the recipe leaves alone.
     /// </summary>
-    protected static SourceSpec CsProj([LanguageInjection("xml")]string before, Func<string, string> afterFromActual,
+    protected static SourceSpec CsProj([LanguageInjection("xml")]string before, Func<string, string?> afterFromActual,
         string sourcePath = "project.csproj")
     {
         return new SourceSpec(before, null, sourcePath, XmlDocumentType) { AfterFromActual = afterFromActual };
@@ -768,9 +772,10 @@ public abstract class RewriteTest
 
     /// <summary>
     /// An XML file the recipe changes, parsed as <see cref="Xml(string, string?, string)"/> does, whose expected text
-    /// <paramref name="afterFromActual"/> makes of what the recipe printed.
+    /// <paramref name="afterFromActual"/> makes of what the recipe printed, as
+    /// <see cref="CSharp(string, Func{string, string?}, string?)"/> does for a C# source.
     /// </summary>
-    protected static SourceSpec Xml([LanguageInjection("xml")]string before, Func<string, string> afterFromActual,
+    protected static SourceSpec Xml([LanguageInjection("xml")]string before, Func<string, string?> afterFromActual,
         string sourcePath = "file.xml")
     {
         return new SourceSpec(before, null, sourcePath, XmlDocumentType) { PlainXml = true, AfterFromActual = afterFromActual };
@@ -924,7 +929,7 @@ public record SourceSpec(
     string? SourcePath = null,
     string? SourceFileType = null)
 {
-    internal Func<string, string>? AfterFromActual { get; init; }
+    internal Func<string, string?>? AfterFromActual { get; init; }
     internal bool PlainXml { get; init; }
     internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
     internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];

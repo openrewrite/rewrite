@@ -135,6 +135,40 @@ public class SourceSpecHooksTests : RewriteTest
         );
     }
 
+    [Theory]
+    [InlineData("Foo")]
+    [InlineData("Bar")]
+    public void AnAfterFunctionSaysWhetherTheRecipeChangesTheSource(string called)
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls(called), actual => called == "Foo" ? actual.Replace("Foo();", "Bar();") : null)
+        );
+    }
+
+    [Fact]
+    public void AnAfterFunctionThatExpectsNoChangeFailsWhenTheRecipeChangesTheSource()
+    {
+        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Foo"), _ => null)
+        ));
+
+        Assert.StartsWith("Recipe made unexpected changes to a source file that was not expected to change.",
+            failure.Message);
+    }
+
+    [Fact]
+    public void AnAfterFunctionThatExpectsAChangeFailsWhenTheRecipeLeavesTheSourceAlone()
+    {
+        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Bar"), actual => actual)
+        ));
+
+        Assert.StartsWith("Recipe was expected to make changes but did not modify the source file.", failure.Message);
+    }
+
     [Fact]
     public void ACSharpSourceIsAtAPathThatEndsInCs()
     {
