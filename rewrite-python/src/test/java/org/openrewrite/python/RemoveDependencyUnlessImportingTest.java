@@ -16,14 +16,30 @@
 package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.toml.ChangeValue;
+import org.openrewrite.toml.tree.Toml;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
 
 class RemoveDependencyUnlessImportingTest implements RewriteTest {
@@ -238,6 +254,107 @@ class RemoveDependencyUnlessImportingTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Timeout(120)
+    void lockRegeneratedInALaterCycleReadsTheDepsFileThatCycleScanned() {
+        rewriteRun(
+          spec -> spec
+            .recipes(new RenameModule("iniconfig", "configparser"),
+              new UpgradeDependencyVersion("six", "==1.17.0", null, null),
+              new RemoveDependency("iniconfig", null, null, List.of("iniconfig")),
+              new ChangeValue("project.requires-python", "\">=3.13\""))
+            .executionContext(uvIndexReplay())
+            .cycles(3)
+            .expectedCyclesThatMakeChanges(2),
+          python(
+            """
+              import iniconfig
+
+              config = iniconfig.IniConfig
+              """,
+            """
+              import configparser
+
+              config = configparser.IniConfig
+              """
+          ),
+          uvLockVisitedBeforePyproject(
+            uvResource("i-minimal-update/uv.lock.v1"),
+            s -> s.noTrim().after(actual -> assertThat(actual)
+              .startsWith("version = 1\nrevision = 3\nrequires-python = \">=3.13\"\n")
+              .contains("{ name = \"six\", specifier = \"==1.17.0\" }")
+              .doesNotContain("iniconfig")
+              .actual())
+          ),
+          pyproject(
+            """
+              [project]
+              name = "fixture-i"
+              version = "0.1.0"
+              requires-python = ">=3.12"
+              dependencies = [
+                  "six==1.16.0",
+                  "iniconfig>=2.0",
+              ]
+
+              [tool.uv]
+              """,
+            """
+              [project]
+              name = "fixture-i"
+              version = "0.1.0"
+              requires-python = ">=3.13"
+              dependencies = [
+                  "six==1.17.0",
+              ]
+
+              [tool.uv]
+              """
+          )
+        );
+    }
+
+    /// RewriteTest groups sources by parser, in no fixed order between groups. A lock parsed by the pyproject parser
+    /// joins that group ahead of `pyproject.toml`, so it is visited first, and the dependency recipe regenerates it
+    /// from the deps file it reads instead of the one it just edited.
+    private static SourceSpecs uvLockVisitedBeforePyproject(String before, Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> lock = new SourceSpec<>(Toml.Document.class, null, PyProjectTomlParser.builder(),
+          before, SourceSpec.ValidateSource.noop, ctx -> {
+        });
+        lock.path("uv.lock");
+        spec.accept(lock);
+        return lock;
+    }
+
+    private static ExecutionContext uvIndexReplay() {
+        Map<String, String> routes = Map.of(
+          "https://pypi.org/simple/six/", uvResource("http/six-listing-json"),
+          "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl.metadata",
+          uvResource("http/six-1.17.0-py2.py3-none-any.whl.metadata"));
+        HttpSender http = request -> {
+            String body = routes.get(request.getUrl().toString());
+            return new HttpSender.Response(body == null ? 404 : 200,
+              new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
+            });
+        };
+        ExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        });
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of(
+          new PythonPackageIndex("pypi", "https://pypi.org/simple", true, null, null, false)));
+        return ctx;
+    }
+
+    private static String uvResource(String name) {
+        try (InputStream is = RemoveDependencyUnlessImportingTest.class.getResourceAsStream("/lock/uv/" + name)) {
+            assertThat(is).as(name).isNotNull();
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
