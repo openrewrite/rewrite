@@ -147,20 +147,48 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             if (TypeUtils.isWellFormedType(constant.getType())) {
                 return constant;
             }
-            JavaType.FullyQualified owner = JavaType.ShallowClass.build(owningType);
-            JavaType.Variable fieldType = new JavaType.Variable(null, Flag.Static.getBitMask(),
-                    constant.getSimpleName(), owner, JavaType.Primitive.String, emptyList());
+            JavaType.FullyQualified target = JavaType.ShallowClass.build(owningType);
+            JavaType.FullyQualified owner = target;
+            long flags = Flag.Public.getBitMask() | Flag.Static.getBitMask() | Flag.Final.getBitMask();
+            try {
+                Class<?> owningClass = loadClass(owningType);
+                Field field = owningClass.getField(constant.getSimpleName());
+                target = JavaType.ShallowClass.build(owningClass.getName());
+                owner = JavaType.ShallowClass.build(field.getDeclaringClass().getName());
+                flags = field.getModifiers();
+            } catch (ClassNotFoundException | NoSuchFieldException e) {
+                // The literal value was given explicitly, so the constant's class need not be on the classpath
+            }
+            JavaType.FullyQualified string = JavaType.ShallowClass.build("java.lang.String");
+            JavaType.Variable fieldType = new JavaType.Variable(null, flags, constant.getSimpleName(), owner, string,
+                    emptyList());
             return constant
-                    .withTarget(constant.getTarget().withType(owner))
-                    .withName(constant.getName().withType(JavaType.Primitive.String).withFieldType(fieldType))
-                    .withType(JavaType.Primitive.String);
+                    .withTarget(constant.getTarget().withType(target))
+                    .withName(constant.getName().withType(string).withFieldType(fieldType))
+                    .withType(string);
         }
     }
 
     private static @Nullable Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
         String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
         String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
-        Field constantField = Class.forName(owningType).getField(constantName);
+        Field constantField = loadClass(owningType).getField(constantName);
         return constantField.get(null);
+    }
+
+    // A nested class may be written with dots, as in source, rather than with its binary name
+    private static Class<?> loadClass(String name) throws ClassNotFoundException {
+        String binaryName = name;
+        while (true) {
+            try {
+                return Class.forName(binaryName);
+            } catch (ClassNotFoundException e) {
+                int lastDot = binaryName.lastIndexOf('.');
+                if (lastDot < 0) {
+                    throw e;
+                }
+                binaryName = binaryName.substring(0, lastDot) + '$' + binaryName.substring(lastDot + 1);
+            }
+        }
     }
 }

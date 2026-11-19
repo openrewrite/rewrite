@@ -266,6 +266,7 @@ public final class Assertions {
                             return true;
                         }
                     })
+                    .filter(missingType -> !typeValidation.allowMissingType().apply(missingType))
                     .collect(toList());
             if (!missingTypeResults.isEmpty()) {
                 throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
@@ -438,10 +439,27 @@ public final class Assertions {
                 return !isWellFormedType(fa.getTarget().getType(), seenTypes);
             }
             Tree parent = getCursor().getParentTreeCursor().getValue();
-            boolean isQualifier = parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
-                                  !"class".equals(((J.FieldAccess) parent).getSimpleName()) ||
-                                  parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect();
-            return isQualifier && isPackageName(fa);
+            // An untyped qualifier is a package only if it names the package of what its parent refers to.
+            // Kotlin qualifies top-level members, not only types, with their package.
+            JavaType.FullyQualified referenced;
+            if (parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                !"class".equals(((J.FieldAccess) parent).getSimpleName())) {
+                J.FieldAccess member = (J.FieldAccess) parent;
+                if (!isWellFormedType(member.getType(), seenTypes)) {
+                    return isPackageName(fa); // reported on the parent instead
+                }
+                JavaType.Variable field = member.getName().getFieldType();
+                referenced = TypeUtils.asFullyQualified(field != null ? field.getOwner() : member.getType());
+            } else if (parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect()) {
+                JavaType.Method method = ((J.MethodInvocation) parent).getMethodType();
+                if (method == null || !isWellFormedType(method, seenTypes)) {
+                    return isPackageName(fa); // reported on the call instead
+                }
+                referenced = method.getDeclaringType();
+            } else {
+                return false;
+            }
+            return referenced != null && referenced.getPackageName().equals(dottedName(fa)) && isPackageName(fa);
         }
 
         // Neither a package nor any segment of its name has a type
@@ -451,6 +469,14 @@ public final class Assertions {
             }
             return name instanceof J.Identifier ||
                    name instanceof J.FieldAccess && isPackageName(((J.FieldAccess) name).getTarget());
+        }
+
+        private String dottedName(Expression name) {
+            if (name instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) name;
+                return dottedName(fa.getTarget()) + '.' + fa.getSimpleName();
+            }
+            return name instanceof J.Identifier ? ((J.Identifier) name).getSimpleName() : "";
         }
 
         @Override

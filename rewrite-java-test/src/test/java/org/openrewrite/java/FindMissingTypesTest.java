@@ -354,6 +354,46 @@ class FindMissingTypesTest implements RewriteTest {
     }
 
     @Test
+    void untypedConstantAsSelect() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                    return "separator".equals(fa.getSimpleName()) ?
+                      fa.withTarget(fa.getTarget().withType(JavaType.Unknown.getInstance()))
+                        .withName(fa.getName().withType(null).withFieldType(null))
+                        .withType(null) :
+                      fa;
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              import java.io.File;
+
+              class A {
+                  boolean b(String s) {
+                      return File.separator.equals(s);
+                  }
+              }
+              """,
+            """
+              import java.io.File;
+
+              class A {
+                  boolean b(String s) {
+                      return /*~~(FieldAccess type is missing or malformed)~~>*/File.separator.equals(s);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void untypedClassLiteral() {
         rewriteRun(
           spec -> spec.recipes(
@@ -391,7 +431,7 @@ class FindMissingTypesTest implements RewriteTest {
 
               import static java.util.Collections.EMPTY_LIST;
 
-              @SuppressWarnings(java.lang.annotation.RetentionPolicy.SOURCE.name)
+              @SuppressWarnings(javax.xml.XMLConstants.XML_NS_PREFIX)
               class A {
                   int x;
                   enum E { P }
