@@ -19,15 +19,15 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.trait.internal.MaybeParenthesesPair;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -38,42 +38,95 @@ public class VariableAccess implements Trait<J.Identifier> {
     Cursor cursor;
 
     /**
-     * A write access to a variable occurs as the destination of an assignment.
+     * Whether the access gives the variable a value: as the destination of an assignment, simple or compound, or as
+     * the operand of {@code ++} or {@code --}.
      */
     public boolean isWriteAccess() {
-        MaybeParenthesesPair pair = MaybeParenthesesPair.from(cursor);
-        if (pair.getParent() instanceof J.Assignment) {
-            J.Assignment assignment = (J.Assignment) pair.getParent();
-            return assignment.getVariable() == pair.getTree();
-        }
-        if (pair.getParent() instanceof J.Unary) {
-            J.Unary unary = (J.Unary) pair.getParent();
-            return unary.getExpression() == pair.getTree() &&
-                   unary.getOperator().isModifying();
-        }
-        return false;
+        return isSimpleAssignmentTarget() || isModifiedInPlace();
     }
 
     /**
-     * A read access to a variable. In other words, it is a variable access that does
-     * _not_ occur as the destination of a simple assignment, but it may occur as
-     * the destination of a compound assignment or a unary assignment.
+     * Whether the access takes the variable's value, which every access does except the destination of a simple
+     * assignment. A compound assignment and {@code ++} or {@code --} read the variable as well as write it.
      */
     public boolean isReadAccess() {
-        if (isWriteAccess()) {
-            return false;
+        return !isSimpleAssignmentTarget();
+    }
+
+    private boolean isSimpleAssignmentTarget() {
+        Object[] used = usedAs();
+        return used[1] instanceof J.Assignment && ((J.Assignment) used[1]).getVariable() == used[0];
+    }
+
+    private boolean isModifiedInPlace() {
+        Object[] used = usedAs();
+        return used[1] instanceof J.AssignmentOperation && ((J.AssignmentOperation) used[1]).getVariable() == used[0] ||
+               used[1] instanceof J.Unary && ((J.Unary) used[1]).getOperator().isModifying() &&
+               ((J.Unary) used[1]).getExpression() == used[0];
+    }
+
+    /**
+     * The expression that stands for the variable and the tree using it: outside the field access that names the
+     * variable, as in {@code this.x}, and outside any parentheses.
+     */
+    private Object[] usedAs() {
+        Object expression = cursor.getValue();
+        Cursor parent = cursor.getParentTreeCursor();
+        if (parent.getValue() instanceof J.FieldAccess && ((J.FieldAccess) parent.getValue()).getName() == expression) {
+            expression = parent.getValue();
+            parent = parent.getParentTreeCursor();
         }
-        MaybeParenthesesPair pair = MaybeParenthesesPair.from(cursor);
-        if (pair.getParent() instanceof J.Assignment) {
-            J.Assignment assignment = (J.Assignment) pair.getParent();
-            return assignment.getVariable() != pair.getTree();
+        while (parent.getValue() instanceof J.Parentheses) {
+            expression = parent.getValue();
+            parent = parent.getParentTreeCursor();
         }
-        if (pair.getParent() instanceof J.Unary) {
-            J.Unary unary = (J.Unary) pair.getParent();
-            return unary.getExpression() == pair.getTree() &&
-                   !unary.getOperator().isModifying();
+        return new Object[]{expression, parent.getValue()};
+    }
+
+    /**
+     * The variable this access reads or writes, found by its position in the tree rather than by its type
+     * attribution, so it tells apart two locals of one name, type and method declared in sibling blocks.
+     */
+    @Incubating(since = "8.113.0")
+    public Optional<Scope.Binding> getBinding() {
+        String name = getTree().getSimpleName();
+        Object parent = cursor.getParentTreeCursor().getValue();
+        if (!(parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getName() == getTree())) {
+            return Scope.at(cursor).lookup(name);
         }
-        return true;
+        // A field selected with a dot belongs to a class around the access. Attribution tells which one, and where
+        // it is missing the qualifier does. A field of a class that is not around the access is not bound here.
+        Expression target = ((J.FieldAccess) parent).getTarget();
+        JavaType.Variable attributed = getTree().getFieldType();
+        String qualifier = target instanceof J.Identifier ? ((J.Identifier) target).getSimpleName() :
+                target instanceof J.FieldAccess && "this".equals(((J.FieldAccess) target).getSimpleName()) &&
+                ((J.FieldAccess) target).getTarget() instanceof J.Identifier ?
+                        ((J.Identifier) ((J.FieldAccess) target).getTarget()).getSimpleName() : null;
+        if (attributed == null && qualifier == null) {
+            return Optional.empty();
+        }
+        boolean viaSuper = target instanceof J.Identifier && "super".equals(qualifier);
+        boolean innermost = target instanceof J.Identifier && ("this".equals(qualifier) || viaSuper);
+        for (Scope scope = Scope.at(cursor); scope != null; scope = scope.enclosing().orElse(null)) {
+            J tree = scope.getTree();
+            if (!(tree instanceof J.ClassDeclaration || tree instanceof J.NewClass) ||
+                attributed == null && !innermost &&
+                !(tree instanceof J.ClassDeclaration && ((J.ClassDeclaration) tree).getSimpleName().equals(qualifier))) {
+                continue;
+            }
+            for (Scope.Binding binding : scope.getBindings()) {
+                if (binding.getNamespace() == Scope.Namespace.VARIABLE && binding.getName().equals(name) &&
+                    !binding.isLocal() &&
+                    (attributed != null ? TypeUtils.isOfType(binding.getType(), attributed) :
+                            !viaSuper || binding.getKind() == Scope.Kind.INHERITED)) {
+                    return Optional.of(binding);
+                }
+            }
+            if (attributed == null) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
     }
 
     public static class Matcher extends SimpleTraitMatcher<VariableAccess> {
@@ -120,7 +173,9 @@ public class VariableAccess implements Trait<J.Identifier> {
             J.Identifier ident = cursor.getValue();
             String name = ident.getSimpleName();
             if ("this".equals(name) || "super".equals(name) ||
-                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getName)) {
+                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class,
+                        J.VariableDeclarations.NamedVariable::getName) ||
+                checkNamePart(cursor, J.InstanceOf.class, J.InstanceOf::getPattern)) {
                 return null;
             }
 
@@ -128,52 +183,8 @@ public class VariableAccess implements Trait<J.Identifier> {
                 return checkFilters(cursor);
             }
 
-            if (checkNamePart(cursor, J.ClassDeclaration.class, J.ClassDeclaration::getName) ||
-                checkNamePart(cursor, J.MethodDeclaration.class, J.MethodDeclaration::getName) ||
-                checkNamePart(cursor, J.MethodInvocation.class, J.MethodInvocation::getName) ||
-                checkNamePart(cursor, J.NewClass.class, J.NewClass::getClazz) ||
-                checkNamePart(cursor, J.FieldAccess.class, J.FieldAccess::getName) ||
-                checkNamePart(cursor, J.MethodInvocation.class, J.MethodInvocation::getName) ||
-                checkNamePart(cursor, J.ParameterizedType.class, J.ParameterizedType::getClazz) ||
-                cursor.firstEnclosing(Javadoc.class) != null) {
-                return null;
-            }
-
-            Cursor parent = cursor.getParentTreeCursor();
-            if (checkParent(parent, J.TypeCast.class, j -> j.getClazz().getTree() == ident)) {
-                return null;
-            }
-
-            // Special case for annotations, where the left side of the assignment is the annotation field name,
-            // and not a variable access.
-            if (checkNamePart(cursor, J.Assignment.class, J.Assignment::getVariable) &&
-                checkParent(parent, J.Annotation.class, j -> j.getArguments() != null && j.getArguments().contains(ident))) {
-                return null;
-            }
-
-            if (checkNamePart(cursor, J.ArrayAccess.class, J.ArrayAccess::getIndexed) ||
-                checkNamePart(cursor, J.ArrayDimension.class, J.ArrayDimension::getIndex) ||
-                checkNamePart(cursor, J.ControlParentheses.class, J.ControlParentheses::getTree) ||
-                checkNamePart(cursor, J.ForEachLoop.Control.class, J.ForEachLoop.Control::getIterable) ||
-                checkNamePart(cursor, J.ForLoop.Control.class, J.ForLoop.Control::getCondition) ||
-                checkNamePart(cursor, J.Parentheses.class, J.Parentheses::getTree) ||
-                checkNamePart(cursor, J.TypeCast.class, J.TypeCast::getExpression) ||
-                checkNamePart(cursor, J.Unary.class, J.Unary::getExpression) ||
-                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getInitializer) ||
-                checkParent(cursor, J.Assignment.class, a -> a.getVariable() == ident || a.getAssignment() == ident) ||
-                checkParent(cursor, J.Binary.class, b -> b.getLeft() == ident || b.getRight() == ident) ||
-                checkParent(cursor, J.MethodInvocation.class, m -> m.getSelect() == ident || m.getArguments().contains(ident)) ||
-                checkParent(cursor, J.NewClass.class, n -> n.getEnclosing() == ident || n.getArguments().contains(ident)) ||
-                checkParent(cursor, J.NewArray.class, n -> n.getInitializer() != null && n.getInitializer().contains(ident)) ||
-                checkParent(cursor, J.Ternary.class, t -> t.getCondition() == ident ||
-                                                          t.getTruePart() == ident ||
-                                                          t.getFalsePart() == ident) ||
-                checkParent(cursor, J.Annotation.class, parentAnnotation -> parentAnnotation.getArguments() != null && parentAnnotation.getArguments().contains(ident))) {
-                return checkFilters(cursor);
-            }
-
-            // Catchall. Useful point for setting a breakpoint when debugging.
-            return null;
+            // Without attribution, the identifier's position decides, under the source file's own language rules.
+            return Scope.service(cursor).namespaceOf(cursor) == Scope.Namespace.VARIABLE ? checkFilters(cursor) : null;
         }
 
         private @Nullable VariableAccess checkFilters(Cursor cursor) {

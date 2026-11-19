@@ -23,13 +23,15 @@ declare module "./tree" {
     namespace Yaml {
         export const Markers: {
             readonly OmitColon: "org.openrewrite.yaml.marker.OmitColon";
+            readonly TagBeforeAnchor: "org.openrewrite.yaml.marker.TagBeforeAnchor";
         };
     }
 }
 
 // At runtime actually attach it to Yaml
 (Yaml as any).Markers = {
-    OmitColon: "org.openrewrite.yaml.marker.OmitColon"
+    OmitColon: "org.openrewrite.yaml.marker.OmitColon",
+    TagBeforeAnchor: "org.openrewrite.yaml.marker.TagBeforeAnchor"
 } as const;
 
 /**
@@ -46,6 +48,21 @@ export interface OmitColon extends Marker {
 export function omitColon(): OmitColon {
     return {
         kind: Yaml.Markers.OmitColon,
+        id: randomId()
+    };
+}
+
+/**
+ * Marker on a scalar, mapping or sequence whose tag was written before its anchor, as in `!!str &a value`,
+ * so that it prints back in that order.
+ */
+export interface TagBeforeAnchor extends Marker {
+    readonly kind: typeof Yaml.Markers.TagBeforeAnchor;
+}
+
+export function tagBeforeAnchor(): TagBeforeAnchor {
+    return {
+        kind: Yaml.Markers.TagBeforeAnchor,
         id: randomId()
     };
 }
@@ -68,3 +85,4 @@ function registerMarkerCodec<M extends Marker>(kind: M["kind"]) {
 }
 
 registerMarkerCodec(Yaml.Markers.OmitColon);
+registerMarkerCodec(Yaml.Markers.TagBeforeAnchor);
