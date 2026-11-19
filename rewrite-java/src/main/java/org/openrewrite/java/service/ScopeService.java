@@ -633,13 +633,24 @@ public class ScopeService {
             return !isTrue(loop.getCondition().getTree()) || breaksOut(loop.getBody());
         } else if (statement instanceof J.DoWhileLoop) {
             J.DoWhileLoop loop = (J.DoWhileLoop) statement;
-            return breaksOut(loop.getBody()) || !isTrue(loop.getWhileCondition().getTree()) && completesNormally(loop.getBody());
+            return breaksOut(loop.getBody()) || !isTrue(loop.getWhileCondition().getTree()) &&
+                   (completesNormally(loop.getBody()) || continuesOwnLoop(loop.getBody(), null));
         } else if (statement instanceof J.ForLoop) {
             J.ForLoop loop = (J.ForLoop) statement;
             Expression condition = loop.getControl().getCondition();
             return !(condition instanceof J.Empty || isTrue(condition)) || breaksOut(loop.getBody());
         } else if (statement instanceof J.Label) {
-            return completesNormally(((J.Label) statement).getStatement()) || breaksOut(((J.Label) statement).getStatement());
+            J.Label label = (J.Label) statement;
+            Statement labeled = label.getStatement();
+            if (completesNormally(labeled) || breaksOut(labeled)) {
+                return true;
+            }
+            if (labeled instanceof J.DoWhileLoop) {
+                J.DoWhileLoop loop = (J.DoWhileLoop) labeled;
+                return !isTrue(loop.getWhileCondition().getTree()) &&
+                       continuesOwnLoop(loop.getBody(), label.getLabel().getSimpleName());
+            }
+            return false;
         } else if (statement instanceof J.Try) {
             J.Try try_ = (J.Try) statement;
             boolean completes = completesNormally(try_.getBody());
@@ -733,6 +744,34 @@ public class ScopeService {
                 return breakStatement;
             }
         }.visit(statement, 0);
+        return found[0];
+    }
+
+    /**
+     * Whether a {@code continue} in a loop's body continues that loop. With no label given, that is an unlabeled
+     * {@code continue} outside any loop nested in the body. With the loop's label, it is a {@code continue} naming
+     * that label.
+     */
+    private static boolean continuesOwnLoop(Statement body, @Nullable String label) {
+        boolean[] found = {false};
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public @Nullable J preVisit(J tree, Integer p) {
+                if (tree instanceof Loop && label == null ||
+                    tree instanceof J.Lambda || tree instanceof J.ClassDeclaration ||
+                    tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null) {
+                    stopAfterPreVisit();
+                }
+                return tree;
+            }
+
+            @Override
+            public J.Continue visitContinue(J.Continue continueStatement, Integer p) {
+                J.Identifier target = continueStatement.getLabel();
+                found[0] |= target == null ? label == null : target.getSimpleName().equals(label);
+                return continueStatement;
+            }
+        }.visit(body, 0);
         return found[0];
     }
 
