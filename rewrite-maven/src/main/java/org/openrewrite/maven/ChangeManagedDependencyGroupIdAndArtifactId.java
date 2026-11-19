@@ -146,6 +146,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 changedVersions = new HashMap<>();
                 renamed = new HashSet<>();
                 Xml.Document d = super.visitDocument(document, ctx);
+                if (changedVersions.isEmpty()) {
+                    return d;
+                }
                 // Removed before the model update and the redundant-version pass run, so that neither sees two
                 // managed entries for the same coordinates.
                 for (Xml.Tag superseded : supersededEntries(d)) {
@@ -156,8 +159,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
 
             /**
              * In each dependencyManagement block, one entry per management key that this pass changed: the entry
-             * already at those coordinates, or else the first, unless another one replaces it by version. A renamed
-             * entry alone at its coordinates is superseded by an entry managed elsewhere at the new version.
+             * already at those coordinates, or else the first, unless another one replaces it by version. When every
+             * entry for a key was renamed, an entry managed elsewhere at the new version supersedes them all.
              */
             private List<Xml.Tag> supersededEntries(Xml.Document document) {
                 List<Xml.Tag> blocks = new ArrayList<>();
@@ -174,20 +177,19 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     for (Xml.Tag dependency : block.getChildren("dependency")) {
                         byKey.computeIfAbsent(managementKey(dependency), k -> new ArrayList<>()).add(dependency);
                     }
-                    for (List<Xml.Tag> entries : byKey.values()) {
+                    for (Map.Entry<GroupArtifactClassifierType, List<Xml.Tag>> group : byKey.entrySet()) {
+                        List<Xml.Tag> entries = group.getValue();
                         if (entries.stream().noneMatch(e -> changedVersions.containsKey(e.getId()))) {
                             continue;
                         }
-                        if (entries.size() == 1) {
-                            Xml.Tag entry = entries.get(0);
-                            if (renamed.contains(entry.getId()) && checkIfNewDependencyPresent(
-                                    pom.getValue(entry.getChildValue("groupId").orElse(null)),
-                                    pom.getValue(entry.getChildValue("artifactId").orElse(null)), newVersion, entry)) {
-                                superseded.add(entry);
+                        Xml.Tag kept = entries.stream().filter(e -> !renamed.contains(e.getId())).findFirst().orElse(null);
+                        if (kept == null) {
+                            kept = entries.get(0);
+                            if (checkIfNewDependencyPresent(group.getKey().getGroupId(), group.getKey().getArtifactId(), newVersion, kept)) {
+                                superseded.addAll(entries);
+                                continue;
                             }
-                            continue;
                         }
-                        Xml.Tag kept = entries.stream().filter(e -> !renamed.contains(e.getId())).findFirst().orElse(entries.get(0));
                         for (Xml.Tag entry : entries) {
                             if (entry != kept && replacesKept(version(pom, entry), version(pom, kept))) {
                                 kept = entry;
@@ -204,7 +206,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             private @Nullable String version(ResolvedPom pom, Xml.Tag entry) {
-                return changedVersions.containsKey(entry.getId()) ? changedVersions.get(entry.getId()) :
+                String changedVersion = changedVersions.get(entry.getId());
+                return changedVersion != null || renamed.contains(entry.getId()) ? changedVersion :
                         pom.getValue(entry.getChildValue("version").orElse(null));
             }
 
