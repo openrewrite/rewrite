@@ -49,8 +49,9 @@ public interface RewriteRunner {
      * Out-of-process runners override this.
      */
     default RecipeRun run(Recipe recipe, Context context) {
-        return CheckingScheduler.of(context.getSources()).scheduleRun(recipe, context.getSources(),
-                context.getExecutionContext(), context.getCycles(), context.getExpectedCyclesThatMakeChanges() + 1);
+        ExecutionContext ctx = context.getExecutionContext();
+        return CheckingScheduler.of(context.getSources(), ctx).scheduleRun(recipe, context.getSources(), ctx,
+                context.getCycles(), context.getExpectedCyclesThatMakeChanges() + 1);
     }
 
     /**

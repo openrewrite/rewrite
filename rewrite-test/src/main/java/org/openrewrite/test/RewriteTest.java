@@ -443,6 +443,8 @@ public interface RewriteTest extends SourceSpecs {
                     recipeFields, scannerEdits);
         }
 
+        // put before the view, which would report the cache as a change the recipe made to the context
+        recipeCtx.putMessage(CheckingScheduler.RUN_TEMPLATE_CACHE, new ConcurrentHashMap<>());
         recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
                 .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
