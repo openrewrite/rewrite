@@ -1039,6 +1039,40 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
      * child as a {@code delegatesTo} stand-in, which the host resolves from its marketplace only
      * when the composite runs.
      */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void guardedJsCompositeWithNestedJavaDelegate(boolean localCondition) {
+        Environment env = Environment.builder()
+          .scanRuntimeClasspath("org.openrewrite.text")
+          .load(new YamlResourceLoader(new ByteArrayInputStream("""
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.example.host.replace-hello
+            displayName: Replace hello
+            description: Replaces hello with goodbye.
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: hello
+                  replace: goodbye
+            """.getBytes(StandardCharsets.UTF_8)), URI.create("rewrite.yml"), new Properties()))
+          .build();
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(env.toMarketplace(RecipeBundle.runtimeClasspath()))
+          .resolvers(List.of(new RuntimeClasspathResolver(env)))
+          .log(tempDir.resolve("rpc.log")));
+        client().installRecipes(new File("rewrite/dist-fixtures/composite-with-java-delegate.js"));
+        Recipe guarded = client().prepareRecipe("org.openrewrite.example.npm.guarded-composite-with-java-delegate",
+          Map.of("localCondition", localCondition));
+        for (int run = 0; run < 2; run++) {
+            rewriteRun(
+              spec -> spec.recipe(guarded).cycles(2).expectedCyclesThatMakeChanges(1),
+              text("start", "farewell", spec -> spec.path("match.txt")),
+              text("start", spec -> spec.path("skip.txt")),
+              text("skip", spec -> spec.path("other.txt"))
+            );
+        }
+    }
+
     @Test
     void jsCompositeWithJavaDelegateChild() {
         File fixture = new File("rewrite/dist-fixtures/composite-with-java-delegate.js");

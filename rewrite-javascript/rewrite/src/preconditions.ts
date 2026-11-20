@@ -203,33 +203,35 @@ async function evaluateComposite(
     composite: CompositePrecondition,
     tree: Tree,
     ctx: ExecutionContext,
-    parent?: Cursor
+    parent?: Cursor,
+    requireLocal: boolean = false
 ): Promise<boolean> {
     const operands = composite.operands;
     switch (composite.op) {
         case "or":
             for (const operand of operands) {
-                if (await operandMatches(operand, tree, ctx, parent)) return true;
+                if (await operandMatches(operand, tree, ctx, parent, requireLocal)) return true;
             }
             return false;
         case "and":
             for (const operand of operands) {
-                if (!(await operandMatches(operand, tree, ctx, parent))) return false;
+                if (!(await operandMatches(operand, tree, ctx, parent, requireLocal))) return false;
             }
             return true;
         case "not":
             if (operands.length !== 1) {
                 throw new Error("CompositePrecondition op=not requires exactly one operand");
             }
-            return !(await operandMatches(operands[0], tree, ctx, parent));
+            return !(await operandMatches(operands[0], tree, ctx, parent, requireLocal));
     }
 }
 
-async function operandMatches(
+export async function operandMatches(
     operand: CheckArg,
     tree: Tree,
     ctx: ExecutionContext,
-    parent?: Cursor
+    parent?: Cursor,
+    requireLocal: boolean = false
 ): Promise<boolean> {
     if (operand instanceof RecipeRef) {
         // If a localVisitor was provided, evaluate against it for real;
@@ -237,6 +239,9 @@ async function operandMatches(
         // editor still runs in unit tests. The host evaluates the gate
         // for real once the response goes over the wire.
         if (operand.localVisitor === undefined) {
+            if (requireLocal) {
+                throw new Error(`RecipeRef ${operand.recipeName} requires a local visitor outside the Java host`);
+            }
             return true;
         }
         const result = parent !== undefined
@@ -245,11 +250,27 @@ async function operandMatches(
         return result !== tree;
     }
     if (operand instanceof CompositePrecondition) {
-        return evaluateComposite(operand, tree, ctx, parent);
+        return evaluateComposite(operand, tree, ctx, parent, requireLocal);
     }
     const visitor = operand instanceof Recipe ? await operand.editor() : operand;
     const result = parent !== undefined
         ? await visitor.visit(tree, ctx, parent)
         : await visitor.visit(tree, ctx);
     return result !== tree;
+}
+
+export function guard(condition: CheckArg, recipe: Recipe): Recipe {
+    return new class extends Recipe {
+        readonly name = recipe.name + ".guarded";
+        readonly displayName = recipe.displayName;
+        readonly description = recipe.description;
+
+        async editPrecondition(): Promise<CheckArg> {
+            return condition;
+        }
+
+        async recipeList(): Promise<Recipe[]> {
+            return [recipe];
+        }
+    };
 }

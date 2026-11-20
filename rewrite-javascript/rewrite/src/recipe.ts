@@ -17,6 +17,7 @@ import {noopVisitor, TreeVisitor} from "./visitor";
 import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
 import {DataTableDescriptor} from "./data-table";
+import type {CheckArg} from "./preconditions";
 import {mapAsync} from "./util";
 
 const OPTIONS_KEY = "__recipe_options__";
@@ -78,6 +79,10 @@ export abstract class Recipe {
     readonly causesAnotherCycle: boolean = false
 
     readonly dataTables: DataTableDescriptor[] = []
+
+    async editPrecondition(): Promise<CheckArg | undefined> {
+        return undefined;
+    }
 
     async recipeList(): Promise<Recipe[]> {
         return []

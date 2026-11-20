@@ -55,6 +55,98 @@ import static org.openrewrite.test.SourceSpecs.text;
 @SuppressWarnings("NullableProblems")
 class DeclarativeRecipeTest implements RewriteTest {
 
+    @Test
+    void programmaticSubtreePrecondition() {
+        AtomicInteger evaluations = new AtomicInteger();
+        var condition = new PlainTextVisitor<ExecutionContext>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                evaluations.incrementAndGet();
+                return "ready".equals(text.getText()) ? SearchResult.found(text) : text;
+            }
+        };
+        var guarded = Preconditions.guard(condition, new CompositeRecipe(List.of(
+          new ChangeText("changed"),
+          new CompositeRecipe(List.of(new ChangeText("done"))))));
+        rewriteRun(
+          spec -> spec.recipe(new CompositeRecipe(List.of(
+              toRecipe(() -> new PlainTextVisitor<ExecutionContext>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      return "start".equals(text.getText()) ? text.withText("ready") : text;
+                  }
+              }), guarded)))
+            .validateRecipeSerialization(false).cycles(1).expectedCyclesThatMakeChanges(1),
+          text("start", "done"),
+          text("skip"),
+          text("ready", "done")
+        );
+        assertThat(evaluations).hasValue(3);
+    }
+
+    @Test
+    void nestedProgrammaticSubtreePreconditions() {
+        var inner = Preconditions.guard(new Find("inner", null, null, null, null, null, null, null).getVisitor(),
+          new CompositeRecipe(List.of(new ChangeText("done"))));
+        var guarded = Preconditions.guard(new Find("outer", null, null, null, null, null, null, null).getVisitor(),
+          new CompositeRecipe(List.of(inner)));
+        rewriteRun(
+          spec -> spec.recipe(guarded).validateRecipeSerialization(false).cycles(1).expectedCyclesThatMakeChanges(1),
+          text("outer inner", "done"),
+          text("inner"),
+          text("outer")
+        );
+    }
+
+    @Test
+    void programmaticGuardPreservesScanningAndGeneration() {
+        var guarded = Preconditions.guard(new Find("match", null, null, null, null, null, null, null),
+          new CompositeRecipe(List.of(new CountingRecipe(), new ThreeArgGenerateRecipe())));
+        rewriteRun(
+          spec -> spec.recipe(guarded).validateRecipeSerialization(false).cycles(1).expectedCyclesThatMakeChanges(1),
+          text("match", "match [scanned:2]", spec -> spec.path("match.txt")),
+          text("skip", spec -> spec.path("skip.txt")),
+          text(null, "generated", spec -> spec.path("generated.txt"))
+        );
+    }
+
+    @Test
+    void programmaticGuardReevaluatesAcrossCyclesAndRuns() {
+        AtomicInteger evaluations = new AtomicInteger();
+        var condition = new PlainTextVisitor<ExecutionContext>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                evaluations.incrementAndGet();
+                return "match".equals(text.getText()) ? SearchResult.found(text) : text;
+            }
+        };
+        var guarded = Preconditions.guard(condition, new CompositeRecipe(List.of(new ChangeText("done"))));
+        for (int run = 0; run < 2; run++) {
+            rewriteRun(
+              spec -> spec.recipe(guarded).validateRecipeSerialization(false).cycles(2).expectedCyclesThatMakeChanges(1),
+              text("match", "done"),
+              text("skip")
+            );
+        }
+        assertThat(evaluations).hasValue(8);
+    }
+
+    @Test
+    void programmaticGuardPreservesDelegateMetadata() {
+        // given
+        var delegate = new ChangeText("done");
+        var guarded = Preconditions.guard(TreeVisitor.noop(), delegate);
+
+        // when
+        var decorated = guarded.getRecipeList().get(1);
+
+        // then
+        assertThat(decorated.getDescriptor().getOptions()).isEqualTo(delegate.getDescriptor().getOptions());
+        assertThat(decorated.getName()).isEqualTo(delegate.getName());
+        assertThat(decorated.getInstanceName()).isEqualTo(delegate.getInstanceName());
+        assertThat(decorated.getDataTableDescriptors()).isEqualTo(delegate.getDataTableDescriptors());
+    }
+
     @DocumentExample
     @Test
     void precondition() {

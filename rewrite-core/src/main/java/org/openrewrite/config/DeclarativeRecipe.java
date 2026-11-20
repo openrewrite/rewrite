@@ -17,11 +17,11 @@ package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
-import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.PreconditionBellwether;
 
 import java.net.URI;
 import java.time.Duration;
@@ -31,6 +31,7 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 import static org.openrewrite.Validated.invalid;
+import static org.openrewrite.internal.PreconditionBellwether.isScanningRequired;
 
 @RequiredArgsConstructor
 public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumulator> implements RecipePreconditions {
@@ -202,304 +203,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Map<Recipe, Object> recipeToAccumulator = new HashMap<>();
     }
 
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    @RequiredArgsConstructor
-    static class PreconditionBellwether extends Recipe {
-
-        String displayName = "Precondition bellwether";
-
-        String description = "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
-                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
-
-        DeclarativeRecipe declarativeRecipe;
-
-        @NonFinal
-        transient boolean preconditionApplicable;
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new TreeVisitor<Tree, ExecutionContext>() {
-                @Nullable
-                TreeVisitor<?, ExecutionContext> p;
-
-                @Override
-                public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                    // p is lazily resolved in visit() where the cursor is available.
-                    // Before that, conservatively accept all source files.
-                    return p == null || p.isAcceptable(sourceFile, ctx);
-                }
-
-                @Override
-                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    Tree t = resolve(ctx).visit(tree, ctx);
-                    preconditionApplicable = t != tree;
-                    return tree;
-                }
-
-                private TreeVisitor<?, ExecutionContext> resolve(ExecutionContext ctx) {
-                    if (p == null) {
-                        Cursor rootCursor = getCursor().getRoot();
-                        List<TreeVisitor<?, ExecutionContext>> andVisitors = new ArrayList<>();
-                        for (Recipe precondition : declarativeRecipe.preconditions) {
-                            andVisitors.add(declarativeRecipe.orVisitors(precondition, rootCursor, ctx));
-                        }
-                        //noinspection unchecked
-                        p = Preconditions.and(andVisitors.toArray(new TreeVisitor[0]));
-                    }
-                    return p;
-                }
-            };
-        }
-    }
-
-    @EqualsAndHashCode(callSuper = false)
-    @Value
-    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe, RecipePreconditions {
-
-        DeclarativeRecipe.PreconditionBellwether bellwether;
-        Recipe delegate;
-
-        @Override
-        public String getName() {
-            return delegate.getName();
-        }
-
-        @Override
-        public String getDisplayName() {
-            return delegate.getDisplayName();
-        }
-
-        @Override
-        public String getDescription() {
-            return delegate.getDescription();
-        }
-
-        @Override
-        public String getInstanceName() {
-            return delegate.getInstanceName();
-        }
-
-        @Override
-        public String getInstanceNameSuffix() {
-            return delegate.getInstanceNameSuffix();
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor());
-        }
-
-        @Override
-        public List<Recipe> getRecipeList() {
-            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
-        }
-
-        @Override
-        public boolean causesAnotherCycle() {
-            return delegate.causesAnotherCycle();
-        }
-
-        @Override
-        public @Nullable Duration getEstimatedEffortPerOccurrence() {
-            return delegate.getEstimatedEffortPerOccurrence();
-        }
-
-        @Override
-        public List<Maintainer> getMaintainers() {
-            return delegate.getMaintainers();
-        }
-
-        @Override
-        public List<Contributor> getContributors() {
-            return delegate.getContributors();
-        }
-
-        @Override
-        public List<org.openrewrite.config.RecipeExample> getExamples() {
-            return delegate.getExamples();
-        }
-
-        @Override
-        public Set<String> getTags() {
-            return delegate.getTags();
-        }
-
-        @Override
-        public int maxCycles() {
-            return delegate.maxCycles();
-        }
-
-        @Override
-        public List<DataTableDescriptor> getDataTableDescriptors() {
-            return delegate.getDataTableDescriptors();
-        }
-
-        @Override
-        public void onComplete(ExecutionContext ctx) {
-            delegate.onComplete(ctx);
-        }
-
-        @Override
-        public Validated<Object> validate() {
-            return delegate.validate();
-        }
-
-        @Override
-        public Validated<Object> validate(ExecutionContext ctx) {
-            return delegate.validate(ctx);
-        }
-
-        @Override
-        public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
-            return delegate.validateAll(ctx, acc);
-        }
-
-        @Override
-        public List<Recipe> getPreconditions() {
-            if (delegate instanceof RecipePreconditions) {
-                return ((RecipePreconditions) delegate).getPreconditions();
-            }
-            return emptyList();
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe, RecipePreconditions {
-
-        DeclarativeRecipe.PreconditionBellwether bellwether;
-        ScanningRecipe<T> delegate;
-
-        @Override
-        public T getAccumulator(Cursor cursor, ExecutionContext ctx) {
-            return delegate.getAccumulator(cursor, ctx);
-        }
-
-        @Override
-        public T getInitialValue(ExecutionContext ctx) {
-            return delegate.getInitialValue(ctx);
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-            return delegate.getScanner(acc);
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
-            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
-        }
-
-        @Override
-        public Collection<? extends SourceFile> generate(T acc, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
-            return delegate.generate(acc, generatedInThisCycle, ctx);
-        }
-
-        @Override
-        public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
-            return delegate.generate(acc, ctx);
-        }
-
-        @Override
-        public String getName() {
-            return delegate.getName();
-        }
-
-        @Override
-        public String getDisplayName() {
-            return delegate.getDisplayName();
-        }
-
-        @Override
-        public String getDescription() {
-            return delegate.getDescription();
-        }
-
-        @Override
-        public String getInstanceName() {
-            return delegate.getInstanceName();
-        }
-
-        @Override
-        public String getInstanceNameSuffix() {
-            return delegate.getInstanceNameSuffix();
-        }
-
-        @Override
-        public List<Recipe> getRecipeList() {
-            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
-        }
-
-        @Override
-        public boolean causesAnotherCycle() {
-            return delegate.causesAnotherCycle();
-        }
-
-        @Override
-        public @Nullable Duration getEstimatedEffortPerOccurrence() {
-            return delegate.getEstimatedEffortPerOccurrence();
-        }
-
-        @Override
-        public List<Maintainer> getMaintainers() {
-            return delegate.getMaintainers();
-        }
-
-        @Override
-        public List<Contributor> getContributors() {
-            return delegate.getContributors();
-        }
-
-        @Override
-        public List<org.openrewrite.config.RecipeExample> getExamples() {
-            return delegate.getExamples();
-        }
-
-        @Override
-        public Set<String> getTags() {
-            return delegate.getTags();
-        }
-
-        @Override
-        public int maxCycles() {
-            return delegate.maxCycles();
-        }
-
-        @Override
-        public List<DataTableDescriptor> getDataTableDescriptors() {
-            return delegate.getDataTableDescriptors();
-        }
-
-        @Override
-        public void onComplete(ExecutionContext ctx) {
-            delegate.onComplete(ctx);
-        }
-
-        @Override
-        public Validated<Object> validate() {
-            return delegate.validate();
-        }
-
-        @Override
-        public Validated<Object> validate(ExecutionContext ctx) {
-            return delegate.validate(ctx);
-        }
-
-        @Override
-        public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
-            return delegate.validateAll(ctx, acc);
-        }
-
-        @Override
-        public List<Recipe> getPreconditions() {
-            if (delegate instanceof RecipePreconditions) {
-                return ((RecipePreconditions) delegate).getPreconditions();
-            }
-            return emptyList();
-        }
-    }
-
     @Override
     public final List<Recipe> getRecipeList() {
         List<Recipe> filtered = deduplicateSingletonsRecursively(recipeList, new HashSet<>());
@@ -508,11 +211,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             return filtered;
         }
 
-        PreconditionBellwether bellwether = new PreconditionBellwether(this);
-        List<Recipe> recipeListWithBellwether = new ArrayList<>(filtered.size() + 1);
-        recipeListWithBellwether.add(bellwether);
-        recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, filtered));
-        return recipeListWithBellwether;
+        return PreconditionBellwether.guard(filtered, (cursor, ctx) -> {
+            List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
+            for (Recipe precondition : preconditions) {
+                conditions.add(orVisitors(precondition, cursor, ctx));
+            }
+            return Preconditions.and(conditions.toArray(new TreeVisitor[0]));
+        });
     }
 
     /**
@@ -602,40 +307,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             return conditions.get(0);
         }
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
-    }
-
-    private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
-        List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
-        for (Recipe recipe : recipeList) {
-            if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
-                mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
-            } else {
-                mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));
-            }
-        }
-        return mappedRecipeList;
-    }
-
-    private static boolean isScanningRequired(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
-            // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
-            if (recipe instanceof DeclarativeRecipe) {
-                for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
-                    if (isScanningRequired(precondition)) {
-                        return true;
-                    }
-                }
-            } else {
-                return true;
-            }
-        }
-        for (Recipe r : recipe.getRecipeList()) {
-            if (isScanningRequired(r)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public void addUninitialized(Recipe recipe) {

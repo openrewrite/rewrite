@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {foundSearchResult} from "../../markers";
+import {Cursor} from "../../tree";
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
 import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {Check, CheckArg, CompositePrecondition, RecipeRef} from "../../preconditions";
+import {Check, CheckArg, CompositePrecondition, RecipeRef, operandMatches} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
 import {DelegatingRecipe} from "../java-recipe";
 import {TreeVisitor} from "../../visitor";
@@ -29,7 +31,8 @@ export class PrepareRecipe {
     constructor(private readonly id: string,
                 private readonly options?: any,
                 // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
-                private readonly acceptsCausesAnotherCycle?: boolean) {
+                private readonly acceptsCausesAnotherCycle?: boolean,
+                private readonly acceptsSubtreeEditPreconditions?: boolean) {
     }
 
     static handle(connection: MessageConnection,
@@ -50,13 +53,13 @@ export class PrepareRecipe {
                         // A miss means the host owns this recipe (e.g. a Java-delegate child a host
                         // re-prepares by name), so answer with a delegatesTo stand-in for it to resolve.
                         return await PrepareRecipe.prepareInstance(new DelegatingRecipe(request.id, request.options ?? {}),
-                            snowflake, preparedRecipes, marketplace, accepts);
+                            snowflake, preparedRecipes, marketplace, accepts, request.acceptsSubtreeEditPreconditions === true);
                     }
                     if (!recipeCtor[1]) {
                         throw new Error(`Recipe ${request.id} was installed without a constructor`);
                     }
                     return await PrepareRecipe.prepareInstance(new recipeCtor[1](request.options),
-                        snowflake, preparedRecipes, marketplace, accepts);
+                        snowflake, preparedRecipes, marketplace, accepts, request.acceptsSubtreeEditPreconditions === true);
                 }
             )
         );
@@ -73,13 +76,23 @@ export class PrepareRecipe {
                                          snowflake: ReturnType<typeof SnowflakeId>,
                                          preparedRecipes: Map<String, Recipe>,
                                          marketplace: RecipeMarketplace,
-                                         acceptsCausesAnotherCycle: boolean): Promise<PrepareRecipeResponse> {
+                                         acceptsCausesAnotherCycle: boolean,
+                                         acceptsSubtreeEditPreconditions: boolean = false): Promise<PrepareRecipeResponse> {
+        const condition = await recipe.editPrecondition();
+        let subtreeEntry: Precondition | undefined;
+        if (condition !== undefined) {
+            if (!acceptsSubtreeEditPreconditions) {
+                throw new Error("The host does not support composite edit preconditions");
+            }
+            subtreeEntry = this.subtreeConditionWireEntry(condition, snowflake, preparedRecipes);
+        }
         const id = snowflake.generate();
         const delegatesTo = PrepareRecipe.delegatesTo(recipe);
         if (delegatesTo) {
             // Registered so a peer that visits `edit:<id>` instead of honouring delegatesTo reaches it.
             preparedRecipes.set(id, recipe);
             return {
+                ...(subtreeEntry ? {subtreeEditPreconditions: [subtreeEntry]} : {}),
                 id: id,
                 descriptor: await recipe.descriptor(),
                 editVisitor: `edit:${id}`,
@@ -111,6 +124,9 @@ export class PrepareRecipe {
             scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
             scanPreconditions: scanPreconditions
         };
+        if (subtreeEntry) {
+            response.subtreeEditPreconditions = [subtreeEntry];
+        }
         if (acceptsCausesAnotherCycle && recipe.causesAnotherCycle === true) {
             response.causesAnotherCycle = true;
         }
@@ -126,7 +142,7 @@ export class PrepareRecipe {
                     }
                 }
                 childResponses.push(await PrepareRecipe.prepareInstance(new DelegatingRecipe(child.name, options),
-                    snowflake, preparedRecipes, marketplace, acceptsCausesAnotherCycle));
+                    snowflake, preparedRecipes, marketplace, acceptsCausesAnotherCycle, acceptsSubtreeEditPreconditions));
                 continue;
             }
             // Register a child that was instantiated in recipeList() but never installed, so a peer
@@ -135,7 +151,7 @@ export class PrepareRecipe {
                 await marketplace.install(child.constructor as any, []);
             }
             childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace,
-                acceptsCausesAnotherCycle));
+                acceptsCausesAnotherCycle, acceptsSubtreeEditPreconditions));
         }
         response.recipeList = childResponses;
 
@@ -217,6 +233,9 @@ export class PrepareRecipe {
      * intact so the gate runs in-process as a fallback.
      */
     private static conditionWireEntry(condition: CheckArg): Precondition | undefined {
+        if (condition instanceof ScanningRecipe && !(condition instanceof RpcRecipe)) {
+            throw new Error("ScanningRecipe is not supported as a check");
+        }
         if (condition instanceof CompositePrecondition) {
             const operands: Precondition[] = [];
             for (const operand of condition.operands) {
@@ -241,6 +260,34 @@ export class PrepareRecipe {
             return {visitorName: condition.editVisitor};
         }
         return undefined;
+    }
+
+    private static subtreeConditionWireEntry(condition: CheckArg,
+                                             snowflake: ReturnType<typeof SnowflakeId>,
+                                             preparedRecipes: Map<String, Recipe>): Precondition {
+        if (condition instanceof CompositePrecondition) {
+            return {op: condition.op, operands: condition.operands.map(operand =>
+                this.subtreeConditionWireEntry(operand, snowflake, preparedRecipes))};
+        }
+        const entry = this.conditionWireEntry(condition);
+        if (entry !== undefined) {
+            return entry;
+        }
+        const conditionId = snowflake.generate();
+        preparedRecipes.set(conditionId, new class extends Recipe {
+            readonly name = "org.openrewrite.rpc.subtree-condition";
+            readonly displayName = "Subtree edit condition";
+            readonly description = "Evaluates a subtree edit condition.";
+
+            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                return new class extends TreeVisitor<any, ExecutionContext> {
+                    async visit(tree: any, ctx: ExecutionContext, parent?: Cursor): Promise<any> {
+                        return await operandMatches(condition, tree, ctx, parent, true) ? foundSearchResult(tree) : tree;
+                    }
+                };
+            }
+        });
+        return {visitorName: `edit:${conditionId}`};
     }
 
     private static async visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Promise<Precondition[]> {
@@ -295,6 +342,7 @@ export interface PrepareRecipeResponse {
      */
     recipeList?: PrepareRecipeResponse[]
     causesAnotherCycle?: boolean
+    subtreeEditPreconditions?: Precondition[]
 }
 
 /**

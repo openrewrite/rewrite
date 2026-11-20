@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 import {ExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor} from "../src";
+import {guard, not, RecipeRef} from "../src/preconditions";
+import {foundSearchResult} from "../src/markers";
 import {scheduleRun} from "../src/run";
 import {PlainText, PlainTextParser, PlainTextVisitor, text} from "../src/text";
 import {RecipeSpec} from "../src/test";
@@ -81,6 +83,66 @@ async function parse(...sources: string[]): Promise<SourceFile[]> {
 }
 
 describe("scheduleRun", () => {
+    test("a subtree evaluates its condition once at entry and keeps files and runs independent", async () => {
+        // given
+        let evaluations = 0;
+        const condition = new class extends PlainTextVisitor<ExecutionContext> {
+            async visitText(t: PlainText): Promise<PlainText> {
+                evaluations++;
+                return t.text === "ready" ? foundSearchResult(t) : t;
+            }
+        };
+        const recipe = guard(condition, new Composite([new Exclaim(), new Composite([new Exclaim()])]));
+
+        // when
+        const first = await scheduleRun(recipe, await parse("ready", "skip", "ready"), new ExecutionContext());
+        const second = await scheduleRun(recipe, await parse("skip", "ready"), new ExecutionContext());
+
+        // then
+        expect(first.changeset.map(r => (r.after as PlainText).text)).toEqual(["ready!!", "skip", "ready!!"]);
+        expect(second.changeset.map(r => (r.after as PlainText).text)).toEqual(["skip", "ready!!"]);
+        expect(evaluations).toBe(5);
+        expect(first.changeset.every(r => r.after?.markers.markers.length === 0)).toBe(true);
+    });
+
+    test("a rejected outer guard keeps scanning and generation active", async () => {
+        // given
+        const generated = (await parse("generated"))[0];
+        let scans = 0;
+        const scanner = new class extends ScanningRecipe<number[]> {
+            name = "scanning";
+            displayName = "Scanning";
+            description = "Scans and generates.";
+            initialValue(): number[] { return []; }
+            async scanner(acc: number[]): Promise<TreeVisitor<any, ExecutionContext>> {
+                return new class extends PlainTextVisitor<ExecutionContext> {
+                    async visitText(t: PlainText): Promise<PlainText> {
+                        scans++;
+                        acc.push(1);
+                        return t;
+                    }
+                };
+            }
+            async generate(acc: number[]): Promise<SourceFile[]> {
+                expect(acc).toEqual([1, 1]);
+                return [generated];
+            }
+            async editorWithData(): Promise<TreeVisitor<any, ExecutionContext>> {
+                throw new Error("A rejected guard must skip editing");
+            }
+        };
+        const reject = not(new RecipeRef("always", {}, new class extends PlainTextVisitor<ExecutionContext> {
+            async visitText(t: PlainText): Promise<PlainText> { return foundSearchResult(t); }
+        }));
+
+        // when
+        const run = await scheduleRun(guard(reject, new Composite([scanner])), await parse("one", "two"), new ExecutionContext());
+
+        // then
+        expect(scans).toBe(2);
+        expect(run.changeset.map(r => (r.after as PlainText).text)).toEqual(["one", "two", "generated"]);
+    });
+
     describe("scanning phase traversal", () => {
         test("scanning recipe one level under a plain composite", async () => {
             const spec = new RecipeSpec();

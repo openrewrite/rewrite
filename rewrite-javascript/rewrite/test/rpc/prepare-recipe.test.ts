@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 import {ExecutionContext, Recipe, ScanningRecipe, TreeVisitor} from "../../src";
-import {check} from "../../src/preconditions";
+import {and, guard, check, RecipeRef} from "../../src/preconditions";
 import {hasSourcePath} from "../../src/javascript/preconditions";
 import {JsonVisitor} from "../../src/json";
 import {PrepareRecipe} from "../../src/rpc/request/prepare-recipe";
+import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
+import {RecipeMarketplace} from "../../src/marketplace";
 import {RpcRecipe} from "../../src/rpc/recipe";
 
 class ScanningRecipeWithPrecondition extends ScanningRecipe<Map<string, string>> {
@@ -49,6 +51,51 @@ class RecipeWithPrecondition extends Recipe {
 }
 
 describe("PrepareRecipe", () => {
+    test("a subtree condition is sent once without copying it onto descendants", async () => {
+        // given
+        const recipes = new Map<string, Recipe>();
+        const recipe = guard(hasSourcePath("**/package.json"), new RecipeWithPrecondition());
+
+        // when
+        const response = await PrepareRecipe["prepareInstance"](recipe, SnowflakeId(), recipes, new RecipeMarketplace(), true, true);
+
+        // then
+        expect(response.subtreeEditPreconditions).toEqual([
+            {visitorName: "org.openrewrite.FindSourceFiles", visitorOptions: {filePattern: "**/package.json"}}
+        ]);
+        expect(response.recipeList?.[0].subtreeEditPreconditions).toBeUndefined();
+    });
+
+    test("mixed host and peer conditions keep their boolean structure", async () => {
+        // given
+        const recipe = guard(and(new RecipeRef("org.openrewrite.text.Find", {find: "ready"}),
+            new class extends TreeVisitor<any, ExecutionContext> {}), new RecipeWithPrecondition());
+        const recipes = new Map<string, Recipe>();
+
+        // when
+        const response = await PrepareRecipe["prepareInstance"](recipe, SnowflakeId(), recipes, new RecipeMarketplace(), true, true);
+
+        // then
+        expect(response.subtreeEditPreconditions?.[0].op).toBe("and");
+        expect(response.subtreeEditPreconditions?.[0].operands?.[0]).toEqual({
+            visitorName: "org.openrewrite.text.Find", visitorOptions: {find: "ready"}
+        });
+        const peer = response.subtreeEditPreconditions?.[0].operands?.[1].visitorName;
+        expect(peer).toMatch(/^edit:/);
+        expect(recipes.has(peer!.slice(5))).toBe(true);
+    });
+
+    test("hosts without subtree guard support reject preparation", async () => {
+        // given
+        const recipe = guard(hasSourcePath("**/package.json"), new RecipeWithPrecondition());
+
+        // when
+        const prepared = PrepareRecipe["prepareInstance"](recipe, SnowflakeId(), new Map(), new RecipeMarketplace(), true);
+
+        // then
+        await expect(prepared).rejects.toThrow("host does not support composite edit preconditions");
+    });
+
     test("an editor gated by a serializable precondition is built again for each visit", async () => {
         // given
         const prepared = await PrepareRecipe["optimizePreconditions"](new RecipeWithPrecondition(), "edit", []);

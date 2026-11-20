@@ -17,6 +17,7 @@ import {ExecutionContext} from "./execution";
 import {Cursor, rootCursor, SourceFile} from "./tree";
 import {createTwoFilesPatch} from "diff";
 import {TreePrinters} from "./print";
+import {operandMatches} from "./preconditions";
 import {Recipe, ScanningRecipe} from "./recipe";
 
 export interface RecipeRun {
@@ -74,6 +75,22 @@ async function recurseRecipeList<T>(recipe: Recipe, initial: T, recipeLists: Rec
         t = await recurseRecipeList(subRecipe, t, recipeLists, fn);
     }
     return t;
+}
+
+async function editRecipeTree(recipe: Recipe, source: SourceFile, recipeLists: RecipeLists,
+                              ctx: ExecutionContext, cursor: Cursor): Promise<SourceFile | undefined> {
+    const condition = await recipe.editPrecondition();
+    if (condition !== undefined && !await operandMatches(condition, source, ctx, cursor, true)) {
+        return source;
+    }
+    let edited = await (await recipe.editor()).visit<SourceFile>(source, ctx, cursor);
+    for (const child of await subRecipes(recipe, recipeLists)) {
+        if (edited === undefined) {
+            break;
+        }
+        edited = await editRecipeTree(child, edited, recipeLists, ctx, cursor);
+    }
+    return edited;
 }
 
 async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext, recipeLists: RecipeLists): Promise<void> {
@@ -182,7 +199,7 @@ export async function* scheduleRunStreaming(
         for (let i = 0; i < files.length; i++) {
             const b = files[i];
             onProgress?.('processing', i + 1, totalFiles, b.sourcePath);
-            const editedB = await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            const editedB = await editRecipeTree(recipe, b, recipeLists, ctx, cursor);
             // Always yield a result so the caller knows when each file is processed
             yield new Result(b, editedB !== b ? editedB : b);
             // Clear array entry to allow GC to free memory for this file
@@ -191,7 +208,7 @@ export async function* scheduleRunStreaming(
 
         // Phase 4: Edit generated files and yield results
         for (const g of generated) {
-            const editedG = await recurseRecipeList(recipe, g, recipeLists, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
+            const editedG = await editRecipeTree(recipe, g, recipeLists, ctx, cursor);
             if (editedG) {
                 yield new Result(undefined, editedG);
             }
@@ -203,7 +220,7 @@ export async function* scheduleRunStreaming(
         for await (const b of before) {
             processCount++;
             onProgress?.('processing', processCount, knownTotal, b.sourcePath);
-            const editedB = await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            const editedB = await editRecipeTree(recipe, b, recipeLists, ctx, cursor);
             // Always yield a result so the caller knows when each file is processed
             yield new Result(b, editedB !== b ? editedB : b);
         }
