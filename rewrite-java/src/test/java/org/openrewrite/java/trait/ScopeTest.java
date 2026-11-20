@@ -1841,6 +1841,11 @@ class ScopeTest implements RewriteTest {
                 {
                     use("instanceInitializerBeforeStaticField", LATER);
                 }
+                {
+                    use("instanceInitializerAssignsLaterField", later = 3);
+                    use("instanceInitializerCompoundAssignsLaterField", later += 3);
+                    use("instanceInitializerIncrementsLaterField", later++);
+                }
                 Runnable lambda = () ->
                         use("lambdaInInitializerBeforeField", later);
                 Object anonymous = new Object() {
@@ -1873,6 +1878,8 @@ class ScopeTest implements RewriteTest {
         assertThat(readsRefused(source)).containsExactly(
           "enumConstantBeforeStaticField",
           "fieldInitializerBeforeInstanceField",
+          "instanceInitializerCompoundAssignsLaterField",
+          "instanceInitializerIncrementsLaterField",
           "lambdaInInitializerBeforeField",
           "laterDeclaratorOfOneStatement",
           "ownInitializer",
@@ -2409,7 +2416,10 @@ class ScopeTest implements RewriteTest {
                 if ("use".equals(method.getSimpleName())) {
                     Expression read = method.getArguments().get(1);
                     J.Identifier name = read instanceof J.MethodInvocation call ? call.getName() :
-                      read instanceof J.TypeCast cast ? (J.Identifier) cast.getClazz().getTree() : (J.Identifier) read;
+                      read instanceof J.TypeCast cast ? (J.Identifier) cast.getClazz().getTree() :
+                      read instanceof J.Assignment assignment ? (J.Identifier) assignment.getVariable() :
+                      read instanceof J.AssignmentOperation operation ? (J.Identifier) operation.getVariable() :
+                      read instanceof J.Unary unary ? (J.Identifier) unary.getExpression() : (J.Identifier) read;
                     Cursor at = Scope.cursorTo(getCursor(), name);
                     Scope scope = Scope.at(at);
                     Scope.Binding binding = scope.lookup(name.getSimpleName(), Scope.service(at).namespaceOf(at)).orElseThrow();

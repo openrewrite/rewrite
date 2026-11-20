@@ -48,8 +48,8 @@ whether it `isEffectivelyFinal()`, and whether it `canRenameTo` another name. Tw
 when they come from the same declaration, so a binding is a stable key where attribution is not.
 
 `ScopeService` holds the rules: which trees open a scope, what each binds, where a binding is
-visible, which namespace an identifier is read in, which trees are a static context, which words are
-reserved. A source file hands out
+visible, which namespace an identifier is read in, which trees are a static context, where a member
+is used before it is initialized, which words are reserved. A source file hands out
 its language's service through `SourceFile.service(ScopeService.class)`, as it does for formatting.
 The Java service implements the Java Language Specification's rules, including flow scoping of
 pattern variables. The Kotlin, Scala and Groovy services extend it and override only where their
@@ -88,17 +88,18 @@ no parameter has no `it`, so inside one the name resolves to that lambda and not
 `lambdaCanCapture` applies Java's rule in every language, so it says no for a capture that Kotlin,
 Scala or Groovy would allow.
 
-`canReference` asks each language what a static context is. It applies Java's rules for capturing a
-local, as `lambdaCanCapture` does, for a forward reference to a field, and for an enum's static field
-read while a constant is constructed, in every language. Groovy and Kotlin refuse such a read too,
-though not in the same places as Java. Scala allows it, so there `canReference` says no for a read
-the language accepts. A Kotlin `init` block is an instance initializer to these rules. In a Kotlin
-enum, `canReference` refuses every member of the companion object while an entry is constructed and
-in an entry's arguments, a `const val` and a function too, as Kotlin does. It allows one in an object
-expression there, which Kotlin refuses. Kotlin allows a read in a lambda, as of a companion member in
-`by lazy { }` or of a property declared after an `init` block, where `canReference` refuses it. An
-enum constant's body binds none of the members it inherits from its enum, so `canReference` refuses a
-field of the enum there that the body could read.
+`canReference` asks each language what a static context is and where a member is used before it is
+initialized. It applies Java's rule for capturing a local in every language, as `lambdaCanCapture`
+does. The base service answers the second question with Java's rules for a forward reference to a
+field and for an enum's static field read while a constant is constructed, and the Groovy and Scala
+services keep them. Groovy refuses such an enum read too, though not in the same places as Java.
+Scala allows it, so there `canReference` says no for a read the language accepts. The Kotlin
+service has rules of its own: properties are initialized in the order they are declared, with `init`
+blocks among them, and an enum's entries before its companion object. Kotlin allows a read in a
+lambda, as of a companion member in `by lazy { }` or of a property declared after an `init` block,
+where `canReference` refuses it. It refuses a companion member in an object expression there, which
+`canReference` allows. An enum constant's body binds none of the members it inherits from its enum,
+so `canReference` refuses a field of the enum there that the body could read.
 
 `canEvaluateBefore` looks at names and assignments only. It does not see a method called in between
 that changes a field or an object the expression reads, nor what the expression itself changes.

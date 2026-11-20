@@ -484,24 +484,51 @@ class ScopeTraitTest implements RewriteTest {
         @Language("kotlin") String source =
           """
             fun use(row: String, read: Any?): Int = 0
-            abstract class C {
+            class C {
                 val earlier = 1
                 init {
                     use("readsProperty", earlier)
                     use("readsLaterProperty", later)
-                    use("readsLaterLateinitProperty", lateinitLater)
-                    use("readsLaterAbstractProperty", abstractLater)
                     use("readsCompanionProperty", logger)
                 }
                 val later = 1
-                lateinit var lateinitLater: String
-                abstract val abstractLater: Int
                 companion object {
                     val logger = Any()
                 }
             }
             """;
         assertThat(readsRefused(source)).containsExactly("readsLaterProperty");
+        assertThat(rowsKotlincRejects(source)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void initializerCannotUseAPropertyInitializedAfterIt() {
+        @Language("kotlin") String source =
+          """
+            fun use(row: String, read: Any?): Int = 0
+            abstract class C {
+                init {
+                    assignedLater = use("assignsLaterProperty", null)
+                    use("readsLaterPropertyWithGetter", laterWithGetter)
+                    use("readsLaterLateinitProperty", lateinitLater)
+                    use("readsLaterAbstractProperty", abstractLater)
+                }
+                val withGetter: Int = use("initializerWithGetterReadsLater", later)
+                    get() = field
+                val getter: Int
+                    get() = use("getterReadsLater", later)
+                var assignedLater = 0
+                val laterWithGetter: Int = 1
+                    get() = field
+                lateinit var lateinitLater: String
+                abstract val abstractLater: Int
+                val later = 1
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "assignsLaterProperty",
+          "initializerWithGetterReadsLater",
+          "readsLaterPropertyWithGetter");
         assertThat(rowsKotlincRejects(source)).isEqualTo(readsRefused(source));
     }
 
@@ -520,6 +547,12 @@ class ScopeTraitTest implements RewriteTest {
                     use("initBlockReadsEntry", A)
                     use("initBlockReadsProperty", n)
                 }
+                constructor(s: String) : this(1) {
+                    use("secondaryConstructorReadsEntry", A)
+                    use("secondaryConstructorReadsCompanion", logger)
+                }
+                var withAccessors: Any = use("propertyWithAccessors", logger)
+                    get() = field
                 companion object {
                     val logger = Any()
                     const val X = 1
@@ -532,15 +565,17 @@ class ScopeTraitTest implements RewriteTest {
           "initBlock",
           "initBlockCallsCompanionFunction",
           "initBlockReadsConst",
-          "initBlockReadsEntry");
+          "initBlockReadsEntry",
+          "propertyWithAccessors",
+          "secondaryConstructorReadsEntry");
         assertThat(rowsKotlincRejects(source)).isEqualTo(readsRefused(source));
     }
 
     private static final Pattern USE_ROW = Pattern.compile("use\\(\"(\\w+)\"");
 
     /**
-     * The rows of a source whose second argument to {@code use(row, read)} names something
-     * {@link Scope#canReference(Scope.Binding)} refuses there, in alphabetical order.
+     * The rows of a source whose second argument to {@code use(row, read)}, or the variable the call is assigned
+     * to, names something {@link Scope#canReference(Scope.Binding)} refuses there, in alphabetical order.
      */
     private static Set<String> readsRefused(@Language("kotlin") String source) {
         Set<String> refused = new TreeSet<>();
@@ -548,9 +583,12 @@ class ScopeTraitTest implements RewriteTest {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
                 if ("use".equals(method.getSimpleName())) {
-                    Expression read = method.getArguments().get(1);
+                    Cursor parent = getCursor().getParentTreeCursor();
+                    Expression read = parent.getValue() instanceof J.Assignment assignment &&
+                                      assignment.getAssignment() == method ? assignment.getVariable() :
+                      method.getArguments().get(1);
                     J.Identifier name = read instanceof J.MethodInvocation call ? call.getName() : (J.Identifier) read;
-                    Cursor at = Scope.cursorTo(getCursor(), name);
+                    Cursor at = Scope.cursorTo(parent, name);
                     Scope scope = Scope.at(at);
                     Scope.Binding binding = scope.lookup(name.getSimpleName(), Scope.service(at).namespaceOf(at)).orElseThrow();
                     if (!scope.canReference(binding)) {
