@@ -18,7 +18,11 @@ package java
 
 import "github.com/google/uuid"
 
-type Tree interface{ IsTree() }
+type Tree interface {
+	IsTree()
+	// IsHeavyweight makes every tree a recipe.Heavyweight.
+	IsHeavyweight()
+}
 
 // J is the interface for all Java-like AST nodes that carry a prefix
 // space. Mirrors org.openrewrite.java.tree.J — `getId`, `getPrefix`,

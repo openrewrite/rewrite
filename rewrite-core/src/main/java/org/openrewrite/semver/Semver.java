@@ -98,6 +98,9 @@ public class Semver {
      * are recognized and everything else must be a valid npm range: dist-tags ({@code latest}),
      * protocol specifiers ({@code workspace:*}, {@code npm:foo@1.2.3}), git URLs, and Maven-only
      * shapes ({@code ~1.2.3.4}, {@code [1.5,2)}) are invalid.
+     * Under {@link Ecosystem#MAVEN}, {@code RELEASE} and {@code LATEST} are case-insensitive
+     * aliases for {@code latest.release} and {@code latest.integration}, respectively.
+     * Prefix with {@code =} to select either as a literal exact version.
      */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern, Ecosystem ecosystem) {
         CacheKey key = new CacheKey(toVersion, metadataPattern, ecosystem);
@@ -129,6 +132,11 @@ public class Semver {
                     .or(CaretRange.buildNode(toVersion, canonicalPattern))
                     .or(UnionRange.build(toVersion, canonicalPattern))
             );
+        }
+        if ("RELEASE".equalsIgnoreCase(toVersion)) {
+            toVersion = "latest.release";
+        } else if ("LATEST".equalsIgnoreCase(toVersion)) {
+            toVersion = "latest.integration";
         }
         return metadataValidation.and(Validated.<VersionComparator>none()
                 .or(LatestRelease.buildLatestRelease(toVersion, canonicalPattern))

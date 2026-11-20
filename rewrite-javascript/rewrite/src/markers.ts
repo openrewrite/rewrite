@@ -128,6 +128,14 @@ export function replaceMarkerByKind(markers: Markers, newMarker: Marker): Marker
     };
 }
 
+/**
+ * Removes every marker of the given kind, returning `markers` itself when none has that kind.
+ */
+export function removeMarkerByKind(markers: Markers, kind: Marker["kind"]): Markers {
+    const kept = markers.markers.filter(m => m.kind !== kind);
+    return kept.length === markers.markers.length ? markers : {...markers, markers: kept};
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
@@ -164,22 +172,25 @@ export interface SearchResult extends Marker {
     readonly description?: string
 }
 
+/**
+ * Marks `t` as a search result, unless it already carries one with this description.
+ */
 export function foundSearchResult<T extends { markers: Markers }>(t: T, description?: string): T {
-    const existing = findMarker(t, MarkersKind.SearchResult);
-    if (!existing || (existing as SearchResult).description !== description) {
-        return {
-            ...t,
-            markers: {
-                ...t.markers,
-                markers: [...t.markers.markers, {
-                    kind: MarkersKind.SearchResult,
-                    id: randomId(),
-                    description: description
-                } as SearchResult]
-            }
-        } as T;
+    if (t.markers.markers.some(m => m.kind === MarkersKind.SearchResult &&
+        (m as SearchResult).description === description)) {
+        return t;
     }
-    return t;
+    return {
+        ...t,
+        markers: {
+            ...t.markers,
+            markers: [...t.markers.markers, {
+                kind: MarkersKind.SearchResult,
+                id: randomId(),
+                description: description
+            } as SearchResult]
+        }
+    } as T;
 }
 
 export interface ParseExceptionResult extends Marker {
@@ -267,6 +278,10 @@ export function markupDebug<T extends { markers: Markers }>(t: T, message: strin
  * Helper to add a markup marker to a tree node.
  */
 function addMarkup<T extends { markers: Markers }>(t: T, markup: Markup): T {
+    if (t.markers.markers.some(m => m.kind === markup.kind &&
+        (m as Markup).message === markup.message && (m as Markup).detail === markup.detail)) {
+        return t;
+    }
     return {
         ...t,
         markers: {

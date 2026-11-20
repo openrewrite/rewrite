@@ -26,7 +26,6 @@ import org.openrewrite.style.Style;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.TypeValidation;
 
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -330,7 +329,6 @@ class MethodParamPadTest implements RewriteTest {
     @Test
     void javadocNotFormatted() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               class A {
@@ -338,6 +336,32 @@ class MethodParamPadTest implements RewriteTest {
                    * @see java.sql.Connection#createArrayOf(String, Object[])
                    */
                   void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticGenericMethodWithoutSpaceBeforeTypeParameters() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Map;
+
+              class A<K, V> {
+                  public static<K, V> A<K, V> of(Map.Entry<K, V> entry) {
+                      return new A<>();
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class A<K, V> {
+                  public static <K, V> A<K, V> of(Map.Entry<K, V> entry) {
+                      return new A<>();
                   }
               }
               """

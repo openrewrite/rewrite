@@ -28,7 +28,7 @@ import static org.openrewrite.python.internal.pipfilelock.PipfileLockWriter.read
 import static org.openrewrite.python.internal.pipfilelock.PipfileLockWriter.write;
 
 /**
- * Lock fixtures under {@code src/test/resources/pipfilelock/locks/} are byte-exact
+ * Lock fixtures under {@code lock/pipenv/locks/} are byte-exact
  * reference outputs: {@code real-pipenv-2026.6.2.Pipfile.lock} was produced by a real
  * {@code pipenv lock} run, the others by {@code oracle.py emit} (Python 3.14), i.e.
  * {@code json.dumps(obj, indent=4, separators=(",", ": "), sort_keys=True) + "\n"}.

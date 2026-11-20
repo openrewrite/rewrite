@@ -97,14 +97,15 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.gradle.attributes.Category",
             "org.openrewrite.gradle.attributes.ProjectAttribute",
             "org.openrewrite.java.JavadocVisitor",
-            "org.openrewrite.java.JavaParser",
-            "org.openrewrite.java.Java17Parser",
             "org.openrewrite.java.AnnotationMatcher",
             "org.openrewrite.java.MethodMatcher",
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.internal.JavaTypeFactory",
+            "org.openrewrite.java.internal.ImportComments",
             "org.openrewrite.java.service",
+            // ScopeService creates and takes Scope.Binding, so the two classes come from one loader
+            "org.openrewrite.java.trait.Scope",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",
@@ -113,7 +114,46 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.maven.attributes.Attributed",
             "org.openrewrite.protobuf.ProtoVisitor",
             "org.openrewrite.text.PlainText",
-            "org.openrewrite.quark.Quark"
+            "org.openrewrite.quark.Quark",
+            // A parser reads the type tables of the jar it comes from, so every parser is the host's copy even when
+            // a recipe ships its own. Each prefix also covers the parser's nested Builder.
+            "org.openrewrite.binary.BinaryParser",
+            "org.openrewrite.coldfusion.ColdFusionParser",
+            "org.openrewrite.csharp.CSharpParser",
+            "org.openrewrite.csharp.CsprojParser",
+            "org.openrewrite.docker.DockerParser",
+            "org.openrewrite.golang.GoModParser",
+            "org.openrewrite.golang.GoSumParser",
+            "org.openrewrite.golang.GolangParser",
+            "org.openrewrite.gradle.GradleParser",
+            "org.openrewrite.groovy.GroovyParser",
+            "org.openrewrite.hcl.HclParser",
+            "org.openrewrite.java.JavaParser",
+            "org.openrewrite.java.Java8Parser",
+            "org.openrewrite.java.Java11Parser",
+            "org.openrewrite.java.Java17Parser",
+            "org.openrewrite.java.Java21Parser",
+            "org.openrewrite.java.Java25Parser",
+            "org.openrewrite.javascript.JavaScriptParser",
+            "org.openrewrite.javascript.PackageJsonParser",
+            "org.openrewrite.json.JsonParser",
+            "org.openrewrite.kotlin.KotlinParser",
+            "org.openrewrite.maven.MavenParser",
+            "org.openrewrite.properties.PropertiesParser",
+            "org.openrewrite.protobuf.ProtoParser",
+            "org.openrewrite.python.PipfileParser",
+            "org.openrewrite.python.PyProjectTomlParser",
+            "org.openrewrite.python.PythonParser",
+            "org.openrewrite.python.RequirementsTxtParser",
+            "org.openrewrite.python.SetupCfgParser",
+            "org.openrewrite.ruby.RubyParser",
+            "org.openrewrite.scala.ScalaParser",
+            "org.openrewrite.toml.TomlParser",
+            "org.openrewrite.xml.XmlParser",
+            "org.openrewrite.yaml.YamlParser",
+            // Recipe code hands the cache to the parser builders and the JavaSourceSet marker, and gets it back from
+            // JavaParser.Builder
+            "org.openrewrite.java.internal.JavaTypeCache"
     );
 
     public RecipeClassLoader(@Nullable Path recipeJar, List<Path> classpath) {
@@ -209,20 +249,28 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // SLF4J, Jackson, and the Kotlin runtime should always come from the parent.
+        // SLF4J, Jackson, Micrometer, and the Kotlin runtime should always come from the parent.
         // Why kotlin: if both the parent and a recipe jar ship kotlin-stdlib, types like
         // kotlin.jvm.functions.Function1 get defined by both loaders. When Jackson (loaded
         // from parent) interacts with jackson-module-kotlin (typically bundled in the recipe
         // jar), the JVM raises a LinkageError on loader-constraint violations.
         // See moderneinc/customer-requests#2372.
+        // Why micrometer: every recipe jar ships it through rewrite-core, and a child-loaded
+        // copy has its own Metrics.globalRegistry with no registries attached, so meters
+        // recorded by OpenRewrite classes loaded here would never reach the host's.
         if (className.startsWith("org.slf4j") ||
             className.startsWith("com.fasterxml.jackson") ||
+            className.startsWith("io.micrometer.") ||
             className.startsWith("kotlin.")) {
             return true;
         }
 
         // Non-OpenRewrite classes are handled by child-first loading
         if (!className.startsWith("org.openrewrite")) {
+            return false;
+        }
+
+        if (className.startsWith("org.openrewrite.groovy.GroovyParser") && gradleParserComesFromRecipe()) {
             return false;
         }
 
@@ -235,6 +283,15 @@ public class RecipeClassLoader extends URLClassLoader {
 
         // Check for tree/marker/style types using package structure
         return isTreeMarkerStyleType(className);
+    }
+
+    /**
+     * GradleParser names a script base class from its own jar, which GroovyParser resolves through its own class
+     * loader. So when the parent has no GradleParser, GroovyParser comes from the recipe that ships one.
+     */
+    private boolean gradleParserComesFromRecipe() {
+        String gradleParser = "org/openrewrite/gradle/GradleParser.class";
+        return parent.getResource(gradleParser) == null && findResource(gradleParser) != null;
     }
 
     private boolean isTreeMarkerStyleType(String className) {

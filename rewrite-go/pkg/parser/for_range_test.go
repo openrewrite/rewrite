@@ -19,6 +19,8 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -29,16 +31,10 @@ import (
 func nthStatementInBody(t *testing.T, src string, n int) java.Statement {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("body.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	fn, ok := cu.Statements[0].Element.(*java.MethodDeclaration)
-	if !ok {
-		t.Fatalf("expected first statement to be *java.MethodDeclaration, got %T", cu.Statements[0].Element)
-	}
-	if fn.Body == nil || len(fn.Body.Statements) <= n {
-		t.Fatalf("function body has fewer than %d statements", n+1)
-	}
+	require.Truef(t, ok, "expected first statement to be *java.MethodDeclaration, got %T", cu.Statements[0].Element)
+	require.Falsef(t, fn.Body == nil || len(fn.Body.Statements) <= n, "function body has fewer than %d statements", n+1)
 	return fn.Body.Statements[n].Element
 }
 
@@ -48,9 +44,7 @@ func forEachControlOf(t *testing.T, src string) *java.ForEachControl {
 	t.Helper()
 	stmt := firstStatementInBody(t, src)
 	loop, ok := stmt.(*java.ForEachLoop)
-	if !ok {
-		t.Fatalf("expected first statement to be *java.ForEachLoop, got %T", stmt)
-	}
+	require.Truef(t, ok, "expected first statement to be *java.ForEachLoop, got %T", stmt)
 	return &loop.Control
 }
 
@@ -80,15 +74,9 @@ func TestForRangeTwoVarsDefineUsesMultiAssignment(t *testing.T) {
 
 	// then
 	ma, ok := control.Variable.Element.(*golang.MultiAssignment)
-	if !ok {
-		t.Fatalf("range head Variable must be *golang.MultiAssignment, got %T", control.Variable.Element)
-	}
-	if len(ma.Variables) != 2 {
-		t.Fatalf("expected 2 loop targets, got %d", len(ma.Variables))
-	}
-	if java.FindMarker[golang.ShortVarDecl](ma.Markers) == nil {
-		t.Fatalf("`:=` range must carry a ShortVarDecl marker")
-	}
+	require.Truef(t, ok, "range head Variable must be *golang.MultiAssignment, got %T", control.Variable.Element)
+	require.Len(t, ma.Variables, 2, "expected 2 loop targets")
+	require.NotNil(t, java.FindMarker[golang.ShortVarDecl](ma.Markers), "`:=` range must carry a ShortVarDecl marker")
 }
 
 // `for k, v = range expr {}` uses `=`, so the MultiAssignment must NOT carry a
@@ -101,18 +89,12 @@ func TestForRangeAssignHasNoShortVarDeclMarker(t *testing.T) {
 	// when
 	stmt := nthStatementInBody(t, src, 1) // the for-range, after `var k, v int`
 	loop, ok := stmt.(*java.ForEachLoop)
-	if !ok {
-		t.Fatalf("expected *java.ForEachLoop, got %T", stmt)
-	}
+	require.Truef(t, ok, "expected *java.ForEachLoop, got %T", stmt)
 	ma, ok := loop.Control.Variable.Element.(*golang.MultiAssignment)
-	if !ok {
-		t.Fatalf("range head Variable must be *golang.MultiAssignment, got %T", loop.Control.Variable.Element)
-	}
+	require.Truef(t, ok, "range head Variable must be *golang.MultiAssignment, got %T", loop.Control.Variable.Element)
 
 	// then
-	if java.FindMarker[golang.ShortVarDecl](ma.Markers) != nil {
-		t.Fatalf("`=` range must NOT carry a ShortVarDecl marker")
-	}
+	require.Nil(t, java.FindMarker[golang.ShortVarDecl](ma.Markers), "`=` range must NOT carry a ShortVarDecl marker")
 }
 
 // Every for-range variant must round-trip parse → print byte-for-byte.

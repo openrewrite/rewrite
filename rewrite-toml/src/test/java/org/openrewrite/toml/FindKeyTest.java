@@ -46,6 +46,25 @@ class FindKeyTest implements RewriteTest {
     }
 
     @Test
+    void quotedSegmentMatchesTheKeyItsEscapesStandFor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("hosts.\"a\\\"b\\\\*\"")),
+          toml(
+            """
+              [hosts]
+              "a\\"b\\\\\\nc" = 1
+              other = 2
+              """,
+            """
+              [hosts]
+              ~~>"a\\"b\\\\\\nc" = 1
+              other = 2
+              """
+          )
+        );
+    }
+
+    @Test
     void findKeyInInlineTable() {
         rewriteRun(
           spec -> spec.recipe(new FindKey(
@@ -272,6 +291,71 @@ class FindKeyTest implements RewriteTest {
                   "tool"
               ]
               version = "0.1.0" # Version number
+              """
+          )
+        );
+    }
+
+    @Test
+    void dottedKeyIsAPathOfItsOwn() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("dependencies.serde.workspace")),
+          toml(
+            """
+              [dependencies]
+              serde.workspace = true
+              serde-json = "1"
+              """,
+            """
+              [dependencies]
+              ~~>serde.workspace = true
+              serde-json = "1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedTableNamePartMatchesWhatItStandsFor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("target.cfg(windows).dependencies.winapi")),
+          toml(
+            """
+              [target.'cfg(windows)'.dependencies]
+              winapi = "0.3"
+
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+              """,
+            """
+              [target.'cfg(windows)'.dependencies]
+              ~~>winapi = "0.3"
+
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedPartKeepsTheDotItHolds() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("target.\"x86_64.linux\".dependencies.winapi")),
+          toml(
+            """
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+
+              [target.x86_64.linux.dependencies]
+              winapi = "0.3"
+              """,
+            """
+              [target."x86_64.linux".dependencies]
+              ~~>winapi = "0.3"
+
+              [target.x86_64.linux.dependencies]
+              winapi = "0.3"
               """
           )
         );

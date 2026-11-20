@@ -22,9 +22,13 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 /**
- * Marks method invocations that represent Scala function application syntax.
- * For example, arr(0) or println("hello") which are syntactic sugar for
- * arr.apply(0) and println.apply("hello").
+ * Marks method invocations that represent Scala function application syntax, where
+ * {@code expr(args)} is sugar for {@code expr.apply(args)}. For example, {@code arr(0)},
+ * {@code f(1)} or {@code List(1, 2)} are mapped with {@code arr}, {@code f} or {@code List}
+ * as the select and {@code apply} as the name, matching their method type.
+ * <p>
+ * An unqualified call to a method, such as {@code println("hello")}, is not function application:
+ * it is mapped without a select and with the method's own name, as in Java.
  */
 @Value
 @With

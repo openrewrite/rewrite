@@ -116,7 +116,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         // fact that it's not in the metadata. Usually it won't be, only in situations like the
                         // MapR repository mentioned in the comment above will it be.
                         Pom pom = new MavenPomDownloader(emptyMap(), ctx,
-                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
+                                settings, mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
                                 null, null, mrr.getPom().getRepositories());
                         if (pom.getGav().getVersion().equals(exactVersion) &&
                             !exactVersion.equals(finalVersion) &&
@@ -171,30 +171,18 @@ public class MavenDependency implements Trait<Xml.Tag> {
                     return null;
                 }
 
-                Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult(cursor).getDependencies();
+                MavenResolutionResult resolutionResult = getResolutionResult(cursor);
+                Map<Scope, List<ResolvedDependency>> dependencies = resolutionResult.getDependencies();
                 for (Scope scope : Scope.values()) {
                     if (dependencies.containsKey(scope)) {
                         for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                             if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
                                 (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
-                                String scopeName = tag.getChildValue("scope").orElse(null);
-                                Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
-                                if (tagScope == null && artifactId != null) {
-                                    tagScope = getResolutionResult(cursor).getPom().getManagedScope(
-                                            groupId,
-                                            artifactId,
-                                            tag.getChildValue("type").orElse(null),
-                                            tag.getChildValue("classifier").orElse(null)
-                                    );
-                                }
-                                if (tagScope == null) {
-                                    tagScope = Scope.Compile;
-                                }
                                 Dependency req = resolvedDependency.getRequested();
                                 String reqGroup = req.getGroupId();
                                 if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
                                     req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                                    scope == tagScope) {
+                                    scope == effectiveScope(tag, resolvedDependency, resolutionResult.getPom())) {
                                     return new MavenDependency(cursor, resolvedDependency);
                                 }
                             }
@@ -204,6 +192,17 @@ public class MavenDependency implements Trait<Xml.Tag> {
             }
 
             return null;
+        }
+
+        private static Scope effectiveScope(Xml.Tag tag, ResolvedDependency resolvedDependency, ResolvedPom pom) {
+            String scopeName = tag.getChildValue("scope").orElse(null);
+            Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : pom.getManagedScope(
+                    resolvedDependency.getGroupId(),
+                    resolvedDependency.getArtifactId(),
+                    pom.getValue(tag.getChildValue("type").orElse(null)),
+                    pom.getValue(tag.getChildValue("classifier").orElse(null))
+            );
+            return tagScope != null ? tagScope : Scope.Compile;
         }
     }
 }

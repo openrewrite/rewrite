@@ -38,6 +38,23 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void unqualifiedMethodCallWithBlockAndColonArguments() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(f: Int => Int): Int = f(1)
+                val a = run { x => x + 1 }
+                val b = run:
+                  x => x + 2
+                val c = run (x => x + 3)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodCallNoArgs() {
         rewriteRun(
           scala(

@@ -19,7 +19,12 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -28,9 +33,7 @@ import (
 func firstAssignRHS(t *testing.T, src string) java.Expression {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("g.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	for _, rp := range cu.Statements {
 		md, ok := rp.Element.(*java.MethodDeclaration)
 		if !ok || md.Body == nil {
@@ -60,30 +63,16 @@ func TestGenericFuncCallSingleTypeArg(t *testing.T) {
 
 	// then
 	mi, ok := rhs.(*java.MethodInvocation)
-	if !ok {
-		t.Fatalf("expected RHS to be *java.MethodInvocation, got %T", rhs)
-	}
-	if mi.Select != nil {
-		t.Errorf("expected Select to be nil for a free generic function call, got %T", mi.Select.Element)
-	}
-	if mi.Name == nil || mi.Name.Name != "Map" {
-		t.Errorf("expected Name == %q, got %q", "Map", nameOrEmpty(mi.Name))
-	}
-	if mi.TypeParameters == nil {
-		t.Fatalf("expected TypeParameters to be non-nil")
-	}
-	if len(mi.TypeParameters.Elements) != 1 {
-		t.Fatalf("expected 1 type argument, got %d", len(mi.TypeParameters.Elements))
-	}
+	require.Truef(t, ok, "expected RHS to be *java.MethodInvocation, got %T", rhs)
+	assert.Nil(t, mi.Select, "expected Select to be nil for a free generic function call")
+	assert.Falsef(t, mi.Name == nil || mi.Name.Name != "Map", "expected Name == %q", "Map")
+	require.NotNil(t, mi.TypeParameters, "expected TypeParameters to be non-nil")
+	require.Len(t, mi.TypeParameters.Elements, 1, "expected 1 type argument")
 	if id, ok := mi.TypeParameters.Elements[0].Element.(*java.Identifier); !ok || id.Name != "int" {
 		t.Errorf("expected type argument Identifier(int), got %T", mi.TypeParameters.Elements[0].Element)
 	}
-	if len(mi.Arguments.Elements) != 1 {
-		t.Errorf("expected 1 call argument, got %d", len(mi.Arguments.Elements))
-	}
-	if mi.MethodType == nil {
-		t.Errorf("expected MethodType to be attributed")
-	}
+	assert.Len(t, mi.Arguments.Elements, 1, "expected 1 call argument")
+	assert.NotNil(t, mi.MethodType, "expected MethodType to be attributed")
 
 	assertRoundTrip(t, src)
 }
@@ -96,9 +85,7 @@ func TestGenericFuncCallMultipleTypeArgs(t *testing.T) {
 
 	// when
 	ccu, err := parser.NewGoParser().Parse("g.go", callSrc)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 
 	// then
 	var mi *java.MethodInvocation
@@ -113,15 +100,9 @@ func TestGenericFuncCallMultipleTypeArgs(t *testing.T) {
 			}
 		}
 	}
-	if mi == nil {
-		t.Fatalf("no MethodInvocation found")
-	}
-	if mi.Name == nil || mi.Name.Name != "Pair" {
-		t.Errorf("expected Name == %q, got %q", "Pair", nameOrEmpty(mi.Name))
-	}
-	if mi.TypeParameters == nil || len(mi.TypeParameters.Elements) != 2 {
-		t.Fatalf("expected 2 type arguments, got %v", mi.TypeParameters)
-	}
+	require.NotNil(t, mi, "no MethodInvocation found")
+	assert.Falsef(t, mi.Name == nil || mi.Name.Name != "Pair", "expected Name == %q", "Pair")
+	require.False(t, mi.TypeParameters == nil || len(mi.TypeParameters.Elements) != 2, "expected 2 type arguments")
 	assertRoundTrip(t, callSrc)
 }
 
@@ -134,9 +115,7 @@ func TestFuncValueIndexCallIsNotGeneric(t *testing.T) {
 
 	// when
 	cu, err := parser.NewGoParser().Parse("g.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 
 	// then
 	var mi *java.MethodInvocation
@@ -151,15 +130,9 @@ func TestFuncValueIndexCallIsNotGeneric(t *testing.T) {
 			}
 		}
 	}
-	if mi == nil {
-		t.Fatalf("no MethodInvocation found")
-	}
-	if mi.TypeParameters != nil {
-		t.Errorf("expected TypeParameters to be nil for func-value index call")
-	}
-	if mi.Select == nil {
-		t.Fatalf("expected Select to be present")
-	}
+	require.NotNil(t, mi, "no MethodInvocation found")
+	assert.Nil(t, mi.TypeParameters, "expected TypeParameters to be nil for func-value index call")
+	require.NotNil(t, mi.Select, "expected Select to be present")
 	if _, ok := mi.Select.Element.(*java.ArrayAccess); !ok {
 		t.Errorf("expected Select to be *java.ArrayAccess, got %T", mi.Select.Element)
 	}
@@ -171,4 +144,56 @@ func nameOrEmpty(id *java.Identifier) string {
 		return ""
 	}
 	return id.Name
+}
+
+func TestGenericValueInstantiationTrailingComma(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		params string
+		args   string
+		count  int
+	}{
+		{"single", "T any", "int,", 1},
+		{"multiple", "T, U any", "int, string,", 2},
+		{"singleComments", "T any", "int /* before */, /* after */", 1},
+		{"multipleComments", "T, U any", "int, string /* before */, /* after */", 2},
+		{"singleMultiline", "T any", "\nint,\n", 1},
+		{"multipleMultiline", "T, U any", "\nint,\nstring,\n", 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// given
+			src := "package main\nfunc F[" + tt.params + "]() {}\nfunc main() {\nf := F[" + tt.args + "]\n_ = f\n}\n"
+
+			// when
+			rhs := firstAssignRHS(t, src)
+
+			// then
+			inst, ok := rhs.(*golang.IndexList)
+			require.Truef(t, ok, "expected IndexList, got %T", rhs)
+			require.Len(t, inst.Indices.Elements, tt.count)
+			require.NotNil(t, java.FindMarker[golang.TrailingComma](inst.Indices.Markers))
+			for _, arg := range inst.Indices.Elements {
+				assert.NotContains(t, arg.After.Whitespace(), ",")
+			}
+			assertRoundTrip(t, src)
+		})
+	}
+}
+
+func TestGenericValueInstantiationWithoutTrailingComma(t *testing.T) {
+	for _, args := range []string{"int", "int /* , */ ", "*int", "(int)", "func(int, string)", "[]map[string]*int"} {
+		t.Run(args, func(t *testing.T) {
+			// given
+			src := "package main\nfunc F[T any]() {}\nfunc main() {\nf := F[" + args + "]\n_ = f\n}\n"
+
+			// when
+			rhs := firstAssignRHS(t, src)
+
+			// then
+			inst, ok := rhs.(*golang.IndexList)
+			require.Truef(t, ok, "expected IndexList, got %T", rhs)
+			require.Nil(t, java.FindMarker[golang.TrailingComma](inst.Indices.Markers))
+			assertRoundTrip(t, src)
+		})
+	}
 }

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.json.style;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -30,8 +32,9 @@ import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY;
+import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
@@ -51,14 +54,38 @@ public class Autodetect extends NamedStyles {
         return new Detector();
     }
 
+    /**
+     * Accumulates formatting statistics from sampled documents. Its state is serializable with Jackson and
+     * can be {@link #merge(Detector) merged}, so documents sampled in separate processes produce the same styles
+     * as if one detector had sampled them all.
+     */
+    @JsonAutoDetect(fieldVisibility = NONE, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     public static class Detector {
 
-        private final IndentStatistics indentStatistics = new IndentStatistics();
-        private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
-        private final WrappingStatistics wrappingStatistics = new WrappingStatistics();
+        @JsonProperty
+        private IndentStatistics indentStatistics = new IndentStatistics();
+
+        @JsonProperty
+        private GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+
+        @JsonProperty
+        private WrappingStatistics wrappingStatistics = new WrappingStatistics();
+
         private final FindIndentJsonVisitor findIndentVisitor = new FindIndentJsonVisitor();
         private final FindLineFormatJsonVisitor findLineFormatVisitor = new FindLineFormatJsonVisitor();
         private final ClassifyWrappingJsonVisitor classifyWrappingVisitor = new ClassifyWrappingJsonVisitor();
+
+        /**
+         * Add another detector's statistics to this one. The result does not depend on the order detectors are merged in.
+         *
+         * @return this detector
+         */
+        public Detector merge(Detector other) {
+            indentStatistics.indentFrequencies.merge(other.indentStatistics.indentFrequencies);
+            generalFormatStatistics.merge(other.generalFormatStatistics);
+            wrappingStatistics.merge(other.wrappingStatistics);
+            return this;
+        }
 
         public Detector sample(SourceFile json) {
             if(json instanceof Json.Document) {
@@ -78,6 +105,7 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class IndentStatistics {
         IndentFrequencies indentFrequencies = new IndentFrequencies();
 
@@ -86,9 +114,15 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class GeneralFormatStatistics {
         private int linesWithCRLFNewLines = 0;
         private int linesWithLFNewLines = 0;
+
+        void merge(GeneralFormatStatistics other) {
+            linesWithCRLFNewLines += other.linesWithCRLFNewLines;
+            linesWithLFNewLines += other.linesWithLFNewLines;
+        }
 
         public boolean isIndentedWithLFNewLines() {
             return linesWithLFNewLines >= linesWithCRLFNewLines;
@@ -101,30 +135,41 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class WrappingStatistics {
-        private Map<Boolean, AtomicInteger> arraysWrapped = new HashMap<>();
-        private Map<Boolean, AtomicInteger> objectsWrapped = new HashMap<>();
+        private int arraysWrapped = 0;
+        private int arraysNotWrapped = 0;
+        private int objectsWrapped = 0;
+        private int objectsNotWrapped = 0;
 
-        private WrappingStatistics() {
-            arraysWrapped.put(Boolean.FALSE, new AtomicInteger());
-            arraysWrapped.put(Boolean.TRUE, new AtomicInteger());
-            objectsWrapped.put(Boolean.FALSE, new AtomicInteger());
-            objectsWrapped.put(Boolean.TRUE, new AtomicInteger());
+        void merge(WrappingStatistics other) {
+            arraysWrapped += other.arraysWrapped;
+            arraysNotWrapped += other.arraysNotWrapped;
+            objectsWrapped += other.objectsWrapped;
+            objectsNotWrapped += other.objectsNotWrapped;
         }
 
         private WrappingAndBracesStyle getWrappingAndBracesStyle() {
             return new WrappingAndBracesStyle(
-                    objectsWrapped.get(Boolean.TRUE).get() >= objectsWrapped.get(Boolean.FALSE).get() ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap,
-                    arraysWrapped.get(Boolean.TRUE).get() >= arraysWrapped.get(Boolean.FALSE).get() ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap
+                    objectsWrapped >= objectsNotWrapped ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap,
+                    arraysWrapped >= arraysNotWrapped ? LineWrapSetting.WrapAlways : LineWrapSetting.DoNotWrap
             );
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = ANY, getterVisibility = NONE, isGetterVisibility = NONE, setterVisibility = NONE)
     private static class IndentFrequencies {
-        private final Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
-        private final Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
+        private Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
+        private Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
+
+        void merge(IndentFrequencies other) {
+            other.spaceIndentFrequencies.forEach((indent, count) -> spaceIndentFrequencies.merge(indent, count, Long::sum));
+            other.tabIndentFrequencies.forEach((indent, count) -> tabIndentFrequencies.merge(indent, count, Long::sum));
+            linesWithSpaceIndents += other.linesWithSpaceIndents;
+            linesWithTabIndents += other.linesWithTabIndents;
+        }
 
         public boolean isIndentedWithSpaces() {
             return linesWithSpaceIndents >= linesWithTabIndents;
@@ -268,7 +313,11 @@ public class Autodetect extends NamedStyles {
         public Json visitArray(Json.Array array, WrappingStatistics wrappingStatistics) {
             for (JsonValue value: array.getValues()) {
                 boolean isWrapped = value.getPrefix().getWhitespace().contains("\n");
-                wrappingStatistics.arraysWrapped.get(isWrapped).incrementAndGet();
+                if (isWrapped) {
+                    wrappingStatistics.arraysWrapped++;
+                } else {
+                    wrappingStatistics.arraysNotWrapped++;
+                }
             }
             return super.visitArray(array, wrappingStatistics);
         }
@@ -282,7 +331,11 @@ public class Autodetect extends NamedStyles {
                 } else {
                     isWrapped = member.getElement().getPrefix().getWhitespace().contains("\n");
                 }
-                wrappingStatistics.objectsWrapped.get(isWrapped).incrementAndGet();
+                if (isWrapped) {
+                    wrappingStatistics.objectsWrapped++;
+                } else {
+                    wrappingStatistics.objectsNotWrapped++;
+                }
             }
             return super.visitObject(obj, wrappingStatistics);
         }

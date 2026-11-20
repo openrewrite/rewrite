@@ -40,31 +40,34 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
     /// in-tree nodes.
     /// </summary>
     private static T AddMarker<T>(T tree, Markup marker) where T : J
-        => J.SetMarkers(tree, tree.Markers.Add(marker));
+        => tree.Markers.MarkerList.Any(m => m.GetType() == marker.GetType() && m is Markup markup &&
+                                            markup.Message == marker.Message && markup.Detail == marker.Detail)
+            ? tree
+            : J.SetMarkers(tree, tree.Markers.Add(marker));
 
     /// <summary>
     /// Adds an Error markup marker to the given tree node.
     /// </summary>
     public static T CreateError<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Error(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Error(Tree.RandomId(), message, detail));
 
     /// <summary>
     /// Adds a Warn markup marker to the given tree node.
     /// </summary>
     public static T CreateWarn<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Warn(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Warn(Tree.RandomId(), message, detail));
 
     /// <summary>
     /// Adds an Info markup marker to the given tree node.
     /// </summary>
     public static T CreateInfo<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Info(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Info(Tree.RandomId(), message, detail));
 
     /// <summary>
     /// Adds a Debug markup marker to the given tree node.
     /// </summary>
     public static T CreateDebug<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Debug(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Debug(Tree.RandomId(), message, detail));
 
     public sealed class Error(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Error>
     {

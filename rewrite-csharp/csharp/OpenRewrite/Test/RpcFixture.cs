@@ -63,7 +63,7 @@ public class RpcFixture : IDisposable
             _javaProcess.StandardOutput.BaseStream,
             formatter);
 
-        _jsonRpc = new JsonRpc(handler);
+        _jsonRpc = new StringErrorDataJsonRpc(handler);
 
         _server = new RewriteRpcServer(new RecipeMarketplace());
         _server.Connect(_jsonRpc);
@@ -81,6 +81,7 @@ public class RpcFixture : IDisposable
         var classpath = File.ReadAllText(cpFile).Trim();
         var psi = new ProcessStartInfo("java", "org.openrewrite.maven.rpc.JavaRewriteRpc")
         {
+            WorkingDirectory = AppContext.BaseDirectory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

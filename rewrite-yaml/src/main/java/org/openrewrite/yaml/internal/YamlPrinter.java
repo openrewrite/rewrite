@@ -15,11 +15,13 @@
  */
 package org.openrewrite.yaml.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.marker.OmitColon;
+import org.openrewrite.yaml.marker.TagBeforeAnchor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.function.UnaryOperator;
@@ -67,7 +69,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, PrintOutputCapture<P> p) {
-        p.append(entry.getPrefix());
+        beforeSyntax(entry, p);
         if (entry.isDash()) {
             p.append('-');
         }
@@ -81,20 +83,17 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, PrintOutputCapture<P> p) {
-        visitMarkers(sequence.getMarkers(), p);
-        if (sequence.getAnchor() != null) {
-            visit(sequence.getAnchor(), p);
-        }
+        beforeSyntax(sequence, p);
+        visitProperties(sequence, sequence.getAnchor(), sequence.getTag(), p);
         if (sequence.getOpeningBracketPrefix() != null) {
             p.append(sequence.getOpeningBracketPrefix()).append('[');
         }
-        Yaml result = super.visitSequence(sequence, p);
+        visit(sequence.getEntries(), p);
         if (sequence.getClosingBracketPrefix() != null) {
             p.append(sequence.getClosingBracketPrefix()).append(']');
         }
-
-        afterSyntax(result, p);
-        return result;
+        afterSyntax(sequence, p);
+        return sequence;
     }
 
     @Override
@@ -112,30 +111,23 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, PrintOutputCapture<P> p) {
-        visitMarkers(mapping.getMarkers(), p);
-        if (mapping.getAnchor() != null) {
-            visit(mapping.getAnchor(), p);
-        }
+        beforeSyntax(mapping, p);
+        visitProperties(mapping, mapping.getAnchor(), mapping.getTag(), p);
         if (mapping.getOpeningBracePrefix() != null) {
             p.append(mapping.getOpeningBracePrefix()).append('{');
         }
-        Yaml result = super.visitMapping(mapping, p);
+        visit(mapping.getEntries(), p);
         if (mapping.getClosingBracePrefix() != null) {
             p.append(mapping.getClosingBracePrefix()).append('}');
         }
-        afterSyntax(result, p);
-        return result;
+        afterSyntax(mapping, p);
+        return mapping;
     }
 
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, PrintOutputCapture<P> p) {
         beforeSyntax(scalar, p);
-        if (scalar.getTag() != null) {
-            visit(scalar.getTag(), p);
-        }
-        if (scalar.getAnchor() != null) {
-            visit(scalar.getAnchor(), p);
-        }
+        visitProperties(scalar, scalar.getAnchor(), scalar.getTag(), p);
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 p.append('"')
@@ -196,6 +188,17 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                 .append(tag.getSuffix());
         afterSyntax(tag, p);
         return tag;
+    }
+
+    private void visitProperties(Yaml yaml, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag, PrintOutputCapture<P> p) {
+        boolean tagBeforeAnchor = yaml.getMarkers().findFirst(TagBeforeAnchor.class).isPresent();
+        if (tagBeforeAnchor) {
+            visit(tag, p);
+        }
+        visit(anchor, p);
+        if (!tagBeforeAnchor) {
+            visit(tag, p);
+        }
     }
 
     private static final UnaryOperator<String> YAML_MARKER_WRAPPER =

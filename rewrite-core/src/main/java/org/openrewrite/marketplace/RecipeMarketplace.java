@@ -25,6 +25,8 @@ import org.openrewrite.internal.StringUtils;
 
 import java.util.*;
 
+import static java.util.Collections.unmodifiableList;
+
 @Incubating(since = "8.66.0")
 public class RecipeMarketplace {
     private final @Getter Category root = new Category("Root",
@@ -164,14 +166,14 @@ public class RecipeMarketplace {
          * {@link #uninstall}, which keep the bundle registry in step with the tree.
          */
         public List<Category> getCategories() {
-            return Collections.unmodifiableList(categories);
+            return unmodifiableList(categories);
         }
 
         /**
          * @see #getCategories()
          */
         public List<RecipeListing> getRecipes() {
-            return Collections.unmodifiableList(recipes);
+            return unmodifiableList(recipes);
         }
 
         private void merge(Category category, Set<BundleKey> alreadyInstalled, Set<RecipeListing> added) {

@@ -20,12 +20,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.org/x/mod/modfile"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
@@ -40,29 +44,48 @@ const resolveTimeout = 120 * time.Second
 // go.sum alone cannot provide. It is a pure function of the on-disk module: no
 // marker coupling, no mutation of go.mod/go.sum (readonly + -e).
 //
-// It degrades gracefully: any hard toolchain/network failure returns an error
-// so the caller can keep today's go.sum-only behavior. Partial output from an
-// untidy module (surfaced via -e) is kept rather than discarded.
-func ResolveModuleGraph(moduleDir string) (mods []golang.GoResolvedDependency, pkgs []golang.GoPackageModule, err error) {
+// It degrades gracefully: any hard toolchain/network failure — including a
+// per-module lookup error that `-e` would otherwise mask as success — returns an
+// error so the caller can keep today's go.sum-only behavior.
+func ResolveModuleGraph(moduleDir string) (mods []golang.GoResolvedDependency, pkgs PackageResolution, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			mods, pkgs, err = nil, nil, fmt.Errorf("resolve panicked: %v", r)
+			mods, pkgs, err = nil, PackageResolution{}, fmt.Errorf("resolve panicked: %v", r)
 		}
 	}()
 
+	r := goRunner{dir: moduleDir}
+	// A module below a go.work that doesn't use it is built standalone; in
+	// workspace mode go would resolve it against the workspace's build list.
+	if outsideWorkspace(r) {
+		r.env = []string{"GOWORK=off"}
+	}
+
 	// The build list is mandatory: without it there is nothing to enrich, so a
 	// failure here propagates and the caller falls back to go.sum-only.
-	mods, err = goListModules(moduleDir)
+	mods, err = goListModules(r)
 	if err != nil {
-		return nil, nil, err
+		return nil, PackageResolution{}, err
 	}
 	// Graph edges and the package map are best-effort: a partial build list is
 	// still useful, so sub-failures are swallowed rather than discarding mods.
-	if edges, gerr := goModGraph(moduleDir); gerr == nil {
+	if edges, gerr := goModGraph(r); gerr == nil {
 		attachEdges(mods, edges)
 	}
-	pkgs, _ = goListPackages(moduleDir)
+	pkgs = goListPackages(r)
 	return mods, pkgs, nil
+}
+
+// PackageResolution is the imported-package -> module map from `go list`, plus a
+// signal of whether that resolution was complete. Incomplete is set when any
+// import failed to resolve (e.g. a private module the toolchain could not
+// fetch); the map is then untrustworthy for require removal, because a still-used
+// module may be missing from it. Unresolved lists the specific import paths that
+// resolved to no module, for diagnostics.
+type PackageResolution struct {
+	Packages   []golang.GoPackageModule
+	Incomplete bool
+	Unresolved []string
 }
 
 // goModule is the subset of `go list -m -json` / `go list -deps -json` output we consume.
@@ -73,20 +96,81 @@ type goModule struct {
 	Indirect  bool
 	GoVersion string
 	Replace   *goModule
+	Error     *goModuleError
+}
+
+type goModuleError struct {
+	Err string
 }
 
 type goPackage struct {
 	ImportPath string
 	Standard   bool
+	Incomplete bool // go list -e: this package or one of its deps failed to resolve
+	Error      *goPackageError
 	Module     *goModule
 }
 
-func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
-	stdout, err := runGo(dir, "list", "-mod=readonly", "-e", "-m", "-json", "all")
+type goPackageError struct {
+	Err string
+}
+
+// outsideWorkspace reports whether moduleDir is governed by a go.work (as the go
+// command locates it, honoring GOWORK) whose use directives don't include it.
+// Any failure to determine this leaves workspace mode as the go command chose it.
+func outsideWorkspace(r goRunner) bool {
+	out, err := r.run("env", "GOWORK")
+	if err != nil {
+		return false
+	}
+	workFile := strings.TrimSpace(string(out))
+	if workFile == "" || workFile == "off" {
+		return false
+	}
+	data, err := os.ReadFile(workFile)
+	if err != nil {
+		return false
+	}
+	wf, err := modfile.ParseWork(workFile, data, nil)
+	if err != nil {
+		return false
+	}
+	moduleDir := canonicalDir(r.dir)
+	workDir := filepath.Dir(workFile)
+	for _, u := range wf.Use {
+		p := filepath.FromSlash(u.Path)
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(workDir, p)
+		}
+		if canonicalDir(p) == moduleDir {
+			return false
+		}
+	}
+	return true
+}
+
+func canonicalDir(dir string) string {
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = real
+	}
+	return filepath.Clean(dir)
+}
+
+func goListModules(r goRunner) ([]golang.GoResolvedDependency, error) {
+	stdout, err := r.run("list", "-mod=readonly", "-e", "-m", "-json", "all")
 	if err != nil && len(stdout) == 0 {
 		return nil, err
 	}
+	return parseGoListModules(stdout)
+}
+
+func parseGoListModules(stdout []byte) ([]golang.GoResolvedDependency, error) {
 	var out []golang.GoResolvedDependency
+	var unresolved, errs []string
+	seenErr := make(map[string]bool)
 	dec := json.NewDecoder(bytes.NewReader(stdout))
 	for {
 		var m goModule
@@ -97,6 +181,18 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 		}
 		if m.Path == "" {
 			continue
+		}
+		// `-e` turns a module lookup failure (unreachable proxy, private module,
+		// GOPROXY=off) into a per-module Error field with a zero exit rather than
+		// a process failure. A build list containing such a module is not the true
+		// MVS selection, so treat it as a hard resolution failure: the caller then
+		// falls back to go.sum-only and marks the result untrustworthy.
+		if m.Error != nil && !m.Main {
+			unresolved = append(unresolved, m.Path)
+			if e := strings.TrimSpace(m.Error.Err); e != "" && !seenErr[e] {
+				seenErr[e] = true
+				errs = append(errs, e)
+			}
 		}
 		rd := golang.GoResolvedDependency{
 			ModulePath:      m.Path,
@@ -111,42 +207,72 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 		}
 		out = append(out, rd)
 	}
+	if len(unresolved) > 0 {
+		msg := fmt.Sprintf("go list -m: %d module(s) unresolved (build list unreliable): %s",
+			len(unresolved), strings.Join(unresolved, ", "))
+		if len(errs) > 0 {
+			msg += ": " + strings.Join(errs, "; ")
+		}
+		return nil, errors.New(msg)
+	}
 	return out, nil
 }
 
-func goListPackages(dir string) ([]golang.GoPackageModule, error) {
-	stdout, err := runGo(dir, "list", "-mod=readonly", "-e", "-deps", "-test", "-json", "./...")
-	if err != nil && len(stdout) == 0 {
-		return nil, err
+func goListPackages(r goRunner) PackageResolution {
+	stdout, runErr := r.run("list", "-mod=readonly", "-e", "-deps", "-test", "-json", "./...")
+	if runErr != nil && len(stdout) == 0 {
+		return PackageResolution{Incomplete: true}
 	}
-	var out []golang.GoPackageModule
+	res := parseGoListPackages(stdout)
+	// A non-empty stdout past a process-level error means `-e` recovered partial
+	// output: usable, but by definition something did not resolve — don't trust it.
+	if runErr != nil {
+		res.Incomplete = true
+	}
+	return res
+}
+
+// parseGoListPackages decodes the `go list -e -deps -json ./...` stream into the
+// import-path -> module map. Incomplete is set when any package (or one of its
+// transitive deps) failed to resolve, which `go list -e` surfaces via the
+// per-package Error/Incomplete fields instead of a process-level failure; the
+// non-standard imports that resolved to no module are collected in Unresolved.
+func parseGoListPackages(stdout []byte) PackageResolution {
+	var res PackageResolution
 	dec := json.NewDecoder(bytes.NewReader(stdout))
 	for {
 		var p goPackage
 		if derr := dec.Decode(&p); derr == io.EOF {
 			break
 		} else if derr != nil {
-			return out, fmt.Errorf("go list -deps decode: %w", derr)
+			res.Incomplete = true
+			break
 		}
 		if p.ImportPath == "" {
 			continue
+		}
+		if p.Error != nil || p.Incomplete {
+			res.Incomplete = true
+			if p.Module == nil && !p.Standard {
+				res.Unresolved = append(res.Unresolved, p.ImportPath)
+			}
 		}
 		pm := golang.GoPackageModule{ImportPath: p.ImportPath, Standard: p.Standard}
 		if p.Module != nil {
 			pm.ModulePath = p.Module.Path
 			pm.Version = p.Module.Version
 		}
-		out = append(out, pm)
+		res.Packages = append(res.Packages, pm)
 	}
-	return out, nil
+	return res
 }
 
 type moduleEdge struct {
 	fromPath, toPath, toVersion string
 }
 
-func goModGraph(dir string) ([]moduleEdge, error) {
-	stdout, err := runGo(dir, "mod", "graph")
+func goModGraph(r goRunner) ([]moduleEdge, error) {
+	stdout, err := r.run("mod", "graph")
 	if err != nil && len(stdout) == 0 {
 		return nil, err
 	}
@@ -191,12 +317,19 @@ func attachEdges(mods []golang.GoResolvedDependency, edges []moduleEdge) {
 	}
 }
 
-func runGo(dir string, args ...string) ([]byte, error) {
+// goRunner runs go commands in a module directory with extra environment
+// overrides layered on the inherited environment.
+type goRunner struct {
+	dir string
+	env []string
+}
+
+func (r goRunner) run(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GO111MODULE=on", "GOFLAGS=-mod=readonly")
+	cmd.Dir = r.dir
+	cmd.Env = append(append(os.Environ(), "GO111MODULE=on", "GOFLAGS=-mod=readonly"), r.env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

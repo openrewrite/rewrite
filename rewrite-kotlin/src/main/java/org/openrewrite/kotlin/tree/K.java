@@ -26,11 +26,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
+import org.openrewrite.kotlin.service.KotlinScopeService;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
@@ -40,6 +42,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -308,14 +311,21 @@ public interface K extends J {
             }
 
             public K.CompilationUnit withClasses(List<JRightPadded<J.ClassDeclaration>> classes) {
-                List<JRightPadded<Statement>> statements = t.statements.stream()
-                        .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
-                        .collect(toList());
-
-                //noinspection unchecked
-                statements.addAll(0, classes.stream()
-                        .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(toList()));
+                // Top-level declarations initialize and read in source order, so each class keeps its position.
+                List<JRightPadded<Statement>> statements = new ArrayList<>(t.statements.size());
+                Iterator<JRightPadded<J.ClassDeclaration>> replacements = classes.iterator();
+                for (JRightPadded<Statement> statement : t.statements) {
+                    if (!(statement.getElement() instanceof J.ClassDeclaration)) {
+                        statements.add(statement);
+                    } else if (replacements.hasNext()) {
+                        //noinspection unchecked
+                        statements.add((JRightPadded<Statement>) (Object) replacements.next());
+                    }
+                }
+                while (replacements.hasNext()) {
+                    //noinspection unchecked
+                    statements.add((JRightPadded<Statement>) (Object) replacements.next());
+                }
 
                 return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
@@ -351,6 +361,10 @@ public interface K extends J {
                     serviceClass = service;
                 } else if (ImportService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinImportService.class.getName());
+                } else if (KotlinScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinScopeService.class.getName());
                 } else if (KotlinAutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
@@ -888,6 +902,112 @@ public interface K extends J {
         }
     }
 
+    /**
+     * The parenthesized entries of a destructuring pattern, as in {@code val (a: Int, b) = pair}, occupying the
+     * declarator slot of the single {@link J.VariableDeclarations.NamedVariable} that the pattern declares.
+     * Each entry is a declaration of its own so that it can carry a type.
+     */
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DestructuringPattern implements K, Expression, TypedTree, VariableDeclarator {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JContainer<J.VariableDeclarations> variables;
+
+        public List<J.VariableDeclarations> getVariables() {
+            return variables.getElements();
+        }
+
+        public DestructuringPattern withVariables(List<J.VariableDeclarations> variables) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, variables));
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            List<J.Identifier> names = new ArrayList<>(variables.getElements().size());
+            for (J.VariableDeclarations variable : variables.getElements()) {
+                for (J.VariableDeclarations.NamedVariable namedVariable : variable.getVariables()) {
+                    names.addAll(namedVariable.getDeclarator().getNames());
+                }
+            }
+            return names;
+        }
+
+        @Getter
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitDestructuringPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DestructuringPattern t;
+
+            public JContainer<J.VariableDeclarations> getVariables() {
+                return t.variables;
+            }
+
+            public DestructuringPattern withVariables(JContainer<J.VariableDeclarations> variables) {
+                return t.variables == variables ? t : new DestructuringPattern(t.id, t.prefix, t.markers, variables, t.type);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+    }
+
+    /**
+     * @deprecated A destructuring declaration is a {@link J.VariableDeclarations} whose single
+     * {@link J.VariableDeclarations.NamedVariable} has a {@link DestructuringPattern} declarator. Retained so that
+     * LSTs written before that shape remain readable.
+     */
+    @Deprecated
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1586,8 +1706,8 @@ public interface K extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            //noinspection DataFlowIssue
-            return expression.getExpression().getType();
+            Expression returnedExpression = expression.getExpression();
+            return returnedExpression == null ? null : returnedExpression.getType();
         }
 
         @Override

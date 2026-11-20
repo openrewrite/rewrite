@@ -29,9 +29,7 @@ public class FindReferencedTypes {
     }
 
     public static Set<JavaType.FullyQualified> find(J j) {
-        Set<JavaType.FullyQualified> fields = new HashSet<>();
-        new FindReferencedTypesVisitor().visit(j, fields);
-        return fields;
+        return new FindReferencedTypesVisitor().reduce(j, new HashSet<>());
     }
 
     private static class FindReferencedTypesVisitor extends JavaIsoVisitor<Set<JavaType.FullyQualified>> {

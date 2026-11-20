@@ -100,8 +100,7 @@ public class FindProperties extends Recipe {
      */
     public static Set<Xml.Tag> find(Xml.Document xml, String propertyPattern) {
         Pattern propertyMatcher = Pattern.compile(propertyPattern);
-        Set<Xml.Tag> found = new HashSet<>();
-        new MavenVisitor<Set<Xml.Tag>>() {
+        return new MavenVisitor<Set<Xml.Tag>>() {
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> tags) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, tags);
@@ -110,7 +109,6 @@ public class FindProperties extends Recipe {
                 }
                 return t;
             }
-        }.visit(xml, found);
-        return found;
+        }.reduce(xml, new HashSet<>());
     }
 }

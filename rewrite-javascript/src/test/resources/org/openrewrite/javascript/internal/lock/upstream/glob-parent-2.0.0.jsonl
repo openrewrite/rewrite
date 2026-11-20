@@ -1,0 +1,31 @@
+{"header":"glob-parent 2.0.0: every call its own tests (test.js) make, with its answer; generate/upstream-calls.js generate/upstream/glob-parent.js <checkout> 2.0.0"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/to/*.js"],"out":"path/to"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/root/path/to/*.js"],"out":"/root/path/to"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/*.js"],"out":"/"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*.js"],"out":"."}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["**/*.js"],"out":"."}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/{to,from}"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/!(to|from)"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/?(to|from)"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/+(to|from)"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/*(to|from)"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/@(to|from)"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/**/*"],"out":"path"}
+{"test":"test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/**/subdir/foo.*"],"out":"path"}
+{"test":"test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path/foo/bar.js"],"out":"path/foo"}
+{"test":"test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path/foo/"],"out":"path/foo"}
+{"test":"test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path/foo"],"out":"path"}
+{"test":"differences","fn":"globParent","args":[""],"out":"."}
+{"test":"differences","fn":"globParent","args":["path/{a,b}/c"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["path/[a]/b"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["path/\\*.js"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["path/(a|b"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["a/\\{b}/c"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["a/[b]"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["{a,b}/"],"out":"."}
+{"test":"differences","fn":"globParent","args":["a/(b|c)/d"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["a/@(b)/c"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["a\\(b/c"],"out":"."}
+{"test":"differences","fn":"globParent","args":["path/!x"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["/"],"out":"/"}
+{"test":"differences","fn":"globParent","args":["//a/*"],"out":"//a"}

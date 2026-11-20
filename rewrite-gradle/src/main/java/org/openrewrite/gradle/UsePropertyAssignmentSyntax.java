@@ -61,6 +61,13 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return method;
                 }
 
+                // Version catalog builders expose methods that look like property setters, e.g.
+                // `version("junit", "6.1.2")` and `library(...).version("1.0")`, but assigning to
+                // them is invalid DSL. Nothing inside the block is a Gradle project/task property.
+                if ("versionCatalogs".equals(method.getSimpleName())) {
+                    return method;
+                }
+
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {
@@ -74,6 +81,16 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                 }
 
                 if (!propertyName.equals(m.getSimpleName())) {
+                    return m;
+                }
+
+                if (m.getSelect() instanceof J.MethodInvocation) {
+                    return m;
+                }
+
+                // The deprecated syntax relies on Groovy's property-setter fallback, so it never resolves to a
+                // declared method. A call that does, e.g. `matcher.group(1)`, is a regular method call.
+                if (m.getMethodType() != null) {
                     return m;
                 }
 

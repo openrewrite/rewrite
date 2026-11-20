@@ -35,6 +35,10 @@ public class NpmRecipeBundleResolver implements RecipeBundleResolver {
         return "npm";
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         Path pkgPath = Paths.get(bundle.getPackageName());

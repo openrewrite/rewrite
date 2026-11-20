@@ -17,6 +17,8 @@ package org.openrewrite.golang.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -24,6 +26,9 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
+
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 @Value
 @With
@@ -34,13 +39,13 @@ public class GroupedImport implements Marker, RpcCodec<GroupedImport> {
     @Override
     public void rpcSend(GroupedImport after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, g -> g.getBefore().getWhitespace());
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override
     public GroupedImport rpcReceive(GroupedImport before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withBefore(Space.format(q.receive(before.getBefore() == null ? "" : before.getBefore().getWhitespace())));
+                .withBefore(q.receive(before.getBefore(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

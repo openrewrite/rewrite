@@ -21,7 +21,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.service.SourcePositionService;
 import org.openrewrite.java.service.Span.ColSpan;
@@ -31,10 +30,11 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.Supplier;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
@@ -49,9 +49,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public TabsAndIndentsVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents),
-                getStyle(SpacesStyle.class, styles, IntelliJ::spaces),
-                getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces),
+        this(StyleHelper.getStyle(TabsAndIndentsStyle.class, styles, (Supplier<TabsAndIndentsStyle>) IntelliJ::tabsAndIndents),
+                StyleHelper.getStyle(SpacesStyle.class, styles, (Supplier<SpacesStyle>) IntelliJ::spaces),
+                StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces),
                 stopAfter);
     }
 
@@ -137,12 +137,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         return super.visitEnumValue(enum_, p);
-    }
-
-    @Override
-    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-        // FIXME fix formatting of control sections
-        return control;
     }
 
     @Override
@@ -284,7 +278,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         if (!Space.firstPrefix(control.getInit()).getLastWhitespace().contains("\n") && evaluate(() -> wrappingStyle.getForStatement().getAlignWhenMultiline(), false)) {
                             sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                             positionService = sourceFile.service(SourcePositionService.class);
-                            ColSpan colSpan = positionService.columnsOf(getCursor(), control.getInit().get(0));
+                            // JavaPrinter prints a loop's control directly, so replace the containing loop,
+                            // not just a Control cursor whose parent may still hold the old initializer.
+                            Cursor loopCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
+                            J.ForLoop currentLoop = ((J.ForLoop) loopCursor.getValue()).withControl(control);
+                            ColSpan colSpan = positionService.columnsOf(loopCursor.withValue(currentLoop), control.getInit().get(0));
                             getCursor().putMessage("lastIndent", colSpan.getStartColumn() - colSpan.getIndent() - 1 + indent);
                             getCursor().putMessage("indentType", IndentType.ALIGN);
                         }
@@ -339,6 +337,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR:
                     case ARRAY_INDEX:
+                    case FOREACH_ITERABLE:
                     case PARENTHESES:
                     case TYPE_PARAMETER: {
                         elem = visitAndCast(elem, p);
@@ -354,6 +353,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             getCursor().getParentOrThrow().putMessage("indentType", IndentType.ALIGN);
                         }
 
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    case FOREACH_VARIABLE:
+                        elem = visitForEachVariable(elem, indent, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
                     default:
@@ -400,6 +403,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         elem = visitAndCast(elem, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
+                    case FOREACH_VARIABLE:
+                        elem = visitForEachVariable(elem, indent, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
                     default:
                         elem = visitAndCast(elem, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
@@ -418,7 +425,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
-        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(elem -> elem instanceof J.Empty)) {
+        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(J.Empty.class::isInstance)) {
             return super.visitContainer(container, loc, p);
         }
 
@@ -555,14 +562,26 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
                         builder.append('\n');
-                        shift(builder, indent);
-                        builder.append(line);
+                        if (!line.isEmpty()) {
+                            shift(builder, indent);
+                            builder.append(line);
+                        }
                     }
-                    literal = literal.withValueSource(builder.toString()).withValue(content);
+                    // every line moves by the same amount, which leaves the text block's value as it was
+                    literal = literal.withValueSource(builder.toString());
                 }
             }
         }
         return literal;
+    }
+
+    private J visitForEachVariable(J variable, int indent, P p) {
+        if (!variable.getPrefix().getLastWhitespace().contains("\n")) {
+            getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+        }
+        J v = visitAndCast(variable, p);
+        getCursor().putMessage("lastIndent", indent);
+        return v;
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
@@ -849,14 +868,5 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             // Handle newly introduced method calls on style that are not part of lst yet
             return defaultValue;
         }
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 }

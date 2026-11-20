@@ -117,6 +117,13 @@ public class AnnotationTemplateGenerator {
         after.append("\n@interface $Placeholder {}");
     }
 
+    /**
+     * The text between a method's printed header and the statements of its body.
+     */
+    protected String openMethodBody() {
+        return "{";
+    }
+
     public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
         List<J.Annotation> annotations = new ArrayList<>();
 
@@ -191,7 +198,7 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, m.withBody(null)
                         .withLeadingAnnotations(emptyList())
                         .withPrefix(Space.EMPTY)
-                        .printTrimmed(cursor).trim() + '{');
+                        .printTrimmed(cursor).trim() + openMethodBody());
                 after.append('}');
             } else if (parent instanceof J.NewClass) {
                 // Anonymous class body
@@ -316,7 +323,8 @@ public class AnnotationTemplateGenerator {
                 .withPrefix(Space.EMPTY)
                 .withKind(J.ClassDeclaration.Kind.Type.Class)
                 .withPrimaryConstructor(null);
-        String printed = c.printTrimmed(cursor);
+        // a nested class is given the cursor of the class around it, and any other class its own cursor
+        String printed = c.printTrimmed(sibling ? cursor : cursor.getParentOrThrow());
         int braceIndex = printed.lastIndexOf('{');
         if (annotated) {
             after.append(braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
@@ -380,7 +388,7 @@ public class AnnotationTemplateGenerator {
         if (!(maybeAnnotation instanceof J.Annotation)) {
             return false;
         }
-        Cursor sourceFileCursor = cursor.dropParentUntil(is -> is instanceof JavaSourceFile);
+        Cursor sourceFileCursor = cursor.dropParentUntil(JavaSourceFile.class::isInstance);
         AnnotationService annotationService = sourceFileCursor.<JavaSourceFile>getValue().service(AnnotationService.class);
         return annotationService.getAllAnnotations(cursor).contains(maybeAnnotation);
     }

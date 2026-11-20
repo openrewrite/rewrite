@@ -300,9 +300,8 @@ class EnumTest implements RewriteTest {
             """
               enum Color {}
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertTrue(requireNonNull(cu.getClasses().get(0).getType()).hasFlags(Flag.Enum));
-            })
+            spec -> spec.afterRecipe(cu ->
+                assertTrue(requireNonNull(cu.getClasses().get(0).getType()).hasFlags(Flag.Enum)))
           )
         );
     }

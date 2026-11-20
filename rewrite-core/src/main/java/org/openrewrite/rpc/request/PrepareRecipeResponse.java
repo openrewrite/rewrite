@@ -56,6 +56,13 @@ public class PrepareRecipeResponse {
     @Nullable
     List<PrepareRecipeResponse> recipeList;
 
+    /**
+     * Mirrors {@link org.openrewrite.Recipe#causesAnotherCycle()}. Only sent when true and requested by
+     * {@link PrepareRecipe#getAcceptsCausesAnotherCycle()}.
+     */
+    @Nullable
+    Boolean causesAnotherCycle;
+
     @Value
     public static class DelegatesTo {
         String recipeName;

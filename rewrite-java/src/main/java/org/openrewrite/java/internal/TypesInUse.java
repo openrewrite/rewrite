@@ -30,7 +30,6 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -40,6 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -66,6 +66,22 @@ public class TypesInUse {
      */
     @Getter(AccessLevel.NONE)
     private final Set<String> docReferencePackages;
+
+    /**
+     * Canonical ({@code $} replaced with {@code .}) fully qualified names of the same documentation-comment
+     * references whose packages are recorded in {@link #docReferencePackages}, so type-changing recipes can
+     * find them too. Equally transient, and queried only via {@link #hasDocReference}.
+     */
+    @Getter(AccessLevel.NONE)
+    private final Set<String> docReferenceTypes;
+
+    /**
+     * Canonical ({@code $} replaced with {@code .}) fully qualified names of the types the compilation unit
+     * declares, at any depth. Populated only by {@link #build(JavaSourceFile)}; {@code null} when built by
+     * {@link #of}, as a serialized type index doesn't carry them. Queried only via {@link #mayDeclareType}.
+     */
+    @Getter(AccessLevel.NONE)
+    private final @Nullable Set<String> declaredTypes;
 
     /**
      * Lazily-built prefix tree over every fully qualified name reachable via
@@ -112,7 +128,9 @@ public class TypesInUse {
                 findTypesInUse.getDeclaredMethods(),
                 findTypesInUse.getUsedMethods(),
                 findTypesInUse.getVariables(),
-                findTypesInUse.getDocReferencePackages());
+                findTypesInUse.getDocReferencePackages(),
+                findTypesInUse.getDocReferenceTypes(),
+                findTypesInUse.getDeclaredTypes());
     }
 
     /**
@@ -125,7 +143,17 @@ public class TypesInUse {
                                 Set<JavaType.Method> declaredMethods,
                                 Set<JavaType.Method> usedMethods,
                                 Set<JavaType.Variable> variables) {
-        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, Collections.emptySet());
+        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, emptySet(), emptySet(), null);
+    }
+
+    /**
+     * Whether the compilation unit may declare a class, interface, enum or other type named
+     * {@code fullyQualifiedType}, treating {@code $} and {@code .} as equivalent in inner-class FQNs. A
+     * {@code false} answer is definite, so callers can skip walking the tree for the declaration. Always
+     * {@code true} when the declared types aren't known, as for a {@link TypesInUse} built by {@link #of}.
+     */
+    public boolean mayDeclareType(String fullyQualifiedType) {
+        return declaredTypes == null || declaredTypes.contains(fullyQualifiedType.replace('$', '.'));
     }
 
     /**
@@ -142,6 +170,15 @@ public class TypesInUse {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether any fully qualified documentation-comment reference in this compilation unit is exactly
+     * {@code fullyQualifiedType}, treating {@code $} and {@code .} as equivalent in inner-class FQNs.
+     * Covers the references that {@link #hasType} deliberately omits.
+     */
+    public boolean hasDocReference(String fullyQualifiedType) {
+        return docReferenceTypes.contains(fullyQualifiedType.replace('$', '.'));
     }
 
     /**
@@ -332,9 +369,11 @@ public class TypesInUse {
                 String keyword = p.getKeyword();
                 if (keyword != null && visited.add(keyword)) {
                     trie.insert(keyword, explicit);
-                }
-                if (p == JavaType.Primitive.String && visited.add("java.lang.String")) {
-                    trie.insert("java.lang.String", explicit);
+                    // The "java.lang.String" visited key belongs to the String class, which walks its
+                    // supertypes when it claims the key, so the literal leaves it alone
+                    if (p == JavaType.Primitive.String) {
+                        trie.insert("java.lang.String", explicit);
+                    }
                 }
                 if (visited.add("java.lang.Object")) {
                     trie.insert("java.lang.Object", explicit);
@@ -593,8 +632,16 @@ public class TypesInUse {
             MethodEntry[] entries = new MethodEntry[methods.size()];
             int i = 0;
             for (JavaType.Method m : methods) {
-                String fqn = m.getDeclaringType().getFullyQualifiedName();
+                JavaType.FullyQualified declaringType = m.getDeclaringType();
+                // Foreign-language methods can have no Java declaring type to index.
+                if (declaringType == null) {
+                    continue;
+                }
+                String fqn = declaringType.getFullyQualifiedName();
                 entries[i++] = new MethodEntry(fqn.indexOf('$') < 0 ? fqn : fqn.replace('$', '.'), m);
+            }
+            if (i != entries.length) {
+                entries = Arrays.copyOf(entries, i);
             }
             Arrays.sort(entries, Comparator.comparing(e -> e.key));
             return entries;
@@ -623,6 +670,16 @@ public class TypesInUse {
         private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
         private final Set<String> docReferencePackages = new HashSet<>();
+        private final Set<String> docReferenceTypes = new HashSet<>();
+        private final Set<String> declaredTypes = new HashSet<>();
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+            if (classDecl.getType() != null) {
+                declaredTypes.add(classDecl.getType().getFullyQualifiedName().replace('$', '.'));
+            }
+            return super.visitClassDeclaration(classDecl, p);
+        }
 
         @Override
         public J.Import visitImport(J.Import _import, Integer p) {
@@ -668,10 +725,15 @@ public class TypesInUse {
                         usedMethods.add((JavaType.Method) javaType);
                     }
                 } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
-                        !(cursor.getValue() instanceof J.Lambda)) {
+                        !(cursor.getValue() instanceof J.Lambda) &&
+                        // A source file may carry the type it declares, as a CFML file carries its component or
+                        // template. Like a class declaration's type, that type isn't in use just for being declared.
+                        !(cursor.getValue() instanceof JavaSourceFile)) {
                     if (isFullyQualifiedJavaDocReference(cursor)) {
                         if (javaType instanceof JavaType.FullyQualified) {
-                            docReferencePackages.add(((JavaType.FullyQualified) javaType).getPackageName());
+                            JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                            docReferencePackages.add(fq.getPackageName());
+                            docReferenceTypes.add(fq.getFullyQualifiedName().replace('$', '.'));
                         }
                     } else {
                         types.add(javaType);

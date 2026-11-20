@@ -221,9 +221,33 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotDowngradeNewerConstraint(@TempDir Path tempDir) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2023.1.1")),
+          uv(tempDir,
+            pyproject(
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                ]
+
+                [tool.uv]
+                constraint-dependencies = [
+                    "certifi>=2024.1.1",
+                ]
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void addToConstraintDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("certifi", ">=2024.1.1", "tool.uv.constraint-dependencies", null)),
+          spec -> spec.recipe(new AddDependency("certifi", ">=2024.1.1", "tool.uv.constraint-dependencies", null, null)),
           pyproject(
             """
               [project]
@@ -464,6 +488,26 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void skipPdmWhenOverrideAlreadyMatches() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              certifi = ">=2024.1.1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerPdmOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2023.1.1")),
           pyproject(
             """
               [project]

@@ -46,7 +46,7 @@ class Capture(Generic[T]):
         # Capture with constraint
         positive_int = capture('n', constraint=lambda n: is_positive_int(n))
 
-        # Typed capture for documentation
+        # Typed capture
         typed = capture('x', type_hint='int')
     """
 
@@ -71,6 +71,11 @@ class Capture(Generic[T]):
             self.max_count == other.max_count and
             self.type_hint == other.type_hint
         )
+
+    @property
+    def is_typed(self) -> bool:
+        """Whether ``type_hint`` constrains what this capture matches."""
+        return self.type_hint is not None and self.type_hint not in ('Any', 'typing.Any')
 
     def __format__(self, format_spec: str) -> str:
         """Format as internal placeholder identifier and register for f-string capture.
@@ -109,7 +114,12 @@ def capture(
         min_count: Minimum elements for variadic captures.
         max_count: Maximum elements for variadic captures.
         constraint: Predicate function to validate matched nodes.
-        type_hint: Type annotation string for documentation.
+        type_hint: A Python type annotation, such as ``'int'``, ``'int | str'``
+            or ``'pathlib.PurePath'``. A pattern matches only an expression
+            whose attributed type is assignable to it. Type arguments are not
+            compared, and an ``Optional`` is attributed as its non-``None`` type.
+            ``'Any'`` and ``'object'`` match anything. The pattern's ``context``
+            has to import what the annotation names.
 
     Returns:
         A Capture instance.

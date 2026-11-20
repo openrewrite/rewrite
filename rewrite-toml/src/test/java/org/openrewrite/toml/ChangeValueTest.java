@@ -23,6 +23,8 @@ import org.openrewrite.test.RewriteTest;
 
 import org.openrewrite.toml.tree.Toml;
 
+import java.time.LocalDate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -312,7 +314,7 @@ class ChangeValueTest implements RewriteTest {
           spec -> spec.recipes(
             new ChangeValue("server.port", "8080"),
             new ChangeValue("server.port", "9090")
-          ).expectedCyclesThatMakeChanges(2),
+          ).expectedCyclesThatMakeChanges(2).cycles(2), // each ChangeValue overwrites the other in every cycle
           toml(
             """
               [server]
@@ -339,6 +341,102 @@ class ChangeValueTest implements RewriteTest {
             """
               [server]
               port = 8080
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeValueOfDottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("package.version", "\"2.0.0\"")),
+          toml(
+            """
+              package.version = "1.0.0"
+              """,
+            """
+              package.version = "2.0.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void newValueIsReadAsTomlReadsIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("released", "2024-01-01")),
+          toml(
+            """
+              released = 2023-01-01
+              """,
+            """
+              released = 2024-01-01
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Literal) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValue())
+              .isEqualTo(LocalDate.of(2024, 1, 1)))
+          )
+        );
+    }
+
+    @Test
+    void newArrayValueIsAnArray() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("authors", "[\"Alice\", \"Bob\"]")),
+          toml(
+            """
+              authors = ["Alice"]
+              """,
+            """
+              authors = ["Alice", "Bob"]
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.KeyValue) doc.getValues().getFirst()).getValue())
+              .isInstanceOf(Toml.Array.class))
+          )
+        );
+    }
+
+    @Test
+    void integerBeyondSixtyFourBitsStaysAnInteger() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("hash", "0x3D8660C0CB2D57B189C3D7995572A552F75E48B5")),
+          toml(
+            """
+              hash = 0x01
+              """,
+            """
+              hash = 0x3D8660C0CB2D57B189C3D7995572A552F75E48B5
+              """
+          )
+        );
+    }
+
+    @Test
+    void valueThatIsNotTomlBecomesAStringWithItsQuotesEscaped() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("name", "it's \"x\"")),
+          toml(
+            """
+              name = "a"
+              version = "1.0.0"
+              """,
+            """
+              name = "it's \\"x\\""
+              version = "1.0.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void unquotedVersionBecomesAString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("version", "2.0.0")),
+          toml(
+            """
+              version = "1.0.0"
+              """,
+            """
+              version = "2.0.0"
               """
           )
         );

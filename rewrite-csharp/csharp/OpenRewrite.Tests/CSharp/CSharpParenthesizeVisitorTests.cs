@@ -212,4 +212,31 @@ public class CSharpParenthesizeVisitorTests
 
         Assert.IsType<IsPattern>(result.Left);
     }
+
+    [Fact]
+    public void ParenthesizeDeep_NullCoalescingOnLeftOfNullCoalescing_AddsParens()
+    {
+        // (a ?? b) ?? c — without parentheses it prints a ?? b ?? c, which parses as a ?? (b ?? c)
+        var inner = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("a"), MakeId("b"));
+
+        var underCsBinary = (CsBinary)CSharpParenthesizeVisitor.ParenthesizeDeep(
+            MakeCsBinary(CsBinary.OperatorType.NullCoalescing, inner, MakeId("c")));
+        var underTernary = (Ternary)CSharpParenthesizeVisitor.ParenthesizeDeep(MakeNullCoalescing(inner, MakeId("c")));
+
+        Assert.IsType<Parentheses<Expression>>(underCsBinary.Left);
+        Assert.IsType<Parentheses<Expression>>(underTernary.Condition);
+    }
+
+    [Fact]
+    public void ParenthesizeDeep_NullCoalescingOnRightOfNullCoalescing_NoParens()
+    {
+        var inner = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("b"), MakeId("c"));
+
+        var underCsBinary = (CsBinary)CSharpParenthesizeVisitor.ParenthesizeDeep(
+            MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("a"), inner));
+        var underTernary = (Ternary)CSharpParenthesizeVisitor.ParenthesizeDeep(MakeNullCoalescing(MakeId("a"), inner));
+
+        Assert.IsType<CsBinary>(underCsBinary.Right);
+        Assert.IsType<CsBinary>(underTernary.FalsePart.Element);
+    }
 }

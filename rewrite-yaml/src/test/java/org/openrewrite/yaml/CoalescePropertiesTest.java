@@ -380,7 +380,6 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void coalescesMappingSiblingOfBlockScalar() {
         rewriteRun(
-          spec -> spec.recipe(new CoalesceProperties(null, null)),
           yaml(
             """
               outer:
@@ -404,7 +403,6 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void coalescesLoneBlockScalar() {
         rewriteRun(
-          spec -> spec.recipe(new CoalesceProperties(null, null)),
           yaml(
             """
               outer:
@@ -424,7 +422,6 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void coalescesDeeplyNestedBlockScalar() {
         rewriteRun(
-          spec -> spec.recipe(new CoalesceProperties(null, null)),
           yaml(
             """
               outer:
@@ -444,10 +441,24 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void coalescesBlockScalarPreservingCrlfBodyLineEndings() {
         rewriteRun(
-          spec -> spec.recipe(new CoalesceProperties(null, null)),
           yaml(
             "outer:\r\n  inner: |\r\n    line one\r\n    line two\r\n",
             "outer.inner: |\r\n  line one\r\n  line two\r\n"
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+              """
           )
         );
     }

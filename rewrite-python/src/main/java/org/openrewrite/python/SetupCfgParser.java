@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.DependencyManifest;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -26,30 +28,56 @@ import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
  * Parser for setup.cfg files that delegates to {@link PlainTextParser} and attaches a
- * {@link PythonResolutionResult} marker with dependency metadata resolved via
- * {@code uv pip install <projectDir>} and {@code uv pip freeze}.
+ * {@link PythonResolutionResult} marker with the project's dependencies, resolved against its
+ * dependency environment.
  */
 public class SetupCfgParser implements Parser {
 
     private final PlainTextParser plainTextParser = new PlainTextParser();
     private final Map<String, String> subprocessEnvironment;
 
+    @Nullable
+    private final Path installedEnv;
+
+    /**
+     * Whether the project gets an environment installed from its setup.cfg or setup.py.
+     */
+    private final boolean installsEnv;
+
     public SetupCfgParser() {
-        this(Collections.emptyMap());
+        this(emptyMap());
     }
 
+    /**
+     * @param subprocessEnvironment environment for the {@code uv} processes that install the project's requirements
+     */
     public SetupCfgParser(Map<String, String> subprocessEnvironment) {
         this.subprocessEnvironment = subprocessEnvironment;
+        this.installedEnv = null;
+        this.installsEnv = true;
+    }
+
+    /**
+     * @param installedEnv the env installed from the project's setup.py or setup.cfg, which the marker
+     *                     resolves against, or null to leave the file without a marker
+     */
+    public SetupCfgParser(@Nullable Path installedEnv) {
+        this.subprocessEnvironment = emptyMap();
+        this.installedEnv = installedEnv;
+        this.installsEnv = false;
     }
 
     @Override
@@ -65,18 +93,27 @@ public class SetupCfgParser implements Parser {
                 Path filePath = relativeTo.resolve(text.getSourcePath());
                 projectDir = filePath.getParent();
             }
-            Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(
-                    text.getText(), projectDir, subprocessEnvironment);
-            if (workspace == null) {
+            Path env = installedEnv;
+            if (installsEnv && projectDir != null) {
+                Path dir = projectDir;
+                DependencyManifest manifest = Files.isRegularFile(dir.resolve("setup.py")) ?
+                        DependencyManifest.SetupPy : DependencyManifest.SetupCfg;
+                env = DependencyWorkspace.install(manifest,
+                        setupPy -> manifest.read(dir, relativeTo, subprocessEnvironment, setupPy),
+                        DependencyWorkspace.Options.builder().environment(subprocessEnvironment).build()).getEnv();
+            }
+            if (env == null) {
                 return sf;
             }
 
-            List<ResolvedDependency> resolvedDeps = RequirementsTxtParser.parseFreezeOutput(workspace);
+            List<ResolvedDependency> resolvedDeps = InstalledEnvParser.parse(env);
             if (resolvedDeps.isEmpty()) {
                 return sf;
             }
 
-            List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
+            DependencyManifest.Requirements setupCfg = DependencyManifest.ofSetupCfg(text.getText(), null);
+            List<Dependency> deps = declaredDependencies(resolvedDeps, setupCfg.getRoots(), env);
+            List<String> requiresPython = setupCfg.getRequiresPython();
 
             PythonResolutionResult marker = new PythonResolutionResult(
                     randomId(),
@@ -85,14 +122,14 @@ public class SetupCfgParser implements Parser {
                     null,
                     null,
                     text.getSourcePath().toString(),
+                    requiresPython.isEmpty() ? null : requiresPython.get(0),
                     null,
-                    null,
-                    Collections.emptyList(),
+                    emptyList(),
                     deps,
-                    Collections.emptyMap(),
-                    Collections.emptyMap(),
-                    Collections.emptyList(),
-                    Collections.emptyList(),
+                    emptyMap(),
+                    emptyMap(),
+                    emptyList(),
+                    emptyList(),
                     resolvedDeps,
                     PackageManager.Uv,
                     null
@@ -100,6 +137,23 @@ public class SetupCfgParser implements Parser {
 
             return text.withMarkers(text.getMarkers().addIfAbsent(marker));
         });
+    }
+
+    /**
+     * The dependencies setup.cfg's {@code install_requires} declares. A setup.py may declare them in code
+     * instead, and then they are the requirements the env was installed from. For an env made elsewhere,
+     * they are its packages that no other package depends on.
+     */
+    private static List<Dependency> declaredDependencies(List<ResolvedDependency> resolved, List<String> declared, Path env) {
+        if (declared.isEmpty()) {
+            List<String> installed = DependencyWorkspace.installedRequirements(env);
+            if (installed == null) {
+                return RequirementsTxtParser.dependenciesFromResolved(resolved);
+            }
+            declared = installed;
+        }
+        Set<String> names = RequirementsTxtParser.parseDeclaredPackageNames(String.join("\n", declared));
+        return RequirementsTxtParser.declaredDependencies(resolved, names);
     }
 
     @Override

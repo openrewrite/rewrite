@@ -23,94 +23,30 @@ describe("UseObjectPropertyShorthand", () => {
     const spec = new RecipeSpec();
     spec.recipe = new UseObjectPropertyShorthand();
 
-    test("simplifies { x: x } to { x }", () => spec.rewriteRun(
+    test("collapses a destructured property whose name matches its binding", () => spec.rewriteRun(
         //language=javascript
         javascript(
-            `const { x: x } = obj;`,
-            `const { x } = obj;`
+            `const { foo: foo, bar: baz, qux: qux, ...props } = obj;`,
+            `const { foo, bar: baz, qux, ...props } = obj;`
         )
     ));
 
-    test("simplifies multiple properties", () => spec.rewriteRun(
+    test("leaves a destructured property alone when it renames or is already shorthand", () => spec.rewriteRun(
         //language=javascript
         javascript(
-            `const { foo: foo, bar: bar } = obj;`,
-            `const { foo, bar } = obj;`
+            `const { x: y, z } = obj;`
         )
     ));
 
-    test("simplifies with rest element", () => spec.rewriteRun(
+    test("collapses a destructured property wherever the binding appears", () => spec.rewriteRun(
         //language=javascript
         javascript(
-            `const { ref: ref, ...props } = obj;`,
-            `const { ref, ...props } = obj;`
+            `function foo({ x: x }) { const { outer: { inner: inner } } = x; return inner; }`,
+            `function foo({ x }) { const { outer: { inner } } = x; return inner; }`
         )
     ));
 
-    test("does not change when names differ", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const { x: y } = obj;`
-        )
-    ));
-
-    test("handles mixed properties", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const { foo: foo, bar: baz, qux: qux } = obj;`,
-            `const { foo, bar: baz, qux } = obj;`
-        )
-    ));
-
-    test("preserves already shorthand properties", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const { x } = obj;`
-        )
-    ));
-
-    test("handles nested destructuring", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const { outer: { inner: inner } } = obj;`,
-            `const { outer: { inner } } = obj;`
-        )
-    ));
-
-    test("handles function parameters", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `function foo({ x: x, y: y }) { return x + y; }`,
-            `function foo({ x, y }) { return x + y; }`
-        )
-    ));
-
-    test("handles arrow function parameters", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const fn = ({ a: a }) => a;`,
-            `const fn = ({ a }) => a;`
-        )
-    ));
-
-    // Object literal tests
-    test("simplifies object literal { x: x } to { x }", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const obj = { x: x };`,
-            `const obj = { x };`
-        )
-    ));
-
-    test("simplifies multiple object literal properties", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `const obj = { foo: foo, bar: bar };`,
-            `const obj = { foo, bar };`
-        )
-    ));
-
-    test("handles mixed object literal properties", () => spec.rewriteRun(
+    test("collapses an object literal property whose value is its own name", () => spec.rewriteRun(
         //language=javascript
         javascript(
             `const obj = { foo: foo, bar: baz, qux: qux };`,
@@ -118,33 +54,18 @@ describe("UseObjectPropertyShorthand", () => {
         )
     ));
 
-    test("does not change object literal when names differ", () => spec.rewriteRun(
+    test("leaves an object literal property alone when it renames or is already shorthand", () => spec.rewriteRun(
         //language=javascript
         javascript(
-            `const obj = { x: y };`
+            `const obj = { x: y, z };`
         )
     ));
 
-    test("preserves already shorthand object literal properties", () => spec.rewriteRun(
+    test("collapses an object literal property wherever the literal appears", () => spec.rewriteRun(
         //language=javascript
         javascript(
-            `const obj = { x };`
-        )
-    ));
-
-    test("simplifies object literal in function call", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `doSomething({ monitorId: monitorId, token: token });`,
-            `doSomething({ monitorId, token });`
-        )
-    ));
-
-    test("simplifies object literal in return statement", () => spec.rewriteRun(
-        //language=javascript
-        javascript(
-            `function getData() { return { name: name, value: value }; }`,
-            `function getData() { return { name, value }; }`
+            `function getData() { return doSomething({ name: name, value: value }); }`,
+            `function getData() { return doSomething({ name, value }); }`
         )
     ));
 

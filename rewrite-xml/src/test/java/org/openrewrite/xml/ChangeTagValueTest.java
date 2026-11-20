@@ -182,6 +182,59 @@ class ChangeTagValueTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceTextAfterComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagValue("//servlet-class", "javax\\.", "jakarta.", true)),
+          xml(
+            """
+              <servlet>
+                  <servlet-class><!-- default -->javax.faces.webapp.FacesServlet</servlet-class>
+              </servlet>
+              """,
+            """
+              <servlet>
+                  <servlet-class><!-- default -->jakarta.faces.webapp.FacesServlet</servlet-class>
+              </servlet>
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceEveryTextNodeAroundComments() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagValue("/tag", "SNAPSHOT", "RELEASE", true)),
+          xml(
+            "<tag>1.0-SNAPSHOT<!-- or -->2.0-SNAPSHOT<!-- latest --></tag>",
+            "<tag>1.0-RELEASE<!-- or -->2.0-RELEASE<!-- latest --></tag>"
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentsAndContainerTagsAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagValue("//*", "javax\\.", "jakarta.", true)),
+          xml(
+            """
+              <servlet>
+                  <!-- javax.faces servlet -->
+                  javax.faces stray text
+                  <servlet-class>javax.faces.webapp.FacesServlet</servlet-class>
+              </servlet>
+              """,
+            """
+              <servlet>
+                  <!-- javax.faces servlet -->
+                  javax.faces stray text
+                  <servlet-class>jakarta.faces.webapp.FacesServlet</servlet-class>
+              </servlet>
+              """
+          )
+        );
+    }
+
     @Nested
     class FindAndReplaceTagTextVisitorTest {
 

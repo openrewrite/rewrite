@@ -18,16 +18,19 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.maven.MavenCentralMirrorExtension;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 /**
  * Loads {@code ~/.m2/settings.xml} (and {@code $M2_HOME/conf/settings.xml}) into the
  * default {@link ExecutionContext} for every {@link RewriteTest} in this module, so a
- * configured Maven mirror or repository is honored by recipes that resolve artifacts.
+ * configured Maven mirror or repository is honored by recipes that resolve artifacts,
+ * then adds the mirror of {@link MavenCentralMirrorExtension}.
  * Auto-registered via {@code META-INF/services/org.junit.jupiter.api.extension.Extension};
  * Gradle does not normally read the user's Maven settings, so this is opt-in at the
  * module test classpath level.
@@ -36,8 +39,9 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) {
-        RewriteTest.defaultExecutionContextCustomizers.putIfAbsent(
-                MavenSettingsAutoLoadingExtension.class,
+        // In place of MavenCentralMirrorExtension's customizer, whichever registers first
+        RewriteTest.defaultExecutionContextCustomizers.put(
+                MavenCentralMirrorExtension.class,
                 MavenSettingsAutoLoadingExtension::loadMavenSettings);
     }
 
@@ -51,5 +55,6 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
         if (nothingConfigured) {
             mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
         }
+        withMavenCentralMirror(mctx);
     }
 }

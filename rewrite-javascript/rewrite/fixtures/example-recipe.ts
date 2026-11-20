@@ -18,12 +18,14 @@ import {FindIdentifier} from "./search-recipe";
 import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
 import {ChangeVersion} from "./change-version";
+import {ChangeXmlAttribute} from "./change-xml-attribute";
 import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
 import {RecipeWithRpcSubRecipe} from "./recipe-with-rpc-sub-recipe";
 import {RecipeWithSameTypeChildren} from "./recipe-with-same-type-children";
 import {ReplaceId} from "./replace-id";
 import {FindIdentifierWithRemotePathPrecondition} from "./remote-path-precondition";
 import {FindIdentifierWithPathPrecondition} from "./path-precondition";
+import {FindIdentifierOutsideVendoredOrBundled} from "./vendored-precondition";
 import {MarkTypes} from "./mark-types";
 import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
@@ -32,11 +34,15 @@ import {ReplaceAssignment} from "./replace-assignment";
 import {JavaChangeMethodName} from "./java-change-method-name";
 import {CrossModuleRecipeList} from "./cross-module-recipe-list";
 import {CompositeWithInvalidChild} from "./composite-with-invalid-child";
+import {GenerateFile} from "./generate-file";
+import {DeleteJsonFile} from "./delete-json-file";
+import {MigrateTslint} from "./migrate-tslint";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
     await marketplace.install(CreateText, JavaScript);
     await marketplace.install(ChangeVersion, JavaScript);
+    await marketplace.install(ChangeXmlAttribute, JavaScript);
     await marketplace.install(RecipeWithRecipeList, JavaScript);
     await marketplace.install(RecipeWithRpcSubRecipe, JavaScript);
     await marketplace.install(RecipeWithSameTypeChildren, JavaScript);
@@ -44,6 +50,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(FindIdentifier, JavaScript);
     await marketplace.install(FindIdentifierWithRemotePathPrecondition, JavaScript);
     await marketplace.install(FindIdentifierWithPathPrecondition, JavaScript);
+    await marketplace.install(FindIdentifierOutsideVendoredOrBundled, JavaScript);
     await marketplace.install(MarkTypes, JavaScript);
     await marketplace.install(MarkPrimitiveTypes, JavaScript);
     await marketplace.install(MarkClassTypes, JavaScript);
@@ -52,4 +59,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(JavaChangeMethodName, JavaScript);
     await marketplace.install(CrossModuleRecipeList, JavaScript);
     await marketplace.install(CompositeWithInvalidChild, JavaScript);
+    await marketplace.install(GenerateFile, JavaScript);
+    await marketplace.install(DeleteJsonFile, JavaScript);
+    await marketplace.install(MigrateTslint, JavaScript);
 }

@@ -1,0 +1,328 @@
+[
+ {
+  "name": "replaces multiple defined variables",
+  "ini": "hi = ${FOO}${BAR}",
+  "env": {
+   "FOO": "bar",
+   "BAR": "baz"
+  },
+  "expected": {
+   "hi": "barbaz"
+  }
+ },
+ {
+  "name": "replaces mixed defined/undefined variables with ? modifier",
+  "ini": "hi = ${FOO?}${BAZ?}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "bar"
+  }
+ },
+ {
+  "name": "escapes normal variable",
+  "ini": "hi = \\${FOO}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "${FOO}"
+  }
+ },
+ {
+  "name": "double escape allows replacement",
+  "ini": "hi = \\\\${FOO}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "\\bar"
+  }
+ },
+ {
+  "name": "triple escape prevents replacement",
+  "ini": "hi = \\\\\\${FOO}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "\\${FOO}"
+  }
+ },
+ {
+  "name": "leaves undefined variable unreplaced",
+  "ini": "hi = ${BAZ}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "${BAZ}"
+  }
+ },
+ {
+  "name": "escapes undefined variable",
+  "ini": "hi = \\${BAZ}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "${BAZ}"
+  }
+ },
+ {
+  "name": "double escape with undefined variable",
+  "ini": "hi = \\\\${BAZ}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "\\${BAZ}"
+  }
+ },
+ {
+  "name": "escapes optional variable",
+  "ini": "hi = \\${FOO?}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "${FOO?}"
+  }
+ },
+ {
+  "name": "double escape allows optional replacement",
+  "ini": "hi = \\\\${FOO?}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "\\bar"
+  }
+ },
+ {
+  "name": "replaces undefined variable with empty string when using ? modifier",
+  "ini": "hi = ${BAZ?}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": ""
+  }
+ },
+ {
+  "name": "escapes undefined optional variable",
+  "ini": "hi = \\${BAZ?}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "${BAZ?}"
+  }
+ },
+ {
+  "name": "double escape with undefined optional variable results in empty replacement",
+  "ini": "hi = \\\\${BAZ?}",
+  "env": {
+   "FOO": "bar"
+  },
+  "expected": {
+   "hi": "\\"
+  }
+ },
+ {
+  "name": "escaped",
+  "ini": "hi = \\${NODE_ENV}",
+  "env": {
+   "NODE_ENV": "production"
+  },
+  "expected": {
+   "hi": "${NODE_ENV}"
+  }
+ },
+ {
+  "name": "escaped2",
+  "ini": "hi = \\\\${NODE_ENV}",
+  "env": {
+   "NODE_ENV": "production"
+  },
+  "expected": {
+   "hi": "\\production"
+  }
+ },
+ {
+  "name": "backslashes",
+  "ini": "filepath=C:\\Home\\someuser\\My Documents\nfilepath2=\\\\\\\\TwoBackslashes",
+  "env": {},
+  "expected": {
+   "filepath": "C:\\Home\\someuser\\My Documents",
+   "filepath2": "\\\\TwoBackslashes"
+  }
+ },
+ {
+  "name": "basic",
+  "ini": "\nhello = ${LOL}\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "hi"
+  }
+ },
+ {
+  "name": "no val",
+  "ini": "\nhello = ${oooooooooooooooogaboga}\n      ",
+  "env": {},
+  "expected": {
+   "hello": "${oooooooooooooooogaboga}"
+  }
+ },
+ {
+  "name": "concat",
+  "ini": "\nhello = greeting: ${LOL}\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "greeting: hi"
+  }
+ },
+ {
+  "name": "nesting selects the inner most",
+  "ini": "\nhello = greeting: ${what${LOL}lol}\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "greeting: ${whathilol}"
+  }
+ },
+ {
+  "name": "nesting 2 selects the inner most",
+  "ini": "\nhello = greeting: ${what${omg${LOL}why}lol}\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "greeting: ${what${omghiwhy}lol}"
+  }
+ },
+ {
+  "name": "unclosed",
+  "ini": "\nhello = greeting: ${LOL\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "greeting: ${LOL"
+  }
+ },
+ {
+  "name": "double quoted env var",
+  "ini": "\nhello = \"${LOL}\"\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "hi"
+  }
+ },
+ {
+  "name": "single quoted env var",
+  "ini": "\nhello = '${LOL}'\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "hi"
+  }
+ },
+ {
+  "name": "double quoted env var with prefix",
+  "ini": "\nhello = \"Bearer ${TOKEN}\"\n      ",
+  "env": {
+   "TOKEN": "secret123"
+  },
+  "expected": {
+   "hello": "Bearer secret123"
+  }
+ },
+ {
+  "name": "double quoted env var not found leaves as-is",
+  "ini": "\nhello = \"${NOTFOUND}\"\n      ",
+  "env": {},
+  "expected": {
+   "hello": "${NOTFOUND}"
+  }
+ },
+ {
+  "name": "unquoted optional env var expands to empty when not found",
+  "ini": "\nhello = ${NOTFOUND?}\n      ",
+  "env": {},
+  "expected": {
+   "hello": ""
+  }
+ },
+ {
+  "name": "unquoted optional env var expands to value when found",
+  "ini": "\nhello = ${TOKEN?}\n      ",
+  "env": {
+   "TOKEN": "secret"
+  },
+  "expected": {
+   "hello": "secret"
+  }
+ },
+ {
+  "name": "double quoted optional env var expands to empty when not found",
+  "ini": "\nhello = \"${NOTFOUND?}\"\n      ",
+  "env": {},
+  "expected": {
+   "hello": ""
+  }
+ },
+ {
+  "name": "double quoted optional env var expands to value when found",
+  "ini": "\nhello = \"${TOKEN?}\"\n      ",
+  "env": {
+   "TOKEN": "secret"
+  },
+  "expected": {
+   "hello": "secret"
+  }
+ },
+ {
+  "name": "single quoted optional env var expands to empty when not found",
+  "ini": "\nhello = '${NOTFOUND?}'\n      ",
+  "env": {},
+  "expected": {
+   "hello": ""
+  }
+ },
+ {
+  "name": "unquoted optional env var with prefix",
+  "ini": "\nhello = Bearer ${TOKEN?}\n      ",
+  "env": {},
+  "expected": {
+   "hello": "Bearer "
+  }
+ },
+ {
+  "name": "double quoted optional env var with prefix",
+  "ini": "\nhello = \"Bearer ${TOKEN?}\"\n      ",
+  "env": {},
+  "expected": {
+   "hello": "Bearer "
+  }
+ },
+ {
+  "name": "double quoted with backslash before env var",
+  "ini": "\nhello = \"\\\\${LOL}\"\n      ",
+  "env": {
+   "LOL": "hi"
+  },
+  "expected": {
+   "hello": "\\hi"
+  }
+ }
+]

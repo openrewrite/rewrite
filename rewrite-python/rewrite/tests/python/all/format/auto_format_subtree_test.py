@@ -34,7 +34,8 @@ from rewrite.java.tree import (
 from rewrite.python import tree as py_tree
 from rewrite.python.format import auto_format
 from rewrite.python.visitor import PythonVisitor
-from rewrite.test import RecipeSpec, python
+from rewrite.java.tree import Literal
+from rewrite.test import RecipeSpec, from_visitor, python
 
 
 class _AutoFormatIfRecipe(Recipe):
@@ -103,5 +104,26 @@ def test_auto_format_if_at_top_level_preserves_indent():
         python(
             "if cond:\n"
             "    pass\n",
+        )
+    )
+
+
+def test_auto_format_a_literal_of_an_implicit_concatenation_preserves_its_indent():
+    class Visitor(PythonVisitor[ExecutionContext]):
+        def visit_literal(self, literal: Literal, p: ExecutionContext) -> Literal:
+            if literal.value_source == '"f"':
+                return auto_format(literal, p, cursor=self.cursor.parent)
+            return literal
+
+    RecipeSpec(recipe=from_visitor(Visitor())).rewrite_run(
+        python(
+            'f(\n'
+            '    "a"\n'
+            '        "b"\n'
+            '        "c"\n'
+            '        "d"\n'
+            '        "e"\n'
+            '        "f"\n'
+            ')\n',
         )
     )

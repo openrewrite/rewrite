@@ -18,7 +18,7 @@ import {Recipe} from "../../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor} from "../visitor";
-import {J, singleSpace} from "../../java";
+import {J, singleSpace, Type} from "../../java";
 import {emptyMarkers} from "../../markers";
 import {randomId} from "../../uuid";
 
@@ -73,7 +73,7 @@ export class AddParseIntRadix extends Recipe {
                     value: 10,
                     valueSource: '10',
                     unicodeEscapes: undefined,
-                    type: undefined
+                    type: Type.Primitive.Double
                 };
 
                 return {

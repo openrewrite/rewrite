@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -121,8 +120,6 @@ class AssignmentOperationTest implements RewriteTest {
     @Test
     void augmentedAssignmentAnnotation() {
         rewriteRun(
-          // Type validation is disabled due to https://github.com/openrewrite/rewrite-kotlin/issues/511
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlin(
             """
              fun foo(l: MutableList<String>) {

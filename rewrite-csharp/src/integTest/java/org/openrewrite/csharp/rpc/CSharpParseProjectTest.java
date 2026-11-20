@@ -19,9 +19,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.CSharpParser;
+import org.openrewrite.csharp.CSharpServer;
 import org.openrewrite.csharp.marker.MSBuildProject;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
@@ -46,23 +48,11 @@ class CSharpParseProjectTest implements RewriteTest {
 
     @BeforeAll
     static void setUpFactory() {
-        Path basePath = Paths.get(System.getProperty("user.dir"));
-        Path[] searchPaths = {
-          basePath.resolve("csharp"),
-          basePath.resolve("rewrite-csharp/csharp"),
-        };
-        for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-            if (csproj.toFile().exists()) {
-                CSharpRewriteRpc.setFactory(
-                  CSharpRewriteRpc.builder()
-                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
-                    .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
-                );
-                return;
-            }
-        }
-        throw new IllegalStateException("Could not find C# Rewrite project");
+        CSharpRewriteRpc.setFactory(
+          CSharpRewriteRpc.builder()
+            .csharpServerEntry(CSharpServer.entry())
+            .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
+        );
     }
 
     // ---- Round-trip tests via rewriteRun ----
@@ -263,6 +253,42 @@ class CSharpParseProjectTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * A build-only MSBuild task (a source-control/PDB {@code <UsingTask>} whose assembly only
+     * exists after a real build) makes MSBuild fail evaluation, and the workspace then reports
+     * the project with no documents at all. Its sources must still reach the LST — parsed as
+     * text, without type attestation — rather than silently disappearing from the build.
+     */
+    @Test
+    void sourcesSurviveAProjectMSBuildCannotEvaluate(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("PdbGit.targets"),
+          """
+            <Project>
+              <UsingTask TaskName="PdbGitTask" AssemblyFile="$(_PdbGitAssemblyFile)" />
+            </Project>
+            """);
+        Files.writeString(tempDir.resolve("Broken.csproj"),
+          """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <Import Project="PdbGit.targets" />
+            </Project>
+            """);
+        Files.writeString(tempDir.resolve("A.cs"), "class A { }\n");
+        Files.createDirectories(tempDir.resolve("nested"));
+        Files.writeString(tempDir.resolve("nested/B.cs"), "class B { }\n");
+
+        CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
+        List<SourceFile> sourceFiles = rpc.parseSolution(
+          tempDir.resolve("Broken.csproj"), tempDir, new InMemoryExecutionContext()).toList();
+
+        assertThat(sourceFiles).noneMatch(ParseError.class::isInstance);
+        assertThat(sourceFiles).extracting(SourceFile::getSourcePath)
+          .containsExactlyInAnyOrder(Paths.get("A.cs"), Paths.get("nested/B.cs"), Paths.get("Broken.csproj"));
     }
 
     // ---- Full working set sweep ----

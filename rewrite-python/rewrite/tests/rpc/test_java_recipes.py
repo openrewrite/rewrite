@@ -24,9 +24,21 @@ Note: These tests require the Java RPC server infrastructure:
 Or set the REWRITE_PYTHON_CLASSPATH environment variable.
 """
 
+from pathlib import Path
+
 import pytest
 
+from rewrite import InMemoryExecutionContext, random_id
+from rewrite.markers import Markers
+from rewrite.parser import ParseError
+from rewrite.rpc.rpc_recipe import JavaRecipeVisitor, PreparedJavaRecipe
 from rewrite.test import RecipeSpec, python
+
+
+def test_a_file_the_parser_failed_on_is_not_sent_to_java():
+    error = ParseError(random_id(), Markers.EMPTY, Path("a.py"), None, "utf-8", False, None, "x = 1\n", None)
+    prepared = PreparedJavaRecipe("unused", "org.openrewrite.java.ChangeMethodName", "edit:unused", None, {})
+    assert JavaRecipeVisitor(prepared).visit(error, InMemoryExecutionContext()) is error
 
 
 @pytest.mark.requires_java_rpc
@@ -310,7 +322,8 @@ class TestAddLiteralMethodArgument:
         The method pattern matches against the *declared* signature, where
         ``datetime.now`` carries its optional ``tz`` parameter — hence
         ``(..)`` rather than ``()``. A str option is inserted as a string
-        literal, i.e. quoted.
+        literal, i.e. quoted. The call keeps matching that declared signature
+        after the argument is added, so a second run adds it again.
         """
         from rewrite.python import AddLiteralMethodArgument
 
@@ -319,7 +332,8 @@ class TestAddLiteralMethodArgument:
                 method_pattern="datetime.datetime now(..)",
                 argument_index=0,
                 literal="UTC"
-            )
+            ),
+            cycles=1,
         )
         spec.rewrite_run(
             python(
@@ -342,14 +356,20 @@ class TestDeleteMethodArgument:
     """Tests for the DeleteMethodArgument Java recipe wrapper."""
 
     def test_delete_argument(self, java_rpc):
-        """Test removing an argument from a method call."""
+        """Test removing an argument from a method call.
+
+        ``foo`` does not resolve, so the call has a type of its own, which
+        keeps matching after the argument goes and a second run deletes the
+        next one.
+        """
         from rewrite.python import DeleteMethodArgument
 
         spec = RecipeSpec(
             recipe=DeleteMethodArgument(
                 method_pattern="foo.bar baz(..)",
                 argument_index=1
-            )
+            ),
+            cycles=1,
         )
         spec.rewrite_run(
             python(

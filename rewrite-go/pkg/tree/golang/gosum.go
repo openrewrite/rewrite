@@ -39,24 +39,36 @@ func (*GoSum) IsSourceFile() {}
 func (n *GoSum) GetSourcePath() string { return n.SourcePath }
 
 func (n *GoSum) WithPrefix(prefix java.Space) *GoSum {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoSum) WithMarkers(markers java.Markers) *GoSum {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *GoSum) WithLines(lines []java.RightPadded[*GoSumLine]) *GoSum {
+	if java.SameSlice(n.Lines, lines) {
+		return n
+	}
 	c := *n
 	c.Lines = lines
 	return &c
 }
 
 func (n *GoSum) WithEof(eof java.Space) *GoSum {
+	if java.SpaceEqual(n.Eof, eof) {
+		return n
+	}
 	c := *n
 	c.Eof = eof
 	return &c
@@ -76,36 +88,54 @@ type GoSumLine struct {
 func (*GoSumLine) IsTree() {}
 
 func (n *GoSumLine) WithPrefix(prefix java.Space) *GoSumLine {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoSumLine) WithMarkers(markers java.Markers) *GoSumLine {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *GoSumLine) WithModulePath(modulePath string) *GoSumLine {
+	if n.ModulePath == modulePath {
+		return n
+	}
 	c := *n
 	c.ModulePath = modulePath
 	return &c
 }
 
 func (n *GoSumLine) WithVersion(version string) *GoSumLine {
+	if n.Version == version {
+		return n
+	}
 	c := *n
 	c.Version = version
 	return &c
 }
 
 func (n *GoSumLine) WithGoMod(goMod bool) *GoSumLine {
+	if n.GoMod == goMod {
+		return n
+	}
 	c := *n
 	c.GoMod = goMod
 	return &c
 }
 
 func (n *GoSumLine) WithHash(hash string) *GoSumLine {
+	if n.Hash == hash {
+		return n
+	}
 	c := *n
 	c.Hash = hash
 	return &c

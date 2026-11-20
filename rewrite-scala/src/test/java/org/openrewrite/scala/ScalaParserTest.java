@@ -16,18 +16,34 @@
 package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ParseWarning;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.tree.ParseError;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ScalaParserTest {
+
+    static {
+        JdkClassSharingTypeFactory.useForParsers();
+    }
 
     @Test
     void parseSimpleValDeclaration() {
@@ -229,10 +245,42 @@ class ScalaParserTest {
     }
 
     @Test
+    void reusedCompilerDoesNotSeeTheSourcesOfEarlierParses() {
+        // given
+        ScalaParser.Builder builder = ScalaParser.builder().reuseCompiler(true);
+        builder.build().parse("package p.q\n\nclass Earlier\n").collect(Collectors.toList());
+
+        // when
+        List<SourceFile> parsed = builder.build()
+          .parse("class Later {\n  val e: p.q.Earlier = null\n}\n")
+          .collect(Collectors.toList());
+
+        // then
+        assertThat(parsed.get(0).getMarkers().findAll(ParseWarning.class))
+          .as("The package and class an earlier parse defined must not resolve")
+          .anyMatch(w -> w.getMessage().contains("Not found: p"));
+    }
+
+    @Test
+    void clonesOfABuilderDoNotShareTypes() {
+        // given
+        ScalaParser.Builder builder = ScalaParser.builder();
+        builder.clone().build().parse("class Box\n").collect(Collectors.toList());
+
+        // when
+        S.CompilationUnit cu = (S.CompilationUnit) builder.clone().build()
+          .parse("class Box extends java.util.ArrayList[String]\n").collect(Collectors.toList()).get(0);
+
+        // then
+        J.ClassDeclaration box = (J.ClassDeclaration) cu.getStatements().get(0);
+        assertThat(box.getType().getSupertype().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+    }
+
+    @Test
     void doesNotLeakTempDirectories() throws Exception {
         // given
-        java.nio.file.Path tmpRoot = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
-        java.util.Set<java.nio.file.Path> before = listRewriteScalaTempDirs(tmpRoot);
+        Path tmpRoot = Paths.get(System.getProperty("java.io.tmpdir"));
+        Set<Path> before = listRewriteScalaTempDirs(tmpRoot);
 
         // when
         ScalaParser parser = ScalaParser.builder().build();
@@ -242,28 +290,76 @@ class ScalaParserTest {
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
 
-        // Concurrently running test classes create their own rewrite-scala temp dirs
-        // and delete them when their compile finishes, so a single snapshot comparison
-        // is racy. Poll until only genuinely leaked dirs (which persist) would remain.
-        java.util.Set<java.nio.file.Path> after = listRewriteScalaTempDirs(tmpRoot);
-        after.removeAll(before);
+        // Other test JVMs on this machine continuously create and delete their own
+        // rewrite-scala temp dirs, so waiting for the directory listing to become
+        // empty never converges. Instead take the candidates once and wait for each
+        // of them to disappear: theirs are removed when their compile finishes,
+        // while a directory genuinely leaked by our parse persists.
+        Set<Path> candidates = listRewriteScalaTempDirs(tmpRoot);
+        candidates.removeAll(before);
         long deadline = System.currentTimeMillis() + 30_000;
-        while (!after.isEmpty() && System.currentTimeMillis() < deadline) {
+        while (!candidates.isEmpty() && System.currentTimeMillis() < deadline) {
             Thread.sleep(250);
-            after = listRewriteScalaTempDirs(tmpRoot);
-            after.removeAll(before);
+            candidates.removeIf(p -> !Files.exists(p));
         }
-        assertThat(after)
-            .as("Parsing should not leak any rewrite-scala temp directories")
-            .isEmpty();
+        assertThat(candidates)
+          .as("Parsing should not leak any rewrite-scala temp directories")
+          .isEmpty();
     }
 
-    private static java.util.Set<java.nio.file.Path> listRewriteScalaTempDirs(java.nio.file.Path tmpRoot) throws java.io.IOException {
-        try (java.util.stream.Stream<java.nio.file.Path> entries = java.nio.file.Files.list(tmpRoot)) {
+    private static Set<Path> listRewriteScalaTempDirs(Path tmpRoot) throws IOException {
+        try (Stream<Path> entries = Files.list(tmpRoot)) {
             return entries
-                .filter(java.nio.file.Files::isDirectory)
-                .filter(p -> p.getFileName().toString().startsWith("rewrite-scala"))
-                .collect(Collectors.toCollection(java.util.HashSet::new));
+              .filter(Files::isDirectory)
+              .filter(p -> p.getFileName().toString().startsWith("rewrite-scala"))
+              .collect(Collectors.toCollection(HashSet::new));
         }
+    }
+
+    @Test
+    void scalaParsersShareTheClassesOfJavaPackagesAmongThemselves() {
+        JavaType first = typeOfS(ScalaParser.builder().build().parse("class A { val s: String = \"\" }"));
+        JavaType second = typeOfS(ScalaParser.builder().build().parse("class B { val s: String = \"\" }"));
+        assertThat(second).isSameAs(first);
+
+        JavaType java = typeOfS(JavaParser.fromJavaVersion().build().parse("class C { String s; }"));
+        assertThat(java).isNotSameAs(first);
+    }
+
+    @Test
+    void scalaParsersOfOneClasspathShareTheClassesOfTheScalaLibrary() {
+        JavaType first = typeOfS(ScalaParser.builder().build().parse("class A { val s: scala.util.Random = null }"));
+        JavaType second = typeOfS(ScalaParser.builder().build().parse("class B { val s: scala.util.Random = null }"));
+        assertThat(second).isSameAs(first);
+
+        JavaType otherClasspath = typeOfS(ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build()
+          .parse("class C { val s: scala.util.Random = null }"));
+        assertThat(otherClasspath).isNotSameAs(first);
+    }
+
+    @Test
+    void aSourceClassInAScalaPackageIsNotShared() {
+        ScalaParser.builder().build().parse("package scala.foo\nclass Bar\nclass A { val s: Bar = null }").findFirst();
+        JavaType bar = typeOfS(ScalaParser.builder().build()
+          .parse("package scala.foo\nclass Bar { val x = 1 }\nclass B { val s: Bar = null }"));
+        assertThat(((JavaType.FullyQualified) bar).getMembers())
+          .extracting(JavaType.Variable::getName)
+          .containsExactly("x");
+    }
+
+    private static JavaType typeOfS(Stream<SourceFile> parsed) {
+        SourceFile sourceFile = parsed.findFirst().orElseThrow();
+        if (!(sourceFile instanceof J cu)) {
+            throw new AssertionError("Not parsed: " + sourceFile);
+        }
+        return new JavaIsoVisitor<List<JavaType>>() {
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, List<JavaType> types) {
+                if (variable.getSimpleName().equals("s")) {
+                    types.add(variable.getType());
+                }
+                return variable;
+            }
+        }.reduce(cu, new java.util.ArrayList<>()).getFirst();
     }
 }

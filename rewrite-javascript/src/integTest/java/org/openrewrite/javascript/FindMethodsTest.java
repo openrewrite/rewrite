@@ -100,7 +100,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void insideRightPaddedStatement() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("node *(..)", false))
+          spec -> spec.recipe(new FindMethods("assert *(..)", false))
             .dataTable(MethodCalls.Row.class, rows ->
               assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("assert(path, 'hello world')")),
           typescript(
@@ -125,7 +125,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void nodeBuiltinModules() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("node assert(..)", false)),
+          spec -> spec.recipe(new FindMethods("assert <default>(..)", false)),
           typescript(
             """
               import assert from 'node:assert';

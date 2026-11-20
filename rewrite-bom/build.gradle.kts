@@ -16,6 +16,6 @@ dependencies {
                         it.name != "rewrite-gradle-tooling-model"
             }
             .sortedBy { it.name }
-            .forEach { api(it) }
+            .forEach { api(project(it.path)) }
     }
 }

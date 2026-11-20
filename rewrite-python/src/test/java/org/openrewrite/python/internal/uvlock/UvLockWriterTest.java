@@ -18,9 +18,9 @@ package org.openrewrite.python.internal.uvlock;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -36,6 +36,33 @@ class UvLockWriterTest {
 
     private String write(UvLockPackage pkg) {
         return UvLockWriter.write(new UvLock(1, 3, ">=3.12", null, null, null, null, null, null, singletonList(pkg)));
+    }
+
+    @Test
+    void optionsAndManifestEntriesRoundTripInUvsOrder() {
+        // an older uv stored the computed timestamp beside a relative span, where uv 0.13.4 writes the sentinel
+        String lock = """
+          version = 1
+          revision = 3
+          requires-python = ">=3.12"
+
+          [options]
+          resolution-mode = "lowest-direct"
+          prerelease-mode = "allow"
+          fork-strategy = "fewest"
+          exclude-newer = "2026-04-16T16:29:01.518541933Z"
+          exclude-newer-span = "P7D"
+
+          [manifest]
+          constraints = [{ name = "six", specifier = ">=1" }]
+          overrides = [{ name = "h2", specifier = ">=4.4.1,<4.4.2" }]
+
+          [[package]]
+          name = "proj"
+          version = "0.1.0"
+          source = { virtual = "." }
+          """;
+        assertThat(UvLockWriter.write(UvLockReader.parse(lock))).isEqualTo(lock);
     }
 
     @Test
@@ -107,7 +134,7 @@ class UvLockWriterTest {
     @Test
     void emptyMetadataEmitsBareHeader() {
         UvLockPackage pkg = minimalPackage().withMetadata(UvLockMetadata.builder()
-          .requiresDev(Collections.singletonMap("dev", singletonList(
+          .requiresDev(singletonMap("dev", singletonList(
             UvLockRequirement.builder().name("iniconfig").specifier(">=2.0").build())))
           .build());
         assertThat(write(pkg)).contains(

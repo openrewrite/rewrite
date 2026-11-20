@@ -58,9 +58,9 @@ class ParseError(SourceFile):
                    input.source().read(),
                    erroneous)
 
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id: UUID) -> 'ParseError':
+    def with_id(self, id: int | UUID) -> 'ParseError':
         return replace_if_changed(self, _id=id)
 
     _markers: Markers
@@ -151,7 +151,7 @@ class ParseErrorVisitor(TreeVisitor[Tree, P]):
         return isinstance(source_file, ParseError)
 
     def visit_parse_error(self, e: ParseError, p: P) -> ParseError:
-        return e.replace(markers=self.visit_markers(e.markers, p))  # ty: ignore[unresolved-attribute]
+        return e.replace(markers=self.visit_markers(e.markers, p))
 
 
 class Parser(ABC):

@@ -18,13 +18,28 @@ package org.openrewrite.python;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
@@ -155,5 +170,54 @@ class PythonParserTest implements RewriteTest {
             softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
             softly.assertThat(sf.printAll()).isEqualTo(source);
         });
+    }
+
+    @Test
+    void intLiteralTypeNamesTheBoxItsValueArrivesIn() {
+        SourceFile sf = PythonParser.builder().build()
+          .parse(
+            //language=python
+            """
+              a = 2147483647
+              b = 2147483648
+              c = 9223372036854775808
+              """)
+          .findFirst()
+          .orElseThrow();
+
+        Map<String, String> actual = new LinkedHashMap<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                actual.put(literal.getValueSource(),
+                  requireNonNull(literal.getValue()).getClass().getSimpleName() + "/" + literal.getType().name());
+                return literal;
+            }
+        }.visit(sf, 0);
+
+        assertThat(actual).containsExactly(
+          entry("2147483647", "Integer/Int"),
+          entry("2147483648", "Long/Long"),
+          // None is the enum's "no type": no member names a BigInteger.
+          entry("9223372036854775808", "BigInteger/None")
+        );
+    }
+
+    @Test
+    void crlfFileOnDiskPrintsBackIdentically(@TempDir Path tempDir) throws IOException {
+        // A file input reaches the RPC server as a path it reads itself, which
+        // the source text of the tests above never exercises.
+        String source = "import sys\r\n\r\n\r\ndef greet(name):\r\n    # a comment\r\n    print(name)\r\n";
+        Path file = tempDir.resolve("crlf.py");
+        Files.write(file, source.getBytes(UTF_8));
+
+        SourceFile sf = PythonParser.builder().build()
+          .parseInputs(singletonList(Parser.Input.fromFile(file)), tempDir,
+            new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst()
+          .orElseThrow();
+
+        assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
+        assertThat(sf.printAll()).isEqualTo(source);
     }
 }

@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
@@ -202,10 +203,10 @@ func enumeratePackage(pkg *types.Package, importPath string, mapper *typeMapper,
 			pc.Methods = append(pc.Methods, mapper.mapSignature(sig, o.Name(), pc))
 		case *types.Var:
 			pc := pkgClassOf()
-			pc.Members = append(pc.Members, &java.JavaTypeVariable{Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
+			pc.Members = append(pc.Members, &java.JavaTypeVariable{FlagsBitMap: flagsForExported(o.Name()), Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
 		case *types.Const:
 			pc := pkgClassOf()
-			pc.Members = append(pc.Members, &java.JavaTypeVariable{Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
+			pc.Members = append(pc.Members, &java.JavaTypeVariable{FlagsBitMap: flagsForExported(o.Name()), Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
 		}
 	}
 	collect(pkgClass)
@@ -269,13 +270,14 @@ func containsGoMod(dir string) bool {
 	return err == nil
 }
 
-// goBuildContext pins GOOS/GOARCH/CgoEnabled so table content is deterministic
-// across build machines; captures the linux/amd64 view.
+// goBuildContext captures the linux/amd64 gc view, pinned so that table
+// content is deterministic across build machines.
 func goBuildContext() build.Context {
 	ctx := build.Default
 	ctx.GOOS = "linux"
 	ctx.GOARCH = "amd64"
 	ctx.CgoEnabled = false
+	ctx.Compiler = "gc"
 	return ctx
 }
 
@@ -340,7 +342,7 @@ func newReferenceImporter(refs []string) *referenceImporter {
 		modDirs:  map[string]string{},
 		cache:    map[string]*types.Package{},
 		fset:     token.NewFileSet(),
-		def:      importer.Default(),
+		def:      sharedStdlibImporter(),
 		buildCtx: goBuildContext(),
 	}
 	for _, dir := range refs {
@@ -351,6 +353,23 @@ func newReferenceImporter(refs []string) *referenceImporter {
 	}
 	sort.Slice(ri.modPaths, func(i, j int) bool { return len(ri.modPaths[i]) > len(ri.modPaths[j]) })
 	return ri
+}
+
+var stdlibForExportedTypes struct {
+	once sync.Once
+	imp  types.Importer
+}
+
+// sharedStdlibImporter is one stdlib importer for every ExportedTypes call of the process, so
+// each stdlib package's export data is decoded once rather than once per dependency. The
+// importer is not safe for concurrent use, which the RPC server's one-request-at-a-time loop
+// guarantees. Wrapped for the panic recovery alone: a dependency's type table has no tree to
+// carry the failures the wrapper records.
+func sharedStdlibImporter() types.Importer {
+	stdlibForExportedTypes.once.Do(func() {
+		stdlibForExportedTypes.imp = newResilientImporter(importer.Default())
+	})
+	return stdlibForExportedTypes.imp
 }
 
 func (ri *referenceImporter) Import(importPath string) (*types.Package, error) {
@@ -379,13 +398,14 @@ func (ri *referenceImporter) Import(importPath string) (*types.Package, error) {
 func (ri *referenceImporter) check(importPath string, files []projectFile) *types.Package {
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {
-		a, err := parser.ParseFile(ri.fset, f.path, f.content, 0)
+		a, err := parser.ParseFile(ri.fset, f.path, f.content, parser.SkipObjectResolution)
 		if err != nil {
 			continue
 		}
 		asts = append(asts, a)
 	}
-	conf := types.Config{Importer: ri, Error: func(error) {}}
+	// A referenced package contributes only the declarations its importers name.
+	conf := types.Config{Importer: ri, Error: func(error) {}, IgnoreFuncBodies: true}
 	pkg := types.NewPackage(importPath, "")
 	ri.cache[importPath] = pkg // forward-declare to break import cycles
 	_ = types.NewChecker(&conf, ri.fset, pkg, &types.Info{}).Files(asts)

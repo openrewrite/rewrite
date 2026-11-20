@@ -17,6 +17,7 @@ package org.openrewrite.hcl.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.style.BracketsStyle;
@@ -66,6 +67,7 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
     @Override
     public Hcl visitConfigFile(Hcl.ConfigFile cf, P p) {
+        FormattingListener.beforeFormat(cf, stopAfter, getCursor());
         Hcl.ConfigFile t = (Hcl.ConfigFile) new RemoveTrailingWhitespaceVisitor<>().visit(cf, p);
 
         t = (Hcl.ConfigFile) new NormalizeFormatVisitor<>().visit(t, p);

@@ -102,7 +102,6 @@ public interface Rb extends J {
         FileAttributes fileAttributes;
 
         @Nullable // for backwards compatibility
-        @With(AccessLevel.PRIVATE)
         String charsetName;
 
         @Getter
@@ -488,7 +487,7 @@ public interface Rb extends J {
     @Value
     @With
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class BlockArgument implements Rb, Expression {
+    class BlockArgument implements Rb, Expression, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -515,8 +514,8 @@ public interface Rb extends J {
         }
 
         @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -2694,13 +2693,13 @@ public interface Rb extends J {
         @With
         Markers markers;
 
-        JContainer<Statement> data;
+        JContainer<Expression> data;
 
-        public List<Statement> getData() {
+        public List<Expression> getData() {
             return data.getElements();
         }
 
-        public Rb.Yield withData(List<Statement> data) {
+        public Rb.Yield withData(List<Expression> data) {
             return getPadding().withData(JContainer.withElements(this.data, data));
         }
 
@@ -2739,11 +2738,11 @@ public interface Rb extends J {
         public static class Padding {
             private final Rb.Yield t;
 
-            public JContainer<Statement> getData() {
+            public JContainer<Expression> getData() {
                 return t.data;
             }
 
-            public Rb.Yield withData(JContainer<Statement> data) {
+            public Rb.Yield withData(JContainer<Expression> data) {
                 return t.data == data ? t : new Rb.Yield(t.id, t.prefix, t.markers, data);
             }
         }

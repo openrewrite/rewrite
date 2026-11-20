@@ -27,9 +27,14 @@ namespace OpenRewrite.Core;
 /// a visitor without binding to a specific tree type (equivalent to
 /// Java's TreeVisitor&lt;?, P&gt;).
 /// </summary>
-public interface ITreeVisitor<P>
+public interface ITreeVisitor<P> : IHeavyweight
 {
     Tree? Visit(Tree? tree, P p);
+
+    /// <summary>
+    /// Visits a tree that is not a whole source file, under the cursor of its parent.
+    /// </summary>
+    Tree? Visit(Tree? tree, P p, Cursor parent) => Visit(tree, p);
 
     static ITreeVisitor<P> Noop() => new NoopVisitor<P>();
 }
@@ -41,6 +46,12 @@ internal class NoopVisitor<P> : ITreeVisitor<P>
 
 public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
 {
+    Tree? ITreeVisitor<P>.Visit(Tree? tree, P p, Cursor parent)
+    {
+        Cursor = parent;
+        return ((ITreeVisitor<P>)this).Visit(tree, p);
+    }
+
     Tree? ITreeVisitor<P>.Visit(Tree? tree, P p)
     {
         // If the tree is a SourceFile that doesn't match this visitor's type parameter T,

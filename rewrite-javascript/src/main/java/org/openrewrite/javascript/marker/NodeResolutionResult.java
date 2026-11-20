@@ -27,6 +27,7 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -56,7 +57,7 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  */
 @Value
 @With
-public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResult> {
+public class NodeResolutionResult implements Marker, Heavyweight, RpcCodec<NodeResolutionResult> {
     UUID id;
 
     // Project metadata from package.json

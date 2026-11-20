@@ -24,6 +24,7 @@ import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.JCDiagnostic;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import lombok.Getter;
@@ -39,6 +40,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.parser.ClasspathJarIndex;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
@@ -54,6 +56,10 @@ import javax.tools.*;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.FileSystems;
+import java.nio.file.FileSystem;
+import java.util.concurrent.ConcurrentHashMap;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -77,31 +83,60 @@ public class ReloadableJava25Parser implements JavaParser {
     @Nullable
     private final Collection<Input> dependsOn;
 
-    private final JavacFileManager pfm;
+    private static final Map<Path, List<Path>> LEGACY_PLATFORMS = new ConcurrentHashMap<>();
+    private final ByteArrayCapableJavacFileManager pfm;
     private final Context context;
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+    private final boolean typeAttribution;
 
     private ReloadableJava25Parser(
             boolean logCompilationWarningsAndErrors,
+            boolean typeAttribution,
             @Nullable Collection<Path> classpath,
             Collection<byte[]> classBytesClasspath,
             @Nullable Collection<Input> dependsOn,
             Charset charset,
             Collection<NamedStyles> styles,
             JavaTypeCache typeCache,
-            @Nullable JavaTypeFactory typeFactory) {
+            @Nullable JavaTypeFactory typeFactory,
+            @Nullable Path javaPlatform,
+            @Nullable Integer sourceCompatibility) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeAttribution = typeAttribution;
         this.typeCache = typeCache;
         this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
+        Path runtimeJar = javaPlatform == null ? null : java8RuntimeJar(javaPlatform);
+        if (runtimeJar != null && sourceCompatibility != null && sourceCompatibility > 8) {
+            throw new IllegalArgumentException("A Java 8 platform requires source compatibility 8");
+        }
+        Integer source = sourceCompatibility != null ? sourceCompatibility : runtimeJar != null ? 8 : null;
+        if (source != null) {
+            Options.instance(context).put(Option.SOURCE, source.toString());
+            Options.instance(context).put(Option.TARGET, source.toString());
+        }
+        compilerLog.enforcedSource = source;
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
+        try {
+            // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
+            pfm.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList());
+            if (javaPlatform != null) {
+                if (source != null && source <= 8) {
+                    pfm.setLocationFromPaths(StandardLocation.PLATFORM_CLASS_PATH, platformClasspath(javaPlatform));
+                } else {
+                    pfm.setLocationFromPaths(StandardLocation.SYSTEM_MODULES, List.of(javaPlatform));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
@@ -169,6 +204,52 @@ public class ReloadableJava25Parser implements JavaParser {
         compileDependencies();
     }
 
+    private static @Nullable Path java8RuntimeJar(Path home) {
+        for (Path rt : List.of(home.resolve("lib/rt.jar"), home.resolve("jre/lib/rt.jar"))) {
+            if (Files.isRegularFile(rt)) {
+                return rt;
+            }
+        }
+        return null;
+    }
+
+    private static List<Path> platformClasspath(Path javaHome) {
+        // Keep runtime images open while their paths are used by parser file managers.
+        return LEGACY_PLATFORMS.computeIfAbsent(javaHome.toAbsolutePath().normalize(), home -> {
+            try {
+                Path runtimeJar = java8RuntimeJar(home);
+                if (runtimeJar != null) {
+                    return java8PlatformClasspath(runtimeJar);
+                }
+                FileSystem image = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of("java.home", home.toString()));
+                try (Stream<Path> modules = Files.list(image.getPath("/modules"))) {
+                    return modules.sorted().toList();
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    private static List<Path> java8PlatformClasspath(Path rtJar) throws IOException {
+        List<Path> platform = new ArrayList<>();
+        platform.add(rtJar);
+        for (String name : List.of("resources.jar", "sunrsasign.jar", "jsse.jar", "jce.jar", "charsets.jar", "jfr.jar")) {
+            Path jar = rtJar.resolveSibling(name);
+            if (Files.isRegularFile(jar)) {
+                platform.add(jar);
+            }
+        }
+        Path extensions = rtJar.resolveSibling("ext");
+        if (Files.isDirectory(extensions)) {
+            try (Stream<Path> jars = Files.list(extensions)) {
+                jars.filter(path -> path.getFileName().toString().endsWith(".jar"))
+                        .sorted().forEach(platform::add);
+            }
+        }
+        return platform;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -176,11 +257,23 @@ public class ReloadableJava25Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        compilerLog.incompatibleSources.clear();
+        compilerLog.compilationErrors = ctx.getMessage(JavaParser.COMPILATION_ERRORS);
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus;
+        try {
+            cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        } finally {
+            compilerLog.compilationErrors = null;
+        }
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
             try {
+                List<String> incompatible = compilerLog.incompatibleSources.get(cuByPath.getValue().sourcefile.toUri());
+                if (incompatible != null) {
+                    throw new IllegalArgumentException("Source is incompatible with Java " + compilerLog.enforcedSource +
+                            ": " + String.join("; ", incompatible));
+                }
                 ReloadableJava25ParserVisitor parser = new ReloadableJava25ParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
@@ -211,7 +304,8 @@ public class ReloadableJava25Parser implements JavaParser {
             }
 
             try {
-                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
+                pfm.setClasspath(new ArrayList<>(classpath),
+                        Boolean.TRUE.equals(ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -247,9 +341,17 @@ public class ReloadableJava25Parser implements JavaParser {
                 handleParsingException(ctx, t);
             }
 
+            if (!typeAttribution) {
+                compiler.todo.clear();
+            }
             while (!compiler.todo.isEmpty()) {
                 try {
-                    compiler.attribute(compiler.todo);
+                    if (compilerLog.compilationErrors == null) {
+                        compiler.attribute(compiler.todo);
+                    } else {
+                        // javac reports some errors, such as an unreported exception, as it analyzes the flow
+                        compiler.flow(compiler.attribute(compiler.todo));
+                    }
                 } catch (Throwable t) {
                     handleParsingException(ctx, t);
                 }
@@ -334,8 +436,30 @@ public class ReloadableJava25Parser implements JavaParser {
     }
 
     private static class ResettableLog extends Log {
+        @Nullable Collection<Diagnostic<? extends JavaFileObject>> compilationErrors;
+        @Nullable Integer enforcedSource;
+        final Map<URI, List<String>> incompatibleSources = new HashMap<>();
+
         protected ResettableLog(Context context) {
             super(context);
+            // Installed first, it stays below the handlers that javac installs and removes, which pass on the
+            // errors of code that javac keeps and discard those of an attribution it only tries.
+            new DiagnosticHandler() {
+                @Override
+                public void report(JCDiagnostic diagnostic) {
+                    if (enforcedSource != null && diagnostic.getKind() == Diagnostic.Kind.ERROR && diagnostic.getSource() != null &&
+                            (diagnostic.getCode().startsWith("compiler.err.feature.not.supported.in.source") ||
+                                    diagnostic.getCode().startsWith("compiler.err.cant.resolve") &&
+                                            Arrays.stream(diagnostic.getArgs()).anyMatch(arg -> "var".equals(String.valueOf(arg))))) {
+                        incompatibleSources.computeIfAbsent(diagnostic.getSource().toUri(), key -> new ArrayList<>())
+                                .add(diagnostic.getMessage(Locale.ROOT));
+                    }
+                    if (compilationErrors != null && diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                        compilationErrors.add(diagnostic);
+                    }
+                    prev.report(diagnostic);
+                }
+            };
         }
 
         public void reset() {
@@ -349,13 +473,19 @@ public class ReloadableJava25Parser implements JavaParser {
 
     public static class Builder extends JavaParser.Builder<ReloadableJava25Parser, Builder> {
         @Override
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return sourceVersion == null || sourceVersion >= 8 && sourceVersion <= 25;
+        }
+
+        @Override
         public ReloadableJava25Parser build() {
-            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
+            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, javaPlatform, sourceCompatibility);
         }
     }
 
     private static class ByteArrayCapableJavacFileManager extends JavacFileManager {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
+        private List<ClasspathJarIndex> indexedJars = emptyList();
 
         public ByteArrayCapableJavacFileManager(Context context,
                                                 boolean register,
@@ -367,18 +497,44 @@ public class ReloadableJava25Parser implements JavaParser {
                     .collect(toList());
         }
 
+        void setClasspath(List<Path> classpath, boolean shareJarIndex) throws IOException {
+            indexedJars = shareJarIndex ? ClasspathJarIndex.indexTrailingJars(classpath) : emptyList();
+            List<Path> searchedByJavac = classpath.subList(0, classpath.size() - indexedJars.size());
+            setLocationFromPaths(StandardLocation.CLASS_PATH, searchedByJavac);
+        }
+
+        @Override
+        public Iterable<? extends File> getLocation(Location location) {
+            Iterable<? extends File> files = super.getLocation(location);
+            return StandardLocation.CLASS_PATH == location ? ClasspathJarIndex.location(files, indexedJars) : files;
+        }
+
         @Override
         public String inferBinaryName(Location location, JavaFileObject file) {
             if (file instanceof PackageAwareJavaFileObject) {
                 return ((PackageAwareJavaFileObject) file).getClassName();
             }
+            String indexed = ClasspathJarIndex.binaryName(file);
+            if (indexed != null) {
+                return indexed;
+            }
             return super.inferBinaryName(location, file);
         }
 
         @Override
+        public @Nullable JavaFileObject getJavaFileForInput(Location location, String className,
+                                                            JavaFileObject.Kind kind) throws IOException {
+            JavaFileObject file = super.getJavaFileForInput(location, className, kind);
+            return file == null && StandardLocation.CLASS_PATH == location ?
+                    ClasspathJarIndex.find(indexedJars, className, kind, Charset.forName(getEncodingName())) : file;
+        }
+
+        @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-            if (StandardLocation.CLASS_PATH.equals(location)) {
-                Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
+            if (StandardLocation.CLASS_PATH == location) {
+                Iterable<JavaFileObject> listed = ClasspathJarIndex.list(
+                        super.list(location, packageName, kinds, recurse), indexedJars, packageName, kinds, recurse,
+                        Charset.forName(getEncodingName()));
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()
                                         .filter(jfo -> jfo.getPackage().equals(packageName)),

@@ -21,7 +21,7 @@ public final class StringUtils {
     }
 
     public static String endSymbol(String beginDelimiter) {
-        if (beginDelimiter.equals(":")) {
+        if (":".equals(beginDelimiter)) {
             return "";
         } else if (beginDelimiter.startsWith(":")) {
             return endDelimiter(beginDelimiter.substring(1));
@@ -39,7 +39,7 @@ public final class StringUtils {
             // for the %[foo bar baz] case
             return matchBeginDelimiter(beginDelimiter.charAt(1), beginDelimiter.substring(1));
         }
-        if (beginDelimiter.equals("?")) {
+        if ("?".equals(beginDelimiter)) {
             return ""; // the character literal case and the bare symbol case
         }
         if (beginDelimiter.length() == 1) {

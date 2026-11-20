@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -41,6 +42,7 @@ import (
 	"github.com/grafana/pyroscope-go"
 	"golang.org/x/mod/module"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/diff"
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
@@ -59,6 +61,7 @@ type jsonRPCRequest struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params"`
 	Result  json.RawMessage `json:"result"` // present in responses
+	Error   *rpcError       `json:"error"`  // present in error responses
 }
 
 type jsonRPCResponse struct {
@@ -88,6 +91,8 @@ type server struct {
 	batchSize     int
 
 	inProgressGetObjects map[string]*getObjectTransfer
+	// Kept after its last batch is handed over, since the peer can still fail on that batch.
+	lastGetObject *getObjectTransfer
 
 	// Built exported-types batches awaiting drain, keyed by dependency coordinate.
 	// Each DependencyTypes call returns one batchSize slice and pops it; the Java
@@ -120,11 +125,9 @@ type server struct {
 	// the workspace binary is stale or missing its implementation.
 	preparedRecipeNames map[string]string
 
-	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
-	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
-	// returns the unwrapped editor — otherwise the precondition would also
-	// run Go-side and double the cost. Keyed by the prepared recipe ID.
-	preparedEditorOverrides map[string]recipe.TreeVisitor
+	// Visitor names ("edit:<id>", "scan:<id>") whose preconditions.Check went to
+	// the host at PrepareRecipe. Dispatch unwraps that Check, so only the host evaluates it.
+	preparedHoistedVisitors map[string]bool
 
 	// Per-prepared-recipe accumulator for ScanningRecipe. Lazily created on
 	// the first scan Visit call. Lifetime = prepared recipe instance; freed
@@ -138,6 +141,10 @@ type server struct {
 
 	traceReceive bool
 	traceSend    bool
+
+	// Fixed at startup, unlike traceReceive/traceSend, which TraceGetObject
+	// toggles per session. See tracef.
+	traceCalls bool
 
 	metricsCsv string
 
@@ -174,6 +181,8 @@ type serverConfig struct {
 	recipeInstallDir string
 }
 
+var testActivators []recipe.Activator
+
 func newServer(cfg serverConfig) *server {
 	var logOut io.Writer
 	if cfg.logFile != "" {
@@ -198,9 +207,11 @@ func newServer(cfg serverConfig) *server {
 	rpc.RegisterFactory("org.openrewrite.InMemoryExecutionContext", func() any {
 		return recipe.NewExecutionContext()
 	})
+	rpc.RegisterValueType(reflect.TypeOf((*recipe.ExecutionContext)(nil)), "org.openrewrite.InMemoryExecutionContext")
 
 	reg := recipe.NewRegistry()
 	reg.Activate(recipes.Activate)
+	reg.Activate(testActivators...)
 
 	logger := log.New(logOut, "", log.LstdFlags)
 
@@ -232,19 +243,20 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
-		pendingDependencyTypes:       make(map[string][]rpc.RpcObjectData),
+		pendingDependencyTypes:  make(map[string][]rpc.RpcObjectData),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
 		refCheckpoints:          make(map[string]evictCheckpoint),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
-		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
+		preparedHoistedVisitors: make(map[string]bool),
 		preparedAccumulators:    make(map[string]any),
 		preparedContexts:        make(map[string]*recipe.ExecutionContext),
 		batchSize:               1000,
 		traceReceive:            cfg.traceRpcMessages,
 		traceSend:               cfg.traceRpcMessages,
+		traceCalls:              cfg.traceRpcMessages,
 		metricsCsv:              cfg.metricsCsv,
 		reader:                  bufio.NewReader(os.Stdin),
 		writer:                  os.Stdout,
@@ -272,6 +284,15 @@ func newServer(cfg serverConfig) *server {
 	return s
 }
 
+// tracef logs detail that recurs once per RPC call or per resolved item, so it
+// is written only under --trace-rpc-messages. Lifecycle and error lines use
+// s.logger directly.
+func (s *server) tracef(format string, v ...any) {
+	if s.traceCalls {
+		s.logger.Printf(format, v...)
+	}
+}
+
 func (s *server) closeMetrics() {
 	s.metricsMu.Lock()
 	defer s.metricsMu.Unlock()
@@ -285,6 +306,18 @@ func (s *server) closeMetrics() {
 		}
 		s.metricsFile = nil
 	}
+}
+
+// remoteObjectCount counts the ids in both directions, as the single remoteObjects map of the
+// Java, JS, Python and C# peers does.
+func (s *server) remoteObjectCount() int {
+	n := len(s.remoteObjects)
+	for id := range s.reverseRemoteObjects {
+		if _, ok := s.remoteObjects[id]; !ok {
+			n++
+		}
+	}
+	return n
 }
 
 // recordMetric appends one row to the metrics CSV. Safe to call from
@@ -315,7 +348,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 		strconv.FormatUint(mem.HeapAlloc, 10),
 		strconv.FormatUint(mem.Sys, 10),
 		strconv.Itoa(len(s.localObjects)),
-		strconv.Itoa(len(s.remoteObjects)),
+		strconv.Itoa(s.remoteObjectCount()),
 		strconv.Itoa(s.localRefs.Len() + len(s.reverseRemoteRefs)),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
@@ -328,7 +361,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 func parseFlags() serverConfig {
 	var cfg serverConfig
 	flag.StringVar(&cfg.logFile, "log-file", "", "path to write server log; empty = OS temp file")
-	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
+	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every RPC call and every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
 	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
 	flag.Parse()
@@ -427,13 +460,65 @@ func (s *server) readMessage() (*jsonRPCRequest, error) {
 	return &req, nil
 }
 
+// Only a page of object data, which is what every GetObject reply carries, goes through the
+// encoder; every other reply keeps the reflective path.
 func (s *server) writeMessage(resp *jsonRPCResponse) error {
+	if batch, ok := resp.Result.([]rpc.RpcObjectData); ok && resp.Error == nil && resp.JSONRPC == "2.0" {
+		bp := bodyPool.Get().(*[]byte)
+		defer bodyPool.Put(bp)
+		body, err := appendBatchResponse((*bp)[:0], resp.ID, batch)
+		*bp = body
+		if err != nil {
+			return err
+		}
+		return s.writeFramed(body)
+	}
+
 	body, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}
-	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-	_, err = s.writer.Write(append([]byte(header), body...))
+	return s.writeFramed(body)
+}
+
+// Bodies are pooled separately from frames because a framed write copies the body into a frame
+// buffer, so both are live at once.
+var bodyPool = sync.Pool{New: func() any { b := make([]byte, 0, 1<<16); return &b }}
+
+// An id is a string, a number or null by the JSON-RPC spec — never a composite — so its raw bytes
+// hold no whitespace for json.Marshal to have compacted, and can be appended as they arrived.
+func appendBatchResponse(dst []byte, id json.RawMessage, batch []rpc.RpcObjectData) ([]byte, error) {
+	dst = append(dst, `{"jsonrpc":"2.0","id":`...)
+	if len(id) == 0 {
+		dst = append(dst, "null"...)
+	} else {
+		dst = append(dst, id...)
+	}
+	dst = append(dst, `,"result":`...)
+	dst, err := rpc.AppendBatch(dst, batch)
+	if err != nil {
+		return dst, err
+	}
+	return append(dst, '}'), nil
+}
+
+// Frame buffers are pooled rather than held on the server: a framed write is
+// reachable from the request loop and from a transfer goroutine, so a shared
+// scratch buffer would race.
+var framePool = sync.Pool{New: func() any { b := make([]byte, 0, 1<<16); return &b }}
+
+// Writes one Content-Length framed message in a single Write. The frame is
+// assembled in a pooled buffer, so the payload is not copied into a freshly
+// allocated one, and the header does not cost a second write.
+func (s *server) writeFramed(body []byte) error {
+	bp := framePool.Get().(*[]byte)
+	b := append((*bp)[:0], "Content-Length: "...)
+	b = strconv.AppendInt(b, int64(len(body)), 10)
+	b = append(b, '\r', '\n', '\r', '\n')
+	b = append(b, body...)
+	_, err := s.writer.Write(b)
+	*bp = b
+	framePool.Put(bp)
 	return err
 }
 
@@ -466,7 +551,7 @@ func (s *server) safeHandleRequest(req *jsonRPCRequest) (resp *jsonRPCResponse) 
 
 // handleRequest dispatches to the appropriate handler.
 func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
-	s.logger.Printf("Handling: %s", req.Method)
+	s.tracef("Handling: %s", req.Method)
 
 	var result any
 	var rpcErr *rpcError
@@ -478,6 +563,8 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 		result, rpcErr = s.handleParse(req.Params)
 	case "GetObject":
 		result, rpcErr = s.handleGetObject(req.Params)
+	case "AbortGetObject":
+		result = s.handleAbortGetObject(req.Params)
 	case "Print":
 		result, rpcErr = s.handlePrint(req.Params)
 	case "InstallRecipes":
@@ -537,10 +624,11 @@ func (s *server) handleGetLanguages() []string {
 // them, the server falls back to per-file parsing with the stdlib
 // importer (today's behavior).
 type parseRequest struct {
-	Inputs       []parseInput `json:"inputs"`
-	RelativeTo   *string      `json:"relativeTo"`
-	Module       string       `json:"module,omitempty"`
-	GoModContent string       `json:"goModContent,omitempty"`
+	Inputs       []parseInput   `json:"inputs"`
+	RelativeTo   *string        `json:"relativeTo"`
+	Module       string         `json:"module,omitempty"`
+	GoModContent string         `json:"goModContent,omitempty"`
+	Options      map[string]any `json:"options,omitempty"`
 }
 
 // parseInput can be a path-based or text-based input.
@@ -566,6 +654,51 @@ func (p *parseInput) UnmarshalJSON(data []byte) error {
 	}
 	*p = parseInput(a)
 	return nil
+}
+
+// Mirrors org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.
+const requirePrintEqualsInputKey = "org.openrewrite.requirePrintEqualsInput"
+
+// A variable so tests can substitute a printer that produces the mismatch
+// this check exists to catch.
+var printGoCompilationUnit = func(cu *golang.CompilationUnit) string {
+	return printer.Print(cu)
+}
+
+// requirePrintEqualsInput reports whether parse results must print back to
+// their input, which they must unless the client says otherwise. Option maps
+// are loosely typed across peers, so both the string and bool forms count.
+func requirePrintEqualsInput(options map[string]any) bool {
+	switch v := options[requirePrintEqualsInputKey].(type) {
+	case bool:
+		return v
+	case string:
+		enabled, err := strconv.ParseBool(v)
+		return err != nil || enabled
+	}
+	return true
+}
+
+// packageParseError describes, for the file at path, why it has no compilation
+// unit: its own syntax error, or that of the sibling that stopped the package.
+func packageParseError(err error, path string) error {
+	var ppe *goparser.PackageParseError
+	if errors.As(err, &ppe) && ppe.Path != path {
+		return fmt.Errorf("package not parsed: %v", ppe)
+	}
+	return err
+}
+
+// printIdempotencyError reports a compilation unit that does not print back to
+// the source it was parsed from. The message matches the JVM's
+// Parser.requirePrintEqualsInput so both engines word the failure the same way.
+func printIdempotencyError(cu *golang.CompilationUnit, source string) error {
+	printed := printGoCompilationUnit(cu)
+	if printed == source {
+		return nil
+	}
+	return fmt.Errorf("%s is not print idempotent. \n%s", cu.SourcePath,
+		diff.Unified(source, printed, cu.SourcePath))
 }
 
 // When req.Module + req.GoModContent are set, the handler builds a
@@ -642,6 +775,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			if mrr, err := goparser.ParseGoMod("go.mod", req.GoModContent); err == nil && mrr != nil {
 				for _, r := range mrr.Requires {
 					pi.AddRequire(r.ModulePath)
+					pi.AddModule(r.ModulePath, "", r.Version)
 				}
 				for _, r := range mrr.Replaces {
 					pi.AddReplace(r.OldPath, r.NewPath, r.NewVersion)
@@ -672,18 +806,17 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Parse each group; collect CUs by their original input index so the
-	// returned IDs land in input-order. Pre-filter against the parser's
-	// BuildContext so the post-parse `cus` slice aligns 1:1 with the
-	// `included` subset of the group.
+	// returned IDs land in input-order. Every file is parsed: those outside
+	// the parser's BuildContext keep their syntax and carry a BuildConstraint
+	// marker (ParsePackage type-checks only the matching subset), so the
+	// post-parse `cus` slice aligns 1:1 with the group.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(resolvedInputs))
 	parseErrByIdx := make(map[int]error)
+	checkPrint := requirePrintEqualsInput(req.Options)
 	for _, group := range groups {
 		included := make([]fileEntry, 0, len(group))
 		files := make([]goparser.FileInput, 0, len(group))
 		for _, g := range group {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(g.input.Path), g.input.Content) {
-				continue
-			}
 			included = append(included, g)
 			files = append(files, g.input)
 		}
@@ -702,11 +835,17 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			// Whole-package parse failure — record per-file ParseErrors
 			// for every file the build context didn't exclude.
 			for _, g := range included {
-				parseErrByIdx[g.idx] = err
+				parseErrByIdx[g.idx] = packageParseError(err, g.input.Path)
 			}
 			continue
 		}
 		for i, cu := range cus {
+			if checkPrint {
+				if perr := printIdempotencyError(cu, included[i].input.Content); perr != nil {
+					parseErrByIdx[included[i].idx] = perr
+					continue
+				}
+			}
 			cuByIdx[included[i].idx] = cu
 		}
 	}
@@ -726,7 +865,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
-			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
+			gm.Markers = java.AddMarker(gm.Markers, *mrr)
 		}
 		goModByIdx[r.idx] = gm
 	}
@@ -734,8 +873,8 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	// Index each go.mod's GoResolutionResult by directory for sibling go.sum.
 	mrrByDir := make(map[string]*golang.GoResolutionResult, len(goModByIdx))
 	for _, gm := range goModByIdx {
-		for i := range gm.Markers.Entries {
-			if mrr, ok := gm.Markers.Entries[i].(golang.GoResolutionResult); ok {
+		for _, entry := range gm.Markers.Entries() {
+			if mrr, ok := entry.(golang.GoResolutionResult); ok {
 				mrrByDir[filepath.Dir(gm.SourcePath)] = &mrr
 				break
 			}
@@ -753,7 +892,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, ok := mrrByDir[filepath.Dir(r.sourcePath)]; ok && mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *mrr)
+			gs.Markers = java.AddMarker(gs.Markers, *mrr)
 		}
 		goSumByIdx[r.idx] = gs
 	}
@@ -803,6 +942,7 @@ type getObjectBatch struct {
 }
 
 type getObjectTransfer struct {
+	id         string
 	after      any
 	batches    chan getObjectBatch
 	cancel     chan struct{}
@@ -820,6 +960,7 @@ func (t *getObjectTransfer) stop() {
 
 func (s *server) startGetObjectTransfer(id string, after, before any) *getObjectTransfer {
 	t := &getObjectTransfer{
+		id:      id,
 		after:   after,
 		batches: make(chan getObjectBatch, 1),
 		cancel:  make(chan struct{}),
@@ -858,12 +999,14 @@ func (s *server) startGetObjectTransfer(id string, after, before any) *getObject
 			}
 		}()
 
-		sender := rpc.NewGoSender()
-		q.Send(after, before, func(v any) {
-			if tree, ok := v.(java.Tree); ok {
-				sender.Visit(tree, q)
-			}
-		})
+		// Only a tree is sent field by field. Anything else goes out under its
+		// Java type or as its value, either of which the peer can decode.
+		var sendFields func(any)
+		if _, ok := after.(java.Tree); ok {
+			sender := rpc.NewGoSender()
+			sendFields = func(v any) { sender.Visit(v.(java.Tree), q) }
+		}
+		q.Send(after, before, sendFields)
 		q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 		q.Flush()
 	}()
@@ -896,6 +1039,7 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 
 		t = s.startGetObjectTransfer(req.ID, obj, s.remoteObjects[req.ID])
 		s.inProgressGetObjects[req.ID] = t
+		s.lastGetObject = t
 	}
 
 	batch, ok := <-t.batches
@@ -920,11 +1064,40 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	return batch.data, nil
 }
 
+// handleAbortGetObject undoes the transfer of an object that the peer failed
+// to take, which this side cannot otherwise know. The next GetObject for it
+// sends the object whole, and whole again every object the transfer had made
+// a reference of, none of which the peer kept.
+func (s *server) handleAbortGetObject(params json.RawMessage) bool {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(params, &req); err != nil {
+		return true
+	}
+	delete(s.inProgressGetObjects, req.ID)
+	delete(s.remoteObjects, req.ID)
+
+	t := s.lastGetObject
+	if t == nil || t.id != req.ID {
+		// Not the latest transfer, so which refs it assigned is no longer known.
+		s.localRefs.Clear()
+		return true
+	}
+	t.stop()
+	for range t.batches {
+		// the traversal has let go of its queue once this closes
+	}
+	t.sendQueue.DiscardNewReferences()
+	return true
+}
+
 type printRequest struct {
-	TreeID         string  `json:"treeId"`
-	SourcePath     string  `json:"sourcePath"`
-	SourceFileType string  `json:"sourceFileType"`
-	MarkerPrinter  *string `json:"markerPrinter"`
+	TreeID         string   `json:"treeId"`
+	SourcePath     string   `json:"sourcePath"`
+	SourceFileType string   `json:"sourceFileType"`
+	MarkerPrinter  *string  `json:"markerPrinter"`
+	Cursor         []string `json:"cursor"`
 }
 
 func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
@@ -938,34 +1111,12 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 		return "", nil
 	}
 
-	mp := mapMarkerPrinter(req.MarkerPrinter)
-
-	if cu, ok := obj.(*golang.CompilationUnit); ok {
-		if mp != nil {
-			return printer.PrintWithMarkers(cu, mp), nil
-		}
-		return printer.Print(cu), nil
+	tree, ok := obj.(java.Tree)
+	if !ok {
+		return "", &rpcError{Code: -32603, Message: "Object is not a Tree"}
 	}
-	if gm, ok := obj.(*golang.GoMod); ok {
-		if mp != nil {
-			return printer.PrintGoModWithMarkers(gm, mp), nil
-		}
-		return printer.PrintGoMod(gm), nil
-	}
-	if gs, ok := obj.(*golang.GoSum); ok {
-		if mp != nil {
-			return printer.PrintGoSumWithMarkers(gs, mp), nil
-		}
-		return printer.PrintGoSum(gs), nil
-	}
-	if t, ok := obj.(java.Tree); ok {
-		if mp != nil {
-			return printer.PrintWithMarkers(t, mp), nil
-		}
-		return printer.Print(t), nil
-	}
-
-	return "", &rpcError{Code: -32603, Message: "Object is not a Tree"}
+	cursor := s.cursorFromIds(req.Cursor, req.SourceFileType)
+	return printer.PrintWithCursor(tree, cursor, mapMarkerPrinter(req.MarkerPrinter)), nil
 }
 
 func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
@@ -1001,7 +1152,7 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	strIntern := make(map[string]string)
 
-	fetchBatch := func() []rpc.RpcObjectData {
+	requestPage := func() error {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
 		rpcReq := map[string]any{
@@ -1011,13 +1162,58 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			"params":  json.RawMessage(paramsJSON),
 		}
 		body, _ := json.Marshal(rpcReq)
-		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-		s.writer.Write(append([]byte(header), body...))
+		return s.writeFramed(body)
+	}
 
+	// The request for the next page goes out before the current one is handed back,
+	// so Java serializes it while Go is still deserializing what it already has.
+	// At most one request is outstanding, and drainPage below consumes it before
+	// this call returns -- an unread response would otherwise be read as the reply
+	// to whatever request comes next.
+	outstanding := false
+	drainPage := func() {
+		if !outstanding {
+			return
+		}
+		outstanding = false
+		// A message carrying a method is a request Java initiated, which Go cannot
+		// answer from here; it is read past so the page behind it still arrives.
+		for {
+			msg, err := s.readMessage()
+			if err != nil {
+				s.logger.Printf("Error draining prefetched page: %v", err)
+				return
+			}
+			if msg.Method == "" {
+				return
+			}
+			s.logger.Printf("Expected the prefetched GetObject page, got a %s request", msg.Method)
+		}
+	}
+
+	fetchBatch := func() []rpc.RpcObjectData {
+		if !outstanding {
+			if err := requestPage(); err != nil {
+				s.logger.Printf("Error requesting object page: %v", err)
+				return nil
+			}
+		}
+		outstanding = false
+
+		// A reply that cannot be turned into a batch panics: the receive queue indexes
+		// whatever this returns, so an empty batch would surface as "index out of range"
+		// naming nothing. The recover in the caller turns a panic into one clear error.
 		resp, err := s.readMessage()
 		if err != nil {
-			s.logger.Printf("Error reading bidirectional response: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: reading the reply failed: %w", id, err))
+		}
+
+		if resp.Error != nil {
+			if resp.Error.Data != "" {
+				// The peer's own frames go to the log; the message travels back to it.
+				s.logger.Printf("GetObject %s failed on the peer:\n%s", id, resp.Error.Data)
+			}
+			panic(fmt.Errorf("GetObject %s failed on the peer: %s", id, resp.Error.Message))
 		}
 
 		resultData := resp.Result
@@ -1025,14 +1221,21 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			resultData = resp.Params
 		}
 		if resultData == nil {
-			s.logger.Printf("No result data in bidirectional response")
-			return nil
+			panic(fmt.Errorf("GetObject %s: reply carried no result", id))
 		}
 
 		batch, err := rpc.DecodeBatch(resultData, strIntern)
 		if err != nil {
-			s.logger.Printf("Error parsing response result: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: decoding the reply failed: %w", id, err))
+		}
+		// END_OF_OBJECT closes the transfer, so a page carrying it has no successor
+		// to ask for; asking anyway would restart the transfer on the Java side.
+		if len(batch) > 0 && batch[len(batch)-1].State != rpc.EndOfObject {
+			if err = requestPage(); err != nil {
+				s.logger.Printf("Error requesting next object page: %v", err)
+			} else {
+				outstanding = true
+			}
 		}
 		return batch
 	}
@@ -1043,6 +1246,8 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	var obj any
 	func() {
+		// Registered first so it runs last, after the recover below re-panics.
+		defer drainPage()
 		// A panic mid-receive leaves Go's per-id baseline diverged from Java's:
 		// Java records remoteObjects[id] when it generates the diff, so its next
 		// send would be a CHANGE delta against a baseline Go never finished
@@ -1052,14 +1257,17 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		// Mirrors the getObject recovery in RewriteRpc (Java) and rewrite-rpc.ts
 		// (JS): on failure they `remoteObjects.remove(id)` and rethrow.
 		//
-		// The shared ref table is intentionally left intact. Java's
-		// reverse-direction send refs are connection-scoped (cleared only on
-		// Reset), so discarding ours would make Java's bare {ref:N} look-ups
-		// fail with "received reference to unknown object: N" — turning a single
-		// failed request into a fresh cascade.
+		// Java also counts every ref it sent as received, and would send the
+		// next use of one bare. Telling it the transfer failed has it send
+		// them whole again, so the ones recorded here are dropped with it. A
+		// peer that cannot roll back keeps sending them bare, and they stay.
 		defer func() {
 			if r := recover(); r != nil {
 				delete(s.reverseRemoteObjects, id)
+				drainPage()
+				if s.abortGetObject(id) {
+					q.RollBackRefs()
+				}
 				panic(r) // surface as one clear error via safeHandleRequest
 			}
 		}()
@@ -1076,9 +1284,12 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			return v
 		})
 
-		// Consume the END_OF_OBJECT sentinel if present
-		if len(q.PeekBatch()) > 0 && q.PeekBatch()[0].State == rpc.EndOfObject {
-			q.Take()
+		// Taking the marker pulls the page still in flight — there is one whenever the
+		// last page did not end in END_OF_OBJECT — so a failure the peer reported on it
+		// reaches the recover above. Java's RewriteRpc.getObject and JS's rewrite-rpc.ts
+		// take the marker inside their failure scope for the same reason.
+		if msg := q.Take(); msg.State != rpc.EndOfObject {
+			panic(fmt.Errorf("GetObject %s: expected END_OF_OBJECT, got %v", id, msg.State))
 		}
 	}()
 
@@ -1088,6 +1299,32 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	}
 
 	return obj
+}
+
+// abortGetObject tells the peer that this side failed to take the object it
+// sent, and reports whether the peer undid the transfer. It waits for the
+// answer, since nothing else may be asked of the peer until it has.
+func (s *server) abortGetObject(id string) bool {
+	params, _ := json.Marshal(map[string]string{"id": id})
+	body, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "go-AbortGetObject",
+		"method":  "AbortGetObject",
+		"params":  json.RawMessage(params),
+	})
+	if err := s.writeFramed(body); err != nil {
+		return false
+	}
+	for {
+		msg, err := s.readMessage()
+		if err != nil {
+			return false
+		}
+		if msg.Method == "" {
+			return msg.Error == nil
+		}
+		s.logger.Printf("Expected the AbortGetObject reply, got a %s request", msg.Method)
+	}
 }
 
 // installRecipesResponse is the response type for InstallRecipes.
@@ -1177,6 +1414,7 @@ func (s *server) handleReset() bool {
 		transfer.stop()
 	}
 	s.inProgressGetObjects = make(map[string]*getObjectTransfer)
+	s.lastGetObject = nil
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
 	s.localRefs = rpc.NewReferenceMap()
@@ -1186,7 +1424,7 @@ func (s *server) handleReset() bool {
 	s.refCheckpoints = make(map[string]evictCheckpoint)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
-	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
+	s.preparedHoistedVisitors = make(map[string]bool)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
 	s.refCheckpoints = make(map[string]evictCheckpoint)
@@ -1226,6 +1464,7 @@ func (s *server) handleEvict(params json.RawMessage) bool {
 	}
 	delete(s.localObjects, req.ID)
 	delete(s.remoteObjects, req.ID)
+	delete(s.reverseRemoteObjects, req.ID)
 	if cp, ok := s.refCheckpoints[req.ID]; ok {
 		s.localRefs.RollbackTo(cp.localRefsNext)
 		for k := range s.reverseRemoteRefs {
@@ -1275,30 +1514,39 @@ func (s *server) getOrCreateAccumulator(recipeID string, sr recipe.ScanningRecip
 	return acc
 }
 
-// seedCursor reconstructs the cursor chain from RPC cursor IDs (root
-// first) and seeds it onto the visitor via SetCursor. Visitors that
-// don't expose SetCursor (e.g., aren't GoVisitor-derived) silently
-// skip. Each cursor ID points to a tree node Java has; fetched via
-// the existing reverse-RPC GetObject path. Mirrors how Java's RpcRecipe
-// seeds the JavaVisitor cursor before traversal.
-func (s *server) seedCursor(v recipe.TreeVisitor, ids []string) {
+// seedCursor rebuilds the cursor a Visit request names and seeds it onto
+// the visitor. Visitors that don't expose SetCursor silently skip.
+func (s *server) seedCursor(v recipe.TreeVisitor, ids []string, sourceFileType string) {
 	type cursorAware interface {
 		SetCursor(c *visitor.Cursor)
 	}
-	ca, ok := v.(cursorAware)
-	if !ok || len(ids) == 0 {
-		return
+	if ca, ok := v.(cursorAware); ok {
+		if cursor := s.cursorFromIds(ids, sourceFileType); cursor != nil {
+			ca.SetCursor(cursor)
+		}
 	}
-	values := make([]java.Tree, 0, len(ids))
-	for _, id := range ids {
-		obj := s.getObjectFromJava(id, "")
-		if t, ok := obj.(java.Tree); ok {
+}
+
+// cursorFromIds rebuilds a cursor from the object ids of its path, fetching
+// each from the peer.
+func (s *server) cursorFromIds(ids []string, sourceFileType string) *visitor.Cursor {
+	return buildCursor(ids, func(id string) any { return s.getObjectFromJava(id, sourceFileType) })
+}
+
+// buildCursor resolves a cursor path, which every peer sends innermost value
+// first. Between its trees the path holds padding and the root marker, under
+// ids that are not UUIDs; a Go cursor holds trees only, so those are skipped.
+func buildCursor(ids []string, fetch func(id string) any) *visitor.Cursor {
+	var values []java.Tree
+	for i := len(ids) - 1; i >= 0; i-- {
+		if _, err := uuid.Parse(ids[i]); err != nil {
+			continue
+		}
+		if t, ok := fetch(ids[i]).(java.Tree); ok {
 			values = append(values, t)
 		}
 	}
-	if len(values) > 0 {
-		ca.SetCursor(visitor.BuildChain(values))
-	}
+	return visitor.BuildChain(values)
 }
 
 // installDataTableStore installs the host-configured store onto the ctx. When
@@ -1662,6 +1910,8 @@ func nonNil(s []string) []string {
 type prepareRecipeRequest struct {
 	ID      string         `json:"id"`
 	Options map[string]any `json:"options"`
+	// Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
+	AcceptsCausesAnotherCycle bool `json:"acceptsCausesAnotherCycle"`
 }
 
 // prepareRecipeResponse contains the prepared recipe info.
@@ -1676,7 +1926,8 @@ type prepareRecipeResponse struct {
 	// RecipeList carries the prepared child recipes of a composite so the host builds the tree
 	// locally instead of re-preparing each child by name. Always emitted (an empty list for a
 	// leaf; null only for a delegating recipe, whose children the host resolves itself).
-	RecipeList []prepareRecipeResponse `json:"recipeList"`
+	RecipeList         []prepareRecipeResponse `json:"recipeList"`
+	CausesAnotherCycle bool                    `json:"causesAnotherCycle,omitempty"`
 }
 
 type delegatesToResponse struct {
@@ -1738,7 +1989,7 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		}, nil
 	}
 
-	resp, rerr := s.prepareInstance(instance, req.ID)
+	resp, rerr := s.prepareInstance(instance, req.ID, req.AcceptsCausesAnotherCycle)
 	if rerr != nil {
 		return nil, rerr
 	}
@@ -1754,7 +2005,7 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 // values its parent set). A child that delegates to a Java recipe is emitted as delegatesTo for the
 // host to resolve; the rest are prepared and validated recursively. Delegating recipes forward
 // validation to the recipe they delegate to, so they are not validated here.
-func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRecipeResponse, *rpcError) {
+func (s *server) prepareInstance(instance recipe.Recipe, name string, acceptsCausesAnotherCycle bool) (prepareRecipeResponse, *rpcError) {
 	desc := recipe.Describe(instance)
 
 	_, isDelegating := instance.(recipe.DelegatesTo)
@@ -1780,23 +2031,11 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 		EditPreconditions: []any{},
 		ScanPreconditions: []any{},
 	}
-
-	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
-	// precondition's wire identity (so the Java host can evaluate it locally and skip the visit
-	// RPC for non-matching files) and cache the bare editor (so a subsequent dispatch via
-	// instantiateVisitor returns the unwrapped editor — otherwise the precondition runs Go-side
-	// too and doubles the cost).
-	_, isScan := instance.(recipe.ScanningRecipe)
-	if !isScan {
-		if editor := instance.Editor(); editor != nil {
-			if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
-				if entry, ok := preconditionWireEntry(checkV.Check); ok {
-					resp.EditPreconditions = append(resp.EditPreconditions, entry)
-					s.preparedEditorOverrides[recipeID] = checkV.V
-				}
-			}
-		}
+	if c, ok := instance.(recipe.CausesAnotherCycle); ok && acceptsCausesAnotherCycle {
+		resp.CausesAnotherCycle = c.CausesAnotherCycle()
 	}
+
+	sr, isScan := instance.(recipe.ScanningRecipe)
 	if isScan {
 		scanVis := "scan:" + recipeID
 		resp.ScanVisitor = &scanVis
@@ -1808,6 +2047,15 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 			Options:    del.JavaOptions(),
 		}
 		return resp, nil
+	}
+
+	// A scanning recipe's editor depends on its accumulator, so only its scanner is hoisted.
+	if isScan {
+		resp.ScanPreconditions = s.hoistPreconditions(*resp.ScanVisitor, builtOutsideARun(func() recipe.TreeVisitor {
+			return sr.Scanner(sr.InitialValue(recipe.NewExecutionContext()))
+		}))
+	} else {
+		resp.EditPreconditions = s.hoistPreconditions(resp.EditVisitor, builtOutsideARun(instance.Editor))
 	}
 
 	// Whole-tree: prepare each child. A child that delegates to a Java recipe is emitted as
@@ -1828,7 +2076,7 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 				},
 			})
 		} else {
-			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name)
+			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name, acceptsCausesAnotherCycle)
 			if rerr != nil {
 				return prepareRecipeResponse{}, rerr
 			}
@@ -1840,6 +2088,50 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 	return resp, nil
 }
 
+// hoistPreconditions returns the wire preconditions of the visitor dispatched as visitorName.
+// A Check whose precondition has a Java implementation goes to the host, which then skips the
+// files it rejects. A Go visitor also gets the language gate.
+func (s *server) hoistPreconditions(visitorName string, v recipe.TreeVisitor) []any {
+	entries := []any{}
+	if check, ok := v.(*preconditions.CheckVisitor); ok {
+		if entry, ok := preconditionWireEntry(check.Check); ok {
+			entries = append(entries, entry)
+			s.preparedHoistedVisitors[visitorName] = true
+		}
+		v = check.V
+	}
+	if _, ok := v.(visitor.VisitorI); ok {
+		entries = append(entries, goLanguageGate)
+	}
+	return entries
+}
+
+// builtOutsideARun returns the visitor build makes at PrepareRecipe, outside a run, or nil if
+// build panics there. The peer then keeps that visitor's precondition.
+func builtOutsideARun(build func() recipe.TreeVisitor) (v recipe.TreeVisitor) {
+	defer func() {
+		if recover() != nil {
+			v = nil
+		}
+	}()
+	return build()
+}
+
+// goLanguageGate is an "or" because a Go visitor visits three Java tree types that share no
+// narrower supertype than SourceFile.
+var goLanguageGate = map[string]any{"op": "or", "operands": []any{
+	findTreesOfType("org.openrewrite.golang.tree.Go"),
+	findTreesOfType("org.openrewrite.golang.tree.GoMod"),
+	findTreesOfType("org.openrewrite.golang.tree.GoSum"),
+}}
+
+func findTreesOfType(javaType string) map[string]any {
+	return map[string]any{
+		"visitorName":    "org.openrewrite.rpc.internal.FindTreesOfType",
+		"visitorOptions": map[string]any{"type": javaType},
+	}
+}
+
 // preconditionWireEntry translates a precondition condition (operand) to
 // a wire entry matching org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition.
 //
@@ -1847,14 +2139,13 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 // operands (a list of nested wire entries). Returns ok=false when the
 // condition can't be serialized (e.g. an opaque local TreeVisitor with
 // no recipe identity) — the caller leaves the wrapper intact so the
+// peer evaluates it.
 func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bool) {
 	switch c := condition.(type) {
 	case *preconditions.RecipeRef:
-		entry := map[string]any{"visitorName": c.RecipeName}
-		if len(c.Options) > 0 {
-			entry["visitorOptions"] = c.Options
-		}
-		return entry, true
+		return javaRecipeWireEntry(c.RecipeName, c.Options), true
+	case recipe.DelegatesTo:
+		return javaRecipeWireEntry(c.JavaRecipeName(), c.JavaOptions()), true
 	case *preconditions.Composite:
 		operands := make([]any, 0, len(c.Operands))
 		for _, operand := range c.Operands {
@@ -1868,6 +2159,14 @@ func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bo
 	default:
 		return nil, false
 	}
+}
+
+func javaRecipeWireEntry(recipeName string, options map[string]any) map[string]any {
+	entry := map[string]any{"visitorName": recipeName}
+	if len(options) > 0 {
+		entry["visitorOptions"] = options
+	}
+	return entry
 }
 
 type visitRequest struct {
@@ -1919,6 +2218,10 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
+	if phase != "edit" && phase != "scan" {
+		return nil, &rpcError{Code: -32602, Message: "Unknown phase: " + phase}
+	}
+
 	// Get the tree from Java via bidirectional RPC
 	s.captureRefCheckpoint(req.TreeID)
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
@@ -1929,30 +2232,7 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	// Resolve ctx first because ScanningRecipe.InitialValue may need it.
 	ctx := s.resolveExecutionContext(req.PID)
 
-	// Get the visitor based on phase. For ScanningRecipe, both scan and edit
-	// phases need access to the accumulator; the accumulator is created
-	// lazily on the first scan visit.
-	var v recipe.TreeVisitor
-	switch phase {
-	case "edit":
-		if sr, ok := r.(recipe.ScanningRecipe); ok {
-			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			v = sr.EditorWithData(acc)
-		} else {
-			v = r.Editor()
-		}
-	case "scan":
-		sr, ok := r.(recipe.ScanningRecipe)
-		if !ok {
-			// scan visitor for a non-scanning recipe is a no-op
-			return &visitResponse{Modified: false}, nil
-		}
-		acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-		v = sr.Scanner(acc)
-	default:
-		return nil, &rpcError{Code: -32602, Message: "Unknown phase: " + phase}
-	}
-
+	v := s.instantiateVisitor(req.Visitor, ctx)
 	if v == nil {
 		return &visitResponse{Modified: false}, nil
 	}
@@ -1962,11 +2242,15 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	if !ok {
 		return &visitResponse{Modified: false}, nil
 	}
-	s.seedCursor(v, req.Cursor)
+	s.seedCursor(v, req.Cursor, req.SourceFileType)
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
 	if after == nil {
-		after = before
+		if q, ok := v.(visitor.AfterVisitsProvider); ok {
+			q.AfterVisits()
+		}
+		delete(s.localObjects, req.TreeID)
+		return &visitResponse{Modified: true}, nil
 	}
 	// Drain any after-visits queued via GoVisitor.DoAfterVisit during
 	// the main visit. Mirrors JavaVisitor's afterVisit drain — recipes
@@ -1979,12 +2263,8 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 
 	// Store the result — update both localObjects (for forward GetObject)
 	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
-	if after != nil {
-		s.localObjects[req.TreeID] = after
-		s.reverseRemoteObjects[req.TreeID] = after
-	} else {
-		delete(s.localObjects, req.TreeID)
-	}
+	s.localObjects[req.TreeID] = after
+	s.reverseRemoteObjects[req.TreeID] = after
 
 	return &visitResponse{Modified: modified}, nil
 }
@@ -2031,21 +2311,44 @@ func (s *server) instantiateVisitor(visitorName string, ctx *recipe.ExecutionCon
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
 			return sr.EditorWithData(acc)
 		}
-		// If the recipe wrapped its editor in preconditions.Check(...) and
-		// we captured the bare editor at PrepareRecipe time, return it here
-		// so the precondition isn't re-evaluated Go-side.
-		if bare, ok := s.preparedEditorOverrides[recipeID]; ok {
-			return bare
-		}
-		return r.Editor()
+		return s.withoutHoistedPrecondition(visitorName, r.Editor())
 	case "scan":
 		if sr, ok := r.(recipe.ScanningRecipe); ok {
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			return sr.Scanner(acc)
+			if scanner := s.withoutHoistedPrecondition(visitorName, sr.Scanner(acc)); scanner != nil {
+				return &scanOnlyVisitor{scanner: scanner}
+			}
 		}
 		return nil
 	}
 	return nil
+}
+
+func (s *server) withoutHoistedPrecondition(visitorName string, v recipe.TreeVisitor) recipe.TreeVisitor {
+	if check, ok := v.(*preconditions.CheckVisitor); ok && s.preparedHoistedVisitors[visitorName] {
+		return check.V
+	}
+	return v
+}
+
+// scanOnlyVisitor runs a scanner for its effect on the accumulator and hands
+// back the tree it was given, as the Java and JS peers do: a scanner can
+// neither change nor delete a source file.
+type scanOnlyVisitor struct {
+	scanner recipe.TreeVisitor
+}
+
+func (v *scanOnlyVisitor) Visit(t java.Tree, p any) java.Tree {
+	if after := v.scanner.Visit(t, p); after != nil {
+		visitor.DrainAfterVisits(v.scanner, after, p)
+	}
+	return t
+}
+
+func (v *scanOnlyVisitor) SetCursor(c *visitor.Cursor) {
+	if ca, ok := v.scanner.(interface{ SetCursor(c *visitor.Cursor) }); ok {
+		ca.SetCursor(c)
+	}
 }
 
 // batchVisitRequest is the parameter type for BatchVisit.
@@ -2110,12 +2413,21 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 			results = append(results, batchVisitResult{SearchResultIDs: []string{}})
 			continue
 		}
-		s.seedCursor(v, req.Cursor)
+		s.seedCursor(v, req.Cursor, req.SourceFileType)
 		before := current
 		// Snapshot the ctx message keys so we can detect whether the
 		// visitor added any new ones (`hasNewMessages`).
 		preKeys := stringSet(ctx.MessageKeys())
 		after := v.Visit(current, ctx)
+		if t, ok := after.(java.Tree); ok {
+			// Part of this visitor's edit, on the same terms as in handleVisit.
+			after = visitor.DrainAfterVisits(v, t, ctx)
+		} else if q, ok := v.(visitor.AfterVisitsProvider); ok {
+			// A deleted tree leaves nothing to apply them to, and an editor
+			// instance can be shared across files: emptying the queue is what
+			// keeps them off the next one.
+			q.AfterVisits()
+		}
 
 		deleted := after == nil
 		modified := !deleted && !treeIdentical(before, after)
@@ -2208,19 +2520,9 @@ func (s *server) handleGenerate(params json.RawMessage) (any, *rpcError) {
 		newID := uuid.New().String()
 		s.localObjects[newID] = t
 		resp.IDs = append(resp.IDs, newID)
-		resp.SourceFileTypes = append(resp.SourceFileTypes, sourceFileTypeFor(t))
+		resp.SourceFileTypes = append(resp.SourceFileTypes, rpc.JavaClassName(t))
 	}
 	return resp, nil
-}
-
-// sourceFileTypeFor returns the FQN Java expects for a Go-side tree.
-// Currently every Go source file is a CompilationUnit; expand if other
-// SourceFile types are added.
-func sourceFileTypeFor(t java.Tree) string {
-	if _, ok := t.(*golang.CompilationUnit); ok {
-		return "org.openrewrite.golang.tree.Go$CompilationUnit"
-	}
-	return ""
 }
 
 type traceGetObjectRequest struct {
@@ -2242,9 +2544,10 @@ func (s *server) handleTraceGetObject(params json.RawMessage) (any, *rpcError) {
 }
 
 type parseProjectRequest struct {
-	ProjectPath string   `json:"projectPath"`
-	Exclusions  []string `json:"exclusions"`
-	RelativeTo  *string  `json:"relativeTo"`
+	ProjectPath string         `json:"projectPath"`
+	Exclusions  []string       `json:"exclusions"`
+	RelativeTo  *string        `json:"relativeTo"`
+	Options     map[string]any `json:"options,omitempty"`
 }
 
 type parseProjectResponseItem struct {
@@ -2333,6 +2636,16 @@ func filterGitIgnored(projectPath string, paths []string) []string {
 	return kept
 }
 
+// versionOfResolved is the version a module's sources live under: the
+// replacement's when a replace applies. A local-path replacement names a
+// directory rather than a version, so it has none.
+func versionOfResolved(d golang.GoResolvedDependency) string {
+	if d.ReplacePath == "" {
+		return d.Version
+	}
+	return d.ReplaceVersion
+}
+
 func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	var req parseProjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -2398,9 +2711,16 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	// non-fatal — the affected files just lose module context and fall
 	// back to stdlib-only attribution.
 	type modCtx struct {
-		dir       string // absolute directory containing go.mod
-		mrr       *golang.GoResolutionResult
+		dir string // absolute directory containing go.mod
+		mrr *golang.GoResolutionResult
+		// buildList is what `go list -m` selected: one version per module path.
+		// mrr.ResolvedDependencies merges go.sum in and so names several
+		// versions of the same module, only one of which is on disk.
+		buildList []golang.GoResolvedDependency
 		goProject golang.GoProject // lightweight per-CU marker; one shared instance per module
+		// unresolved lists imports that resolved to no module; when non-empty the
+		// package->module map was withheld and a warning is attached to the go.mod.
+		unresolved []string
 	}
 	mods := make(map[string]*modCtx, len(disc.goMods))
 	for _, modPath := range disc.goMods {
@@ -2430,16 +2750,34 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// package->module map. Best-effort: on any toolchain/network failure keep
 		// the go.sum-only result (never fail the parse).
 		moduleDir := filepath.Dir(modPath)
+		var buildList []golang.GoResolvedDependency
+		var unresolved []string
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
+			mrr.ResolutionStatus = golang.GoResolutionGoSumOnly
+			mrr.ResolutionError = rerr.Error()
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
+			buildList = resolved
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
-			mrr.PackageModules = pkgs
+			// A partial package->module map omits the modules that failed to resolve, so a
+			// still-used require would look unused. Withhold it and let require-removal
+			// no-op (its gate is len(PackageModules)==0) rather than break the build.
+			if pkgs.Incomplete {
+				mrr.ResolutionStatus = golang.GoResolutionIncomplete
+				mrr.UnresolvedImports = pkgs.Unresolved
+				unresolved = pkgs.Unresolved
+				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal (unresolved imports: %v)", moduleDir, pkgs.Unresolved)
+			} else {
+				mrr.ResolutionStatus = golang.GoResolutionResolved
+				mrr.PackageModules = pkgs.Packages
+			}
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{
-			dir:       filepath.Dir(modPath),
-			mrr:       mrr,
-			goProject: golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+			dir:        filepath.Dir(modPath),
+			mrr:        mrr,
+			buildList:  buildList,
+			goProject:  golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+			unresolved: unresolved,
 		}
 	}
 
@@ -2484,6 +2822,21 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		}
 		for _, r := range m.mrr.Replaces {
 			pi.AddReplace(r.OldPath, r.NewPath, r.NewVersion)
+		}
+		// The build list names the version MVS selected, which is the coordinate
+		// whose sources the module cache holds. Without toolchain resolution the
+		// go.mod requires name the minimum versions, which MVS selects for every
+		// module no other requirement raises.
+		if len(m.buildList) > 0 {
+			for _, d := range m.buildList {
+				if !d.Main {
+					pi.AddModule(d.ModulePath, d.ReplacePath, versionOfResolved(d))
+				}
+			}
+		} else {
+			for _, r := range m.mrr.Requires {
+				pi.AddModule(r.ModulePath, "", r.Version)
+			}
 		}
 		piByModule[m.dir] = pi
 	}
@@ -2530,6 +2883,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	groups := make(map[groupKey][]fileEntry)
 	type ordered struct {
 		idx        int
+		path       string
 		sourcePath string
 		modCtx     *modCtx
 	}
@@ -2557,26 +2911,31 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			sourcePath: sourcePath,
 			content:    src,
 		})
-		order = append(order, ordered{idx: i, sourcePath: sourcePath, modCtx: m})
+		order = append(order, ordered{idx: i, path: goFile, sourcePath: sourcePath, modCtx: m})
 	}
 
 	// Parse each group; collect CUs by original input index so the
-	// returned IDs land in input-order. Files filtered out by the
-	// parser's BuildContext (`//go:build` / `_GOOS_GOARCH.go` suffixes)
-	// don't appear in the response — handled here so the post-parse
-	// `cus` slice aligns with the `included` subset of entries.
+	// returned IDs land in input-order. Every file is parsed: those outside
+	// the parser's BuildContext keep their syntax and carry a BuildConstraint
+	// marker (ParsePackage type-checks only the matching subset), so the
+	// post-parse `cus` slice aligns with the entries.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(disc.goFiles))
+	parseErrByIdx := make(map[int]error)
+	checkPrint := requirePrintEqualsInput(req.Options)
+	// One parser per module, since packages of a module share its importer and so its types.
+	parserByModule := make(map[string]*goparser.GoParser, len(mods))
 	for key, entries := range groups {
-		p := goparser.NewGoParser()
-		if pi, ok := piByModule[key.moduleDir]; ok {
-			p.Importer = pi
+		p, ok := parserByModule[key.moduleDir]
+		if !ok {
+			p = goparser.NewGoParser()
+			if pi, ok := piByModule[key.moduleDir]; ok {
+				p.Importer = pi
+			}
+			parserByModule[key.moduleDir] = p
 		}
 		included := make([]fileEntry, 0, len(entries))
 		inputs := make([]goparser.FileInput, 0, len(entries))
 		for _, e := range entries {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(e.sourcePath), e.content) {
-				continue
-			}
 			included = append(included, e)
 			inputs = append(inputs, goparser.FileInput{Path: e.sourcePath, Content: e.content})
 		}
@@ -2594,10 +2953,18 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if err != nil {
 			for _, e := range included {
 				s.logger.Printf("ParseProject: parse error in %s: %v", e.path, err)
+				parseErrByIdx[e.idx] = packageParseError(err, e.sourcePath)
 			}
 			continue
 		}
 		for i, cu := range cus {
+			if checkPrint {
+				if perr := printIdempotencyError(cu, included[i].content); perr != nil {
+					s.logger.Printf("ParseProject: %v", perr)
+					parseErrByIdx[included[i].idx] = perr
+					continue
+				}
+			}
 			cuByIdx[included[i].idx] = cu
 		}
 	}
@@ -2608,6 +2975,19 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	for _, o := range order {
 		cu, ok := cuByIdx[o.idx]
 		if !ok || cu == nil {
+			// Two ways to reach this: the BuildContext excluded the file, which
+			// stays out of the response, or parsing failed, which is reported so
+			// the file still reaches the JVM.
+			if perr := parseErrByIdx[o.idx]; perr != nil {
+				pe := java.NewParseError(o.sourcePath, contents[o.path], perr)
+				id := pe.Ident.String()
+				s.localObjects[id] = pe
+				items = append(items, parseProjectResponseItem{
+					ID:             id,
+					SourceFileType: "org.openrewrite.tree.ParseError",
+					SourcePath:     o.sourcePath,
+				})
+			}
 			continue
 		}
 		if o.modCtx != nil {
@@ -2666,7 +3046,16 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
+			gm.Markers = java.AddMarker(java.AddMarker(gm.Markers, *m.mrr), m.goProject)
+			if m.mrr.ResolutionStatus == golang.GoResolutionGoSumOnly {
+				gm.Markers = java.MarkupWarnDetail(gm.Markers,
+					"Go module resolution failed, so dependencies were derived from go.sum alone. go.sum records every version ever seen rather than the selected build list, so the dependency set is incomplete and may name older versions. Recipes that depend on the resolved module graph (e.g. go mod tidy) must not be trusted for this module until resolution succeeds.",
+					m.mrr.ResolutionError)
+			} else if len(m.unresolved) > 0 {
+				gm.Markers = java.MarkupWarnDetail(gm.Markers,
+					"Go module resolution was incomplete, so unused-require removal was skipped to avoid dropping a still-used dependency. Re-run once the modules below can be resolved.",
+					"unresolved imports: "+strings.Join(m.unresolved, ", "))
+			}
 		}
 		id := gm.Ident.String()
 		s.localObjects[id] = gm
@@ -2696,7 +3085,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr, m.goProject)
+			gs.Markers = java.AddMarker(java.AddMarker(gs.Markers, *m.mrr), m.goProject)
 		}
 		id := gs.Ident.String()
 		s.localObjects[id] = gs
@@ -2778,7 +3167,7 @@ func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) 
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: err.Error()}
 		}
-		s.logger.Printf("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
+		s.tracef("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
 		types := goparser.ExportedTypes([]string{dir}, nil)
 
 		q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
@@ -2797,7 +3186,7 @@ func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) 
 			func(v any) { sender.Visit(v.(java.JavaType), q) })
 		q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 		q.Flush()
-		s.logger.Printf("DependencyTypes: %d types, %d items", len(types), len(data))
+		s.tracef("DependencyTypes: %d types, %d items", len(types), len(data))
 	}
 
 	n := s.batchSize

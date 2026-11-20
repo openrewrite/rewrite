@@ -22,9 +22,9 @@ S = TypeVar('S', bound=Style)
 
 @dataclass(frozen=True)
 class NamedStyles(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id: UUID) -> NamedStyles:
+    def with_id(self, id: int | UUID) -> NamedStyles:
         return replace_if_changed(self, _id=id)
 
     _name: str

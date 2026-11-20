@@ -74,7 +74,7 @@ public class AddPropertyComment extends Recipe {
                             entry.getPrefix(),
                             entry.getMarkers(),
                             Properties.Comment.Delimiter.HASH_TAG,
-                            " " + entry.printTrimmed(getCursor()));
+                            " " + entry.printTrimmed(getCursor().getParentOrThrow()));
                 }
                 return super.visitEntry(entry, ctx);
             }

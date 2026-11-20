@@ -56,17 +56,8 @@ public class ExcludeDependency extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope, s -> {
-            try {
-                if (s != null) {
-                    //noinspection ResultOfMethodCallIgnored
-                    Scope.fromName(s);
-                }
-                return true;
-            } catch (Throwable t) {
-                return false;
-            }
-        }));
+        return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope,
+                s -> Scope.Invalid != Scope.fromName(s)));
     }
 
     String displayName = "Exclude Maven dependency";

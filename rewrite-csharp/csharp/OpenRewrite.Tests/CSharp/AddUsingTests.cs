@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
@@ -26,6 +28,15 @@ public class AddUsingTests : RewriteTest
         var cu = Parse(source);
         var result = new AddUsing<int>(type, onlyIfReferenced).Visit(cu, 0);
         return new CSharpPrinter<object>().Print(result!);
+    }
+
+    private static async Task AssertCompiles(string source)
+    {
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var syntax = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("AddUsing", [syntax], refs,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
     }
 
     [Fact]
@@ -238,6 +249,340 @@ public class AddUsingTests : RewriteTest
                 }
             }
             """, after);
+    }
+
+    [Fact]
+    public async Task UsingInASiblingNamespaceIsNotVisible()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace A { using System.Text; class A {} }
+            namespace B { class B { StringBuilder x; } }
+            """,
+            "System.Text.StringBuilder",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            namespace A { using System.Text; class A {} }
+            namespace B { using System.Text; class B { StringBuilder x; } }
+            """, after);
+        await AssertCompiles(after);
+    }
+
+    [Fact]
+    public async Task UnrelatedUsingInTheFirstNamespaceIsNotTheInsertionPoint()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace A
+            {
+                using System;
+
+                class A
+                {
+                }
+            }
+
+            namespace B
+            {
+                class B
+                {
+                    private StringBuilder field;
+                }
+            }
+            """,
+            "System.Text.StringBuilder");
+
+        Assert.Equal(
+            """
+            namespace A
+            {
+                using System;
+
+                class A
+                {
+                }
+            }
+
+            namespace B
+            {
+                using System.Text;
+
+                class B
+                {
+                    private StringBuilder field;
+                }
+            }
+            """, after);
+        await AssertCompiles(after);
+        var reparsed = Parse(after);
+        Assert.Same(reparsed, new AddUsing<int>("System.Text.StringBuilder").Visit(reparsed, 0));
+    }
+
+    [Fact]
+    public void FirstNamespaceUsingGoesAboveTheCommentsOfTheFirstMember()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace A
+            {
+                using System;
+            }
+
+            namespace B
+            {
+                // Holds text.
+                class B
+                {
+                    private StringBuilder field;
+                }
+            }
+            """,
+            "System.Text.StringBuilder");
+
+        Assert.Equal(
+            """
+            namespace A
+            {
+                using System;
+            }
+
+            namespace B
+            {
+                using System.Text;
+
+                // Holds text.
+                class B
+                {
+                    private StringBuilder field;
+                }
+            }
+            """, after);
+    }
+
+    [Fact]
+    public async Task UsingInANestedNamespaceIsNotVisibleToItsParent()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace Outer
+            {
+                using System;
+
+                namespace Inner
+                {
+                    using System.Text;
+
+                    class C
+                    {
+                        private StringBuilder field;
+                    }
+                }
+
+                class D
+                {
+                    private StringBuilder field;
+                }
+            }
+            """,
+            "System.Text.StringBuilder");
+
+        Assert.Equal(
+            """
+            namespace Outer
+            {
+                using System;
+                using System.Text;
+
+                namespace Inner
+                {
+                    using System.Text;
+
+                    class C
+                    {
+                        private StringBuilder field;
+                    }
+                }
+
+                class D
+                {
+                    private StringBuilder field;
+                }
+            }
+            """, after);
+        await AssertCompiles(after);
+    }
+
+    [Fact]
+    public async Task UsingInAnEnclosingNamespaceIsReferenceEqualNoOp()
+    {
+        var source =
+            """
+            namespace Outer
+            {
+                using System.Text;
+
+                namespace Inner
+                {
+                    class C
+                    {
+                        private StringBuilder field;
+                    }
+                }
+            }
+            """;
+        var cu = Parse(source);
+
+        var result = new AddUsing<int>("System.Text.StringBuilder").Visit(cu, 0);
+
+        Assert.Same(cu, result);
+        await AssertCompiles(source);
+    }
+
+    [Fact]
+    public async Task ReferencesInSeveralNamespacesGetACompilationUnitUsing()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace A
+            {
+                using System;
+
+                class A
+                {
+                    private StringBuilder field;
+                }
+            }
+
+            namespace B
+            {
+                class B
+                {
+                    private StringBuilder field;
+                }
+            }
+            """,
+            "System.Text.StringBuilder");
+
+        Assert.Equal(
+            """
+            using System.Text;
+
+            namespace A
+            {
+                using System;
+
+                class A
+                {
+                    private StringBuilder field;
+                }
+            }
+
+            namespace B
+            {
+                class B
+                {
+                    private StringBuilder field;
+                }
+            }
+            """, after);
+        await AssertCompiles(after);
+    }
+
+    [Fact]
+    public async Task ReferenceOutsideAnyNamespaceGetsACompilationUnitUsing()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace N
+            {
+                using System.Text;
+
+                class C
+                {
+                    private StringBuilder field;
+                }
+            }
+
+            class D
+            {
+                private StringBuilder field;
+            }
+            """,
+            "System.Text.StringBuilder");
+
+        Assert.Equal(
+            """
+            using System.Text;
+
+            namespace N
+            {
+                using System.Text;
+
+                class C
+                {
+                    private StringBuilder field;
+                }
+            }
+
+            class D
+            {
+                private StringBuilder field;
+            }
+            """, after);
+        await AssertCompiles(after);
+    }
+
+    [Fact]
+    public async Task AddsIntoFileScopedNamespaceWhenUsingsLiveThere()
+    {
+        var after = ApplyAddUsing(
+            """
+            namespace N;
+
+            using System;
+
+            public class C
+            {
+                private StringBuilder field;
+            }
+            """,
+            "System.Text.StringBuilder");
+
+        Assert.Equal(
+            """
+            namespace N;
+
+            using System;
+            using System.Text;
+
+            public class C
+            {
+                private StringBuilder field;
+            }
+            """, after);
+        await AssertCompiles(after);
+    }
+
+    [Fact]
+    public void UsingInAFileScopedNamespaceIsReferenceEqualNoOp()
+    {
+        var cu = Parse(
+            """
+            namespace N;
+
+            using System.Text;
+
+            public class C
+            {
+                private StringBuilder field;
+            }
+            """);
+
+        var result = new AddUsing<int>("System.Text.StringBuilder").Visit(cu, 0);
+
+        Assert.Same(cu, result);
     }
 
     [Fact]

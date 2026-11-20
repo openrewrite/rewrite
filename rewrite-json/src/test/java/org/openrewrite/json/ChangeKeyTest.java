@@ -17,8 +17,10 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.json.Assertions.json;
 
 class ChangeKeyTest implements RewriteTest {
@@ -105,6 +107,74 @@ class ChangeKeyTest implements RewriteTest {
                     "name": "monitoring-tools"
                   }
                 ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newKeyWithEscapes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey(
+            "$.moduleNameMapper.css",
+            "\"\\\\.(css|less)$\""
+          )),
+          json(
+            """
+              {
+                "moduleNameMapper": {
+                  "css": "identity-obj-proxy"
+                }
+              }
+              """,
+            """
+              {
+                "moduleNameMapper": {
+                  "\\\\.(css|less)$": "identity-obj-proxy"
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newKeyWithUnpairedSurrogateKeepsItsEscape() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("$.kept", "\"high\\ud800\"")),
+          json(
+            """
+              {
+                "kept": "value"
+              }
+              """,
+            """
+              {
+                "high\\ud800": "value"
+              }
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Json.Member member = (Json.Member) ((Json.JsonObject) doc.getValue()).getMembers().get(0);
+                assertThat(((Json.Literal) member.getKey()).getValue()).isEqualTo("high\\ud800");
+            })
+          )
+        );
+    }
+
+    @Test
+    void keyWithUnpairedSurrogateIsFoundByItsEscape() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("$['high\\\\ud800']", "\"renamed\"")),
+          json(
+            """
+              {
+                "high\\ud800": "value"
+              }
+              """,
+            """
+              {
+                "renamed": "value"
               }
               """
           )

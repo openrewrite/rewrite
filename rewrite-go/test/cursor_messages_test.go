@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -28,9 +30,7 @@ import (
 func threeFrameCursor(t *testing.T) (*visitor.Cursor, *visitor.Cursor, *visitor.Cursor) {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	root := visitor.NewCursor(nil, cu)
 	mid := visitor.NewCursor(root, cu)
 	leaf := visitor.NewCursor(mid, cu)
@@ -88,12 +88,8 @@ func TestCursorComputeMessageIfAbsent(t *testing.T) {
 		calls++
 		return "second"
 	})
-	if v1 != "computed" || v2 != "computed" {
-		t.Fatalf("expected stable computed value, got v1=%v v2=%v", v1, v2)
-	}
-	if calls != 1 {
-		t.Fatalf("expected supplier to fire once, fired %d", calls)
-	}
+	require.Falsef(t, v1 != "computed" || v2 != "computed", "expected stable computed value, got v1=%v v", v1)
+	require.Equal(t, 1, calls, "expected supplier to fire once, fired")
 }
 
 func TestCursorPutMessageOnFirstEnclosing(t *testing.T) {

@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.scala.Assertions.scala;
 
 class MemberReferenceTest implements RewriteTest {
-    
+
     @Test
     void simpleMemberReference() {
         rewriteRun(
@@ -36,7 +36,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceOnObject() {
         rewriteRun(
@@ -63,7 +63,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void staticMemberReference() {
         rewriteRun(
@@ -80,7 +80,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceAsArgument() {
         rewriteRun(
@@ -96,7 +96,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void constructorReference() {
         rewriteRun(
@@ -111,7 +111,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void partiallyAppliedFunction() {
         rewriteRun(
@@ -126,7 +126,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceWithTypeParameters() {
         rewriteRun(
@@ -141,7 +141,7 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceInHigherOrderFunction() {
         rewriteRun(

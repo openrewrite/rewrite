@@ -253,6 +253,7 @@ func (s *JavaTypeSender) VisitMethod(m *java.JavaTypeMethod, p any) java.JavaTyp
 
 func (s *JavaTypeSender) VisitVariable(v *java.JavaTypeVariable, p any) java.JavaType {
 	q := p.(*SendQueue)
+	q.GetAndSend(v, func(x any) any { return x.(*java.JavaTypeVariable).FlagsBitMap }, nil)
 	q.GetAndSend(v, func(x any) any { return x.(*java.JavaTypeVariable).Name }, nil)
 	q.GetAndSend(v, func(x any) any { return AsRef(x.(*java.JavaTypeVariable).Owner) },
 		func(x any) { s.Visit(GetValueNonNull(x).(java.JavaType), q) })

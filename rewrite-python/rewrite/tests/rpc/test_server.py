@@ -28,6 +28,8 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
         observed["source"] = source
         observed["path"] = path
+        # Read while the batch is still in flight; the file is removed once it ends.
+        observed["content_at_parse"] = open(path, encoding="utf-8").read()
         return {"id": "empty-file"}
 
     monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
@@ -44,7 +46,7 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     assert result == ["empty-file"]
     assert observed["source"] == ""
     assert observed["path"] == str(tmp_path / "pkg" / "__init__.py")
-    assert (tmp_path / "pkg" / "__init__.py").read_text(encoding="utf-8") == ""
+    assert observed["content_at_parse"] == ""
 
 
 def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
@@ -531,27 +533,324 @@ def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
     it would emit a GET_REF for a ref the child no longer holds; if it rewound while the child did
     not, it would reuse a number still bound to the old object and serve a wrong tree silently."""
     import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
 
     bundle, first, second = "pkg", "file-1", "file-2"
-    server._hub_send_refs[bundle] = {}
-    server._hub_send_next[bundle] = 0
+    refs = server._hub_send_refs[bundle] = ReferenceMap()
 
     # Serving the first file advances this child's numbering and records where it started.
-    server._hub_send_checkpoint.setdefault((bundle, first), server._hub_send_next[bundle])
-    server._hub_send_refs[bundle].update({"obj-a": (object(), 1), "obj-b": (object(), 2)})
-    server._hub_send_next[bundle] = 2
+    server._hub_send_checkpoint.setdefault((bundle, first), refs.snapshot())
+    refs.create(object())
+    refs.create(object())
     server._hub_served[(bundle, first)] = object()
     server._hub_tree[first] = object()
 
     server._hub_release(first)
 
     # Everything that file introduced is gone, and the counter is back where it began.
-    assert server._hub_send_next[bundle] == 0
-    assert server._hub_send_refs[bundle] == {}
+    assert refs.snapshot() == 0
+    assert len(refs) == 0
     assert (bundle, first) not in server._hub_served
     assert (bundle, first) not in server._hub_send_checkpoint
     assert first not in server._hub_tree
 
     # So the next file reuses the same ref numbers rather than continuing past them.
-    server._hub_send_checkpoint.setdefault((bundle, second), server._hub_send_next[bundle])
+    server._hub_send_checkpoint.setdefault((bundle, second), refs.snapshot())
     assert server._hub_send_checkpoint[(bundle, second)] == 0
+
+
+def test_project_root_roots_ty_independently_of_relative_to(tmp_path, monkeypatch):
+    """``projectRoot`` is where ty is rooted; ``relativeTo`` is the base source
+    paths are made relative to. A caller whose generated ``ty.toml`` sits outside
+    its source tree needs the two pointed at different directories."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "a.py").write_text("x = 1\n", encoding="utf-8")
+    config_root = tmp_path / "cfg"
+    config_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_file(path, relative_to=None, ty_client=None, **_):
+        observed["relative_to"] = relative_to
+        return {"id": "parsed"}
+
+    monkeypatch.setattr(server, "parse_python_file", fake_parse_python_file)
+
+    result = server.handle_parse({
+        "inputs": [{"path": str(sources / "a.py")}],
+        "relativeTo": str(sources),
+        "projectRoot": str(config_root),
+    })
+
+    assert result == ["parsed"]
+    assert observed["ty_root"] == str(config_root)
+    assert observed["relative_to"] == str(sources)
+
+
+def test_project_language_level_comes_from_the_source_tree(tmp_path, monkeypatch):
+    """``projectRoot`` may hold only a generated ``ty.toml``; the manifests declaring the
+    project's Python version sit with the sources. That version also selects the py2 parser."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "pyproject.toml").write_text(
+        '[project]\nname = "legacy"\nversion = "0.0.0"\nrequires-python = ">=2.7,<3"\n',
+        encoding="utf-8")
+    (sources / "app.py").write_text("print 'hello'\n", encoding="utf-8")
+    config_root = tmp_path / "cfg"
+    config_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            observed["ty_python_version"] = python_version
+
+        def initialize(self, project_root):
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_file(path, relative_to=None, ty_client=None, **kw):
+        observed["project_language_level"] = kw.get("project_language_level")
+        return {"id": "parsed"}
+
+    monkeypatch.setattr(server, "parse_python_file", fake_parse_python_file)
+
+    server.handle_parse({
+        "inputs": [{"path": str(sources / "app.py")}],
+        "relativeTo": str(sources),
+        "projectRoot": str(config_root),
+    })
+
+    assert observed["project_language_level"] == "2.7"
+
+
+def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
+    """The root ty is initialized at is ``projectRoot``, which the caller may point away
+    from the sources."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    ty_root = tmp_path / "cfg"
+    ty_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
+        observed["path"] = path
+        observed["relative_to"] = relative_to
+        observed["content_at_parse"] = open(path, encoding="utf-8").read()
+        return {"id": "inline"}
+
+    monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
+
+    server.handle_parse({
+        "inputs": [{"text": "x = 1\n", "sourcePath": "pkg/a.py"}],
+        "relativeTo": str(sources),
+        "projectRoot": str(ty_root),
+    })
+
+    assert observed["path"] == str(ty_root / "pkg" / "a.py")
+    assert observed["content_at_parse"] == "x = 1\n"
+    # The base passed alongside it keeps the reported source path the caller's own.
+    assert observed["relative_to"] == observed["ty_root"]
+
+    # The caller's directory is left as it was found; a later parse rooted here would
+    # otherwise pick these up as project sources.
+    assert not (ty_root / "pkg" / "a.py").exists()
+    assert not (ty_root / "pkg").exists()
+
+
+def test_consecutive_parses_each_use_their_own_project_root(tmp_path, monkeypatch):
+    """One peer serves many parse calls in sequence, each naming its own ``projectRoot``.
+    A ty client outliving a call would resolve later calls against the first one's config."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "a.py").write_text("x = 1\n", encoding="utf-8")
+    roots = [tmp_path / "cfg-a", tmp_path / "cfg-b"]
+    for r in roots:
+        r.mkdir()
+
+    initialized = []
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            initialized.append(project_root)
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_file",
+                        lambda path, relative_to=None, ty_client=None, **kw: {"id": "parsed"})
+
+    for root in roots:
+        server.handle_parse({
+            "inputs": [{"path": str(sources / "a.py")}],
+            "relativeTo": str(sources),
+            "projectRoot": str(root),
+        })
+
+    assert initialized == [str(roots[0]), str(roots[1])], \
+        "each call roots ty at its own projectRoot; a client carried over unrooted " \
+        "would leave later calls resolving against the first call's config"
+
+
+def test_a_source_the_caller_already_had_survives_the_parse(tmp_path, monkeypatch):
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    existing = pkg / "a.py"
+    existing.write_text("original = 1\n", encoding="utf-8")
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_source",
+                        lambda source, path="<unknown>", relative_to=None, ty_client=None, **_: {"id": "inline"})
+
+    server.handle_parse({
+        "inputs": [{"text": "replaced = 2\n", "sourcePath": "pkg/a.py"}],
+        "relativeTo": str(tmp_path),
+    })
+
+    assert existing.exists(), "a file the server did not create must not be removed"
+    assert pkg.exists()
+
+
+def test_source_path_is_not_relativized_against_an_inferred_project_root(tmp_path, monkeypatch):
+    """Without a ``relativeTo`` the host's other parsers keep its input paths as given,
+    so an inferred project root may only root ty, not rebase the LST's source path."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+    from pathlib import Path
+
+    # given
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n', encoding="utf-8")
+    source_path = tmp_path / "demo" / "http.py"
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    parse_python_source = server.parse_python_source
+
+    def untyped_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **kw):
+        return parse_python_source(source, path, relative_to, None, **kw)
+
+    monkeypatch.setattr(server, "parse_python_source", untyped_parse_python_source)
+
+    # when
+    ids = server.handle_parse({"inputs": [{"text": "x = 1\n", "sourcePath": str(source_path)}]})
+
+    # then
+    assert server.local_objects[ids[0]].source_path == Path(source_path)
+    assert observed["ty_root"] == str(tmp_path)
+
+
+def test_generate_names_a_python_file_by_its_java_type(monkeypatch):
+    """The host builds each generated file from the type the response names, so a Python source
+    file has to be named as the Java `Py$CompilationUnit` it is registered as. Named by its
+    Python class, the host read it as some other object and failed with `Expected
+    END_OF_OBJECT`, so no file a Python scanning recipe generated ever reached the run."""
+    import ast
+    from pathlib import Path
+
+    import rewrite.rpc.server as server
+    from rewrite import CategoryDescriptor, ScanningRecipe
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite.python._parser_visitor import ParserVisitor
+
+    class _WritesAModule(ScanningRecipe):
+        @property
+        def name(self): return "org.example.WritesAModule"
+        @property
+        def display_name(self): return "Writes a module"
+        @property
+        def description(self): return "Generates one Python source file."
+
+        def initial_value(self, ctx): return None
+
+        def scanner(self, acc):
+            from rewrite.visitor import TreeVisitor
+            return TreeVisitor.noop()
+
+        def generate(self, acc, ctx):
+            source = "x = 1\n"
+            cu = ParserVisitor(source, None, None).visit_Module(ast.parse(source))
+            return [cu.replace(_source_path=Path("pkg/generated.py"))]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_WritesAModule, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    prepared = server.handle_prepare_recipe({"id": "org.example.WritesAModule"})
+    response = server.handle_generate({"id": prepared["id"]})
+
+    assert response["sourceFileTypes"] == ["org.openrewrite.python.tree.Py$CompilationUnit"]

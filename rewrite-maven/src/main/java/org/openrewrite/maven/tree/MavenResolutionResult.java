@@ -23,6 +23,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
@@ -44,7 +45,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class MavenResolutionResult implements Marker {
+public class MavenResolutionResult implements Marker, Heavyweight {
     @EqualsAndHashCode.Include
     @With
     UUID id;

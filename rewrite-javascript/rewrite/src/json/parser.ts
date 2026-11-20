@@ -64,6 +64,14 @@ const TokenNames: Record<number, string> = {
     [Token.EOF]: 'EOF'
 };
 
+/**
+ * A surrogate with no partner stays a lower-case `\uXXXX` escape, because the LST writer can't encode it.
+ * The Java parser's `JsonString.decode` does the same. The `u` flag reads a pair as one code point, outside this range.
+ */
+function escapeUnpairedSurrogates(value: string): string {
+    return value.replace(/[\ud800-\udfff]/gu, surrogate => `\\u${surrogate.charCodeAt(0).toString(16)}`);
+}
+
 export class JsonParser extends Parser {
 
     async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
@@ -255,8 +263,7 @@ class JsoncParserReader {
                 markers: emptyMarkers
             } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
         } else {
-            // Parse members
-            // Put back the trivia by prepending it to the key's prefix
+            // Trivia consumed while probing for '}' belongs to the first member's prefix
             let pendingTrivia = afterOpen;
 
             while (true) {
@@ -467,10 +474,10 @@ class JsoncParserReader {
     }
 
     private parseMember(pendingTrivia: string): Json.Member {
-        const keyPrefix = pendingTrivia + this.consumeTrivia();
+        const memberPrefix = pendingTrivia + this.consumeTrivia();
         const key = this.parseKey({
             id: randomId(),
-            prefix: space(keyPrefix),
+            prefix: emptySpace,
             markers: emptyMarkers
         });
 
@@ -485,7 +492,7 @@ class JsoncParserReader {
         return {
             kind: Json.Kind.Member,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: space(memberPrefix),
             markers: emptyMarkers,
             key: {
                 kind: Json.Kind.RightPadded,
@@ -510,7 +517,7 @@ class JsoncParserReader {
 
     private parseStringLiteral(base: { id: string; prefix: Json.Space; markers: typeof emptyMarkers }): Json.Literal {
         const source = this.source.slice(this.tokenOffset, this.tokenOffset + this.tokenLength);
-        const value = this.tokenValue;
+        const value = escapeUnpairedSurrogates(this.tokenValue);
         this.advance();
 
         return {

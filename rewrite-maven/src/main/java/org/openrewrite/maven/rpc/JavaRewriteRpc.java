@@ -93,7 +93,7 @@ public class JavaRewriteRpc {
                 marketplaceCsv = Paths.get(arg.substring("--marketplace=".length()));
             } else if (arg.startsWith("--log-file=")) {
                 logFile = Paths.get(arg.substring("--log-file=".length()));
-            } else if (arg.equals("--trace")) {
+            } else if ("--trace".equals(arg)) {
                 trace = true;
             }
         }
@@ -197,7 +197,7 @@ public class JavaRewriteRpc {
             handler = new TraceMessageHandler("server", handler);
         }
 
-        JsonRpc jsonRpc = new JsonRpc(handler);
+        JsonRpc jsonRpc = new JsonRpc(handler, new JsonMessageFormatter());
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);

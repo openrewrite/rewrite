@@ -49,6 +49,19 @@ class RefinedTypeTreeTest implements RewriteTest {
     }
 
     @Test
+    void structuralReturnType() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def g(): AnyRef { def greet(): String } = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitRefinedTypeTree — `{` in block comment before refinement body
         rewriteRun(
@@ -57,6 +70,32 @@ class RefinedTypeTreeTest implements RewriteTest {
               type T = AnyRef /* { */ { def f: Int }
               """
           )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedStructuralTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f(r: { def a: Int; def b: Int }) = r.a
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInStructuralType() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f(r: { ; def a: Int;; def b: Int; }) = r.a
+                }
+                """
+            )
         );
     }
 }

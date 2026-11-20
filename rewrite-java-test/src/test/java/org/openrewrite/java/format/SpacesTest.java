@@ -5157,14 +5157,14 @@ class SpacesTest implements RewriteTest {
           java(
             """
             class Test {
-                void isString(Object o) {
+                boolean isString(Object o) {
                     return o   instanceof   String;
                 }
             }
             """,
             """
             class Test {
-                void isString(Object o) {
+                boolean isString(Object o) {
                     return o instanceof String;
                 }
             }

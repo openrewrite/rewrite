@@ -20,10 +20,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.internal.PackageManagerExecutor;
+import org.openrewrite.python.rpc.ParseProjectOptions;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
@@ -31,11 +38,14 @@ import org.openrewrite.toml.tree.Toml;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Integration test for ParseProject RPC functionality.
@@ -90,7 +100,7 @@ class ParseProjectIntegTest {
         // Parse the project
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(2);
         assertThat(sources)
@@ -111,7 +121,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(2);
         // Source paths must be relative to the project directory
@@ -132,7 +142,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(1);
         assertThat(sources.get(0).getSourcePath().toString()).doesNotContain("__pycache__");
@@ -146,7 +156,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).isEmpty();
     }
@@ -163,9 +173,41 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(absolutePath, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(1);
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void manifestsPrecedeSources() throws Exception {
+        Path pyprojectDir = tempDir.resolve("pyproject_first");
+        Files.createDirectories(pyprojectDir);
+        Files.writeString(pyprojectDir.resolve("a.py"), "x = 1");
+        Files.writeString(pyprojectDir.resolve("b.py"), "y = 2");
+        Files.writeString(pyprojectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                """);
+
+        assertThat(client().parseProject(pyprojectDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("pyproject.toml");
+
+        Path setupPyDir = tempDir.resolve("setup_py_first");
+        Files.createDirectories(setupPyDir);
+        Files.writeString(setupPyDir.resolve("a.py"), "x = 1");
+        Files.writeString(setupPyDir.resolve("setup.py"), """
+                from setuptools import setup
+                setup(name="myapp", version="1.0.0")
+                """);
+
+        assertThat(client().parseProject(setupPyDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("setup.py");
     }
 
     @Test
@@ -184,7 +226,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -196,6 +238,36 @@ class ParseProjectIntegTest {
                 .orElseThrow();
         assertThat(pyproject).isInstanceOf(Toml.Document.class);
         assertThat(pyproject.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uv.lock", "poetry.lock", "pdm.lock"})
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesPyprojectLockFile(String lockFileName) throws Exception {
+        Path projectDir = tempDir.resolve("with_" + lockFileName.replace('.', '_'));
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = ["requests>=2.28.0"]
+                """);
+        Files.writeString(projectDir.resolve(lockFileName), """
+                [[package]]
+                name = "requests"
+                version = "2.31.0"
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        assertThat(sources)
+                .filteredOn(sf -> sf.getSourcePath().getFileName().toString().equals(lockFileName))
+                .singleElement()
+                .isInstanceOf(Toml.Document.class);
     }
 
     @Test
@@ -212,7 +284,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -247,7 +319,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -286,7 +358,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         // pyproject.toml should be included but not requirements.txt
         assertThat(sources)
@@ -295,6 +367,158 @@ class ParseProjectIntegTest {
                 .doesNotContain("requirements.txt");
     }
 
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void provisionedEnvBacksBothTypesAndMarkers() throws Exception {
+        Path projectDir = tempDir.resolve("provisioned");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [tool.ruff]
+                line-length = 100
+                """);
+        Files.writeString(projectDir.resolve("requirements.txt"), "sortedcontainers==2.4.0\n");
+        Files.writeString(projectDir.resolve("requirements-dev.txt"), "six\n");
+        // A package the parser's own interpreter lacks, so that only the provisioned env resolves it
+        Files.writeString(projectDir.resolve("ranked.py"), """
+                from sortedcontainers import SortedList
+
+                class Ranked(SortedList):
+                    pass
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        List<JavaType.FullyQualified> supertypes = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                if (classDecl.getType() != null && classDecl.getType().getSupertype() != null) {
+                    supertypes.add(classDecl.getType().getSupertype());
+                }
+                return classDecl;
+            }
+        }.visit(sources.stream().filter(s -> s.getSourcePath().endsWith("ranked.py")).findFirst().orElseThrow(), 0);
+        assertThat(supertypes).extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                .containsExactly("sortedcontainers.sortedlist.SortedList");
+
+        // Both files resolve against the one env, while each names only its own dependencies
+        PythonResolutionResult base = marker(sources, "requirements.txt");
+        PythonResolutionResult dev = marker(sources, "requirements-dev.txt");
+        assertThat(base.getDependencies()).extracting(PythonResolutionResult.Dependency::getName).containsExactly("sortedcontainers");
+        assertThat(dev.getDependencies()).extracting(PythonResolutionResult.Dependency::getName).containsExactly("six");
+        assertThat(dev.getResolvedDependency("sortedcontainers")).isNotNull()
+                .extracting(PythonResolutionResult.ResolvedDependency::getVersion).isEqualTo("2.4.0");
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void requirementsMarkerCarriesPythonRequiresOfSetupPy() throws Exception {
+        // huggingface/peft
+        Path projectDir = tempDir.resolve("peft");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [tool.ruff]
+                line-length = 119
+                """);
+        Files.writeString(projectDir.resolve("requirements.txt"), "six\n");
+        Files.writeString(projectDir.resolve("setup.py"), """
+                from setuptools import find_packages, setup
+
+                setup(
+                    name="peft",
+                    version="0.18.2.dev0",
+                    python_requires=">=3.11.0",
+                    install_requires=["six"],
+                )
+                """);
+
+        List<SourceFile> sources = parseWithEnvOf(projectDir, "six", "1.16.0");
+
+        assertThat(marker(sources, "requirements.txt").getRequiresPython()).isEqualTo(">=3.11.0");
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void setupCfgMarkerCarriesPythonRequiresOfSetupPy() throws Exception {
+        // McGill-NLP/llm2vec
+        Path projectDir = tempDir.resolve("llm2vec");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("setup.cfg"), """
+                # Inside of setup.cfg
+                [metadata]
+                description-file = README.md
+                """);
+        Files.writeString(projectDir.resolve("setup.py"), """
+                from setuptools import setup, find_packages
+
+                setup(
+                    name="llm2vec",
+                    python_requires=">=3.8",
+                    install_requires=["six"],
+                )
+                """);
+
+        List<SourceFile> sources = parseWithEnvOf(projectDir, "six", "1.16.0");
+
+        assertThat(marker(sources, "setup.cfg").getRequiresPython()).isEqualTo(">=3.8");
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void setupPyMarkerCarriesItsPythonRequires() throws Exception {
+        // huggingface/diffusers
+        Path projectDir = tempDir.resolve("diffusers");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [tool.ruff]
+                line-length = 119
+                """);
+        Files.writeString(projectDir.resolve("setup.py"), """
+                from setuptools import find_packages, setup
+
+                setup(
+                    name="diffusers",
+                    python_requires=">=3.11.0",
+                    install_requires=["six"],
+                )
+                """);
+
+        List<SourceFile> sources = parseWithEnvOf(projectDir, "six", "1.16.0");
+
+        assertThat(marker(sources, "setup.py").getRequiresPython()).isEqualTo(">=3.11.0");
+    }
+
+    /**
+     * Parses against a venv holding only the named distribution, so that the markers resolve without an install.
+     */
+    private List<SourceFile> parseWithEnvOf(Path projectDir, String name, String version) throws Exception {
+        assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
+        Path env = tempDir.resolve("env");
+        Process venv = new ProcessBuilder(PackageManagerExecutor.UV.find(), "venv", "--python", "3.12", env.toString())
+                .redirectErrorStream(true).start();
+        assertThat(venv.waitFor()).isZero();
+        try (Stream<Path> libs = Files.list(env.resolve("lib"))) {
+            Path sitePackages = libs.findFirst().orElseThrow().resolve("site-packages");
+            Path distInfo = Files.createDirectories(sitePackages.resolve(name + "-" + version + ".dist-info"));
+            Files.writeString(distInfo.resolve("METADATA"),
+                    "Metadata-Version: 2.1\nName: " + name + "\nVersion: " + version + "\n");
+        }
+        return client()
+                .parseProject(projectDir, ParseProjectOptions.builder().dependencyPath(env).build(),
+                        new InMemoryExecutionContext())
+                .collect(toList());
+    }
+
+    private static PythonResolutionResult marker(List<SourceFile> sources, String fileName) {
+        return sources.stream()
+                .filter(s -> s.getSourcePath().getFileName().toString().equals(fileName))
+                .findFirst()
+                .flatMap(s -> s.getMarkers().findFirst(PythonResolutionResult.class))
+                .orElseThrow(() -> new AssertionError("No PythonResolutionResult on " + fileName));
+    }
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
@@ -312,7 +536,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -338,6 +562,38 @@ class ParseProjectIntegTest {
         // Each file should have its own distinct marker pointing to its own path
         assertThat(baseMarker.getPath()).isEqualTo("requirements.txt");
         assertThat(devMarker.getPath()).isEqualTo("requirements-dev.txt");
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void complexLiteralKeepsOnlyItsSource() throws Exception {
+        Path projectDir = tempDir.resolve("complex_literal");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("main.py"), "x = 0j\n");
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        SourceFile main = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("main.py"))
+                .findFirst()
+                .orElseThrow();
+
+        List<J.Literal> literals = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                literals.add(literal);
+                return literal;
+            }
+        }.visit(main, 0);
+
+        assertThat(literals).hasSize(1);
+        assertThat(literals.get(0).getValueSource()).isEqualTo("0j");
+        // no JSON number carries a complex, and no primitive names one
+        assertThat(literals.get(0).getValue()).isNull();
+        assertThat(literals.get(0).getType()).isEqualTo(JavaType.Primitive.None);
     }
 
     private PythonRewriteRpc client() {

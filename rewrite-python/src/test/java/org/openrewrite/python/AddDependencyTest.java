@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
 
@@ -44,7 +45,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyWithResolvedProject(@TempDir Path tempDir) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           uv(tempDir,
             pyproject(
               """
@@ -82,14 +83,14 @@ class AddDependencyTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec.recipe(new CompositeRecipe(List.of(
-            new AddDependency("flask", ">=2.0", null, null),
-            new AddDependency("click", ">=8.0", null, null)
+            new AddDependency("flask", ">=2.0", null, null, null),
+            new AddDependency("click", ">=8.0", null, null, null)
           ))).afterRecipe(run -> {
               // Verify both recipes applied: pyproject has both flask and click in the changeset
               List<String> pyprojectContents = run.getChangeset().getAllResults().stream()
                       .filter(r -> r.getAfter() != null && r.getAfter().getSourcePath().endsWith("pyproject.toml"))
                       .map(r -> r.getAfter().printAll())
-                      .collect(java.util.stream.Collectors.toList());
+                      .collect(toList());
               assertThat(pyprojectContents).isNotEmpty();
               String pyprojectContent = pyprojectContents.get(0);
               assertThat(pyprojectContent).contains("flask>=2.0");
@@ -116,7 +117,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyToExistingList() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", null, null, null)),
+          spec -> spec.recipe(new AddDependency("flask", null, null, null, null)),
           pyproject(
             """
               [project]
@@ -144,7 +145,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyWithVersion() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           pyproject(
             """
               [project]
@@ -170,7 +171,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void skipWhenAlreadyPresent() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("requests", null, null, null)),
+          spec -> spec.recipe(new AddDependency("requests", null, null, null, null)),
           pyproject(
             """
               [project]
@@ -187,7 +188,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addToEmptyDependencyList() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           pyproject(
             """
               [project]
@@ -208,7 +209,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addToInlineDependencyList() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", null, null, null)),
+          spec -> spec.recipe(new AddDependency("flask", null, null, null, null)),
           pyproject(
             """
               [project]
@@ -229,7 +230,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addToOptionalDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("pytest-cov", null, "project.optional-dependencies", "dev")),
+          spec -> spec.recipe(new AddDependency("pytest-cov", null, "project.optional-dependencies", "dev", null)),
           pyproject(
             """
               [project]
@@ -261,7 +262,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addToDependencyGroup() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("pytest-cov", ">=4.0", "dependency-groups", "test")),
+          spec -> spec.recipe(new AddDependency("pytest-cov", ">=4.0", "dependency-groups", "test", null)),
           pyproject(
             """
               [project]
@@ -293,7 +294,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void skipWhenAlreadyInScope() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("pytest", null, "dependency-groups", "test")),
+          spec -> spec.recipe(new AddDependency("pytest", null, "dependency-groups", "test", null)),
           pyproject(
             """
               [project]
@@ -311,12 +312,36 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void markerRefreshedAndFailureSurfacedWhenAdditionNeedsResolution() {
-        // Resolving into a lock restricted to a subset of environments ([tool.uv] environments,
-        // recorded as supported-markers) needs marker-space resolution the native engine defers;
-        // the edit still lands, the marker reflects it, and the failure is surfaced on both files.
+    void refreshedMarkerKeepsRequiresPythonFromAnotherManifest() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              dependencies = ["requests>=2.28.0"]
+              """,
+            """
+              [project]
+              name = "myapp"
+              dependencies = ["requests>=2.28.0", "flask>=2.0"]
+              """,
+            // as parseProject leaves it when setup.py declares python_requires
+            s -> s.mapBeforeRecipe(doc -> doc.withMarkers(doc.getMarkers().setByType(doc.getMarkers()
+                    .findFirst(PythonResolutionResult.class).orElseThrow().withRequiresPython(">=3.10"))))
+              .afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(PythonResolutionResult.class)
+                .orElseThrow().getRequiresPython()).isEqualTo(">=3.10"))
+          )
+        );
+    }
+
+    @Test
+    void markerRefreshedAndFailureSurfacedWhenAdditionNeedsResolution() {
+        // Resolving into a lock that requires wheels for some environments ([tool.uv] required-environments,
+        // recorded as required-markers) is deferred by the native engine. The edit still lands, the marker
+        // reflects it, and the failure is surfaced on both files.
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           pyproject(
             """
               [project]
@@ -352,7 +377,7 @@ class AddDependencyTest implements RewriteTest {
               resolution-markers = [
                   "sys_platform == 'linux'",
               ]
-              supported-markers = [
+              required-markers = [
                   "sys_platform == 'linux'",
               ]
 
@@ -414,7 +439,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     private static String uvResource(String name) {
-        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -425,7 +450,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyWithBareVersion() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", "2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", "2.0", null, null, null)),
           pyproject(
             """
               [project]
@@ -451,7 +476,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyToRequirementsTxt() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           requirementsTxt(
             "requests>=2.28.0",
             "requests>=2.28.0\nflask>=2.0"
@@ -462,7 +487,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void skipWhenAlreadyPresentInRequirementsTxt() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("requests", null, null, null)),
+          spec -> spec.recipe(new AddDependency("requests", null, null, null, null)),
           requirementsTxt("requests>=2.28.0")
         );
     }
@@ -470,7 +495,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyToPipfile() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null, null)),
           pipfile(
             """
               [packages]
@@ -488,7 +513,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void skipWhenAlreadyPresentInPipfileAsQuotedKey() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("urllib3", ">=2.0", null, null)),
+          spec -> spec.recipe(new AddDependency("urllib3", ">=2.0", null, null, null)),
           pipfile(
             """
               [packages]
@@ -500,8 +525,231 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void onlyIfUsingAddsWhenSomeFileImportsTheModule() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("tenacity", ">=8.0.0", null, null, "tenacity")),
+          python(
+            """
+              from tenacity import retry
+
+
+              @retry()
+              def fetch():
+                  pass
+              """
+          ),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+                  "tenacity>=8.0.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyIfUsingDeclinesWhenNoFileImportsTheModule() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("tenacity", ">=8.0.0", null, null, "tenacity")),
+          python(
+            """
+              import backoff
+
+
+              @backoff.on_exception(backoff.fibo, IOError)
+              def fetch():
+                  pass
+              """
+          ),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyIfUsingIsIndependentOfTheAddedPackageName() {
+        // The module a file imports and the distribution installed for it need not share a name.
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("PyYAML", ">=6.0", null, null, "yaml")),
+          python(
+            """
+              import yaml
+              """
+          ),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = []
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["PyYAML>=6.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void unsetOnlyIfUsingStillAddsUnconditionally() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("tenacity", ">=8.0.0", null, null, null)),
+          python(
+            """
+              import backoff
+              """
+          ),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = []
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["tenacity>=8.0.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyIfUsingIsScopedToTheProjectThatImportsTheModule() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("tenacity", ">=8.0.0", null, null, "tenacity")),
+          python(
+            """
+              import tenacity
+              """,
+            spec -> spec.path("svc-a/src/svc_a/client.py")
+          ),
+          python(
+            """
+              import backoff
+              """,
+            spec -> spec.path("svc-b/src/svc_b/client.py")
+          ),
+          pyproject(
+            """
+              [project]
+              name = "svc-a"
+              version = "1.0.0"
+              dependencies = []
+              """,
+            """
+              [project]
+              name = "svc-a"
+              version = "1.0.0"
+              dependencies = ["tenacity>=8.0.0"]
+              """,
+            spec -> spec.path("svc-a/pyproject.toml")
+          ),
+          pyproject(
+            """
+              [project]
+              name = "svc-b"
+              version = "1.0.0"
+              dependencies = []
+              """,
+            spec -> spec.path("svc-b/pyproject.toml")
+          )
+        );
+    }
+
+    @Test
+    void onlyIfUsingAttributesAFileToItsNearestProject() {
+        // The import sits inside the nested project, so the enclosing root project is left alone.
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("tenacity", ">=8.0.0", null, null, "tenacity")),
+          python(
+            """
+              import tenacity
+              """,
+            spec -> spec.path("libs/inner/inner/core.py")
+          ),
+          pyproject(
+            """
+              [project]
+              name = "root"
+              version = "1.0.0"
+              dependencies = []
+              """
+          ),
+          pyproject(
+            """
+              [project]
+              name = "inner"
+              version = "1.0.0"
+              dependencies = []
+              """,
+            """
+              [project]
+              name = "inner"
+              version = "1.0.0"
+              dependencies = ["tenacity>=8.0.0"]
+              """,
+            spec -> spec.path("libs/inner/pyproject.toml")
+          )
+        );
+    }
+
+    @Test
+    void onlyIfUsingReachesTheRootProjectFromANestedPackage() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("tenacity", ">=8.0.0", null, null, "tenacity")),
+          python(
+            """
+              from tenacity import retry
+              """,
+            spec -> spec.path("src/myapp/net/client.py")
+          ),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = []
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = ["tenacity>=8.0.0"]
+              """
+          )
+        );
+    }
+
+    @Test
     void validateRequiresGroupName() {
-        var recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
+        var recipe = new AddDependency("pytest", null, "project.optional-dependencies", null, null);
         assertThat(recipe.validate().isValid()).isFalse();
     }
 }

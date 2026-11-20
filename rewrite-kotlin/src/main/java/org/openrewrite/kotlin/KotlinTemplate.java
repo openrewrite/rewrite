@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.kotlin.internal.template.KotlinSubstitutions;
 import org.openrewrite.kotlin.internal.template.KotlinTemplateParser;
 
+import javax.annotation.CheckReturnValue;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -58,6 +59,7 @@ public class KotlinTemplate extends JavaTemplate {
         return new KotlinSubstitutions(getCode(), parameters);
     }
 
+    @CheckReturnValue
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }

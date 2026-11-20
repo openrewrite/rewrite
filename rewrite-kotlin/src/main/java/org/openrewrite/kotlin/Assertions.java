@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.Extension;
@@ -36,6 +37,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 import org.opentest4j.AssertionFailedError;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -49,7 +51,12 @@ import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings({"unused", "unchecked", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
+@CheckReturnValue
 public final class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+    }
+
 
     private Assertions() {
     }
@@ -57,6 +64,9 @@ public final class Assertions {
     public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
         if (source instanceof JavaSourceFile) {
             assertValidTypes(typeValidation, (JavaSourceFile) source);
+            if (typeValidation.unknown()) {
+                assertNoUnknownElements(source);
+            }
         }
         return source;
     }
@@ -216,13 +226,31 @@ public final class Assertions {
         };
     }
 
+    private static void assertNoUnknownElements(SourceFile source) {
+        List<J.Unknown> unknowns = new KotlinIsoVisitor<List<J.Unknown>>() {
+            @Override
+            public J visitUnknown(J.Unknown unknown, List<J.Unknown> unknowns) {
+                unknowns.add(unknown);
+                return super.visitUnknown(unknown, unknowns);
+            }
+        }.reduce(source, new ArrayList<>());
+        if (!unknowns.isEmpty()) {
+            throw new IllegalStateException("LST contains unknown elements\n" + unknowns.stream()
+                    .map(unknown -> unknown.getSource().getMarkers()
+                            .findFirst(ParseExceptionResult.class)
+                            .map(ParseExceptionResult::getMessage)
+                            .orElse("") + unknown.getSource().getText())
+                    .collect(joining("\n\n")));
+        }
+    }
+
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
                 typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier || missingType.getJ() instanceof J.FieldAccess) {
                             return typeValidation.identifiers();
                         } else if (missingType.getJ() instanceof J.ClassDeclaration) {
                             return typeValidation.classDeclarations();
@@ -238,6 +266,7 @@ public final class Assertions {
                             return true;
                         }
                     })
+                    .filter(missingType -> !typeValidation.allowMissingType().apply(missingType))
                     .collect(toList());
             if (!missingTypeResults.isEmpty()) {
                 throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
@@ -347,6 +376,11 @@ public final class Assertions {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
             if (v == variable) {
+                if (!(v.getDeclarator() instanceof J.Identifier)) {
+                    // A destructuring pattern names its variables through its own identifiers, which carry and are
+                    // checked against their own types; the declaration itself names no single variable.
+                    return v;
+                }
                 JavaType.Variable variableType = v.getVariableType();
                 if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
                     if (isValidated(variable)) {
@@ -388,6 +422,64 @@ public final class Assertions {
         }
 
         @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fieldAccess)) {
+                fa = SearchResult.found(fa, "FieldAccess type is missing or malformed");
+            }
+            return fa;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.FieldAccess fa) {
+            if (inPackageDeclaration() || inImport()) {
+                return true;
+            }
+            if ("class".equals(fa.getSimpleName())) {
+                // An unattributed class literal target is reported on the target itself
+                return !isWellFormedType(fa.getTarget().getType(), seenTypes);
+            }
+            Tree parent = getCursor().getParentTreeCursor().getValue();
+            // An untyped qualifier is a package only if it names the package of what its parent refers to.
+            // Kotlin qualifies top-level members, not only types, with their package.
+            JavaType.FullyQualified referenced;
+            if (parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                !"class".equals(((J.FieldAccess) parent).getSimpleName())) {
+                J.FieldAccess member = (J.FieldAccess) parent;
+                if (!isWellFormedType(member.getType(), seenTypes)) {
+                    return isPackageName(fa); // reported on the parent instead
+                }
+                JavaType.Variable field = member.getName().getFieldType();
+                referenced = TypeUtils.asFullyQualified(field != null ? field.getOwner() : member.getType());
+            } else if (parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect()) {
+                JavaType.Method method = ((J.MethodInvocation) parent).getMethodType();
+                if (method == null || !isWellFormedType(method, seenTypes)) {
+                    return isPackageName(fa); // reported on the call instead
+                }
+                referenced = method.getDeclaringType();
+            } else {
+                return false;
+            }
+            return referenced != null && referenced.getPackageName().equals(dottedName(fa)) && isPackageName(fa);
+        }
+
+        // Neither a package nor any segment of its name has a type
+        private boolean isPackageName(Expression name) {
+            if (isWellFormedType(name.getType(), seenTypes)) {
+                return false;
+            }
+            return name instanceof J.Identifier ||
+                   name instanceof J.FieldAccess && isPackageName(((J.FieldAccess) name).getTarget());
+        }
+
+        private String dottedName(Expression name) {
+            if (name instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) name;
+                return dottedName(fa.getTarget()) + '.' + fa.getSimpleName();
+            }
+            return name instanceof J.Identifier ? ((J.Identifier) name).getSimpleName() : "";
+        }
+
+        @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
             JavaType.Method type = mr.getMethodType();
@@ -416,7 +508,9 @@ public final class Assertions {
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
-            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName())) {
+            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName()) &&
+                       // An accessor is declared by its `get`/`set` keyword but typed by its JVM name, such as `getName`.
+                       !(getCursor().getParentTreeCursor().getValue() instanceof K.Property)) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
             if (md.getName().getType() != null && type != md.getName().getType()) {
@@ -472,7 +566,7 @@ public final class Assertions {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName() ||
-                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isMethodName(ident) || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
                     isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument() || isThisLabel();
         }
@@ -501,8 +595,9 @@ public final class Assertions {
             return getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
         }
 
-        private boolean isMethodName() {
-            return getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration;
+        private boolean isMethodName(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.MethodDeclaration && ident == ((J.MethodDeclaration) value).getName();
         }
 
         private boolean isMethodInvocationName() {

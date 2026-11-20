@@ -15,21 +15,26 @@
  */
 package org.openrewrite.csharp;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
+import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TextComment;
 
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,13 +46,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CSharpVisitorCompletenessTest {
 
+    @BeforeAll
+    static void setUpFactory() {
+        CSharpPrinterParityTest.setUpFactory();
+    }
+
+    @AfterAll
+    static void shutDown() {
+        CSharpRewriteRpc.shutdownCurrent();
+    }
+
     static long nl(String s) {
         return s == null ? 0 : s.chars().filter(c -> c == '\n').count();
     }
 
     long visitorNewlines(SourceFile cu) {
-        AtomicInteger n = new AtomicInteger();
-        new CSharpVisitor<AtomicInteger>() {
+        return new CSharpVisitor<AtomicInteger>() {
             @Override
             public Space visitSpace(Space s, Space.Location l, AtomicInteger a) {
                 a.addAndGet((int) nl(s.getWhitespace()));
@@ -63,8 +77,7 @@ class CSharpVisitorCompletenessTest {
                 a.addAndGet((int) nl(lit.getValueSource()));
                 return super.visitLiteral(lit, a);
             }
-        }.visit(cu, n);
-        return n.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     @Test
@@ -98,6 +111,71 @@ class CSharpVisitorCompletenessTest {
         }
         assertThat(failures.toString()).isEmpty();
     }
+
+    @Test
+    @Timeout(120)
+    void visitsTheTypeOfEveryCsNode() {
+        SourceFile cu = CSharpParser.builder().build()
+          .parse(new InMemoryExecutionContext(), TYPED_NODES)
+          .findFirst().orElseThrow();
+
+        List<Tree> typedNodes = new ArrayList<>();
+        Set<Tree> typeVisited = Collections.newSetFromMap(new IdentityHashMap<>());
+        new CSharpVisitor<Integer>() {
+            @Override
+            public J preVisit(J tree, Integer p) {
+                if (tree instanceof Cs && declaresType(tree.getClass())) {
+                    typedNodes.add(tree);
+                }
+                return tree;
+            }
+
+            @Override
+            public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
+                typeVisited.add(getCursor().getValue());
+                return javaType;
+            }
+        }.visit(cu, 0);
+
+        // The parser never produces a Cs.PointerFieldAccess, so no source can cover it.
+        assertThat(typedNodes).extracting(Object::getClass).containsAll(Arrays.stream(Cs.class.getDeclaredClasses())
+          .filter(c -> declaresType(c) && c != Cs.PointerFieldAccess.class)
+          .toList());
+        assertThat(typedNodes).filteredOn(t -> !typeVisited.contains(t))
+          .extracting(t -> t.getClass().getSimpleName())
+          .isEmpty();
+    }
+
+    private static boolean declaresType(Class<?> c) {
+        return Arrays.stream(c.getDeclaredFields())
+          .anyMatch(f -> !Modifier.isStatic(f.getModifiers()) && JavaType.class.isAssignableFrom(f.getType()));
+    }
+
+    static final String TYPED_NODES = """
+      using System.Threading.Tasks;
+      unsafe class C<T> where T : class {
+          struct P { public int X; }
+          record R(int X);
+          public static C<T> operator +(C<T> a, C<T> b) => a;
+          public static implicit operator int(C<T> c) => 0;
+          ref int First(int[] xs) => ref xs[0];
+          async Task M(object o, int[] xs, R r, P* p, delegate*<int, void> fp, string? n) {
+              await Task.Delay(1);
+              var s = o as string;
+              n ??= "x";
+              int[] ys = [..xs, 1];
+              var (a, b) = (1, 2);
+              (int, string) t = (1, "a");
+              var last = xs[^1];
+              var size = sizeof(int);
+              var type = typeof(int);
+              var d = o switch { _ => 0 };
+              var x = *p;
+              var anon = new { A = 1 };
+              var r2 = r with { X = 2 };
+          }
+      }
+      """;
 
     static final List<String> SNIPPETS = List.of(
       // using directives

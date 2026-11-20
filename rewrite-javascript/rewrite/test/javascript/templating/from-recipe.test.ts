@@ -99,6 +99,7 @@ describe('fromRecipe', () => {
                 return await combined.tryOn(this.cursor, binary) || binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript

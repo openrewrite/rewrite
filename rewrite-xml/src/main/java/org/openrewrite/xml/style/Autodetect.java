@@ -75,7 +75,7 @@ public class Autodetect extends NamedStyles {
 
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             TabsAndIndentsStyle style = indentFrequencies.getTabsAndIndentsStyle();
-            return continuationIndentFrequencies.hasEnoughSamples() ?
+            return continuationIndentFrequencies.hasSamples() ?
                     style.withContinuationIndentSize(continuationIndentFrequencies.getTabsAndIndentsStyle().getIndentSize()) :
                     style;
         }
@@ -91,8 +91,8 @@ public class Autodetect extends NamedStyles {
             return linesWithSpaceIndents >= linesWithTabIndents;
         }
 
-        public boolean hasEnoughSamples() {
-            return linesWithSpaceIndents + linesWithTabIndents > 1;
+        public boolean hasSamples() {
+            return linesWithSpaceIndents + linesWithTabIndents > 0;
         }
 
         private TabsAndIndentsStyle getTabsAndIndentsStyle() {
@@ -165,11 +165,16 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Xml visitAttribute(Xml.Attribute attribute, IndentStatistics stats) {
-            measureFrequencies(attribute.getPrefix(), stats.continuationIndentFrequencies);
+            Xml.Tag parent = getCursor().firstEnclosing(Xml.Tag.class);
+            measureFrequencies(attribute.getPrefix(), parent == null ? "" : parent.getPrefix(), stats.continuationIndentFrequencies);
             return super.visitAttribute(attribute, stats);
         }
 
         private void measureFrequencies(String prefix, IndentFrequencies frequencies) {
+            measureFrequencies(prefix, "", frequencies);
+        }
+
+        private void measureFrequencies(String prefix, String basePrefix, IndentFrequencies frequencies) {
             AtomicBoolean takeWhile = new AtomicBoolean(true);
             if (prefix.chars()
                         .filter(c -> {
@@ -209,6 +214,10 @@ public class Autodetect extends NamedStyles {
                     }
                 }
 
+                int[] baseIndent = countIndent(basePrefix);
+                spaceIndent = Math.max(0, spaceIndent - baseIndent[0]);
+                tabIndent = Math.max(0, tabIndent - baseIndent[1]);
+
                 frequencies.spaceIndentFrequencies.merge(spaceIndent, 1L, Long::sum);
                 frequencies.tabIndentFrequencies.merge(tabIndent, 1L, Long::sum);
 
@@ -232,6 +241,29 @@ public class Autodetect extends NamedStyles {
                     frequencies.linesWithTabIndents++;
                 }
             }
+        }
+
+        private int[] countIndent(String prefix) {
+            int spaceIndent = 0;
+            int tabIndent = 0;
+            int lastNewline = Math.max(prefix.lastIndexOf('\n'), prefix.lastIndexOf('\r'));
+            for (int i = lastNewline + 1; i < prefix.length(); i++) {
+                char c = prefix.charAt(i);
+                if (c == ' ') {
+                    if (tabIndent > 0) {
+                        return new int[]{0, 0};
+                    }
+                    spaceIndent++;
+                } else if (Character.isWhitespace(c)) {
+                    if (spaceIndent > 0) {
+                        return new int[]{0, 0};
+                    }
+                    tabIndent++;
+                } else {
+                    break;
+                }
+            }
+            return new int[]{spaceIndent, tabIndent};
         }
     }
 

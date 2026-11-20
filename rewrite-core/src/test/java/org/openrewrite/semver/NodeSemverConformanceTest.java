@@ -159,15 +159,9 @@ class NodeSemverConformanceTest {
     @MethodSource("include")
     void satisfies(String range, String version, String options) {
         assumeTrue(!"loose".equals(options), "loose parsing is not supported");
-        if ("incPre".equals(options)) {
-            assertThat(UnionRange.satisfies(version, range, true))
-              .as("%s satisfies %s (%s)", version, range, options)
-              .isTrue();
-        } else {
-            assertThat(Semver.satisfies(version, range, NODE))
-              .as("%s satisfies %s", version, range)
-              .isTrue();
-        }
+        assertThat(Semver.satisfies(version, range, NODE))
+          .as("%s satisfies %s", version, range)
+          .isTrue();
     }
 
     static Stream<Arguments> include() {
@@ -178,15 +172,9 @@ class NodeSemverConformanceTest {
     @MethodSource("exclude")
     void notSatisfies(String range, String version, String options) {
         assumeTrue(!"loose".equals(options), "loose parsing is not supported");
-        if ("incPre".equals(options)) {
-            assertThat(UnionRange.satisfies(version, range, true))
-              .as("%s does not satisfy %s (%s)", version, range, options)
-              .isFalse();
-        } else {
-            assertThat(Semver.satisfies(version, range, NODE))
-              .as("%s does not satisfy %s", version, range)
-              .isFalse();
-        }
+        assertThat(Semver.satisfies(version, range, NODE))
+          .as("%s does not satisfy %s", version, range)
+          .isFalse();
     }
 
     static Stream<Arguments> exclude() {
@@ -202,7 +190,6 @@ class NodeSemverConformanceTest {
     void prereleaseUpperBoundGuard() {
         // The `-0` bound excludes prerelease of the next major.
         assertThat(Semver.satisfies("2.0.0-alpha", "^1.2.3", NODE)).isFalse();
-        assertThat(UnionRange.satisfies("2.0.0-alpha", "^1.2.3", true)).isFalse();
     }
 
     @Test
@@ -211,8 +198,6 @@ class NodeSemverConformanceTest {
         assertThat(Semver.satisfies("1.2.4-beta.1", ">=1.2.3", NODE)).isFalse();
         // A comparator naming the same tuple with a prerelease -> allowed.
         assertThat(Semver.satisfies("1.2.3-beta.2", ">=1.2.3-beta.1 <1.2.4", NODE)).isTrue();
-        // includePrerelease disables the guard entirely.
-        assertThat(UnionRange.satisfies("1.2.4-beta.1", ">=1.2.3", true)).isTrue();
     }
 
     @Test
@@ -272,7 +257,7 @@ class NodeSemverConformanceTest {
     @MethodSource("minSatisfying")
     void minSatisfying(String versions, String range, String expected, String options) {
         assumeTrue(!"loose".equals(options), "loose parsing is not supported");
-        assertThat(UnionRange.minSatisfying(Arrays.asList(versions.split(" ")), range, false))
+        assertThat(UnionRange.minSatisfying(Arrays.asList(versions.split(" ")), range))
           .as("minSatisfying(%s, %s)", versions, range)
           .isEqualTo(expected);
     }
@@ -304,30 +289,6 @@ class NodeSemverConformanceTest {
         LatestRelease latestRelease = new LatestRelease(null);
         assertThat(latestRelease.maxSatisfying(Arrays.asList("1.0.0", "2.0.0-RC1", "2.0.0", "1.9.9")))
           .isEqualTo(Optional.of("2.0.0"));
-    }
-
-    // --- gtr / ltr ---
-
-    @ParameterizedTest
-    @MethodSource("gtRange")
-    void gtr(String range, String version) {
-        assertThat(UnionRange.gtr(version, range)).as("%s > %s", version, range).isTrue();
-    }
-
-    static Stream<Arguments> gtRange() {
-        return NodeSemverCorpus.rows("/node-semver/version-gt-range.tsv").stream()
-          .map(row -> Arguments.of(row[0], row[1]));
-    }
-
-    @ParameterizedTest
-    @MethodSource("ltRange")
-    void ltr(String range, String version) {
-        assertThat(UnionRange.ltr(version, range)).as("%s < %s", version, range).isTrue();
-    }
-
-    static Stream<Arguments> ltRange() {
-        return NodeSemverCorpus.rows("/node-semver/version-lt-range.tsv").stream()
-          .map(row -> Arguments.of(row[0], row[1]));
     }
 
     // --- compare ---

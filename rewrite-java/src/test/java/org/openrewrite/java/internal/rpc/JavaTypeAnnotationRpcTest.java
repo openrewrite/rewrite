@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcObjectData;
@@ -25,12 +26,12 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTypeAnnotationRpcTest {
@@ -69,6 +70,23 @@ class JavaTypeAnnotationRpcTest {
         assertThat(sev.getConstantValue()).isNull();
         JavaType.Variable receivedRef = (JavaType.Variable) sev.getReferenceValue();
         assertThat(receivedRef.getName()).isEqualTo("INFO");
+    }
+
+    @Test
+    void roundTripsAnnotationWithNullValue() {
+        // e.g. C#'s `[Foo(null)]` — the value is null, so neither slot is set
+        JavaType.Method element = methodOn("com.example.Foo", "value", JavaType.Primitive.String);
+        JavaType.Annotation original = annotation("com.example.Foo", List.of(
+                new JavaType.Annotation.SingleElementValue(element, null, null)));
+
+        JavaType.Annotation roundTripped = sendAndReceive(original);
+
+        JavaType.Annotation.SingleElementValue sev =
+                (JavaType.Annotation.SingleElementValue) roundTripped.getValues().get(0);
+        assertThat(sev.getValue()).isNull();
+
+        // the type signature builder is the one production caller that reads getValue()
+        assertThat(roundTripped.toString()).endsWith("=null)");
     }
 
     @Test
@@ -134,9 +152,26 @@ class JavaTypeAnnotationRpcTest {
     }
 
     @Test
+    void roundTripsAnnotationWithNeitherArrayValuesSet() {
+        JavaType.Method element = methodOn("com.example.Foo", "value", JavaType.Primitive.String);
+        JavaType.Annotation original = annotation("com.example.Foo", List.of(
+                new JavaType.Annotation.ArrayElementValue(element, null, null)));
+
+        // Sending the annotations of a JavaType.Method keys the list diff on each
+        // annotation's signature, so this value has to have one.
+        assertThat(new DefaultJavaTypeSignatureBuilder().signature(original))
+                .isEqualTo("@com.example.Foo(com.example.Foo{name=value,return=String,parameters=[]}=[])");
+
+        JavaType.Annotation.ArrayElementValue aev =
+                (JavaType.Annotation.ArrayElementValue) sendAndReceive(original).getValues().get(0);
+        assertThat(aev.getConstantValues()).isNull();
+        assertThat(aev.getReferenceValues()).isNull();
+    }
+
+    @Test
     void roundTripsAnnotationWithoutValues() {
         // Marker annotation like @Override — values list is empty
-        JavaType.Annotation original = annotation("java.lang.Override", Collections.emptyList());
+        JavaType.Annotation original = annotation("java.lang.Override", emptyList());
 
         JavaType.Annotation roundTripped = sendAndReceive(original);
 
@@ -151,9 +186,9 @@ class JavaTypeAnnotationRpcTest {
 
     private static JavaType.Method methodOn(String declaringFqn, String name, JavaType returnType) {
         JavaType.Class declaring = (JavaType.Class) JavaType.ShallowClass.build(declaringFqn);
-        List<String> noStrings = Collections.emptyList();
-        List<JavaType> noTypes = Collections.emptyList();
-        List<JavaType.FullyQualified> noFq = Collections.emptyList();
+        List<String> noStrings = emptyList();
+        List<JavaType> noTypes = emptyList();
+        List<JavaType.FullyQualified> noFq = emptyList();
         return new JavaType.Method(null, 0L, declaring, name, returnType,
                 noStrings, noTypes, noTypes, noFq, null, noStrings);
     }

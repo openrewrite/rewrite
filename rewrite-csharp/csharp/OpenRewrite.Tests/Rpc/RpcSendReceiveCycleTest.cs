@@ -60,7 +60,7 @@ public class RpcSendReceiveCycleTest
 
         // Diff node2 against node1 as the before state
         var allData = new List<RpcObjectData>();
-        var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+        var sendRefs = new RpcRefs();
         var sendQueue = new RpcSendQueue(1024, batch => allData.AddRange(batch),
             sendRefs, null, false);
 

@@ -79,6 +79,8 @@ public class CSharpUnwrapParentheses<P> : CSharpVisitor<P>
                     isRight = parentBinary.Right.Id == parens.Id;
                 else if (parent is CsBinary parentCsBinary)
                     isRight = parentCsBinary.Right.Id == parens.Id;
+                else if (parent is Ternary parentTernary && parentTernary.Markers.FindFirst<NullCoalescing>() != null)
+                    isRight = parentTernary.FalsePart.Element.Id == parens.Id;
                 if (CSharpPrecedences.NeedsParentheses(innerExpr, parentExpr, isRight))
                     return false;
             }

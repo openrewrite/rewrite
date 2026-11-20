@@ -60,11 +60,25 @@ internal static class TestHelpers
             new JLeftPadded<Expression>(Space.Empty, falseExpr),
             null);
 
+    /// <summary>
+    /// <c>left ?? right</c> as the parser builds it, a <see cref="Ternary"/> marked <see cref="NullCoalescing"/>.
+    /// </summary>
+    public static Ternary MakeNullCoalescing(Expression left, Expression right) =>
+        new(Guid.NewGuid(), Space.Empty, Markers.Build([NullCoalescing.Instance]), left,
+            new JLeftPadded<Expression>(Space.Empty, new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty)),
+            new JLeftPadded<Expression>(Space.Empty, right),
+            null);
+
     public static TypeCast MakeTypeCast(Expression expr) =>
         new(Guid.NewGuid(), Space.Empty, Markers.Empty,
             new ControlParentheses<TypeTree>(Guid.NewGuid(), Space.Empty, Markers.Empty,
                 new JRightPadded<TypeTree>(MakeId("int"), Space.Empty, Markers.Empty)),
             expr);
+
+    public static InstanceOf MakeInstanceOf(Expression expr) =>
+        new(Guid.NewGuid(), Space.Empty, Markers.Empty,
+            new JRightPadded<Expression>(expr, Space.Empty, Markers.Empty),
+            MakeId("string"), null, null, null);
 
     public static Assignment MakeAssignment(Expression variable, Expression value) =>
         new(Guid.NewGuid(), Space.Empty, Markers.Empty, variable,

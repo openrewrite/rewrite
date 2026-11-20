@@ -17,19 +17,21 @@
 package test
 
 import (
+	"go/build"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
 func TestSelfParseGoParser(t *testing.T) {
 	data, err := os.ReadFile("../pkg/parser/go_parser.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -37,9 +39,7 @@ func TestSelfParseGoParser(t *testing.T) {
 
 func TestSelfParseGoPrinter(t *testing.T) {
 	data, err := os.ReadFile("../pkg/printer/go_printer.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -47,9 +47,7 @@ func TestSelfParseGoPrinter(t *testing.T) {
 
 func TestSelfParseGoVisitor(t *testing.T) {
 	data, err := os.ReadFile("../pkg/visitor/go_visitor.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -57,9 +55,7 @@ func TestSelfParseGoVisitor(t *testing.T) {
 
 func TestSelfParseJTree(t *testing.T) {
 	data, err := os.ReadFile("../pkg/tree/java/j.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -67,9 +63,7 @@ func TestSelfParseJTree(t *testing.T) {
 
 func TestSelfParseGoTree(t *testing.T) {
 	data, err := os.ReadFile("../pkg/tree/golang/go.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -77,254 +71,144 @@ func TestSelfParseGoTree(t *testing.T) {
 
 func TestSelfParseSpec(t *testing.T) {
 	data, err := os.ReadFile("../pkg/test/spec.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
 }
 
-func stdlibFile(path string) string {
-	return filepath.Join(runtime.GOROOT(), "src", path)
+// readStdlibFile returns the source of a $GOROOT/src file, skipping when the
+// host toolchain lacks it or excludes it from the build — the corpus is the
+// running toolchain's stdlib, and an excluded file yields no compilation unit.
+func readStdlibFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(runtime.GOROOT(), "src", path))
+	if err != nil {
+		t.Skipf("skipping: %v", err)
+	}
+	src := string(data)
+	if !parser.MatchBuildContext(build.Default, filepath.Base(path), src) {
+		t.Skipf("skipping: %s is excluded from the build under this toolchain", path)
+	}
+	return src
 }
 
 func TestParseStdlibSort(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("sort/sort.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "sort/sort.go")))
 }
 
 func TestParseStdlibStrings(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("strings/strings.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "strings/strings.go")))
 }
 
 func TestParseStdlibFmt(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("fmt/print.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "fmt/print.go")))
 }
 
 func TestParseStdlibSync(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("sync/mutex.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "sync/mutex.go")))
 }
 
 func TestParseStdlibHTTP(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("net/http/server.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "net/http/server.go")))
 }
 
 func TestParseStdlibJSON(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("encoding/json/encode.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "encoding/json/encode.go")))
 }
 
 func TestParseStdlibReflect(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("reflect/type.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "reflect/type.go")))
 }
 
 func TestParseStdlibGoParser(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("go/parser/parser.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "go/parser/parser.go")))
 }
 
 func TestParseStdlibGoAST(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("go/ast/ast.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "go/ast/ast.go")))
 }
 
 func TestParseStdlibIO(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("io/io.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "io/io.go")))
 }
 
 func TestParseStdlibContext(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("context/context.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "context/context.go")))
 }
 
 func TestParseStdlibBytesBuffer(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("bytes/buffer.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "bytes/buffer.go")))
 }
 
 func TestParseStdlibRegexp(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("regexp/regexp.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "regexp/regexp.go")))
 }
 
 func TestParseStdlibOsFile(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("os/file.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "os/file.go")))
 }
 
 func TestParseStdlibTLS(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("crypto/tls/tls.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "crypto/tls/tls.go")))
 }
 
 func TestParseStdlibSQL(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("database/sql/sql.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "database/sql/sql.go")))
 }
 
 func TestParseStdlibTesting(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("testing/testing.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "testing/testing.go")))
 }
 
 func TestParseStdlibSlices(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("slices/slices.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "slices/slices.go")))
 }
 
 func TestParseStdlibMaps(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("maps/maps.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "maps/maps.go")))
 }
 
 func TestParseStdlibSlog(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("log/slog/handler.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "log/slog/handler.go")))
 }
 
 func TestParseStdlibAtomic(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("sync/atomic/value.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "sync/atomic/value.go")))
 }
 
 func TestParseStdlibBufio(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("bufio/bufio.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "bufio/bufio.go")))
 }
 
 func TestParseStdlibStrconv(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("strconv/atoi.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "strconv/quote.go")))
 }
 
 func TestParseStdlibPath(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("path/filepath/path.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "path/filepath/path.go")))
 }
 
 func TestParseStdlibExec(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("os/exec/exec.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "os/exec/exec.go")))
 }
 
 func TestParseStdlibTemplate(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("text/template/exec.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "text/template/exec.go")))
 }
 
 func TestParseStdlibScanner(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("go/scanner/scanner.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "go/scanner/scanner.go")))
 }
 
 func TestParseStdlibToken(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("go/token/token.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "go/token/token.go")))
 }
 
 func TestParseStdlibErrors(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("errors/wrap.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "errors/wrap.go")))
 }
 
 func TestParseStdlibUnicode(t *testing.T) {
-	data, err := os.ReadFile(stdlibFile("unicode/utf8/utf8.go"))
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	NewRecipeSpec().RewriteRun(t, GolangRaw(string(data)))
+	NewRecipeSpec().RewriteRun(t, GolangRaw(readStdlibFile(t, "unicode/utf8/utf8.go")))
 }

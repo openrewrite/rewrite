@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Text.Json.Nodes;
 using LibGit2Sharp;
 using OpenRewrite.CSharp;
 
@@ -35,6 +36,15 @@ public class GlobalJsonGuardTests : IDisposable
 
     private const string PinnedGlobalJson = """{"sdk":{"version":"8.0.100","rollForward":"disable"}}""";
 
+    private const string PinnedWithMsBuildSdks = """
+        {
+          // Arcade-style repo pin
+          "sdk": { "version": "8.0.100", "rollForward": "disable" },
+          "tools": { "dotnet": "8.0.100" },
+          "msbuild-sdks": { "MSTest.Sdk": "3.6.4" },
+        }
+        """;
+
     private string WriteGlobalJson(string relDir, string content)
     {
         var dir = Path.Combine(_tempDir, relDir);
@@ -44,25 +54,74 @@ public class GlobalJsonGuardTests : IDisposable
         return path;
     }
 
+    private static JsonObject ReadJson(string path) => (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
+
     [Fact]
-    public void RemovesGlobalJsonWhileActiveAndRestoresVerbatimOnDispose()
+    public void StripsSdkWhileActiveAndRestoresVerbatimOnDispose()
     {
-        // Include a BOM + trailing whitespace to prove byte-for-byte restoration.
-        var original = "﻿" + PinnedGlobalJson + "\n";
+        var original = PinnedGlobalJson + "\n";
         var path = Path.Combine(_tempDir, "global.json");
         File.WriteAllText(path, original, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
         var originalBytes = File.ReadAllBytes(path);
 
         GlobalJsonGuard guard = GlobalJsonGuard.Neutralize(_tempDir);
-        Assert.False(File.Exists(path)); // removed while active
+        var neutralized = ReadJson(path);
+        Assert.False(neutralized.ContainsKey("sdk"));
 
         guard.Dispose();
-        Assert.True(File.Exists(path));
-        Assert.Equal(originalBytes, File.ReadAllBytes(path)); // restored verbatim
+        Assert.Equal(originalBytes, File.ReadAllBytes(path));
     }
 
     [Fact]
-    public void RemovesNestedGlobalJsonButSkipsBinAndObj()
+    public void KeepsMsBuildSdksAndOtherSectionsWhileActive()
+    {
+        var path = WriteGlobalJson(".", PinnedWithMsBuildSdks);
+
+        using (GlobalJsonGuard.Neutralize(_tempDir))
+        {
+            var neutralized = ReadJson(path);
+            Assert.False(neutralized.ContainsKey("sdk"));
+            Assert.Equal("3.6.4", neutralized["msbuild-sdks"]!["MSTest.Sdk"]!.GetValue<string>());
+            Assert.Equal("8.0.100", neutralized["tools"]!["dotnet"]!.GetValue<string>());
+        }
+
+        Assert.Equal(PinnedWithMsBuildSdks, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void LeavesGlobalJsonWithoutSdkSectionUntouched()
+    {
+        const string msBuildSdksOnly = """{ "msbuild-sdks": { "Microsoft.Build.NoTargets": "3.7.56" } }""";
+        var path = WriteGlobalJson(".", msBuildSdksOnly);
+        var lastWrite = File.GetLastWriteTimeUtc(path);
+
+        using (GlobalJsonGuard.Neutralize(_tempDir))
+        {
+            Assert.Equal(msBuildSdksOnly, File.ReadAllText(path));
+        }
+
+        Assert.Equal(msBuildSdksOnly, File.ReadAllText(path));
+        Assert.Equal(lastWrite, File.GetLastWriteTimeUtc(path));
+    }
+
+    [Theory]
+    [InlineData("""{ "sdk": { "version": """)]
+    [InlineData("""{ "sdk": { "version": "8.0.100" }, "sdk": { "version": "9.0.100" } }""")]
+    [InlineData("""[ "not", "an", "object" ]""")]
+    public void RemovesGlobalJsonItCannotRewriteWhileActive(string content)
+    {
+        var path = WriteGlobalJson(".", content);
+
+        using (GlobalJsonGuard.Neutralize(_tempDir))
+        {
+            Assert.False(File.Exists(path));
+        }
+
+        Assert.Equal(content, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void NeutralizesNestedGlobalJsonButSkipsBinAndObj()
     {
         var root = WriteGlobalJson(".", PinnedGlobalJson);
         var nested = WriteGlobalJson("src/Project", PinnedGlobalJson);
@@ -71,31 +130,44 @@ public class GlobalJsonGuardTests : IDisposable
 
         using (GlobalJsonGuard.Neutralize(_tempDir))
         {
-            Assert.False(File.Exists(root));
-            Assert.False(File.Exists(nested));
-            Assert.True(File.Exists(inObj));  // bin/obj are build output, not honored by hostfxr — left alone
-            Assert.True(File.Exists(inBin));
+            Assert.False(ReadJson(root).ContainsKey("sdk"));
+            Assert.False(ReadJson(nested).ContainsKey("sdk"));
+            Assert.Equal(PinnedGlobalJson, File.ReadAllText(inObj));
+            Assert.Equal(PinnedGlobalJson, File.ReadAllText(inBin));
         }
 
-        Assert.True(File.Exists(root));
-        Assert.True(File.Exists(nested));
+        Assert.Equal(PinnedGlobalJson, File.ReadAllText(root));
+        Assert.Equal(PinnedGlobalJson, File.ReadAllText(nested));
+    }
+
+    [Fact]
+    public void DoesNotClobberAGlobalJsonChangedWhileActive()
+    {
+        var path = WriteGlobalJson(".", PinnedGlobalJson);
+        const string edited = """{"sdk":{"version":"10.0.100"}}""";
+
+        using (GlobalJsonGuard.Neutralize(_tempDir))
+        {
+            File.WriteAllText(path, edited);
+        }
+
+        Assert.Equal(edited, File.ReadAllText(path));
     }
 
     [Fact]
     public void IsReferenceCountedAcrossOverlappingGuards()
     {
-        var path = Path.Combine(_tempDir, "global.json");
-        File.WriteAllText(path, PinnedGlobalJson);
+        var path = WriteGlobalJson(".", PinnedGlobalJson);
 
         var outer = GlobalJsonGuard.Neutralize(_tempDir);
         var inner = GlobalJsonGuard.Neutralize(_tempDir);
-        Assert.False(File.Exists(path));
+        Assert.False(ReadJson(path).ContainsKey("sdk"));
 
         inner.Dispose();
-        Assert.False(File.Exists(path)); // outer still holds it removed
+        Assert.False(ReadJson(path).ContainsKey("sdk"));
 
         outer.Dispose();
-        Assert.True(File.Exists(path)); // restored only after the last guard releases
+        Assert.Equal(PinnedGlobalJson, File.ReadAllText(path));
     }
 
     [Fact]
@@ -103,15 +175,23 @@ public class GlobalJsonGuardTests : IDisposable
     {
         InitGitRepoWithCommittedGlobalJson();
         var path = Path.Combine(_tempDir, "global.json");
-
-        // Simulate a prior crashed run that deleted global.json and never restored it.
         File.Delete(path);
-        Assert.False(File.Exists(path));
 
-        // A fresh guard over a repo with no global.json present still runs git recovery on dispose.
         GlobalJsonGuard.Neutralize(_tempDir).Dispose();
 
-        Assert.True(File.Exists(path)); // recovered from git
+        Assert.Equal(PinnedGlobalJson, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void RecoversTrackedGlobalJsonLeftNeutralizedFromGitOnDispose()
+    {
+        InitGitRepoWithCommittedGlobalJson();
+        var path = Path.Combine(_tempDir, "global.json");
+        Assert.True(GlobalJsonGuard.TryNeutralize(File.ReadAllBytes(path), out var neutralized));
+        File.WriteAllBytes(path, neutralized!);
+
+        GlobalJsonGuard.Neutralize(_tempDir).Dispose();
+
         Assert.Equal(PinnedGlobalJson, File.ReadAllText(path));
     }
 
@@ -121,16 +201,14 @@ public class GlobalJsonGuardTests : IDisposable
         InitGitRepoWithCommittedGlobalJson();
         var path = Path.Combine(_tempDir, "global.json");
 
-        var active = GlobalJsonGuard.Neutralize(_tempDir); // removes the tracked global.json
-        Assert.False(File.Exists(path));
+        var active = GlobalJsonGuard.Neutralize(_tempDir);
+        Assert.False(ReadJson(path).ContainsKey("sdk"));
 
-        // A second guard's dispose triggers git recovery, but must not resurrect the file the
-        // active guard deliberately removed.
         GlobalJsonGuard.Neutralize(_tempDir).Dispose();
-        Assert.False(File.Exists(path));
+        Assert.False(ReadJson(path).ContainsKey("sdk"));
 
         active.Dispose();
-        Assert.True(File.Exists(path)); // restored from memory by the holder
+        Assert.Equal(PinnedGlobalJson, File.ReadAllText(path));
     }
 
     [Fact]
@@ -160,6 +238,31 @@ public class GlobalJsonGuardTests : IDisposable
         // The pin is restored verbatim once parsing completes.
         Assert.True(File.Exists(gj));
         Assert.Equal(PinnedGlobalJson, File.ReadAllText(gj));
+    }
+
+    [Fact]
+    public async Task GuardedSolutionLoadResolvesVersionlessMsBuildSdkPinnedInGlobalJson()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "Test.csproj"), """
+            <Project Sdk="MSTest.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(Path.Combine(_tempDir, "Tests.cs"),
+            "namespace Test { public class Tests { } }\n");
+        var gj = WriteGlobalJson(".", PinnedWithMsBuildSdks);
+        var proj = Path.Combine(_tempDir, "Test.csproj");
+
+        var parser = new SolutionParser();
+        using (GlobalJsonGuard.Neutralize(_tempDir))
+        {
+            var solution = await parser.LoadAsync(proj);
+            Assert.Empty(parser.UnevaluatedProjects);
+            var results = parser.ParseProject(solution, proj, _tempDir);
+            Assert.IsType<CompilationUnit>(Assert.Single(results));
+        }
+
+        Assert.Equal(PinnedWithMsBuildSdks, File.ReadAllText(gj));
     }
 
     [Fact]

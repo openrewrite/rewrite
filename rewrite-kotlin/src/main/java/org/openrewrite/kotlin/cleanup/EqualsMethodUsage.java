@@ -23,7 +23,6 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.IsNullSafe;
@@ -68,7 +67,9 @@ public class EqualsMethodUsage extends Recipe {
                     getCursor().pollMessage("replaced") != null) {
                     J.Binary binary = (J.Binary) unary.getExpression();
                     if (binary.getOperator() == J.Binary.Type.Equal) {
-                        return binary.withOperator(J.Binary.Type.NotEqual);
+                        binary = binary.withOperator(J.Binary.Type.NotEqual).withPrefix(unary.getPrefix());
+                        return getCursor().getParentTreeCursor().getValue() instanceof J.Block ?
+                                new K.ExpressionStatement(randomId(), binary) : binary;
                     }
                 }
                 return unary;

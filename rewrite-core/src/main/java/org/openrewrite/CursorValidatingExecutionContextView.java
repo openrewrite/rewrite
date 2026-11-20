@@ -35,10 +35,18 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
         return new CursorValidatingExecutionContextView(ctx);
     }
 
+    /**
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
+     */
+    @Deprecated
     public boolean getValidateCursorAcyclic() {
         return getMessage(VALIDATE_CURSOR_ACYCLIC, false);
     }
 
+    /**
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
+     */
+    @Deprecated
     @SuppressWarnings("UnusedReturnValue")
     public CursorValidatingExecutionContextView setValidateCursorAcyclic(boolean validateCursorAcyclic) {
         putMessage(VALIDATE_CURSOR_ACYCLIC, validateCursorAcyclic);
@@ -52,23 +60,35 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        boolean mutationAllowed =
-                !getMessage(VALIDATE_CTX_MUTATION, false) ||
-                VALIDATE_CURSOR_ACYCLIC.equals(key) ||
-                VALIDATE_CTX_MUTATION.equals(key) ||
-                PANIC.equals(key) ||
-                ExecutionContext.CURRENT_CYCLE.equals(key) ||
-                ExecutionContext.CURRENT_RECIPE.equals(key) ||
-                DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
-                WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
-                ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
-                key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
-                || key.startsWith("io.moderne"); // We ought to know what we're doing
-        assert mutationAllowed : "Recipe mutated execution context key \"" + key + "\". " +
-                "Recipes should not mutate the contents of the ExecutionContext as it allows mutable state to leak between " +
-                "recipes, opening the door for difficult to debug recipe composition errors. " +
-                "If you need to store state within the execution of a single recipe use Cursor messaging. " +
-                "If you want to pass state between recipes, use a ScanningRecipe instead.";
+        assert !getMessage(VALIDATE_CTX_MUTATION, false) || isAlwaysMutable(key) : mutationMessage(key);
         super.putMessage(key, value);
+    }
+
+    /**
+     * Whether a key may be put even when the execution context is validated to stay unchanged, as the keys of the
+     * framework's own bookkeeping may.
+     */
+    @Incubating(since = "8.106.0")
+    protected boolean isAlwaysMutable(String key) {
+        return VALIDATE_CURSOR_ACYCLIC.equals(key) ||
+               VALIDATE_CTX_MUTATION.equals(key) ||
+               PANIC.equals(key) ||
+               ExecutionContext.CURRENT_CYCLE.equals(key) ||
+               ExecutionContext.CURRENT_RECIPE.equals(key) ||
+               DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
+               WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
+               ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
+               key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
+               || key.startsWith("io.moderne"); // We ought to know what we're doing
+    }
+
+    private String mutationMessage(String key) {
+        Recipe recipe = getMessage(ExecutionContext.CURRENT_RECIPE);
+        return (recipe == null ? "A recipe" : recipe.getName()) + " put \"" + key + "\" on the ExecutionContext, " +
+               "which every recipe and source file in a run shares, so what it keeps there leaks into the others. " +
+               "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source " +
+               "file in Cursor messages, with getCursor().putMessage(..) or putMessageOnFirstEnclosing(..). A recipe " +
+               "that must change the ExecutionContext opts out with " +
+               "RecipeQualityValidation.builder().executionContextUnchanged(false).";
     }
 }

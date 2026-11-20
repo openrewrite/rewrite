@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -64,6 +65,71 @@ class ImportTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "java.util./* extension */ArrayList",
+      "java.util./*extension*/ArrayList",
+      "java./**/util.ArrayList",
+      "java.util/* before dot */.ArrayList",
+      "java /* package */ . util . /* name */ ArrayList",
+      "java.util./*$ identifier_type {*/ArrayList/*$}*/",
+      "java.util./*$ gui_graphics_type {*/ArrayList/*$}*/ as L",
+      "java.util./* comment.with.dots and $ */ArrayList",
+      "java./* outer /* nested */ comment */util.ArrayList",
+      "java.`util`./* name */`ArrayList`",
+      "java.util./** name */ArrayList"
+    })
+    void commentsInImportPath(String path) {
+        rewriteRun(
+          kotlin(
+            "import " + path,
+            spec -> spec.afterRecipe(cu -> {
+                J.FieldAccess qualid = cu.getImports().getFirst().getQualid();
+                assertThat(qualid.getSimpleName()).isEqualTo("ArrayList");
+                assertThat(qualid.isFullyQualifiedClassReference("java.util.ArrayList")).isTrue();
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "java.util./* wildcard */*",
+      "java./* package */util.*",
+      "java.util /* before dot */ . /* after dot */ *"
+    })
+    void commentsInWildcardImport(String path) {
+        rewriteRun(
+          kotlin(
+            "import " + path,
+            spec -> spec.afterRecipe(cu -> {
+                J.Import anImport = cu.getImports().getFirst();
+                assertThat(anImport.getQualid().getSimpleName()).isEqualTo("*");
+                assertThat(anImport.getPackageName()).isEqualTo("java.util");
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "import kotlin.*",
+      "import /* prefix */kotlin.*",
+      "import   kotlin /* before dot */ . /* after dot */ *"
+    })
+    void rootPackageWildcardImport(String source) {
+        rewriteRun(
+          kotlin(
+            source,
+            spec -> spec.afterRecipe(cu -> {
+                J.Import anImport = cu.getImports().getFirst();
+                assertThat(anImport.getQualid().getSimpleName()).isEqualTo("*");
+                assertThat(anImport.getPackageName()).isEqualTo("kotlin");
+            })
+          )
+        );
+    }
+
     @Test
     void wildCard() {
         rewriteRun(
@@ -99,9 +165,8 @@ class ImportTest implements RewriteTest {
           kotlin("fun <T : Any> Class<T>.createInstance() {}"),
           kotlin(
             "import   createInstance /*C1*/",
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getImports().getFirst().getPackageName()).isEmpty();
-            })
+            spec -> spec.afterRecipe(cu ->
+                assertThat(cu.getImports().getFirst().getPackageName()).isEmpty())
           )
         );
     }

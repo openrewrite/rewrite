@@ -16,14 +16,23 @@
 package org.openrewrite.groovy.service;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.groovy.format.AutoFormatVisitor;
+import org.openrewrite.groovy.format.SpacesVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.SpacesStyle;
 
 public class GroovyAutoFormatService extends AutoFormatService {
     @Override
     public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
         return new AutoFormatVisitor<>(stopAfter);
+    }
+
+    @Override
+    public <P> JavaVisitor<P> spacesVisitor(SourceFile sourceFile, SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
+        return new SpacesVisitor<>(spacesStyle, null, null, IntelliJ.wrappingAndBraces(), stopAfter);
     }
 }

@@ -22,9 +22,11 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
+import org.openrewrite.yaml.internal.YamlTreeShapeValidationService;
 import org.openrewrite.yaml.service.YamlCommentService;
 
 import java.lang.ref.SoftReference;
@@ -144,6 +146,8 @@ public interface Yaml extends Tree {
         public <S, T extends S> T service(Class<S> service) {
             if (CommentService.class.getName().equals(service.getName())) {
                 return (T) new YamlCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new YamlTreeShapeValidationService();
             }
             return SourceFileWithReferences.super.service(service);
         }

@@ -16,8 +16,8 @@
 
 These exercise ``handle_prepare_recipe`` and verify it correctly extracts
 precondition wire entries from a ``Preconditions.check(...)`` wrapper around
-``recipe.editor()``, registers the bare editor in the override cache, and
-returns the wrapper-free editor on subsequent ``_instantiate_visitor`` calls.
+``recipe.editor()`` or ``recipe.scanner()``, and that ``_instantiate_visitor``
+then returns the wrapper-free visitor.
 """
 
 from typing import Any
@@ -29,6 +29,7 @@ from rewrite import (
     Preconditions,
     Recipe,
     RecipeMarketplace,
+    ScanningRecipe,
     Tree,
     TreeVisitor,
 )
@@ -103,6 +104,34 @@ class _PlainRecipe(Recipe):
         return _BareEditor()
 
 
+class _Collector(TreeVisitor[Tree, Any]):
+    def __init__(self, collect):
+        super().__init__()
+        self.collect = collect
+
+
+class _ScanningPreconditionRecipe(ScanningRecipe[set]):
+    @property
+    def name(self):
+        return "test.precondition.ScanningPrecondition"
+
+    @property
+    def display_name(self):
+        return "Scanning precondition"
+
+    @property
+    def description(self):
+        return "Scanner() collects into its accumulator behind a uses_method check."
+
+    def initial_value(self, ctx):
+        return set()
+
+    def scanner(self, acc):
+        from rewrite.python.preconditions import uses_method
+
+        return Preconditions.check(uses_method("*..* tostring(..)"), _Collector(acc.add))
+
+
 @pytest.fixture
 def isolated_server():
     """Swap the global marketplace + state caches so tests don't leak."""
@@ -111,14 +140,16 @@ def isolated_server():
     saved_marketplace = server._marketplace
     server._marketplace = RecipeMarketplace()
     server._prepared_recipes.clear()
-    server._prepared_editor_overrides.clear()
+    server._prepared_unwrapped_editors.clear()
+    server._prepared_unwrapped_scanners.clear()
     server._prepared_edit_preconditions.clear()
     try:
         yield server
     finally:
         server._marketplace = saved_marketplace
         server._prepared_recipes.clear()
-        server._prepared_editor_overrides.clear()
+        server._prepared_unwrapped_editors.clear()
+        server._prepared_unwrapped_scanners.clear()
         server._prepared_edit_preconditions.clear()
 
 
@@ -140,8 +171,8 @@ class TestPrepareRecipeWithPreconditions:
         assert len(precs) == 1
         assert precs[0]["visitorName"] == "org.openrewrite.rpc.internal.FindTreesOfType"
         prepared_id = response["id"]
-        # No override cached: editor() returned a plain visitor.
-        assert prepared_id not in server._prepared_editor_overrides
+        # editor() returned a plain visitor, so there is nothing to unwrap.
+        assert prepared_id not in server._prepared_unwrapped_editors
 
     def test_check_wrapped_editor_emits_recipe_precondition(self, isolated_server):
         server = isolated_server
@@ -194,9 +225,7 @@ class TestPrepareRecipeWithPreconditions:
         )
         assert precs[1]["visitorName"] == cond_visitor
 
-    def test_bare_editor_is_cached_and_returned_by_instantiate(
-        self, isolated_server
-    ):
+    def test_each_dispatch_gets_a_fresh_bare_editor(self, isolated_server):
         server = isolated_server
         _install(server, _ConditionRecipe)
 
@@ -225,15 +254,12 @@ class TestPrepareRecipeWithPreconditions:
         resp = server.handle_prepare_recipe({"id": "test.precondition.Wrapper"})
         prepared_id = resp["id"]
 
-        # The override cache holds the BARE editor (not the Check wrapper),
-        # so dispatch via _instantiate_visitor returns it directly.
-        assert prepared_id in server._prepared_editor_overrides
-        cached = server._prepared_editor_overrides[prepared_id]
-        assert isinstance(cached, _BareEditor)
-
         ctx = InMemoryExecutionContext()
-        instantiated = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
-        assert instantiated is cached
+        first = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
+        second = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
+        assert isinstance(first, _BareEditor)
+        assert isinstance(second, _BareEditor)
+        assert first is not second
 
     def test_recipe_ref_emits_class_name_and_options(self, isolated_server):
         """uses_method/uses_type return a RecipeRef; the wire entry should
@@ -278,10 +304,10 @@ class TestPrepareRecipeWithPreconditions:
             "matchOverrides": False,
         }
 
-        # Bare editor cached so dispatch via _instantiate_visitor returns it.
-        prepared_id = resp["id"]
-        assert prepared_id in server._prepared_editor_overrides
-        assert isinstance(server._prepared_editor_overrides[prepared_id], _BareEditor)
+        instantiated = server._instantiate_visitor(
+            f"edit:{resp['id']}", InMemoryExecutionContext()
+        )
+        assert isinstance(instantiated, _BareEditor)
 
     def test_or_emits_composite_wire_entry(self, isolated_server):
         """Preconditions.or_ over RecipeRefs becomes a single composite wire entry
@@ -373,5 +399,43 @@ class TestPrepareRecipeWithPreconditions:
 
         # No wire entry beyond the baseline language gate.
         assert len(resp["editPreconditions"]) == 1
-        # No override cached — the wrapper still runs Python-side as a fallback.
-        assert prepared_id not in server._prepared_editor_overrides
+        # Not unwrapped, so the wrapper still runs Python-side as a fallback.
+        assert prepared_id not in server._prepared_unwrapped_editors
+
+    def test_check_wrapped_scanner_emits_scan_precondition(self, isolated_server):
+        server = isolated_server
+        _install(server, _ScanningPreconditionRecipe)
+
+        resp = server.handle_prepare_recipe(
+            {"id": "test.precondition.ScanningPrecondition"}
+        )
+
+        precs = resp["scanPreconditions"]
+        assert [p["visitorName"] for p in precs] == [
+            "org.openrewrite.rpc.internal.FindTreesOfType",
+            "org.openrewrite.java.search.HasMethod",
+        ]
+        instantiated = server._instantiate_visitor(
+            f"scan:{resp['id']}", InMemoryExecutionContext()
+        )
+        assert isinstance(instantiated, _Collector)
+        assert instantiated.collect.__self__ is server._recipe_accumulators[resp["id"]]
+
+    def test_scanner_that_cannot_be_built_outside_a_run_keeps_its_precondition(self, isolated_server):
+        server = isolated_server
+
+        class _RunOnlyScanningRecipe(_ScanningPreconditionRecipe):
+            @property
+            def name(self):
+                return "test.precondition.RunOnlyScanning"
+
+            def initial_value(self, ctx):
+                raise RuntimeError("only available during a run")
+
+        _install(server, _RunOnlyScanningRecipe)
+        resp = server.handle_prepare_recipe(
+            {"id": "test.precondition.RunOnlyScanning"}
+        )
+
+        assert len(resp["scanPreconditions"]) == 1
+        assert resp["id"] not in server._prepared_unwrapped_scanners

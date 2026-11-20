@@ -69,4 +69,8 @@ public class UvLockRequirement {
      */
     @Nullable
     String directory;
+
+    /** {@code [manifest] build-constraints} entries may carry the artifact hashes they were pinned with. */
+    @Nullable
+    List<String> hashes;
 }

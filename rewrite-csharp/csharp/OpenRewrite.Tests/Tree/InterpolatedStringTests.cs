@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
@@ -154,6 +156,29 @@ public class InterpolatedStringTests : RewriteTest
                 """
             )
         );
+    }
+
+    /// <summary>
+    /// The value of a text part is Roslyn's ValueText, which resolves escape sequences but keeps braces doubled.
+    /// </summary>
+    [Fact]
+    public void TextValueResolvesEscapesAndKeepsBracesDoubled()
+    {
+        var cu = Parse("class Foo { string Bar(int x) => $\"a{{b}}\\tc{x}\" + $@\"{{d}}\"\"e{x}\"; }");
+        var texts = new List<Literal>();
+        new LiteralCollector(texts).Visit(cu, 0);
+
+        Assert.Equal(["a{{b}}\tc", "{{d}}\"e"], texts.Select(t => (string)t.Value!));
+        Assert.Equal(["a{{b}}\\tc", "{{d}}\"\"e"], texts.Select(t => t.ValueSource));
+    }
+
+    private class LiteralCollector(List<Literal> literals) : CSharpVisitor<int>
+    {
+        public override J VisitLiteral(Literal literal, int p)
+        {
+            literals.Add(literal);
+            return literal;
+        }
     }
 
     [Fact]

@@ -22,6 +22,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.Tree;
 import org.openrewrite.java.marker.ProjectIdentity;
 import org.openrewrite.marker.Markup;
@@ -46,7 +47,7 @@ import static org.openrewrite.gradle.marker.GradleDependencyConfiguration.update
 @Value
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class GradleProject implements ProjectIdentity, Serializable {
+public class GradleProject implements ProjectIdentity, Heavyweight, Serializable {
 
     /**
      * Project identity convergence with {@link org.openrewrite.java.marker.JavaProject}: returns
@@ -99,6 +100,23 @@ public class GradleProject implements ProjectIdentity, Serializable {
     @Builder.Default
     @With
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
+
+    /**
+     * State of the {@code io.spring.dependency-management} plugin, or null when it is not applied.
+     */
+    @With
+    @Nullable
+    SpringDependencyManagementPlugin springDependencyManagementPlugin;
+
+    /**
+     * The project's build script, relative to its project directory and with platform separators as
+     * {@code SourceFile.getSourcePath()} records them; null on LSTs parsed before this field existed.
+     * Gradle permits a name other than {@code build.gradle} via {@code ProjectDescriptor.setBuildFileName},
+     * so the conventional names alone cannot identify a build script.
+     */
+    @With
+    @Nullable
+    String buildFilePath;
 
     public GradleBuildscript getBuildscript() {
         // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
@@ -214,7 +232,9 @@ public class GradleProject implements ProjectIdentity, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 configurations,
-                buildscript
+                buildscript,
+                springDependencyManagementPlugin,
+                buildFilePath
         );
     }
 
@@ -319,7 +339,9 @@ public class GradleProject implements ProjectIdentity, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 updateExtendsFrom(updatedConfigurations, untouchedConfigurations),
-                buildscript
+                buildscript,
+                springDependencyManagementPlugin,
+                buildFilePath
         );
 
         // All configurations extending from a mutated configuration must be marked as requiring re-resolution to propagate heritable changes

@@ -15,13 +15,35 @@
  */
 package org.openrewrite.toml;
 
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.atn.DecisionInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.toml.internal.grammar.TomlLexer;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.tree.ParseError;
 
+import java.io.ByteArrayInputStream;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -303,6 +325,21 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void quotedKeyNameHoldsTheTextTheEscapesStandFor() {
+        rewriteRun(
+          toml(
+            """
+              "a\\tb\\u00e9" = 1
+              'a\\tb' = 2
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Identifier) ((Toml.KeyValue) kv).getKey()).getName())
+              .containsExactly("a\tbé", "a\\tb"))
+          )
+        );
+    }
+
+    @Test
     void quotedKeys() {
         rewriteRun(
           toml(
@@ -477,6 +514,32 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    /**
+     * A basic string's value is the decoded text, so a marker such as
+     * {@code python_version < "3.11"} written with escaped quotes reads back with the quotes
+     * themselves; a literal string has no escapes and keeps its backslashes.
+     */
+    @Test
+    void basicStringEscapesAreDecoded() {
+        rewriteRun(
+          toml(
+            """
+              basic = "tomli; python_version < \\"3.11\\"\\tx\\\\y\\u00e9"
+              literal = 'a\\"b'
+              multiline = \"""
+              first\\
+                  second\"""
+              beyondUnicode = "\\U00110000"
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getValues())
+                .extracting(Toml.KeyValue.class::cast)
+                .extracting(keyValue -> ((Toml.Literal) keyValue.getValue()).getValue())
+                .containsExactly("tomli; python_version < \"3.11\"\tx\\yé", "a\\\"b", "firstsecond", "\\U00110000"))
+          )
+        );
+    }
+
     @Test
     void multiBytesUnicode() {
         rewriteRun(
@@ -523,5 +586,361 @@ class TomlParserTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"config.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", ".xmake.cfg"})
+    void acceptsTomlFiles(String fileName) {
+        assertThat(new TomlParser().accept(Paths.get("project", fileName))).isTrue();
+    }
+
+    @Test
+    void localDateTimeWithSpaceOrLowercaseDelimiter() {
+        rewriteRun(
+          toml(
+            """
+              a = 2017-02-25 12:00:01.123456789
+              b = 1979-05-27t07:32:00
+              c = 1979-05-27t07:32:00Z
+              d = 1979-05-27 07:32:00+01:00
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                LocalDateTime.of(2017, 2, 25, 12, 0, 1, 123456789),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(1))))
+          )
+        );
+    }
+
+    @Test
+    void fractionalSecondsBeyondNanosecondsAreTruncated() {
+        rewriteRun(
+          toml(
+            """
+              a = 1979-05-27T07:32:00.1234567899Z
+              b = 1979-05-27 07:32:00.1234567899
+              c = 07:32:00.1234567899
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 123456789, ZoneOffset.UTC),
+                LocalDateTime.of(1979, 5, 27, 7, 32, 0, 123456789),
+                LocalTime.of(7, 32, 0, 123456789)))
+          )
+        );
+    }
+
+    @Test
+    void emptyInlineTableKeepsItsSpace() {
+        rewriteRun(
+          toml(
+            """
+              dev-dependencies = { }
+              coverageThreshold = {}
+              headers = {  }
+              """
+          )
+        );
+    }
+
+    @Test
+    void integerBeyondSixtyFourBits() {
+        rewriteRun(
+          toml(
+            """
+              hex = 0x3D8660C0CB2D57B189C3D7995572A552F75E48B5
+              dec = 228097355113300204138531148905234651262148041026195375645000724271212049151994375092458297304264351187709081232384
+              max = 9223372036854775807
+              min = -9223372036854775808
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                new BigInteger("3D8660C0CB2D57B189C3D7995572A552F75E48B5", 16),
+                new BigInteger("228097355113300204138531148905234651262148041026195375645000724271212049151994375092458297304264351187709081232384"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE))
+          )
+        );
+    }
+
+    @Test
+    void fileNotInUtf8() {
+        String source = "[default]\nencoded_variable=\"accents like ç and ã é\"\n";
+        Parser.Input input = new Parser.Input(Paths.get("settings.toml"),
+          () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.ISO_8859_1)));
+
+        SourceFile parsed = new TomlParser().parseInputs(singletonList(input), null, new InMemoryExecutionContext())
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(Toml.Document.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+    }
+
+    @Test
+    void invalidTomlReportsTheSyntaxError() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "not toml\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage())
+            .startsWith("org.openrewrite.toml.TomlParsingException: Syntax error")
+            .contains("line 1:4"));
+    }
+
+    @Test
+    void dottedKeyWithCharactersOutsideTheBasicMultilingualPlane() {
+        rewriteRun(
+          toml(
+            """
+              ['😀'.sub]
+              a = 1
+              ["𝐭𝐛𝐥".b."😀"]
+              c = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void slashIsNotAnEscape() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "a = \"\\/\"\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 1:"));
+    }
+
+    @Test
+    void recoveredSyntaxErrorIsMarked() {
+        SourceFile recovered = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nkey =\nb = 1\n")
+          .findFirst().orElseThrow();
+        SourceFile valid = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nb = 1\n")
+          .findFirst().orElseThrow();
+
+        assertThat(recovered).isInstanceOf(Toml.Document.class);
+        assertThat(recovered.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 2:"));
+        assertThat(valid.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "[server]\nport = 8080 host = \"x\"\n",
+      "[server] port = 8080\n",
+      "[[servers]]\nport = 8080 host = \"x\"\n"
+    })
+    void keyValueInATableNeedsALineOfItsOwn(String source) {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), source)
+          .findFirst().orElseThrow();
+
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error"));
+    }
+
+    @Test
+    void keyValuesUnderTableHeadersNeedNoFullContextPrediction() {
+        org.openrewrite.toml.internal.grammar.TomlParser parser = new org.openrewrite.toml.internal.grammar.TomlParser(
+          new CommonTokenStream(new TomlLexer(CharStreams.fromString("[a]\nx = 1\ny = 2\n\n[[b]]\nx = 1\n# c\ny = 2\n"))));
+        parser.setProfile(true);
+        parser.document();
+
+        assertThat(parser.getNumberOfSyntaxErrors()).isZero();
+        assertThat(Arrays.stream(parser.getParseInfo().getDecisionInfo()).mapToLong(d -> d.LL_Fallback).sum()).isZero();
+    }
+
+    @Test
+    void inlineTableSpanningLinesWithComments() {
+        // TOML 1.1
+        rewriteRun(
+          toml(
+            """
+              tbl = {
+                  key      = "a string",
+                  # comments
+                  moar-tbl =  {
+                      key = 1,
+                  }, # trailing comma
+              }
+              ProcessConfigsByRound = [
+                  {
+                      EnableRound = 0,
+                      MaxRoundsWithoutNewBlockReceived = 10
+                  }
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineBasicStringWithQuoteBeforeEscape() {
+        rewriteRun(
+          toml(
+            """
+              query = ""\"(
+              (#match? @ternary_block "\\\\\\\\?[\\\\\\\\n]*nil:")
+              )""\"
+              quotes = ""\"Here are two quotation marks: "". Simple enough.""\"
+              ends-in-quotes = ""\"a "quote\"""\"\"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                "(\n(#match? @ternary_block \"\\\\?[\\\\n]*nil:\")\n)",
+                "Here are two quotation marks: \"\". Simple enough.",
+                "a \"quote\"\""))
+          )
+        );
+    }
+
+    @Test
+    void offsetDateTimeWithLowercaseZ() {
+        rewriteRun(
+          toml(
+            """
+              d = 1979-05-27T07:32:00z
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Literal) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValue())
+              .isEqualTo(OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC)))
+          )
+        );
+    }
+
+    @Test
+    void multilineLiteralStringEndingInQuotes() {
+        rewriteRun(
+          toml(
+            """
+              str = '''That,' she said, 'is still pointless.''''
+              this-str-has-apostrophes='''' there's one already
+              '' two more
+              '''''
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly("That,' she said, 'is still pointless.'", "' there's one already\n'' two more\n''"))
+          )
+        );
+    }
+
+    @Test
+    void arrayWithCommaAfterNewlineOrComment() {
+        rewriteRun(
+          toml(
+            """
+              arr = [
+                1 # one
+                , 2
+                ,#3
+                3
+                , # trailing
+              ]
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Array) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValues())
+              .filteredOn(Toml.Literal.class::isInstance)
+              .extracting(v -> ((Toml.Literal) v).getValue())
+              .containsExactly(1L, 2L, 3L))
+          )
+        );
+    }
+
+    @Test
+    void timesWithoutSeconds() {
+        // TOML 1.1
+        rewriteRun(
+          toml(
+            """
+              odt = 1979-05-27 07:32Z
+              odt-offset = 1979-05-27T07:32-07:00
+              ldt = 1979-05-27T07:32
+              lt = 07:32
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(-7)),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                LocalTime.of(7, 32)))
+          )
+        );
+    }
+
+    @Test
+    void escapesOfToml11() {
+        rewriteRun(
+          toml(
+            """
+              esc = "\\e[0m"
+              hex = "tab\\x09 e-acute\\xE9"
+              ml = ""\"\\e and \\x41""\"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly("\u001b[0m", "tab\t e-acute\u00e9", "\u001b and A"))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
+    void rejectsNonTomlFiles(String fileName) {
+        assertThat(new TomlParser().accept(Paths.get("project", fileName))).isFalse();
+    }
+
+    @Test
+    void emptyCommentInArray() {
+        rewriteRun(
+          toml(
+            """
+              a = [
+                1 #
+              ]
+              b = [
+                1 #
+                , 2
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyCommentInInlineTable() {
+        rewriteRun(
+          toml(
+            """
+              t = {
+                  a = 1 #
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recoveredTreeThatDoesNotPrintBackReportsTheSyntaxError() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "a = [1, 2\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage())
+            .startsWith("org.openrewrite.toml.TomlParsingException: Syntax error")
+            .contains("line 2:0"));
+    }
+
+    @Test
+    void eachErrorIsReportedOnce() {
+        List<Throwable> errors = new ArrayList<>();
+        new TomlParser().parse(new InMemoryExecutionContext(errors::add), "not toml\n").findFirst().orElseThrow();
+
+        assertThat(errors).isNotEmpty().doesNotHaveDuplicates();
     }
 }

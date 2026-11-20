@@ -110,7 +110,7 @@ internal object MappedTypeFallbackBodyGenerator {
         // by name, then match on arity (we don't try to disambiguate
         // overloads — the JVM bytecode will resolve via descriptor).
         val javaClassId = org.jetbrains.kotlin.name.ClassId.topLevel(FqName(javaClassFqn))
-        val classSymbol = pluginContext.referenceClass(javaClassId) ?: return
+        val classSymbol = pluginContext.finderForBuiltins().findClass(javaClassId) ?: return
         val candidates = classSymbol.owner.declarations
             .filterIsInstance<IrSimpleFunction>()
             .filter { it.name.asString() == fn.name.asString() }

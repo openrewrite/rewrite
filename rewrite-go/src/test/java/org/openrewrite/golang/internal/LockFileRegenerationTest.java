@@ -18,17 +18,24 @@ package org.openrewrite.golang.internal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.golang.RegenerateGoSum;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class LockFileRegenerationTest implements RewriteTest {
+
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(new RegenerateGoSum());
+  }
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
@@ -75,7 +82,7 @@ class LockFileRegenerationTest implements RewriteTest {
 
         // when the sibling go.mod is seeded into the workspace and go.sum is regenerated from the sub directory
         LockFileRegeneration.Result result = LockFileRegeneration.GO_SUM.regenerate(
-          workspace, "sub", null, java.util.Collections.emptyMap());
+          workspace, "sub", null, emptyMap());
 
         // then the local replacement resolves and the public dependency is locked
         assertThat(result.isSuccess()).isTrue();
@@ -90,7 +97,6 @@ class LockFileRegenerationTest implements RewriteTest {
 
         // when / then
         rewriteRun(
-          spec -> spec.recipe(new RegenerateGoSum()),
           text(
             """
             module example.com/foo
@@ -124,7 +130,6 @@ class LockFileRegenerationTest implements RewriteTest {
 
         // when / then
         rewriteRun(
-          spec -> spec.recipe(new RegenerateGoSum()),
           text(
             """
             module example.com/foo
@@ -161,7 +166,6 @@ class LockFileRegenerationTest implements RewriteTest {
 
         // when / then
         rewriteRun(
-          spec -> spec.recipe(new RegenerateGoSum()),
           text(
             """
             module example.com/foo

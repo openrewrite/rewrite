@@ -27,4 +27,7 @@
     <ProjectReference Remove="@(ProjectReference)" />
     <ProjectReference Include="@(_SdkProjectReferenceOriginal->'%(FullPath)')" />
   </ItemGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)../../.local/RealPath.targets"
+          Condition="Exists('$(MSBuildThisFileDirectory)../../.local/RealPath.targets')" />
 </Project>

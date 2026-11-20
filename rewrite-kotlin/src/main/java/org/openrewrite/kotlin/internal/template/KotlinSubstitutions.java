@@ -16,13 +16,19 @@
 package org.openrewrite.kotlin.internal.template;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypedTree;
-
-import java.util.Collections;
+import org.openrewrite.kotlin.KotlinParenthesizeVisitor;
+import org.openrewrite.kotlin.tree.K;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.nCopies;
+import static org.openrewrite.Tree.randomId;
 
 public class KotlinSubstitutions extends Substitutions {
     private final Object[] parameters;
@@ -51,7 +57,7 @@ public class KotlinSubstitutions extends Substitutions {
         if (starProjectRaw && kotlinType.indexOf('<') < 0) {
             int arity = genericArity(index);
             if (arity > 0) {
-                return kotlinType + "<" + String.join(", ", Collections.nCopies(arity, "*")) + ">";
+                return kotlinType + "<" + String.join(", ", nCopies(arity, "*")) + ">";
             }
         }
         return kotlinType;
@@ -101,5 +107,16 @@ public class KotlinSubstitutions extends Substitutions {
     @Override
     protected String newPrimitiveParameter(String fqn, int index) {
         return newObjectParameter(fqn, index);
+    }
+
+    @Override
+    public J toStatement(J j) {
+        return j instanceof Expression && !(j instanceof Statement) ?
+                new K.ExpressionStatement(randomId(), (Expression) j) : j;
+    }
+
+    @Override
+    public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
+        return KotlinParenthesizeVisitor.maybeParenthesize(newTree, cursor);
     }
 }

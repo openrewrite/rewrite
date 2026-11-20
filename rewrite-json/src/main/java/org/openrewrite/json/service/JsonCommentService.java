@@ -90,8 +90,8 @@ public class JsonCommentService extends CommentService {
         Json json = (Json) tree;
         Space prefix = json.getPrefix();
         //noinspection DataFlowIssue
-        return json.withPrefix(prefix.withComments(ListUtils.map(prefix.getComments(), c ->
-                text.equals(c.getText()) ? null : c)));
+        return json.withPrefix(prefix.withComments(ListUtils.filter(prefix.getComments(), c ->
+                !text.equals(c.getText()))));
     }
 
     @Override

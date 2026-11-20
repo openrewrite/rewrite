@@ -127,7 +127,7 @@ export class BatchVisit {
 
                         if (deleted) {
                             localObjects.delete(request.treeId);
-                            break;
+                            return {results};
                         }
 
                         if (modified) {

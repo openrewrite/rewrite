@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class AnnotationTest implements RewriteTest {
-    
+
     @Test
     void simpleAnnotation() {
         rewriteRun(
@@ -39,7 +39,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void annotationWithStringArgument() {
         rewriteRun(
@@ -51,7 +51,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void annotationWithNamedArguments() {
         rewriteRun(
@@ -63,7 +63,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void multipleAnnotations() {
         rewriteRun(
@@ -76,7 +76,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void annotationOnClass() {
         rewriteRun(
@@ -89,7 +89,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void annotationOnVariable() {
         rewriteRun(
@@ -103,7 +103,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void annotationWithClassArgument() {
         rewriteRun(
@@ -115,7 +115,7 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void annotationWithArrayArgumentMultiline() {
         rewriteRun(

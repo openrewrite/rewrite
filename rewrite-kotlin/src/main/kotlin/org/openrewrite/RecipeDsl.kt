@@ -257,8 +257,8 @@ public class RecipeBuilder internal constructor() {
                 val scope = GenerateScope(ctx)
                 val produced = genBlock(scope, acc).toMutableList()
                 // 3-arg form: filter against already-generated files for cycle-2 stability.
-                val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
-                produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
+                val alreadyByPath = generatedInThisCycle.map { it.sourcePath.toString() }.toSet()
+                produced.removeAll { it.sourcePath.toString() in alreadyByPath }
                 return produced
             }
         }
@@ -285,8 +285,8 @@ public class RecipeBuilder internal constructor() {
             ): MutableCollection<SourceFile> {
                 val scope = GenerateScope(ctx)
                 val produced = scope.genBlock().toMutableList()
-                val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
-                produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
+                val alreadyByPath = generatedInThisCycle.map { it.sourcePath.toString() }.toSet()
+                produced.removeAll { it.sourcePath.toString() in alreadyByPath }
                 return produced
             }
         }

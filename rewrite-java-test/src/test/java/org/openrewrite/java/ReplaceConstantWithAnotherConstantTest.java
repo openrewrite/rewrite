@@ -18,13 +18,76 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
     @DocumentExample
+    @Test
+    void qualifyWhereALocalHasTheNewName() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+          java(
+            """
+              import static java.io.File.pathSeparator;
+
+              class Test {
+                  void foo(String separator) {
+                      System.out.println(pathSeparator + separator);
+                  }
+              }
+              """,
+            """
+              import java.io.File;
+
+              class Test {
+                  void foo(String separator) {
+                      System.out.println(File.separator + separator);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void bareNameWhereTheClassDeclaresTheNewConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.acme.Test.SEPARATOR")),
+          java(
+            """
+              package com.acme;
+
+              import static java.io.File.pathSeparator;
+
+              class Test {
+                  static final String SEPARATOR = ":";
+
+                  String foo() {
+                      return pathSeparator;
+                  }
+              }
+              """,
+            """
+              package com.acme;
+
+              class Test {
+                  static final String SEPARATOR = ":";
+
+                  String foo() {
+                      return SEPARATOR;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void replaceConstant() {
         rewriteRun(
@@ -136,6 +199,134 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   void foo() {
                       Object test = NewValue.B;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStaticallyImportedEnumConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.constant.OldValue.A", "com.constant.NewValue.B")),
+          java(
+            """
+              package com.constant;
+              public enum OldValue {
+                  A
+              }
+              """
+          ),
+          java(
+            """
+              package com.constant;
+              public enum NewValue {
+                  B
+              }
+              """
+          ),
+          java(
+            """
+              import static com.constant.OldValue.A;
+
+              class Test {
+                  void foo() {
+                      Object test = A;
+                  }
+              }
+              """,
+            """
+              import static com.constant.NewValue.B;
+
+              class Test {
+                  void foo() {
+                      Object test = B;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstantOfItsOwnClassWithConstantOfThatClassElsewhere() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant(
+              "com.constant.Strategy.SNAKE_CASE", "com.constant.Strategies.SNAKE_CASE"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package com.constant;
+                public class Strategy {
+                    public static final Strategy SNAKE_CASE = new Strategy();
+                }
+                """,
+              """
+                package com.constant;
+                public class Strategies {
+                    public static final Strategy SNAKE_CASE = new Strategy();
+                }
+                """
+            )),
+          java(
+            """
+              import com.constant.Strategy;
+
+              class Test {
+                  Strategy s = Strategy.SNAKE_CASE;
+              }
+              """,
+            """
+              import com.constant.Strategies;
+              import com.constant.Strategy;
+
+              class Test {
+                  Strategy s = Strategies.SNAKE_CASE;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedEnumConstantIsAnEnumConstantToTheNextReplacement() {
+        rewriteRun(
+          spec -> spec.recipes(
+              new ReplaceConstantWithAnotherConstant("old.core.GeneratorFeature.QUOTE_FIELD_NAMES", "old.core.json.WriteFeature.QUOTE_FIELD_NAMES"),
+              new ReplaceConstantWithAnotherConstant("old.core.json.WriteFeature.QUOTE_FIELD_NAMES", "neu.core.json.WriteFeature.QUOTE_PROPERTY_NAMES"),
+              new ChangePackage("old.core", "neu.core", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package old.core;
+                public enum GeneratorFeature {
+                    QUOTE_FIELD_NAMES
+                }
+                """,
+              """
+                package old.core.json;
+                public enum WriteFeature {
+                    QUOTE_FIELD_NAMES
+                }
+                """,
+              """
+                package neu.core.json;
+                public enum WriteFeature {
+                    QUOTE_PROPERTY_NAMES
+                }
+                """
+            )),
+          java(
+            """
+              import old.core.GeneratorFeature;
+
+              class Test {
+                  Object o = GeneratorFeature.QUOTE_FIELD_NAMES;
+              }
+              """,
+            """
+              import neu.core.json.WriteFeature;
+
+              class Test {
+                  Object o = WriteFeature.QUOTE_PROPERTY_NAMES;
               }
               """
           )
@@ -471,4 +662,486 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void replaceWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations o = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.FieldAccess constant = (J.FieldAccess) o.getVariables().getFirst().getInitializer();
+                assertThat(TypeUtils.asFullyQualified(constant.getName().getFieldType().getOwner()).getFullyQualifiedName()).isEqualTo("b.Outer$Inner");
+                J.FieldAccess inner = (J.FieldAccess) constant.getTarget();
+                assertThat(inner.getSimpleName()).isEqualTo("Inner");
+                assertThat(TypeUtils.isOfClassType(inner.getType(), "b.Outer$Inner")).isTrue();
+                assertThat(TypeUtils.isOfClassType(inner.getName().getType(), "b.Outer$Inner")).isTrue();
+                J.Identifier outer = (J.Identifier) inner.getTarget();
+                assertThat(outer.getSimpleName()).isEqualTo("Outer");
+                assertThat(TypeUtils.isOfClassType(outer.getType(), "b.Outer")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void replaceWithConstantOfNestedClassWrittenWithDots() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer.Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceFullyQualifiedReferenceWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              class Test {
+                  Object o = a.Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStaticallyImportedWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import static a.Old.A;
+
+              class Test {
+                  Object o = A;
+              }
+              """,
+            """
+              import static b.Outer.Inner.B;
+
+              class Test {
+                  Object o = B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstantOfNestedClassWithConstantOfNestedClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.OldOuter$OldInner.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class OldOuter {
+                    public static class OldInner {
+                        public static final String A = "a";
+                    }
+                }
+                """,
+              OUTER
+            )),
+          java(
+            """
+              import a.OldOuter;
+
+              class Test {
+                  Object o = OldOuter.OldInner.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          ),
+          java(
+            """
+              import a.OldOuter.OldInner;
+
+              class Test2 {
+                  Object o = OldInner.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test2 {
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyWhenOuterClassOfNewConstantIsAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              OLD,
+              OUTER,
+              """
+                package c;
+                public class Outer {
+                }
+                """,
+              """
+                package d;
+                public class D {
+                    public static class Outer {
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import a.Old;
+              import c.Outer;
+
+              class Test {
+                  Outer outer;
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import c.Outer;
+
+              class Test {
+                  Outer outer;
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+
+              class Test2 {
+                  Object o = Old.A;
+
+                  static class Outer {
+                  }
+              }
+              """,
+            """
+              class Test2 {
+                  Object o = b.Outer.Inner.B;
+
+                  static class Outer {
+                  }
+              }
+              """
+          ),
+
+          java(
+            """
+              package c;
+
+              import a.Old;
+
+              class Test3 {
+                  Outer outer;
+                  Object o = Old.A;
+              }
+              """,
+            """
+              package c;
+
+              class Test3 {
+                  Outer outer;
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+
+              class Test4 {
+                  void m() {
+                      class Outer {
+                      }
+                      Object o = Old.A;
+                  }
+              }
+              """,
+            """
+              class Test4 {
+                  void m() {
+                      class Outer {
+                      }
+                      Object o = b.Outer.Inner.B;
+                  }
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+              import static d.D.Outer;
+
+              class Test5 {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              import static d.D.Outer;
+
+              class Test5 {
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Old;
+
+              class Test6<Outer> {
+                  Object o = Old.A;
+              }
+              """,
+            """
+              class Test6<Outer> {
+                  Object o = b.Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importOuterClassOnceTheOldOwnerOfThatNameIsNoLongerImported() {
+        rewriteRun(
+          spec -> spec.recipes(
+              new ReplaceConstantWithAnotherConstant("a.Holder.X", "b.Holder$Kind.X"),
+              new ReplaceConstantWithAnotherConstant("a.Holder.Y", "b.Holder$Kind.Y"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class Holder {
+                    public static final int X = 0;
+                    public static final int Y = 1;
+                }
+                """,
+              """
+                package b;
+                public class Holder {
+                    public static class Kind {
+                        public static final int X = 0;
+                        public static final int Y = 1;
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import a.Holder;
+
+              class Test {
+                  Object x = Holder.X;
+                  Object y = Holder.Y;
+              }
+              """,
+            """
+              import b.Holder;
+
+              class Test {
+                  Object x = Holder.Kind.X;
+                  Object y = Holder.Kind.Y;
+              }
+              """
+          ),
+
+          java(
+            """
+              import a.Holder;
+
+              class Test2 {
+                  Object x = Holder.X;
+              }
+              """,
+            """
+              import b.Holder;
+
+              class Test2 {
+                  Object x = Holder.Kind.X;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstantAccessedThroughAnExpression() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(OLD, OUTER)),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Old old() {
+                      return null;
+                  }
+                  Object o = old().A;
+              }
+              """,
+            """
+              import a.Old;
+              import b.Outer;
+
+              class Test {
+                  Old old() {
+                      return null;
+                  }
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportConstantOfNestedClassDespiteOuterClassNameClash() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              OLD,
+              OUTER,
+              """
+                package c;
+                public class Outer {
+                }
+                """
+            )),
+          java(
+            """
+              import c.Outer;
+
+              import static a.Old.A;
+
+              class Test {
+                  Outer outer;
+                  Object o = A;
+              }
+              """,
+            """
+              import c.Outer;
+
+              import static b.Outer.Inner.B;
+
+              class Test {
+                  Outer outer;
+                  Object o = B;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importOuterClassOfStaticallyImportedConstantWhoseNestedOwnerNameIsImported() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("a.Old.A", "b.Outer$Inner.B"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              OLD,
+              OUTER,
+              """
+                package c;
+                public class Outer {
+                    public static class Inner {
+                    }
+                }
+                """
+            )),
+          java(
+            """
+              import c.Outer.Inner;
+
+              import static a.Old.A;
+
+              class Test {
+                  Inner inner;
+                  Object o = A;
+              }
+              """,
+            """
+              import b.Outer;
+              import c.Outer.Inner;
+
+              class Test {
+                  Inner inner;
+                  Object o = Outer.Inner.B;
+              }
+              """
+          )
+        );
+    }
+
+    private static final String OLD = """
+      package a;
+      public class Old {
+          public static final String A = "a";
+      }
+      """;
+
+    private static final String OUTER = """
+      package b;
+      public class Outer {
+          public static class Inner {
+              public static final String B = "b";
+          }
+      }
+      """;
 }

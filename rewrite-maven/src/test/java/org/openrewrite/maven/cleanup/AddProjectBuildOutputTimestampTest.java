@@ -47,7 +47,7 @@ class AddProjectBuildOutputTimestampTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <properties>
-                  <project.build.outputTimestamp>1980-01-01T00:00:00Z</project.build.outputTimestamp>
+                  <project.build.outputTimestamp>1980-01-01T00:00:02Z</project.build.outputTimestamp>
                 </properties>
               </project>
               """
@@ -120,7 +120,7 @@ class AddProjectBuildOutputTimestampTest implements RewriteTest {
                 <version>1</version>
                 <properties>
                   <maven.compiler.release>21</maven.compiler.release>
-                  <project.build.outputTimestamp>1980-01-01T00:00:00Z</project.build.outputTimestamp>
+                  <project.build.outputTimestamp>1980-01-01T00:00:02Z</project.build.outputTimestamp>
                 </properties>
               </project>
               """

@@ -226,8 +226,8 @@ The build enforces license headers on all source files and runs OWASP dependency
 
 For detailed guidance on working with specific language implementations, consult the module-specific CLAUDE.md files:
 
-- **Python (`rewrite-python/rewrite/CLAUDE.md`)**: Development setup, testing with RPC, recipe patterns, padding/whitespace conventions specific to the Python module.
-- **TypeScript/JavaScript (`rewrite-javascript/rewrite/CLAUDE.md`)**: Node.js setup, async visitor patterns, test patterns, RPC sender/receiver architecture, module organization.
+- **Python (`rewrite-python/rewrite/CLAUDE.md`)**: Development setup, testing with RPC, recipe patterns, padding/whitespace conventions specific to the Python module, inspecting type attribution (`REWRITE_PYTHON_DUMP_TYPES`, `rewrite-python-types`).
+- **TypeScript/JavaScript (`rewrite-javascript/rewrite/CLAUDE.md`)**: Node.js setup, async visitor patterns, test patterns, RPC sender/receiver architecture, module organization, inspecting type attribution (`REWRITE_JAVASCRIPT_DUMP_TYPES`, `rewrite-javascript-types`).
 
 These files contain implementation-specific patterns, conventions, and debugging tips that supersede general guidance in this document.
 

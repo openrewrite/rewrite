@@ -159,4 +159,39 @@ class CommentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void lineCommentOnElementSharingALineWithItsParent() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return Comments.of(getCursor()).comment(" TODO: revisit");
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void foo() {
+                      int i = bar();
+                  }
+                  int bar() {
+                      return 0;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void foo() {
+                      int i = // TODO: revisit
+                              bar();
+                  }
+                  int bar() {
+                      return 0;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

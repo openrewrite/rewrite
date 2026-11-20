@@ -16,8 +16,12 @@
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
+import {maybeBind} from '../binding';
+import {ModuleScopeBinding} from '../add-import';
+import {opensWithBrace, replacedByObjectLiteral} from './engine';
+import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -92,7 +96,8 @@ export class TemplateBuilder {
     /**
      * Adds a parameter to the template.
      *
-     * @param value The parameter value (Capture, Tree, or primitive)
+     * @param value The parameter value (Capture, Tree, or primitive); may be added more than once
+     *              (see {@link template})
      * @returns This builder for chaining
      */
     param(value: TemplateParameter): this {
@@ -142,11 +147,11 @@ export class TemplateBuilder {
  *
  * @example
  * // Generate a literal AST node
- * const result = template`2`.apply(cursor, coordinates);
+ * const result = await template`2`.apply(node, cursor);
  *
  * @example
  * // Generate an AST node with a parameter
- * const result = template`${capture()}`.apply(cursor, coordinates);
+ * const result = await template`${capture()}`.apply(node, cursor);
  *
  * @example
  * // Access properties of captured nodes in templates
@@ -154,10 +159,10 @@ export class TemplateBuilder {
  * const pat = pattern`foo(${method})`;
  * const tmpl = template`bar(${method.name})`; // Access the 'name' property
  *
- * const match = await pat.match(someNode);
+ * const match = await pat.match(someNode, cursor);
  * if (match) {
  *     // The template will insert just the 'name' subtree from the captured method
- *     const result = await tmpl.apply(cursor, someNode, match);
+ *     const result = await tmpl.apply(someNode, cursor, { values: match });
  * }
  *
  * @example
@@ -172,7 +177,9 @@ export class TemplateBuilder {
  */
 export class Template {
     private options: TemplateOptions = {};
-    private _cachedTemplate?: J;
+    /** The parsed code, keyed by whether it was parsed as an expression and by its parameters' declarations. */
+    private _cachedTemplates = new LRUCache<string, J>(10);
+    private _contextBindings?: Promise<ModuleScopeBinding[]>;
 
     /**
      * Creates a new template.
@@ -217,15 +224,22 @@ export class Template {
      *     })
      */
     configure(options: TemplateOptions): Template {
+        // The `never` applies only where a caller typechecks against it, so JavaScript and pre-#8685
+        // typings reach here, where a silently dropped option leaves the template's names unbound.
+        if ((options as { bindings?: unknown }).bindings !== undefined) {
+            throw new Error("Template option 'bindings' is now 'context': name each module as the " +
+                "import it stands for, e.g. context: [`import {vi} from 'vitest';`].");
+        }
         this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
-        this._cachedTemplate = undefined;
+        this._cachedTemplates.clear();
+        this._contextBindings = undefined;
         return this;
     }
 
     /**
-     * Gets the template tree for this template, using two-level caching:
-     * - Level 1: Instance cache (this._cachedTemplate) - fastest, no lookup needed
+     * Gets the template tree for this template, using three-level caching:
+     * - Level 1: Instance cache (this._cachedTemplates) - fastest, no lookup needed
      * - Level 2: Global cache (globalAstCache) - fast, shared across all templates
      * - Level 3: TemplateEngine - slow, parses and processes the template
      *
@@ -236,10 +250,15 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private async getTemplateTree(expression: boolean, values?: Pick<Map<string, J | J[]>, 'get'>): Promise<J> {
+        // The types of the bound values shape the parse, so each set of them is a tree of its own
+        const preamble = TemplateEngine.parameterPreamble(this.parameters, values);
+        const instanceKey = `${expression}::${preamble.join('')}`;
+
         // Level 1: Instance cache (fastest path)
-        if (this._cachedTemplate) {
-            return this._cachedTemplate as JS.CompilationUnit;
+        const instanceCached = this._cachedTemplates.get(instanceKey);
+        if (instanceCached) {
+            return instanceCached;
         }
 
         // Generate cache key for global lookup
@@ -253,19 +272,20 @@ export class Template {
                 return `raw:${value.code}`;
             }
             return i.toString();
-        }).join(',');
+        }).join(',') + (expression ? '::expression' : '');
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
-            contextStatements,
-            this.options.dependencies || {}
+            [...contextStatements, ...preamble],
+            this.options.dependencies || {},
+            this.options.types
         );
 
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplate = cached as JS.CompilationUnit;
-            return cached as JS.CompilationUnit;
+            this._cachedTemplates.set(instanceKey, cached);
+            return cached;
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
@@ -273,14 +293,62 @@ export class Template {
             this.templateParts,
             this.parameters,
             contextStatements,
-            this.options.dependencies || {}
-        ) as JS.CompilationUnit;
+            this.options.dependencies || {},
+            this.options.types,
+            expression,
+            preamble
+        );
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
-        this._cachedTemplate = result;
+        this._cachedTemplates.set(instanceKey, result);
 
         return result;
+    }
+
+    /**
+     * Binds every module this template declares in the file `visitor` is traversing, and returns
+     * the local names to hand back through {@link ApplyOptions.bindings}. Each is bound outright, so
+     * call this where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern
+     * matched.
+     */
+    async resolveBindings(visitor: JavaScriptVisitor<any>): Promise<Record<string, string>> {
+        const resolved: Record<string, string> = {};
+        for (const binding of await this.contextBindings()) {
+            // The template's code reads every binding listed, which its attribution cannot always show
+            const bound = maybeBind(visitor, {
+                module: binding.module!,
+                member: binding.member,
+                typeOnly: binding.typeOnly,
+                preferredName: binding.name,
+                onlyIfReferenced: false
+            });
+            // An unresolved binding is left out rather than recorded as `undefined`, so `apply()`'s
+            // own "applied without a local name" check catches it, same as a caller-omitted one.
+            if (bound !== undefined) {
+                resolved[binding.name] = bound;
+            }
+        }
+        return resolved;
+    }
+
+    /** Whether the context binds a module, which applying this template therefore has to resolve. */
+    async bindsModules(): Promise<boolean> {
+        return (await this.contextBindings()).length > 0;
+    }
+
+    /** What this template's context statements bind, which is what it needs bound in the target file. */
+    private contextBindings(): Promise<ModuleScopeBinding[]> {
+        return this._contextBindings ??= this.deriveContextBindings();
+    }
+
+    private deriveContextBindings(): Promise<ModuleScopeBinding[]> {
+        return TemplateEngine.getContextBindings(
+            this.templateParts, this.parameters,
+            this.options.context || this.options.imports || [],
+            this.options.dependencies || {},
+            this.options.types
+        );
     }
 
     /**
@@ -345,8 +413,23 @@ export class Template {
             }
         }
 
-        // Use instance-level cache to get the template tree
-        const ast = await this.getTemplateTree();
+        const renames: Record<string, string> = {};
+        // Supplying names is what asks for the context's modules to be bound in the file being
+        // edited; without them a context import only types the template.
+        if (options?.bindings !== undefined) {
+            for (const binding of await this.contextBindings()) {
+                const bound = options.bindings[binding.name];
+                if (bound === undefined) {
+                    throw new Error(`Template binds '${binding.module}' in its context, but no local name was ` +
+                        `given for '${binding.name}'. Either pass bindings from resolveBindings(visitor), or — if it ` +
+                        `already did — binding was refused, which an AMD block or a file requiring its modules can do.`);
+                }
+                renames[binding.name] = bound;
+            }
+        }
+
+        const expression = opensWithBrace(this.templateParts) && await replacedByObjectLiteral(tree, cursor);
+        const ast = await this.getTemplateTree(expression, normalizedValues);
 
         // Delegate to TemplateEngine for placeholder substitution and application
         return TemplateEngine.applyTemplateFromAst(
@@ -358,7 +441,11 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            wrappersMap
+            wrappersMap,
+            options?.format ?? true,
+            renames,
+            // Unformatted, a capture the template spaces as the pattern did keeps the source's spacing
+            options?.format === false && values instanceof MatchResult ? values[PATTERN_PREFIXES_SYMBOL]() : undefined
         );
     }
 }
@@ -377,13 +464,16 @@ export class Template {
  * - J.Container<T>: Elements will be expanded in place
  *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container).
+ *                   A parameter may appear more than once — `(${arr} ? f(${arr}) : -1)`. A node
+ *                   keeps its id only at its first occurrence, and only if it belongs to the
+ *                   subtree being replaced; anything else is spliced under fresh ids.
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
  * // Simple template with literal
  * const tmpl = template`console.log("hello")`;
- * const result = await tmpl.apply(cursor, node);
+ * const result = await tmpl.apply(node, cursor);
  *
  * @example
  * // Template with capture - matches captured value from pattern
@@ -391,9 +481,9 @@ export class Template {
  * const pat = pattern`foo(${expr})`;
  * const tmpl = template`bar(${expr})`;
  *
- * const match = await pat.match(node);
+ * const match = await pat.match(node, cursor);
  * if (match) {
- *     const result = await tmpl.apply(cursor, node, match);
+ *     const result = await tmpl.apply(node, cursor, { values: match });
  * }
  *
  * @example

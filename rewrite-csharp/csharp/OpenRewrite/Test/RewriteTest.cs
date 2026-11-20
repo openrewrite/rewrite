@@ -46,6 +46,7 @@ public abstract class RewriteTest
 
     private static ImmutableArray<MetadataReference> ResolveAssemblies(ReferenceAssemblies assemblies)
     {
+        // Blocks because its callers, RewriteRun and Parse, are synchronous test APIs.
         return ResolvedAssembliesCache.GetOrAdd(assemblies, a =>
             a.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
                 .GetAwaiter()
@@ -62,12 +63,24 @@ public abstract class RewriteTest
         var recipeSpec = new RecipeSpec();
         configure(recipeSpec);
 
-        var parser = new CSharpParser();
-        var printer = new CSharpPrinter<object>();
+        // An .editorconfig styles the C# sources, as SolutionParser has it do, and is not a source itself
+        var editorConfigSpecs = specs.Where(EditorConfigSources.Is).ToList();
+        if (editorConfigSpecs.Any(s => s.After != null))
+        {
+            throw new ArgumentException("An .editorconfig styles the sources of a test, and no recipe changes it.");
+        }
+        specs = specs.Where(s => !EditorConfigSources.Is(s)).ToArray();
+        if (specs.Any(s => s.Skipped && (s.After != null || s.AfterFromActual != null)))
+        {
+            throw new ArgumentException("A source the test skips is kept from the recipe, which doesn't change it.");
+        }
+        using var editorConfigs = editorConfigSpecs.Count > 0 ? new EditorConfigSources(editorConfigSpecs) : null;
 
-        // Resolve metadata references if ReferenceAssemblies is configured
-        ImmutableArray<MetadataReference>? metadataReferences = recipeSpec.ReferenceAssemblies != null
-            ? ResolveAssemblies(recipeSpec.ReferenceAssemblies)
+        var parser = new CSharpParser();
+
+        var setup = recipeSpec.ReferenceAssemblies != null
+            ? new CompileSetup(ResolveAssemblies(recipeSpec.ReferenceAssemblies).AddRange(recipeSpec.References),
+                recipeSpec.CompilationOptions, recipeSpec.ParseOptions)
             : null;
 
         // 1. Parse all sources and validate round-trip
@@ -76,16 +89,14 @@ public abstract class RewriteTest
 
         // Collect all csproj-related specs and parse them together in a shared temp directory
         // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
-        var csprojSpecs = specs.Where(s => s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
-        Dictionary<string, SourceFile>? csprojParsed = null;
-        if (csprojSpecs.Count > 0)
-        {
-            csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
-        }
+        var csprojSpecs = specs.Where(s => !s.PlainXml && s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
+        var csprojParsed = ParseCsprojFilesTogether(csprojSpecs, recipeSpec.ProjectRestore, validations);
+        var projects = new TestProjects(specs,
+            spec => csprojParsed.GetValueOrDefault(spec)?.Markers.FindFirst<MSBuildProject>());
 
         var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
-        CSharpCompilation? sharedCompilation = null;
-        if (metadataReferences != null)
+        var compilations = new Dictionary<SyntaxTree, CSharpCompilation>();
+        if (setup != null)
         {
             foreach (var spec in specs)
             {
@@ -94,28 +105,41 @@ public abstract class RewriteTest
                            spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
                 if (isCs && !isCsproj)
                 {
-                    sharedTrees[spec] = CSharpSyntaxTree.ParseText(
-                        spec.Before, path: spec.SourcePath ?? "source.cs");
+                    sharedTrees[spec] = setup.Parse(spec.Before, spec.SourcePath ?? "source.cs");
                 }
             }
-
-            if (sharedTrees.Count > 0)
-            {
-                sharedCompilation = CSharpCompilation.Create("TestCompilation")
-                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-                    .AddReferences(metadataReferences)
-                    .AddSyntaxTrees(sharedTrees.Values);
-            }
+            compilations = projects.Compile(sharedTrees.Select(t => (projects.Of(t.Key), t.Value)), setup);
         }
+
+        if (recipeSpec.InputCompiles)
+        {
+            if (recipeSpec.ReferenceAssemblies == null)
+            {
+                throw new ArgumentException(
+                    "ExpectInputCompiles compiles against the ReferenceAssemblies, which are not set.");
+            }
+            AssertCompiles(compilations.Values.Distinct(), recipeSpec.InputInspections, recipeSpec.ExpectedInputErrors,
+                $"The sources of the test don't compile against {recipeSpec.ReferenceAssemblies.TargetFramework}" +
+                ", so types the recipe looks at are missing or wrong");
+        }
+
+        SourceFile WithProject(SourceSpec spec, SourceFile source) =>
+            projects.Of(spec) is { } project ? SourceSpec.AddMarker(source, project) : source;
 
         foreach (var spec in specs)
         {
             SourceFile source;
             var isCsFile = spec.SourcePath != null &&
                            spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
-            if (spec.SourcePath != null && IsCsprojPath(spec.SourcePath) && csprojParsed != null)
+            if (csprojParsed.TryGetValue(spec, out var projectFile))
             {
-                source = csprojParsed[spec.SourcePath];
+                parsed.Add((spec, WithProject(spec, projectFile)));
+                continue;
+            }
+            if (spec.PlainXml)
+            {
+                source = new XmlParser().Parse(spec.Before, spec.SourcePath!);
+                AssertPrintsAsParsed(spec, source, validations);
             }
             else if (spec.SourcePath != null && !isCsFile)
             {
@@ -134,12 +158,13 @@ public abstract class RewriteTest
                 // Local C# parsing
                 var localSourcePath = spec.SourcePath ?? "source.cs";
                 SemanticModel? semanticModel = null;
-                if (sharedCompilation != null && sharedTrees.TryGetValue(spec, out var syntaxTree))
+                if (sharedTrees.TryGetValue(spec, out var syntaxTree))
                 {
-                    semanticModel = sharedCompilation.GetSemanticModel(syntaxTree);
+                    semanticModel = compilations[syntaxTree].GetSemanticModel(syntaxTree);
                 }
 
-                source = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
+                var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
+                source = editorConfigs?.Style(cu, localSourcePath) ?? cu;
 
                 // Verify no non-whitespace content leaked into Space fields
                 if (validations.WhitespaceInSpaces)
@@ -152,7 +177,7 @@ public abstract class RewriteTest
                 }
 
                 // Verify round-trip: printed should match input
-                var printed = printer.Print(source);
+                var printed = PrintTree(source);
                 if (validations.PrintEqualsInput)
                 {
                     AssertContentEquals(spec.Before, printed, source.SourcePath,
@@ -164,69 +189,631 @@ public abstract class RewriteTest
                 if (validations.PrintIdempotence)
                 {
                     var reparsed = parser.Parse(printed);
-                    var reprinted = printer.Print(reparsed);
+                    var reprinted = PrintTree(reparsed);
                     AssertContentEquals(printed, reprinted, source.SourcePath,
                         "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
                 }
             }
 
-            parsed.Add((spec, source));
+            if (source is ParseError parseError)
+            {
+                var exception = parseError.Markers.FindFirst<ParseExceptionResult>();
+                Assert.Fail($"Parsed source contains a ParseError at {parseError.SourcePath}: " +
+                            (exception != null ? exception.Message : "no ParseExceptionResult marker"));
+            }
+
+            parsed.Add((spec, SourceSpec.ApplyBeforeRecipe(spec, WithProject(spec, source))));
         }
 
         // 2. If recipe configured, run it and verify results
         if (recipeSpec.Recipe != null)
         {
-            var sources = parsed.Select(p => p.Source).ToList();
+            var sources = parsed.Where(p => !p.Spec.Skipped).Select(p => p.Source).ToList();
+            var skipped = parsed.Where(p => p.Spec.Skipped).Select(p => p.Source).ToList();
+            // Marker placements the inputs already carry were not added by the recipe
+            var inputMarkers = validations.ReportingMarkersOnly ? AddedMarkersCheck.Placements(sources) : null;
+            var expectedCycles = recipeSpec.ExpectedCyclesThatMakeChanges ?? 1;
+            var cycles = recipeSpec.Cycles ?? Math.Max(2, expectedCycles + 1);
+            if (cycles < Math.Max(1, expectedCycles))
+            {
+                throw new ArgumentException(
+                    $"Cycles={cycles} has to be at least 1 and at least ExpectedCyclesThatMakeChanges={expectedCycles}");
+            }
+
             var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
-            List<Result> results;
-            var runCtx = new ExecutionContext();
+            var checks = new RunChecks(validations);
+            var runCtx = checks.Ctx;
+            if (recipeSpec.GivenExecutionContext is { } given)
+            {
+                runCtx.OnError = given.OnError;
+                checks.Seed(ctx =>
+                {
+                    foreach (var (key, value) in given.Messages)
+                    {
+                        ctx.PutMessage(key, value);
+                    }
+                });
+            }
+            foreach (var seed in recipeSpec.ExecutionContextSeeds)
+            {
+                checks.Seed(seed);
+            }
+            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
             try
             {
-                results = RecipeScheduler.Run(recipeSpec.Recipe, sources, runCtx);
+                CycleRun run;
+                using (formatting?.Install())
+                {
+                    run = RunCycles(recipeSpec.Recipe, sources, checks, cycles, expectedCycles);
+                }
+                var results = run.Changes;
+
+                if (inputMarkers != null)
+                {
+                    AddedMarkersCheck.Verify(inputMarkers, results);
+                }
+                checks.AssertLightweightAccumulators();
+
+                foreach (var afterRecipe in recipeSpec.AfterRecipe)
+                {
+                    afterRecipe(runCtx);
+                }
+                foreach (var assertion in recipeSpec.ResultAssertions)
+                {
+                    assertion(results);
+                }
+                foreach (var assertion in recipeSpec.AccumulatorAssertions)
+                {
+                    assertion(checks.FirstScan ?? new Dictionary<IScanningRecipe, object>());
+                }
+
+                foreach (var (spec, source) in parsed)
+                {
+                    var result = results.FirstOrDefault(r =>
+                        r.Before != null && r.Before.Id == source.Id);
+
+                    var expected = spec.AfterFromActual != null
+                        ? spec.AfterFromActual(result?.After is { } printed ? PrintTree(printed) : spec.Before)
+                        : spec.After;
+                    if (expected != null)
+                    {
+                        // Expected a change
+                        Assert.True(result != null && result.After != null,
+                            $"Recipe was expected to make changes but did not modify the source file.");
+                        AssertContentEquals(expected, PrintTree(result.After), result.After.SourcePath,
+                            "Unexpected result from recipe");
+                    }
+                    else
+                    {
+                        // Expected no change
+                        if (result is { After: { } changed } && PrintTree(changed) == PrintTree(source))
+                        {
+                            Assert.Fail(
+                                "Return the tree the recipe was given when there is nothing to change.\n" +
+                                $"{recipeSpec.Recipe.Name} returned a new tree for {source.SourcePath} that prints " +
+                                "the same, so the run reports the source file as changed, with an empty diff.");
+                        }
+                        Assert.True(result == null || result.Before == result.After,
+                            "Recipe made unexpected changes to a source file that was not expected to change.");
+                    }
+                    AfterRecipe(spec, source, result == null ? source : result.After);
+                }
+                AssertOutputCompiles(recipeSpec, [..run.Finals, ..skipped], setup, projects);
+
+                if (run.Unsettled is var (cycle, changes))
+                {
+                    ExpectNoFurtherChanges(changes,
+                        $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
+                }
+                var fresh = results.Count > 0 &&
+                            (cycles > expectedCycles || validations.ParserShapedTrees || validations.TypesAttributed)
+                    ? ParseAgain([..run.Finals, ..skipped], FreshParseSetup(recipeSpec, setup), projects)
+                    : null;
+                if (cycles > expectedCycles && fresh != null)
+                {
+                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, fresh, checks);
+                }
+                formatting?.AssertFormattedOnlyWhatChanged(results);
+                if (validations.ParserShapedTrees && fresh != null)
+                {
+                    TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
+                }
+                if (validations.TypesAttributed && fresh != null)
+                {
+                    TreeShapes.AssertTyped(recipeSpec.Recipe, results, fresh);
+                }
+                if (validations.UniqueIds)
+                {
+                    UniqueIds.AssertUnique(recipeSpec.Recipe, results);
+                }
+                if (validations.SourceFileIdentity)
+                {
+                    global::OpenRewrite.Test.SourceFileIdentity.AssertKept(recipeSpec.Recipe, results);
+                }
+                EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
+                UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);
             }
             finally
             {
                 WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
+                if (recipeSpec.GivenExecutionContext is { } carried)
+                {
+                    foreach (var (key, value) in runCtx.Messages)
+                    {
+                        if (key != DataTable<object>.DataTableStoreKey)
+                        {
+                            carried.PutMessage(key, value);
+                        }
+                    }
+                }
             }
-
-            foreach (var afterRecipe in recipeSpec.AfterRecipe)
+        }
+        else
+        {
+            foreach (var assertion in recipeSpec.ResultAssertions)
             {
-                afterRecipe(runCtx);
+                assertion([]);
             }
-
             foreach (var (spec, source) in parsed)
             {
-                var result = results.FirstOrDefault(r =>
-                    r.Before != null && r.Before.Id == source.Id);
+                AfterRecipe(spec, source, source);
+            }
+            AssertOutputCompiles(recipeSpec, parsed.Select(p => p.Source).ToList(), setup, projects);
+        }
+    }
 
-                if (spec.After != null)
-                {
-                    // Expected a change
-                    Assert.True(result != null && result.After != null,
-                        $"Recipe was expected to make changes but did not modify the source file.");
-                    var afterPrinted = PrintTree(result.After);
-                    AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
-                        "Unexpected result from recipe");
-                }
-                else
-                {
-                    // Expected no change
-                    Assert.True(result == null || result.After == null || result.Before == result.After,
-                        "Recipe made unexpected changes to a source file that was not expected to change.");
-                }
+    private static void AfterRecipe(SourceSpec spec, SourceFile before, SourceFile? after)
+    {
+        if (spec.AfterRecipeHooks.IsEmpty)
+        {
+            return;
+        }
+        if (after == null)
+        {
+            Assert.Fail($"The recipe deleted {before.SourcePath}, which has AfterRecipe assertions.");
+        }
+        foreach (var assertion in spec.AfterRecipeHooks)
+        {
+            assertion(before, after);
+        }
+    }
+
+    private static void AssertOutputCompiles(RecipeSpec recipeSpec, List<SourceFile> finals, CompileSetup? setup,
+        TestProjects projects)
+    {
+        var units = finals.OfType<CSharp.CompilationUnit>()
+            .Select(unit => (Unit: unit, Text: PrintTree(unit, MarkerPrinter.Sanitized)))
+            .ToList();
+        foreach (var check in recipeSpec.OutputCompilations)
+        {
+            var outputSetup = OutputSetup(recipeSpec, check, setup);
+            var compilations = projects.Compile(
+                units.Select(u => (projects.Of(u.Unit), outputSetup.Parse(u.Text, u.Unit.SourcePath))), outputSetup);
+            AssertCompiles(compilations.Values.Distinct(), check.Inspect == null ? [] : [check.Inspect],
+                ImmutableHashSet<string>.Empty,
+                $"The recipe's output doesn't compile against {Target(recipeSpec, check).TargetFramework}");
+        }
+    }
+
+    /// <summary>
+    /// How the output is compiled when it is parsed again, as the first <see cref="RecipeSpec.ExpectOutputCompiles"/>
+    /// compiles it, or else as the input was.
+    /// </summary>
+    private static CompileSetup? FreshParseSetup(RecipeSpec recipeSpec, CompileSetup? setup) =>
+        recipeSpec.OutputCompilations is [var first, ..] ? OutputSetup(recipeSpec, first, setup) : setup;
+
+    private static CompileSetup OutputSetup(RecipeSpec recipeSpec, OutputCompilation check, CompileSetup? setup) =>
+        new((check.References == null && setup != null
+                    ? setup.References
+                    : ResolveAssemblies(Target(recipeSpec, check)).AddRange(recipeSpec.References))
+                .AddRange(check.AddReferences),
+            check.Options ?? recipeSpec.CompilationOptions,
+            check.ParseOptions ?? recipeSpec.ParseOptions);
+
+    private static ReferenceAssemblies Target(RecipeSpec recipeSpec, OutputCompilation check) =>
+        check.References ?? recipeSpec.ReferenceAssemblies ?? throw new ArgumentException(
+            "ExpectOutputCompiles compiles against the ReferenceAssemblies when it isn't given references, " +
+            "and they are not set.");
+
+    private static void AssertCompiles(IEnumerable<CSharpCompilation> compilations,
+        IReadOnlyList<Action<CSharpCompilation>> inspections, IReadOnlySet<string> expectedErrors, string headline)
+    {
+        var all = compilations.ToList();
+        var reported = all.SelectMany(c => c.GetDiagnostics())
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToList();
+        var errors = reported.Where(e => !expectedErrors.Contains(e.Id)).ToList();
+        var missing = expectedErrors.Where(id => reported.All(e => e.Id != id)).Order().ToList();
+        if (errors.Count > 0)
+        {
+            var failing = errors.Select(e => e.Location.SourceTree).OfType<SyntaxTree>().Distinct();
+            Assert.Fail(string.Join("\n", [
+                $"{headline}:",
+                ..errors.Select(e => $"  {e}"),
+                ..failing.Select(tree => $"{tree.FilePath}:\n{tree.GetText()}")
+            ]));
+        }
+        if (missing.Count > 0)
+        {
+            Assert.Fail("The sources of the test were expected to fail to compile with " +
+                        $"{string.Join(", ", missing)}, which the compiler didn't report.");
+        }
+        foreach (var compilation in all)
+        {
+            foreach (var inspect in inspections)
+            {
+                inspect(compilation);
             }
         }
     }
 
-    protected static SourceSpec CSharp(string before, string? after = null)
+    /// <param name="Changes">The changes of the expected cycles, from the parsed sources to the output of the last of them.</param>
+    /// <param name="Finals">Every source file as the last of the expected cycles left it.</param>
+    /// <param name="Unsettled">The cycle that changed the sources after the expected ones, with its changes.</param>
+    private sealed record CycleRun(
+        List<Result> Changes,
+        List<SourceFile> Finals,
+        (int Cycle, List<Result> Changes)? Unsettled);
+
+    /// <summary>Follows one source file from where it started to where it is now, either end null for a file a cycle generated or deleted.</summary>
+    private sealed class Lineage(SourceFile? origin, SourceFile? latest)
     {
-        return new SourceSpec(before, after);
+        public SourceFile? Origin { get; } = origin;
+        public SourceFile? Latest { get; set; } = latest;
+    }
+
+    /// <summary>Runs the recipe cycle after cycle, each on what the cycle before produced.</summary>
+    private static CycleRun RunCycles(Recipe recipe, List<SourceFile> sources, RunChecks checks,
+        int cycles, int expectedCycles)
+    {
+        var lineages = sources.Select(s => new Lineage(s, s)).ToList();
+        CycleRun Settle(int cycle, List<Result>? changes) => new(
+            lineages.Where(l => !ReferenceEquals(l.Origin, l.Latest)).Select(l => new Result(l.Origin, l.Latest)).ToList(),
+            lineages.Where(l => l.Latest != null).Select(l => l.Latest!).ToList(),
+            changes == null ? null : (cycle, changes));
+
+        var settled = expectedCycles == 0 ? Settle(0, null) : null;
+        var cyclesThatMadeChanges = 0;
+        for (var cycle = 1; cycle <= cycles; cycle++)
+        {
+            var live = lineages.Where(l => l.Latest != null).Select(l => l.Latest!).ToList();
+            var changes = cycle == 1
+                ? checks.Run(recipe, live)
+                : RunWithoutWritingDataTables(recipe, live, checks);
+            if (changes.Count == 0)
+            {
+                break;
+            }
+            if (settled != null)
+            {
+                return settled with { Unsettled = (cycle, changes) };
+            }
+
+            cyclesThatMadeChanges++;
+            foreach (var (before, after) in changes)
+            {
+                var lineage = before == null ? null : lineages.Find(l => ReferenceEquals(l.Latest, before));
+                if (lineage != null)
+                {
+                    lineage.Latest = after;
+                }
+                else
+                {
+                    lineages.Add(new Lineage(null, after));
+                }
+            }
+            if (cycle >= expectedCycles)
+            {
+                settled = Settle(cycle, null);
+            }
+        }
+
+        if (expectedCycles > 1 && cyclesThatMadeChanges < expectedCycles)
+        {
+            Assert.Fail($"Expected recipe to complete in {PluralCycles(expectedCycles)}, but it settled after " +
+                        $"{PluralCycles(cyclesThatMadeChanges)}. Lower ExpectedCyclesThatMakeChanges.");
+        }
+        return settled ?? Settle(0, null);
+    }
+
+    /// <summary>Data tables are written by the first cycle only, as in Java.</summary>
+    private static List<Result> RunWithoutWritingDataTables(Recipe recipe, List<SourceFile> sources, RunChecks checks)
+    {
+        var ctx = checks.Ctx;
+        var dataTables = ctx.ComputeMessageIfAbsent<IDataTableStore>(DataTable<object>.DataTableStoreKey,
+            _ => new InMemoryDataTableStore());
+        ctx.PutMessage(DataTable<object>.DataTableStoreKey, new InMemoryDataTableStore());
+        try
+        {
+            return checks.Run(recipe, sources);
+        }
+        finally
+        {
+            ctx.PutMessage(DataTable<object>.DataTableStoreKey, dataTables);
+        }
+    }
+
+    private static void ExpectNoFurtherChanges(List<Result> changes, string headline, bool sanitized = false)
+    {
+        var markerPrinter = sanitized ? MarkerPrinter.Sanitized : MarkerPrinter.Default;
+        var found = new List<string>();
+        foreach (var (before, after) in changes)
+        {
+            if (before == null)
+            {
+                found.Add($"  {after!.SourcePath}, which it generated");
+            }
+            else if (after == null)
+            {
+                found.Add($"  {before.SourcePath}, which it deleted");
+            }
+            else
+            {
+                var expected = PrintTree(before, markerPrinter);
+                var actual = PrintTree(after, markerPrinter);
+                if (expected != actual)
+                {
+                    found.Add($"  {after.SourcePath}\n{DiffUtils.UnifiedDiff(expected, actual, after.SourcePath)}");
+                }
+                else if (!sanitized)
+                {
+                    found.Add($"  {after.SourcePath}, whose LST it changed without changing the printed source");
+                }
+            }
+        }
+
+        if (found.Count > 0)
+        {
+            Assert.Fail(string.Join("\n", [
+                $"{headline} the sources again:",
+                ..found,
+                "A recipe should recognize code it has already changed and leave it alone, so that running it " +
+                "again changes nothing. A recipe that is meant to need more cycles declares how many with " +
+                "ExpectedCyclesThatMakeChanges."
+            ]));
+        }
+    }
+
+    /// <param name="SyntaxTree">Roslyn's parse of the printed text.</param>
+    /// <param name="Unit">The LST of the printed text, or null when the parser doesn't print it back.</param>
+    internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit);
+
+    /// <summary>The printed text of each compilation unit the cycles left, parsed as the next run reads it.</summary>
+    private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals, CompileSetup? setup,
+        TestProjects projects)
+    {
+        var units = finals.OfType<CompilationUnit>()
+            .Select(unit =>
+            {
+                var text = PrintTree(unit, MarkerPrinter.Sanitized);
+                var tree = setup?.Parse(text, unit.SourcePath) ??
+                           CSharpSyntaxTree.ParseText(text, path: unit.SourcePath);
+                return (Unit: unit, Text: text, Tree: tree);
+            })
+            .ToList();
+        var compilations = setup != null
+            ? projects.Compile(units.Select(u => (projects.Of(u.Unit), u.Tree)), setup)
+            : null;
+
+        var parser = new CSharpParser();
+        var fresh = new Dictionary<SourceFile, FreshParse>(ReferenceEqualityComparer.Instance);
+        foreach (var (unit, text, tree) in units)
+        {
+            CompilationUnit? reparsed = null;
+            try
+            {
+                reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
+                    semanticModel: compilations?[tree].GetSemanticModel(tree));
+                if (PrintTree(reparsed, MarkerPrinter.Sanitized) != text)
+                {
+                    reparsed = null;
+                }
+            }
+            catch (Exception)
+            {
+                // A file that does not parse again keeps the LST the recipe produced
+            }
+            fresh[unit] = new FreshParse(tree, reparsed);
+        }
+        return fresh;
+    }
+
+    /// <summary>
+    /// Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
+    /// recipe that recognizes its own output only by the shape of that LST changes it again.
+    /// </summary>
+    private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
+        Dictionary<SourceFile, FreshParse> fresh, RunChecks checks)
+    {
+        if (!fresh.Values.Any(parse => parse.Unit != null))
+        {
+            return;
+        }
+
+        var sources = finals
+            .Select(f => fresh.TryGetValue(f, out var parse) && parse.Unit != null
+                // What the source file carries, like its styles, comes from outside its text
+                ? parse.Unit.WithMarkers(f.Markers)
+                : f)
+            .ToList();
+        ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, checks),
+            "Running the recipe on a fresh parse of its output changed", sanitized: true);
+    }
+
+    private static string PluralCycles(int count) => count == 1 ? "1 cycle" : $"{count} cycles";
+
+    /// <summary>
+    /// A C# source, at <paramref name="sourcePath"/> when the recipe looks at where it is, such as one that takes a
+    /// path as an option, or else at <c>source.cs</c>.
+    /// </summary>
+    protected static SourceSpec CSharp(string before, string? after = null, string? sourcePath = null)
+    {
+        return new SourceSpec(before, after, CSharpSourcePath(sourcePath));
+    }
+
+    /// <summary>
+    /// A C# source whose expected text <paramref name="after"/> makes of what the recipe printed, such as to assert on
+    /// parts of a large output and return it, or to compute it from the parts that vary. It gets the source as it was
+    /// when the recipe leaves it alone, and returns null when the recipe is to leave it alone, such as where the data
+    /// of a theory decides whether the recipe changes anything.
+    /// </summary>
+    protected static SourceSpec CSharp(string before, Func<string, string?> after, string? sourcePath = null)
+    {
+        return new SourceSpec(before, null, CSharpSourcePath(sourcePath)) { AfterFromActual = after };
+    }
+
+    private static string? CSharpSourcePath(string? sourcePath) =>
+        sourcePath == null || sourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+            ? sourcePath
+            : throw new ArgumentException($"A C# source is parsed here at a path that ends in .cs, not {sourcePath}.",
+                nameof(sourcePath));
+
+    /// <summary>
+    /// A C# source read from a file, such as a fixture the test project copies to its output directory, by its path
+    /// or a path relative to that directory. A <c>.txt</c> suffix that keeps the fixture out of the test project's
+    /// build is not part of its source path, unless the test gives it another <paramref name="sourcePath"/>.
+    /// <paramref name="sha256"/>, when given, is the hex SHA-256 the file has to have, as for code taken from a
+    /// project the test cites.
+    /// </summary>
+    protected static SourceSpec CSharpFromFile(string path, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureFile(path), path, sha256);
+        return new SourceSpec(text, after, sourcePath ?? CSharpPath(FixturePath(path)));
+    }
+
+    /// <summary>
+    /// A C# source read from a resource embedded in the test's assembly, by its manifest name or the end of it, such as
+    /// <c>Fixture.cs.txt</c>, otherwise as <see cref="CSharpFromFile"/>. MSBuild reads the <c>cs</c> of
+    /// <c>Fixture.cs.txt</c> as the Czech culture and puts the resource in a satellite assembly unless the
+    /// <c>EmbeddedResource</c> item says <c>WithCulture="false"</c>.
+    /// </summary>
+    protected SourceSpec CSharpFromResource(string name, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureResource(name), name, sha256);
+        return new SourceSpec(text, after, sourcePath ?? CSharpPath(FixturePath(name)));
+    }
+
+    /// <summary>
+    /// An XML source, such as a project file, <c>Directory.Build.props</c> or <c>packages.config</c>, read from a file
+    /// as <see cref="CSharpFromFile"/> reads a C# source. Its source path is where the test puts it, such as
+    /// <c>src/App/App.csproj</c>, or else the file's name. Project files and the files their build reads parse here, as
+    /// <see cref="CsProj"/> sources do, and other XML over RPC.
+    /// </summary>
+    protected static SourceSpec XmlFromFile(string path, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureFile(path), path, sha256);
+        return new SourceSpec(text, after, sourcePath ?? FixturePath(path), XmlDocumentType);
+    }
+
+    /// <summary>
+    /// An XML source read from a resource embedded in the test's assembly, as <see cref="CSharpFromResource"/> reads a
+    /// C# source, otherwise as <see cref="XmlFromFile"/>.
+    /// </summary>
+    protected SourceSpec XmlFromResource(string name, string? after = null, string? sha256 = null,
+        string? sourcePath = null)
+    {
+        var text = FixtureText(ReadFixtureResource(name), name, sha256);
+        return new SourceSpec(text, after, sourcePath ?? FixturePath(name), XmlDocumentType);
+    }
+
+    private const string XmlDocumentType = "org.openrewrite.xml.tree.Xml$Document";
+
+    private static byte[] ReadFixtureFile(string path) =>
+        File.ReadAllBytes(Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path));
+
+    private byte[] ReadFixtureResource(string name)
+    {
+        var assembly = GetType().Assembly;
+        var names = assembly.GetManifestResourceNames();
+        var matches = names.Where(n => n == name || n.EndsWith("." + name, StringComparison.Ordinal)).ToList();
+        if (matches.Count != 1)
+        {
+            var count = matches.Count == 0 ? "no" : matches.Count.ToString();
+            throw new ArgumentException($"{assembly.GetName().Name} embeds {count} resources named {name}, and has: " +
+                                        $"{string.Join(", ", names)}.");
+        }
+        using var stream = assembly.GetManifestResourceStream(matches[0])!;
+        using var bytes = new MemoryStream();
+        stream.CopyTo(bytes);
+        return bytes.ToArray();
+    }
+
+    private static string FixtureText(byte[] bytes, string name, string? sha256)
+    {
+        if (sha256 != null)
+        {
+            var actual = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+            if (!actual.Equals(sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    $"{Path.GetFileName(name)} has the SHA-256 {actual}, not {sha256}, so it isn't the code the test " +
+                    "cites.");
+            }
+        }
+        using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
+        var text = reader.ReadToEnd();
+        var bom = reader.CurrentEncoding.GetPreamble();
+        return bom.Length > 0 && bytes.AsSpan().StartsWith(bom) ? '\uFEFF' + text : text;
+    }
+
+    private static string FixturePath(string name)
+    {
+        var fileName = Path.GetFileName(name);
+        return fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ? fileName[..^4] : fileName;
+    }
+
+    private static string? CSharpPath(string path) =>
+        path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? path : null;
+
+    /// <summary>
+    /// An .editorconfig of the project the test's sources belong to. The C# sources take the style it sets for their
+    /// paths, as <see cref="SolutionParser"/> gives them, and no recipe runs on it.
+    /// </summary>
+    protected static SourceSpec EditorConfig(string content, string sourcePath = ".editorconfig")
+    {
+        return new SourceSpec(content, null, sourcePath);
     }
 
     protected static SourceSpec CsProj([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null, string sourcePath = "project.csproj")
     {
-        return new SourceSpec(before, after, sourcePath, "org.openrewrite.xml.tree.Xml$Document");
+        return new SourceSpec(before, after, sourcePath, XmlDocumentType);
+    }
+
+    /// <summary>
+    /// A project file the recipe changes, whose expected text <paramref name="afterFromActual"/> makes of what the
+    /// recipe printed, as <see cref="CSharp(string, Func{string, string?}, string?)"/> does for a C# source. It isn't named
+    /// <c>after</c>, so that <c>CsProj(before, after: null)</c> still means a project file the recipe leaves alone.
+    /// </summary>
+    protected static SourceSpec CsProj([LanguageInjection("xml")]string before, Func<string, string?> afterFromActual,
+        string sourcePath = "project.csproj")
+    {
+        return new SourceSpec(before, null, sourcePath, XmlDocumentType) { AfterFromActual = afterFromActual };
+    }
+
+    /// <summary>
+    /// An XML file as an XML parser parses it here, with no <see cref="MSBuildProject"/> and not written anywhere for a
+    /// restore, at any source path, such as a <c>nuget.config</c> or project file a recipe has to see as plain XML, or
+    /// one at a path that no build would read.
+    /// </summary>
+    protected static SourceSpec Xml([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null,
+        string sourcePath = "file.xml")
+    {
+        return new SourceSpec(before, after, sourcePath, XmlDocumentType) { PlainXml = true };
+    }
+
+    /// <summary>
+    /// An XML file the recipe changes, parsed as <see cref="Xml(string, string?, string)"/> does, whose expected text
+    /// <paramref name="afterFromActual"/> makes of what the recipe printed, as
+    /// <see cref="CSharp(string, Func{string, string?}, string?)"/> does for a C# source.
+    /// </summary>
+    protected static SourceSpec Xml([LanguageInjection("xml")]string before, Func<string, string?> afterFromActual,
+        string sourcePath = "file.xml")
+    {
+        return new SourceSpec(before, null, sourcePath, XmlDocumentType) { PlainXml = true, AfterFromActual = afterFromActual };
     }
 
     /// <summary>
@@ -269,16 +856,48 @@ public abstract class RewriteTest
         }
     }
 
-    private static string PrintTree(SourceFile tree)
+    protected static string PrintTree(SourceFile tree, IMarkerPrinter? markerPrinter = null)
     {
-        if (tree is Xml.Document)
+        var capture = new PrintOutputCapture<object>(null!, markerPrinter ?? MarkerPrinter.Default);
+        if (tree is ParseError parseError)
         {
-            var capture = new PrintOutputCapture<object>(null!);
-            new XmlPrinter<object>().Visit(tree, capture);
-            return capture.ToString();
+            PrintParseError(parseError, capture);
         }
-        return new CSharpPrinter<object>().Print(tree);
+        else if (tree is global::OpenRewrite.Xml.Document)
+        {
+            new XmlPrinter<object>().Visit(tree, capture);
+        }
+        else
+        {
+            new CSharpPrinter<object>().Visit(tree, capture);
+        }
+        var printed = capture.ToString();
+        return tree is CompilationUnit { CharsetBomMarked: true } && !printed.StartsWith('\uFEFF')
+            ? '\uFEFF' + printed
+            : printed;
     }
+
+    private static void PrintParseError(ParseError parseError, PrintOutputCapture<object> capture)
+    {
+        var cursor = new Cursor(new Cursor(), parseError);
+        var markers = parseError.Markers.MarkerList;
+        foreach (var marker in markers)
+        {
+            capture.Append(capture.MarkerPrinter.BeforePrefix(marker, new Cursor(cursor, marker), ParseErrorMarkerWrapper));
+        }
+        foreach (var marker in markers)
+        {
+            capture.Append(capture.MarkerPrinter.BeforeSyntax(marker, new Cursor(cursor, marker), ParseErrorMarkerWrapper));
+        }
+        capture.Append(parseError.Text);
+        foreach (var marker in markers)
+        {
+            capture.Append(capture.MarkerPrinter.AfterSyntax(marker, new Cursor(cursor, marker), ParseErrorMarkerWrapper));
+        }
+    }
+
+    private static string ParseErrorMarkerWrapper(string content) =>
+        "~~" + content + (content.Length == 0 ? "" : "~~") + ">";
 
     private static readonly CsprojParser CsprojParserInstance = new();
 
@@ -295,15 +914,37 @@ public abstract class RewriteTest
         return CsprojParserInstance.Accept(path);
     }
 
-    private static Dictionary<string, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs)
+    /// <summary>
+    /// The project files and the files their build reads, parsed together, checked to print as parsed, and adjusted as
+    /// their specs say before the projects of the C# sources are read from them.
+    /// </summary>
+    private static Dictionary<SourceSpec, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs, bool restore,
+        Validations validations)
     {
-        var files = specs.Select(s => (s.Before, s.SourcePath!)).ToList();
-        var docs = CsprojParserInstance.ParseAll(files);
-
-        var result = new Dictionary<string, SourceFile>();
+        var result = new Dictionary<SourceSpec, SourceFile>(ReferenceEqualityComparer.Instance);
+        if (specs.Count == 0)
+        {
+            return result;
+        }
+        var restored = specs.Where(s => restore && s.RestoresProject).Select(s => s.SourcePath!).ToHashSet();
+        var docs = CsprojParserInstance.ParseAll(specs.Select(s => (s.Before, s.SourcePath!)).ToList(),
+            restored.Contains);
         for (var i = 0; i < specs.Count; i++)
-            result[specs[i].SourcePath!] = docs[i];
+        {
+            AssertPrintsAsParsed(specs[i], docs[i], validations);
+            result[specs[i]] = SourceSpec.ApplyBeforeRecipe(specs[i], docs[i]);
+        }
         return result;
+    }
+
+    private static void AssertPrintsAsParsed(SourceSpec spec, SourceFile source, Validations validations)
+    {
+        if (validations.PrintEqualsInput)
+        {
+            AssertContentEquals(spec.Before, PrintTree(source), source.SourcePath,
+                "The printed source didn't match the original source code. " +
+                "This means there is a bug in the parser implementation itself.");
+        }
     }
 
     private static void AssertContentEquals(string expected, string actual, string sourcePath,
@@ -326,7 +967,135 @@ public record SourceSpec(
     string Before,
     string? After = null,
     string? SourcePath = null,
-    string? SourceFileType = null);
+    string? SourceFileType = null)
+{
+    internal Func<string, string?>? AfterFromActual { get; init; }
+    internal bool PlainXml { get; init; }
+    internal bool Skipped { get; private init; }
+    internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
+    internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];
+    internal ImmutableArray<string>? ProjectTargetFrameworks { get; private init; }
+    internal string? ProjectName { get; private init; }
+    internal ImmutableArray<string> ProjectReferences { get; private init; } = [];
+
+    /// <summary>
+    /// Adjusts the parsed source before the recipe runs on it, after the parse and print checks, as when a test needs
+    /// a tree the parser doesn't make. The adjustments run in the order they were added.
+    /// </summary>
+    public SourceSpec BeforeRecipe(Func<CompilationUnit, CompilationUnit> adjust) =>
+        BeforeRecipe<CompilationUnit>(adjust);
+
+    /// <inheritdoc cref="BeforeRecipe(Func{CompilationUnit, CompilationUnit})"/>
+    public SourceSpec BeforeRecipe<T>(Func<T, T> adjust) where T : class, SourceFile =>
+        this with
+        {
+            BeforeRecipeHooks = BeforeRecipeHooks.Add(source => adjust(As<T>(source, nameof(BeforeRecipe))))
+        };
+
+    /// <summary>
+    /// Puts markers on the parsed source before the recipe runs on it, each in place of a marker of its type that the
+    /// source has, such as the <see cref="MSBuildProject"/> of a project file, which then isn't restored.
+    /// </summary>
+    public SourceSpec AddMarkers(params Marker[] markers) =>
+        BeforeRecipe<SourceFile>(source => markers.Aggregate(source, SetMarker)) with
+        {
+            RestoresProject = RestoresProject && !markers.Any(m => m is MSBuildProject)
+        };
+
+    /// <summary>
+    /// Takes the markers of type <typeparamref name="T"/> off the parsed source before the recipe runs on it, such as
+    /// the <see cref="MSBuildProject"/> of a project file or a <c>Directory.Build.props</c>, to have the recipe see the
+    /// file as an XML parser parses it. A project file without its <see cref="MSBuildProject"/> isn't restored.
+    /// </summary>
+    public SourceSpec RemoveMarkers<T>() where T : Marker =>
+        BeforeRecipe<SourceFile>(source => WithMarkers(source, source.Markers.Remove<T>())) with
+        {
+            RestoresProject = RestoresProject && !typeof(T).IsAssignableFrom(typeof(MSBuildProject))
+        };
+
+    /// <summary>
+    /// Whether a project file among the sources gets its <see cref="MSBuildProject"/> from a NuGet restore, rather
+    /// than the test giving it one.
+    /// </summary>
+    internal bool RestoresProject { get; private init; } = true;
+
+    /// <summary>
+    /// Has the source's project target the given frameworks, as its <see cref="DotNetProject"/> marker says. A source
+    /// in no <see cref="InProject">named project</see> goes in a project named <c>Test</c>, as
+    /// <see cref="SolutionParser"/> names the project of <c>Test.csproj</c>, which the sources of the test that target
+    /// the same frameworks share.
+    /// </summary>
+    public SourceSpec TargetFrameworks(params string[] targetFrameworks) =>
+        this with { ProjectTargetFrameworks = [..targetFrameworks] };
+
+    /// <summary>
+    /// Puts the source in the named SDK-style project, with the <see cref="DotNetProject"/> marker that
+    /// <see cref="SolutionParser"/> gives it. The C# sources of each project compile on their own, against the projects
+    /// that any of its sources names in <paramref name="projectReferences"/>, and those in no project compile together.
+    /// To have sources compile together and still carry different markers, add the markers with
+    /// <see cref="AddMarkers"/> instead. A project named by the path of a project file among the test's sources, such
+    /// as <c>src/App/App.csproj</c>, is named, targets the frameworks, uses the SDK and references the projects that
+    /// project file says, as <see cref="SolutionParser"/> reads them.
+    /// </summary>
+    public SourceSpec InProject(string projectName, params string[] projectReferences) =>
+        this with { ProjectName = projectName, ProjectReferences = [..projectReferences] };
+
+    /// <summary>
+    /// Parses the source and compiles it with the others, and keeps it from the recipe, such as code that the sources
+    /// the recipe runs on use. The output compiles with it, and the recipe doesn't change it.
+    /// </summary>
+    public SourceSpec Skip() => this with { Skipped = true };
+
+    /// <summary>
+    /// Assertions on the source after the recipe ran, which get the source as the last expected cycle left it, or as
+    /// it was parsed when the recipe didn't change it.
+    /// </summary>
+    public SourceSpec AfterRecipe(Action<CompilationUnit> assertion) => AfterRecipe<CompilationUnit>(assertion);
+
+    /// <inheritdoc cref="AfterRecipe(Action{CompilationUnit})"/>
+    public SourceSpec AfterRecipe<T>(Action<T> assertion) where T : class, SourceFile =>
+        AfterRecipe<T>((_, after) => assertion(after));
+
+    /// <summary>
+    /// Assertions on the source as it was before the recipe ran and as the last expected cycle left it, the same tree
+    /// twice when the recipe didn't change it, such as that a type the recipe kept is the same object as before.
+    /// </summary>
+    public SourceSpec AfterRecipe(Action<CompilationUnit, CompilationUnit> assertion) =>
+        AfterRecipe<CompilationUnit>(assertion);
+
+    /// <inheritdoc cref="AfterRecipe(Action{CompilationUnit, CompilationUnit})"/>
+    public SourceSpec AfterRecipe<T>(Action<T, T> assertion) where T : class, SourceFile =>
+        this with
+        {
+            AfterRecipeHooks = AfterRecipeHooks.Add((before, after) =>
+                assertion(As<T>(before, nameof(AfterRecipe)), As<T>(after, nameof(AfterRecipe))))
+        };
+
+    /// <summary>The source as the spec's <see cref="BeforeRecipe{T}"/> adjustments leave it.</summary>
+    internal static SourceFile ApplyBeforeRecipe(SourceSpec spec, SourceFile source) =>
+        spec.BeforeRecipeHooks.Aggregate(source, (s, adjust) => adjust(s));
+
+    internal static SourceFile AddMarker(SourceFile source, Marker marker) =>
+        WithMarkers(source, source.Markers.Add(marker));
+
+    private static SourceFile SetMarker(SourceFile source, Marker marker) =>
+        WithMarkers(source, source.Markers.SetByType(marker));
+
+    private static SourceFile WithMarkers(SourceFile source, Markers markers)
+    {
+        if (source is J j)
+        {
+            return (SourceFile)J.SetMarkers(j, markers);
+        }
+        var withMarkers = source.GetType().GetMethod("WithMarkers", [typeof(Markers)]) ??
+                          throw new ArgumentException($"{source.GetType().Name} has no markers to add to.");
+        return (SourceFile)withMarkers.Invoke(source, [markers])!;
+    }
+
+    private static T As<T>(SourceFile source, string hook) where T : class, SourceFile =>
+        source as T ?? throw new ArgumentException(
+            $"{hook} takes a {typeof(T).Name}, but {source.SourcePath} is a {source.GetType().Name}.");
+}
 
 /// <summary>
 /// Specification for recipe configuration in a test.
@@ -345,9 +1114,90 @@ public class RecipeSpec
     /// </summary>
     public IReadOnlyList<Action<ExecutionContext>> AfterRecipe => _afterRecipe;
 
+    /// <summary>
+    /// The cycles to run, by default one more than <see cref="ExpectedCyclesThatMakeChanges"/> and at least two.
+    /// The cycles after the expected ones, and a run on a fresh parse of the output, fail the test if they change
+    /// anything, so setting this to 1 turns the stability checks off.
+    /// </summary>
+    public int? Cycles { get; private set; }
+
+    /// <summary>
+    /// How many cycles a recipe needs to settle, by default 1. A recipe that only reaches its result over several
+    /// cycles declares how many here, and the test then compares the output of the last of them.
+    /// </summary>
+    public int? ExpectedCyclesThatMakeChanges { get; private set; }
+
     public RecipeSpec SetRecipe(Recipe recipe)
     {
         Recipe = recipe;
+        return this;
+    }
+
+    /// <summary>
+    /// Runs the recipes one after the other on each source, as a recipe that lists them does, such as a recipe that
+    /// Java runs before and after the recipe under test to check that Java matches the types the recipe left. The
+    /// sources the test expects are those the last of them leaves.
+    /// </summary>
+    public RecipeSpec SetRecipes(params Recipe[] recipes)
+    {
+        if (recipes.Length == 0)
+        {
+            throw new ArgumentException("SetRecipes takes the recipes to run, and none were given.");
+        }
+        Recipe = recipes.Length == 1 ? recipes[0] : new RecipeSteps(recipes);
+        return this;
+    }
+
+    internal ExecutionContext? GivenExecutionContext { get; private set; }
+
+    /// <summary>
+    /// Has the recipe run with what <paramref name="ctx"/> holds, and leaves on it what the recipe put on the context
+    /// it ran with, such as to give a follow-up run the context an earlier run left.
+    /// </summary>
+    public RecipeSpec SetExecutionContext(ExecutionContext ctx)
+    {
+        GivenExecutionContext = ctx;
+        return this;
+    }
+
+    private readonly List<Action<ExecutionContext>> _executionContextSeeds = [];
+
+    internal IReadOnlyList<Action<ExecutionContext>> ExecutionContextSeeds => _executionContextSeeds;
+
+    /// <summary>
+    /// Puts what the recipe expects to find on the execution context before it runs, such as the build files a
+    /// <see cref="DotNetBuildContext"/> captured earlier in the run, which the
+    /// <see cref="Validations.ExecutionContextUnchanged"/> check then counts as there from the start.
+    /// </summary>
+    public RecipeSpec ConfigureExecutionContext(Action<ExecutionContext> configure)
+    {
+        _executionContextSeeds.Add(configure);
+        return this;
+    }
+
+    /// <summary>
+    /// Whether the project files among the sources get their <see cref="MSBuildProject"/> from a NuGet restore of the
+    /// test's files, by default true. Without it they get the marker of their SDK only, as props and targets files do,
+    /// with no target frameworks or packages, so a test that only needs to know which files are build files doesn't
+    /// wait for the restore or depend on what a package feed serves.
+    /// </summary>
+    public bool ProjectRestore { get; private set; } = true;
+
+    public RecipeSpec SetProjectRestore(bool projectRestore)
+    {
+        ProjectRestore = projectRestore;
+        return this;
+    }
+
+    public RecipeSpec SetCycles(int cycles)
+    {
+        Cycles = cycles;
+        return this;
+    }
+
+    public RecipeSpec SetExpectedCyclesThatMakeChanges(int expectedCyclesThatMakeChanges)
+    {
+        ExpectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
         return this;
     }
 
@@ -370,6 +1220,155 @@ public class RecipeSpec
         return this;
     }
 
+    /// <summary>
+    /// Assertions on the execution context the recipe ran with, such as that it marked a project's restore metadata
+    /// stale with <see cref="MSBuildProjectHelper.MarkAttestationStale"/>.
+    /// </summary>
+    public RecipeSpec ExpectExecutionContext(Action<ExecutionContext> assertion)
+    {
+        _afterRecipe.Add(assertion);
+        return this;
+    }
+
+    private readonly List<Action<IReadOnlyList<Result>>> _resultAssertions = [];
+
+    internal IReadOnlyList<Action<IReadOnlyList<Result>>> ResultAssertions => _resultAssertions;
+
+    /// <summary>
+    /// Assertions on the changes of the run: the source files the expected cycles changed, generated or deleted,
+    /// each from how it was parsed to how the last of those cycles left it.
+    /// </summary>
+    public RecipeSpec ExpectResults(Action<IReadOnlyList<Result>> assertion)
+    {
+        _resultAssertions.Add(assertion);
+        return this;
+    }
+
+    /// <summary>The options the C# sources compile with, by default those of a library.</summary>
+    public CSharpCompilationOptions CompilationOptions { get; private set; } = new(OutputKind.DynamicallyLinkedLibrary);
+
+    /// <summary>
+    /// The options the C# sources are parsed with, such as the language version and preprocessor symbols.
+    /// </summary>
+    public CSharpParseOptions ParseOptions { get; private set; } = CSharpParseOptions.Default;
+
+    private readonly List<MetadataReference> _references = [];
+
+    /// <summary>
+    /// The references the C# sources compile against in addition to the <see cref="ReferenceAssemblies"/>.
+    /// </summary>
+    public IReadOnlyList<MetadataReference> References => _references;
+
+    public RecipeSpec SetCompilationOptions(CSharpCompilationOptions options)
+    {
+        CompilationOptions = options;
+        return this;
+    }
+
+    public RecipeSpec SetParseOptions(CSharpParseOptions options)
+    {
+        ParseOptions = options;
+        return this;
+    }
+
+    /// <summary>
+    /// Has the C# sources, and the output that <see cref="ExpectOutputCompiles"/> compiles, also compile against the
+    /// references, such as prebuilt DLLs, NuGet packages or a library compiled in memory, as with
+    /// <c>MetadataReference.CreateFromFile(path)</c> or <c>compilation.ToMetadataReference()</c>.
+    /// </summary>
+    public RecipeSpec AddReferences(params MetadataReference[] references)
+    {
+        _references.AddRange(references);
+        return this;
+    }
+
+    private readonly List<Action<IReadOnlyDictionary<IScanningRecipe, object>>> _accumulatorAssertions = [];
+
+    internal IReadOnlyList<Action<IReadOnlyDictionary<IScanningRecipe, object>>> AccumulatorAssertions =>
+        _accumulatorAssertions;
+
+    /// <summary>
+    /// Assertions on what a scanning recipe of the run found, in each accumulator of a <typeparamref name="T"/> once
+    /// the first cycle scanned the sources, such as why the recipe leaves a file alone.
+    /// </summary>
+    public RecipeSpec ExpectAccumulator<T>(Action<T> assertion)
+    {
+        _accumulatorAssertions.Add(accumulators =>
+        {
+            var matching = accumulators.Values.OfType<T>().ToList();
+            if (matching.Count == 0)
+            {
+                var kept = accumulators.Count == 0
+                    ? "no scanning recipe ran"
+                    : "the scanning recipes keep " +
+                      string.Join(", ", accumulators.Values.Select(a => Name(a.GetType())));
+                Assert.Fail($"ExpectAccumulator<{Name(typeof(T))}> found no accumulator of that type: {kept}.");
+            }
+            matching.ForEach(assertion);
+        });
+        return this;
+    }
+
+    private static string Name(Type type) => type.IsGenericType
+        ? $"{type.Name[..type.Name.IndexOf('`')]}<{string.Join(", ", type.GetGenericArguments().Select(Name))}>"
+        : type.Name;
+
+    private readonly List<OutputCompilation> _outputCompilations = [];
+
+    internal IReadOnlyList<OutputCompilation> OutputCompilations => _outputCompilations;
+
+    /// <summary>
+    /// Expect the C# sources as the recipe left them to compile without errors, against
+    /// <paramref name="references"/> when the output targets other frameworks than the input, and against
+    /// <see cref="ReferenceAssemblies"/> otherwise, and with <paramref name="options"/> and
+    /// <paramref name="parseOptions"/> when they differ from <see cref="CompilationOptions"/> and
+    /// <see cref="ParseOptions"/>, such as to treat warnings as errors or build a console app, and also against
+    /// <paramref name="addReferences"/>, as <see cref="AddReferences"/> has the input and the output compile, such as
+    /// the package a recipe migrates to.
+    /// <paramref name="inspect"/> gets the compilation of each project, such as to emit and run the output. Call it
+    /// once for each way the output has to compile. The first call also says how the output is parsed again for the
+    /// checks that the recipe leaves it alone and builds the trees the parser builds, since the next run reads the
+    /// migrated code as the project the recipe migrated builds it.
+    /// </summary>
+    public RecipeSpec ExpectOutputCompiles(ReferenceAssemblies? references = null,
+        Action<CSharpCompilation>? inspect = null, CSharpCompilationOptions? options = null,
+        CSharpParseOptions? parseOptions = null, IEnumerable<MetadataReference>? addReferences = null)
+    {
+        _outputCompilations.Add(new OutputCompilation(references, inspect, options, parseOptions,
+            [..addReferences ?? []]));
+        return this;
+    }
+
+    private readonly List<Action<CSharpCompilation>> _inputInspections = [];
+
+    internal IReadOnlyList<Action<CSharpCompilation>> InputInspections => _inputInspections;
+
+    /// <summary>Whether the test expects the C# sources to compile without errors before the recipe runs.</summary>
+    public bool InputCompiles { get; private set; }
+
+    /// <summary>
+    /// Expect the C# sources to compile without errors before the recipe runs, so that the types the recipe sees are
+    /// the ones the compiler resolved. <paramref name="inspect"/> gets the compilation of each project, such as to run
+    /// the input and compare what it does with what the output does. <paramref name="expectedErrors"/> are the ids of
+    /// the errors the sources have to have, such as <c>CS0618</c> for the obsolete API a recipe migrates away from
+    /// under <c>TreatWarningsAsErrors</c>, and the only ones they may have.
+    /// </summary>
+    public RecipeSpec ExpectInputCompiles(Action<CSharpCompilation>? inspect = null,
+        IEnumerable<string>? expectedErrors = null)
+    {
+        InputCompiles = true;
+        if (inspect != null)
+        {
+            _inputInspections.Add(inspect);
+        }
+        _expectedInputErrors.UnionWith(expectedErrors ?? []);
+        return this;
+    }
+
+    private readonly HashSet<string> _expectedInputErrors = [];
+
+    internal IReadOnlySet<string> ExpectedInputErrors => _expectedInputErrors;
+
     public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
@@ -381,6 +1380,28 @@ public class RecipeSpec
         Validations = validations;
         return this;
     }
+}
+
+/// <param name="References">The references to compile against, or null for the ones the input compiled against.</param>
+/// <param name="Inspect">What the test checks of the compilation.</param>
+/// <param name="Options">The options to compile with, or null for the ones the input compiled with.</param>
+/// <param name="ParseOptions">The options to parse with, or null for the ones the input was parsed with.</param>
+/// <param name="AddReferences">The references to compile against in addition to the others.</param>
+internal sealed record OutputCompilation(
+    ReferenceAssemblies? References,
+    Action<CSharpCompilation>? Inspect,
+    CSharpCompilationOptions? Options,
+    CSharpParseOptions? ParseOptions,
+    ImmutableArray<MetadataReference> AddReferences);
+
+/// <summary>The recipes of <see cref="RecipeSpec.SetRecipes"/>, run one after the other.</summary>
+internal sealed class RecipeSteps(IReadOnlyList<Recipe> steps) : Recipe
+{
+    public override string DisplayName => "Recipe steps";
+
+    public override string Description => string.Join(", then ", steps.Select(step => step.DisplayName)) + ".";
+
+    public override List<Recipe> GetRecipeList() => [..steps];
 }
 
 /// <summary>

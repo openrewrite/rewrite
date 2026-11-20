@@ -1,0 +1,24 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 0,
+  "workspaces": {
+    "": {
+      "name": "test-scoped-lockfile-project",
+      "dependencies": {
+        "@inquirer/confirm": "^5.1.21",
+        "is-odd": "^3.0.1",
+      },
+    },
+  },
+  "packages": {
+    "@inquirer/confirm": ["@inquirer/confirm@5.1.21", "", { "dependencies": { "@inquirer/core": "^10.3.2", "is-odd": "^0.1.2" } }, "sha512-confirm"],
+
+    "@inquirer/core": ["@inquirer/core@10.3.2", "", {}, "sha512-core10"],
+
+    "is-odd": ["is-odd@3.0.1", "", {}, "sha512-isodd3"],
+
+    "@inquirer/confirm/is-odd": ["is-odd@0.1.2", "", { "dependencies": { "@inquirer/core": "^9.2.1" } }, "sha512-isodd0"],
+
+    "@inquirer/confirm/is-odd/@inquirer/core": ["@inquirer/core@9.2.1", "", {}, "sha512-core9"],
+  }
+}

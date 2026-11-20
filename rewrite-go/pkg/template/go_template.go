@@ -17,8 +17,12 @@
 package template
 
 import (
+	"io/fs"
 	"sync"
 
+	"github.com/google/uuid"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -29,49 +33,257 @@ type GoTemplate struct {
 	code     string
 	captures map[string]*Capture
 	imports  []string
+	context  []string
 	kind     ScaffoldKind
+	importerCache
 
 	once     sync.Once
 	cached   java.J
 	parseErr error
+
+	// required names the captures the parsed tree stands in for, which is a
+	// property of the template rather than of an application.
+	requiredOnce sync.Once
+	required     map[string]bool
+
+	// sourceImports are the imports a recipe adds alongside the template,
+	// whose names the template qualifies with as it does its own imports'.
+	sourceImports  []SourceImportSpec
+	qualifiersOnce sync.Once
+	qualifierNames map[string]bool
+}
+
+// qualifiedBy names the package qualifiers the template's code is written
+// with, which a local declaration at the site would capture.
+func (t *GoTemplate) qualifiedBy(tree java.J) map[string]bool {
+	t.qualifiersOnce.Do(func() {
+		paths := append([]string(nil), t.imports...)
+		var aliases []string
+		for _, imp := range t.sourceImports {
+			if imp.Alias == nil {
+				paths = append(paths, imp.Path)
+			} else if *imp.Alias != "_" && *imp.Alias != "." {
+				aliases = append(aliases, *imp.Alias)
+			}
+		}
+		t.qualifierNames = qualifiers(tree, paths, aliases)
+	})
+	return t.qualifierNames
+}
+
+// fileQualifiers maps each qualifier the template's code is written with to the
+// name cu imports the same package under, where that is another one. It is not
+// ok where cu imports such a package with a dot only, leaving no qualifier to
+// write.
+func (t *GoTemplate) fileQualifiers(cu *golang.CompilationUnit, qualified map[string]bool) (map[string]string, bool) {
+	if cu == nil || cu.Imports == nil {
+		return nil, true
+	}
+	paths := map[string]string{}
+	for _, imp := range t.imports {
+		paths[packageNameOf(imp)] = imp
+	}
+	for _, imp := range t.sourceImports {
+		if imp.Alias == nil {
+			paths[packageNameOf(imp.Path)] = imp.Path
+		} else {
+			paths[*imp.Alias] = imp.Path
+		}
+	}
+	var renames map[string]string
+	for name := range qualified {
+		path, ok := paths[name]
+		if !ok {
+			continue
+		}
+		var alias string
+		imported, dotted := false, false
+		for _, rp := range cu.Imports.Elements {
+			imp := rp.Element
+			if imp == nil || imp.Path() != path {
+				continue
+			}
+			as := packageNameOf(path)
+			if imp.Alias != nil && imp.Alias.Element != nil {
+				as = imp.Alias.Element.Name
+			}
+			switch as {
+			case name:
+				imported = true
+			case ".":
+				dotted = true
+			case "_":
+			default:
+				if alias == "" {
+					alias = as
+				}
+			}
+		}
+		switch {
+		case imported:
+		case alias != "":
+			if renames == nil {
+				renames = map[string]string{}
+			}
+			renames[name] = alias
+		case dotted:
+			return nil, false
+		}
+	}
+	return renames, true
+}
+
+// required names the captures a substitution has to bind. A capture the
+// template never names has no placeholder to leave behind, so a recipe may
+// declare one and share it across alternatives that do not all use it.
+func (t *GoTemplate) requiredCaptures(tree java.J) map[string]bool {
+	t.requiredOnce.Do(func() {
+		t.required = map[string]bool{}
+		for name := range placeholdersIn(tree) {
+			if _, declared := t.captures[name]; declared {
+				t.required[name] = true
+			}
+		}
+	})
+	return t.required
 }
 
 // Apply produces a new AST node by parsing the template and substituting
-// captured values from the MatchResult.
+// captured values from the MatchResult. cursor is the node the result replaces,
+// and is what lets Apply place the result there: leading whitespace,
+// parentheses where the expression around it binds tighter, indentation. Pass
+// nil for the substituted tree alone, carrying the template's own whitespace.
 func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
+	return t.apply(cursor, values, false)
+}
+
+// applyInFile is Apply for a rewrite that hands its result to the file as it
+// is, as Rewrite and NewRecipe do, the cursor naming exactly the node replaced.
+// The result is nil where Go's grammar does not admit it in that slot, such as
+// a statement where an expression belongs. The template's package qualifiers
+// take on the names the file imports their packages under, and the result is
+// nil where a local declaration in scope at the site shadows one of them, or
+// where the file dot-imports one. A recipe calling Apply places the result
+// itself and keeps those decisions; it may alias an import a local shadows.
+func (t *GoTemplate) applyInFile(cursor *visitor.Cursor, values *MatchResult) java.J {
+	return t.apply(cursor, values, true)
+}
+
+func (t *GoTemplate) apply(cursor *visitor.Cursor, values *MatchResult, inFile bool) java.J {
 	templateTree, err := t.getTree()
 	if err != nil || templateTree == nil {
 		return nil
 	}
 
-	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
-	// and we need a fresh tree to substitute into).
-	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind)
-	if err != nil {
-		return nil
+	// A placeholder left unsubstituted prints as the identifier standing in
+	// for it, which would reach the source file.
+	for name := range t.requiredCaptures(templateTree) {
+		if values == nil || !values.satisfies(t.captures[name]) {
+			return nil
+		}
+	}
+
+	// The file may import a package the template qualifies with under another
+	// name, which the template's code takes on. A local declaration at the
+	// site naming one of them would take the reference over.
+	var requalified map[string]string
+	if inFile && cursor != nil {
+		if qualified := t.qualifiedBy(templateTree); len(qualified) > 0 {
+			var ok bool
+			if requalified, ok = t.fileQualifiers(compilationUnitOf(cursor), qualified); !ok {
+				return nil
+			}
+			locals := localNames(cursor)
+			for name := range qualified {
+				if as, renamed := requalified[name]; renamed {
+					name = as
+				}
+				if locals[name] {
+					return nil
+				}
+			}
+		}
+	}
+
+	// Giving every node a new ID copies the whole tree, so the result shares
+	// no node with the cached one and two applications share none with each
+	// other. The cache is what the scaffold parse produced, once.
+	fresh := withFreshIDs(templateTree)
+	if len(requalified) > 0 {
+		fresh = renamedQualifiers(fresh, requalified)
 	}
 
 	if values != nil {
+		if cursor != nil {
+			if replaced, ok := cursor.Value().(java.J); ok {
+				fresh = hygienic(fresh, values, replaced)
+			}
+		}
 		fresh = substitute(fresh, values)
+		if fresh != nil && !wellFormed(fresh) {
+			return nil
+		}
 	}
+	if fresh == nil {
+		return nil
+	}
+	if cursor == nil {
+		return fresh
+	}
+	return placeAt(fresh, cursor, inFile)
+}
 
-	return fresh
+// Instantiate produces the template as a detached node for a recipe that
+// inserts the result somewhere new, where Apply replaces a matched node. Bound
+// values are copied, so a spliced subtree may also stay where it came from.
+// The result carries no leading whitespace. Like Apply it is nil unless every
+// capture is bound, through Bind for a single subtree or BindList for a run of
+// them within the capture's declared bounds.
+func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
+	instantiated := t.Apply(nil, values)
+	if instantiated == nil {
+		return nil
+	}
+	// The whitespace is the gap the scaffold leaves before the template code,
+	// not whitespace the template itself declares. Its comments are its own.
+	return setLeadingPrefix(instantiated, java.MakeSpace(getLeadingPrefix(instantiated).Comments(), ""))
+}
+
+// withFreshIDs returns a copy of j in which every node has a new ID, keeping
+// IDs unique within whatever tree the result is inserted into.
+func withFreshIDs(j java.J) java.J {
+	v := &idRefreshVisitor{}
+	v.Self = v
+	return v.Visit(j, nil).(java.J)
+}
+
+type idRefreshVisitor struct {
+	visitor.GoVisitor
+}
+
+func (v *idRefreshVisitor) Visit(t java.Tree, p any) java.Tree {
+	visited := v.GoVisitor.Visit(t, p)
+	if j, ok := visited.(java.J); ok && j != nil {
+		return j.WithID(uuid.New())
+	}
+	return visited
 }
 
 // getTree lazily parses the template and caches the result.
 func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
-		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind)
+		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.context, t.kind, t.shared())
 	})
 	return t.cached, t.parseErr
 }
 
 type TemplateBuilder struct {
-	code     string
-	captures []*Capture
-	imports  []string
-	kind     ScaffoldKind
+	code       string
+	captures   []*Capture
+	imports    []string
+	context    []string
+	kind       ScaffoldKind
+	exportData []fs.FS
 }
 
 func ExpressionTemplate(code string) *TemplateBuilder {
@@ -97,12 +309,30 @@ func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	return b
 }
 
+// Context adds declarations the template is parsed against. See
+// PatternBuilder.Context.
+func (b *TemplateBuilder) Context(decls ...string) *TemplateBuilder {
+	b.context = append(b.context, decls...)
+	return b
+}
+
+// ExportData attributes the template against compiler export data the recipe
+// module carries, reaching packages the running toolchain cannot load. Sets
+// accumulate, as Imports does, so a module can draw on several generated
+// packages; see exportdata.Importer for what none of them covers.
+func (b *TemplateBuilder) ExportData(sets ...fs.FS) *TemplateBuilder {
+	b.exportData = append(b.exportData, sets...)
+	return b
+}
+
 func (b *TemplateBuilder) Build() *GoTemplate {
 	return &GoTemplate{
-		code:     b.code,
-		captures: captureMap(b.captures),
-		imports:  b.imports,
-		kind:     b.kind,
+		code:          b.code,
+		captures:      captureMap(b.captures),
+		imports:       b.imports,
+		context:       b.context,
+		kind:          b.kind,
+		importerCache: importerCache{exportData: b.exportData},
 	}
 }
 
@@ -137,13 +367,13 @@ func (v *RewriteVisitor) Visit(t java.Tree, p any) java.Tree {
 		return result
 	}
 
-	replaced := v.after.Apply(nil, match)
+	// The cursor names t, not the visited j: rewriting a descendant leaves j a
+	// new node, while the parent Apply consults still holds t.
+	replaced := v.after.applyInFile(visitor.NewCursor(v.Cursor(), t), match)
 	if replaced == nil {
 		return result
 	}
-
-	// Preserve the original node's leading prefix on the replacement.
-	return setLeadingPrefix(replaced, getLeadingPrefix(j))
+	return replaced
 }
 
 // setLeadingPrefix sets the node's own leading whitespace. The parser
@@ -158,4 +388,18 @@ func setLeadingPrefix(j java.J, prefix java.Space) java.J {
 // leading prefix lives directly on the node.
 func getLeadingPrefix(j java.J) java.Space {
 	return j.GetPrefix()
+}
+
+// placeholdersIn names the captures a template tree stands in for.
+func placeholdersIn(tree java.J) map[string]bool {
+	names := map[string]bool{}
+	visitor.Walk(tree, func(t java.Tree) bool {
+		if ident, ok := t.(*java.Identifier); ok {
+			if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
+				names[name] = true
+			}
+		}
+		return true
+	})
+	return names
 }

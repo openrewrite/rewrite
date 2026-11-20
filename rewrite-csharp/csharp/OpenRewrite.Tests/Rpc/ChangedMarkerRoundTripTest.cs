@@ -35,7 +35,7 @@ public class ChangedMarkerRoundTripTest
         var after = before.WithMarkerList([afterMarker]);
 
         var data = new List<RpcObjectData>();
-        var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+        var sendRefs = new RpcRefs();
         var sendQueue = new RpcSendQueue(1024, batch => data.AddRange(batch), sendRefs, null, false);
         sendQueue.Send(after, before, null);
         sendQueue.Flush();
@@ -52,7 +52,7 @@ public class ChangedMarkerRoundTripTest
         // against an empty before keeps it off the NO_CHANGE path.
         var secondData = new List<RpcObjectData>();
         var secondSend = new RpcSendQueue(1024, batch => secondData.AddRange(batch),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
         secondSend.Send(received, null, null);
         secondSend.Flush();
         Assert.Contains(secondData, d => (d.Value as string) == "com.example.After");

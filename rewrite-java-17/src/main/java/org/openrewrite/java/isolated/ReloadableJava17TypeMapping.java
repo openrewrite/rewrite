@@ -192,6 +192,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             name = type.tsym.name.toString();
         }
         return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
+            if (type instanceof Type.CapturedType && !((Type.CapturedType) type).lower.hasTag(TypeTag.BOT)) {
+                // a capture of `? super String` is denoted by its lower bound, not by the declared bound it has above
+                gtv.unsafeSet(gtv.getName(), CONTRAVARIANT, singletonList(type(((Type.CapturedType) type).lower)));
+                return;
+            }
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
@@ -220,6 +225,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
+        // Taken before the initializer may complete the symbol, matching the signature built from the same state.
+        // A generic class arrives through its own symbol type only once javac has completed it, since javac
+        // completes an owner before its nested classes and a class before any of its members.
+        boolean parameterized = classType.typarams_field != null && classType.typarams_field.length() > 0;
+        // flags_field is empty until javac completes the symbol, so the initializer sets flags and kind again.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), stub -> {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
@@ -278,10 +288,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     typeParameters.add(type(tParam));
                 }
             }
-            stub.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            stub.unsafeSet(sym.flags_field, getKind(sym), fqn, typeParameters, supertype, owner, listAnnotations(sym),
+                    interfaces, fields, methods);
         });
 
-        if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
+        if (parameterized) {
             JavaType.Class finalClazz = clazz;
             return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
@@ -295,18 +306,17 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.FullyQualified.Kind getKind(Symbol.ClassSymbol sym) {
-        switch (sym.getKind()) {
-            case ENUM:
-                return JavaType.FullyQualified.Kind.Enum;
-            case ANNOTATION_TYPE:
-                return JavaType.FullyQualified.Kind.Annotation;
-            case INTERFACE:
-                return JavaType.FullyQualified.Kind.Interface;
-            case RECORD:
-                return JavaType.FullyQualified.Kind.Record;
-            default:
-                return JavaType.FullyQualified.Kind.Class;
+        long flags = sym.flags_field;
+        if ((flags & Flags.ANNOTATION) != 0) {
+            return JavaType.FullyQualified.Kind.Annotation;
+        } else if ((flags & Flags.INTERFACE) != 0) {
+            return JavaType.FullyQualified.Kind.Interface;
+        } else if ((flags & Flags.ENUM) != 0) {
+            return JavaType.FullyQualified.Kind.Enum;
+        } else if ((flags & Flags.RECORD) != 0) {
+            return JavaType.FullyQualified.Kind.Record;
         }
+        return JavaType.FullyQualified.Kind.Class;
     }
 
     @Override
@@ -328,7 +338,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         } else if (tree instanceof JCTree.JCClassDecl) {
             symbol = ((JCTree.JCClassDecl) tree).sym;
         } else if (tree instanceof JCTree.JCFieldAccess) {
-            symbol = ((JCTree.JCFieldAccess) tree).sym;
+            JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+            // A class literal that javac marks erroneous because of its context still has `Class<X>` on its symbol
+            if (select.type instanceof Type.ErrorType && select.sym != null && select.name.contentEquals("class")) {
+                return type(select.sym.type);
+            }
+            symbol = select.sym;
         }
 
         return type(((JCTree) tree).type, symbol);
@@ -398,15 +413,33 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     type = ((Type.ForAll) type).qtype;
                 }
 
-                resolvedOwner = type instanceof Type.MethodType ?
-                        methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
-                        type(type);
+                if (type instanceof Type.MethodType) {
+                    resolvedOwner = methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type));
+                } else if (type == null && sym instanceof Symbol.MethodSymbol &&
+                           ((Symbol.MethodSymbol) sym).isStaticOrInstanceInit()) {
+                    resolvedOwner = initializerType((Symbol.MethodSymbol) sym);
+                } else {
+                    resolvedOwner = type(type);
+                }
                 assert resolvedOwner != null;
             }
 
             variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
             return variable;
         });
+    }
+
+    /**
+     * javac 21 and earlier leave the placeholder method symbol of an initializer block without a type,
+     * so give it the {@code void()} method type that later javac versions produce.
+     */
+    private JavaType.Method initializerType(Symbol.MethodSymbol initializer) {
+        JavaType.FullyQualified declaringType = (JavaType.FullyQualified) type(initializer.owner.type);
+        return typeFactory.methodFor(signatureBuilder.methodSignature(initializer),
+                () -> new JavaType.Method(null, initializer.flags_field, declaringType, "",
+                        JavaType.Primitive.Void, (String[]) null, null, null, null, null, null),
+                method -> {
+                });
     }
 
     /**

@@ -16,6 +16,9 @@
 package org.openrewrite.semver;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Validated;
 
 import java.util.ArrayList;
@@ -30,6 +33,41 @@ import static org.openrewrite.semver.Semver.Ecosystem.MAVEN;
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 class SemverTest {
+    @ParameterizedTest
+    @CsvSource({
+      "RELEASE, latest.release, 2.0.0",
+      "release, latest.release, 2.0.0",
+      "LATEST, latest.integration, 3.0.0-RC1",
+      "Latest, latest.integration, 3.0.0-RC1"
+    })
+    void mavenMetaVersionsAreLatestSelectors(String alias, String canonical, String expected) {
+        VersionComparator comparator = Semver.validate(alias, null).getValue();
+        assertThat(comparator).isExactlyInstanceOf(Semver.validate(canonical, null).getValue().getClass());
+        assertThat(comparator.upgrade("1.0.0", List.of("1.0.0", "2.0.0", "3.0.0-RC1")))
+          .contains(expected);
+        assertThat(comparator.upgrade(expected, List.of("1.0.0", "2.0.0", "3.0.0-RC1")))
+          .isEmpty();
+        assertThat(Semver.validate(alias, null)).isSameAs(Semver.validate(alias, null));
+        assertThat(Semver.validate(alias, null, NODE).isValid()).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RELEASE", "LATEST"})
+    void mavenMetaVersionsRetainMetadataPatterns(String alias) {
+        VersionComparator comparator = Semver.validate(alias, "-jre").getValue();
+        assertThat(comparator.upgrade("1.0.0-jre", List.of("2.0.0-jre", "3.0.0-android", "4.0.0")))
+          .contains("2.0.0-jre");
+        assertThat(Semver.validate(alias, "-jre")).isNotSameAs(Semver.validate(alias, null));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"=RELEASE", "=LATEST", "beta", "Camden.SR5", "1.0.RELEASE", "RELEASE-custom", "LATEST-custom"})
+    void preservesExactVersions(String selector) {
+        assertThat(Semver.validate(selector, null).getValue()).isExactlyInstanceOf(ExactVersion.class);
+        String expected = selector.startsWith("=") ? selector.substring(1) : selector;
+        assertThat(((ExactVersion) Semver.validate(selector, null).getValue()).getVersion()).isEqualTo(expected);
+    }
+
     @Test
     void cachesValidationResultByVersionAndMetadataPattern() {
         Validated<VersionComparator> first = Semver.validate("1.5.1", null);

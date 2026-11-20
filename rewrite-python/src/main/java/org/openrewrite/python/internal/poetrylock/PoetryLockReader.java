@@ -47,6 +47,19 @@ public final class PoetryLockReader {
         String[] lines = content.split("\n", -1);
         int[] pos = {0};
 
+        // Poetry before 2.0 writes lock-version 2.0 (1.1 before 1.3, without the header comment), whose packages
+        // carry no groups; say so before any of those differences reads as a malformed lock
+        for (int i = lines.length - 1; i >= 0; i--) {
+            if ("[metadata]".equals(lines[i].trim())) {
+                Object lockVersion = MachineTomlReader.readKeyValues(lines, new int[]{i + 1}).get("lock-version");
+                if (lockVersion != null && !"2.1".equals(lockVersion)) {
+                    throw new PoetryLockFormatException("Unsupported poetry.lock lock-version: " + lockVersion +
+                            "; the native engine reads only lock-version 2.1, which Poetry writes from release 2.0 on");
+                }
+                break;
+            }
+        }
+
         String header = MachineTomlReader.readHeader(lines, pos);
         if (header == null) {
             throw new PoetryLockFormatException("poetry.lock is missing its @generated header comment");
@@ -90,9 +103,6 @@ public final class PoetryLockReader {
         }
 
         String lockVersion = requireString(metadata, "lock-version", "[metadata]");
-        if (!"2.1".equals(lockVersion)) {
-            throw new PoetryLockFormatException("Unsupported poetry.lock lock-version: " + lockVersion);
-        }
         String pythonVersions = optString(metadata, "python-versions");
         String contentHash = requireString(metadata, "content-hash", "[metadata]");
         for (String key : metadata.keySet()) {

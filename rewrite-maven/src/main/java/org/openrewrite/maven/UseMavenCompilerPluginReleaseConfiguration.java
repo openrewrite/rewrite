@@ -24,6 +24,7 @@ import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -40,6 +41,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
 
     private static final Pattern MAVEN_COMPILER_PROPERTY_PATTERN =
             Pattern.compile("\\$\\{(maven\\.compiler\\.(?:source|target|testSource|testTarget))}");
+
+    // A conservative module-name boundary, not a version-specific JDK module inventory.
+    private static final Pattern JAVA_OR_JDK_MODULE_EXPORT_PATTERN =
+            Pattern.compile("--add-exports=(?:java|jdk)\\.[^/\\s]+/[^=\\s]+=\\S+");
 
     private static final Set<String> DEFAULT_MAVEN_COMPILER_PROPERTIES = new HashSet<>(Arrays.asList(
             "${maven.compiler.source}", "${maven.compiler.target}", "${maven.compiler.release}",
@@ -62,8 +67,8 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 "`maven.compiler.testTarget` properties that are no longer referenced.";
 
     public static class Accumulator {
-        // Only tracks usages from OUTSIDE the compiler plugin's source/target/testSource/testTarget tags,
-        // since those tags will be replaced by the visitor
+        // Tracks references outside rewritten compiler plugin tags, including references in compiler
+        // configurations retained because they explicitly export a java.* or jdk.* module package.
         Map<String, Set<ResolvedGroupArtifactVersion>> propertyUsages = new HashMap<>();
     }
 
@@ -77,9 +82,9 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                // Skip visiting compiler plugin children entirely; the visitor will replace
-                // source/target/testSource/testTarget, so those references should not count as usages
-                if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
+                // Keep references in guarded compiler configurations live. Other compiler plugin
+                // references retain the existing scan behavior for configurations rewritten below.
+                if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin") && !hasJavaOrJdkModuleExports(tag)) {
                     return tag;
                 }
 
@@ -118,6 +123,9 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
             }
 
             private Xml.Tag handleCompilerPlugin(Xml.Tag t) {
+                if (hasJavaOrJdkModuleExports(t)) {
+                    return t;
+                }
                 Optional<Xml.Tag> maybeConfig = t.getChild("configuration");
                 if (!maybeConfig.isPresent()) {
                     return t;
@@ -138,10 +146,11 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 }
 
                 // Determine whether to process main source/target → release
+                ResolvedPom pom = getResolutionResult().getPom();
                 boolean processMain = hasMainConfig &&
-                        !versionNewerThanProposed(source) &&
-                        !versionNewerThanProposed(target) &&
-                        !versionNewerThanProposed(release);
+                        !versionNewerThanProposed(source.map(pom::getValue)) &&
+                        !versionNewerThanProposed(target.map(pom::getValue)) &&
+                        !versionNewerThanProposed(release.map(pom::getValue));
 
                 // Determine test handling: whether testRelease is needed after removing testSource/testTarget
                 boolean testNeedsOwnRelease = false;
@@ -262,6 +271,20 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 return false;
             }
         };
+    }
+
+    private static boolean hasJavaOrJdkModuleExports(Xml.Tag plugin) {
+        Optional<Xml.Tag> args = plugin.getChild("configuration")
+                .flatMap(configuration -> configuration.getChild("compilerArgs"));
+        if (args.isPresent()) {
+            for (Xml.Tag arg : args.get().getChildren("arg")) {
+                if (arg.getValue().map(String::trim)
+                        .filter(value -> JAVA_OR_JDK_MODULE_EXPORT_PATTERN.matcher(value).matches()).isPresent()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean versionNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> config) {

@@ -21,10 +21,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.reverse;
 import static java.util.stream.Collectors.toList;
@@ -86,6 +89,19 @@ public class SimplifyMethodChain extends Recipe {
                 if (select instanceof J.MethodInvocation) {
                     assert m.getMethodType() != null;
                     JavaType.Method mt = m.getMethodType().withName(newMethodName);
+                    // the new method is called on what the chain's first method is called on, and so is static
+                    // where that one is
+                    JavaType.Method first = ((J.MethodInvocation) select).getMethodType();
+                    if (first != null) {
+                        Set<Flag> flags = EnumSet.noneOf(Flag.class);
+                        flags.addAll(mt.getFlags());
+                        if (first.hasFlags(Flag.Static)) {
+                            flags.add(Flag.Static);
+                        } else {
+                            flags.remove(Flag.Static);
+                        }
+                        mt = mt.withDeclaringType(first.getDeclaringType()).withFlags(flags);
+                    }
                     return m.withSelect(((J.MethodInvocation) select).getSelect())
                             .withName(m.getName().withSimpleName(newMethodName).withType(mt))
                             .withMethodType(mt);

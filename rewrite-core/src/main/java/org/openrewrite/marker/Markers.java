@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -29,6 +30,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -98,7 +100,7 @@ public class Markers implements RpcCodec<Markers> {
      */
     public <M extends Marker> Markers computeByType(M identity, BinaryOperator<M> remappingFunction) {
         AtomicBoolean updated = new AtomicBoolean(false);
-        List<Marker> markers = ListUtils.map(this.markers, m -> {
+        Markers mapped = map(m -> {
             if (m.getClass().equals(identity.getClass())) {
                 updated.set(true);
 
@@ -107,12 +109,30 @@ public class Markers implements RpcCodec<Markers> {
             }
             return m;
         });
-        return withMarkers(!updated.get() ? ListUtils.concat(markers, identity) : markers);
+        return updated.get() ? mapped : withMarkers(ListUtils.concat(markers, identity));
     }
 
     public Markers removeByType(Class<? extends Marker> type) {
-        //noinspection DataFlowIssue
-        return withMarkers(ListUtils.map(this.markers, m -> type.equals(m.getClass()) ? null : m));
+        return map(m -> type.equals(m.getClass()) ? null : m);
+    }
+
+    /**
+     * Maps each marker, removing one that maps to null. An entry that is already null is not mapped
+     * and stays where it is: it stands for a marker that could not be read, which printers account for.
+     */
+    public Markers map(Function<Marker, @Nullable Marker> map) {
+        List<Marker> mapped = null;
+        for (int i = 0; i < markers.size(); i++) {
+            Marker m = markers.get(i);
+            Marker after = m == null ? null : map.apply(m);
+            if (after != m && mapped == null) {
+                mapped = new ArrayList<>(markers.subList(0, i));
+            }
+            if (mapped != null && (m == null || after != null)) {
+                mapped.add(after);
+            }
+        }
+        return mapped == null ? this : withMarkers(mapped);
     }
 
     public <M extends Marker> Markers setByType(M m) {
@@ -129,7 +149,7 @@ public class Markers implements RpcCodec<Markers> {
      */
     public <M extends Marker> Markers compute(M identity, BinaryOperator<M> remappingFunction) {
         AtomicBoolean foundEqualMarker = new AtomicBoolean(false);
-        List<Marker> updatedMarkers = ListUtils.map(markers, m -> {
+        Markers mapped = map(m -> {
             if (m.equals(identity)) {
                 foundEqualMarker.set(true);
                 //noinspection unchecked
@@ -137,12 +157,7 @@ public class Markers implements RpcCodec<Markers> {
             }
             return m;
         });
-
-        if (!foundEqualMarker.get()) {
-            updatedMarkers = ListUtils.concat(updatedMarkers, identity);
-        }
-
-        return withMarkers(updatedMarkers);
+        return foundEqualMarker.get() ? mapped : withMarkers(ListUtils.concat(markers, identity));
     }
 
     /**
@@ -176,7 +191,7 @@ public class Markers implements RpcCodec<Markers> {
     @Override
     public void rpcSend(Markers after, RpcSendQueue q) {
         q.getAndSend(this, Markers::getId);
-        q.getAndSendListAsRef(this, Markers::getMarkers, Marker::getId, null);
+        q.getAndSendListAsRef(this, Markers::getMarkers, m -> m == null ? null : m.getId(), null);
     }
 
     @Override

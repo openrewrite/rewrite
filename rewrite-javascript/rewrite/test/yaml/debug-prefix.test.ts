@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import {YamlParser} from "../../src/yaml/parser";
 import {Yaml, isMapping, isSequence} from "../../src/yaml/tree";
 import {TreePrinters} from "../../src/print";
@@ -177,14 +178,10 @@ ignoredBuiltDependencies:
         }
     });
 
-    test("real pnpm-lock.yaml from h3 project", async () => {
-        const fs = require('fs');
-        const filePath = '/Users/knut/moderne/working-set-js-ts-static-analysis/h3js/h3/pnpm-lock.yaml';
-        if (!fs.existsSync(filePath)) {
-            console.log("Skipping: file not found");
-            return;
-        }
-        const yaml = fs.readFileSync(filePath, 'utf8');
+    // A lock file in a local checkout of h3, so this runs only where that checkout is
+    const h3Lock = '/Users/knut/moderne/working-set-js-ts-static-analysis/h3js/h3/pnpm-lock.yaml';
+    test.skipIf(!fs.existsSync(h3Lock))("real pnpm-lock.yaml from h3 project", async () => {
+        const yaml = fs.readFileSync(h3Lock, 'utf8');
         const parser = new YamlParser();
         for await (const sf of parser.parse({sourcePath: "pnpm-lock.yaml", text: yaml})) {
             const docs = sf as Yaml.Documents;

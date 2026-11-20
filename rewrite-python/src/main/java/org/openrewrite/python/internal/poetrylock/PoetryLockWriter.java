@@ -61,12 +61,14 @@ public final class PoetryLockWriter {
         b.append("\ngroups = ").append(inlineStringArray(pkg.getGroups()));
         if (pkg.getMarker() != null) {
             b.append("\nmarkers = ").append(string(pkg.getMarker()));
-        } else if (pkg.getGroupMarkers() != null) {
-            b.append("\nmarkers = ").append(inlineStringMap(pkg.getGroupMarkers()));
         }
         b.append("\nfiles = ").append(filesArray(pkg.getFiles()));
         if (pkg.getDevelop() != null) {
             b.append("\ndevelop = ").append(pkg.getDevelop());
+        }
+        // poetry emits the per-group inline table after every plain key
+        if (pkg.getMarker() == null && pkg.getGroupMarkers() != null) {
+            b.append("\nmarkers = ").append(inlineStringMap(pkg.getGroupMarkers()));
         }
         if (pkg.getDependencies() != null) {
             b.append("\n\n[package.dependencies]");

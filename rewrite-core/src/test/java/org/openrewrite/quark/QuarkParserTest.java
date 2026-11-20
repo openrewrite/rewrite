@@ -80,7 +80,7 @@ class QuarkParserTest implements RewriteTest {
                       return sourceFile.withSourcePath(Path.of(sourceFile.getSourcePath() + ".bak"));
                   }
               }))
-              .afterRecipe(run -> {
+              .afterRecipe(run ->
                 Assertions.assertDoesNotThrow(() -> {
                     for (Result result : run.getChangeset().getAllResults()) {
                         try (var git = Git.init().setDirectory(tempDir.toFile()).call()) {
@@ -90,8 +90,7 @@ class QuarkParserTest implements RewriteTest {
                     assertThat(tempDir.toFile().list())
                             .containsExactlyInAnyOrder("hi.txt.bak", "jon.bak", ".git");
                     assertThat(Files.readString(tempDir.resolve("jon.bak")).trim()).isEqualTo("jon");
-                });
-              }),
+                })),
           text(
             "hi",
             spec -> spec

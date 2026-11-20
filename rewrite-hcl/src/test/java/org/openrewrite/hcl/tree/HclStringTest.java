@@ -17,11 +17,47 @@ package org.openrewrite.hcl.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class HclStringTest implements RewriteTest {
+
+    @Test
+    void literalValueHoldsTheTextTheEscapesStandFor() {
+        rewriteRun(
+          hcl(
+            """
+              resource "a\\"b" x {
+                quoted = "\\u00e9 \\U0001F600 \\"q\\" \\\\ \\n $${x} %%{y} $$z"
+                heredoc = <<EOT
+              \\n $${x}
+              EOT
+              }
+              """,
+            spec -> spec.afterRecipe(config -> {
+                List<Object> values = new ArrayList<>();
+                new HclIsoVisitor<List<Object>>() {
+                    @Override
+                    public Hcl.Literal visitLiteral(Hcl.Literal literal, List<Object> found) {
+                        found.add(literal.getValue());
+                        return literal;
+                    }
+                }.visit(config, values);
+                assertThat(values).containsExactly(
+                  "a\"b",
+                  "é 😀 \"q\" \\ \n ${x} %{y} $$z",
+                  "\\n ${x}"
+                );
+            })
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4612")
     @Test

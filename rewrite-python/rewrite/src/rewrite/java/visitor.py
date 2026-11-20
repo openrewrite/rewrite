@@ -18,7 +18,8 @@ from __future__ import annotations
 
 from typing import TypeVar, Optional, cast
 
-from rewrite.java.support_types import J, Space, JRightPadded, JLeftPadded, JContainer, Expression, Statement
+from rewrite.java.support_types import (J, JavaType, Space, JRightPadded, JLeftPadded, JContainer, Expression,
+                                        Statement)
 from rewrite.utils import list_map
 from rewrite.visitor import TreeVisitor
 
@@ -42,6 +43,19 @@ class JavaVisitor(TreeVisitor[J, P]):
     def visit_statement(self, stmt: Statement, p: P) -> J:
         """Visit a statement. Override to intercept all statements."""
         return stmt
+
+    # True where a subclass overrides `visit_type`. Only such a visitor has its nodes' types
+    # handed to it, since the base one returns each type unchanged.
+    _visits_types = False
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls._visits_types = cls.visit_type is not JavaVisitor.visit_type
+
+    def visit_type(self, java_type: Optional[JavaType], p: P) -> Optional[JavaType]:
+        """Visit a type attributed to a tree. Every visit method hands each of its node's type
+        slots to this one, so overriding it rewrites the file's attribution."""
+        return java_type
 
     def visit_space(self, space: Optional[Space], p: P) -> Space:
         """Visit a space (whitespace and comments)."""
@@ -164,6 +178,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         array_access = array_access.replace(
             dimension=self.visit_and_cast(array_access.dimension, j.ArrayDimension, p)
         )
+        if self._visits_types:
+            array_access = array_access.replace(_type=self.visit_type(array_access.type, p))
         return array_access
 
     def visit_array_dimension(self, array_dimension: j.ArrayDimension, p: P) -> J:
@@ -195,6 +211,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         array_type = array_type.replace(
             dimension=self.visit_left_padded(array_type.dimension, p)
         )
+        if self._visits_types:
+            array_type = array_type.replace(_type=self.visit_type(array_type.type, p))
         return array_type
 
     def visit_assert(self, assert_: j.Assert, p: P) -> J:
@@ -234,6 +252,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         assignment = assignment.padding.replace(
             assignment=self.visit_left_padded(assignment.padding.assignment, p)
         )
+        if self._visits_types:
+            assignment = assignment.replace(_type=self.visit_type(assignment.type, p))
         return assignment
 
     def visit_assignment_operation(self, assign_op: j.AssignmentOperation, p: P) -> J:
@@ -258,6 +278,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         assign_op = assign_op.replace(
             assignment=self.visit_and_cast(assign_op.assignment, Expression, p)
         )
+        if self._visits_types:
+            assign_op = assign_op.replace(_type=self.visit_type(assign_op.type, p))
         return assign_op
 
     def visit_binary(self, binary: j.Binary, p: P) -> J:
@@ -278,6 +300,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         binary = binary.replace(
             right=self.visit_and_cast(binary.right, Expression, p)
         )
+        if self._visits_types:
+            binary = binary.replace(_type=self.visit_type(binary.type, p))
         return binary
 
     def visit_block(self, block: j.Block, p: P) -> J:
@@ -377,6 +401,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         class_decl = class_decl.replace(
             body=self.visit_and_cast(class_decl.body, j.Block, p)
         )
+        if self._visits_types:
+            class_decl = class_decl.replace(_type=self.visit_type(class_decl.type, p))
         return class_decl
 
     def visit_class_declaration_kind(self, kind: j.ClassDeclaration.Kind, p: P) -> J:
@@ -435,6 +461,9 @@ class JavaVisitor(TreeVisitor[J, P]):
         deconstruction_pattern = deconstruction_pattern.replace(
             nested=self.visit_container(deconstruction_pattern.padding.nested, p)
         )
+        if self._visits_types:
+            deconstruction_pattern = deconstruction_pattern.replace(
+                _type=self.visit_type(deconstruction_pattern.type, p))
         return deconstruction_pattern
 
     def visit_control_parentheses(self, control_parens: j.ControlParentheses, p: P) -> J:
@@ -536,6 +565,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         field_access = field_access.padding.replace(
             name=self.visit_left_padded(field_access.padding.name, p)
         )
+        if self._visits_types:
+            field_access = field_access.replace(_type=self.visit_type(field_access.type, p))
         return field_access
 
     def visit_for_each_loop(self, for_each: j.ForEachLoop, p: P) -> J:
@@ -620,6 +651,9 @@ class JavaVisitor(TreeVisitor[J, P]):
             ident = ident.replace(
                 annotations=list_map(lambda a: self.visit_and_cast(a, j.Annotation, p), ident.annotations)
             )
+        if self._visits_types:
+            ident = ident.replace(_type=self.visit_type(ident.type, p))
+            ident = ident.replace(_field_type=self.visit_type(ident.field_type, p))
         return ident
 
     def visit_if(self, if_: j.If, p: P) -> J:
@@ -693,6 +727,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             instance_of = instance_of.replace(
                 pattern=self.visit_and_cast(instance_of.pattern, J, p)
             )
+        if self._visits_types:
+            instance_of = instance_of.replace(_type=self.visit_type(instance_of.type, p))
         return instance_of
 
     def visit_intersection_type(self, intersection_type: j.IntersectionType, p: P) -> J:
@@ -748,6 +784,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         lambda_ = lambda_.replace(
             body=self.visit_and_cast(lambda_.body, J, p)
         )
+        if self._visits_types:
+            lambda_ = lambda_.replace(_type=self.visit_type(lambda_.type, p))
         return lambda_
 
     def visit_lambda_parameters(self, params: j.Lambda.Parameters, p: P) -> J:
@@ -772,6 +810,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             return temp_expr
         literal = temp_expr
         literal = literal.replace(markers=self.visit_markers(literal.markers, p))
+        if self._visits_types:
+            literal = literal.replace(_type=self.visit_type(literal.type, p))
         return literal
 
     def visit_member_reference(self, member_ref: j.MemberReference, p: P) -> J:
@@ -792,6 +832,10 @@ class JavaVisitor(TreeVisitor[J, P]):
         member_ref = member_ref.padding.replace(
             reference=self.visit_left_padded(member_ref.padding.reference, p)
         )
+        if self._visits_types:
+            member_ref = member_ref.replace(_type=self.visit_type(member_ref.type, p))
+            member_ref = member_ref.replace(_method_type=self.visit_type(member_ref.method_type, p))
+            member_ref = member_ref.replace(_variable_type=self.visit_type(member_ref.variable_type, p))
         return member_ref
 
     def visit_method_declaration(self, method: j.MethodDeclaration, p: P) -> J:
@@ -834,6 +878,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         method = method.padding.replace(
             default_value=self.visit_left_padded(method.padding.default_value, p)
         )
+        if self._visits_types:
+            method = method.replace(_method_type=self.visit_type(method.method_type, p))
         return method
 
     def visit_method_invocation(self, method: j.MethodInvocation, p: P) -> J:
@@ -855,6 +901,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             name=self.visit_and_cast(method.name, j.Identifier, p),
             arguments=self.visit_container(method.padding.arguments, p),
         )
+        if self._visits_types:
+            method = method.replace(_method_type=self.visit_type(method.method_type, p))
         return method
 
     def visit_modifier(self, modifier: j.Modifier, p: P) -> J:
@@ -899,6 +947,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         new_array = new_array.replace(
             initializer=self.visit_container(new_array.padding.initializer, p)
         )
+        if self._visits_types:
+            new_array = new_array.replace(_type=self.visit_type(new_array.type, p))
         return new_array
 
     def visit_new_class(self, new_class: j.NewClass, p: P) -> J:
@@ -932,6 +982,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             new_class = new_class.replace(
                 body=self.visit_and_cast(new_class.body, j.Block, p)
             )
+        if self._visits_types:
+            new_class = new_class.replace(_constructor_type=self.visit_type(new_class.constructor_type, p))
         return new_class
 
     def visit_nullable_type(self, nullable_type: j.NullableType, p: P) -> J:
@@ -983,6 +1035,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         parameterized_type = parameterized_type.replace(
             type_parameters=self.visit_container(parameterized_type.padding.type_parameters, p)
         )
+        if self._visits_types:
+            parameterized_type = parameterized_type.replace(_type=self.visit_type(parameterized_type.type, p))
         return parameterized_type
 
     def visit_parentheses(self, parens: j.Parentheses, p: P) -> J:
@@ -1025,6 +1079,8 @@ class JavaVisitor(TreeVisitor[J, P]):
             return temp_expr
         primitive = temp_expr
         primitive = primitive.replace(markers=self.visit_markers(primitive.markers, p))
+        if self._visits_types:
+            primitive = primitive.replace(_type=self.visit_type(primitive.type, p))
         return primitive
 
     def visit_return(self, return_: j.Return, p: P) -> J:
@@ -1074,6 +1130,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         switch_expr = switch_expr.replace(
             cases=self.visit_and_cast(switch_expr.cases, j.Block, p)
         )
+        if self._visits_types:
+            switch_expr = switch_expr.replace(_type=self.visit_type(switch_expr.type, p))
         return switch_expr
 
     def visit_synchronized(self, sync: j.Synchronized, p: P) -> J:
@@ -1115,6 +1173,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         ternary = ternary.padding.replace(
             false_part=self.visit_left_padded(ternary.padding.false_part, p)
         )
+        if self._visits_types:
+            ternary = ternary.replace(_type=self.visit_type(ternary.type, p))
         return ternary
 
     def visit_throw(self, throw: j.Throw, p: P) -> J:
@@ -1249,6 +1309,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         unary = unary.replace(
             expression=self.visit_and_cast(unary.expression, Expression, p)
         )
+        if self._visits_types:
+            unary = unary.replace(_type=self.visit_type(unary.type, p))
         return unary
 
     def visit_variable_declarations(self, var_decls: j.VariableDeclarations, p: P) -> J:
@@ -1299,6 +1361,8 @@ class JavaVisitor(TreeVisitor[J, P]):
         variable = variable.padding.replace(
             initializer=self.visit_left_padded(variable.padding.initializer, p)
         )
+        if self._visits_types:
+            variable = variable.replace(_variable_type=self.visit_type(variable.variable_type, p))
         return variable
 
     def visit_while_loop(self, while_loop: j.WhileLoop, p: P) -> J:

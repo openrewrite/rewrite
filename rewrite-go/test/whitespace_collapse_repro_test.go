@@ -23,6 +23,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+	"github.com/stretchr/testify/require"
 )
 
 const collapseReproSrc = `package main
@@ -59,9 +60,7 @@ func locateIfThenBlock(t *testing.T, root java.Tree) *java.Block {
 	t.Helper()
 	loc := visitor.Init(&ifThenBlockLocator{})
 	loc.Visit(root, nil)
-	if loc.block == nil {
-		t.Fatal("could not locate the if-then block in the parsed tree")
-	}
+	require.NotNil(t, loc.block, "could not locate the if-then block in the parsed tree")
 	return loc.block
 }
 
@@ -72,9 +71,7 @@ func TestNoOpVisitPreservesUntouchedBlockIdentity(t *testing.T) {
 	// given
 	p := parser.NewGoParser()
 	cu, err := p.Parse("bind.go", collapseReproSrc)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	before := locateIfThenBlock(t, cu)
 
 	// when

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import { RecipeSpec } from "../../../src/test";
-import { ChangeImport, npm, packageJson, tsx, typescript } from "../../../src/javascript";
+import { ChangeImport, JavaScriptVisitor, npm, packageJson, tsx, typescript } from "../../../src/javascript";
+import { J, Type } from "../../../src/java";
 import { withDir } from "tmp-promise";
 
 describe("change-import", () => {
@@ -112,7 +113,7 @@ describe("change-import", () => {
                             `,
                             `
                             import { renderIntoDocument } from 'react-dom/test-utils';
-                            import {act} from 'react';
+                            import { act } from 'react';
 
                             act(() => {});
                             renderIntoDocument(<div />);
@@ -191,7 +192,7 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
-        test("adds import from target module", async () => {
+        test("merges into an existing import of the target module", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
                 oldModule: "react-dom/test-utils",
@@ -212,8 +213,7 @@ describe("change-import", () => {
                             act(() => {});
                             `,
                             `
-                            import { useState } from 'react';
-                            import { act } from 'react';
+                            import { act, useState } from 'react';
 
                             const [state, setState] = useState(0);
                             act(() => {});
@@ -338,41 +338,62 @@ describe("change-import", () => {
         });
     });
 
-    describe("member renaming", () => {
-        test("renames member when changing import", async () => {
+    describe("spellings through the module", () => {
+        test("a renamed namespace call keeps its method attribution in sync", async () => {
             const spec = new RecipeSpec();
-            spec.recipe = new ChangeImport({
-                oldModule: "lodash",
-                oldMember: "extend",
-                newModule: "lodash",
-                newMember: "assign"
-            });
-
-            // Note: This test only verifies the import statement change.
-            // The identifier usage in the code would need a separate recipe to rename.
-            await withDir(async (repo) => {
-                await spec.rewriteRun(
-                    npm(
-                        repo.path,
-                        typescript(
-                            `
-                            import { extend } from 'lodash';
-                            `,
-                            `
-                            import { assign } from 'lodash';
-                            `
-                        ),
-                        packageJson(`{
-                            "name": "test",
-                            "dependencies": {
-                                "lodash": "^4.17.21"
+            spec.recipe = new ChangeImport({oldModule: "lodash", oldMember: "extend", newModule: "lodash", newMember: "assign"});
+            const names: (string | undefined)[][] = [];
+            await withDir(async repo => {
+                await spec.rewriteRun(npm(repo.path, {
+                    //language=typescript
+                    ...typescript(
+                        `
+                        import * as NS from "lodash";
+                        NS.extend({}, {});
+                        NS.flatten([[1]]);
+                        `,
+                        `
+                        import * as NS from "lodash";
+                        NS.assign({}, {});
+                        NS.flatten([[1]]);
+                        `
+                    ),
+                    afterRecipe: async (cu: any) => {
+                        await new class extends JavaScriptVisitor<any> {
+                            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                                names.push([method.name.simpleName, method.methodType?.name]);
+                                return method;
                             }
-                        }`)
-                    )
-                );
-            }, { unsafeCleanup: true });
+                        }().visit(cu, undefined);
+                    }
+                } as any, packageJson(`{
+                    "name": "test",
+                    "dependencies": {"lodash": "^4.17.21", "@types/lodash": "^4.14.202"}
+                }`)));
+            }, {unsafeCleanup: true});
+            expect(names).toEqual([["assign", "assign"], ["flatten", "flatten"]]);
         });
 
+        test("renames a member read through a namespace import", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({oldModule: "react", oldMember: "SFC", newModule: "react", newMember: "FC"});
+            //language=typescript
+            await spec.rewriteRun(typescript(
+                `
+                    import * as React from "react";
+
+                    export const Greeting: React.SFC<{name: string}> = ({name}) => null;
+                `,
+                `
+                    import * as React from "react";
+
+                    export const Greeting: React.FC<{name: string}> = ({name}) => null;
+                `
+            ));
+        });
+    });
+
+    describe("member renaming", () => {
         test("renames aliased member when changing import", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
@@ -392,6 +413,158 @@ describe("change-import", () => {
                             `,
                             `
                             import { assign as myExtend } from 'lodash';
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("renames an unaliased member and the references that resolve to it", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "primeng/sidebar",
+                oldMember: "SidebarModule",
+                newModule: "primeng/drawer",
+                newMember: "DrawerModule"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { SidebarModule } from 'primeng/sidebar';
+
+                            const m = SidebarModule;
+                            `,
+                            `
+                            import { DrawerModule } from 'primeng/drawer';
+
+                            const m = DrawerModule;
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {}
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("renames the member but keeps the local name", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { extend } from 'lodash';
+
+                            function assign() {}
+
+                            extend({}, {});
+                            assign();
+                            `,
+                            `
+                            import { assign as extend } from 'lodash';
+
+                            function assign() {}
+
+                            extend({}, {});
+                            assign();
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("a pinned alias keeps a type-only specifier's type keyword separate", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign",
+                newAlias: "extend"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { type extend } from 'lodash';
+
+                            let v: extend;
+                            `,
+                            `
+                            import { type assign as extend } from 'lodash';
+
+                            let v: extend;
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("moving a member to another module renames it too, leaving its siblings behind", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash-es",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { extend, flatten } from 'lodash';
+
+                            extend({}, {});
+                            flatten([]);
+                            `,
+                            `
+                            import { flatten } from 'lodash';
+                            import { assign } from 'lodash-es';
+
+                            assign({}, {});
+                            flatten([]);
                             `
                         ),
                         packageJson(`{
@@ -458,8 +631,7 @@ describe("change-import", () => {
                             act(() => {});
                             `,
                             `
-                            import { act } from 'react';
-                            import React from 'react';
+                            import React, { act } from 'react';
 
                             const Component = () => <div>Hello</div>;
 
@@ -478,4 +650,117 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
     });
+
+    test("the moved member's attribution follows it, and a sibling's stays behind", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new ChangeImport({
+            oldModule: "lodash",
+            oldMember: "extend",
+            newModule: "lodash-es",
+            newMember: "assign"
+        });
+        const attribution: string[] = [];
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(repo.path, {
+                    //language=typescript
+                    ...typescript(
+                        `
+                        import { extend, flatten } from 'lodash';
+
+                        extend({}, {});
+                        flatten([[1]]);
+                        `,
+                        `
+                        import { flatten } from 'lodash';
+                        import { assign } from 'lodash-es';
+
+                        assign({}, {});
+                        flatten([[1]]);
+                        `),
+                    afterRecipe: async (cu: any) => {
+                        await new class extends JavaScriptVisitor<any> {
+                            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                                const declaringType = m.methodType?.declaringType;
+                                attribution.push(`${declaringType && Type.isFullyQualified(declaringType)
+                                    ? Type.FullyQualified.getFullyQualifiedName(declaringType as any)
+                                    : undefined}.${m.methodType?.name}`);
+                                return m;
+                            }
+                        }().visit(cu, undefined);
+                    }
+                } as any, packageJson(`{
+                    "name": "test",
+                    "dependencies": {
+                        "lodash": "^4.17.21",
+                        "lodash-es": "^4.17.21",
+                        "@types/lodash": "^4.14.202",
+                        "@types/lodash-es": "^4.17.12"
+                    }
+                }`))
+            );
+        }, { unsafeCleanup: true });
+
+        // Printing does not show a method type's module, so this is what pins the sibling's.
+        expect(attribution).toEqual(["lodash-es.assign", "lodash.flatten"]);
+    });
+
+    test("moving a reference typed by a large graph terminates", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new ChangeImport({
+            oldModule: "./token",
+            oldMember: "documentToken",
+            newModule: "./core-token"
+        });
+        const referenced: { name?: string, members?: number } = {};
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        //language=typescript
+                        ...typescript(
+                            `
+                            import { documentToken } from './token';
+
+                            const d = documentToken;
+                            console.log(d);
+                            `,
+                            `
+                            import { documentToken } from './core-token';
+
+                            const d = documentToken;
+                            console.log(d);
+                            `),
+                        path: "main.ts",
+                        afterRecipe: async (cu: any) => {
+                            await new class extends JavaScriptVisitor<any> {
+                                override async visitIdentifier(id: J.Identifier, p: any): Promise<J | undefined> {
+                                    const type = id.type;
+                                    if (id.simpleName === "documentToken" && referenced.name === undefined &&
+                                        type !== undefined && Type.isFullyQualified(type)) {
+                                        referenced.name = Type.FullyQualified.getFullyQualifiedName(type as any);
+                                        referenced.members = (type as Type.Class).members.length;
+                                    }
+                                    return id;
+                                }
+                            }().visit(cu, undefined);
+                        }
+                    } as any,
+                    {
+                        ...typescript(`export const documentToken: Document = document;`),
+                        path: "token.ts"
+                    },
+                    packageJson(`{"name": "test"}`)
+                )
+            );
+        }, { unsafeCleanup: true });
+
+        // `Document` reaches some 50k types, which is the only reason this case is large enough to
+        // guard the walk; with a primitive here the recipe finishes instantly and pins nothing.
+        expect(referenced.name).toBe("Document");
+        expect(referenced.members).toBeGreaterThan(100);
+    }, 30000);
 });

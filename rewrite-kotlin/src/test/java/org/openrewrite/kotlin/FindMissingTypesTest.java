@@ -18,11 +18,17 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class FindMissingTypesTest implements RewriteTest {
@@ -88,5 +94,38 @@ class FindMissingTypesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void javaVarargsCalledFromKotlinAndJava() {
+        // Kotlin maps String.format through reflection into the type cache it shares with the Java parser
+        JavaTypeCache cache = new JavaTypeCache();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("parse failed", t));
+        KotlinParser.builder().typeCache(cache).build()
+          .parse(ctx, "fun newline(): String = java.lang.String.format(\"%n\")").toList();
+        J.CompilationUnit java = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(cache).build()
+          .parse(ctx, "class A { String newline = String.format(\"%n\"); }").findFirst().orElseThrow();
+
+        assertThat(FindMissingTypes.findMissingTypes(java, false)).isEmpty();
+    }
+
+    @Test
+    void untypedReturnTypeExpression() {
+        K.CompilationUnit cu = (K.CompilationUnit) KotlinParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> fail("parse failed", t)), "fun foo(): String = \"\"")
+          .findFirst().orElseThrow();
+        J withUntypedReturnType = new KotlinIsoVisitor<Integer>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+                //noinspection DataFlowIssue
+                return m.withReturnTypeExpression(m.getReturnTypeExpression().withType(JavaType.Unknown.getInstance()));
+            }
+        }.visitNonNull(cu, 0);
+
+        assertThat(Assertions.findMissingTypes(withUntypedReturnType))
+          .extracting(FindMissingTypes.MissingTypeResult::getMessage)
+          .containsExactly("Identifier type is missing or malformed");
     }
 }

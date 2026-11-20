@@ -30,11 +30,15 @@ import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Name;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -58,7 +62,12 @@ import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
+    /// javac's {@code LayoutCharacters.EOI}, the sentinel it appends to its scanner buffers.
+    private static final char EOI = 0x1A;
+
     private final Attr attr;
+    private final Symtab syms;
+    private final Types types;
 
     private final Symbol.@Nullable TypeSymbol symbol;
 
@@ -84,6 +93,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     public ReloadableJava25JavadocVisitor(Context context, TreePath scope, ReloadableJava25TypeMapping typeMapping, String source, JCTree tree, boolean markdown) {
         this.attr = Attr.instance(context);
+        this.syms = Symtab.instance(context);
+        this.types = Types.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;
         this.markdown = markdown;
@@ -188,6 +199,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         StringBuilder firstPrefixBuilder = new StringBuilder();
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
+        String marginLineEnd = null;
         boolean inFirstPrefix = true;
         boolean isPrefixAsterisk = true;
 
@@ -198,7 +210,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (inFirstPrefix) {
                 // '*' characters are considered a part of the margin until a non '*' is parsed.
                 if (Character.isWhitespace(c) || c == '*' && isPrefixAsterisk) {
-                    if (isPrefixAsterisk && i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
+                    // javac also strips a margin `*` after whitespace on the opening line (`/**   * Get x`)
+                    if (c == '*' && isPrefixAsterisk && i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
                         isPrefixAsterisk = false;
                     }
                     firstPrefixBuilder.append(c);
@@ -208,30 +221,32 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 }
             }
 
+            String lineEnd = null;
             if (c == '\r') {
-                continue;
+                if (i + 1 < source.length() && source.charAt(i + 1) == '\n') {
+                    continue;
+                }
+                lineEnd = "\r";
+            } else if (c == '\n') {
+                lineEnd = source.charAt(i - 1) == '\r' ? "\r\n" : "\n";
             }
 
-            if (c == '\n') {
-                char prev = source.charAt(i - 1);
+            if (lineEnd != null) {
                 if (inFirstPrefix) {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
-                    // Handle consecutive new lines.
-                    if ((prev == '\n' ||
-                            prev == '\r' && source.charAt(i - 2) == '\n')) {
-                        String prevLineLine = prev == '\n' ? "\n" : "\r\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
+                    if (marginBuilder != null && marginBuilder.length() == marginLineEnd.length()) {
+                        // Handle consecutive new lines.
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), marginLineEnd, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
-                        String newLine = prev == '\r' ? "\r\n" : "\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
-                        javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), marginLineEnd, Markers.EMPTY));
+                        javadocContent.append(marginBuilder.substring(marginLineEnd.length()));
                     }
-                    javadocContent.append(c);
+                    javadocContent.append('\n');
                 }
-                String newLine = prev == '\r' ? "\r\n" : "\n";
-                marginBuilder = new StringBuilder(newLine);
+                marginLineEnd = lineEnd;
+                marginBuilder = new StringBuilder(lineEnd);
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
@@ -248,11 +263,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                                     marginBuilder.toString(), Markers.EMPTY));
                             javadocContent.append(c);
                         } else {
-                            String newLine = marginBuilder.charAt(0) == '\r' ? "\r\n" : "\n";
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                    newLine, Markers.EMPTY));
-                            String margin = marginBuilder.toString();
-                            javadocContent.append(margin.substring(margin.indexOf("\n") + 1)).append(c);
+                                    marginLineEnd, Markers.EMPTY));
+                            javadocContent.append(marginBuilder.substring(marginLineEnd.length())).append(c);
                         }
                         marginBuilder = null;
                     }
@@ -675,7 +688,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         JavaType qualifierType;
         TypedTree qualifier;
 
-        if (ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null && !resolveWithoutCompleting(ref.qualifierExpression)) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
             } catch (NullPointerException ignored) {
@@ -841,7 +854,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     for (int i = 0; i < ref.paramTypes.size(); i++) {
                         JCTree param = ref.paramTypes.get(i);
                         JavaType testParamType = parameterTypes.get(i);
-                        Type paramType = attr.attribType(param, symbol);
+                        Type paramType = resolveWithoutCompleting(param) ? param.type : attr.attribType(param, symbol);
                         if (!paramTypeMatches(testParamType, paramType)) {
                             continue nextMethod;
                         }
@@ -851,6 +864,52 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
         return null;
+    }
+
+    /**
+     * Resolves a {@code pkg.Name} reference to the class symbol its package lists, which needs no class file
+     * read, and types the tree with it so the type mapping can serve it from the factory. Every other shape,
+     * and a class not accessible from here, is left to attribution. So is a package whose listing fails, as with an
+     * unreadable classpath jar.
+     */
+    private boolean resolveWithoutCompleting(JCTree tree) {
+        if (!(tree instanceof JCTree.JCFieldAccess) || symbol == null) {
+            return false;
+        }
+        JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+        Name packageName = TreeInfo.fullName(select.selected);
+        if (packageName == null) {
+            return false;
+        }
+        Symbol.PackageSymbol pkg;
+        try {
+            pkg = syms.lookupPackage(symbol.packge().modle, packageName);
+            pkg.complete();
+        } catch (Symbol.CompletionFailure ignored) {
+            return false;
+        }
+        if (!pkg.exists()) {
+            return false;
+        }
+        Symbol.ClassSymbol cls = null;
+        for (Symbol member : pkg.members().getSymbolsByName(select.name)) {
+            if (member instanceof Symbol.ClassSymbol) {
+                cls = (Symbol.ClassSymbol) member;
+            }
+        }
+        if (cls == null) {
+            return false;
+        }
+        Type erasure = cls.erasure(types);
+        JavaType.FullyQualified mapped = TypeUtils.asFullyQualified(typeMapping.type(erasure));
+        boolean accessible = mapped != null &&
+                             (mapped.hasFlags(Flag.Public) || symbol.packge().fullname.equals(packageName));
+        if (!accessible) {
+            return false;
+        }
+        select.sym = cls;
+        select.type = erasure;
+        return true;
     }
 
     private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
@@ -1063,6 +1122,12 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
+        // javac can append its end-of-input sentinel to `DCRawText#getContent()` for `///` doc comments,
+        // e.g. when the content ends in a backslash. It is absent from `source`, so it also skews the cursor.
+        if (!node.isEmpty() && node.charAt(node.length() - 1) == EOI) {
+            node = node.substring(0, node.length() - 1);
+        }
+
         if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) && !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
         }
@@ -1103,9 +1168,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 if (cursor < source.length()
                         && source.charAt(cursor) != c
                         && !Character.isWhitespace(c)
-                        && Character.isSpaceChar(source.charAt(cursor))
+                        && isInlineWhitespace(source.charAt(cursor))
                 ) {
-                    text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                    text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
                 }
                 text.append(c);
                 cursor++;
@@ -1113,7 +1178,10 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                // Only the stripped indentation is missing: stop at whitespace the node keeps,
+                // like the tab in ` * \t<li>`, or the next character is consumed in its place.
+                char next = node.charAt(i + 1);
+                text.append(whitespaceBeforeAsString(ch -> ch != next && isInlineWhitespace(ch)));
             }
         }
 
@@ -1266,6 +1334,11 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     private String whitespaceBeforeAsString() {
         return whitespaceBeforeAsString(Character::isWhitespace);
+    }
+
+    /// Mirrors what javac's `JavadocTokenizer.getIndent` strips as a Javadoc's common indentation.
+    private static boolean isInlineWhitespace(char c) {
+        return c != '\n' && c != '\r' && Character.isWhitespace(c);
     }
 
     private String whitespaceBeforeAsString(Predicate<Character> whitespace) {

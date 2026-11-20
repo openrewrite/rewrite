@@ -80,62 +80,6 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void emptyRepositories() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>org.openrewrite.example</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, 1, """
-              <project>
-                <groupId>org.openrewrite.example</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """))
-          )
-        );
-    }
-
-    @Test
-    void repositoryInPom() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>org.openrewrite.example</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <repositories>
-                  <repository>
-                    <id>spring-milestone</id>
-                    <url>https://repo.spring.io/milestone</url>
-                    </repository>
-                </repositories>
-              </project>
-              """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, 2, """
-              <project>
-                <groupId>org.openrewrite.example</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <repositories>
-                  <repository>
-                    <id>spring-milestone</id>
-                    <url>https://repo.spring.io/milestone</url>
-                    </repository>
-                </repositories>
-              </project>
-              """))
-          )
-        );
-    }
-
-    @Test
     void fromExecutionContextSettings() {
         rewriteRun(
           spec -> spec.executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())

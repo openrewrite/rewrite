@@ -20,23 +20,60 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markup;
 
-import java.util.Iterator;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
 public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
 
     private final RecipeRunException vt;
-    private final Tree nearestTree;
+    private final @Nullable Tree nearestTree;
 
     public FindRecipeRunException(RecipeRunException rre) {
+        this(rre, rre.getCursor() == null ? null : innermostTree(rre));
+    }
+
+    private FindRecipeRunException(RecipeRunException rre, @Nullable Tree nearestTree) {
         this.vt = rre;
+        this.nearestTree = nearestTree;
+    }
+
+    /**
+     * Marks the nearest cursor tree still in {@code tree} (the failing one may be an edited copy), else {@code tree}.
+     */
+    public static <T extends Tree> T markNearest(T tree, RecipeRunException rre) {
         if (rre.getCursor() == null) {
-            this.nearestTree = null;
-        } else {
-            Iterator<Object> path = requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance);
-            this.nearestTree = path.hasNext() ? (Tree) path.next() : null;
+            return Markup.error(tree, rre);
         }
+
+        List<Tree> path = new ArrayList<>();
+        requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance)
+                .forEachRemaining(t -> path.add((Tree) t));
+        Set<Tree> candidates = Collections.newSetFromMap(new IdentityHashMap<>());
+        candidates.addAll(path);
+        Set<Tree> present = Collections.newSetFromMap(new IdentityHashMap<>());
+        new TreeVisitor<Tree, Integer>() {
+            @Override
+            public Tree preVisit(Tree t, Integer p) {
+                if (candidates.contains(t)) {
+                    present.add(t);
+                }
+                return t;
+            }
+        }.visit(tree, 0);
+
+        for (Tree candidate : path) {
+            if (present.contains(candidate)) {
+                //noinspection unchecked
+                return (T) new FindRecipeRunException(rre, candidate).visitNonNull(tree, 0);
+            }
+        }
+        return Markup.error(tree, rre);
+    }
+
+    private static @Nullable Tree innermostTree(RecipeRunException rre) {
+        Iterator<Object> path = requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance);
+        return path.hasNext() ? (Tree) path.next() : null;
     }
 
     @Override

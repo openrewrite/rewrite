@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -51,9 +53,7 @@ var immutabilitySamples = map[string]string{
 func TestVisitDoesNotMutateOriginal(t *testing.T) {
 	for name, src := range immutabilitySamples {
 		cu, err := parser.NewGoParser().Parse("p.go", src)
-		if err != nil {
-			t.Fatalf("%s: parse: %v", name, err)
-		}
+		require.NoErrorf(t, err, "%s: parse", name)
 		before := printer.Print(cu)
 		r := &renamer{}
 		visitor.Init(r)
@@ -71,14 +71,28 @@ func TestVisitDoesNotMutateOriginal(t *testing.T) {
 func TestNoOpVisitPreservesIdentity(t *testing.T) {
 	for name, src := range immutabilitySamples {
 		cu, err := parser.NewGoParser().Parse("p.go", src)
-		if err != nil {
-			t.Fatalf("%s: parse: %v", name, err)
-		}
+		require.NoErrorf(t, err, "%s: parse", name)
 		v := &visitor.GoVisitor{}
 		visitor.Init(v)
 		got := v.Visit(cu, nil)
 		if got != java.Tree(cu) {
 			t.Errorf("%s: no-op visit did not preserve identity (returned a new pointer)", name)
 		}
+	}
+}
+
+// go.mod and go.sum are not J nodes and carry their own node set, so they ride
+// a separate branch of the traversal from the .go samples above.
+func TestNoOpVisitPreservesGoModAndGoSumIdentity(t *testing.T) {
+	gm, err := parser.ParseGoModFile("go.mod", identityGoMod)
+	require.NoError(t, err, "go.mod parse")
+	if got := visitor.Init(&visitor.GoVisitor{}).Visit(gm, nil); got != java.Tree(gm) {
+		t.Error("no-op visit did not preserve go.mod identity (returned a new pointer)")
+	}
+
+	gs, err := parser.ParseGoSumFile("go.sum", identityGoSum)
+	require.NoError(t, err, "go.sum parse")
+	if got := visitor.Init(&visitor.GoVisitor{}).Visit(gs, nil); got != java.Tree(gs) {
+		t.Error("no-op visit did not preserve go.sum identity (returned a new pointer)")
 	}
 }

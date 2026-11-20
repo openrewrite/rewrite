@@ -80,4 +80,37 @@ class User {
         expect(captured.get('Entity')).toBe('typeorm.Entity');
         expect(captured.get('Column')).toBe('typeorm.Column');
     }, 240000);
+
+    test('an aliased decorator import resolves to the name the package exports', async () => {
+        const captured = new Map<string, string>();
+        const spec = new RecipeSpec();
+        spec.recipe = captureAnnotationTypes(captured);
+
+        const src = `
+import {Entity as Table, Column as Field} from 'typeorm';
+
+@Table()
+class User {
+    @Field()
+    name: string = '';
+}
+`;
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(repo.path,
+                    //language=typescript
+                    typescript(src),
+                    //language=json
+                    packageJson(`{
+                      "name": "decorator-fixture", "version": "1.0.0",
+                      "dependencies": { "typeorm": "^0.3.20", "reflect-metadata": "^0.2.1" }
+                    }`)
+                )
+            );
+        }, {unsafeCleanup: true});
+
+        expect(captured.get('Table')).toBe('typeorm.Entity');
+        expect(captured.get('Field')).toBe('typeorm.Column');
+    }, 240000);
 });

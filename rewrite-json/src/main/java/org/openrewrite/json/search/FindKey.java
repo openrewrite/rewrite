@@ -59,8 +59,7 @@ public class FindKey extends Recipe {
 
     public static Set<JsonKey> find(Json j, String key) {
         JsonPathMatcher matcher = new JsonPathMatcher(key);
-        Set<JsonKey> ks = new HashSet<>();
-        new JsonIsoVisitor<Set<JsonKey>>() {
+        return new JsonIsoVisitor<Set<JsonKey>>() {
             @Override
             public Json.Member visitMember(Json.Member member, Set<JsonKey> ks) {
                 Json.Member m = super.visitMember(member, ks);
@@ -69,7 +68,6 @@ public class FindKey extends Recipe {
                 }
                 return m;
             }
-        }.visit(j, ks);
-        return ks;
+        }.reduce(j, new HashSet<>());
     }
 }

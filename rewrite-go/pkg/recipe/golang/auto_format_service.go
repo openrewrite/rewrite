@@ -25,10 +25,11 @@ import (
 // AutoFormatService exposes gofmt-style normalization as composable
 // visitors. Mirrors org.openrewrite.java.service.AutoFormatService.
 //
-// Recipes get one via recipe.Service:
+// Recipes get one with recipe.Service[*golang.AutoFormatService](cu). To
+// format only the element a recipe changed, not the whole file, give
+// format.MaybeAutoFormat that element and its parent's cursor:
 //
-//	svc := recipe.Service[*golang.AutoFormatService](cu)
-//	v.DoAfterVisit(svc.AutoFormatVisitor(nil))
+//	return format.MaybeAutoFormat(original, m, p, nil, v.Cursor().Parent()).(java.J)
 //
 // AutoFormatVisitor runs the full pipeline (trailing whitespace →
 // blank lines → tabs/indents → spaces). The single-pass visitors
@@ -36,9 +37,8 @@ import (
 // individually for recipes that only need one normalization pass.
 //
 // Each method accepts a `stopAfter` bound. When non-nil, traversal
-// halts once that node has been fully visited — useful for formatting
-// only a synthesized subtree without disturbing surrounding code.
-// Pass nil to format the entire visited subtree.
+// halts once that node has been fully visited, which still formats
+// what comes before it. Pass nil to format the entire visited subtree.
 type AutoFormatService struct{}
 
 // AutoFormatVisitor returns a visitor that applies the full gofmt-style

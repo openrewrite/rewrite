@@ -1,0 +1,179 @@
+{"header":"brace-expansion 1.1.11: every call its own tests (test/bash-comparison.js, test/dollar.js, test/empty-option.js, test/negative-increment.js, test/nested.js, test/order.js, test/pad.js, test/same-type.js, test/sequence.js) make, with its answer; generate/upstream-calls.js generate/upstream/brace-expansion.js <checkout> 1.1.11"}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["A{b,{d,e},{f,g}}Z"],"out":["AbZ","AdZ","AeZ","AfZ","AgZ"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["PRE-{a,b}{{a,b},a,b}-POST"],"out":["PRE-aa-POST","PRE-ab-POST","PRE-aa-POST","PRE-ab-POST","PRE-ba-POST","PRE-bb-POST","PRE-ba-POST","PRE-bb-POST"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["\\{a,b}{{a,b},a,b}"],"out":["{a,b}a","{a,b}b","{a,b}a","{a,b}b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b}"],"out":["{a","{b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a,b}}"],"out":["a}","b}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{,}"],"out":[]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{,}"],"out":["a","a"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{,}b"],"out":["b","b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{,}b"],"out":["ab","ab"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b}c"],"out":["a{b}c"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{1..5}b"],"out":["a1b","a2b","a3b","a4b","a5b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{01..5}b"],"out":["a01b","a02b","a03b","a04b","a05b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{-01..5}b"],"out":["a-01b","a000b","a001b","a002b","a003b","a004b","a005b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{-01..5..3}b"],"out":["a-01b","a002b","a005b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{001..9}b"],"out":["a001b","a002b","a003b","a004b","a005b","a006b","a007b","a008b","a009b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b,c{d,e},{f,g}h}x{y,z"],"out":["abx{y,z","acdx{y,z","acex{y,z","afhx{y,z","aghx{y,z"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b,c{d,e},{f,g}h}x{y,z\\}"],"out":["abx{y,z}","acdx{y,z}","acex{y,z}","afhx{y,z}","aghx{y,z}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b,c{d,e},{f,g}h}x{y,z}"],"out":["abxy","abxz","acdxy","acdxz","acexy","acexz","afhxy","afhxz","aghxy","aghxz"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b{c{d,e}f{x,y{{g}h"],"out":["a{b{cdf{x,y{{g}h","a{b{cef{x,y{{g}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b{c{d,e}f{x,y{}g}h"],"out":["a{b{cdfxh","a{b{cdfy{}gh","a{b{cefxh","a{b{cefy{}gh"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b{c{d,e}f{x,y}}g}h"],"out":["a{b{cdfx}g}h","a{b{cdfy}g}h","a{b{cefx}g}h","a{b{cefy}g}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{b{c{d,e}f}g}h"],"out":["a{b{cdf}g}h","a{b{cef}g}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a{{x,y},z}b"],"out":["axb","ayb","azb"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{x,y{g,z}}h"],"out":["fxh","fygh","fyzh"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{x,y{{g,z}}h"],"out":["f{x,y{g}h","f{x,y{z}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{x,y{{g,z}}h}"],"out":["fx","fy{g}h","fy{z}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{x,y{{g}h"],"out":["f{x,y{{g}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{x,y{{g}}h"],"out":["f{x,y{{g}}h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{x,y{}g}h"],"out":["fxh","fy{}gh"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["z{a,b{,c}d"],"out":["z{a,bd","z{a,bcd"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["z{a,b},c}d"],"out":["za,c}d","zb,c}d"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-01..5}"],"out":["-01","000","001","002","003","004","005"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-05..100..5}"],"out":["-05","000","005","010","015","020","025","030","035","040","045","050","055","060","065","070","075","080","085","090","095","100"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-05..100}"],"out":["-05","-04","-03","-02","-01","000","001","002","003","004","005","006","007","008","009","010","011","012","013","014","015","016","017","018","019","020","021","022","023","024","025","026","027","028","029","030","031","032","033","034","035","036","037","038","039","040","041","042","043","044","045","046","047","048","049","050","051","052","053","054","055","056","057","058","059","060","061","062","063","064","065","066","067","068","069","070","071","072","073","074","075","076","077","078","079","080","081","082","083","084","085","086","087","088","089","090","091","092","093","094","095","096","097","098","099","100"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0..5..2}"],"out":["0","2","4"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0001..05..2}"],"out":["0001","0003","0005"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0001..-5..2}"],"out":["0001","-001","-003","-005"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0001..-5..-2}"],"out":["0001","-001","-003","-005"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0001..5..-2}"],"out":["0001","0003","0005"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{01..5}"],"out":["01","02","03","04","05"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..05}"],"out":["01","02","03","04","05"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..05..3}"],"out":["01","04"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{05..100}"],"out":["005","006","007","008","009","010","011","012","013","014","015","016","017","018","019","020","021","022","023","024","025","026","027","028","029","030","031","032","033","034","035","036","037","038","039","040","041","042","043","044","045","046","047","048","049","050","051","052","053","054","055","056","057","058","059","060","061","062","063","064","065","066","067","068","069","070","071","072","073","074","075","076","077","078","079","080","081","082","083","084","085","086","087","088","089","090","091","092","093","094","095","096","097","098","099","100"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0a..0z}"],"out":["{0a..0z}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a,b\\}c,d}"],"out":["a","b}c","d"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a,b{c,d}"],"out":["{a,bc","{a,bd"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a,b}c,d}"],"out":["ac,d}","bc,d}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..F}"],"out":["a","`","_","^","]","","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{A..f}"],"out":["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","","]","^","_","`","a","b","c","d","e","f"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..Z}"],"out":["a","`","_","^","]","","[","Z"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{A..z}"],"out":["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","","]","^","_","`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{z..A}"],"out":["z","y","x","w","v","u","t","s","r","q","p","o","n","m","l","k","j","i","h","g","f","e","d","c","b","a","`","_","^","]","","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{Z..a}"],"out":["Z","[","","]","^","_","`","a"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..F..2}"],"out":["a","_","]","[","Y","W","U","S","Q","O","M","K","I","G"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{A..f..02}"],"out":["A","C","E","G","I","K","M","O","Q","S","U","W","Y","[","]","_","a","c","e"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..Z..5}"],"out":["a",""]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["d{a..Z..5}b"],"out":["dab","db"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{A..z..10}"],"out":["A","K","U","_","i","s"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{z..A..-2}"],"out":["z","x","v","t","r","p","n","l","j","h","f","d","b","`","^","","Z","X","V","T","R","P","N","L","J","H","F","D","B"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{Z..a..20}"],"out":["Z"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a{,b}"],"out":["{a","{ab"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a},b}"],"out":["a}","b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{x,y{,}g}"],"out":["x","yg","yg"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{x,y{}g}"],"out":["x","y{}g"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b}"],"out":["{a","{b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b},c}"],"out":["a","b","c"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b}c}"],"out":["{ac}","{bc}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b},}"],"out":["a","b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["X{{a,b},}X"],"out":["XaX","XbX","XX"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b},}c"],"out":["ac","bc","c"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b}.}"],"out":["{a.}","{b.}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{a,b}}"],"out":["{a}","{b}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["X{a..#}X"],"out":["X{a..#}X"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":[""],"out":[]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-10..00}"],"out":["-10","-09","-08","-07","-06","-05","-04","-03","-02","-01","000"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a,\\\\{a,b}c}"],"out":["a","\\ac","\\bc"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a,\\{a,b}c}"],"out":["ac}","{ac}","bc}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a,\\{b,c}"],"out":["a,{b,c}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-10.\\.00}"],"out":["{-10..00}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["ff{c,b,a}"],"out":["ffc","ffb","ffa"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["f{d,e,f}g"],"out":["fdg","feg","ffg"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{l,n,m}xyz"],"out":["lxyz","nxyz","mxyz"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{abc\\,def}"],"out":["{abc,def}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{abc}"],"out":["{abc}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{x\\,y,\\{abc\\},trie}"],"out":["x,y","{abc}","trie"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{}"],"out":["{}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["}"],"out":["}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{"],"out":["{"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["abcd{efgh"],"out":["abcd{efgh"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..10}"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{0..10,braces}"],"out":["0..10","braces"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{0..10},braces}"],"out":["0","1","2","3","4","5","6","7","8","9","10","braces"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["x{{0..10},braces}y"],"out":["x0y","x1y","x2y","x3y","x4y","x5y","x6y","x7y","x8y","x9y","x10y","xbracesy"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{3..3}"],"out":["3"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["x{3..3}y"],"out":["x3y"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{10..1}"],"out":["10","9","8","7","6","5","4","3","2","1"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{10..1}y"],"out":["10y","9y","8y","7y","6y","5y","4y","3y","2y","1y"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["x{10..1}y"],"out":["x10y","x9y","x8y","x7y","x6y","x5y","x4y","x3y","x2y","x1y"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..f}"],"out":["a","b","c","d","e","f"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{f..a}"],"out":["f","e","d","c","b","a"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..A}"],"out":["a","`","_","^","]","","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{A..a}"],"out":["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","","]","^","_","`","a"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{f..f}"],"out":["f"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..f}"],"out":["{1..f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{f..1}"],"out":["{f..1}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-1..-10}"],"out":["-1","-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-20..0}"],"out":["-20","-19","-18","-17","-16","-15","-14","-13","-12","-11","-10","-9","-8","-7","-6","-5","-4","-3","-2","-1","0"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a-{b{d,e}}-c"],"out":["a-{bd}-c","a-{be}-c"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["a-{bdef-{g,i}-c"],"out":["a-{bdef-g-c","a-{bdef-i-c"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{klklkl}{1,2,3}"],"out":["{klklkl}1","{klklkl}2","{klklkl}3"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..10..2}"],"out":["1","3","5","7","9"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-1..-10..2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-1..-10..-2}"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{10..1..-2}"],"out":["10","8","6","4","2"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{10..1..2}"],"out":["10","8","6","4","2"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..20..2}"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..20..20}"],"out":["1"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{100..0..5}"],"out":["100","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5","0"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{100..0..-5}"],"out":["100","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5","0"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..z}"],"out":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{a..z..2}"],"out":["a","c","e","g","i","k","m","o","q","s","u","w","y"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{z..a..-2}"],"out":["z","x","v","t","r","p","n","l","j","h","f","d","b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{2147483645..2147483649}"],"out":["2147483645","2147483646","2147483647","2147483648","2147483649"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{10..0..2}"],"out":["10","8","6","4","2","0"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{10..0..-2}"],"out":["10","8","6","4","2","0"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{-50..-0..5}"],"out":["-50","-45","-40","-35","-30","-25","-20","-15","-10","-5","0"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..10.f}"],"out":["{1..10.f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..ff}"],"out":["{1..ff}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..10..ff}"],"out":["{1..10..ff}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1.20..2}"],"out":["{1.20..2}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..20..f2}"],"out":["{1..20..f2}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..20..2f}"],"out":["{1..20..2f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..2f..2}"],"out":["{1..2f..2}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..ff..2}"],"out":["{1..ff..2}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..ff}"],"out":["{1..ff}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..f}"],"out":["{1..f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..0f}"],"out":["{1..0f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..10f}"],"out":["{1..10f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{1..10.f}"],"out":["{1..10.f}"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{},b}.h"],"out":["{},b}.h"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["y{},a}x"],"out":["y}x","yax"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{}{},a}b"],"out":["{}}b","{}ab"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{{},a}}b"],"out":["{}}b","a}b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{}{{},a}}b"],"out":["{}{}}b","{}a}b"]}
+{"test":"test/bash-comparison.js > matches bash expansions","fn":"expand","args":["{}a,b}c"],"out":["{}a,b}c"]}
+{"test":"test/dollar.js > ignores ${","fn":"expand","args":["${1..3}"],"out":["${1..3}"]}
+{"test":"test/dollar.js > ignores ${","fn":"expand","args":["${a,b}${c,d}"],"out":["${a,b}${c,d}"]}
+{"test":"test/dollar.js > ignores ${","fn":"expand","args":["x${a,b}x${c,d}x"],"out":["x${a,b}x${c,d}x"]}
+{"test":"test/empty-option.js > empty option","fn":"expand","args":["-v{,,,,}"],"out":["-v","-v","-v","-v","-v"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{3..1}"],"out":["3","2","1"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{10..8}"],"out":["10","9","8"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{10..08}"],"out":["10","09","08"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{c..a}"],"out":["c","b","a"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{4..0..2}"],"out":["4","2","0"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{4..0..-2}"],"out":["4","2","0"]}
+{"test":"test/negative-increment.js > negative increment","fn":"expand","args":["{e..a..2}"],"out":["e","c","a"]}
+{"test":"test/nested.js > nested","fn":"expand","args":["{a,b{1..3},c}"],"out":["a","b1","b2","b3","c"]}
+{"test":"test/nested.js > nested","fn":"expand","args":["{{A..Z},{a..z}}"],"out":["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]}
+{"test":"test/nested.js > nested","fn":"expand","args":["ppp{,config,oe{,conf}}"],"out":["ppp","pppconfig","pppoe","pppoeconf"]}
+{"test":"test/order.js > order","fn":"expand","args":["a{d,c,b}e"],"out":["ade","ace","abe"]}
+{"test":"test/pad.js > pad","fn":"expand","args":["{9..11}"],"out":["9","10","11"]}
+{"test":"test/pad.js > pad","fn":"expand","args":["{09..11}"],"out":["09","10","11"]}
+{"test":"test/same-type.js > x and y of same type","fn":"expand","args":["{a..9}"],"out":["{a..9}"]}
+{"test":"test/sequence.js > numeric sequences","fn":"expand","args":["a{1..2}b{2..3}c"],"out":["a1b2c","a1b3c","a2b2c","a2b3c"]}
+{"test":"test/sequence.js > numeric sequences","fn":"expand","args":["{1..2}{2..3}"],"out":["12","13","22","23"]}
+{"test":"test/sequence.js > numeric sequences with step count","fn":"expand","args":["{0..8..2}"],"out":["0","2","4","6","8"]}
+{"test":"test/sequence.js > numeric sequences with step count","fn":"expand","args":["{1..8..2}"],"out":["1","3","5","7"]}
+{"test":"test/sequence.js > numeric sequence with negative x / y","fn":"expand","args":["{3..-2}"],"out":["3","2","1","0","-1","-2"]}
+{"test":"test/sequence.js > alphabetic sequences","fn":"expand","args":["1{a..b}2{b..c}3"],"out":["1a2b3","1a2c3","1b2b3","1b2c3"]}
+{"test":"test/sequence.js > alphabetic sequences","fn":"expand","args":["{a..b}{b..c}"],"out":["ab","ac","bb","bc"]}
+{"test":"test/sequence.js > alphabetic sequences with step count","fn":"expand","args":["{a..k..2}"],"out":["a","c","e","g","i","k"]}
+{"test":"test/sequence.js > alphabetic sequences with step count","fn":"expand","args":["{b..k..2}"],"out":["b","d","f","h","j"]}
+{"test":"differences","fn":"expand","args":["a$b{c,d}{e,f}"],"out":["a$bce","a$bcf","a$bde","a$bdf"]}
+{"test":"differences","fn":"expand","args":["x{a}y,{c,d}"],"out":["x{a}y,c","x{a}y,d"]}
+{"test":"differences","fn":"expand","args":["{a},{,b}"],"out":["{a},","{a},b"]}
+{"test":"differences","fn":"expand","args":["{a}y,,z}"],"out":["a}y","","z"]}
+{"test":"differences","fn":"expand","args":["{a}{b,c},,d}"],"out":["a}b","a}c","","d"]}
+{"test":"differences","fn":"expand","args":["{1..3}{a,b}"],"out":["1a","1b","2a","2b","3a","3b"]}

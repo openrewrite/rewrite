@@ -362,7 +362,17 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 rule = rule.substring(0, rule.length()-wildcardSuffix.length());
             }
             if (wildcardPrefix != null && rule.startsWith(wildcardPrefix)) {
-                rule = path.substring(0, path.indexOf(rule.substring(wildcardPrefix.length()))) + rule.substring(wildcardPrefix.length());
+                String literal = rule.substring(wildcardPrefix.length());
+                int literalIdx = path.indexOf(literal);
+                if (literalIdx < 0 && (path + "/").endsWith(literal)) {
+                    // A dir-only rule like `*/log/` matches `/app/log` as a directory.
+                    path = path + "/";
+                    literalIdx = path.indexOf(literal);
+                }
+                if (literalIdx < 0) {
+                    return singletonList(new FastIgnoreRule(originalRule));
+                }
+                rule = path.substring(0, literalIdx) + literal;
                 traversedRemainingRules.add(new FastIgnoreRule(originalRule + (originalRule.endsWith("/") ? "*" : "/*")));
                 traversedRemainingRules.add(new FastIgnoreRule("!" + rule));
             }

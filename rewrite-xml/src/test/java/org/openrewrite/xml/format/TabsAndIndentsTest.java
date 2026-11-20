@@ -18,6 +18,7 @@ package org.openrewrite.xml.format;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
 
@@ -26,13 +27,17 @@ import static org.openrewrite.xml.Assertions.xml;
 
 class TabsAndIndentsTest implements RewriteTest {
 
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
+      TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
+    )));
+  }
+
     @DocumentExample
     @Test
     void indentsAndContinuationIndents() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
-            TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
-          ))),
           xml(
             """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -54,13 +59,31 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3648")
+    @Test
+    void continuationIndentIsRelativeToTagDepth() {
+        rewriteRun(
+          xml(
+            """
+              <root>
+              <child first="1"
+               second="2"/>
+              </root>
+              """,
+            """
+              <root>
+                <child first="1"
+                     second="2"/>
+              </root>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4234")
     @Test
     void continuationIndentsWithinDOCTYPE() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
-            TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
-          ))),
           xml(
             """
               <!DOCTYPE module PUBLIC

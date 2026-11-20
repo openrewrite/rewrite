@@ -26,7 +26,9 @@ export type {
     TemplateParameter,
     TemplateOptions,
     RewriteRule,
+    TryOnOptions,
     RewriteConfig,
+    DebugSetting,
     DebugOptions,
     DebugLogEntry,
     MatchExplanation,
@@ -66,6 +68,14 @@ export {
     TemplateBuilder,
     template
 } from './template';
+
+// Precedence utilities, so hand-written visitors need not carry their own parenthesization
+export {
+    Precedence,
+    precedenceOf,
+    maybeParenthesize,
+    parenthesize
+} from './precedence';
 
 // Export engine utilities (for testing)
 export {

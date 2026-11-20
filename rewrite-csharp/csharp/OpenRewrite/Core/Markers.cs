@@ -15,6 +15,9 @@
  */
 using OpenRewrite.Core.Rpc;
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
@@ -26,13 +29,21 @@ public interface Marker
 }
 
 /// <summary>
-/// Fallback marker for Java marker types that have no C# equivalent.
-/// Similar to Java's RpcMarker, this captures the Id so the marker can
-/// be round-tripped without losing identity, while the actual data is ignored.
+/// Stands in for a Java marker that has no type here. Like Java's RpcMarker, it keeps the
+/// marker's fields along with its id, so that it is sent back as it came.
 /// </summary>
-public sealed class UnknownMarker(Guid id) : Marker
+public sealed class UnknownMarker(Guid id, string? javaType = null) : Marker
 {
     public Guid Id { get; } = id;
+
+    /// <summary>
+    /// The Java type the marker arrived as.
+    /// </summary>
+    [JsonIgnore]
+    public string? JavaType { get; } = javaType;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Data { get; } = new();
 }
 
 /// <summary>
@@ -65,7 +76,7 @@ public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Marke
     public static Markers Build(IEnumerable<Marker> markers)
     {
         var list = markers.ToList();
-        return list.Count == 0 ? Empty : new Markers(Guid.NewGuid(), list);
+        return list.Count == 0 ? Empty : new Markers(Tree.RandomId(), list);
     }
 
     public T? FindFirst<T>() where T : Marker =>
@@ -73,6 +84,32 @@ public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Marke
 
     public Markers Add(Marker marker) =>
         new(Id, [..MarkerList, marker]);
+
+    /// <summary>
+    /// The markers with <paramref name="marker"/> in place of those of its exact type, or added when there are none.
+    /// </summary>
+    public Markers SetByType(Marker marker)
+    {
+        var markers = new List<Marker>(MarkerList.Count + 1);
+        var replaced = false;
+        foreach (var existing in MarkerList)
+        {
+            if (existing.GetType() != marker.GetType())
+            {
+                markers.Add(existing);
+            }
+            else if (!replaced)
+            {
+                markers.Add(marker);
+                replaced = true;
+            }
+        }
+        if (!replaced)
+        {
+            markers.Add(marker);
+        }
+        return new(Id, markers);
+    }
 
     public Markers Remove<T>() where T : Marker =>
         new(Id, MarkerList.Where(m => m is not T).ToList());

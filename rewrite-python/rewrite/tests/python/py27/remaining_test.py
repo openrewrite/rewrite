@@ -19,6 +19,7 @@ comprehensions, chained assignment, two-token comparison operators."""
 import pytest
 
 from rewrite.java import tree as j
+from rewrite.java.support_types import JavaType
 from rewrite.python import tree as py
 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
 from rewrite.python.markers import TupleExceptClause
@@ -231,6 +232,7 @@ class TestCallArgs:
         e = _expr("x = f(a=1)\n")
         assert isinstance(e, j.MethodInvocation)
         assert isinstance(e.arguments[0], py.NamedArgument)
+        assert e.arguments[0].type == JavaType.Primitive.Int
 
     def test_mixed_args(self):
         e = _expr("x = f(a, b=2)\n")

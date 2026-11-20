@@ -24,6 +24,8 @@ import org.openrewrite.toml.tree.TomlValue;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static java.util.Collections.singletonList;
+
 /**
  * Computes {@code _meta.hash.sha256} with pipenv's exact algorithm: the SHA-256 of
  * {@code json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")} where
@@ -106,7 +108,7 @@ public final class PipfileLockHash {
         }
 
         if (sources.isEmpty()) {
-            sources = fallbackSources != null ? fallbackSources : Collections.singletonList(defaultSource());
+            sources = fallbackSources != null ? fallbackSources : singletonList(defaultSource());
         }
 
         if (variant == HashVariant.CANONICAL) {

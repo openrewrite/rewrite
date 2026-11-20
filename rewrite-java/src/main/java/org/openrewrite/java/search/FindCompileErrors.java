@@ -42,7 +42,7 @@ public class FindCompileErrors extends Recipe {
             public J.Erroneous visitErroneous(J.Erroneous erroneous, ExecutionContext ctx) {
                 JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
                 String sourceFile = cu != null ? cu.getSourcePath().toString() : "Unknown source file";
-                String code = erroneous.print(getCursor());
+                String code = erroneous.print(getCursor().getParentOrThrow());
                 report.insertRow(ctx, new CompileErrors.Row(
                         sourceFile,
                         code

@@ -49,8 +49,8 @@ public final class PythonImportNames {
     }
 
     /**
-     * The canonical fully qualified name of the symbol the import binds, which differs from the
-     * written path for re-exports: {@code from os.path import join} binds {@code posixpath.join}.
+     * The fully qualified name of the symbol the import binds, at the module defining it,
+     * read off the qualid's own type.
      */
     public static @Nullable String canonicalFqn(J.Import imp) {
         JavaType type = imp.getQualid().getType();

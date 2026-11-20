@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class ReplaceTableRowTest implements RewriteTest {
@@ -303,6 +304,51 @@ class ReplaceTableRowTest implements RewriteTest {
               name = "Alice Smith"
               email = "alice@example.com"
               role = "developer"
+              """
+          )
+        );
+    }
+
+    @Test
+    void keyNewToTheRowGoesOnItsOwnLine() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceTableRow(
+            "package.contributors",
+            "email = \"alice@example.com\"\nname = \"Alice\"",
+            "name"
+          )),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice"
+              """,
+            """
+              [[package.contributors]]
+              name = "Alice"
+              email = "alice@example.com"
+              """
+          )
+        );
+    }
+
+    @Test
+    void rowThatIsNotTomlIsInvalid() {
+        assertThat(new ReplaceTableRow("pkg", "name = \"a\"\nurl = https://example.com", "name").validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void commentOnTheLastLineStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceTableRow("pkg", "name = \"a\"\nx = 1", "name")),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
               """
           )
         );

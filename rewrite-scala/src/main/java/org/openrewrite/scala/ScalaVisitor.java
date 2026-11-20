@@ -29,9 +29,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 
-import java.util.Collections;
-import java.util.List;
-
 /**
  * ScalaVisitor extends JavaVisitor to support visiting both Java (J) and Scala (S) AST elements.
  * This allows Scala code to be processed by Java-focused recipes while also supporting
@@ -54,59 +51,55 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
 
-        if (c.getPackageDeclaration() != null) {
-            c = c.withPackageDeclaration(visitAndCast(c.getPackageDeclaration(), p));
-        }
+        c = c.getPadding().withPackageDeclaration(
+                visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, p));
 
-        c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
-            try {
-                return visitAndCast(s, p);
-            } catch (Exception e) {
-                // Some Java recipes may fail on Scala-specific class structures
-                // (e.g., missing primaryConstructor). Return unchanged rather than crashing.
-                return s;
+        c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), rp -> {
+            if (rp.getElement() instanceof J.Import) {
+                return visitRightPadded(rp, JRightPadded.Location.IMPORT, p);
             }
+            Statement s = toStatement(visit(rp.getElement(), p));
+            return s == null ? null : rp.withElement(s);
         }));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
 
-        // Bridge to Java visitor: create a temporary J.CompilationUnit so that Java recipes
-        // that override visitCompilationUnit(J.CompilationUnit, P) can process imports, classes, etc.
-        J.CompilationUnit tempJcu = new J.CompilationUnit(
-                Tree.randomId(),
-                c.getPrefix(),
-                c.getMarkers(),
-                c.getSourcePath(),
-                c.getFileAttributes(),
-                c.getCharset().name(),
-                c.isCharsetBomMarked(),
-                c.getChecksum(),
-                c.getPadding().getPackageDeclaration(),
-                c.getPadding().getImports(),
-                Collections.emptyList(),
-                c.getEof()
-        );
-
-        // Cast to JavaVisitor to invoke visitCompilationUnit(J.CompilationUnit, P) virtually.
-        // When this visitor is an adapted delegate, the adapter's override will call
-        // the original Java recipe's visitCompilationUnit (e.g., OrderImports).
-        J.CompilationUnit result = (J.CompilationUnit) ((JavaVisitor<P>) this).visitCompilationUnit(tempJcu, p);
-
-        // Sync changes from the J.CompilationUnit back to S.CompilationUnit
-        if (result != tempJcu) {
-            List<JRightPadded<J.Import>> newImports = result.getPadding().getImports();
-            c = (S.CompilationUnit) c.getPadding().withImports(newImports);
-            if (result.getPrefix() != c.getPrefix()) {
-                c = c.withPrefix(result.getPrefix());
-            }
-            if (result.getMarkers() != c.getMarkers()) {
-                c = c.withMarkers(result.getMarkers());
-            }
-            if (result.getEof() != c.getEof()) {
-                c = c.withEof(result.getEof());
-            }
-        }
-
         return c;
+    }
+
+    @Override
+    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
+        throw new UnsupportedOperationException("Scala has a different structure for its compilation unit. See S.CompilationUnit.");
+    }
+
+    @Override
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+        JRightPadded<T> r = super.visitRightPadded(right, loc, p);
+        if (r != null && isStatementLocation(loc) &&
+            r.getElement() instanceof Expression && !(r.getElement() instanceof Statement)) {
+            //noinspection unchecked
+            return r.withElement((T) new S.ExpressionStatement(Tree.randomId(), (Expression) r.getElement()));
+        }
+        return r;
+    }
+
+    private static boolean isStatementLocation(JRightPadded.Location loc) {
+        switch (loc) {
+            case BLOCK_STATEMENT:
+            case IF_THEN:
+            case IF_ELSE:
+            case FOR_BODY:
+            case WHILE_BODY:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static @Nullable Statement toStatement(@Nullable J j) {
+        if (j instanceof Expression && !(j instanceof Statement)) {
+            return new S.ExpressionStatement(Tree.randomId(), (Expression) j);
+        }
+        return (Statement) j;
     }
 
     // Additional visit methods for Scala-specific constructs will be added here
@@ -116,6 +109,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.TuplePattern t = tuplePattern;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(t, p);
+        if (!(temp instanceof S.TuplePattern)) {
+            return temp;
+        }
+        t = (S.TuplePattern) temp;
         t = t.getPadding().withElements(visitContainer(t.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return t;
     }
@@ -124,6 +122,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.Wildcard w = wildcard;
         w = w.withPrefix(visitSpace(w.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         w = w.withMarkers(visitMarkers(w.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(w, p);
+        if (!(temp instanceof S.Wildcard)) {
+            return temp;
+        }
+        w = (S.Wildcard) temp;
         return w;
     }
 
@@ -141,6 +144,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.TypeAscription t = typeAscription;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(t, p);
+        if (!(temp instanceof S.TypeAscription)) {
+            return temp;
+        }
+        t = (S.TypeAscription) temp;
         t = t.withExpression(visitAndCast(t.getExpression(), p));
         t = t.withTypeTree(visitAndCast(t.getTypeTree(), p));
         return t;
@@ -150,6 +158,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.TypeAlias t = typeAlias;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(t, p);
+        if (!(temp instanceof S.TypeAlias)) {
+            return temp;
+        }
+        t = (S.TypeAlias) temp;
         return t;
     }
 
@@ -203,11 +216,41 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    @SuppressWarnings("deprecation")
     public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
         S.PatternDefinition pd = patDef;
         pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(pd, p);
+        if (!(temp instanceof S.PatternDefinition)) {
+            return temp;
+        }
+        pd = (S.PatternDefinition) temp;
+        if (pd.getText() != null) {
+            return pd;
+        }
+        pd = pd.withLeadingAnnotations(ListUtils.map(pd.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        pd = pd.withModifiers(ListUtils.map(pd.getModifiers(), m -> visitAndCast(m, p)));
+        pd = pd.getPadding().withPatterns(visitContainer(pd.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        if (pd.getPadding().getTypeExpression() != null) {
+            pd = pd.getPadding().withTypeExpression(visitLeftPadded(pd.getPadding().getTypeExpression(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (pd.getPadding().getInitializer() != null) {
+            pd = pd.getPadding().withInitializer(visitLeftPadded(pd.getPadding().getInitializer(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
         return pd;
+    }
+
+    public J visitSelfType(S.SelfType selfType, P p) {
+        S.SelfType s = selfType;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(s, p);
+        if (!(temp instanceof S.SelfType)) {
+            return temp;
+        }
+        s = (S.SelfType) temp;
+        return s.getPadding().withDeclaration(visitRightPadded(s.getPadding().getDeclaration(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
     }
 
     public J visitAnonymousGiven(S.AnonymousGiven anonymousGiven, P p) {
@@ -232,6 +275,16 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.FunctionCall f = functionCall;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        Statement tempStatement = (Statement) visitStatement(f, p);
+        if (!(tempStatement instanceof S.FunctionCall)) {
+            return tempStatement;
+        }
+        f = (S.FunctionCall) tempStatement;
+        Expression tempExpression = (Expression) visitExpression(f, p);
+        if (!(tempExpression instanceof S.FunctionCall)) {
+            return tempExpression;
+        }
+        f = (S.FunctionCall) tempExpression;
         f = f.getPadding().withFunction(visitRightPadded(f.getPadding().getFunction(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
         f = f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
         return f;
@@ -250,6 +303,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.SingletonType s = singletonType;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof S.SingletonType)) {
+            return temp;
+        }
+        s = (S.SingletonType) temp;
         s = s.withQualifier(visitAndCast(s.getQualifier(), p));
         s = s.withBeforeType(visitSpace(s.getBeforeType(), Space.Location.LANGUAGE_EXTENSION, p));
         return s;
@@ -259,6 +317,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.RepeatedType r = repeatedType;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(r, p);
+        if (!(temp instanceof S.RepeatedType)) {
+            return temp;
+        }
+        r = (S.RepeatedType) temp;
         r = r.withElementType(visitAndCast(r.getElementType(), p));
         r = r.withBeforeStar(visitSpace(r.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
         return r;
@@ -268,6 +331,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.SplatExpression s = splatExpression;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof S.SplatExpression)) {
+            return temp;
+        }
+        s = (S.SplatExpression) temp;
         s = s.withExpression(visitAndCast(s.getExpression(), p));
         if (s.getBeforeColon() != null) {
             s = s.withBeforeColon(visitSpace(s.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
@@ -283,6 +351,16 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.XmlLiteral x = xmlLiteral;
         x = x.withPrefix(visitSpace(x.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         x = x.withMarkers(visitMarkers(x.getMarkers(), p));
+        Statement tempStatement = (Statement) visitStatement(x, p);
+        if (!(tempStatement instanceof S.XmlLiteral)) {
+            return tempStatement;
+        }
+        x = (S.XmlLiteral) tempStatement;
+        Expression tempExpression = (Expression) visitExpression(x, p);
+        if (!(tempExpression instanceof S.XmlLiteral)) {
+            return tempExpression;
+        }
+        x = (S.XmlLiteral) tempExpression;
         return x;
     }
 
@@ -290,6 +368,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.Alternative a = alternative;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(a, p);
+        if (!(temp instanceof S.Alternative)) {
+            return temp;
+        }
+        a = (S.Alternative) temp;
         a = a.getPadding().withPatterns(visitContainer(a.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return a;
     }
@@ -298,6 +381,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.InterpolatedString i = interpolatedString;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(i, p);
+        if (!(temp instanceof S.InterpolatedString)) {
+            return temp;
+        }
+        i = (S.InterpolatedString) temp;
         i = i.withInterpolator(visitAndCast(i.getInterpolator(), p));
         i = i.withParts(ListUtils.map(i.getParts(), e -> visitAndCast(e, p)));
         return i;
@@ -307,6 +395,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.Interpolation i = interpolation;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(i, p);
+        if (!(temp instanceof S.Interpolation)) {
+            return temp;
+        }
+        i = (S.Interpolation) temp;
         i = i.withExpression(visitAndCast(i.getExpression(), p));
         i = i.withAfterExpression(visitSpace(i.getAfterExpression(), Space.Location.LANGUAGE_EXTENSION, p));
         return i;
@@ -316,6 +409,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.Binding b = binding;
         b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof S.Binding)) {
+            return temp;
+        }
+        b = (S.Binding) temp;
         b = b.withName(visitAndCast(b.getName(), p));
         b = b.withBeforeAt(visitSpace(b.getBeforeAt(), Space.Location.LANGUAGE_EXTENSION, p));
         b = b.withPattern(visitAndCast(b.getPattern(), p));
@@ -326,6 +424,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.QualifiedSuper q = qualifiedSuper;
         q = q.withPrefix(visitSpace(q.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         q = q.withMarkers(visitMarkers(q.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(q, p);
+        if (!(temp instanceof S.QualifiedSuper)) {
+            return temp;
+        }
+        q = (S.QualifiedSuper) temp;
         if (q.getQualifier() != null) {
             q = q.withQualifier(visitAndCast(q.getQualifier(), p));
         }
@@ -339,6 +442,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.AnnotatedExpression a = annotatedExpression;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(a, p);
+        if (!(temp instanceof S.AnnotatedExpression)) {
+            return temp;
+        }
+        a = (S.AnnotatedExpression) temp;
         a = a.withExpression(visitAndCast(a.getExpression(), p));
         a = a.withBeforeColon(visitSpace(a.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withAnnotation(visitAndCast(a.getAnnotation(), p));
@@ -349,6 +457,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.FunctionType f = functionType;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(f, p);
+        if (!(temp instanceof S.FunctionType)) {
+            return temp;
+        }
+        f = (S.FunctionType) temp;
         f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
         f = f.getPadding().withReturnType(visitLeftPadded(f.getPadding().getReturnType(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
         return f;
@@ -358,6 +471,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.TupleType t = tupleType;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(t, p);
+        if (!(temp instanceof S.TupleType)) {
+            return temp;
+        }
+        t = (S.TupleType) temp;
         t = t.getPadding().withElements(visitContainer(t.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return t;
     }
@@ -366,6 +484,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.UnionType u = unionType;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(u, p);
+        if (!(temp instanceof S.UnionType)) {
+            return temp;
+        }
+        u = (S.UnionType) temp;
         u = u.getPadding().withTypes(visitContainer(u.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return u;
     }
@@ -374,6 +497,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.RefinedType r = refinedType;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(r, p);
+        if (!(temp instanceof S.RefinedType)) {
+            return temp;
+        }
+        r = (S.RefinedType) temp;
         if (r.getParent() != null) {
             r = r.withParent(visitAndCast(r.getParent(), p));
         }
@@ -381,10 +509,29 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return r;
     }
 
+    public J visitExistentialType(S.ExistentialType existentialType, P p) {
+        S.ExistentialType e = existentialType;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(e, p);
+        if (!(temp instanceof S.ExistentialType)) {
+            return temp;
+        }
+        e = (S.ExistentialType) temp;
+        e = e.withUnderlying(visitAndCast(e.getUnderlying(), p));
+        e = e.getPadding().withClause(visitLeftPadded(e.getPadding().getClause(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return e;
+    }
+
     public J visitMacro(S.Macro macro, P p) {
         S.Macro m = macro;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(m, p);
+        if (!(temp instanceof S.Macro)) {
+            return temp;
+        }
+        m = (S.Macro) temp;
         m = m.withExpression(visitAndCast(m.getExpression(), p));
         return m;
     }
@@ -393,6 +540,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.ExtensionMethods e = ext;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(e, p);
+        if (!(temp instanceof S.ExtensionMethods)) {
+            return temp;
+        }
+        e = (S.ExtensionMethods) temp;
         e = e.withTypeParameters(visitAndCast(e.getTypeParameters(), p));
         e = e.getPadding().withParameters(visitContainer(e.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
         e = e.withBody(visitAndCast(e.getBody(), p));
@@ -417,6 +569,16 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.For f = forLoop;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        Statement tempStatement = (Statement) visitStatement(f, p);
+        if (!(tempStatement instanceof S.For)) {
+            return tempStatement;
+        }
+        f = (S.For) tempStatement;
+        Expression tempExpression = (Expression) visitExpression(f, p);
+        if (!(tempExpression instanceof S.For)) {
+            return tempExpression;
+        }
+        f = (S.For) tempExpression;
         f = f.getPadding().withEnumerators(visitContainer(f.getPadding().getEnumerators(), JContainer.Location.LANGUAGE_EXTENSION, p));
         f = f.withBeforeBody(visitSpace(f.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withBody(visitAndCast(f.getBody(), p));
@@ -427,6 +589,16 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.Try t = tryable;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TRY_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        Statement tempStatement = (Statement) visitStatement(t, p);
+        if (!(tempStatement instanceof S.Try)) {
+            return tempStatement;
+        }
+        t = (S.Try) tempStatement;
+        Expression tempExpression = (Expression) visitExpression(t, p);
+        if (!(tempExpression instanceof S.Try)) {
+            return tempExpression;
+        }
+        t = (S.Try) tempExpression;
         t = t.withBody(visitAndCast(t.getBody(), p));
         if (t.getPadding().getCatches() != null) {
             t = t.getPadding().withCatches(visitLeftPadded(t.getPadding().getCatches(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));

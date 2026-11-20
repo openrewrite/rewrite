@@ -137,7 +137,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             // visiting only partial tree.
             Optional<Json> containingNode = getCursor().getPathAsStream().filter(obj ->
                     (obj instanceof Json) && ((Json) obj).getPrefix().getWhitespace().contains("\n")
-            ).findFirst().map(obj -> (Json) obj);
+            ).findFirst().map(Json.class::cast);
             return containingNode.map(node -> node.getPrefix().getWhitespaceIndent()).orElse("");
         }
         return ret;

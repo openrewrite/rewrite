@@ -21,7 +21,8 @@ Mirrors Java's ``org.openrewrite.Preconditions``. A recipe author writes::
 
 The framework introspects the wrapper at PrepareRecipe time and emits the
 ``check`` visitor's identity in the ``editPreconditions`` slot of the
-``PrepareRecipeResponse``. The Java side then evaluates the precondition
+``PrepareRecipeResponse``, or in ``scanPreconditions`` when the wrapper is
+returned by ``scanner()``. The Java side then evaluates the precondition
 against the local source file *before* dispatching the visit RPC, skipping
 the entire RPC round trip when the precondition does not match.
 
@@ -68,11 +69,11 @@ class RecipeRef:
 
     Captures a Java recipe class name + options without instantiating the
     recipe or firing an RPC. The framework introspects a
-    ``Preconditions.check(RecipeRef, editor)`` wrapper at PrepareRecipe
+    ``Preconditions.check(RecipeRef, visitor)`` wrapper at PrepareRecipe
     time and emits the recipe identity directly in
-    ``PrepareRecipeResponse.editPreconditions``. The Java host's
-    ``PreparedRecipeCache.instantiateVisitor`` constructs the recipe via
-    Jackson and uses its ``getVisitor()``.
+    ``PrepareRecipeResponse.editPreconditions`` or ``scanPreconditions``.
+    The Java host's ``PreparedRecipeCache.instantiateVisitor`` constructs
+    the recipe via Jackson and uses its ``getVisitor()``.
 
     This avoids requiring the recipe author to do an RPC at ``editor()``
     construction time, which would otherwise block in-process unit tests
@@ -136,11 +137,12 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
     are designed to evaluate at the root and may assume the root layout.
 
     The framework also introspects this wrapper at PrepareRecipe time and
-    promotes ``check`` to the ``editPreconditions`` wire slot so that the
-    Java host can evaluate the precondition locally and skip the visit RPC
-    entirely. In that case the wrapped ``v`` is what runs Python-side, so
-    the ``visit`` method below is the fallback for in-process callers (tests,
-    direct invocation) and for non-RPC dispatch paths.
+    promotes ``check`` to the ``editPreconditions`` or ``scanPreconditions``
+    wire slot so that the Java host can evaluate the precondition locally
+    and skip the visit RPC entirely. In that case the wrapped ``v`` is what
+    runs Python-side, so the ``visit`` method below is the fallback for
+    in-process callers (tests, direct invocation) and for non-RPC dispatch
+    paths.
     """
 
     def __init__(
@@ -314,8 +316,8 @@ class Preconditions:
             (``ScanningRecipe`` is rejected; see :class:`RecipeCheck`)
           * a :class:`RecipeRef` — placeholder for a Java search recipe
             (typically returned by ``uses_method``/``uses_type``); the
-            framework emits the recipe identity in the
-            ``editPreconditions`` wire slot at PrepareRecipe time so the
+            framework emits the recipe identity in the ``editPreconditions``
+            or ``scanPreconditions`` wire slot at PrepareRecipe time so the
             host evaluates it locally without a Python RPC
 
         The return is always a :class:`Check` instance.
@@ -347,8 +349,9 @@ class Preconditions:
         """AND-compose precondition checks.
 
         Mirrors Java's ``Preconditions.and(visitor...)``. Note that the
-        outer ``editPreconditions`` list is already AND-composed by
-        the host, so this is mainly useful as an operand of ``or_``/``not_``.
+        outer ``editPreconditions`` and ``scanPreconditions`` lists are
+        already AND-composed by the host, so this is mainly useful as an
+        operand of ``or_``/``not_``.
         """
         if len(checks) < 2:
             raise ValueError("Preconditions.and_ requires at least two operands")

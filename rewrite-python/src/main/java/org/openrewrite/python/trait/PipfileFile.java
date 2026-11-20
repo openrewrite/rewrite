@@ -55,9 +55,13 @@ public class PipfileFile implements PythonDependencyFile {
                 if (newVersion == null) {
                     return kv;
                 }
+                String currentVersion = keyValueVersion(kv);
+                if (currentVersion != null && PyProjectHelper.startsAtOrAbove(currentVersion, newVersion)) {
+                    return kv;
+                }
                 return updateKeyValueVersion(kv, newVersion);
             }
-        }.visitNonNull(doc, upgrades, cursor);
+        }.visitNonNull(doc, upgrades, cursor.getParentOrThrow());
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
             result = result.withMarkers(result.getMarkers().setByType(updatedMarker));
@@ -110,7 +114,7 @@ public class PipfileFile implements PythonDependencyFile {
                 });
                 return t.withValues(newValues);
             }
-        }.visitNonNull(doc, normalizedNames, cursor);
+        }.visitNonNull(doc, normalizedNames, cursor.getParentOrThrow());
         if (result != doc) {
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -141,7 +145,7 @@ public class PipfileFile implements PythonDependencyFile {
                 }
                 return kv;
             }
-        }.visitNonNull(doc, 0, cursor);
+        }.visitNonNull(doc, 0, cursor.getParentOrThrow());
         if (result != doc) {
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -174,7 +178,7 @@ public class PipfileFile implements PythonDependencyFile {
                 }
                 return kv;
             }
-        }.visitNonNull(doc, packageMessages, cursor);
+        }.visitNonNull(doc, packageMessages, cursor.getParentOrThrow());
         if (result != doc) {
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -267,6 +271,27 @@ public class PipfileFile implements PythonDependencyFile {
                 return t.withValues(concat(values, newKv));
             }
         }.visitNonNull(doc, 0);
+    }
+
+    private static @Nullable String keyValueVersion(Toml.KeyValue kv) {
+        if (kv.getValue() instanceof Toml.Literal) {
+            Object value = ((Toml.Literal) kv.getValue()).getValue();
+            return value instanceof String ? (String) value : null;
+        }
+        if (kv.getValue() instanceof Toml.Table) {
+            for (Toml inner : ((Toml.Table) kv.getValue()).getValues()) {
+                if (inner instanceof Toml.KeyValue) {
+                    Toml.KeyValue innerKv = (Toml.KeyValue) inner;
+                    if (innerKv.getKey() instanceof Toml.Identifier &&
+                            "version".equals(((Toml.Identifier) innerKv.getKey()).getName()) &&
+                            innerKv.getValue() instanceof Toml.Literal &&
+                            ((Toml.Literal) innerKv.getValue()).getValue() instanceof String) {
+                        return (String) ((Toml.Literal) innerKv.getValue()).getValue();
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**

@@ -29,11 +29,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
+
 /**
- * Resolves the npm registries (and their credentials) a project locks against: host-supplied
- * registries on the {@link NodeExecutionContextView} win outright; otherwise the marker's merged
- * {@code .npmrc} is parsed via {@link NpmConfig}, with credentials filled from the URL, then
- * host-supplied credentials, then {@code .netrc}. Mirrors the Python {@code IndexDiscovery}.
+ * The registries and credentials a project locks against: the {@link NodeExecutionContextView}'s, else the marker's
+ * merged {@code .npmrc} ({@link NpmConfig}), credentials from the URL, then the host's, then {@code .netrc}.
  */
 public final class RegistryDiscovery {
     private static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
@@ -43,13 +43,21 @@ public final class RegistryDiscovery {
 
     public static NodeRegistries discover(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
-        List<NodeRegistry> explicit = view.getRegistries();
+        return discover(view.getRegistries(), view.getRegistryCredentials(),
+                marker == null ? null : marker.getNpmrcConfigs(), env);
+    }
+
+    /**
+     * {@link #discover(ExecutionContext, NodeResolutionResult, Environment)} over the view's registries and
+     * credentials as given and the marker's npmrc files (null for none).
+     */
+    public static NodeRegistries discover(List<NodeRegistry> explicit, List<NodeRegistryCredentials> credentials,
+                                          @Nullable List<Npmrc> npmrcConfigs, Environment env) {
         if (!explicit.isEmpty()) {
             return fromExplicit(explicit);
         }
 
-        NpmConfig config = new NpmConfig(mergeNpmrc(marker), env);
-        List<NodeRegistryCredentials> credentials = view.getRegistryCredentials();
+        NpmConfig config = new NpmConfig(mergeNpmrc(npmrcConfigs), env);
 
         EnvExpansion.Expansion defaultUrl = config.defaultRegistry();
         String resolvedDefaultUrl = defaultUrl.value != null ? defaultUrl.value : DEFAULT_REGISTRY;
@@ -88,7 +96,7 @@ public final class RegistryDiscovery {
     private static NodeRegistry buildRegistry(@Nullable String scope, String url, boolean urlUnresolved,
                                               NpmConfig config, List<NodeRegistryCredentials> credentials,
                                               Environment env) {
-        boolean unresolved = urlUnresolved;
+        List<String> unresolvedCredentials = emptyList();
         String authToken = null;
         String username = null;
         String password = null;
@@ -107,12 +115,14 @@ public final class RegistryDiscovery {
             // 2. npmrc auth keyed by nerf-dart.
             NpmConfig.Auth auth = config.authFor(url);
             if (auth != null) {
+                // sent as written even with a variable unset, as npm does: a proxy may replace them, and a
+                // rejection names the placeholders
+                unresolvedCredentials = auth.unresolved;
                 authToken = auth.authToken;
                 username = auth.username;
                 password = auth.password;
                 authBase64 = auth.authBase64;
                 alwaysAuth |= auth.alwaysAuth;
-                unresolved |= auth.unresolvedPlaceholders;
             } else {
                 // 3. Host-supplied credentials, then 4. .netrc.
                 String host = Urls.host(url);
@@ -134,7 +144,7 @@ public final class RegistryDiscovery {
         }
 
         return new NodeRegistry(scope, url, authToken, username, password, authBase64,
-                alwaysAuth, config.getCafile(), config.isStrictSsl(), unresolved);
+                alwaysAuth, config.getCafile(), config.isStrictSsl(), urlUnresolved, unresolvedCredentials);
     }
 
     private static @Nullable NodeRegistryCredentials matchByHost(List<NodeRegistryCredentials> credentials, String host) {
@@ -150,12 +160,12 @@ public final class RegistryDiscovery {
         return new NodeRegistry(scope, url, null, null, null, null, false, null, true, unresolved);
     }
 
-    private static Map<String, String> mergeNpmrc(@Nullable NodeResolutionResult marker) {
+    private static Map<String, String> mergeNpmrc(@Nullable List<Npmrc> npmrcConfigs) {
         Map<String, String> merged = new LinkedHashMap<>();
-        if (marker == null || marker.getNpmrcConfigs() == null) {
+        if (npmrcConfigs == null) {
             return merged;
         }
-        List<Npmrc> configs = new ArrayList<>(marker.getNpmrcConfigs());
+        List<Npmrc> configs = new ArrayList<>(npmrcConfigs);
         // Global -> User -> Project, later scopes overriding earlier per key.
         configs.sort(Comparator.comparingInt(n -> n.getScope().ordinal()));
         for (Npmrc config : configs) {

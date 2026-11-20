@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
@@ -59,10 +60,19 @@ public class FindMissingTypes extends Recipe {
         J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
+            Set<UUID> preexistingSearchResults = new JavaIsoVisitor<Set<UUID>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ids) {
+                    if (marker instanceof SearchResult) {
+                        ids.add(marker.getId());
+                    }
+                    return super.visitMarker(marker, ids);
+                }
+            }.reduce(j, new HashSet<>());
             new JavaIsoVisitor<List<MissingTypeResult>>() {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
-                    if (marker instanceof SearchResult) {
+                    if (marker instanceof SearchResult && !preexistingSearchResults.contains(marker.getId())) {
                         String message = ((SearchResult) marker).getDescription();
                         String path = getCursor()
                                 .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
@@ -171,6 +181,68 @@ public class FindMissingTypes extends Recipe {
                 }
             }
             return mi;
+        }
+
+        @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fieldAccess)) {
+                fa = SearchResult.found(fa, "FieldAccess type is missing or malformed");
+            }
+            return fa;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.FieldAccess fa) {
+            if (inPackageDeclaration() || inImport()) {
+                return true;
+            }
+            if ("class".equals(fa.getSimpleName())) {
+                // An unattributed class literal target is reported on the target itself
+                return !isWellFormedType(fa.getTarget().getType(), seenTypes);
+            }
+            Tree parent = getCursor().getParentTreeCursor().getValue();
+            // Like a simple name, a qualified Javadoc reference may name something that is not on the classpath
+            if (parent instanceof Javadoc.Reference && fa == ((Javadoc.Reference) parent).getTree()) {
+                return true;
+            }
+            // An untyped qualifier is a package only if it names the package of what its parent refers to.
+            // Kotlin qualifies top-level members, not only types, with their package.
+            JavaType.FullyQualified referenced;
+            if (parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                !"class".equals(((J.FieldAccess) parent).getSimpleName())) {
+                J.FieldAccess member = (J.FieldAccess) parent;
+                if (!isWellFormedType(member.getType(), seenTypes)) {
+                    return isPackageName(fa); // reported on the parent instead
+                }
+                JavaType.Variable field = member.getName().getFieldType();
+                referenced = TypeUtils.asFullyQualified(field != null ? field.getOwner() : member.getType());
+            } else if (parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect()) {
+                JavaType.Method method = ((J.MethodInvocation) parent).getMethodType();
+                if (method == null || !isWellFormedType(method, seenTypes)) {
+                    return isPackageName(fa); // reported on the call instead
+                }
+                referenced = method.getDeclaringType();
+            } else {
+                return false;
+            }
+            return referenced != null && referenced.getPackageName().equals(dottedName(fa)) && isPackageName(fa);
+        }
+
+        // Neither a package nor any segment of its name has a type
+        private boolean isPackageName(Expression name) {
+            if (isWellFormedType(name.getType(), seenTypes)) {
+                return false;
+            }
+            return name instanceof J.Identifier ||
+                   name instanceof J.FieldAccess && isPackageName(((J.FieldAccess) name).getTarget());
+        }
+
+        private String dottedName(Expression name) {
+            if (name instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) name;
+                return dottedName(fa.getTarget()) + '.' + fa.getSimpleName();
+            }
+            return name instanceof J.Identifier ? ((J.Identifier) name).getSimpleName() : "";
         }
 
         @Override
@@ -288,7 +360,7 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName() ||
-                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isMethodName(ident) || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
                     isInJavaDoc(ident);
         }
@@ -306,9 +378,10 @@ public class FindMissingTypes extends Recipe {
             return parent != null && parent.getValue() instanceof J.ClassDeclaration;
         }
 
-        private boolean isMethodName() {
+        private boolean isMethodName(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.MethodDeclaration;
+            return parent != null && parent.getValue() instanceof J.MethodDeclaration &&
+                    ident == ((J.MethodDeclaration) parent.getValue()).getName();
         }
 
         private boolean isMethodInvocationName() {

@@ -283,4 +283,107 @@ class RemoveBuildPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepLicenseHeaderOfRemovedApply() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveBuildPlugin("maven")),
+          buildGradle(
+            """
+              /*
+               * Licensed under the Apache License, Version 2.0 (the "License");
+               */
+
+              apply plugin: 'maven'
+              apply plugin: 'com.android.library'
+              """,
+            """
+              /*
+               * Licensed under the Apache License, Version 2.0 (the "License");
+               */
+
+              apply plugin: 'com.android.library'
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepLicenseHeaderOfRemovedPluginsBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveBuildPlugin("java")),
+          buildGradle(
+            """
+              // Copyright example
+
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            """
+              // Copyright example
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepLicenseHeaderOfRemovedPluginsBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveBuildPlugin("java")),
+          buildGradleKts(
+            """
+              // Copyright example
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            """
+              // Copyright example
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentsAboutRemovedPluginGoWithIt() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
+          buildGradle(
+            """
+              plugins {
+                  // Plugins we publish with
+
+                  // bintray is going away
+                  id "com.jfrog.bintray" version "1.0" // pinned
+                  id "java"
+              }
+              """,
+            """
+              plugins {
+                  // Plugins we publish with
+
+                  id "java"
+              }
+              """
+          )
+        );
+    }
 }

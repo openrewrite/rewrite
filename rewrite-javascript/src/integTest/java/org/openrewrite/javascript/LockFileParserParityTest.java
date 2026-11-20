@@ -32,10 +32,10 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LockFileParserParityTest {
@@ -89,7 +89,7 @@ class LockFileParserParityTest {
 
         PackageJsonParser parser = new PackageJsonParser();
         Parser.Input input = Parser.Input.fromString(workspace.resolve("package.json"), packageJson);
-        SourceFile sf = parser.parseInputs(Collections.singletonList(input), null,
+        SourceFile sf = parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
         NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow();
         ResolvedDependency tsExpress = marker.getResolvedDependencies().stream()
@@ -146,7 +146,7 @@ class LockFileParserParityTest {
         }
         return LockFileParser.parse(lockContent).getAll().stream()
                 .map(d -> d.getName() + "@" + d.getVersion())
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static Set<String> parseMarkerViaRpcForPm(String packageJson, PackageManager pm) throws Exception {
@@ -154,12 +154,12 @@ class LockFileParserParityTest {
         Path packageJsonPath = workspace.resolve("package.json");
         PackageJsonParser parser = new PackageJsonParser();
         Parser.Input input = Parser.Input.fromString(packageJsonPath, packageJson);
-        SourceFile sf = parser.parseInputs(Collections.singletonList(input), null,
+        SourceFile sf = parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
         NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow();
         return marker.getResolvedDependencies().stream()
                 .map(d -> d.getName() + "@" + d.getVersion())
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     @Test

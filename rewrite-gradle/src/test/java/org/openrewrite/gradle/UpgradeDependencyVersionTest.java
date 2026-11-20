@@ -16,7 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,6 +50,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.list;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
 import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
@@ -927,6 +928,179 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionManagedByPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionManagedByPlatformKotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.7"))
+                  implementation("org.yaml:snakeyaml")
+              }
+              """,
+            """
+              plugins {
+                  `java`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.7"))
+                  implementation("org.yaml:snakeyaml:1.29")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionManagedByEnforcedPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation enforcedPlatform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation enforcedPlatform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionDeclaredAlongsidePlatformIsUpgradedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.27'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotPinAVersionAConstraintGoverns() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  constraints {
+                      implementation 'org.yaml:snakeyaml:1.28'
+                  }
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraProperties() {
         rewriteRun(
           buildGradle(
@@ -1048,6 +1222,88 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-annotations:2.21"
                   implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedVariableInMapNotation() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-annotations", version: jacksonVersion
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-annotations", version: "2.21"
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedVariableInKotlinNamedArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = jacksonVersion)
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = jacksonVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = "2.21")
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = jacksonVersion)
               }
               """
           )
@@ -1490,6 +1746,42 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "${property(\"guavaVersion\")}",
+      "${project.property(\"guavaVersion\")}",
+      "${findProperty(\"guavaVersion\")}",
+      "${project.findProperty(\"guavaVersion\")}"
+    })
+    void kotlinDslVersionInPropertiesFileUsingPropertyMethod(String propertyNotation) {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava:guava:%s")
+              }
+              """.formatted(propertyNotation)
+          )
+        );
+    }
+
     @Test
     void versionInPropertiesFileNotUpdatedIfNoDependencyVariable() {
         rewriteRun(
@@ -1569,6 +1861,154 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               """,
             spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void selectsVersionFromSubprojectRepositoriesInRootSubprojectsBlock() {
+        rewriteRun(
+          // Without Maven settings, so that only the projects' own repositories are searched
+          spec -> spec.executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+              throw new AssertionError(t);
+          }))),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:29.0-jre'
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:30.1.1-jre'
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void selectsVersionFromSubprojectRepositoriesInRootAllprojectsBlock() {
+        rewriteRun(
+          spec -> spec.executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+              throw new AssertionError(t);
+          }))),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              allprojects {
+                  apply plugin: 'java-library'
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:29.0-jre'
+                  }
+              }
+
+              subprojects {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """,
+            """
+              allprojects {
+                  apply plugin: 'java-library'
+
+                  dependencies {
+                      implementation 'com.google.guava:guava:30.1.1-jre'
+                  }
+              }
+
+              subprojects {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void selectsPropertyVersionFromSubprojectRepositoriesInRootSubprojectsBlock() {
+        rewriteRun(
+          spec -> spec.executionContext(withMavenCentralMirror(new InMemoryExecutionContext(t -> {
+              throw new AssertionError(t);
+          }))),
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'app'
+              """
+          ),
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java-library'
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation "com.google.guava:guava:$guavaVersion"
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              description = 'app'
+              """,
+            spec -> spec.path("app/build.gradle")
           )
         );
     }
@@ -2262,7 +2702,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void cannotDownloadMetaDataWhenNoRepositoriesAreDefined() {
         rewriteRun(
           buildGradle(
@@ -2282,6 +2721,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                 /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/implementation "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void cannotDownloadMetaDataForOneNotationOfSeveralInOneCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              dependencies {
+                implementation "commons-lang:commons-lang:2.6", "com.google.guava:guava:29.0-jre"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              dependencies {
+                /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/implementation "commons-lang:commons-lang:2.6", "com.google.guava:guava:29.0-jre"
               }
               """
           )
@@ -2804,88 +3269,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    /**
-     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration.
-     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
-     */
-    @Test
-    void groovyDslUpgradesPluginProvidedDirectDependency() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
-          buildGradle(
-            //language=groovy
-            """
-              plugins {
-                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
-              }
-              repositories { mavenCentral() }
-              """,
-            //language=groovy
-            """
-              plugins {
-                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
-              }
-              repositories { mavenCentral() }
-
-              dependencies {
-                  api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
-              }
-              """
-          )
-        );
-    }
-
-    /**
-     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration (Kotlin DSL).
-     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
-     */
-    @Test
-    void kotlinDslUpgradesPluginProvidedDirectDependency() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
-          buildGradleKts(
-            //language=kotlin
-            """
-              plugins {
-                  kotlin("jvm") version "1.7.21"
-              }
-              repositories { mavenCentral() }
-              """,
-            //language=kotlin
-            """
-              plugins {
-                  kotlin("jvm") version "1.7.21"
-              }
-              repositories { mavenCentral() }
-
-              dependencies {
-                  api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0")
-              }
-              """
-          )
-        );
-    }
-
-    /**
-     * Transitive dependencies from plugins should not be upgraded by this recipe.
-     * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
-     */
-    @Test
-    void doesNotUpgradePluginProvidedTransitiveDependency() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib", "1.9.0", null)),
-          buildGradle(
-            //language=groovy
-            """
-              plugins {
-                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
-              }
-              repositories { mavenCentral() }
-              """
-          )
-        );
-    }
-
     @ParameterizedTest
     @ValueSource(strings = {
       "$springCloudVersion",
@@ -3157,5 +3540,158 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class OnGradle8 implements RewriteTest {
+
+        // Spring Boot 2's Gradle plugin calls Configuration#getUploadTaskName, which Gradle 9 removed
+        // Kotlin 1.7's Gradle plugin, the last to add kotlin-stdlib-jdk8, uses SelfResolvingDependency, which Gradle 9 removed
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.beforeRecipe(withToolingApi("8.14.5"))
+              .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
+        }
+
+        @Test
+        void leavesVersionlessDependencyManagedByAnUpgradedPlatform() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "*", "2.7.18", null)),
+              buildGradle(
+                """
+                  plugins {
+                      id "java"
+                      id "org.springframework.boot" version "2.6.15"
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation platform("org.springframework.boot:spring-boot-dependencies:2.6.15")
+                      implementation "org.springframework.boot:spring-boot-starter-web"
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java"
+                      id "org.springframework.boot" version "2.6.15"
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation platform("org.springframework.boot:spring-boot-dependencies:2.7.18")
+                      implementation "org.springframework.boot:spring-boot-starter-web"
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration.
+         * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+         */
+        @Test
+        void groovyDslUpgradesPluginProvidedDirectDependency() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+              buildGradle(
+                //language=groovy
+                """
+                  plugins {
+                      id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+                  }
+                  repositories { mavenCentral() }
+                  """,
+                //language=groovy
+                """
+                  plugins {
+                      id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+                  }
+                  repositories { mavenCentral() }
+
+                  dependencies {
+                      api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration (Kotlin DSL).
+         * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+         */
+        @Test
+        void kotlinDslUpgradesPluginProvidedDirectDependency() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+              buildGradleKts(
+                //language=kotlin
+                """
+                  plugins {
+                      kotlin("jvm") version "1.7.21"
+                  }
+                  repositories { mavenCentral() }
+                  """,
+                //language=kotlin
+                """
+                  plugins {
+                      kotlin("jvm") version "1.7.21"
+                  }
+                  repositories { mavenCentral() }
+
+                  dependencies {
+                      api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0")
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * The Kotlin plugin resolves its own tooling, such as swift-export-embeddable, at the plugin's version.
+         * That is no dependency of the project, so no declaration is added for it.
+         */
+        @Test
+        void doesNotDeclarePluginToolingDependency() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "swift-export-embeddable", "2.3.x", null)),
+              buildGradleKts(
+                //language=kotlin
+                """
+                  plugins {
+                      kotlin("jvm") version "2.2.21"
+                  }
+                  repositories { mavenCentral() }
+                  """
+              )
+            );
+        }
+
+        /**
+         * Transitive dependencies from plugins should not be upgraded by this recipe.
+         * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
+         */
+        @Test
+        void doesNotUpgradePluginProvidedTransitiveDependency() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib", "1.9.0", null)),
+              buildGradle(
+                //language=groovy
+                """
+                  plugins {
+                      id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+                  }
+                  repositories { mavenCentral() }
+                  """
+              )
+            );
+        }
     }
 }

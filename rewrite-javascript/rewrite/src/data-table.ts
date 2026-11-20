@@ -17,10 +17,15 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import {ExecutionContext} from "./execution";
-import {OptionDescriptor} from "./recipe";
 
 export const DATA_TABLE_STORE = Symbol.for("org.openrewrite.dataTables.store");
 const COLUMNS_KEY = Symbol.for("org.openrewrite.dataTables.columns");
+
+/**
+ * Java's ColumnDescriptor declares `type` non-nullable, and every value is displayable
+ * as text, so a column omitting one degrades to String rather than reporting no type.
+ */
+export const DEFAULT_COLUMN_TYPE = "String";
 
 export function Column(descriptor: ColumnDescriptor) {
     return function (target: any, propertyKey: string) {
@@ -119,11 +124,11 @@ export class DataTable<Row> {
     }
 
     get descriptor(): DataTableDescriptor {
-        const columnsRecord: Record<string, OptionDescriptor> = this.rowConstructor[COLUMNS_KEY] || {};
+        const columnsRecord: Record<string, ColumnDescriptor> = this.rowConstructor[COLUMNS_KEY] || {};
         return {
             ...this._descriptor,
             columns: Object.entries(columnsRecord).map(([name, descriptor]) =>
-                ({name, ...descriptor})),
+                ({name, type: descriptor.type ?? DEFAULT_COLUMN_TYPE, ...descriptor})),
         }
     }
 
@@ -161,7 +166,14 @@ export interface DataTableDescriptor {
 
 export interface ColumnDescriptor {
     displayName: string,
-    description: string
+    description: string,
+
+    /**
+     * Java simple type name, canonically String, Long, Boolean or Double to match rewrite-python.
+     * Java and Python derive it from the field declaration; TypeScript erases types at runtime,
+     * so anything but {@link DEFAULT_COLUMN_TYPE} must be declared here.
+     */
+    type?: string
 }
 
 /**

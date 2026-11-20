@@ -85,7 +85,7 @@ public class FindFieldsOfType extends Recipe {
                             multiVariable.getTypeExpression().getType().toString(),
                             varType,
                             multiVariable.getModifiers().stream().map(J.Modifier::toString).reduce((m1, m2) -> m1 + " " + m2).orElse(""),
-                            multiVariable.printTrimmed(getCursor())
+                            multiVariable.printTrimmed(getCursor().getParentOrThrow())
                         ));
                     }
                     return SearchResult.found(multiVariable);
@@ -111,9 +111,7 @@ public class FindFieldsOfType extends Recipe {
             }
         };
 
-        Set<J.VariableDeclarations> vs = new HashSet<>();
-        findVisitor.visit(j, vs);
-        return vs;
+        return findVisitor.reduce(j, new HashSet<>());
     }
 
     private static boolean isField(Cursor cursor) {

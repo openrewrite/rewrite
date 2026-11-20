@@ -25,18 +25,19 @@ import {lastParsedProject} from "./last-parsed-project";
 
 const JAVA_TYPE_CLASS = "org.openrewrite.java.tree.JavaType$Class";
 
-type ExportedTypes = typeof import("../../javascript/package-exported-types.js")["exportedTypes"];
+type PackageExportedTypes = typeof import("../../javascript/package-exported-types.js");
 
 /**
  * Handle a DependencyTypes request: resolve one dependency, named by its npm coordinate, against
- * the most recently parsed project's node_modules, enumerate its public types, and stream them
- * back terminated by END_OF_OBJECT. Built once, returned in {@code batchSize} slices across the
- * client's repeated pulls. A {@code null} version names a TypeScript runtime declaration file
- * (e.g. {@code lib.dom}) instead of an installed package.
+ * the node_modules of {@code path} or else of the most recently parsed project, enumerate its
+ * public types, and stream them back terminated by END_OF_OBJECT. Built once, returned in
+ * {@code batchSize} slices across the client's repeated pulls. A {@code null} version names a
+ * TypeScript runtime declaration file (e.g. {@code lib.dom}) instead of an installed package.
  */
 export class DependencyTypes {
     constructor(private readonly name: string,
-                private readonly version?: string | null) {
+                private readonly version?: string | null,
+                private readonly path?: string | null) {
     }
 
     static handle(connection: rpc.MessageConnection, batchSize: number, metricsCsv?: string): void {
@@ -51,27 +52,29 @@ export class DependencyTypes {
                 metricsCsv,
                 (context) => async (request) => {
                     const version = request.version ?? null;
+                    const projectDir = request.path ?? null;
                     context.target = version ? `${request.name}@${version}` : request.name;
 
-                    const key = JSON.stringify([request.name, version]);
+                    const key = JSON.stringify([request.name, version, projectDir]);
                     if (!pending.has(key)) {
                         // Dynamic import to break the circular dependency with the javascript module.
-                        const {exportedTypes} = await import("../../javascript/package-exported-types.js");
-                        const types = version !== null
-                            ? packageTypes(request.name, exportedTypes)
-                            : exportedTypes([runtimeLibFile(request.name)], []);
+                        const exported = await import("../../javascript/package-exported-types.js");
+                        const types = version === null
+                            ? exported.exportedTypes([runtimeLibFile(request.name)], [])
+                            : packageTypes(request.name, exported,
+                                projectDir === null ? projectNodeModules() : path.join(projectDir, "node_modules"));
 
                         const q = new RpcSendQueue(new ReferenceMap(), JAVA_TYPE_CLASS, false);
                         const sender = new JavaSender();
                         // FQNs this dependency defines, sent before the types so the caller can tell
                         // defined types from references up front, then the types themselves.
-                        await q.sendList(types.map(t => Type.FullyQualified.getFullyQualifiedName(t)), undefined, s => s);
-                        await q.sendList(
+                        q.sendList(types.map(t => Type.FullyQualified.getFullyQualifiedName(t)), undefined, s => s);
+                        q.sendList(
                             types.map(t => asRef(t)),
                             undefined,
                             t => Type.signature(t),
-                            async t => {
-                                await sender.visitType(t, q);
+                            t => {
+                                sender.visitType(t, q);
                             }
                         );
                         pending.set(key, q.finish());
@@ -98,20 +101,31 @@ function projectNodeModules(): string {
 }
 
 /** The installed package's own types, falling back to its DefinitelyTyped package when it ships none. */
-function packageTypes(name: string, exportedTypes: ExportedTypes): Type.FullyQualified[] {
-    const nodeModules = projectNodeModules();
+function packageTypes(name: string, {exportedTypes, packageNames}: PackageExportedTypes,
+                      nodeModules: string): Type.FullyQualified[] {
     const pkgDir = path.join(nodeModules, ...name.split("/"));
     if (!fs.existsSync(pkgDir)) {
         throw new Error(`Package '${name}' is not installed under ${nodeModules}`);
     }
     const types = exportedTypes([pkgDir], []);
-    if (types.length > 0) {
+    // Every package defines its own names, so those alone are a package that ships no types.
+    const own = packageNames(pkgDir);
+    if (types.some(type => !own.includes(Type.FullyQualified.getFullyQualifiedName(type)))) {
         return types;
     }
     // @scope/pkg -> @types/scope__pkg
     const typesDir = path.join(nodeModules, "@types",
         name.startsWith("@") ? name.slice(1).replace("/", "__") : name);
-    return fs.existsSync(typesDir) ? exportedTypes([typesDir], []) : types;
+    if (!fs.existsSync(typesDir)) {
+        return types;
+    }
+    // The fallback stands for this package, so it goes by this package's names. The DefinitelyTyped
+    // package's id is left to that package's own table, or two tables would claim it.
+    const theirs = packageNames(typesDir).filter(typesName => !own.includes(typesName));
+    const typed = exportedTypes([typesDir], [])
+        .filter(type => !theirs.includes(Type.FullyQualified.getFullyQualifiedName(type)));
+    const named = new Set(typed.map(type => Type.FullyQualified.getFullyQualifiedName(type)));
+    return [...typed, ...types.filter(type => !named.has(Type.FullyQualified.getFullyQualifiedName(type)))];
 }
 
 /** A runtime declaration file (e.g. lib.dom.d.ts): the project's installed TypeScript first, else the engine's own. */

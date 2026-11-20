@@ -218,6 +218,23 @@ public class WhitespaceValidatorTests
     }
 
     [Fact]
+    public void AttributeOnAccessor()
+    {
+        AssertNoViolations(
+            """
+            class Foo {
+                int P
+                {
+                    [Obsolete]
+                    get { return 1; }
+                    [Obsolete]
+                    private set { }
+                }
+            }
+            """);
+    }
+
+    [Fact]
     public void AttributeOnParameter()
     {
         AssertNoViolations(
@@ -846,6 +863,92 @@ public class WhitespaceValidatorTests
     }
 
     [Fact]
+    public void ConstantConditionalDirective()
+    {
+        AssertNoViolations(
+            """
+            #if true
+            class Foo { }
+            #endif
+            """);
+    }
+
+    [Fact]
+    public void ConstantConditionalDirectiveWithElse()
+    {
+        AssertNoViolations(
+            """
+            #if false
+            class Inactive { }
+            #else
+            class Foo { }
+            #endif
+            """);
+    }
+
+    [Fact]
+    public void ConstantConditionalDirectiveInBlock()
+    {
+        AssertNoViolations(
+            """
+            class Foo {
+                void Bar() {
+            #if true
+                    int x = 1;
+            #endif
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void EndifLineInsideRawStringLiteral()
+    {
+        AssertNoViolations(
+            """"
+            class Foo {
+                string s = """
+            #endif
+            """;
+            }
+            """");
+    }
+
+    [Fact]
+    public void EndifLineInsideRawStringLiteralNextToConditionalDirective()
+    {
+        AssertNoViolations(
+            """"
+            #if DEBUG
+            class Debug { }
+            #endif
+            class Foo {
+                string s = """
+            #endif
+            """;
+            }
+            """");
+    }
+
+    [Fact]
+    public void ByteOrderMark()
+    {
+        AssertNoViolations("\uFEFFclass Foo { }");
+    }
+
+    [Fact]
+    public void ByteOrderMarkBeforeConditionalDirective()
+    {
+        AssertNoViolations(
+            "\uFEFF" +
+            """
+            #if DEBUG
+            class Foo { }
+            #endif
+            """);
+    }
+
+    [Fact]
     public void Region()
     {
         AssertNoViolations(
@@ -1029,5 +1132,29 @@ public class WhitespaceValidatorTests
             /// </summary>
             class Foo { }
             """);
+    }
+
+    [Fact]
+    public void NonBreakingSpace()
+    {
+        AssertNoViolations("class\u00A0Foo\u00A0{\u00A0int\u00A0x;\u00A0}");
+    }
+
+    [Fact]
+    public void UnicodeSpaceSeparators()
+    {
+        AssertNoViolations("class\u2002Foo\u3000{\u202Fint\u2009x;\u1680}");
+    }
+
+    [Fact]
+    public void UnicodeLineSeparators()
+    {
+        AssertNoViolations("class Foo\u2028{\u2029int x;\u0085}");
+    }
+
+    [Fact]
+    public void ByteOrderMarkAndControlZTreatedAsWhitespaceByRoslyn()
+    {
+        AssertNoViolations("class Foo {\ufeff}\n\u001A");
     }
 }

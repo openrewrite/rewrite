@@ -31,26 +31,26 @@ import (
 // vanishingly rare — every J-conformant type carries one).
 func getPrefix(t java.Tree) java.Space {
 	if t == nil {
-		return java.Space{}
+		return java.EmptySpace
 	}
 	rv := reflect.ValueOf(t)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-			return java.Space{}
+			return java.EmptySpace
 		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return java.Space{}
+		return java.EmptySpace
 	}
 	f := rv.FieldByName("Prefix")
 	if !f.IsValid() {
-		return java.Space{}
+		return java.EmptySpace
 	}
 	if s, ok := f.Interface().(java.Space); ok {
 		return s
 	}
-	return java.Space{}
+	return java.EmptySpace
 }
 
 // withPrefix calls the node's `WithPrefix(Space) <T>` method to produce
@@ -82,8 +82,19 @@ func transformPrefix(t java.Tree, f func(java.Space) java.Space) java.Tree {
 	}
 	cur := getPrefix(t)
 	next := f(cur)
-	if next.Whitespace == cur.Whitespace && len(next.Comments) == len(cur.Comments) {
+	if spaceContentEqual(cur, next) {
 		return t
 	}
 	return withPrefix(t, next)
+}
+
+// PrefixOf returns t's own leading whitespace. Callers outside layout need it
+// to move whitespace between a node and one that comes to enclose it.
+func PrefixOf(t java.Tree) java.Space {
+	return getPrefix(t)
+}
+
+// WithPrefix returns t carrying s as its leading whitespace.
+func WithPrefix(t java.Tree, s java.Space) java.Tree {
+	return transformPrefix(t, func(java.Space) java.Space { return s })
 }

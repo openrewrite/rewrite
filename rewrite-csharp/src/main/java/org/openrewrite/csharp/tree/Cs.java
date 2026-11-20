@@ -15,26 +15,28 @@
  */
 package org.openrewrite.csharp.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.csharp.CSharpPrinter;
 import org.openrewrite.csharp.CSharpVisitor;
-import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.service.CSharpAutoFormatService;
 import org.openrewrite.csharp.service.CSharpNamingService;
+import org.openrewrite.csharp.service.CSharpImportService;
 import org.openrewrite.csharp.service.CSharpWhitespaceValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
-import org.openrewrite.rpc.request.Print;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -47,12 +49,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public interface Cs extends J {
@@ -179,7 +181,7 @@ public interface Cs extends J {
         @Override
         @Transient
         public List<Import> getImports() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -190,7 +192,7 @@ public interface Cs extends J {
         @Override
         @Transient
         public List<J.ClassDeclaration> getClasses() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -209,16 +211,7 @@ public interface Cs extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new CSharpPrinter<>();
         }
 
         @Override
@@ -290,6 +283,9 @@ public interface Cs extends J {
             if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) new CSharpAutoFormatService();
             }
+            if (ImportService.class.getName().equals(service.getName())) {
+                return (T) new CSharpImportService();
+            }
             if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new CSharpNamingService();
             }
@@ -305,7 +301,7 @@ public interface Cs extends J {
 
             @Override
             public List<JRightPadded<Import>> getImports() {
-                return Collections.emptyList();
+                return emptyList();
             }
 
             @Override
@@ -1899,7 +1895,7 @@ public interface Cs extends J {
         JContainer<Statement> accessors;
 
         public List<Statement> getAccessors() {
-            return accessors == null ? Collections.emptyList() : accessors.getElements();
+            return accessors == null ? emptyList() : accessors.getElements();
         }
 
         public EventDeclaration withAccessors(@Nullable List<Statement> accessors) {
@@ -2277,7 +2273,7 @@ public interface Cs extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
+    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ExpressionStatement implements Cs, Statement {
         @Nullable
@@ -2289,14 +2285,6 @@ public interface Cs extends J {
         @Getter
         UUID id;
 
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
         JRightPadded<Expression> expression;
 
         public Expression getExpression() {
@@ -2305,6 +2293,31 @@ public interface Cs extends J {
 
         public ExpressionStatement withExpression(Expression expression) {
             return getPadding().withExpression(this.expression.withElement(expression));
+        }
+
+        /**
+         * The statement has no syntax of its own, so its prefix and markers are those of its expression.
+         */
+        @Override
+        public Space getPrefix() {
+            return expression.getElement().getPrefix();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ExpressionStatement withPrefix(Space prefix) {
+            return withExpression(expression.getElement().<Expression>withPrefix(prefix));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getElement().getMarkers();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ExpressionStatement withMarkers(Markers markers) {
+            return withExpression(expression.getElement().<Expression>withMarkers(markers));
         }
 
         @Override
@@ -2342,7 +2355,7 @@ public interface Cs extends J {
             }
 
             public ExpressionStatement withExpression(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new ExpressionStatement(t.id, t.prefix, t.markers, expression);
+                return t.expression == expression ? t : new ExpressionStatement(t.id, expression);
             }
         }
     }
@@ -2505,7 +2518,7 @@ public interface Cs extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
+    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Interpolation implements Cs, Expression {
         @Nullable
@@ -2535,6 +2548,20 @@ public interface Cs extends J {
             return getPadding().withExpression(JRightPadded.withElement(this.expression, expression));
         }
 
+        /**
+         * Whitespace before the {@code ,} that introduces the alignment.
+         */
+        @Nullable
+        Space alignmentBefore;
+
+        public Space getAlignmentBefore() {
+            return alignmentBefore == null ? Space.EMPTY : alignmentBefore;
+        }
+
+        public Interpolation withAlignmentBefore(Space alignmentBefore) {
+            return getAlignmentBefore() == alignmentBefore ? this : new Interpolation(id, prefix, markers, expression, alignmentBefore, alignment, formatBefore, format);
+        }
+
         @Nullable
         JRightPadded<Expression> alignment;
 
@@ -2544,6 +2571,20 @@ public interface Cs extends J {
 
         public Interpolation withAlignment(@Nullable Expression alignment) {
             return getPadding().withAlignment(JRightPadded.withElement(this.alignment, alignment));
+        }
+
+        /**
+         * Whitespace before the {@code :} that introduces the format.
+         */
+        @Nullable
+        Space formatBefore;
+
+        public Space getFormatBefore() {
+            return formatBefore == null ? Space.EMPTY : formatBefore;
+        }
+
+        public Interpolation withFormatBefore(Space formatBefore) {
+            return getFormatBefore() == formatBefore ? this : new Interpolation(id, prefix, markers, expression, alignmentBefore, alignment, formatBefore, format);
         }
 
         @Nullable
@@ -2602,7 +2643,7 @@ public interface Cs extends J {
             }
 
             public Interpolation withExpression(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new Interpolation(t.id, t.prefix, t.markers, expression, t.alignment, t.format);
+                return t.expression == expression ? t : new Interpolation(t.id, t.prefix, t.markers, expression, t.alignmentBefore, t.alignment, t.formatBefore, t.format);
             }
 
             public @Nullable JRightPadded<Expression> getAlignment() {
@@ -2610,7 +2651,7 @@ public interface Cs extends J {
             }
 
             public Interpolation withAlignment(@Nullable JRightPadded<Expression> alignment) {
-                return t.alignment == alignment ? t : new Interpolation(t.id, t.prefix, t.markers, t.expression, alignment, t.format);
+                return t.alignment == alignment ? t : new Interpolation(t.id, t.prefix, t.markers, t.expression, t.alignmentBefore, alignment, t.formatBefore, t.format);
             }
 
             public @Nullable JRightPadded<Expression> getFormat() {
@@ -2618,7 +2659,7 @@ public interface Cs extends J {
             }
 
             public Interpolation withFormat(@Nullable JRightPadded<Expression> format) {
-                return t.format == format ? t : new Interpolation(t.id, t.prefix, t.markers, t.expression, t.alignment, format);
+                return t.format == format ? t : new Interpolation(t.id, t.prefix, t.markers, t.expression, t.alignmentBefore, t.alignment, t.formatBefore, format);
             }
         }
     }
@@ -2747,7 +2788,7 @@ public interface Cs extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
+    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class UsingDirective implements Cs, Statement {
         @Nullable
@@ -2785,6 +2826,17 @@ public interface Cs extends J {
 
         public UsingDirective withStatic(boolean statik) {
             return getPadding().withStatic(JLeftPadded.withElement(this.statik, statik));
+        }
+
+        @Nullable
+        JLeftPadded<Boolean> unsafe;
+
+        public boolean isUnsafe() {
+            return unsafe != null && unsafe.getElement();
+        }
+
+        public UsingDirective withUnsafe(boolean unsafe) {
+            return getPadding().withUnsafe(JLeftPadded.withElement(this.unsafe, unsafe));
         }
 
         @Nullable
@@ -2836,7 +2888,7 @@ public interface Cs extends J {
             }
 
             public UsingDirective withGlobal(JRightPadded<Boolean> global) {
-                return t.global == global ? t : new UsingDirective(t.id, t.prefix, t.markers, global, t.statik, t.alias, t.namespaceOrType);
+                return t.global == global ? t : new UsingDirective(t.id, t.prefix, t.markers, global, t.statik, t.unsafe, t.alias, t.namespaceOrType);
             }
 
             public JLeftPadded<Boolean> getStatic() {
@@ -2844,7 +2896,15 @@ public interface Cs extends J {
             }
 
             public UsingDirective withStatic(JLeftPadded<Boolean> statik) {
-                return t.statik == statik ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, statik, t.alias, t.namespaceOrType);
+                return t.statik == statik ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, statik, t.unsafe, t.alias, t.namespaceOrType);
+            }
+
+            public @Nullable JLeftPadded<Boolean> getUnsafe() {
+                return t.unsafe;
+            }
+
+            public UsingDirective withUnsafe(@Nullable JLeftPadded<Boolean> unsafe) {
+                return t.unsafe == unsafe ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, unsafe, t.alias, t.namespaceOrType);
             }
 
             public @Nullable JRightPadded<Identifier> getAlias() {
@@ -2852,7 +2912,7 @@ public interface Cs extends J {
             }
 
             public UsingDirective withAlias(JRightPadded<Identifier> alias) {
-                return t.alias == alias ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, alias, t.namespaceOrType);
+                return t.alias == alias ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, t.unsafe, alias, t.namespaceOrType);
             }
         }
     }
@@ -3119,12 +3179,7 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class UsingStatement implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
         @With
         @EqualsAndHashCode.Include
         @Getter
@@ -3138,19 +3193,16 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-        JLeftPadded<Expression> expression;
-
-        public Expression getExpression() {
-            return expression.getElement();
-        }
-
-        public UsingStatement withExpression(Expression expression) {
-            return getPadding().withExpression(this.expression.withElement(expression));
-        }
-
         /**
-         * The block is null for using declaration form.
+         * <pre>
+         * using (var stream = File.OpenRead(path)) { }
+         *       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         * </pre>
          */
+        @With
+        @Getter
+        ControlParentheses<Expression> expression;
+
         @With
         @Getter
         Statement statement;
@@ -3164,34 +3216,6 @@ public interface Cs extends J {
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final UsingStatement t;
-
-            public JLeftPadded<Expression> getExpression() {
-                return t.expression;
-            }
-
-            public UsingStatement withExpression(JLeftPadded<Expression> expression) {
-                return t.expression == expression ? t : new UsingStatement(t.id, t.prefix, t.markers, expression, t.statement);
-            }
         }
     }
     //endregion
@@ -4410,7 +4434,7 @@ public interface Cs extends J {
         JContainer<TypeTree> typeOperator;
 
         public List<TypeTree> getTypeOperator() {
-            return typeOperator == null ? Collections.emptyList() : typeOperator.getElements();
+            return typeOperator == null ? emptyList() : typeOperator.getElements();
         }
 
         public DefaultExpression withTypeOperator(@Nullable List<TypeTree> typeOperator) {
@@ -4494,9 +4518,15 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
+        /**
+         * <pre>
+         * sizeof(int)
+         *       ^^^^^
+         * </pre>
+         */
         @With
         @Getter
-        Expression expression;
+        ControlParentheses<TypeTree> clazz;
 
         @With
         @Nullable
@@ -4506,6 +4536,55 @@ public interface Cs extends J {
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitSizeOf(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a C# typeof expression, e.g. {@code typeof(int)}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @Data
+    final class TypeOf implements Cs, Expression, TypedTree {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * <pre>
+         * typeof(int)
+         *       ^^^^^
+         * </pre>
+         */
+        @With
+        @Getter
+        ControlParentheses<TypeTree> clazz;
+
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitTypeOf(this, p);
         }
 
         @Override
@@ -6193,7 +6272,7 @@ public interface Cs extends J {
         JContainer<Statement> parameters;
 
         public List<J.TypeParameter> getTypeParameters() {
-            return typeParameters == null ? Collections.emptyList() : typeParameters.getElements();
+            return typeParameters == null ? emptyList() : typeParameters.getElements();
         }
 
         public DelegateDeclaration withTypeParameters(@Nullable List<J.TypeParameter> typeParameters) {
@@ -6398,6 +6477,13 @@ public interface Cs extends J {
         @Nullable
         Block body;
 
+        /**
+         * The method this operator declares. Its name is the compiled one, such as {@code op_Implicit}.
+         */
+        @With
+        @Getter
+        JavaType.@Nullable Method methodType;
+
         public enum ExplicitImplicit {
             Implicit,
             Explicit
@@ -6455,7 +6541,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withKind(JLeftPadded<ExplicitImplicit> kind) {
                 return t.kind == kind ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, kind, t.interfaceSpecifier, t.returnType, t.parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public @Nullable JRightPadded<TypeTree> getInterfaceSpecifier() {
@@ -6465,7 +6551,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withInterfaceSpecifier(@Nullable JRightPadded<TypeTree> interfaceSpecifier) {
                 return t.interfaceSpecifier == interfaceSpecifier ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, interfaceSpecifier, t.returnType, t.parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public JLeftPadded<TypeTree> getReturnType() {
@@ -6475,7 +6561,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
                 return t.returnType == returnType ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, t.interfaceSpecifier, returnType, t.parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public JContainer<Statement> getParameters() {
@@ -6485,7 +6571,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public @Nullable JLeftPadded<Expression> getExpressionBody() {
@@ -6495,7 +6581,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withExpressionBody(@Nullable JLeftPadded<Expression> expressionBody) {
                 return t.expressionBody == expressionBody ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, t.parameters,
-                        expressionBody, t.body);
+                        expressionBody, t.body, t.methodType);
             }
         }
     }

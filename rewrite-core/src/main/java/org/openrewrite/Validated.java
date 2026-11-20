@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -129,6 +130,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
     }
 
     @SuppressWarnings("unchecked")
+    @CheckReturnValue
     default Validated<T> and(Validated<? extends T> validated) {
         if (validated instanceof None) {
             return this;
@@ -137,6 +139,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
     }
 
     @SuppressWarnings("unchecked")
+    @CheckReturnValue
     default Validated<T> or(Validated<? extends T> validated) {
         if (validated instanceof None) {
             return this;
@@ -166,6 +169,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
+        @CheckReturnValue
         public Validated<T> or(Validated<? extends T> validated) {
             if (validated instanceof None) {
                 return this;
@@ -175,6 +179,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
+        @CheckReturnValue
         public Validated<T> and(Validated<? extends T> validated) {
             if (validated instanceof None) {
                 return this;

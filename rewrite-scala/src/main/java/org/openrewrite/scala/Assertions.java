@@ -19,23 +19,32 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import javax.annotation.CheckReturnValue;
 import java.util.function.Consumer;
 
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
+@CheckReturnValue
 public class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+        JdkClassSharingTypeFactory.useForParsers();
+    }
 
     private Assertions() {
     }
 
     private static ScalaParser.Builder scalaParser = ScalaParser.builder()
             .classpath(JavaParser.runtimeClasspath())
-            .logCompilationWarningsAndErrors(true);
+            .logCompilationWarningsAndErrors(true)
+            .reuseCompiler(true);
 
     public static SourceSpecs scala(@Language("scala") @Nullable String before) {
         return scala(before, s -> {

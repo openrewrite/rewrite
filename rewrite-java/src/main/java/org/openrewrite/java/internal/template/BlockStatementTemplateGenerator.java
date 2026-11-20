@@ -18,6 +18,7 @@ package org.openrewrite.java.internal.template;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
@@ -28,6 +29,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -51,10 +53,11 @@ public class BlockStatementTemplateGenerator {
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
-    private final String bindType;
+    @Getter
+    private final @Nullable String bindType;
 
     public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
-        this(imports, contextSensitive, "Object");
+        this(imports, contextSensitive, null);
     }
 
     public String template(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location, JavaCoordinates.Mode mode) {
@@ -74,10 +77,13 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
+                    // at the end of a block or as an if's else, the template goes inside what the cursor points to
+                    Cursor scope = location == Space.Location.BLOCK_END || location == Space.Location.ELSE_PREFIX ?
+                            cursor : next(cursor);
                     if (contextSensitive) {
-                        contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                        contextTemplate(scope, cursor.getValue(), before, after, cursor, mode);
                     } else {
-                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after);
+                        contextFreeTemplate(scope, cursor.getValue(), typeVariables, before, after, location, mode);
                     }
 
                     return before.toString().trim() +
@@ -217,35 +223,49 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
+    /// Inserting before or after a statement makes the template a sibling statement, even when the anchor is
+    /// an expression statement like `list.add(x)` or `super(x)` whose value the stub would otherwise bind.
+    protected static boolean insertsBesideStatement(Space.Location location, JavaCoordinates.Mode mode) {
+        return location == Space.Location.STATEMENT_PREFIX && mode != REPLACEMENT;
+    }
+
     @SuppressWarnings("DataFlowIssue")
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
                 "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
-        if (j instanceof J.Lambda && "Object".equals(bindType)) {
+        boolean bindsObject = bindType == null || "Object".equals(bindType);
+        if (j instanceof J.Lambda && bindsObject) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
                     "specify the type by calling JavaTemplate.Builder#bindType()");
-        } else if (j instanceof J.MemberReference && "Object".equals(bindType)) {
+        } else if (j instanceof J.MemberReference && bindsObject) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
                     "specify the type by calling JavaTemplate.Builder#bindType()");
+        } else if (j instanceof Expression && insertsBesideStatement(location, mode)) {
+            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            after.append("\n}}");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append(bindType).append(" o = ");
+                before.append(declaredType()).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
-            before.append(bindType).append(" o = ");
-            after.append(";\n}");
+            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            before.append(declaredType()).append(" o = ");
+            after.append(";\n}}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
                    (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
+            // javac gives a member of an interface the modifiers the interface implies
+            boolean inInterface = cursor.getParent().getValue() instanceof J.ClassDeclaration &&
+                                  ((J.ClassDeclaration) cursor.getParent().getValue()).getKind() == J.ClassDeclaration.Kind.Type.Interface;
+            before.insert(0, String.format("%s %s {\n", inInterface ? "interface" : "class", classDeclaration));
             after.append("\n}");
         } else if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
@@ -267,8 +287,19 @@ public class BlockStatementTemplateGenerator {
         }
     }
 
+    /**
+     * A poly expression such as a conditional takes its target's type, so declared {@code Object} it is typed Object
+     * where its branches say String. {@code var} gives it no target, and javac 8, to which {@code var} is an unknown
+     * class, types it the same way. {@code var} is only legal for a local, hence the initializer block around it.
+     */
+    private String declaredType() {
+        return bindType == null ? "var" : bindType;
+    }
+
     @SuppressWarnings("ConstantConditions")
-    private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+    private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Cursor insertion,
+                                 JavaCoordinates.Mode mode) {
+        J insertionPoint = insertion.getValue();
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             before.insert(0, TEMPLATE_INTERNAL_IMPORTS);
@@ -298,7 +329,7 @@ public class BlockStatementTemplateGenerator {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
                 // variable declarations up to the point of insertion
-                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, insertionPoint);
+                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, insertion);
 
                 if (m.getReturnTypeExpression() != null && JavaType.Primitive.Void != m.getReturnTypeExpression().getType()) {
                     before.insert(0, "if(true) {");
@@ -320,7 +351,7 @@ public class BlockStatementTemplateGenerator {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
-                addLeadingVariableDeclarations(cursor, prior, b, before, insertionPoint);
+                addLeadingVariableDeclarations(cursor, prior, b, before, insertion);
 
                 before.insert(0, "{\n");
             }
@@ -348,7 +379,7 @@ public class BlockStatementTemplateGenerator {
                 J parent = next(cursor).getValue();
                 if (parent instanceof J.ClassDeclaration) {
                     J.ClassDeclaration cd = (J.ClassDeclaration) parent;
-                    after.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
+                    after.append(cd.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
                 } else if (parent instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) parent;
                     after.append(md.withBody(null)
@@ -370,7 +401,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
-                before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
+                before.insert(0, n.withInitializer(null).printTrimmed(cursor.getParentOrThrow()) + "{\n");
                 after.append("\n}");
             } else {
                 // no initializer
@@ -443,12 +474,14 @@ public class BlockStatementTemplateGenerator {
                 insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
                         f.withBody(null).withPrefix(Space.EMPTY)
                                 .withControl(f.getControl().withCondition(null).withUpdate(emptyList()))
-                                .printTrimmed(cursor).trim()));
+                                .printTrimmed(cursor.getParentOrThrow()).trim()));
             }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor));
+                // a `var` the loop declares takes the iterable's element type
+                before.insert(0, "for (");
+                after.append(" : /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor)).append(") {}");
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
@@ -457,7 +490,7 @@ public class BlockStatementTemplateGenerator {
             J.ForEachLoop f = (J.ForEachLoop) j;
             if (!referToSameElement(prior, f.getControl())) {
                 insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
-                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()));
+                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor.getParentOrThrow()).trim()));
             }
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
@@ -494,7 +527,13 @@ public class BlockStatementTemplateGenerator {
                         .append('=')
                         .append(valueOfType(((J.VariableDeclarations) j).getType()));
             } else {
-                before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+                J.VariableDeclarations declarations = (J.VariableDeclarations) j;
+                int initialized = declarations.getVariables().indexOf(prior);
+                if (initialized >= 0) {
+                    // The stub's `=` goes to the last variable it declares, so it ends at the template's variable
+                    declarations = declarations.withVariables(declarations.getVariables().subList(0, initialized + 1));
+                }
+                before.insert(0, variable(declarations, false, cursor) + '=');
             }
             after.append(";");
         } else if (j instanceof J.MethodInvocation) {
@@ -536,45 +575,9 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, '(');
             after.append(')');
         } else if (j instanceof J.If) {
-            J.If iff = (J.If) j;
-            if (referToSameElement(prior, iff.getIfCondition())) {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
-                int toReplaceIdx;
-                if (condition != null && (toReplaceIdx = condition.indexOf('§')) != -1) {
-                    before.insert(0, "if (" + condition.substring(0, toReplaceIdx) + '(');
-                    after.append(')').append(condition.substring(toReplaceIdx + 1)).append(") {}");
-                } else {
-                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                    after.append(";");
-                }
-            } else {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
-                if (condition != null) {
-                    if (referToSameElement(prior, iff.getThenPart())) {
-                        insertControlWithBlock(iff.getThenPart(), before, after, () ->
-                                before.insert(0, "if (" + condition + ") "));
-                    } else if (referToSameElement(prior, iff.getElsePart())) {
-                        insertControlWithBlock(iff.getElsePart().getBody(), before, after, () ->
-                                before.insert(0, "if (" + condition + ") {} else "));
-                    }
-                }
-            }
-        } else if (j instanceof J.Ternary) {
-            J.Ternary ternary = (J.Ternary) j;
-            String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), insertionPoint);
-            if (condition != null) {
-                if (referToSameElement(prior, ternary.getCondition())) {
-                    int splitIdx = condition.indexOf('§');
-                    before.insert(0, condition.substring(0, splitIdx) + '(');
-                    after.append(')').append(condition.substring(splitIdx + 1))
-                            .append(" ? ").append(ternary.getTruePart().printTrimmed(cursor).trim())
-                            .append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
-                } else if (referToSameElement(prior, ternary.getTruePart())) {
-                    before.insert(0, (condition == null ? "true" : condition) + " ? ");
-                    after.append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
-                } else if (referToSameElement(prior, ternary.getFalsePart())) {
-                    before.insert(0, (condition == null ? "true" : condition) + " ? " + ternary.getTruePart().printTrimmed(cursor).trim() + " : ");
-                }
+            if (referToSameElement(prior, ((J.If) j).getIfCondition())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
             }
         } else if (j instanceof J.WhileLoop) {
             J.WhileLoop wl = (J.WhileLoop) j;
@@ -615,7 +618,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Case) {
             after.append(";");
         }
-        contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
+        contextTemplate(next(cursor), j, before, after, insertion, REPLACEMENT);
     }
 
     private void switchExpressionCases(J prior, J.Block casesBlock, StringBuilder before, StringBuilder after, Cursor cursor) {
@@ -659,7 +662,8 @@ public class BlockStatementTemplateGenerator {
         return sb.toString();
     }
 
-    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {
+    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock,
+                                                StringBuilder before, Cursor insertion) {
         for (Statement statement : containingBlock.getStatements()) {
             if (referToSameElement(current, statement)) {
                 break;
@@ -671,21 +675,61 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "\n" +
                                  variable((J.VariableDeclarations) statement, true, cursor) +
                                  ";\n");
-            } else if (statement instanceof J.If) {
-                J.If iff = (J.If) statement;
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
-                if (condition != null) {
-                    boolean thenAlwaysCompletesAbnormally = PatternVariables.alwaysCompletesAbnormally(iff.getThenPart());
-                    boolean elseAlwaysCompletesAbnormally = iff.getElsePart() != null && PatternVariables.alwaysCompletesAbnormally(iff.getElsePart().getBody());
-                    if (thenAlwaysCompletesAbnormally || elseAlwaysCompletesAbnormally) {
-                        StringBuilder ifStatement = new StringBuilder("if (").append(condition).append(") {");
-                        ifStatement.append(thenAlwaysCompletesAbnormally ? " throw new RuntimeException(); }" : " }");
-                        ifStatement.append(elseAlwaysCompletesAbnormally ? " else { throw new RuntimeException(); }" : " else { }");
-                        before.insert(0, ifStatement);
-                    }
-                }
             }
         }
+        // The block nearest the template declares every pattern variable in scope where the template goes
+        // (JLS 6.3), so no enclosing condition has to be rebuilt to bring one into scope.
+        if (!isNearestBlock(containingBlock, insertion)) {
+            return;
+        }
+        Cursor position = insertion;
+        if (referToSameElement(current, containingBlock)) {
+            // Inserting into the block itself puts the template after its last statement.
+            J.Empty end = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
+            position = new Cursor(new Cursor(cursor.getParentOrThrow(),
+                    containingBlock.withStatements(ListUtils.concat(containingBlock.getStatements(), end))), end);
+        }
+        Scope.at(position).visible().forEach(binding -> {
+            String type = patternVariableType(binding);
+            if (type != null) {
+                JavaType variableType = binding.getType() instanceof JavaType.Variable ?
+                        ((JavaType.Variable) binding.getType()).getType() : null;
+                before.insert(0, "\n" + type + " " + binding.getName() + " = " + valueOfType(variableType) + ";\n");
+            }
+        });
+    }
+
+    private static boolean isNearestBlock(J.Block block, Cursor insertion) {
+        Cursor from = insertion.getValue() instanceof J.Block && !referToSameElement(insertion.getValue(), block) ?
+                insertion.getParentOrThrow() : insertion;
+        J.Block nearest = from.getValue() instanceof J.Block ? from.getValue() : from.firstEnclosing(J.Block.class);
+        return nearest != null && referToSameElement(nearest, block);
+    }
+
+    /**
+     * The declared type of a binding an {@code instanceof} pattern introduces, or null for any other binding.
+     */
+    private @Nullable String patternVariableType(Scope.Binding binding) {
+        if (!(binding.getTree() instanceof J.Identifier) || binding.getNamespace() != Scope.Namespace.VARIABLE ||
+            binding.getCursor().firstEnclosing(J.InstanceOf.class) == null) {
+            return null;
+        }
+        Cursor declaring = binding.getCursor().getParentTreeCursor();
+        if (declaring.getValue() instanceof J.InstanceOf) {
+            J clazz = ((J.InstanceOf) declaring.getValue()).getClazz();
+            return clazz.withPrefix(Space.EMPTY).printTrimmed(declaring);
+        }
+        Object declarations = declaring.getParentTreeCursor().getValue();
+        if (declaring.getValue() instanceof J.VariableDeclarations.NamedVariable &&
+            declarations instanceof J.VariableDeclarations) {
+            TypeTree typeExpression = ((J.VariableDeclarations) declarations).getTypeExpression();
+            if (typeExpression == null || typeExpression.getMarkers().findFirst(JavaVarKeyword.class).isPresent()) {
+                J.VariableDeclarations.NamedVariable variable = declaring.getValue();
+                return Substitutions.getTypeName(variable.getType());
+            }
+            return typeExpression.withPrefix(Space.EMPTY).printTrimmed(declaring);
+        }
+        return null;
     }
 
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
@@ -702,7 +746,7 @@ public class BlockStatementTemplateGenerator {
         StringBuilder beforeBuffer = prior == null ? null : new StringBuilder();
         StringBuilder appendBuffer = prior == null ? after : beforeBuffer;
 
-        appendBuffer.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append('{');
+        appendBuffer.append(cd.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append('{');
 
         List<Statement> statements = cd.getBody().getStatements();
         for (Statement statement : statements) {
@@ -828,21 +872,22 @@ public class BlockStatementTemplateGenerator {
         for (int i = 0, variablesSize = variables.size(); i < variablesSize; i++) {
             J.VariableDeclarations.NamedVariable nv = variables.get(i);
             if (i == 0) {
-                if (variable.getTypeExpression() != null) {
-                    varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor));
+                TypeTree typeExpression = variable.getTypeExpression();
+                if (initializer && typeExpression != null &&
+                    typeExpression.getMarkers().findFirst(JavaVarKeyword.class).isPresent()) {
+                    // `var` would take the placeholder value's type, so the stub declares the variable's type
+                    varBuilder.append(Substitutions.getTypeName(nv.getType()));
+                } else if (typeExpression != null) {
+                    varBuilder.append(typeExpression.withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
-                if (nv.getType() instanceof JavaType.Array) {
-                    if (nv.getInitializer() instanceof J.NewArray && !((J.NewArray) nv.getInitializer()).getDimensions().isEmpty()) {
-                        J.NewArray na = (J.NewArray) nv.getInitializer();
-                        na.getDimensions().forEach(d -> varBuilder.append("[]"));
-                    } else {
-                        varBuilder.append("[]");
-                    }
+                if (variable.getVarargs() != null) {
+                    varBuilder.append("[]");
                 }
                 varBuilder.append(" ");
             }
 
             varBuilder.append(nv.getSimpleName());
+            nv.getDimensionsAfterName().forEach(d -> varBuilder.append("[]"));
 
             JavaType type = nv.getType();
             if (initializer && type != null) {

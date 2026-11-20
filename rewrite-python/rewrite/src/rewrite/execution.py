@@ -5,15 +5,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, ClassVar, TYPE_CHECKING, List, Optional
 
+from .heavyweight import Heavyweight
 from .tree import SourceFile
 
 if TYPE_CHECKING:
     from .visitor import TreeVisitor, Cursor
 
 
-class ExecutionContext(ABC):
+class ExecutionContext(Heavyweight, ABC):
     REQUIRE_PRINT_EQUALS_INPUT: ClassVar[str] = "org.openrewrite.requirePrintEqualsInput"
     CHARSET: ClassVar[str] = "org.openrewrite.parser.charset"
+    # Set by a test harness to fail a ScanningRecipe whose scanner changes the tree it scans.
+    SCANNING_MUTATION_VALIDATION: ClassVar[str] = "org.openrewrite.test.scanningMutationValidation"
+    # Set by a test harness to a callable that sees each ScanningRecipe's accumulator after scanning and editing.
+    ACCUMULATOR_INSPECTION: ClassVar[str] = "org.openrewrite.test.accumulatorInspection"
 
     @abstractmethod
     def get_message(self, key: str, default_value=None) -> Any:

@@ -240,4 +240,28 @@ class AddSettingsPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginRepositoryAndPluginToEmptySettings() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddSettingsPluginRepository("gradlePluginPortal", null),
+            new AddSettingsPlugin("org.gradle.toolchains.foojay-resolver-convention", "0.8.0", null, null, null)
+          ),
+          settingsGradleKts(
+            "",
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+              }
+              """
+          )
+        );
+    }
 }

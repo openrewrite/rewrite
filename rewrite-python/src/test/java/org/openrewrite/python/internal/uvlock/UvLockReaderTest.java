@@ -50,6 +50,16 @@ class UvLockReaderTest {
     }
 
     @Test
+    void uploadTimeIsAlsoReadUnderItsUnderscoredName() {
+        // uv reads upload_time, which some locks record, as an alias of upload-time
+        UvLock lock = UvLockReader.parse(resource("a-multi-package/uv.lock").replace("upload-time", "upload_time"));
+        UvLockPackage pkg = Objects.requireNonNull(lock.getPackage("charset-normalizer"));
+        assertThat(Objects.requireNonNull(pkg.getWheels()))
+          .extracting(UvLockArtifact::getUploadTime)
+          .contains("2026-07-07T14:33:57.9Z");
+    }
+
+    @Test
     void forkDuplicatesAndResolutionMarkers() {
         UvLock lock = UvLockReader.parse(resource("e2-true-fork/uv.lock"));
         assertThat(lock.getResolutionMarkers()).containsExactly(
@@ -132,8 +142,20 @@ class UvLockReaderTest {
     }
 
     @Test
+    void relativeExcludeNewerSentinelAndItsCommentComeTogether() {
+        String comment = UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT;
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\n\n[options]\nexclude-newer = \"0001-01-01T00:00:00Z\"\nexclude-newer-span = \"P1W\"\n"))
+          .isInstanceOf(UvLockFormatException.class)
+          .hasMessageContaining("comment");
+
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\n\n[options]\nexclude-newer = \"2024-01-01T00:00:00Z\" " + comment + "\n"))
+          .isInstanceOf(UvLockFormatException.class)
+          .hasMessageContaining("Trailing content");
+    }
+
+    @Test
     void unrecognizedRevisionThrows() {
-        assertThatThrownBy(() -> UvLockReader.parse("version = 1\nrevision = 4\n"))
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\nrevision = 6\n"))
           .isInstanceOf(UvLockFormatException.class)
           .hasMessageContaining("revision");
     }

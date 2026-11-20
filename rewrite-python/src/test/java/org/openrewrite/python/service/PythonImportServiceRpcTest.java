@@ -57,10 +57,10 @@ class PythonImportServiceRpcTest {
         var hostIn = new PipedInputStream(serverOut);
 
         host = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(
-          new JsonMessageFormatter(new ParameterNamesModule()), hostIn, hostOut)), new RecipeMarketplace())
+          new JsonMessageFormatter(new ParameterNamesModule()), hostIn, hostOut), new JsonMessageFormatter()), new RecipeMarketplace())
           .batchSize(1);
         server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(
-          new JsonMessageFormatter(new ParameterNamesModule()), serverIn, serverOut)), new RecipeMarketplace())
+          new JsonMessageFormatter(new ParameterNamesModule()), serverIn, serverOut), new JsonMessageFormatter()), new RecipeMarketplace())
           .batchSize(1);
     }
 

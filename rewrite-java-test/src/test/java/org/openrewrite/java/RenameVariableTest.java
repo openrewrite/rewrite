@@ -650,6 +650,7 @@ class RenameVariableTest implements RewriteTest {
                               v += 2;
                               break;
                           case 3:
+                              // the local declared in case 2 is in scope here
                               v = 0;
                               break;
                           default:
@@ -675,7 +676,8 @@ class RenameVariableTest implements RewriteTest {
                               v += 2;
                               break;
                           case 3:
-                              VALUE = 0;
+                              // the local declared in case 2 is in scope here
+                              v = 0;
                               break;
                           default:
                               break;
@@ -1681,6 +1683,198 @@ class RenameVariableTest implements RewriteTest {
                   FOO.baz = (a, b) -> true;
                   FOO.baz2 = "hello";
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamingAParameterLeavesTheInheritedFieldAnAnonymousClassReads() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("node", "n", true)),
+          java(
+            """
+              class Base {
+                  protected int node;
+              }
+              """
+          ),
+          java(
+            """
+              public class A {
+                  Object m(int node) {
+                      return new Base() {
+                          int get() {
+                              return node;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              public class A {
+                  Object m(int n) {
+                      return new Base() {
+                          int get() {
+                              return node;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameWithinASubtreeVisitedOnItsOwn() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.VariableDeclarations parameter = (J.VariableDeclarations) method.getParameters().getFirst();
+                  return (J.MethodDeclaration) new RenameVariable<ExecutionContext>(parameter.getVariables().getFirst(), "n")
+                    .visitNonNull(method, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  int increment(int v) {
+                      return v + 1;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int increment(int n) {
+                      return n + 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameAReferenceThatCarriesNoFieldType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  Object parent = getCursor().getParentTreeCursor().getValue();
+                  if (parent instanceof J.VariableDeclarations.NamedVariable variable) {
+                      doAfterVisit(new RenameVariable<>(variable, "n"));
+                      return identifier;
+                  }
+                  // A reference a recipe builds may carry a type and no field type
+                  return identifier.withFieldType(null);
+              }
+          })),
+          java(
+            """
+              class A {
+                  int length() {
+                      String v = "";
+                      return v.length();
+                  }
+              }
+              """,
+            """
+              class A {
+                  int length() {
+                      String n = "";
+                      return n.length();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamingAFieldFollowsOnlyTheJavadocLinksThatResolveToIt() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("count", "total", false)),
+          java(
+            """
+              /**
+               * Holds {@link #count}, unlike {@link Other#count}.
+               */
+              public class A<T> {
+                  int count;
+
+                  class Inner {
+                      /**
+                       * Reads {@link #count}.
+                       */
+                      void m() {
+                      }
+                  }
+              }
+
+              /**
+               * Reads {@link A#count}.
+               */
+              class Other {
+                  int count;
+              }
+              """,
+            """
+              /**
+               * Holds {@link #total}, unlike {@link Other#count}.
+               */
+              public class A<T> {
+                  int total;
+
+                  class Inner {
+                      /**
+                       * Reads {@link #total}.
+                       */
+                      void m() {
+                      }
+                  }
+              }
+
+              /**
+               * Reads {@link A#total}.
+               */
+              class Other {
+                  int count;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamingAFieldKeepsAJavadocLinkToAMethodOfItsName() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("count", "total", false)),
+          java(
+            """
+              public class A {
+                  private int count;
+
+                  /**
+                   * Reads {@link #count}, as {@link #count()} says.
+                   */
+                  int count() {
+                      return count;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  private int total;
+
+                  /**
+                   * Reads {@link #total}, as {@link #count()} says.
+                   */
+                  int count() {
+                      return total;
+                  }
               }
               """
           )

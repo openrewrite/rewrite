@@ -23,13 +23,15 @@ declare module "./tree" {
     namespace Yaml {
         export const Markers: {
             readonly OmitColon: "org.openrewrite.yaml.marker.OmitColon";
+            readonly TagBeforeAnchor: "org.openrewrite.yaml.marker.TagBeforeAnchor";
         };
     }
 }
 
 // At runtime actually attach it to Yaml
 (Yaml as any).Markers = {
-    OmitColon: "org.openrewrite.yaml.marker.OmitColon"
+    OmitColon: "org.openrewrite.yaml.marker.OmitColon",
+    TagBeforeAnchor: "org.openrewrite.yaml.marker.TagBeforeAnchor"
 } as const;
 
 /**
@@ -51,20 +53,36 @@ export function omitColon(): OmitColon {
 }
 
 /**
+ * Marker on a scalar, mapping or sequence whose tag was written before its anchor, as in `!!str &a value`,
+ * so that it prints back in that order.
+ */
+export interface TagBeforeAnchor extends Marker {
+    readonly kind: typeof Yaml.Markers.TagBeforeAnchor;
+}
+
+export function tagBeforeAnchor(): TagBeforeAnchor {
+    return {
+        kind: Yaml.Markers.TagBeforeAnchor,
+        id: randomId()
+    };
+}
+
+/**
  * Registers an RPC codec for any marker without additional properties.
  */
 function registerMarkerCodec<M extends Marker>(kind: M["kind"]) {
     RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+        rpcReceive(before: M, q: RpcReceiveQueue): M {
             return updateIfChanged(before, {
-                id: await q.receive(before.id),
+                id: q.receive(before.id),
             } as Partial<M>);
         },
 
-        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
+        rpcSend(after: M, q: RpcSendQueue): void {
+            q.getAndSend(after, a => a.id);
         }
     });
 }
 
 registerMarkerCodec(Yaml.Markers.OmitColon);
+registerMarkerCodec(Yaml.Markers.TagBeforeAnchor);

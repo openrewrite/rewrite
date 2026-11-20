@@ -443,4 +443,103 @@ class GoRpcPrintRoundTripIntegTest {
                 }
                 """);
     }
+
+    @Test
+    void trailingCommentOnLastCompositeLiteralElementSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                var cases = []tc{
+                \t{
+                \t\tname: "with trailing comment on last entry",
+                \t\tdata: map[string][]string{
+                \t\t\t"a": {"hi"},    // first
+                \t\t\t"b": {"3.14"},  // second
+                \t\t\t"c": {"value"}, // third
+                \t\t},
+                \t},
+                }
+                """);
+    }
+
+    @Test
+    void commentBeforeSecondImportBlockSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                import "fmt"
+
+                // about os
+                import "os"
+
+                func f() {
+                \t_ = fmt.Sprintf
+                \t_ = os.Getenv
+                }
+                """);
+    }
+
+    @Test
+    void commentBeforeGroupedImportParenSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                import /* which */ (
+                \t"fmt"
+                )
+
+                func f() {
+                \t_ = fmt.Sprintf
+                }
+                """);
+    }
+
+    @Test
+    void trailingCommentOnLastCallArgumentSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f() {
+                \tg(
+                \t\t1, // one
+                \t)
+                }
+                """);
+    }
+
+    @Test
+    void trailingCommentOnLastParameterSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(
+                \ta int, // first
+                ) {
+                }
+                """);
+    }
+
+    @Test
+    void selectSurvivesReset() {
+        // Go.Select and its Go.CommClause clauses (receive, send, and default)
+        // must fully deserialize from the wire, not survive only via the cache.
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(c chan int, d chan int) {
+                \tselect {
+                \tcase v := <-c:
+                \t\t_ = v
+                \tcase d <- 1:
+                \tdefault:
+                \t}
+                }
+                """);
+    }
 }

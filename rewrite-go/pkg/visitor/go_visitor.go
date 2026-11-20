@@ -63,6 +63,8 @@ func (v *GoVisitor) Cursor() *Cursor { return v.cursor }
 // IDs before invoking Visit. Recipes typically don't call this directly.
 func (v *GoVisitor) SetCursor(c *Cursor) { v.cursor = c }
 
+func (*GoVisitor) IsHeavyweight() {}
+
 // DoAfterVisit queues a follow-up visitor to run after the main visit
 // completes. Mirrors JavaVisitor.doAfterVisit. Use this from inside any
 // Visit* override to compose side-effects like adding an import:
@@ -101,12 +103,16 @@ func (v *GoVisitor) PendingAfterVisits() []AfterVisitor {
 //  2. PreVisit(t, p) is called via virtual dispatch — subclasses
 //     (e.g. RPC sender/receiver) override it to handle cross-cutting
 //     fields (id, prefix, markers) once per node.
-//  3. The type-specific Visit* method is dispatched via virtual
-//     dispatch on the (possibly modified) tree returned by PreVisit.
-//  4. cursor pops on return.
+//  3. VisitStatement and VisitExpression are called on a node that is
+//     one, where and in the order JavaVisitor calls them.
+//  4. The type-specific Visit* method is dispatched via virtual
+//     dispatch on the (possibly modified) tree returned so far.
+//  5. cursor pops on return.
 //
 // PreVisit returning nil short-circuits the visit — useful for
-// receivers that get DELETE state from the wire.
+// receivers that get DELETE state from the wire. A VisitStatement or
+// VisitExpression returning nil or a node of another type replaces the
+// node without visiting its children, as in Java.
 func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
@@ -118,6 +124,10 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	t = v.self().PreVisit(t, p)
 	if t == nil {
 		return nil
+	}
+	t, ok := v.visitStatementAndExpression(t, p)
+	if !ok {
+		return t
 	}
 
 	switch n := t.(type) {
@@ -205,6 +215,10 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitArrayType(n, p)
 	case *java.Parentheses:
 		return v.self().VisitParentheses(n, p)
+	case *java.ParenthesizedTypeTree:
+		return v.self().VisitParenthesizedTypeTree(n, p)
+	case *golang.TypeAssertion:
+		return v.self().VisitTypeAssertion(n, p)
 	case *java.TypeCast:
 		return v.self().VisitTypeCast(n, p)
 	case *java.ControlParentheses:
@@ -229,6 +243,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitSlice(n, p)
 	case *golang.MapType:
 		return v.self().VisitMapType(n, p)
+	case *golang.ExpressionStatement:
+		return v.self().VisitExpressionStatement(n, p)
 	case *golang.StatementExpression:
 		return v.self().VisitStatementExpression(n, p)
 	case *golang.PointerType:
@@ -261,6 +277,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitStatementWithInit(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
+	case *golang.Select:
+		return v.self().VisitSelect(n, p)
 	case *golang.Unary:
 		return v.self().VisitGoUnary(n, p)
 	case *golang.Binary:
@@ -272,6 +290,46 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	default:
 		return t
 	}
+}
+
+// visitStatementAndExpression reports false when a hook replaced t with a
+// node the type-specific Visit* method must not visit.
+func (v *GoVisitor) visitStatementAndExpression(t java.Tree, p any) (java.Tree, bool) {
+	switch t.(type) {
+	case *java.Import, *java.ParenthesizedTypeTree:
+		// JavaVisitor gives these neither hook.
+		return t, true
+	case *java.FieldAccess:
+		// JavaVisitor.visitFieldAccess calls visitExpression first.
+		t, ok := v.visitExpressionHook(t, p)
+		if !ok {
+			return t, false
+		}
+		return v.visitStatementHook(t, p)
+	}
+	t, ok := v.visitStatementHook(t, p)
+	if !ok {
+		return t, false
+	}
+	return v.visitExpressionHook(t, p)
+}
+
+func (v *GoVisitor) visitStatementHook(t java.Tree, p any) (java.Tree, bool) {
+	s, ok := t.(java.Statement)
+	if !ok {
+		return t, true
+	}
+	r := v.self().VisitStatement(s, p)
+	return r, reflect.TypeOf(r) == reflect.TypeOf(t)
+}
+
+func (v *GoVisitor) visitExpressionHook(t java.Tree, p any) (java.Tree, bool) {
+	e, ok := t.(java.Expression)
+	if !ok {
+		return t, true
+	}
+	r := v.self().VisitExpression(e, p)
+	return r, reflect.TypeOf(r) == reflect.TypeOf(t)
 }
 
 func (v *GoVisitor) self() VisitorI {
@@ -287,6 +345,8 @@ func (v *GoVisitor) self() VisitorI {
 type VisitorI interface {
 	Visit(t java.Tree, p any) java.Tree
 	PreVisit(t java.Tree, p any) java.Tree
+	VisitStatement(s java.Statement, p any) java.J
+	VisitExpression(e java.Expression, p any) java.J
 	VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J
 	// go.mod nodes are Tree, not J (their tokens are not Java
 	// expressions), so these return java.Tree rather than java.J.
@@ -332,6 +392,8 @@ type VisitorI interface {
 	VisitArrayType(at *java.ArrayType, p any) java.J
 	VisitGoArrayType(at *golang.ArrayType, p any) java.J
 	VisitParentheses(paren *java.Parentheses, p any) java.J
+	VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J
+	VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J
 	VisitTypeCast(tc *java.TypeCast, p any) java.J
 	VisitControlParentheses(cp *java.ControlParentheses, p any) java.J
 	VisitArrayAccess(aa *java.ArrayAccess, p any) java.J
@@ -344,6 +406,7 @@ type VisitorI interface {
 	VisitKeyValue(kv *golang.KeyValue, p any) java.J
 	VisitSlice(s *golang.Slice, p any) java.J
 	VisitMapType(mt *golang.MapType, p any) java.J
+	VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J
 	VisitStatementExpression(se *golang.StatementExpression, p any) java.J
 	VisitPointerType(pt *golang.PointerType, p any) java.J
 	VisitChannel(ch *golang.Channel, p any) java.J
@@ -359,6 +422,7 @@ type VisitorI interface {
 	VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J
 	VisitStatementWithInit(s *golang.StatementWithInit, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
+	VisitSelect(sel *golang.Select, p any) java.J
 	VisitGoUnary(u *golang.Unary, p any) java.J
 	VisitGoBinary(b *golang.Binary, p any) java.J
 	VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J
@@ -378,6 +442,16 @@ var _ VisitorI = (*GoVisitor)(nil)
 // `markers` fields once per node, mirroring Java's
 // JavaVisitor.preVisit pattern.
 func (v *GoVisitor) PreVisit(t java.Tree, p any) java.Tree { return t }
+
+// VisitStatement is called on a statement before its type-specific Visit*
+// method, wherever JavaVisitor calls visitStatement. The default returns it
+// unchanged.
+func (v *GoVisitor) VisitStatement(s java.Statement, p any) java.J { return s }
+
+// VisitExpression is called on an expression before its type-specific Visit*
+// method, wherever JavaVisitor calls visitExpression. The default returns it
+// unchanged.
+func (v *GoVisitor) VisitExpression(e java.Expression, p any) java.J { return e }
 
 func (v *GoVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	prefix := v.self().VisitSpace(cu.Prefix, p)
@@ -491,11 +565,22 @@ func (v *GoVisitor) VisitLiteral(lit *java.Literal, p any) java.J {
 }
 
 func (v *GoVisitor) VisitBinary(bin *java.Binary, p any) java.J {
-	bin = bin.WithPrefix(v.self().VisitSpace(bin.Prefix, p))
-	bin = bin.WithMarkers(v.visitMarkers(bin.Markers, p))
-	bin = bin.WithLeft(visitExpression(v, bin.Left, p))
-	bin = bin.WithRight(visitExpression(v, bin.Right, p))
-	return bin
+	prefix := v.self().VisitSpace(bin.Prefix, p)
+	markers := v.visitMarkers(bin.Markers, p)
+	left := visitExpression(v, bin.Left, p)
+	opBefore := v.self().VisitSpace(bin.Operator.Before, p)
+	right := visitExpression(v, bin.Right, p)
+	if java.SpaceEqual(prefix, bin.Prefix) && java.MarkersEqual(markers, bin.Markers) &&
+		left == bin.Left && java.SpaceEqual(opBefore, bin.Operator.Before) && right == bin.Right {
+		return bin
+	}
+	c := *bin
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Left = left
+	c.Operator.Before = opBefore
+	c.Right = right
+	return &c
 }
 
 func (v *GoVisitor) VisitBlock(block *java.Block, p any) java.J {
@@ -795,10 +880,17 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 	if typeExpr != nil {
 		typeExpr = visitExpression(v, typeExpr, p)
 	}
+	varargs := vd.Varargs
+	if varargs != nil {
+		visited := v.self().VisitSpace(*varargs, p)
+		if !java.SpaceEqual(visited, *varargs) {
+			varargs = &visited
+		}
+	}
 	variables := visitRightPaddedList(v, vd.Variables, p)
 	if java.SpaceEqual(prefix, vd.Prefix) && java.MarkersEqual(markers, vd.Markers) &&
 		java.SameSlice(anns, vd.LeadingAnnotations) && typeExpr == vd.TypeExpr &&
-		java.SameSlice(variables, vd.Variables) {
+		varargs == vd.Varargs && java.SameSlice(variables, vd.Variables) {
 		return vd
 	}
 	c := *vd
@@ -806,6 +898,7 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 	c.Markers = markers
 	c.LeadingAnnotations = anns
 	c.TypeExpr = typeExpr
+	c.Varargs = varargs
 	c.Variables = variables
 	return &c
 }
@@ -878,7 +971,7 @@ func (v *GoVisitor) VisitImport(imp *java.Import, p any) java.J {
 			alias = &c
 		}
 	}
-	qualid := visitExpression(v, imp.Qualid, p)
+	qualid := visitAndCast[*java.FieldAccess](v, imp.Qualid, p)
 	if java.SpaceEqual(prefix, imp.Prefix) && java.MarkersEqual(markers, imp.Markers) &&
 		alias == imp.Alias && qualid == imp.Qualid {
 		return imp
@@ -892,34 +985,60 @@ func (v *GoVisitor) VisitImport(imp *java.Import, p any) java.J {
 }
 
 func (v *GoVisitor) VisitUnary(unary *java.Unary, p any) java.J {
-	unary = unary.WithPrefix(v.self().VisitSpace(unary.Prefix, p))
-	unary = unary.WithMarkers(v.visitMarkers(unary.Markers, p))
-	unary = unary.WithOperand(visitExpression(v, unary.Operand, p))
-	return unary
+	prefix := v.self().VisitSpace(unary.Prefix, p)
+	markers := v.visitMarkers(unary.Markers, p)
+	opBefore := v.self().VisitSpace(unary.Operator.Before, p)
+	operand := visitExpression(v, unary.Operand, p)
+	if java.SpaceEqual(prefix, unary.Prefix) && java.MarkersEqual(markers, unary.Markers) &&
+		java.SpaceEqual(opBefore, unary.Operator.Before) && operand == unary.Operand {
+		return unary
+	}
+	c := *unary
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Operator.Before = opBefore
+	c.Operand = operand
+	return &c
 }
 
 func (v *GoVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any) java.J {
 	prefix := v.self().VisitSpace(ao.Prefix, p)
 	markers := v.visitMarkers(ao.Markers, p)
 	variable := visitExpression(v, ao.Variable, p)
+	opBefore := v.self().VisitSpace(ao.Operator.Before, p)
 	assignment := visitExpression(v, ao.Assignment, p)
 	if java.SpaceEqual(prefix, ao.Prefix) && java.MarkersEqual(markers, ao.Markers) &&
-		variable == ao.Variable && assignment == ao.Assignment {
+		variable == ao.Variable && java.SpaceEqual(opBefore, ao.Operator.Before) &&
+		assignment == ao.Assignment {
 		return ao
 	}
 	c := *ao
 	c.Prefix = prefix
 	c.Markers = markers
 	c.Variable = variable
+	c.Operator.Before = opBefore
 	c.Assignment = assignment
 	return &c
 }
 
 func (v *GoVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
-	sw = sw.WithPrefix(v.self().VisitSpace(sw.Prefix, p))
-	sw = sw.WithMarkers(v.visitMarkers(sw.Markers, p))
-	sw = sw.WithBody(visitAndCast[*java.Block](v, sw.Body, p))
-	return sw
+	prefix := v.self().VisitSpace(sw.Prefix, p)
+	markers := v.visitMarkers(sw.Markers, p)
+	var selector *java.ControlParentheses
+	if sw.Selector != nil {
+		selector = visitAndCast[*java.ControlParentheses](v, sw.Selector, p)
+	}
+	body := visitAndCast[*java.Block](v, sw.Body, p)
+	if java.SpaceEqual(prefix, sw.Prefix) && java.MarkersEqual(markers, sw.Markers) &&
+		selector == sw.Selector && body == sw.Body {
+		return sw
+	}
+	c := *sw
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Selector = selector
+	c.Body = body
+	return &c
 }
 
 func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
@@ -927,10 +1046,11 @@ func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
 	markers := v.visitMarkers(cse.Markers, p)
 	exprsBefore := v.self().VisitSpace(cse.Expressions.Before, p)
 	exprsElems := visitRightPaddedExpressionList(v, cse.Expressions.Elements, p)
-	body := visitRightPaddedList(v, cse.Body, p)
+	bodyBefore := v.self().VisitSpace(cse.Body.Before, p)
+	body := visitRightPaddedList(v, cse.Body.Elements, p)
 	if java.SpaceEqual(prefix, cse.Prefix) && java.MarkersEqual(markers, cse.Markers) &&
 		java.SpaceEqual(exprsBefore, cse.Expressions.Before) && java.SameSlice(exprsElems, cse.Expressions.Elements) &&
-		java.SameSlice(body, cse.Body) {
+		java.SpaceEqual(bodyBefore, cse.Body.Before) && java.SameSlice(body, cse.Body.Elements) {
 		return cse
 	}
 	c := *cse
@@ -938,7 +1058,8 @@ func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
 	c.Markers = markers
 	c.Expressions.Before = exprsBefore
 	c.Expressions.Elements = exprsElems
-	c.Body = body
+	c.Body.Before = bodyBefore
+	c.Body.Elements = body
 	return &c
 }
 
@@ -946,9 +1067,15 @@ func (v *GoVisitor) VisitForLoop(forLoop *java.ForLoop, p any) java.J {
 	prefix := v.self().VisitSpace(forLoop.Prefix, p)
 	markers := v.visitMarkers(forLoop.Markers, p)
 	ctrl := visitAndCast[*java.ForControl](v, &forLoop.Control, p)
-	body := visitAndCast[*java.Block](v, forLoop.Body, p)
+	if ctrl == nil {
+		// Control is a value field, so a pruned control has no deleted form.
+		ctrl = &forLoop.Control
+	}
+	body := forLoop.Body
+	body.Element = visitAndCast[java.Statement](v, forLoop.Body.Element, p)
+	body.After = v.self().VisitSpace(forLoop.Body.After, p)
 	if java.SpaceEqual(prefix, forLoop.Prefix) && java.MarkersEqual(markers, forLoop.Markers) &&
-		ctrl == &forLoop.Control && body == forLoop.Body {
+		ctrl == &forLoop.Control && java.RightPaddedEqual(body, forLoop.Body) {
 		return forLoop
 	}
 	c := *forLoop
@@ -1009,10 +1136,25 @@ func (v *GoVisitor) VisitForControl(control *java.ForControl, p any) java.J {
 }
 
 func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
-	forEach = forEach.WithPrefix(v.self().VisitSpace(forEach.Prefix, p))
-	forEach = forEach.WithMarkers(v.visitMarkers(forEach.Markers, p))
-	forEach = forEach.WithBody(visitAndCast[*java.Block](v, forEach.Body, p))
-	return forEach
+	prefix := v.self().VisitSpace(forEach.Prefix, p)
+	markers := v.visitMarkers(forEach.Markers, p)
+	ctrl := visitAndCast[*java.ForEachControl](v, &forEach.Control, p)
+	if ctrl == nil {
+		ctrl = &forEach.Control
+	}
+	body := forEach.Body
+	body.Element = visitAndCast[java.Statement](v, forEach.Body.Element, p)
+	body.After = v.self().VisitSpace(forEach.Body.After, p)
+	if java.SpaceEqual(prefix, forEach.Prefix) && java.MarkersEqual(markers, forEach.Markers) &&
+		ctrl == &forEach.Control && java.RightPaddedEqual(body, forEach.Body) {
+		return forEach
+	}
+	c := *forEach
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Control = *ctrl
+	c.Body = body
+	return &c
 }
 
 func (v *GoVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
@@ -1234,8 +1376,15 @@ func (v *GoVisitor) VisitFallthrough(f *golang.Fallthrough, p any) java.J {
 }
 
 func (v *GoVisitor) VisitEmpty(empty *java.Empty, p any) java.J {
-	empty = empty.WithPrefix(v.self().VisitSpace(empty.Prefix, p))
-	return empty
+	prefix := v.self().VisitSpace(empty.Prefix, p)
+	markers := v.visitMarkers(empty.Markers, p)
+	if java.SpaceEqual(prefix, empty.Prefix) && java.MarkersEqual(markers, empty.Markers) {
+		return empty
+	}
+	c := *empty
+	c.Prefix = prefix
+	c.Markers = markers
+	return &c
 }
 
 func (v *GoVisitor) VisitAnnotation(ann *java.Annotation, p any) java.J {
@@ -1327,14 +1476,31 @@ func (v *GoVisitor) VisitParentheses(paren *java.Parentheses, p any) java.J {
 	return &c
 }
 
+func (v *GoVisitor) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	prefix := v.self().VisitSpace(ptt.Prefix, p)
+	markers := v.visitMarkers(ptt.Markers, p)
+	anns := visitAnnotationList(v, ptt.Annotations, p)
+	parenthesizedType := visitAndCast[*java.Parentheses](v, ptt.Type, p)
+	if java.SpaceEqual(prefix, ptt.Prefix) && java.MarkersEqual(markers, ptt.Markers) &&
+		java.SameSlice(anns, ptt.Annotations) && parenthesizedType == ptt.Type {
+		return ptt
+	}
+	c := *ptt
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Annotations = anns
+	c.Type = parenthesizedType
+	return &c
+}
+
 func (v *GoVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	prefix := v.self().VisitSpace(tc.Prefix, p)
 	markers := v.visitMarkers(tc.Markers, p)
-	expr := visitExpression(v, tc.Expr, p)
 	clazz := tc.Clazz
 	if clazz != nil {
 		clazz = visitAndCast[*java.ControlParentheses](v, clazz, p)
 	}
+	expr := visitExpression(v, tc.Expr, p)
 	if java.SpaceEqual(prefix, tc.Prefix) && java.MarkersEqual(markers, tc.Markers) &&
 		expr == tc.Expr && clazz == tc.Clazz {
 		return tc
@@ -1344,6 +1510,27 @@ func (v *GoVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	c.Markers = markers
 	c.Expr = expr
 	c.Clazz = clazz
+	return &c
+}
+
+func (v *GoVisitor) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	prefix := v.self().VisitSpace(ta.Prefix, p)
+	markers := v.visitMarkers(ta.Markers, p)
+	left := visitExpression(v, ta.Left.Element, p)
+	leftAfter := v.self().VisitSpace(ta.Left.After, p)
+	clazz := ta.AssertedType
+	if clazz != nil {
+		clazz = visitAndCast[*java.ControlParentheses](v, clazz, p)
+	}
+	if java.SpaceEqual(prefix, ta.Prefix) && java.MarkersEqual(markers, ta.Markers) &&
+		left == ta.Left.Element && java.SpaceEqual(leftAfter, ta.Left.After) && clazz == ta.AssertedType {
+		return ta
+	}
+	c := *ta
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Left = java.RightPadded[java.Expression]{Element: left, After: leftAfter, Markers: ta.Left.Markers}
+	c.AssertedType = clazz
 	return &c
 }
 
@@ -1421,10 +1608,11 @@ func (v *GoVisitor) VisitIndexList(il *golang.IndexList, p any) java.J {
 	if target != nil {
 		target = visitExpression(v, target, p)
 	}
+	indicesMarkers := v.visitMarkers(il.Indices.Markers, p)
 	indicesBefore := v.self().VisitSpace(il.Indices.Before, p)
 	indicesElems := visitRightPaddedList(v, il.Indices.Elements, p)
 	if java.SpaceEqual(prefix, il.Prefix) && java.MarkersEqual(markers, il.Markers) &&
-		target == il.Target &&
+		target == il.Target && java.MarkersEqual(indicesMarkers, il.Indices.Markers) &&
 		java.SpaceEqual(indicesBefore, il.Indices.Before) && java.SameSlice(indicesElems, il.Indices.Elements) {
 		return il
 	}
@@ -1432,6 +1620,7 @@ func (v *GoVisitor) VisitIndexList(il *golang.IndexList, p any) java.J {
 	c.Prefix = prefix
 	c.Markers = markers
 	c.Target = target
+	c.Indices.Markers = indicesMarkers
 	c.Indices.Before = indicesBefore
 	c.Indices.Elements = indicesElems
 	return &c
@@ -1552,6 +1741,20 @@ func (v *GoVisitor) VisitMapType(mt *golang.MapType, p any) java.J {
 	c.Key.Element = keyElem
 	c.Key.After = keyAfter
 	c.Value = value
+	return &c
+}
+
+func (v *GoVisitor) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	prefix := v.self().VisitSpace(es.Prefix, p)
+	markers := v.visitMarkers(es.Markers, p)
+	expr := visitExpression(v, es.Expression, p)
+	if java.SpaceEqual(prefix, es.Prefix) && java.MarkersEqual(markers, es.Markers) && expr == es.Expression {
+		return es
+	}
+	c := *es
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Expression = expr
 	return &c
 }
 
@@ -1797,6 +2000,20 @@ func (v *GoVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	return &c
 }
 
+func (v *GoVisitor) VisitSelect(sel *golang.Select, p any) java.J {
+	prefix := v.self().VisitSpace(sel.Prefix, p)
+	markers := v.visitMarkers(sel.Markers, p)
+	body := visitAndCast[*java.Block](v, sel.Body, p)
+	if java.SpaceEqual(prefix, sel.Prefix) && java.MarkersEqual(markers, sel.Markers) && body == sel.Body {
+		return sel
+	}
+	c := *sel
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Body = body
+	return &c
+}
+
 func (v *GoVisitor) VisitSpace(space java.Space, p any) java.Space {
 	return space
 }
@@ -1810,30 +2027,33 @@ func (v *GoVisitor) VisitType(javaType java.JavaType, p any) java.JavaType {
 // the Python, JS, and C# ports). Every Visit* method routes its node's
 // markers through visitMarkers, which invokes VisitMarker on each entry via
 // virtual dispatch, so subclasses collect or rewrite markers without
-// touching individual node types. The default returns the marker unchanged.
+// touching individual node types.
 func (v *GoVisitor) VisitMarker(marker java.Marker, p any) java.Marker {
+	if tc, ok := marker.(golang.TrailingComma); ok {
+		tc.Before = v.self().VisitSpace(tc.Before, p)
+		tc.After = v.self().VisitSpace(tc.After, p)
+		return tc
+	}
 	return marker
 }
 
-// visitMarkers maps VisitMarker over every entry. Nodes carrying no markers
-// (the vast majority) short-circuit with no allocation; marker-bearing nodes
-// rebuild the slice. We can't skip the rebuild via an == comparison because
-// marker types may be uncomparable (they hold slices/maps), which would
-// panic — and it would buy nothing anyway, since WithMarkers already
-// reallocates the node regardless of marker identity.
+// visitMarkers maps VisitMarker over every entry. Entries are compared with
+// sameMarker rather than ==, since marker types may hold slices or maps and
+// == panics on those.
 func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
-	if len(markers.Entries) == 0 {
+	existing := markers.Entries()
+	if len(existing) == 0 {
 		return markers
 	}
 	// Preserve identity: return the same Markers (same entries slice) when no
 	// entry changed, so the enclosing withX guard (java.MarkersEqual) reports
 	// no change. Only allocate once VisitMarker actually rewrites an entry.
 	var entries []java.Marker
-	for i, m := range markers.Entries {
+	for i, m := range existing {
 		visited := v.self().VisitMarker(m, p)
 		if entries == nil && !sameMarker(visited, m) {
-			entries = make([]java.Marker, len(markers.Entries))
-			copy(entries, markers.Entries[:i])
+			entries = make([]java.Marker, len(existing))
+			copy(entries, existing[:i])
 		}
 		if entries != nil {
 			entries[i] = visited
@@ -1842,7 +2062,7 @@ func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
 	if entries == nil {
 		return markers
 	}
-	return java.Markers{ID: markers.ID, Entries: entries}
+	return java.MakeMarkers(markers.GetID(), entries)
 }
 
 // sameMarker reports whether VisitMarker left an entry unchanged, without an
@@ -1975,15 +2195,35 @@ func visitGoModStatementList(v *GoVisitor, list []java.RightPadded[golang.GoModS
 }
 
 func visitGoSumLineList(v *GoVisitor, list []java.RightPadded[*golang.GoSumLine], p any) []java.RightPadded[*golang.GoSumLine] {
-	result := make([]java.RightPadded[*golang.GoSumLine], 0, len(list))
-	for _, rp := range list {
+	var result []java.RightPadded[*golang.GoSumLine]
+	materialize := func(i int) {
+		if result == nil {
+			result = make([]java.RightPadded[*golang.GoSumLine], 0, len(list))
+			result = append(result, list[:i]...)
+		}
+	}
+	for i := range list {
+		rp := list[i]
 		visited := v.self().Visit(rp.Element, p)
+		newAfter := v.self().VisitSpace(rp.After, p)
 		if visited == nil {
+			materialize(i)
 			continue
 		}
-		rp.Element = visited.(*golang.GoSumLine)
-		rp.After = v.self().VisitSpace(rp.After, p)
+		ne := visited.(*golang.GoSumLine)
+		if ne == rp.Element && java.SpaceEqual(newAfter, rp.After) {
+			if result != nil {
+				result = append(result, rp)
+			}
+			continue
+		}
+		materialize(i)
+		rp.Element = ne
+		rp.After = newAfter
 		result = append(result, rp)
+	}
+	if result == nil {
+		return list
 	}
 	return result
 }

@@ -1,0 +1,23 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "quote-in-dependency-name",
+    },
+    "packages/\"": {
+      "name": "\"",
+    },
+    "packages/pkg1": {
+      "name": "pkg1",
+      "dependencies": {
+        "\"": "*",
+      },
+    },
+  },
+  "packages": {
+    "\"": ["\"@workspace:packages/\""],
+
+    "pkg1": ["pkg1@workspace:packages/pkg1"],
+  }
+}

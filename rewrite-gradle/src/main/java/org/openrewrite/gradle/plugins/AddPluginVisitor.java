@@ -299,6 +299,10 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     private K.CompilationUnit addPluginToKotlinCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+        // a Kotlin script's statements live in the block that is its first statement
+        if (cu.getStatements().isEmpty() || !(cu.getStatements().get(0) instanceof J.Block)) {
+            return cu;
+        }
         // Wildcard type because KTS extension functions have a file-level declaring type, not Project/Settings
         MethodMatcher pluginsMatcher = new MethodMatcher("* plugins(..)", false);
         MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);

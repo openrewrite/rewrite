@@ -2,7 +2,7 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-val antlrGeneration by configurations.creating {
+val antlrGeneration = configurations.create("antlrGeneration") {
     extendsFrom(configurations.implementation.get())
 }
 
@@ -47,7 +47,6 @@ dependencies {
     }
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
-    implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("org.apache.commons:commons-text:latest.release")
 
     testImplementation(project(":rewrite-test"))

@@ -249,6 +249,52 @@ describe("Lock file parsing", () => {
         });
     });
 
+    // Legacy npm lockfileVersion 1 fixture: real entries lifted verbatim from
+    // typicode/json-server@v0.14.0 (the `chalk` dependency and its transitive closure),
+    // exercising a deep chain, a `dev` entry, and nested conflicting versions on real bytes.
+    describe("npm v1 (legacy package-lock.json)", () => {
+        test("should resolve the full graph from a lockfileVersion 1 file", async () => {
+            const marker = await parseAndGetMarker("npm-v1");
+            expect(marker).not.toBeNull();
+            expect(marker!.packageManager).toBe(PackageManager.Npm);
+            expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
+
+            // Direct dependency resolves to its locked version.
+            const chalk = marker!.dependencies.find(d => d.name === "chalk")?.resolved;
+            expect(chalk).toBeDefined();
+            expect(chalk!.version).toBe("2.4.1");
+        });
+
+        test("should resolve a deep transitive dependency", async () => {
+            const marker = await parseAndGetMarker("npm-v1");
+            expect(marker).not.toBeNull();
+
+            // chalk -> ansi-styles -> color-convert -> color-name
+            const chalk = marker!.dependencies.find(d => d.name === "chalk")!.resolved!;
+            const ansiStyles = chalk.dependencies!.find(d => d.name === "ansi-styles")!.resolved!;
+            const colorConvert = ansiStyles.dependencies!.find(d => d.name === "color-convert")!.resolved!;
+            const colorName = colorConvert.dependencies!.find(d => d.name === "color-name")!.resolved!;
+            expect(colorName.version).toBe("1.1.3");
+        });
+
+        test("should resolve nested conflicting versions by node_modules path", async () => {
+            const marker = await parseAndGetMarker("npm-v1");
+            expect(marker).not.toBeNull();
+
+            // The lock file has ansi-styles@3.2.0 at the top level (a `dev` entry) and
+            // ansi-styles@3.2.1 nested under chalk. chalk must resolve to the nested 3.2.1.
+            const chalk = marker!.dependencies.find(d => d.name === "chalk")!.resolved!;
+            const ansiStyles = chalk.dependencies!.find(d => d.name === "ansi-styles")!.resolved!;
+            expect(ansiStyles.version).toBe("3.2.1");
+
+            const ansiStylesVersions = NodeResolutionResultQueries
+                .getAllResolvedVersions(marker!, "ansi-styles")
+                .map(d => d.version)
+                .sort();
+            expect(ansiStylesVersions).toEqual(["3.2.0", "3.2.1"]);
+        });
+    });
+
     describe("bun (bun.lock)", () => {
         test("should parse all dependencies from bun.lock", async () => {
             const marker = await parseAndGetMarker("bun");
@@ -260,6 +306,35 @@ describe("Lock file parsing", () => {
             const marker = await parseAndGetMarker("bun");
             expect(marker).not.toBeNull();
             expect(marker!.packageManager).toBe(PackageManager.Bun);
+        });
+
+        test("should keep the scope of scoped packages, top-level and nested", async () => {
+            const marker = await parseAndGetMarker("bun-scoped");
+            expect(marker).not.toBeNull();
+            const resolved = marker!.resolvedDependencies.map(d => `${d.name}@${d.version}`).sort();
+            expect(resolved).toEqual([
+                "@inquirer/confirm@5.1.21",
+                "@inquirer/core@10.3.2",
+                "@inquirer/core@9.2.1",
+                "is-odd@0.1.2",
+                "is-odd@3.0.1"
+            ]);
+        });
+
+        test("should resolve dependencies nested under a scoped package", async () => {
+            const marker = await parseAndGetMarker("bun-scoped");
+            expect(marker).not.toBeNull();
+
+            const confirm = marker!.dependencies.find(d => d.name === "@inquirer/confirm");
+            expect(confirm?.resolved?.version).toBe("5.1.21");
+
+            // @inquirer/confirm's own is-odd is the copy bun nests under it, not the top-level one
+            const nestedIsOdd = confirm!.resolved!.dependencies!.find(d => d.name === "is-odd");
+            expect(nestedIsOdd?.resolved?.version).toBe("0.1.2");
+
+            // and that copy's @inquirer/core is nested under it in turn
+            const nestedCore = nestedIsOdd!.resolved!.dependencies!.find(d => d.name === "@inquirer/core");
+            expect(nestedCore?.resolved?.version).toBe("9.2.1");
         });
     });
 

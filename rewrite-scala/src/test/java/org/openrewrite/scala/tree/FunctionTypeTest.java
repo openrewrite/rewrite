@@ -93,7 +93,7 @@ class FunctionTypeTest implements RewriteTest {
             """
             val xs: List[A => B] = ???
             """,
-            spec -> spec.afterRecipe(cu -> firstFunctionType(cu))
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
           )
         );
     }
@@ -105,7 +105,7 @@ class FunctionTypeTest implements RewriteTest {
             """
             val f = summon[A => B]
             """,
-            spec -> spec.afterRecipe(cu -> firstFunctionType(cu))
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
           )
         );
     }
@@ -117,7 +117,7 @@ class FunctionTypeTest implements RewriteTest {
             """
             val b = x.isInstanceOf[A => B]
             """,
-            spec -> spec.afterRecipe(cu -> firstFunctionType(cu))
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
           )
         );
     }
@@ -129,7 +129,7 @@ class FunctionTypeTest implements RewriteTest {
             """
             val x: (A => B) { def foo: Int } = ???
             """,
-            spec -> spec.afterRecipe(cu -> firstFunctionType(cu))
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
           )
         );
     }
@@ -141,7 +141,26 @@ class FunctionTypeTest implements RewriteTest {
             """
             given (A => B) = ???
             """,
-            spec -> spec.afterRecipe(cu -> firstFunctionType(cu))
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
+          )
+        );
+    }
+
+    @Test
+    void byNameParameterInFunctionTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def f(g: (=> Int) => Int) = g(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                S.FunctionType ft = firstFunctionType(cu);
+                assertThat(ft.isParenthesized()).isTrue();
+                assertThat(ft.getParameters()).singleElement().isInstanceOf(S.FunctionType.class);
+                assertThat(((J.Identifier) ft.getReturnType()).getSimpleName()).isEqualTo("Int");
+            })
           )
         );
     }

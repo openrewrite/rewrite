@@ -48,7 +48,7 @@ class ReproducibleBuildsTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <properties>
-                  <project.build.outputTimestamp>1980-01-01T00:00:00Z</project.build.outputTimestamp>
+                  <project.build.outputTimestamp>1980-01-01T00:00:02Z</project.build.outputTimestamp>
                   <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
                   <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
                 </properties>

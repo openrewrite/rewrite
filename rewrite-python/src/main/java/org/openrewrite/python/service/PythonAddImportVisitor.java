@@ -24,12 +24,14 @@ import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.python.PythonVisitor;
 import org.openrewrite.python.internal.PythonBuiltins;
+import org.openrewrite.python.marker.Quoted;
 import org.openrewrite.python.tree.Py;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.python.internal.PythonImportNames.aliasName;
 import static org.openrewrite.python.internal.PythonImportNames.canonicalFqn;
@@ -133,11 +135,16 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
         return nameString(imp.getQualid()).equals(expected) && Objects.equals(alias, aliasName(imp));
     }
 
+    /** The name {@code import <module>} binds: `import a.b.c` binds only `a`. */
+    private static String rootPackage(String module) {
+        int dot = module.indexOf('.');
+        return dot < 0 ? module : module.substring(0, dot);
+    }
+
     private boolean isReferenced(Py.CompilationUnit cu) {
-        String target = alias != null ? alias :
-                name != null ? name : module.substring(module.lastIndexOf('.') + 1);
-        AtomicBoolean found = new AtomicBoolean();
-        new PythonVisitor<AtomicBoolean>() {
+        String target = alias != null ? alias : name != null ? name : rootPackage(module);
+        Pattern spelledIn = Pattern.compile("\\b" + Pattern.quote(target) + "\\b");
+        return new PythonVisitor<AtomicBoolean>() {
             // Identifiers inside an import are bindings rather than uses, so neither kind of
             // import statement is descended into (#8409).
             @Override
@@ -150,14 +157,19 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
                 return multi;
             }
 
+            // A quoted identifier is a forward reference, which can name the target within a
+            // larger expression. Spelling it is enough: the Python side resolves it, and this
+            // predicate may only over-approximate.
             @Override
             public J visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
-                if (target.equals(identifier.getSimpleName())) {
+                String simpleName = identifier.getSimpleName();
+                if (target.equals(simpleName) ||
+                        identifier.getMarkers().findFirst(Quoted.class).isPresent() &&
+                                spelledIn.matcher(simpleName).find()) {
                     found.set(true);
                 }
                 return identifier;
             }
-        }.visit(cu, found);
-        return found.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 }

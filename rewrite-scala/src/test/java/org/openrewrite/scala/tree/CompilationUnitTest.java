@@ -16,8 +16,10 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaParser;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -593,4 +595,95 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void semicolonSeparatedTopLevelValues() {
+        rewriteRun(
+            scala(
+                """
+                val a = 1; val b = 2
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTopLevelDefinitions() {
+        rewriteRun(
+            scala(
+                """
+                trait T; class A; object O extends T
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTopLevelImports() {
+        rewriteRun(
+            scala(
+                """
+                import scala.util.Try; import scala.util.Success; class A
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTopLevelStatementsAfterPackage() {
+        rewriteRun(
+            scala(
+                """
+                package p
+
+                class A; class B
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonOnOwnLineBetweenTopLevelStatements() {
+        rewriteRun(
+            scala(
+                """
+                object O
+                ;
+                object P
+                """
+            )
+        );
+    }
+
+    @Test
+    void leadingSemicolonInFile() {
+        rewriteRun(
+            scala(
+                """
+                ; class A
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInBracedPackage() {
+        rewriteRun(
+            scala(
+                """
+                package p { ; class A;; class B; }
+                """
+            )
+        );
+    }
+
+    @Test
+    void withClassesAppendsClassesBeyondTheExistingOnes() {
+        ScalaParser parser = ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build();
+        S.CompilationUnit one = (S.CompilationUnit) parser.parse("class A").toList().getFirst();
+        S.CompilationUnit two = (S.CompilationUnit) parser.parse("class A\nclass B").toList().getFirst();
+
+        S.CompilationUnit cu = one.withClasses(two.getClasses());
+
+        assertThat(cu.printAll()).isEqualTo("class A\nclass B");
+    }
 }

@@ -74,7 +74,7 @@ public sealed class NullSafe : Marker, IRpcCodec<NullSafe>, IEquatable<NullSafe>
     public void RpcSend(NullSafe after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
-        q.GetAndSend(after, m => m.DotPrefix, s => new Rpc.JavaSender().VisitSpace(s, q));
+        q.GetAndSend(after, m => Rpc.JavaSender.SpaceRef(m.DotPrefix), s => new Rpc.JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
     }
 
     public NullSafe RpcReceive(NullSafe before, RpcReceiveQueue q) =>
@@ -1201,13 +1201,13 @@ public sealed class TypeParameters(
     /// Create a TypeParameters wrapper from a JContainer (for RPC sending).
     /// </summary>
     public static TypeParameters FromContainer(JContainer<TypeParameter> container) =>
-        new(Guid.NewGuid(), container.Before, Markers.Empty, [], container.Elements);
+        new(Tree.RandomId(), container.Before, container.Markers, [], container.Elements);
 
     /// <summary>
     /// Convert back to a JContainer (for RPC receiving).
     /// </summary>
     public JContainer<TypeParameter> ToContainer() =>
-        new(Prefix, Params, Markers.Empty);
+        new(Prefix, Params, Markers);
 
     public bool Equals(TypeParameters? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as TypeParameters);

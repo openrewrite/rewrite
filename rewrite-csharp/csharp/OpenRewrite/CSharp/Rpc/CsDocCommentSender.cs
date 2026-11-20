@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Rewrite.Core.Rpc;
 using OpenRewrite.Core.Rpc;
 
 namespace OpenRewrite.CSharp.Rpc;
@@ -32,7 +33,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitDocComment(CsDocComment.DocComment docComment, RpcSendQueue q)
     {
         q.GetAndSend(docComment, d => d.Id);
-        q.GetAndSend(docComment, d => d.Markers);
+        q.GetAndSend(docComment, d => Reference.AsRef(d.Markers));
         q.GetAndSendList(docComment, d => d.Body, b => (object)b.Id, b => Visit(b, q));
         q.GetAndSend(docComment, d => d.Suffix);
         return docComment;
@@ -41,7 +42,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitXmlElement(CsDocComment.XmlElement element, RpcSendQueue q)
     {
         q.GetAndSend(element, e => e.Id);
-        q.GetAndSend(element, e => e.Markers);
+        q.GetAndSend(element, e => Reference.AsRef(e.Markers));
         q.GetAndSend(element, e => e.Name);
         q.GetAndSendList(element, e => e.Attributes, a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(element, e => e.SpaceBeforeClose, s => (object)s.Id, s => Visit(s, q));
@@ -53,7 +54,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitXmlEmptyElement(CsDocComment.XmlEmptyElement element, RpcSendQueue q)
     {
         q.GetAndSend(element, e => e.Id);
-        q.GetAndSend(element, e => e.Markers);
+        q.GetAndSend(element, e => Reference.AsRef(e.Markers));
         q.GetAndSend(element, e => e.Name);
         q.GetAndSendList(element, e => e.Attributes, a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(element, e => e.SpaceBeforeSlashClose, s => (object)s.Id, s => Visit(s, q));
@@ -63,7 +64,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitXmlText(CsDocComment.XmlText text, RpcSendQueue q)
     {
         q.GetAndSend(text, t => t.Id);
-        q.GetAndSend(text, t => t.Markers);
+        q.GetAndSend(text, t => Reference.AsRef(t.Markers));
         q.GetAndSend(text, t => t.Text);
         return text;
     }
@@ -71,7 +72,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitXmlAttribute(CsDocComment.XmlAttribute attribute, RpcSendQueue q)
     {
         q.GetAndSend(attribute, a => a.Id);
-        q.GetAndSend(attribute, a => a.Markers);
+        q.GetAndSend(attribute, a => Reference.AsRef(a.Markers));
         q.GetAndSend(attribute, a => a.Name);
         q.GetAndSendList(attribute, a => a.SpaceBeforeEquals, s => (object)s.Id, s => Visit(s, q));
         q.GetAndSendList(attribute, a => a.Value, v => (object)v.Id, v => Visit(v, q));
@@ -81,7 +82,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitXmlCrefAttribute(CsDocComment.XmlCrefAttribute attribute, RpcSendQueue q)
     {
         q.GetAndSend(attribute, a => a.Id);
-        q.GetAndSend(attribute, a => a.Markers);
+        q.GetAndSend(attribute, a => Reference.AsRef(a.Markers));
         q.GetAndSendList(attribute, a => a.SpaceBeforeEquals, s => (object)s.Id, s => Visit(s, q));
         q.GetAndSendList(attribute, a => a.Value, v => (object)v.Id, v => Visit(v, q));
         q.GetAndSend(attribute, a => a.Reference, r => CsharpVisitorVisit(r, q));
@@ -91,7 +92,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     public override CsDocComment VisitXmlNameAttribute(CsDocComment.XmlNameAttribute attribute, RpcSendQueue q)
     {
         q.GetAndSend(attribute, a => a.Id);
-        q.GetAndSend(attribute, a => a.Markers);
+        q.GetAndSend(attribute, a => Reference.AsRef(a.Markers));
         q.GetAndSendList(attribute, a => a.SpaceBeforeEquals, s => (object)s.Id, s => Visit(s, q));
         q.GetAndSendList(attribute, a => a.Value, v => (object)v.Id, v => Visit(v, q));
         q.GetAndSend(attribute, a => a.ParamName, r => CsharpVisitorVisit(r, q));
@@ -102,7 +103,7 @@ internal class CsDocCommentSender : CsDocCommentVisitor<RpcSendQueue>
     {
         q.GetAndSend(lineBreak, l => l.Id);
         q.GetAndSend(lineBreak, l => l.Margin);
-        q.GetAndSend(lineBreak, l => l.Markers);
+        q.GetAndSend(lineBreak, l => Reference.AsRef(l.Markers));
         return lineBreak;
     }
 }

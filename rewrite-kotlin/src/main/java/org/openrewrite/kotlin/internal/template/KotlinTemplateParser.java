@@ -34,4 +34,14 @@ public class KotlinTemplateParser extends JavaTemplateParser {
                 new KotlinAnnotationTemplateGenerator(imports)
         );
     }
+
+    @Override
+    protected String parameterStub() {
+        return "abstract class Template { abstract fun template(#{}) }";
+    }
+
+    @Override
+    protected String typeParametersStub() {
+        return "class Template<#{}>";
+    }
 }

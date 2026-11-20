@@ -17,12 +17,15 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 
+	"github.com/openrewrite/rewrite/rewrite-go/internal/testrecipes"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -92,6 +95,9 @@ func TestRemoveUnusedImports_KeepsImportReferencedByUnattributedQualifier(t *tes
 	// when RemoveUnusedImports runs after
 	// then the import survives on the lexical qualifier match alone
 	spec := NewRecipeSpec().WithRecipe(&handBuiltCallThenRemoveUnused{})
+	// stripQualifierAttribution swaps in a fresh, un-attributed qualifier that
+	// prints identically, so the tree legitimately differs from the parsed one.
+	spec.CheckUnchangedTreeIdentity = false
 	spec.RewriteRun(t,
 		Golang(`
 			package main
@@ -202,6 +208,83 @@ func TestAddImport_PromotesAliasedImportToGroupedBlock(t *testing.T) {
 	spec.RewriteRun(t, Golang(before, after))
 }
 
+func TestAddImport_PromotesUngroupedLaterDeclaration(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"})
+	before := `
+		package main
+
+		import "fmt"
+		import "os"
+
+		func main() { fmt.Println(os.Args) }
+	`
+	after := `
+		package main
+
+		import "fmt"
+		import (
+			"os"
+			"strings"
+		)
+
+		func main() { fmt.Println(os.Args) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_ClosesPromotedDeclarationBeforeTheNext(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "os"})
+	before := `
+		package main
+
+		import "fmt"
+		import "github.com/x/y"
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+		)
+		import "github.com/x/y"
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_OpensLaterDeclaration(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "os"})
+	before := `
+		package main
+
+		import "github.com/a/b"
+
+		import (
+			"github.com/x/y"
+		)
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import "github.com/a/b"
+
+		import (
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
 func TestAddImport_OnlyIfReferenced_NoOpWhenNotReferenced(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{
 		PackagePath:      "github.com/x/y",
@@ -236,7 +319,7 @@ func TestAddImport_AliasedFormDoesNotMatchRegular(t *testing.T) {
 }
 
 func TestRemoveImport_DeletesMatching(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings", Force: true})
 	before := `
 		package main
 
@@ -257,6 +340,142 @@ func TestRemoveImport_DeletesMatching(t *testing.T) {
 		func main() { fmt.Println(strings.ToUpper("hi")) }
 	`
 	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_KeepsStillReferenced(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				"strings"
+			)
+
+			func main() { fmt.Println(strings.ToUpper("hi")) }
+		`),
+	)
+}
+
+func TestRemoveImport_DeletesUnreferenced(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"strings"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_DeletesUnreferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			s "strings"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_KeepsReferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				s "strings"
+			)
+
+			func main() { fmt.Println(s.ToUpper("hi")) }
+		`),
+	)
+}
+
+func TestRemoveImport_KeepsBlankImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "github.com/x/y"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				_ "github.com/x/y"
+				"fmt"
+			)
+
+			func main() { fmt.Println("hi") }
+		`),
+	)
+}
+
+func TestRemoveImport_ForceDeletesBlankImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "github.com/x/y", Force: true})
+	before := `
+		package main
+
+		import (
+			_ "github.com/x/y"
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_KeepsDotImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "github.com/x/y"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				. "github.com/x/y"
+				"fmt"
+			)
+
+			func main() { fmt.Println("hi") }
+		`),
+	)
 }
 
 func TestRemoveImport_NoOpWhenAbsent(t *testing.T) {
@@ -294,6 +513,46 @@ func TestRemoveUnusedImports_DropsUnreferenced(t *testing.T) {
 		func main() { fmt.Println("hi") }
 	`
 	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_DropsUnreferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			s "strings"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsReferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				s "strings"
+			)
+
+			func main() { fmt.Println(s.ToUpper("hi")) }
+		`),
+	)
 }
 
 func TestRemoveUnusedImports_PreservesBlankImports(t *testing.T) {
@@ -417,4 +676,719 @@ func TestOrderImports_AlphabeticalWithinGroupAndBlankLineBetween(t *testing.T) {
 		}
 	`
 	spec.RewriteRun(t, Golang(before, after))
+}
+
+// Go allows several import declarations; gofmt sorts each on its own, so
+// imports never move between them.
+func TestOrderImports_GroupedDeclarationThenSingle(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	before := `
+		package mocks
+
+		import (
+			"github.com/x/y"
+			"fmt"
+		)
+
+		import mock "github.com/stretchr/testify/mock"
+
+		var _ = fmt.Sprint(y.Hello, mock.Anything)
+	`
+	after := `
+		package mocks
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		import mock "github.com/stretchr/testify/mock"
+
+		var _ = fmt.Sprint(y.Hello, mock.Anything)
+	`
+	spec.RewriteRun(t, Golang(before, after))
+	spec.RewriteRun(t, Golang(after))
+}
+
+func TestOrderImports_SingleThenGroupedDeclaration(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	before := `
+		package mocks
+
+		import "fmt"
+
+		import (
+			"github.com/x/y"
+			"context"
+		)
+
+		var _ = fmt.Sprint(y.Hello, context.TODO)
+	`
+	after := `
+		package mocks
+
+		import "fmt"
+
+		import (
+			"context"
+
+			"github.com/x/y"
+		)
+
+		var _ = fmt.Sprint(y.Hello, context.TODO)
+	`
+	spec.RewriteRun(t, Golang(before, after))
+	spec.RewriteRun(t, Golang(after))
+}
+
+func TestOrderImports_TwoGroupedDeclarations(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	before := `
+		package main
+
+		import (
+			"strings"
+			"fmt"
+		)
+
+		import (
+			"github.com/x/y"
+			"context"
+		)
+
+		var _ = fmt.Sprint(strings.ToUpper, y.Hello, context.TODO)
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"strings"
+		)
+
+		import (
+			"context"
+
+			"github.com/x/y"
+		)
+
+		var _ = fmt.Sprint(strings.ToUpper, y.Hello, context.TODO)
+	`
+	spec.RewriteRun(t, Golang(before, after))
+	spec.RewriteRun(t, Golang(after))
+}
+
+func TestOrderImports_DeclarationsSortedButNotAcross(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import "os"
+
+			import "fmt"
+
+			var _ = fmt.Sprint(os.Args)
+		`),
+	)
+}
+
+func TestRemoveUnusedImports_DropsFirstOfGroupedBlock(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"io/ioutil"
+
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	after := `
+		package main
+
+		import (
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsGroupSeparatorWhenDroppingMiddle(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"io/ioutil"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_OpensNewLeadingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
+	before := `
+		package main
+
+		import (
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_JoinsExistingLeadingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "os"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_JoinsExistingTrailingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "example.com/plainpkg"})
+	before := `
+		package main
+
+		import (
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() { os.Exit(0); y.Hello() }
+	`
+	after := `
+		package main
+
+		import (
+			"os"
+
+			"github.com/x/y"
+			"example.com/plainpkg"
+		)
+
+		func main() { os.Exit(0); y.Hello() }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_OpensNewTrailingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "github.com/x/y"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+		)
+
+		func main() { fmt.Println(os.Args) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(os.Args) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsVersionedPathImportUsedByQualifier(t *testing.T) {
+	// Attribution cannot resolve these paths, so the lexical qualifier is
+	// the only signal keeping the imports.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"github.com/x/y/v2"
+				"gopkg.in/yaml.v3"
+			)
+
+			func f(b []byte, out any) error {
+				y.Hello()
+				return yaml.Unmarshal(b, out)
+			}
+		`),
+	)
+}
+
+func TestRemoveUnusedImports_DropsImportSupersededOnSharedQualifier(t *testing.T) {
+	// The rewrite binds `rand` twice mid-tree, which is what makes the
+	// superseded import contend for the new one's qualifier. Driving the
+	// recipe from compilable source is what puts it in that state — a
+	// hand-written post-rewrite file is invalid Go and binds `rand`
+	// arbitrarily.
+	n := template.Expr("n")
+	r := template.NewRecipe(
+		template.RecipeName("test.RandIntnToIntN"),
+		template.WithDisplayName("Use math/rand/v2"),
+		template.WithBefore(fmt.Sprintf(`rand.Intn(%s)`, n), template.Imports("math/rand")),
+		template.WithAfter(fmt.Sprintf(`rand.IntN(%s)`, n), template.Imports("math/rand/v2"), template.SourceImports("math/rand/v2")),
+		template.WithCaptures(n),
+	)
+
+	spec := NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import "math/rand"
+
+			func pick() int {
+				return rand.Intn(10)
+			}
+		`, `
+			package main
+
+			import (
+				"math/rand/v2"
+			)
+
+			func pick() int {
+				return rand.IntN(10)
+			}
+		`),
+	)
+}
+
+func TestRemoveUnusedImports_KeepsEveryImportWhenNothingIsAttributed(t *testing.T) {
+	// Attribution names none of these paths, so refs is empty, no qualifier
+	// is resolved, and the lexical fallback keeps every import.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"github.com/x/y/v2"
+				"gopkg.in/check.v1"
+				"gopkg.in/yaml.v3"
+			)
+
+			func f(b []byte, out any) error {
+				check.Assert(y.Hello())
+				return yaml.Unmarshal(b, out)
+			}
+		`),
+	)
+}
+
+func TestRemoveUnusedImports_DropsUnreferencedRepoPrefixedPath(t *testing.T) {
+	// `go-yaml` binds `yaml`, which nothing here uses.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"github.com/goccy/go-yaml"
+			"github.com/x/y"
+		)
+
+		func f() {
+			y.Hello()
+		}
+	`
+	after := `
+		package main
+
+		import (
+			"github.com/x/y"
+		)
+
+		func f() {
+			y.Hello()
+		}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsImportUnderRepoPrefixedPath(t *testing.T) {
+	// `github.com/pelletier/go-toml/v2` declares `package toml`.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"github.com/pelletier/go-toml/v2"
+			)
+
+			func Encode(v map[string]any) ([]byte, error) {
+				return toml.Marshal(v)
+			}
+		`),
+	)
+}
+
+type wrapThenRemoveUnused struct {
+	recipe.Base
+}
+
+func (r *wrapThenRemoveUnused) Name() string {
+	return "org.openrewrite.golang.test.WrapThenRemoveUnused"
+}
+func (r *wrapThenRemoveUnused) DisplayName() string { return "Wrap then remove unused" }
+func (r *wrapThenRemoveUnused) Description() string {
+	return "Wraps errors with context, then removes unused imports."
+}
+func (r *wrapThenRemoveUnused) RecipeList() []recipe.Recipe {
+	return []recipe.Recipe{&testrecipes.WrapErrorWithContext{}, &recipes.RemoveUnusedImports{}}
+}
+
+func TestRemoveUnusedImports_KeepsImportAddedByEarlierRecipe(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&wrapThenRemoveUnused{})
+	before := `
+		package main
+
+		import (
+			"errors"
+		)
+
+		func doWork() error {
+			if err := errors.New("boom"); err != nil {
+				return err
+			}
+			return nil
+		}
+	`
+	after := `
+		package main
+
+		import (
+			"errors"
+			"fmt"
+		)
+
+		func doWork() error {
+			if err := errors.New("boom"); err != nil {
+				return fmt.Errorf("doWork: %w", err)
+			}
+			return nil
+		}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestImportEditing_RemoveFirstSingle(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import "fmt"
+import "os"
+`, `package main
+
+import "os"
+`))
+}
+
+func TestImportEditing_RemoveFirstGrouped(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt"
+)
+import "os"
+`, `package main
+
+import "os"
+`))
+}
+
+func TestImportEditing_RemoveLaterHead(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import "os"
+import (
+ "fmt"
+ "strings"
+)
+`, `package main
+
+import "os"
+import (
+ "strings"
+)
+`))
+}
+
+func TestImportEditing_RemoveGroupTail(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "os"
+ "fmt"
+)
+import "strings"
+`, `package main
+
+import (
+ "os"
+)
+import "strings"
+`))
+}
+
+func TestImportEditing_RemoveLastSingle(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import "os"
+import "fmt"
+`, `package main
+
+import "os"
+`))
+}
+
+func TestImportEditing_RemoveMiddle(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "fmt", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "os"
+)
+import "fmt"
+import "strings"
+`, `package main
+
+import (
+ "os"
+)
+import "strings"
+`))
+}
+
+func TestImportEditing_Cgo(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"}).RewriteRun(t, Golang(`package main
+
+/*
+#include <stdlib.h>
+*/
+import "C"
+`, `package main
+
+/*
+#include <stdlib.h>
+*/
+import "C"
+
+import "fmt"
+`))
+}
+
+func TestImportEditing_OrderComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.OrderImports{}).RewriteRun(t, Golang(`package main
+
+import (
+ "strings" // strings comment
+ "fmt" // fmt comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+ "strings" // strings comment
+)
+`))
+}
+
+func TestImportEditing_AddComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt" // fmt comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+ "strings"
+)
+`))
+}
+
+func TestImportEditing_RemoveUnusedDeclarations(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt"
+)
+import (
+ "os"
+ "strings"
+)
+
+var _ = strings.TrimSpace
+`, `package main
+
+import (
+ "strings"
+)
+
+var _ = strings.TrimSpace
+`))
+}
+
+func TestImportEditing_RemoveComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings", Force: true}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt" // fmt comment
+ "strings" // strings comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+)
+`))
+}
+
+func TestImportEditing_AddWithCgoLast(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import "fmt"
+
+/* cgo preamble */
+import "C"
+`, `package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+/* cgo preamble */
+import "C"
+`))
+}
+
+func TestImportEditing_AddWithCgoFirst(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+/* cgo preamble */
+import "C"
+
+import "fmt"
+`, `package main
+
+/* cgo preamble */
+import "C"
+
+import (
+	"fmt"
+	"strings"
+)
+`))
+}
+
+func TestImportEditing_OrderLeadingAndTrailingComments(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.OrderImports{}).RewriteRun(t, Golang(`package main
+
+import (
+ // strings docs
+ "strings" // strings comment
+ // fmt docs
+ "fmt" // fmt comment
+)
+`, `package main
+
+import (
+ // fmt docs
+ "fmt" // fmt comment
+ // strings docs
+ "strings" // strings comment
+)
+`))
+}
+
+func TestImportEditing_ClosingComment(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import (
+ "fmt" // fmt comment
+ // closing comment
+)
+`, `package main
+
+import (
+ "fmt" // fmt comment
+ "strings"
+ // closing comment
+)
+`))
+}
+
+func TestImportEditing_PromoteComment(t *testing.T) {
+	NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"}).RewriteRun(t, Golang(`package main
+
+import "fmt" // fmt comment
+`, `package main
+
+import (
+	"fmt" // fmt comment
+	"strings"
+)
+`))
 }

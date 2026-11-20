@@ -34,7 +34,6 @@ import org.openrewrite.kotlin.tree.K;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -98,14 +97,15 @@ public class AddSettingsPluginRepository extends Recipe {
 
                 List<Statement> statements = k.getStatements();
 
+                // a Kotlin script's statements live in the block that is its first statement
                 if (statements.isEmpty()) {
-                    statements = new ArrayList<>(pluginManagement.getStatements());
+                    statements = singletonList(pluginManagement);
                 } else {
                     Statement blockStatement = statements.get(0);
                     if (blockStatement instanceof J.Block) {
                         J.Block b = (J.Block) blockStatement;
                         if (b.getStatements().isEmpty()) {
-                            statements = new ArrayList<>(pluginManagement.getStatements());
+                            statements = singletonList(b.withStatements(pluginManagement.getStatements()));
                         } else {
                             List<Statement> updated = addPluginManagementRepos(b.getStatements(), pluginManagement);
                             if (updated != b.getStatements()) {

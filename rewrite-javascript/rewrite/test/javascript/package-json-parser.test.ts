@@ -20,6 +20,7 @@ import {
     NpmrcScope,
     packageJson,
     PackageJsonParser,
+    PackageManager,
     packageLockJson,
     readNpmrcConfigs,
     typescript
@@ -31,6 +32,96 @@ import * as fs from "fs";
 import * as path from "path";
 
 describe("PackageJsonParser", () => {
+
+    test("npm workspace dependencies resolve from their owning member", async () => {
+        await withDir(async (repo) => {
+            const write = (file: string, value: object) => {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), JSON.stringify(value));
+            };
+            write("package.json", {name: "root", workspaces: ["packages/*"]});
+            write("packages/appium/package.json", {name: "appium", dependencies: {semver: "7.8.6"}});
+            write("package-lock.json", {lockfileVersion: 3, packages: {
+                "": {name: "root"},
+                "packages/appium": {name: "appium", version: "1.0.0", dependencies: {semver: "7.8.6"}},
+                "node_modules/appium": {resolved: "packages/appium", link: true},
+                "node_modules/semver": {version: "7.8.5"},
+                "packages/appium/node_modules/semver": {version: "7.8.6"}
+            }});
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            for await (const result of parser.parse(path.join(repo.path, "packages/appium/package.json"))) {
+                const marker = findNodeResolutionResult(result as Json.Document)!;
+                expect(marker.dependencies[0].resolved?.version).toBe("7.8.6");
+            }
+        }, {unsafeCleanup: true});
+    });
+
+    test.each(["app", "nested/app"])("independent lock root %s is separate from marker path", async (project) => {
+        await withDir(async (repo) => {
+            const write = (file: string, value: object) => {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), JSON.stringify(value));
+            };
+            write("package.json", {name: "outer"});
+            write("package-lock.json", {lockfileVersion: 3, packages: {"node_modules/semver": {version: "6.0.0"}}});
+            write(`${project}/package.json`, {name: "independent", dependencies: {semver: "*"}});
+            write(`${project}/package-lock.json`, {lockfileVersion: 3, packages: {
+                "node_modules/semver": {version: "7.8.5"},
+                // This is a different nested directory inside the independent project.
+                [`${project}/node_modules/semver`]: {version: "7.8.6"}
+            }});
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(repo.path, `${project}/package.json`))) {
+                docs.push(result as Json.Document);
+            }
+            expect(docs).toHaveLength(1);
+            const marker = findNodeResolutionResult(docs[0])!;
+            expect(marker.path).toBe(`${project}/package.json`);
+            expect(marker.dependencies[0].resolved?.version).toBe("7.8.5");
+        }, {unsafeCleanup: true});
+    });
+
+    test("npm nearest workspace ancestor, scoped dependencies and links retain target context", async () => {
+        await withDir(async (repo) => {
+            const write = (file: string, value: object) => {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), JSON.stringify(value));
+            };
+            write("package.json", {name: "root", workspaces: ["packages/**"], dependencies: {"@local/member": "*"}});
+            write("packages/group/member/package.json", {name: "@local/member", version: "1.0.0",
+                dependencies: {"@scope/dep": "*", child: "*"}, devDependencies: {"@scope/dep": "*"},
+                peerDependencies: {"@scope/dep": "*"}, optionalDependencies: {"@scope/dep": "*"},
+                bundledDependencies: ["@scope/dep"]});
+            write("package-lock.json", {lockfileVersion: 3, packages: {
+                "node_modules/@scope/dep": {version: "1.0.0"},
+                "packages/group/node_modules/@scope/dep": {version: "2.0.0"},
+                "packages/group/member": {version: "1.0.0",
+                    dependencies: {"@scope/dep": "*", child: "*"}},
+                "node_modules/@local/member": {link: true, resolved: "packages/group/member"},
+                "packages/group/member/node_modules/child": {version: "1.0.0", dependencies: {"@scope/dep": "*", "@local/member": "*"}},
+                "packages/group/member/node_modules/child/node_modules/@scope/dep": {version: "3.0.0"}
+            }});
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(repo.path, "package.json"),
+                path.join(repo.path, "packages/group/member/package.json"))) {
+                docs.push(result as Json.Document);
+            }
+            expect(docs).toHaveLength(2);
+            const root = findNodeResolutionResult(docs[0])!;
+            const member = findNodeResolutionResult(docs[1])!;
+            expect(root.dependencies[0].resolved?.name).toBe("@local/member");
+            expect(root.dependencies[0].resolved?.dependencies?.find(d => d.name === "@scope/dep")?.resolved?.version).toBe("2.0.0");
+            for (const deps of [member.dependencies, member.devDependencies, member.peerDependencies,
+                member.optionalDependencies, member.bundledDependencies]) {
+                expect(deps.find(d => d.name === "@scope/dep")?.resolved?.version).toBe("2.0.0");
+            }
+            const child = member.dependencies.find(d => d.name === "child")!.resolved!;
+            expect(child.dependencies?.find(d => d.name === "@scope/dep")?.resolved?.version).toBe("3.0.0");
+            expect(child.dependencies?.find(d => d.name === "@local/member")?.resolved?.name).toBe("@local/member");
+        }, {unsafeCleanup: true});
+    });
 
     test("should parse package.json and create NodeResolutionResult marker", async () => {
         const spec = new RecipeSpec();
@@ -527,6 +618,81 @@ empty-value=
             const lodashDep = marker!.dependencies.find(d => d.name === "lodash");
             expect(lodashDep?.resolved).toBeDefined();
             expect(lodashDep!.resolved!.version).toBe("4.17.21");
+        }, {unsafeCleanup: true});
+    });
+
+    test("a workspace listed by its path is a member, as one a glob matches is", async () => {
+        await withDir(async (rootDir) => {
+            const write = (rel: string, content: object) => {
+                fs.mkdirSync(path.join(rootDir.path, path.dirname(rel)), {recursive: true});
+                fs.writeFileSync(path.join(rootDir.path, rel), JSON.stringify(content));
+            };
+            write("package.json", {name: "root", workspaces: ["packages/ui", "apps/*", "apps/web"]});
+            write("packages/ui/package.json", {name: "ui"});
+            write("packages/ui/src/package.json", {name: "not-a-member"});
+            write("apps/web/package.json", {name: "web"});
+
+            const parser = new PackageJsonParser({relativeTo: rootDir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(rootDir.path, "package.json"))) {
+                results.push(result as Json.Document);
+            }
+
+            const marker = findNodeResolutionResult(results[0]);
+            expect([...marker!.workspacePackagePaths!].sort()).toEqual([
+                path.normalize("apps/web/package.json"),
+                path.normalize("packages/ui/package.json")
+            ]);
+        }, {unsafeCleanup: true});
+    });
+
+    test("a workspace member with installed node_modules takes its workspace's package manager", async () => {
+        await withDir(async (rootDir) => {
+            const write = (rel: string, content: object | string) => {
+                fs.mkdirSync(path.join(rootDir.path, path.dirname(rel)), {recursive: true});
+                fs.writeFileSync(path.join(rootDir.path, rel),
+                    typeof content === "string" ? content : JSON.stringify(content));
+            };
+            write("package.json", {name: "root", private: true, workspaces: ["packages/*"]});
+            write("yarn.lock", "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n" +
+                "# yarn lockfile v1\n\n\nms@2.1.3:\n  version \"2.1.3\"\n" +
+                "  resolved \"https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2\"\n");
+            write("packages/core/package.json", {name: "core", version: "1.0.0", dependencies: {ms: "2.1.3"}});
+            // what an install leaves beside a member, which has no lock of its own
+            write("packages/core/node_modules/ms/package.json", {name: "ms", version: "2.1.3"});
+            write("packages/bare/package.json", {name: "bare", version: "1.0.0"});
+
+            const parser = new PackageJsonParser({relativeTo: rootDir.path});
+            const markers = [];
+            for await (const result of parser.parse(
+                path.join(rootDir.path, "packages/core/package.json"),
+                path.join(rootDir.path, "packages/bare/package.json"))) {
+                markers.push(findNodeResolutionResult(result as Json.Document));
+            }
+
+            expect(markers.map(marker => marker!.packageManager))
+                .toEqual([PackageManager.YarnClassic, PackageManager.YarnClassic]);
+        }, {unsafeCleanup: true});
+    });
+
+    test("node_modules without a lock file anywhere above are npm's", async () => {
+        await withDir(async (rootDir) => {
+            const write = (rel: string, content: object) => {
+                fs.mkdirSync(path.join(rootDir.path, path.dirname(rel)), {recursive: true});
+                fs.writeFileSync(path.join(rootDir.path, rel), JSON.stringify(content));
+            };
+            write("app/package.json", {name: "app", version: "1.0.0", dependencies: {ms: "2.1.3"}});
+            write("app/node_modules/ms/package.json", {name: "ms", version: "2.1.3"});
+
+            const parser = new PackageJsonParser({relativeTo: rootDir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(rootDir.path, "app/package.json"))) {
+                results.push(result as Json.Document);
+            }
+
+            const marker = findNodeResolutionResult(results[0]);
+            expect(marker!.packageManager).toBe(PackageManager.Npm);
+            expect(marker!.dependencies.find(d => d.name === "ms")?.resolved?.version).toBe("2.1.3");
         }, {unsafeCleanup: true});
     });
 

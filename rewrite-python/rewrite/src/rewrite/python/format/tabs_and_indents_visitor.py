@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sys
+import ast
 import textwrap
 from enum import Enum, auto
 from typing import TypeVar, Optional, cast, List
@@ -11,13 +11,13 @@ from rewrite.java.tree import (
     JRightPadded, JLeftPadded, JContainer, Block, ArrayDimension,
     ClassDeclaration, Empty, MethodDeclaration, MethodInvocation,
     FieldAccess, Identifier, Lambda, NewArray, Annotation, Literal,
-    If, Binary, JavaSourceFile,
+    If, Binary, JavaSourceFile, ParameterizedType, TypeParameters,
 )
-from rewrite.java.markers import TrailingComma
+from rewrite.java.markers import OmitParentheses, TrailingComma
 from rewrite.python import (
     PythonVisitor, TabsAndIndentsStyle, DictLiteral, CollectionLiteral,
     ExpressionStatement, OtherStyle, IntelliJ, ComprehensionExpression, PyComment,
-    TrailingElseWrapper, Binary as PyBinary,
+    TrailingElseWrapper, Binary as PyBinary, MultiImport,
 )
 from rewrite.tree import Tree
 from rewrite.visitor import P, T, Cursor
@@ -34,13 +34,19 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         CONTINUATION_INDENT = auto()
 
     def __init__(self, style: TabsAndIndentsStyle, other: OtherStyle = IntelliJ.other(),
-                 stop_after: Optional[Tree] = None):
+                 stop_after: Optional[Tree] = None, keep_indent: bool = False):
+        """With ``keep_indent``, a tree visited with a parent cursor keeps the indentation of the line it starts
+        and indents its other lines from there, as a tree that took the place of another should."""
         self._stop_after = stop_after
         self._style = style
         self._other = other
         self._stop = False
+        self._keep_indent = keep_indent
+        self._keeps_next_indent = False
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[J]:
+        if self._stop:
+            return cast(Optional[J], tree)
         if parent is not None:
             self._cursor = parent
             if tree is None:
@@ -67,14 +73,19 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 if isinstance(next_parent, J):
                     self.pre_visit(next_parent, p)
                     break
+            self._keeps_next_indent = self._keep_indent
 
         return super().visit(tree, p)
 
     def pre_visit(self, tree: T, p: P) -> Optional[T]:
-        if isinstance(tree, (JavaSourceFile, ArrayDimension, ClassDeclaration)):
+        if isinstance(tree, (JavaSourceFile, ClassDeclaration)) or (
+                _subscript_tuple(tree, self.cursor) and '\n' in cast(J, tree).prefix.last_whitespace):
             self.cursor.put_message("indent_type", self.IndentType.ALIGN)
-        elif isinstance(tree, (Block, If)):
+        elif isinstance(tree, (Block, If, ArrayDimension)):
             self.cursor.put_message("indent_type", self.IndentType.INDENT)
+        elif isinstance(tree, TypeParameters):
+            self.cursor.put_message("indent_type", self.IndentType.CONTINUATION_INDENT
+                if self._other.use_continuation_indent.method_declaration_parameters else self.IndentType.INDENT)
         elif isinstance(tree, (DictLiteral, CollectionLiteral, NewArray, ComprehensionExpression)):
             self.cursor.put_message("indent_type", self.IndentType.CONTINUATION_INDENT
                 if self._other.use_continuation_indent.collections_and_comprehensions else self.IndentType.INDENT)
@@ -103,6 +114,13 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         if space is None:
             return space  # ty: ignore[invalid-return-type]
 
+        if self._keeps_next_indent:
+            # Every visit method visits its node's prefix first, so this is the prefix of the tree visited.
+            self._keeps_next_indent = False
+            if '\n' in space.last_whitespace:
+                self.cursor.put_message("last_indent", self.find_indent(space))
+                return space
+
         space_context = self.cursor.get_nearest_message("space_context")
         parent = self.cursor.parent
         align_to_annotation = False
@@ -121,7 +139,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 isinstance(self.cursor.parent_tree_cursor().value, JavaSourceFile)):
             space_context = "compilation_unit_prefix"
 
-        indent = cast(int, self.cursor.get_nearest_message("last_indent")) or 0
+        indent = cast(int, self._indent_origin().get_nearest_message("last_indent")) or 0
         indent_type = self.cursor.parent_or_throw.get_nearest_message("indent_type") or self.IndentType.ALIGN
 
         if not space.comments and '\n' not in space.last_whitespace or parent is None:
@@ -153,6 +171,19 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             self.cursor.put_message("last_indent", indent)
 
         return s
+
+    def _indent_origin(self) -> Cursor:
+        """The cursor that the cursor's tree takes its indent from.
+        The literals of an implicit concatenation all indent from its outermost node, however the parser nests them."""
+        origin = self.cursor
+        cursor = origin.parent
+        while cursor is not None:
+            if isinstance(cursor.value, PyBinary) and cursor.value.operator == PyBinary.Type.StringConcatenation:
+                origin = cursor
+            elif isinstance(cursor.value, Tree):
+                break
+            cursor = cursor.parent
+        return origin
 
     def visit_right_padded(self, right: Optional[JRightPadded], p: P) -> Optional[JRightPadded]:
         if right is None:
@@ -211,10 +242,6 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     if not trailing_comma and args.padding.elements[-1] is right:
                         self.cursor.parent_or_throw.put_message("indent_type", self.IndentType.ALIGN)
                     after = self.visit_space(right.after, p)
-                    if trailing_comma:
-                        self.cursor.parent_or_throw.put_message("indent_type", self.IndentType.ALIGN)
-                        trailing_comma = trailing_comma.replace(suffix=self.visit_space(trailing_comma.suffix, p))
-                        right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: trailing_comma))
 
                 elif rp_context is not None:
                     elem = self.visit_and_cast(elem, J, p)
@@ -257,6 +284,17 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 else:
                     elem = self.visit_and_cast(elem, J, p)
                     after = self.visit_space(right.after, p)
+
+            closing = self._closing_column(right, indent)
+            if closing is not None and trailing_comma:
+                # After a trailing comma, the line break before the closing bracket is the comma's.
+                comma = trailing_comma.replace(suffix=self._closing(trailing_comma.suffix, elem, closing))
+                right = right.replace(markers=right.markers.compute_by_type(TrailingComma, lambda _t: comma))
+            elif closing is not None:
+                last = elem
+                if isinstance(last, CollectionLiteral) and last.padding.elements.markers.find_first(OmitParentheses):
+                    last = last.elements[-1]
+                after = self._closing(right.after, last, closing)
 
             t = cast(T, elem)
         else:
@@ -490,6 +528,25 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             parens = parens.padding.replace(tree=tree_rp.replace(element=elem, after=after))
         return parens
 
+    def visit_comprehension_expression(self, comp: ComprehensionExpression, p: P) -> J:
+        comp = comp.replace(prefix=self.visit_space(comp.prefix, p))
+        temp_expr = self.visit_expression(comp, p)
+        if not isinstance(temp_expr, ComprehensionExpression):
+            return temp_expr
+        comp = temp_expr
+        comp = comp.replace(markers=self.visit_markers(comp.markers, p))
+        comp = comp.replace(result=self.visit_and_cast(comp.result, j.Expression, p))
+        comp = comp.replace(clauses=list_map(lambda c: self.visit(c, p), comp.clauses))
+        if '\n' in comp.suffix.last_whitespace:
+            # The closing bracket aligns with the line that opened it, as for a parenthesis.
+            indent = cast(int, self.cursor.parent_or_throw.get_nearest_message("last_indent")) or 0
+            comp = comp.replace(suffix=self._indent_to(comp.suffix, indent))
+        else:
+            comp = comp.replace(suffix=self.visit_space(comp.suffix, p))
+        if self._visits_types:
+            comp = comp.replace(_type=self.visit_type(comp.type, p))
+        return comp
+
     def visit_binary(self, binary: Binary, p: P) -> J:
         if self.cursor.first_enclosing(j.Parentheses) is not None:
             # Inside parentheses: operator before spaces align to same indent as first line
@@ -554,6 +611,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     break
         if line_start is None:
             return -1
+        tab_size = self._style.tab_size
 
         class _ColumnCounter(PrintOutputCapture):
             def __init__(self):
@@ -564,7 +622,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             def append(self, text):
                 if text and not self.found:
                     for ch in text:
-                        self.col = 0 if ch == '\n' else self.col + 1
+                        self.col = 0 if ch == '\n' else self.col + (tab_size if ch == '\t' else 1)
                 return self
 
         class _Printer(PythonPrinter):
@@ -615,6 +673,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             return -1
 
         select = method.select
+        tab_size = self._style.tab_size
 
         class _ColumnCounter(PrintOutputCapture):
             def __init__(self):
@@ -625,7 +684,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             def append(self, text):
                 if text and not self.found:
                     for ch in text:
-                        self.col = 0 if ch == '\n' else self.col + 1
+                        self.col = 0 if ch == '\n' else self.col + (tab_size if ch == '\t' else 1)
                 return self
 
         class _Printer(PythonPrinter):
@@ -667,8 +726,9 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             stm = cast(ExpressionStatement, super().visit_expression_statement(expr_stmt, p))
             literal = cast(Literal, stm.expression)
             shift = len(stm.prefix.last_whitespace.split("\n")[-1]) - prefix_before
-            return stm.replace(expression=
-                literal.replace(value_source=textwrap.indent(str(literal.value_source), shift * " ")[shift:]))
+            source = _shifted(str(literal.value_source), shift)
+            return stm.replace(expression=literal.replace(value_source=source,
+                                                          value=_string_value(source, literal.value)))
 
         return super().visit_expression_statement(expr_stmt, p)
 
@@ -709,6 +769,52 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 grandparent.put_message("last_indent", indent)
                 grandparent.put_message("chained_indent", indent)
         return elem, after
+
+    def _closing_column(self, right: JRightPadded, indent: int) -> Optional[int]:
+        """The column of the bracket that closes the list ``right`` ends, or None when no bracket follows ``right``. A
+        list without brackets, as at the end of `x = 1,`, leaves the line break after its trailing comma to the next
+        statement, though the comma holds it. A tuple without parentheses in a subscript closes with the `]`."""
+        holder = self.cursor.parent_or_throw.value
+        if isinstance(holder, ArrayDimension):
+            return indent
+        if isinstance(holder, TypeParameters):
+            return indent if holder.padding.type_parameters[-1] is right else None
+        if not isinstance(holder, JContainer) or holder.padding.elements[-1] is not right:
+            return None
+        owner = self.cursor.parent_tree_cursor()
+        if holder.markers.find_first(OmitParentheses) is not None:
+            if _subscript_tuple(owner.value, owner):
+                return cast(int, owner.parent_or_throw.get_nearest_message("last_indent")) or 0
+            return None
+        if isinstance(owner.value, MultiImport):
+            return indent if owner.value.parenthesized else None
+        if isinstance(owner.value, (MethodInvocation, Annotation, MethodDeclaration, ClassDeclaration, DictLiteral,
+                                    CollectionLiteral, ParameterizedType, j.Try)):
+            return indent
+        return None
+
+    def _closing(self, space: Space, last: J, column: int) -> Space:
+        """``space``, running from ``last``, a bracket's last element, to the closing bracket, with the bracket at
+        ``column``. A comment line takes the column of ``last`` when ``last`` starts a line, and otherwise moves as
+        far as the bracket does, but no further left than the bracket."""
+        if not space.comments:
+            return self._indent_to(space, column)
+        final = len(space.comments) - 1
+        closing = space.comments[final].suffix
+        shift = column - self._get_length_of_whitespace(closing) if '\n' in closing else 0
+        element_column = self.find_indent(last.prefix) if '\n' in last.prefix.last_whitespace else None
+
+        def line(whitespace: str, to_column: Optional[int]) -> str:
+            if '\n' not in whitespace:
+                return whitespace
+            current = self._get_length_of_whitespace(whitespace)
+            target = max(current + shift, column) if to_column is None else to_column
+            return self._indent(whitespace, target - current)
+
+        return space.replace(
+            whitespace=line(space.whitespace, element_column),
+            comments=list_map(lambda c, i: c.replace(suffix=line(c.suffix, column if i == final else element_column)),
+                              space.comments))
 
     def _indent_to(self, space: Space, column: int, context: Optional[str] = None) -> Space:
         s = space
@@ -786,22 +892,17 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         return self._shift(whitespace, shift)
 
     def _shift(self, text: str, shift: int) -> str:
-        tab_indent = self._style.tab_size
-        if not self._style.use_tab_character:
-            tab_indent = sys.maxsize
-
+        if shift == 0:
+            return text
+        if self._style.use_tab_character:
+            # By columns, since a line that aligns may hold spaces after its tabs
+            head, newline, indent = text.rpartition('\n')
+            column = max(self._get_length_of_whitespace(indent) + shift, 0)
+            return head + newline + '\t' * (column // self._style.tab_size) + ' ' * (column % self._style.tab_size)
         if shift > 0:
-            text += '\t' * (shift // tab_indent)
-            text += ' ' * (shift % tab_indent)
-        else:
-            if self._style.use_tab_character:
-                len_text = len(text) + (shift // tab_indent)
-            else:
-                len_text = len(text) + shift
-            if len_text >= 0:
-                text = text[:len_text]
-
-        return text
+            return text + ' ' * shift
+        len_text = len(text) + shift
+        return text[:len_text] if len_text >= 0 else text
 
     def find_indent(self, space: Space) -> int:
         return self._get_length_of_whitespace(space.indent)
@@ -815,3 +916,30 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             if c in ('\n', '\r'):
                 length = 0
         return length
+
+
+def _subscript_tuple(tree: Tree, cursor: Cursor) -> bool:
+    """Whether ``tree``, on ``cursor``'s path, is a tuple without parentheses that a subscript's brackets hold."""
+    if not isinstance(tree, CollectionLiteral) or tree.padding.elements.markers.find_first(OmitParentheses) is None:
+        return False
+    own: Optional[Cursor] = cursor
+    while own is not None and own.value is not tree:
+        own = own.parent
+    return own is not None and isinstance(own.parent_tree_cursor().value, ArrayDimension)
+
+
+def _shifted(source: str, shift: int) -> str:
+    """``source`` with each line after the first moved ``shift`` columns, to the left when ``shift`` is negative."""
+    if shift >= 0:
+        return textwrap.indent(source, shift * " ")[shift:]
+    first, *rest = source.split("\n")
+    return "\n".join([first, *(line[min(-shift, len(line) - len(line.lstrip(" "))):] for line in rest)])
+
+
+def _string_value(source: str, value: object) -> object:
+    """The string a re-indented docstring's ``source`` now spells, which the parser would read, or ``value``."""
+    try:
+        spelled = ast.literal_eval(source)
+    except (SyntaxError, ValueError):
+        return value
+    return spelled if isinstance(spelled, str) else value

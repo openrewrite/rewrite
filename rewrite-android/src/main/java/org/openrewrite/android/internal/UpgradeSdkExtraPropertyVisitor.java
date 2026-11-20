@@ -23,6 +23,8 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.util.Set;
 
+import static java.util.Collections.singletonList;
+
 /**
  * Rewrites extra-property declarations whose values back an SDK assignment.
  * Handles both DSL shapes:
@@ -117,7 +119,7 @@ public class UpgradeSdkExtraPropertyVisitor extends JavaIsoVisitor<ExecutionCont
                 return namedVar;
             }
             J.Literal newLit = lit.withValue(newValue).withValueSource(String.valueOf(newValue));
-            return namedVar.withInitializer(mi.withArguments(java.util.Collections.singletonList(newLit)));
+            return namedVar.withInitializer(mi.withArguments(singletonList(newLit)));
         }));
     }
 

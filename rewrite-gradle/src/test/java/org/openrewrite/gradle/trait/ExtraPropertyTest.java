@@ -22,6 +22,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class ExtraPropertyTest implements RewriteTest {
 
@@ -247,6 +248,27 @@ class ExtraPropertyTest implements RewriteTest {
             """
               /*~~>*/ext['jackson.version'] = "2.13.3"
               ext['guava.version'] = "30.0-jre"
+              """
+          )
+        );
+    }
+
+    @Test
+    void updatesKotlinExtraSubscriptAccess() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new ExtraProperty.Matcher()
+            .propertyName("jackson.version")
+            .asVisitor((prop, ctx) -> prop.withValue("2.15.0").getTree()))),
+          buildGradleKts(
+            """
+              extra["jackson.version"] = "2.13.3"
+              extra["guava.version"] = "30.0-jre"
+              extra.set("guava.version", "30.0-jre")
+              """,
+            """
+              extra["jackson.version"] = "2.15.0"
+              extra["guava.version"] = "30.0-jre"
+              extra.set("guava.version", "30.0-jre")
               """
           )
         );

@@ -27,11 +27,12 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Upgrade the Android Gradle Plugin (AGP) version.
@@ -101,7 +102,7 @@ public class UpgradeAndroidGradlePluginVersion extends Recipe {
         // Compose UpgradeDependencyVersion for the buildscript classpath form. This delegates
         // all of the version-variable / version-catalog / gradle.properties resolution to the
         // upstream recipe; no need to reimplement it here.
-        return Collections.singletonList(
+        return singletonList(
                 new UpgradeDependencyVersion(
                         "com.android.tools.build",
                         "gradle",
@@ -176,7 +177,7 @@ public class UpgradeAndroidGradlePluginVersion extends Recipe {
                     if (comparator == null) {
                         return m;
                     }
-                    Optional<String> upgrade = comparator.upgrade(currentVersion, Collections.singletonList(configuredNewVersion));
+                    Optional<String> upgrade = comparator.upgrade(currentVersion, singletonList(configuredNewVersion));
                     if (!upgrade.isPresent()) {
                         return m;
                     }
@@ -187,7 +188,7 @@ public class UpgradeAndroidGradlePluginVersion extends Recipe {
                     String src = versionLit.getValueSource();
                     String quote = src == null || src.isEmpty() ? "\"" : src.substring(0, 1);
                     J.Literal newLit = versionLit.withValue(selectedVersion).withValueSource(quote + selectedVersion + quote);
-                    return m.withArguments(Collections.singletonList(newLit));
+                    return m.withArguments(singletonList(newLit));
                 }
                 return m;
             } finally {

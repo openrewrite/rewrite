@@ -16,10 +16,10 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PipfileParserTest {
@@ -68,10 +68,10 @@ class PipfileParserTest {
         PipfileParser parser = new PipfileParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("Pipfile"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -116,10 +116,10 @@ class PipfileParserTest {
         PipfileParser parser = new PipfileParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("Pipfile"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -130,5 +130,20 @@ class PipfileParserTest {
         assertThat(marker.getResolvedDependencies()).isEmpty();
         // No [[source]] blocks means no source indexes on the marker.
         assertThat(marker.getSourceIndexes()).isNull();
+    }
+
+    @Test
+    void pythonFullVersionIsRequiresPythonWithoutPythonVersion() {
+        Toml.Document pipfile = (Toml.Document) new PipfileParser().parse("""
+          [packages]
+          requests = "*"
+
+          [requires]
+          python_full_version = "3.11.4"
+          """).findFirst().orElseThrow();
+
+        PythonResolutionResult marker = PipfileParser.createMarker(pipfile);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getRequiresPython()).isEqualTo("3.11.4");
     }
 }

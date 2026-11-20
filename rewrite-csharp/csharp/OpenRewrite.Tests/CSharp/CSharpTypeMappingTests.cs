@@ -42,12 +42,11 @@ public class CSharpTypeMappingTests : RewriteTest
         """,
         path: "__GlobalUsings__.g.cs");
 
-    private static CompilationUnit ParseWithSemanticModel(string code,
+    private static async Task<CompilationUnit> ParseWithSemanticModelAsync(string code,
         ReferenceAssemblies? referenceAssemblies = null)
     {
-        var refs = (referenceAssemblies ?? Assemblies.Net90)
-            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
-            .GetAwaiter().GetResult();
+        var refs = await (referenceAssemblies ?? Assemblies.Net90)
+            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
         var syntaxTree = CSharpSyntaxTree.ParseText(code, path: "source.cs");
         var compilation = CSharpCompilation.Create("TestCompilation")
             .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
@@ -83,11 +82,11 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void GenericClassField_HasParameterizedTypeWithGenericTypeVariables()
+    public async Task GenericClassField_HasParameterizedTypeWithGenericTypeVariables()
     {
         // A class with type parameters and a field whose type references them.
         // The field's type should be Parameterized with GenericTypeVariable entries.
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Collections.Generic;
             class Foo<TKey, TValue>
             {
@@ -117,10 +116,10 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void ConcreteGenericVariable_HasParameterizedTypeWithConcreteArgs()
+    public async Task ConcreteGenericVariable_HasParameterizedTypeWithConcreteArgs()
     {
         // A local variable with a concrete generic type.
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Collections.Generic;
             class Test
             {
@@ -158,13 +157,13 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void ConcreteGenericVariable_InterfacesHaveUnsubstitutedTypeParams()
+    public async Task ConcreteGenericVariable_InterfacesHaveUnsubstitutedTypeParams()
     {
         // Verify that the underlying Class for Dictionary stores interfaces
         // with unsubstituted type parameters (GenericTypeVariable), not
         // concrete types. This is the expected behavior — TypeUtils must
         // resolve these at comparison time.
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Collections.Generic;
             class Test
             {
@@ -209,13 +208,13 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void ImplicitUsings_ShortNameResolvesWithoutExplicitUsing()
+    public async Task ImplicitUsings_ShortNameResolvesWithoutExplicitUsing()
     {
         // In .NET 6+, System.Collections.Generic is an implicit using.
         // Test whether Dictionary (short name, no using directive) gets
         // type attribution. This will fail if implicit usings are not
         // configured in the compilation.
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             class Test
             {
                 void M()
@@ -235,11 +234,11 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void DictionaryClass_HasFormalTypeParameters()
+    public async Task DictionaryClass_HasFormalTypeParameters()
     {
         // Verify that the underlying Class for Dictionary has formal type parameters
         // (needed for building substitution maps during type comparison).
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Collections.Generic;
             class Test
             {
@@ -269,10 +268,10 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void NullableValueType_IsMappedAsParameterizedNullable()
+    public async Task NullableValueType_IsMappedAsParameterizedNullable()
     {
         // int? should be mapped as Parameterized(System.Nullable, [Primitive(Int)])
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             class Test
             {
                 void M()
@@ -295,11 +294,11 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void NullableReferenceType_String_IsNotWrappedInNullable()
+    public async Task NullableReferenceType_String_IsNotWrappedInNullable()
     {
         // string? is a nullable reference type — Roslyn models it as plain System.String
         // (not Nullable<String>), since nullable reference types are annotation-only
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             #nullable enable
             class Test
             {
@@ -319,10 +318,10 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void NullableReferenceType_Object_IsNotWrappedInNullable()
+    public async Task NullableReferenceType_Object_IsNotWrappedInNullable()
     {
         // object? is a nullable reference type — plain System.Object, not Nullable<Object>
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             #nullable enable
             class Test
             {
@@ -342,10 +341,10 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void NullableUserDefinedClass_IsNotWrappedInNullable()
+    public async Task NullableUserDefinedClass_IsNotWrappedInNullable()
     {
         // Foo? where Foo is a user-defined reference type — plain Class, not Nullable
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             #nullable enable
             class Foo { }
             class Test
@@ -366,10 +365,10 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void NullableUserDefinedStruct_IsMappedAsParameterizedNullable()
+    public async Task NullableUserDefinedStruct_IsMappedAsParameterizedNullable()
     {
         // Bar? where Bar is a user-defined struct — Parameterized(Nullable, [Bar])
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             struct Bar { public int X; }
             class Test
             {
@@ -392,11 +391,11 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void StringTypeArgument_IsMappedAsClass()
+    public async Task StringTypeArgument_IsMappedAsClass()
     {
         // System.String should be mapped as JavaType.Class (not Primitive) when used
         // as a type argument, so TypeUtils.IsAssignableTo can walk its interface chain.
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Collections.Generic;
             class Test
             {
@@ -458,9 +457,9 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void SourceClass_DeclaredMembersAndMethodsArePopulated()
+    public async Task SourceClass_DeclaredMembersAndMethodsArePopulated()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Collections.Generic;
             class Holder
             {
@@ -512,9 +511,9 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
-    public void MetadataClass_DeclaredMembersAndMethodsArePopulated()
+    public async Task MetadataClass_DeclaredMembersAndMethodsArePopulated()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Windows.Controls;
             class Test
             {
@@ -551,9 +550,9 @@ public class CSharpTypeMappingTests : RewriteTest
     /// attribute class' properties and their values carried as constants or type references.
     /// </summary>
     [Fact]
-    public void SourceClass_AnnotationsAreMapped()
+    public async Task SourceClass_AnnotationsAreMapped()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System;
 
             [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
@@ -603,9 +602,9 @@ public class CSharpTypeMappingTests : RewriteTest
     /// matched case-insensitively on name — the universal C# convention.
     /// </summary>
     [Fact]
-    public void PositionalAttributeArguments_ResolveToTheMatchingProperty()
+    public async Task PositionalAttributeArguments_ResolveToTheMatchingProperty()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System;
 
             [Obsolete("use something else", true)]
@@ -642,9 +641,9 @@ public class CSharpTypeMappingTests : RewriteTest
     /// arguments map to an <see cref="JavaType.Annotation.ArrayElementValue"/>.
     /// </summary>
     [Fact]
-    public void EnumAndArrayAttributeArguments_AreMapped()
+    public async Task EnumAndArrayAttributeArguments_AreMapped()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System;
 
             enum Level { Low, High }
@@ -684,9 +683,9 @@ public class CSharpTypeMappingTests : RewriteTest
     /// Attributes on methods and on fields/properties are mapped too.
     /// </summary>
     [Fact]
-    public void MethodAndVariableAnnotationsAreMapped()
+    public async Task MethodAndVariableAnnotationsAreMapped()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System;
 
             class Holder
@@ -719,9 +718,9 @@ public class CSharpTypeMappingTests : RewriteTest
     /// WPF recipe that only sees one of them silently loses <c>PART_Popup</c>.
     /// </summary>
     [Fact]
-    public void MetadataClass_RepeatedAnnotationsAreMappedWithTheirValues()
+    public async Task MetadataClass_RepeatedAnnotationsAreMappedWithTheirValues()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System.Windows.Controls;
             class Test
             {
@@ -761,9 +760,9 @@ public class CSharpTypeMappingTests : RewriteTest
     /// answer as soon as the reference is made from a derived type.
     /// </summary>
     [Fact]
-    public void EventReferencesCarryVariableAttribution()
+    public async Task EventReferencesCarryVariableAttribution()
     {
-        var cu = ParseWithSemanticModel("""
+        var cu = await ParseWithSemanticModelAsync("""
             using System;
             class Base
             {

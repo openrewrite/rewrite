@@ -23,6 +23,7 @@ import org.objenesis.ObjenesisStd;
 import org.openrewrite.*;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.BiFunction;
 
 @Value
@@ -34,9 +35,17 @@ public class Print implements RpcRequest {
     @Nullable
     MarkerPrinter markerPrinter;
 
+    /**
+     * A list of IDs representing the cursor of the tree's parent, whose objects are
+     * stored in the caller's local object cache. Absent when printing a whole source file.
+     */
+    @Nullable
+    List<String> cursor;
+
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Print> {
         private final BiFunction<String, @Nullable String, ?> getObject;
+        private final BiFunction<@Nullable List<String>, @Nullable String, Cursor> getCursor;
 
         @Override
         protected Object handle(Print request) throws Exception {
@@ -55,7 +64,7 @@ public class Print implements RpcRequest {
                 // Get the printer from the dummy SourceFile and use it to print the tree
                 Cursor dummyCursor = new Cursor(null, dummySourceFile);
                 TreeVisitor<?, PrintOutputCapture<Integer>> printer = dummySourceFile.printer(dummyCursor);
-                printer.visit(tree, outputCapture);
+                printer.visit(tree, outputCapture, getCursor.apply(request.getCursor(), request.getSourceFileType()));
 
                 return outputCapture.getOut();
             } catch (ClassNotFoundException e) {

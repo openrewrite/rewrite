@@ -18,11 +18,13 @@ package org.openrewrite.java;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.LineStart;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 
 @SuppressWarnings("unused")
@@ -63,36 +65,65 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
         return maybeAutoFormat(before, after, p, getCursor().getParentTreeCursor());
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor parent) {
         return maybeAutoFormat(before, after, null, p, parent);
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor parent) {
         if (before != after) {
-            return autoFormat(after, stopAfter, p, parent);
+            // what changed in place keeps the indentation of the line it starts, however the file is indented, and a
+            // declaration also keeps the indentation of the line that holds its modifiers and name
+            J2 formatted = autoFormat(after, stopAfter, p, parent);
+            formatted = formatted.withPrefix(LineStart.keep(formatted.getPrefix(), before.getPrefix(), after.getPrefix()));
+            return LineStart.keepDeclarationLine(formatted, before, after.getPrefix());
         }
         return after;
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, P p) {
         return autoFormat(j, p, getCursor().getParentTreeCursor());
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor parent) {
         return autoFormat(j, null, p, parent);
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
+        FormattingListener.beforeFormat(j, stopAfter, parent);
         JavaSourceFile cu = (j instanceof JavaSourceFile) ?
                 (JavaSourceFile) j :
                 getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         AutoFormatService service = cu.service(AutoFormatService.class);
         return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, parent);
+    }
+
+    public <J2 extends J> J2 autoIndent(J2 j, P p, Cursor parent) {
+        return autoIndent(j, null, p, parent);
+    }
+
+    /**
+     * Re-indent {@code j} for where it now sits, leaving every other aspect of its formatting alone. Statements
+     * moved in from elsewhere in the tree arrive with the indentation of where they came from, which is all that
+     * needs fixing when the surrounding shell was itself parsed from well-formed source.
+     */
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 autoIndent(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
+        JavaSourceFile cu = (j instanceof JavaSourceFile) ?
+                (JavaSourceFile) j :
+                getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        AutoFormatService service = cu.service(AutoFormatService.class);
+        return (J2) service.tabsAndIndentsVisitor(cu, stopAfter).visit(j, p, parent);
     }
 
     /**

@@ -89,6 +89,26 @@ class ChangeKeyTest implements RewriteTest {
     }
 
     @Test
+    void changeKeyToOneThatNeedsEscapes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey(
+            "package.name",
+            "\"say \\\"hi\\\" \\\\ x\""
+          )),
+          toml(
+            """
+              [package]
+              name = "my-package"
+              """,
+            """
+              [package]
+              "say \\"hi\\" \\\\ x" = "my-package"
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotChangeUnmatchedKeys() {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
@@ -175,6 +195,25 @@ class ChangeKeyTest implements RewriteTest {
             """
               contributors = ["John Doe", "Jane Smith"]
               version = "1.0.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameTheLastPartOfADottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("package.name", "title")),
+          toml(
+            """
+              package.name = "x"
+              package . name = "y"
+              "package".name = "z"
+              """,
+            """
+              package.title = "x"
+              package . title = "y"
+              "package".title = "z"
               """
           )
         );

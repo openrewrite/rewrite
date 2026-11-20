@@ -21,6 +21,7 @@ import org.openrewrite.text.PlainText;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CursorTest {
     @Test
@@ -33,8 +34,35 @@ class CursorTest {
         cursor.putMessage("key", 1);
         assertThat(cursor.<Integer>getNearestMessage("key")).isEqualTo(1);
 
-        var child = new Cursor(cursor, t);
+        var child = new Cursor(cursor, "child");
         assertThat(child.<Integer>getNearestMessage("key")).isEqualTo(1);
+    }
+
+    @Test
+    void computingAMessageMayStoreAnotherOnTheSameCursor() {
+        var cursor = new Cursor(null, "root");
+
+        String outer = cursor.computeMessageIfAbsent("outer", k -> "outer of " + cursor.computeMessageIfAbsent("inner", i -> "inner"));
+
+        assertThat(outer).isEqualTo("outer of inner");
+        assertThat(cursor.<String>getMessage("inner")).isEqualTo("inner");
+        assertThat(cursor.<String>getMessage("outer")).isEqualTo("outer of inner");
+    }
+
+    @Test
+    void parentIsNeverTheSameElement() {
+        var t = PlainText.builder()
+          .text("test")
+          .build();
+        var cursor = new Cursor(null, t);
+
+        assertThatThrownBy(() -> new Cursor(cursor, t))
+          .isInstanceOf(AssertionError.class)
+          .hasMessageContaining("is a cursor on the same PlainText")
+          .hasMessageContaining("getCursor().getParentOrThrow()");
+        assertThatThrownBy(() -> new Cursor(cursor, t.withText("changed")))
+          .isInstanceOf(AssertionError.class)
+          .hasMessageContaining("is a cursor on an element with the same id");
     }
 
     @Test
@@ -50,7 +78,7 @@ class CursorTest {
         assertThat(cursor.<Integer>pollNearestMessage("key")).isNull();
 
         cursor.putMessage("key", 1);
-        var child = new Cursor(cursor, t);
+        var child = new Cursor(cursor, "child");
         assertThat(child.<Integer>getNearestMessage("key")).isEqualTo(1);
     }
 

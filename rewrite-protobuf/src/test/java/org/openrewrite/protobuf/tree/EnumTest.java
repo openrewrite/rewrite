@@ -16,9 +16,17 @@
 package org.openrewrite.protobuf.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.protobuf.ProtoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.protobuf.Assertions.proto;
 
 class EnumTest implements RewriteTest {
@@ -34,6 +42,30 @@ class EnumTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void negativeValues() {
+        rewriteRun(
+          proto(
+            """
+              syntax = 'proto2';
+              enum MyEnum {
+                Negative = -1;
+                SpacedNegative = - 2;
+              }
+              """,
+            spec -> spec.beforeRecipe(protoDoc -> {
+                List<Object> values = TreeVisitor.collect(new ProtoVisitor<>() {
+                    @Override
+                    public Proto visitEnumField(Proto.EnumField enumField, ExecutionContext ctx) {
+                        return SearchResult.found(enumField);
+                    }
+                }, protoDoc, new ArrayList<>(), Proto.EnumField.class, f -> f.getNumber().getValue());
+
+                assertThat(values).containsExactly(-1, -2);
+            }))
         );
     }
 

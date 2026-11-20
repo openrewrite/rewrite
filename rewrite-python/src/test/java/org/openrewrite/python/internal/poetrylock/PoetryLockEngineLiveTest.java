@@ -43,7 +43,7 @@ import static org.openrewrite.python.internal.poetrylock.PoetryLockFixtures.reso
  * Live-network validation of the poetry engine against pypi.org, and recorder for the offline
  * fixtures the committed engine test replays. Disabled by default; run explicitly.
  */
-@Disabled("hits pypi.org; run manually to re-record /poetrylock/http fixtures")
+@Disabled("hits pypi.org; run manually to re-record /lock/poetry/http fixtures")
 class PoetryLockEngineLiveTest {
 
     @Test

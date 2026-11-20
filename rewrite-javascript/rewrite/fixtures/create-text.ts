@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, Option, ScanningRecipe, SourceFile} from "@openrewrite/rewrite";
+import {ExecutionContext, Option, ScanningRecipe, SourceFile, TreeVisitor} from "@openrewrite/rewrite";
 import {PlainTextParser} from "@openrewrite/rewrite/text";
 
 export class CreateText extends ScanningRecipe<{ exists: boolean }> {
@@ -39,6 +39,19 @@ export class CreateText extends ScanningRecipe<{ exists: boolean }> {
 
     initialValue(_ctx: ExecutionContext): { exists: boolean; } {
         return {exists: false};
+    }
+
+    async scanner(acc: { exists: boolean }): Promise<TreeVisitor<any, ExecutionContext>> {
+        const sourcePath = this.sourcePath;
+        return new class extends TreeVisitor<any, ExecutionContext> {
+            protected async preVisit(tree: any, _ctx: ExecutionContext): Promise<any> {
+                if (tree.sourcePath === sourcePath) {
+                    acc.exists = true;
+                }
+                this.stopAfterPreVisit();
+                return tree;
+            }
+        };
     }
 
     async generate(acc: { exists: boolean }, _ctx: ExecutionContext): Promise<SourceFile[]> {

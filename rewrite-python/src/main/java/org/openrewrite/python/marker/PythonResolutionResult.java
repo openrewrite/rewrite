@@ -27,12 +27,14 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -53,7 +55,7 @@ import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
  */
 @Value
 @With
-public class PythonResolutionResult implements Marker, RpcCodec<PythonResolutionResult> {
+public class PythonResolutionResult implements Marker, Heavyweight, RpcCodec<PythonResolutionResult> {
     UUID id;
 
     @ToString.Include
@@ -247,7 +249,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
     @Override
     public PythonResolutionResult rpcReceive(PythonResolutionResult before, RpcReceiveQueue q) {
-        return before
+        PythonResolutionResult received = before
                 .withId(q.receiveAndGet(before.id, UUID::fromString))
                 .withName(q.receive(before.name))
                 .withVersion(q.receive(before.version))
@@ -271,6 +273,38 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withSourceIndexes(q.receiveList(before.sourceIndexes,
                         si -> si.rpcReceive(si, q)));
+        return received
+                .withOptionalDependencies(received.declared(received.optionalDependencies))
+                .withDependencyGroups(received.declared(received.dependencyGroups));
+    }
+
+    /**
+     * The dependency maps travel as plain JSON, so off the wire each {@link Dependency} is a map
+     * and its resolution a copy, rather than the entry of {@link #resolvedDependencies} it names.
+     */
+    private Map<String, List<Dependency>> declared(Map<String, List<Dependency>> received) {
+        Map<String, List<Dependency>> declared = new LinkedHashMap<>();
+        boolean rebuilt = false;
+        for (Map.Entry<String, ? extends List<?>> group : received.entrySet()) {
+            List<Dependency> dependencies = new ArrayList<>(group.getValue().size());
+            for (Object dependency : group.getValue()) {
+                if (dependency instanceof Dependency) {
+                    dependencies.add((Dependency) dependency);
+                } else {
+                    dependencies.add(fromJson((Map<?, ?>) dependency));
+                    rebuilt = true;
+                }
+            }
+            declared.put(group.getKey(), dependencies);
+        }
+        return rebuilt ? declared : received;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Dependency fromJson(Map<?, ?> json) {
+        String name = (String) json.get("name");
+        return new Dependency(name, (String) json.get("versionConstraint"), (List<String>) json.get("extras"),
+                (String) json.get("marker"), json.get("resolved") == null ? null : getResolvedDependency(name));
     }
 
     /**
@@ -340,7 +374,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     @AllArgsConstructor
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static final class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+    public static final class ResolvedDependency implements Heavyweight, RpcCodec<ResolvedDependency> {
         @ToString.Include
         String name;
 

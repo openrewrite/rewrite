@@ -22,17 +22,13 @@ import {
     pattern,
     rewrite,
     template,
-    typescript
-} from "../../../src/javascript";
+    typescript,
+    sourceFileCache} from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
 import { fromVisitor, RecipeSpec } from "../../../src/test";
 
 describe('Non-Capturing any() Function', () => {
-    let parser: JavaScriptParser;
-
-    beforeEach(() => {
-        parser = new JavaScriptParser();
-    });
+    const parser = new JavaScriptParser({sourceFileCache});
 
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});

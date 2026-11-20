@@ -18,9 +18,16 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -427,11 +434,45 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void unresolvedMethodInvocationName() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
           kotlin(
             """
               val x = some .  qualified   . fooBar ( )
               """
+          )
+        );
+    }
+
+    @Test
+    void callOnUnresolvedReceiverHasNoMethodType() {
+        AtomicInteger count = new AtomicInteger();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
+          kotlin(
+            """
+              fun f() {
+                  languageVersion.set(17)
+                  languageVersion.set(0, 'c')
+                  with(languageVersion) {
+                      set(0, 'c')
+                  }
+                  languageVersion[0] = 'c'
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        // An indexed access is named `<get>` whether it reads or assigns.
+                        if ("set".equals(method.getSimpleName()) || "<get>".equals(method.getSimpleName())) {
+                            assertThat(method.getMethodType()).isNull();
+                            count.incrementAndGet();
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(count).hasValue(4);
+            })
           )
         );
     }
@@ -669,7 +710,7 @@ class MethodInvocationTest implements RewriteTest {
               val surface = Surface()
               val z = surface[4, 2]
               """,
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 assertThat(((J.VariableDeclarations) cu.getStatements().get(cu.getStatements().size() - 1))).satisfies(
                     z ->
                         assertThat(((J.MethodInvocation) z.getVariables().getFirst().getInitializer())).satisfies(
@@ -680,7 +721,52 @@ class MethodInvocationTest implements RewriteTest {
                                 assertThat(get.getArguments()).hasSize(2);
                             }
                         )
-                );
+                ))
+          )
+        );
+    }
+
+    @Test
+    void indexedAssignmentIsTypedLikeTheDirectCall() {
+        rewriteRun(
+          kotlin(
+            """
+              package lib
+              class Box
+              operator fun Box.get(i: Int): Int = i
+              operator fun Box.set(i: Int, v: Int) {}
+              """
+          ),
+          kotlin(
+            """
+              import lib.Box
+              import lib.get
+              import lib.set
+
+              fun f(sb: StringBuilder, m: MutableMap<String, Int>, l: java.util.ArrayList<String>, b: Box) {
+                  sb[0] = 'c'
+                  sb.set(0, 'c')
+                  m["a"] = 1
+                  m.set("a", 1)
+                  l[0] = "x"
+                  l.set(0, "x")
+                  b[0] += 1
+                  b.get(0)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Method> types = new ArrayList<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        types.add(method.getMethodType());
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(types).hasSize(8);
+                for (int i = 0; i < types.size(); i += 2) {
+                    assertThat(types.get(i)).isNotNull().isSameAs(types.get(i + 1));
+                }
             })
           )
         );
@@ -939,6 +1025,35 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void typeArgumentsOnQualifier() {
+        AtomicBoolean asserted = new AtomicBoolean();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
+          kotlin(
+            //language=none
+            """
+              class A {
+                  val h = Holder<Unit>.create(Unit)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("create".equals(method.getSimpleName())) {
+                            assertThat(method.getSelect()).isInstanceOf(J.ParameterizedType.class);
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).isTrue();
+            })
           )
         );
     }

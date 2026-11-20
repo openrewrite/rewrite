@@ -73,24 +73,7 @@ public class ScalaParserVisitor {
         CompilationUnitResult result = converter.convertToCompilationUnit(parseResult, source, typeFactory);
 
         J.Package packageDecl = result.getPackageDecl();
-        List<Statement> statements = result.getStatements();
-
-
-        // Filter out any Unknown statements that contain the entire source with package
-        if (packageDecl != null) {
-            final String packageName = packageDecl.getPackageName();
-            statements = statements.stream()
-                .filter(stmt -> {
-                    if (stmt instanceof J.Unknown) {
-                        String text = ((J.Unknown) stmt).getSource().getText().trim();
-                        // Skip if this Unknown contains the same package declaration
-                        boolean shouldFilter = text.startsWith("package " + packageName);
-                        return !shouldFilter;
-                    }
-                    return true;
-                })
-                .collect(java.util.stream.Collectors.toList());
-        }
+        List<JRightPadded<Statement>> statements = result.getStatements();
 
         // Don't include empty package declarations
         if (packageDecl != null && packageDecl.getExpression() instanceof J.Identifier) {
@@ -100,29 +83,18 @@ public class ScalaParserVisitor {
             }
         }
 
-        // If we didn't get any statements and have source content, create an Unknown node
-        // But skip if we already have a package declaration (to avoid duplication)
-        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null) {
-            J.Unknown.Source unknownSource = new J.Unknown.Source(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                source
-            );
-
-            J.Unknown unknown = new J.Unknown(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                unknownSource
-            );
-
-            statements.add(unknown);
-        }
-
-        // Get remaining source for EOF
         String remainingSource = converter.getRemainingSource(parseResult, source, result.getLastCursorPosition());
-        Space eof = remainingSource.isEmpty() ? EMPTY : Space.build(remainingSource, Collections.emptyList());
+        Space eof = remainingSource.isEmpty() ? EMPTY : ScalaSpace.format(remainingSource);
+
+        if (statements.isEmpty() && packageDecl == null) {
+            Space whole = ScalaSpace.format(source);
+            if (isWhitespaceAndComments(whole)) {
+                // A file of only whitespace and comments has no statements; it is modeled entirely by EOF.
+                eof = whole;
+            } else {
+                throw new UnsupportedOperationException("No Scala statements could be mapped from " + sourcePath);
+            }
+        }
 
         // Build S.CompilationUnit
         return new S.CompilationUnit(
@@ -135,8 +107,20 @@ public class ScalaParserVisitor {
             charsetBomMarked,              // boolean charsetBomMarked
             null,                          // Checksum checksum
             packageDecl == null ? null : JRightPadded.build(packageDecl),
-            JRightPadded.withElements(Collections.emptyList(), statements),
+            statements,
             eof                            // Space eof
         );
+    }
+
+    private static boolean isWhitespaceAndComments(Space space) {
+        if (!space.getWhitespace().trim().isEmpty()) {
+            return false;
+        }
+        for (Comment comment : space.getComments()) {
+            if (!comment.getSuffix().trim().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

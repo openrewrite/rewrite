@@ -16,10 +16,13 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.DeleteStatement;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +32,25 @@ import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class DeleteStatementTest implements RewriteTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"if (keep) {}", "if (keep) { println 'remove' } else { println 'other' }"})
+    void deleteTopLevelIf(String statement) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+              @Override
+              public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                  for (Statement current : cu.getStatements()) {
+                      if (current instanceof J.If) {
+                          return (G.CompilationUnit) new DeleteStatement<>(current).visitNonNull(cu, ctx);
+                      }
+                  }
+                  return cu;
+              }
+          })),
+          groovy("def keep = true\n" + statement + "\nprintln keep\n", "def keep = true\nprintln keep\n")
+        );
+    }
+
     @DocumentExample
     @Test
     void deleteStatement() {

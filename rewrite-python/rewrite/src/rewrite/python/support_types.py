@@ -6,6 +6,7 @@ from typing import TypeVar, Any, Optional, TYPE_CHECKING
 from rewrite import TreeVisitor, Markers
 from rewrite.java.tree import J
 from rewrite.java import Comment
+from rewrite.utils import lst_value_dataclass
 
 if TYPE_CHECKING:
     from .visitor import PythonVisitor
@@ -43,7 +44,7 @@ T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class PyComment(Comment):
     _aligned_to_indent: bool
 

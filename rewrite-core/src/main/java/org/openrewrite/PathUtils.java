@@ -83,6 +83,21 @@ public class PathUtils {
         return separatorsToUnix(path);
     }
 
+    /**
+     * Join the elements of {@code path} with forward slashes, keeping any backslash that is part of a file name.
+     */
+    public static String toSlashPath(Path path) {
+        Path root = path.getRoot();
+        StringBuilder slashPath = new StringBuilder(root == null ? "" : separatorsToUnix(root.toString()));
+        for (int i = 0; i < path.getNameCount(); i++) {
+            if (i > 0) {
+                slashPath.append(UNIX_SEPARATOR);
+            }
+            slashPath.append(path.getName(i));
+        }
+        return slashPath.toString();
+    }
+
     public static boolean matchesGlob(@Nullable Path path, @Nullable String globPattern) {
         return matchesGlob(path == null ? null : separatorsToUnix(path.toString()), globPattern);
     }

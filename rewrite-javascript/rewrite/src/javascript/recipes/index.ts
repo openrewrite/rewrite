@@ -18,4 +18,5 @@ export * from "./async-callback-in-sync-array-method";
 export * from "./auto-format";
 export * from "./order-imports";
 export * from "./change-import";
+export * from "./change-method-target-to-import";
 export * from "./dependencies";

@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import java.util.List;
+
 /**
  * Manages the Scala 3 compiler context and provides methods to parse Scala source files.
  * This class delegates to the Scala bridge for compiler interaction.
@@ -46,9 +48,20 @@ public class ScalaCompilerContext {
     public ScalaCompilerContext(@Nullable Collection<Path> classpath,
                                 boolean logCompilationWarningsAndErrors,
                                 ExecutionContext executionContext) {
+        this(classpath, logCompilationWarningsAndErrors, executionContext, null);
+    }
+
+    /**
+     * @param compilers where {@link #compileAll} takes its compiler from and {@link #release} returns it to,
+     *                  or null to compile with a new compiler
+     */
+    public ScalaCompilerContext(@Nullable Collection<Path> classpath,
+                                boolean logCompilationWarningsAndErrors,
+                                ExecutionContext executionContext,
+                                @Nullable ScalaCompilerCache compilers) {
         this.executionContext = executionContext;
         this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
-        this.bridge = new ScalaCompilerBridge();
+        this.bridge = new ScalaCompilerBridge(compilers);
 
         // Convert classpath paths to strings for the Scala bridge
         if (classpath != null && !classpath.isEmpty()) {
@@ -99,8 +112,8 @@ public class ScalaCompilerContext {
         }
 
         // Convert to Java lists for the bridge
-        java.util.List<SourceEntry> sourceList = new ArrayList<>(entries);
-        java.util.List<String> cpList = new ArrayList<>(classpathStrings);
+        List<SourceEntry> sourceList = new ArrayList<>(entries);
+        List<String> cpList = new ArrayList<>(classpathStrings);
 
         // Get a working directory for compiler output (.class/.tasty files).
         String outputDir;
@@ -146,6 +159,13 @@ public class ScalaCompilerContext {
                 deleteRecursively(ownedTempDir);
             }
         }
+    }
+
+    /**
+     * Returns the compiler of {@link #compileAll} for reuse, once no result of it is used any more.
+     */
+    public void release() {
+        bridge.release();
     }
 
     private static void deleteRecursively(Path path) {

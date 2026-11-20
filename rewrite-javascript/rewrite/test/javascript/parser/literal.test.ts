@@ -74,6 +74,28 @@ describe('property key literal types', () => {
         }));
 });
 
+describe('bigint literal values', () => {
+    test.each([
+        ['1n', BigInt(1)],
+        ['0x1fn', BigInt(31)],
+        ['1_000n', BigInt(1000)],
+        ['0o17n', BigInt(15)],
+        ['0b101n', BigInt(5)],
+        ['123456789012345678901234567890n', BigInt("123456789012345678901234567890")],
+    ])('%s holds the bigint it denotes', (valueSource, expectedValue) =>
+        spec.rewriteRun({
+            ...typescript(`const n = ${valueSource};`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const decl = cu.statements[0].element as J.VariableDeclarations;
+                const lit = decl.variables[0].element.initializer!.element as Literal;
+                expect(typeof lit.value).toBe('bigint');
+                expect(lit.value).toBe(expectedValue);
+                expect(lit.valueSource).toBe(valueSource);
+                expect(lit.type).toBe(Type.Primitive.BigInt);
+            }
+        }));
+});
+
 describe('Old-style octal literals (error 1121)', () => {
     test('should parse in .js files', () => spec.rewriteRun({
         ...javascript('0777'),
@@ -120,7 +142,25 @@ describe('Malformed hex escape sequences (error 1125)', () => {
         }
     }));
 
-    test('should NOT parse in .ts files', () => {
-        return expect(spec.rewriteRun(typescript('/\\x-.*/'))).rejects.toThrow(/Hexadecimal digit expected/);
+    test('should parse in .ts files', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('/\\x-.*/')
+        ));
+
+    test('string escape should parse in .js files', () => spec.rewriteRun(javascript("'\\x'")));
+
+    test('string escape should NOT parse in .ts files', () => {
+        // A regex literal's `\x` is validated by the checker, a string literal's by the scanner, so only
+        // the latter reaches `jsOnlyExcludedCodes`.
+        return expect(spec.rewriteRun(typescript("'\\x'"))).rejects.toThrow(/Hexadecimal digit expected/);
     });
+});
+
+describe('surrogate pairs', () => {
+    test('a character outside the BMP round-trips as itself', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('const s = "\u{1F42D}";')
+        ));
 });

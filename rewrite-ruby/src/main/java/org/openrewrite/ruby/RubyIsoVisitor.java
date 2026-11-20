@@ -23,13 +23,53 @@ import org.openrewrite.ruby.tree.Rb;
 public class RubyIsoVisitor<P> extends RubyVisitor<P> {
 
     @Override
+    public Rb.Alias visitAlias(Rb.Alias alias, P p) {
+        return (Rb.Alias) super.visitAlias(alias, p);
+    }
+
+    @Override
     public Rb.Array visitArray(Rb.Array array, P p) {
         return (Rb.Array) super.visitArray(array, p);
     }
 
     @Override
+    public Rb.AssignmentOperation visitAssignmentOperation(Rb.AssignmentOperation assignmentOperation, P p) {
+        return (Rb.AssignmentOperation) super.visitAssignmentOperation(assignmentOperation, p);
+    }
+
+    @Override
+    public Rb.Begin visitBegin(Rb.Begin begin, P p) {
+        return (Rb.Begin) super.visitBegin(begin, p);
+    }
+
+    @Override
     public Rb.Binary visitBinary(Rb.Binary binary, P p) {
         return (Rb.Binary) super.visitBinary(binary, p);
+    }
+
+    @Override
+    public Rb.Block visitBlock(Rb.Block block, P p) {
+        return (Rb.Block) super.visitBlock(block, p);
+    }
+
+    @Override
+    public Rb.BlockArgument visitBlockArgument(Rb.BlockArgument blockArgument, P p) {
+        return (Rb.BlockArgument) super.visitBlockArgument(blockArgument, p);
+    }
+
+    @Override
+    public Rb.BooleanCheck visitBooleanCheck(Rb.BooleanCheck booleanCheck, P p) {
+        return (Rb.BooleanCheck) super.visitBooleanCheck(booleanCheck, p);
+    }
+
+    @Override
+    public Rb.Break visitBreak(Rb.Break aBreak, P p) {
+        return (Rb.Break) super.visitBreak(aBreak, p);
+    }
+
+    @Override
+    public Rb.ClassMethod visitClassMethod(Rb.ClassMethod classMethod, P p) {
+        return (Rb.ClassMethod) super.visitClassMethod(classMethod, p);
     }
 
     @Override
@@ -53,6 +93,16 @@ public class RubyIsoVisitor<P> extends RubyVisitor<P> {
     }
 
     @Override
+    public Rb.DelimitedArray visitDelimitedArray(Rb.DelimitedArray delimitedArray, P p) {
+        return (Rb.DelimitedArray) super.visitDelimitedArray(delimitedArray, p);
+    }
+
+    @Override
+    public Rb.ExpressionTypeTree visitExpressionTypeTree(Rb.ExpressionTypeTree expressionTypeTree, P p) {
+        return (Rb.ExpressionTypeTree) super.visitExpressionTypeTree(expressionTypeTree, p);
+    }
+
+    @Override
     public Rb.Hash visitHash(Rb.Hash hash, P p) {
         return (Rb.Hash) super.visitHash(hash, p);
     }
@@ -68,8 +118,48 @@ public class RubyIsoVisitor<P> extends RubyVisitor<P> {
     }
 
     @Override
+    public Rb.Module visitModule(Rb.Module module, P p) {
+        return (Rb.Module) super.visitModule(module, p);
+    }
+
+    @Override
     public Rb.MultipleAssignment visitMultipleAssignment(Rb.MultipleAssignment multipleAssignment, P p) {
         return (Rb.MultipleAssignment) super.visitMultipleAssignment(multipleAssignment, p);
+    }
+
+    @Override
+    public Rb.Next visitNext(Rb.Next aNext, P p) {
+        return (Rb.Next) super.visitNext(aNext, p);
+    }
+
+    @Override
+    public Rb.NumericDomain visitNumericDomain(Rb.NumericDomain numericDomain, P p) {
+        return (Rb.NumericDomain) super.visitNumericDomain(numericDomain, p);
+    }
+
+    @Override
+    public Rb.OpenEigenclass visitOpenEigenclass(Rb.OpenEigenclass openEigenclass, P p) {
+        return (Rb.OpenEigenclass) super.visitOpenEigenclass(openEigenclass, p);
+    }
+
+    @Override
+    public Rb.PatternBinding visitPatternBinding(Rb.PatternBinding patternBinding, P p) {
+        return (Rb.PatternBinding) super.visitPatternBinding(patternBinding, p);
+    }
+
+    @Override
+    public Rb.PatternGuard visitPatternGuard(Rb.PatternGuard patternGuard, P p) {
+        return (Rb.PatternGuard) super.visitPatternGuard(patternGuard, p);
+    }
+
+    @Override
+    public Rb.PostExecution visitPostExecution(Rb.PostExecution postExecution, P p) {
+        return (Rb.PostExecution) super.visitPostExecution(postExecution, p);
+    }
+
+    @Override
+    public Rb.PreExecution visitPreExecution(Rb.PreExecution preExecution, P p) {
+        return (Rb.PreExecution) super.visitPreExecution(preExecution, p);
     }
 
     @Override
@@ -78,8 +168,53 @@ public class RubyIsoVisitor<P> extends RubyVisitor<P> {
     }
 
     @Override
-    public Rb.Yield visitYield(Rb.Yield yield, P p) {
-        return (Rb.Yield) super.visitYield(yield, p);
+    public Rb.Rescue visitRescue(Rb.Rescue rescue, P p) {
+        return (Rb.Rescue) super.visitRescue(rescue, p);
+    }
+
+    @Override
+    public Rb.Retry visitRetry(Rb.Retry retry, P p) {
+        return (Rb.Retry) super.visitRetry(retry, p);
+    }
+
+    @Override
+    public Rb.RightwardAssignment visitRightwardAssignment(Rb.RightwardAssignment rightwardAssignment, P p) {
+        return (Rb.RightwardAssignment) super.visitRightwardAssignment(rightwardAssignment, p);
+    }
+
+    @Override
+    public Rb.Splat visitSplat(Rb.Splat splat, P p) {
+        return (Rb.Splat) super.visitSplat(splat, p);
+    }
+
+    @Override
+    public Rb.StructPattern visitStructPattern(Rb.StructPattern structPattern, P p) {
+        return (Rb.StructPattern) super.visitStructPattern(structPattern, p);
+    }
+
+    @Override
+    public Rb.SubArrayIndex visitSubArrayIndex(Rb.SubArrayIndex subArrayIndex, P p) {
+        return (Rb.SubArrayIndex) super.visitSubArrayIndex(subArrayIndex, p);
+    }
+
+    @Override
+    public Rb.Symbol visitSymbol(Rb.Symbol symbol, P p) {
+        return (Rb.Symbol) super.visitSymbol(symbol, p);
+    }
+
+    @Override
+    public Rb.Unary visitUnary(Rb.Unary unary, P p) {
+        return (Rb.Unary) super.visitUnary(unary, p);
+    }
+
+    @Override
+    public Rb.Undef visitUndef(Rb.Undef undef, P p) {
+        return (Rb.Undef) super.visitUndef(undef, p);
+    }
+
+    @Override
+    public Rb.Yield visitYield(Rb.Yield aYield, P p) {
+        return (Rb.Yield) super.visitYield(aYield, p);
     }
 
     @Override

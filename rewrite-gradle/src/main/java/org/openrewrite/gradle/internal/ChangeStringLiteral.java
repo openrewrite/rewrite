@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
@@ -25,6 +26,16 @@ import org.openrewrite.java.tree.J;
  */
 @Incubating(since = "7.22.0")
 public class ChangeStringLiteral {
+
+    /**
+     * Opening to closing delimiter, ordered longest opening first so that {@code '''} matches before {@code '}.
+     */
+    private static final String[][] DELIMITERS = {
+            {"~\"\"\"", "\"\"\""}, {"~'''", "'''"}, {"\"\"\"", "\"\"\""}, {"'''", "'''"},
+            {"~\"", "\""}, {"~'", "'"}, {"~/", "/"}, {"$/", "/$"},
+            {"\"", "\""}, {"'", "'"}, {"/", "/"}
+    };
+
     public static Expression withStringValue(Expression e, String newValue) {
         return (Expression) new JavaVisitor<Integer>() {
             @Override
@@ -39,9 +50,25 @@ public class ChangeStringLiteral {
         if (oldValue == null || oldValue.equals(newValue)) {
             return l;
         }
-        String valueSource = l.getValueSource();
-        String delimiter = (valueSource == null) ? "'" :
-                valueSource.substring(0, valueSource.indexOf(oldValue));
-        return l.withValue(newValue).withValueSource(delimiter + newValue + delimiter);
+        String[] delimiters = delimitersOf(l.getValueSource(), oldValue);
+        return l.withValue(newValue).withValueSource(delimiters[0] + newValue + delimiters[1]);
+    }
+
+    /**
+     * What encloses {@code value} in {@code valueSource} — nothing at all for a string template fragment.
+     */
+    private static String[] delimitersOf(@Nullable String valueSource, String value) {
+        if (valueSource == null) {
+            return new String[]{"'", "'"};
+        }
+        for (String[] delimiter : DELIMITERS) {
+            int enclosed = valueSource.length() - delimiter[0].length() - delimiter[1].length();
+            // An escape sequence is longer than the character it spells, so a delimited literal always has at
+            // least as many characters between its delimiters as its value has
+            if (enclosed >= value.length() && valueSource.startsWith(delimiter[0]) && valueSource.endsWith(delimiter[1])) {
+                return delimiter;
+            }
+        }
+        return new String[]{"", ""};
     }
 }

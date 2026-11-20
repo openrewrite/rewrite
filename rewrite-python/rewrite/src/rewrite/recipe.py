@@ -21,9 +21,11 @@ from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
     Callable,
+    Dict,
     List,
     Optional,
     TYPE_CHECKING,
+    Tuple,
     TypeVar,
     Generic,
     cast,
@@ -121,8 +123,21 @@ class RecipeDescriptor:
                     value = getattr(recipe, f.name)
                     options.append((f.name, value, descriptor))
 
-        # Extract data table descriptors
-        data_tables = [dt.descriptor() for dt in recipe.data_tables]
+        recipe_list = [cls.from_recipe(r) for r in recipe.recipe_list()]
+
+        # A recipe reports the union of the data tables it owns and every table its
+        # children produce, so consumers that read only the top-level descriptor --
+        # the marketplace listing and everything derived from it -- can resolve a
+        # composite's tables. Mirrors Java's Recipe#aggregateDataTableDescriptors.
+        # Sub-descriptors are built the same way, so the union is recursive; the
+        # recipe's own tables come first and the first descriptor for a given name
+        # wins.
+        data_tables: Dict[str, dict] = {}
+        for data_table in recipe.data_tables:
+            data_tables.setdefault(data_table.name, data_table.descriptor())
+        for sub_recipe in recipe_list:
+            for descriptor in sub_recipe.data_tables:
+                data_tables.setdefault(descriptor["name"], descriptor)
 
         return cls(
             name=recipe.name,
@@ -131,8 +146,8 @@ class RecipeDescriptor:
             tags=recipe.tags,
             estimated_effort_per_occurrence=recipe.estimated_effort_per_occurrence,
             options=options,
-            data_tables=data_tables,
-            recipe_list=[cls.from_recipe(r) for r in recipe.recipe_list()],
+            data_tables=list(data_tables.values()),
+            recipe_list=recipe_list,
         )
 
 
@@ -224,6 +239,11 @@ class Recipe(ABC):
         return 5
 
     @property
+    def causes_another_cycle(self) -> bool:
+        """Whether changes made by this recipe should trigger another recipe cycle."""
+        return False
+
+    @property
     def data_tables(self) -> List[DataTable]:
         """
         Return data tables this recipe produces.
@@ -275,25 +295,35 @@ class Recipe(ABC):
         Returns:
             List of results showing before/after for each changed file
         """
+        from rewrite.execution import ExecutionContext
         from rewrite.visitor import Cursor
 
         cursor = Cursor(None, Cursor.ROOT_VALUE)
         recipe_lists: _RecipeLists = {}
 
         after = before
-        if _has_scanning_recipe(self, recipe_lists):
+        scanning = _has_scanning_recipe(self, recipe_lists)
+        if scanning:
             # Phase 1: scan each file. Scanning must not modify the tree, so the
             # visit result is discarded and the original file is passed on to the
             # next recipe in the list. Returning None here would abort traversal
             # of the remainder of the recipe list, leaving nested scanners unrun.
             def scan_one(recipe: Recipe, source: SourceFile) -> SourceFile:
                 if isinstance(recipe, ScanningRecipe):
-                    recipe.scanner(recipe.accumulator(cursor, ctx)).visit(source, ctx, cursor)
+                    scanned = recipe.scanner(recipe.accumulator(cursor, ctx)).visit(source, ctx, cursor)
+                    if scanned is not source and ctx.get_message(ExecutionContext.SCANNING_MUTATION_VALIDATION, False):
+                        raise AssertionError(
+                            "Record what the scanner finds in the accumulator, and make the edits in "
+                            f"editor_with_data(acc).\n{recipe.name}'s scanner changed {source.source_path}, and the "
+                            "scanning phase discards edits. A scanner that reuses an editing visitor opts out with "
+                            "RecipeSpec(check_no_edits_in_scanning_phase=False)."
+                        )
                 return source
 
             # edit() is used only to iterate the source files; scan_one returns
             # each file unchanged, so the returned source set is the same
             after.edit(lambda source: _recurse_recipe_list(self, source, recipe_lists, scan_one))
+            _inspect_accumulators(self, cursor, ctx, recipe_lists, "after scanning")
 
             # Phase 2: collect generated files
             def generate_one(recipe: Recipe, generated: List[SourceFile]) -> List[SourceFile]:
@@ -309,6 +339,8 @@ class Recipe(ABC):
             return recipe.editor().visit(source, ctx, cursor)
 
         after = after.edit(lambda source: _recurse_recipe_list(self, source, recipe_lists, edit_one))
+        if scanning:
+            _inspect_accumulators(self, cursor, ctx, recipe_lists, "after editing")
         return after.get_changeset()
 
 
@@ -325,6 +357,10 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
 
     This is useful for recipes that need global information, like
     finding all usages of a method before deciding which to change.
+
+    The accumulator stays in memory until the cycle ends, so it should
+    hold values such as coordinates, paths and ids, not trees or other
+    Heavyweight objects.
 
     Example:
         @dataclass
@@ -389,12 +425,16 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
         (each with a fresh root cursor) start from initial_value().
         """
         root = cursor.root
-        key = f"org.openrewrite.recipe.acc.{id(self)}"
+        key = self._accumulator_key
         if root.messages is not None and key in root.messages:
             return cast(T, root.messages[key])
         acc = self.initial_value(ctx)
         root.put_message(key, acc)
         return acc
+
+    @property
+    def _accumulator_key(self) -> str:
+        return f"org.openrewrite.recipe.acc.{id(self)}"
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         """
@@ -442,6 +482,25 @@ def _has_scanning_recipe(recipe: Recipe, recipe_lists: _RecipeLists) -> bool:
     if isinstance(recipe, ScanningRecipe):
         return True
     return any(_has_scanning_recipe(r, recipe_lists) for r in _sub_recipes(recipe, recipe_lists))
+
+
+def _inspect_accumulators(
+    recipe: Recipe, cursor: Cursor, ctx: ExecutionContext, recipe_lists: _RecipeLists, when: str,
+) -> None:
+    """Show each scanning recipe's accumulator to the inspector a test harness put on the context, if any."""
+    from rewrite.execution import ExecutionContext
+    inspect = ctx.get_message(ExecutionContext.ACCUMULATOR_INSPECTION)
+    messages = cursor.messages
+    if inspect is None or messages is None:
+        return
+
+    def collect(r: Recipe, found: List[Tuple[Recipe, Any]]) -> List[Tuple[Recipe, Any]]:
+        if isinstance(r, ScanningRecipe) and r._accumulator_key in messages:
+            found.append((r, messages[r._accumulator_key]))
+        return found
+
+    for scanning_recipe, acc in _recurse_recipe_list(recipe, [], recipe_lists, collect) or []:
+        inspect(scanning_recipe, acc, when)
 
 
 def _recurse_recipe_list(

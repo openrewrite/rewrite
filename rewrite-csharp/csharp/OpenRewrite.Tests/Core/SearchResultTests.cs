@@ -54,6 +54,34 @@ public class SearchResultTests
     }
 
     [Fact]
+    public void FoundTwiceWithTheSameDescriptionKeepsOneMarker()
+    {
+        // given
+        var empty = new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty);
+        var found = SearchResult.Found(empty, "here");
+
+        // when
+        var foundAgain = SearchResult.Found(found, "here");
+
+        // then
+        Assert.Same(found, foundAgain);
+    }
+
+    [Fact]
+    public void FoundWithADifferentDescriptionAddsAnotherMarker()
+    {
+        // given
+        var empty = new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty);
+        var found = SearchResult.Found(empty);
+
+        // when
+        var foundAgain = SearchResult.Found(found, "here");
+
+        // then
+        Assert.Equal([null, "here"], foundAgain.Markers.MarkerList.OfType<SearchResult>().Select(m => m.Description));
+    }
+
+    [Fact]
     public void FoundThrowsWhenTheNodeHasNoWithMarkers()
     {
         var ex = Assert.Throws<InvalidOperationException>(

@@ -81,7 +81,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
     @Test
     void gradle8_catalogPresent_addDependencyEditsBuildKts() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi("8.14.3")),
+          spec -> spec.beforeRecipe(withToolingApi("8.14.5")),
           toml(
             """
               [versions]

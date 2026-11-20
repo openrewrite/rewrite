@@ -82,13 +82,7 @@ public class EncodingDetectingInputStream extends InputStream {
 
         // if we haven't yet determined a charset...
         if (read == -1) {
-            if (charset == null) {
-                if (remainingContinuationBytes > 0) {
-                    charset = WINDOWS_1252;
-                } else {
-                    charset = StandardCharsets.UTF_8;
-                }
-            }
+            endOfInput();
         } else if (charset == null) {
             guessCharset(read);
         }
@@ -98,8 +92,7 @@ public class EncodingDetectingInputStream extends InputStream {
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         if (charset == null) {
-            // we need to read the bytes one-by-one to determine the encoding
-            return super.read(b, off, len);
+            return readGuessingCharset(b, off, len);
         } else if (charset == StandardCharsets.UTF_8 && !bomChecked) {
             int read = checkAndSkipUtf8Bom();
             if (read == -1) {
@@ -111,6 +104,47 @@ public class EncodingDetectingInputStream extends InputStream {
             return read == -1 ? charsetBomMarked ? -1 : 1 : (charsetBomMarked ? 0 : 1) + read;
         } else {
             return inputStream.read(b, off, len);
+        }
+    }
+
+    /**
+     * Like {@link InputStream#read(byte[], int, int)}, fills {@code b} until it is full or the input ends,
+     * but reads the delegate a chunk at a time instead of a byte at a time.
+     */
+    private int readGuessingCharset(byte[] b, int off, int len) throws IOException {
+        if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return 0;
+        }
+
+        int n = 0;
+        if (!bomChecked) {
+            // the first byte comes from read(), which skips a byte order mark
+            int read = read();
+            if (read == -1) {
+                return -1;
+            }
+            b[off] = (byte) read;
+            n = 1;
+        }
+        while (n < len) {
+            int read = inputStream.read(b, off + n, len - n);
+            if (read == -1) {
+                endOfInput();
+                return n == 0 ? -1 : n;
+            }
+            for (int i = off + n; charset == null && i < off + n + read; i++) {
+                guessCharset(b[i] & 0xFF);
+            }
+            n += read;
+        }
+        return n;
+    }
+
+    private void endOfInput() {
+        if (charset == null) {
+            charset = remainingContinuationBytes > 0 ? WINDOWS_1252 : StandardCharsets.UTF_8;
         }
     }
 

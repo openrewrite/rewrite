@@ -22,7 +22,9 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 /**
  * A comma-separated set of PEP 440 specifier clauses, ported from pypa/packaging's
@@ -91,20 +93,71 @@ public class PythonVersionSpecifierSet {
         return specifiers.stream().anyMatch(PythonVersionSpecifier::referencesPrerelease);
     }
 
+    /**
+     * Whether the lowest version this set admits is at or above the lowest version {@code other}
+     * admits. Only lower bounds ({@code >=}, {@code >}, {@code ==}, {@code ~=}, {@code ===}) count;
+     * upper bounds and exclusions are ignored. A set without a lower bound never starts at or above
+     * {@code other}, while any set with one starts at or above an {@code other} without one.
+     */
+    public boolean startsAtOrAbove(PythonVersionSpecifierSet other) {
+        LowerBound mine = lowerBound();
+        if (mine == null) {
+            return false;
+        }
+        LowerBound theirs = other.lowerBound();
+        return theirs == null || !theirs.isAbove(mine);
+    }
+
+    private @Nullable LowerBound lowerBound() {
+        LowerBound highest = null;
+        for (PythonVersionSpecifier spec : specifiers) {
+            String operator = spec.getOperator();
+            if (!">=".equals(operator) && !">".equals(operator) && !"==".equals(operator) &&
+                    !"~=".equals(operator) && !"===".equals(operator)) {
+                continue;
+            }
+            String v = spec.getVersion();
+            PythonVersion version = PythonVersion.parse(v.endsWith(".*") ? v.substring(0, v.length() - 2) : v);
+            if (version == null) {
+                continue;
+            }
+            LowerBound bound = new LowerBound(version, ">".equals(operator));
+            if (highest == null || bound.isAbove(highest)) {
+                highest = bound;
+            }
+        }
+        return highest;
+    }
+
+    private static final class LowerBound {
+        final PythonVersion version;
+        final boolean exclusive;
+
+        LowerBound(PythonVersion version, boolean exclusive) {
+            this.version = version;
+            this.exclusive = exclusive;
+        }
+
+        boolean isAbove(LowerBound other) {
+            int c = version.compareTo(other.version);
+            return c > 0 || c == 0 && exclusive && !other.exclusive;
+        }
+    }
+
     // Deduplicated, string-sorted clauses, mirroring packaging's canonical ordering.
     private List<PythonVersionSpecifier> canonicalSpecifiers() {
         Set<String> seen = new LinkedHashSet<>();
         return specifiers.stream()
                 .sorted(Comparator.comparing(PythonVersionSpecifier::toString))
                 .filter(s -> seen.add(s.toString()))
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     @Override
     public String toString() {
         return canonicalSpecifiers().stream()
                 .map(PythonVersionSpecifier::toString)
-                .collect(Collectors.joining(","));
+                .collect(joining(","));
     }
 
     @Override

@@ -41,6 +41,14 @@ import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 @SuppressWarnings("ConstantConditions")
 class MethodMatcherTest implements RewriteTest {
 
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.concurrent.CompletableFuture *Async(..)", "*..* *(..)", "java.util.concurrent.CompletableFuture runAsync(..)"})
+    void unnamedForeignMethodDoesNotMatch(String pattern) {
+        var method = new JavaType.Method(null, 0, build("java.util.concurrent.CompletableFuture"), null,
+          JavaType.Primitive.Void, emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList());
+        assertThat(new MethodMatcher(pattern).matches(method)).isFalse();
+    }
+
     @Test
     void declaringTypeMatchPrefix() {
         // The literal prefix is everything in the declaring-type pattern up to the first wildcard.
@@ -197,6 +205,18 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void singleWildcardTypeExcludesSubPackages() {
+        MethodMatcher singlePackage = new MethodMatcher("java.util.* *(..)");
+        assertTrue(singlePackage.matchesTargetType(build("java.util.List")));
+        assertTrue(singlePackage.matchesTargetType(build("java.util.Map$Entry")));
+        assertFalse(singlePackage.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
+
+        MethodMatcher withSubPackages = new MethodMatcher("java.util..* *(..)");
+        assertTrue(withSubPackages.matchesTargetType(build("java.util.List")));
+        assertTrue(withSubPackages.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
+    }
+
+    @Test
     void packagePrefixWithArrayDimensions() {
         JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
         assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*[])").matches(
@@ -226,6 +246,19 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
           new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
             null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void typedArgumentMatchesAUnionWhoseMembersBesidesNullAllMatch() {
+        var optionalString = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Null));
+        assertTrue(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(optionalString), emptyList(), emptyList(), emptyList(), null)));
+
+        var stringOrInt = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Int));
+        assertFalse(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringOrInt), emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -296,6 +329,24 @@ class MethodMatcherTest implements RewriteTest {
         void matchUnknownTypesRejectsStaticSelectMismatch() {
             var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
             assertFalse(new MethodMatcher("org.junit.FooAssert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsQualifiedCallOnAnotherType() {
+            var mi = asMethodInvocation("com.example.Assertions.assertTrue(true);", """
+              package com.example;
+              public class Assertions {
+                  public static void assertTrue(boolean condition) {
+                  }
+              }
+              """);
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesOnAField() {
+            var mi = asMethodInvocation("this.helper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.MyHelper doSomething(boolean)").matches(mi, true));
         }
 
         @Test
@@ -430,7 +481,7 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matcherForUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           java(
             """
               class Test {
@@ -760,7 +811,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }
@@ -796,7 +847,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }

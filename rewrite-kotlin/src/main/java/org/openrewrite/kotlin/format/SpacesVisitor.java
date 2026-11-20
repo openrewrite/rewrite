@@ -39,6 +39,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Nullable
     private final Tree stopAfter;
+    private boolean stopped;
 
     private final SpacesStyle style;
 
@@ -164,11 +165,14 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     // handle space before colon after declaration name
     private Markers spaceBeforeColonAfterDeclarationName(Markers markers) {
+        return spaceBeforeColon(markers, style.getOther().getBeforeColonAfterDeclarationName());
+    }
+
+    private Markers spaceBeforeColon(Markers markers, boolean spaceBefore) {
         return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
             if (marker instanceof TypeReferencePrefix) {
                 TypeReferencePrefix mf = (TypeReferencePrefix) marker;
-                return mf.withPrefix(updateSpace(mf.getPrefix(),
-                        style.getOther().getBeforeColonAfterDeclarationName()));
+                return mf.withPrefix(updateSpace(mf.getPrefix(), spaceBefore));
             }
             return marker;
         }));
@@ -352,12 +356,12 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
         J.TypeParameter pa = super.visitTypeParameter(typeParam, p);
 
-        // handle space before colon after declaration name
-        pa = pa.withMarkers(spaceBeforeColonAfterDeclarationName(pa.getMarkers()));
+        // a type parameter bound is a new type definition, e.g. `fun <T : Number> foo()`
+        pa = pa.withMarkers(spaceBeforeColon(pa.getMarkers(), style.getOther().getBeforeColonInNewTypeDefinition()));
         if (pa.getMarkers().findFirst(TypeReferencePrefix.class).isPresent()) {
             pa = pa.withBounds(
                     ListUtils.map(pa.getBounds(), b ->
-                            spaceBefore(b, style.getOther().getAfterColonBeforeDeclarationType()))
+                            spaceBefore(b, style.getOther().getAfterColonInNewTypeDefinition()))
             );
         }
         return pa;
@@ -1196,14 +1200,14 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().getRoot().putMessage("stop", true);
+            stopped = true;
         }
         return super.postVisit(tree, p);
     }
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
+        if (stopped) {
             return (J) tree;
         }
         return super.visit(tree, p);

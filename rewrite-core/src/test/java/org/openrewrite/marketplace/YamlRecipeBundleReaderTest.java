@@ -40,11 +40,27 @@ class YamlRecipeBundleReaderTest {
       """;
 
     private static RecipeMarketplace read(List<CategoryDescriptor> categoryOverride) {
+        return read(YAML, categoryOverride);
+    }
+
+    private static RecipeMarketplace read(String yaml, List<CategoryDescriptor> categoryOverride) {
         RecipeBundle bundle = new RecipeBundle("yaml", "/recipes/example.yml", null, null, null);
         return new YamlRecipeBundleReader(bundle,
-                new ByteArrayInputStream(YAML.getBytes(StandardCharsets.UTF_8)),
+                new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)),
                 URI.create("file:///recipes/example.yml"),
                 new Properties(), new RecipeMarketplace(), emptyList(), categoryOverride).read();
+    }
+
+    private static String recipeNamed(String name) {
+        return """
+          type: specs.openrewrite.org/v1beta/recipe
+          name: %s
+          displayName: Find and replace
+          description: Finds and replaces.
+          recipeList:
+            - org.openrewrite.text.Find:
+                find: hello
+          """.formatted(name);
     }
 
     private static CategoryDescriptor category(String name) {
@@ -80,6 +96,24 @@ class YamlRecipeBundleReaderTest {
         assertThat(pathTo(marketplace, "com.example.text.FindAndReplace"))
                 .as("the path comes from the recipe's own package, not from the caller")
                 .isNotEmpty();
+    }
+
+    @Test
+    void twoSegmentReverseDnsPrefixesAreOmittedFromTheInferredPath() {
+        RecipeMarketplace marketplace = read(recipeNamed("uk.co.acme.recipes.FindAndReplace"), emptyList());
+
+        assertThat(pathTo(marketplace, "uk.co.acme.recipes.FindAndReplace"))
+                .as("both \"uk\" and \"uk.co\" are category roots, so the path starts at the publisher")
+                .containsExactly("Acme", "Recipes");
+    }
+
+    @Test
+    void singleSegmentReverseDnsPrefixesAreOmittedFromTheInferredPath() {
+        RecipeMarketplace marketplace = read(recipeNamed("de.example.recipes.SomeRecipe"), emptyList());
+
+        assertThat(pathTo(marketplace, "de.example.recipes.SomeRecipe"))
+                .as("\"de\" is a category root, so it is not rendered as a top level category")
+                .containsExactly("Example", "Recipes");
     }
 
     @Test

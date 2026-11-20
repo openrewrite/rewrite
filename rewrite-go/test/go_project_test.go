@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -37,12 +39,8 @@ func TestGoProjectTagsGoSiblingsButNotMod(t *testing.T) {
 	goSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		project, ok := findGoProject(cu.Markers)
-		if !ok {
-			t.Fatal("expected GoProject marker on .go file but none was attached")
-		}
-		if project.ProjectName != "foo" {
-			t.Fatalf("expected GoProject name=%q, got %q", "foo", project.ProjectName)
-		}
+		require.True(t, ok, "expected GoProject marker on .go file but none was attached")
+		require.Equalf(t, "foo", project.ProjectName, "expected GoProject name=%q", "foo")
 	}
 
 	spec := test.NewRecipeSpec()
@@ -96,7 +94,7 @@ func TestGoProjectMixesWithBareGolangSpecs(t *testing.T) {
 // findGoProject is a small lookup helper that mirrors what real recipes
 // would do: scan a tree's Markers for a GoProject and return it.
 func findGoProject(m java.Markers) (golang.GoProject, bool) {
-	for _, e := range m.Entries {
+	for _, e := range m.Entries() {
 		if p, ok := e.(golang.GoProject); ok {
 			return p, true
 		}
