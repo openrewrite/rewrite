@@ -22,9 +22,12 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.cleanup.RenameJavaDocParamNameVisitor;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 
-import java.util.Stack;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Renames a NamedVariable to the target name.
@@ -52,30 +55,35 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @RequiredArgsConstructor
     private class RenameVariableVisitor extends JavaIsoVisitor<P> {
-        private final Stack<Tree> currentNameScope = new Stack<>();
         private final J.VariableDeclarations.NamedVariable renameVariable;
         private final String newName;
 
-        @Override
-        public J.Block visitBlock(J.Block block, P p) {
-            // A variable name scope is owned by the ClassDeclaration regardless of what order it is declared.
-            // Variables declared in a child block are owned by the corresponding block until the block is exited.
-            if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
-                boolean isClassScope = false;
-                for (Statement statement : block.getStatements()) {
-                    if (statement instanceof J.VariableDeclarations) {
-                        if (((J.VariableDeclarations) statement).getVariables().contains(renameVariable)) {
-                            isClassScope = true;
-                            break;
-                        }
-                    }
-                }
+        /**
+         * The declaring identifier and every identifier the scope model resolves to it, by id.
+         */
+        private final Set<UUID> renamed = new HashSet<>();
 
-                if (isClassScope) {
-                    currentNameScope.add(block);
-                }
+        /**
+         * Whether the variable is a field, whose name a Javadoc reference such as {@code {@link #name}} also spells.
+         */
+        private boolean field;
+
+        /**
+         * Whether the references were collected, which happens on the tree the visit starts from.
+         */
+        private boolean resolved;
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, P p) {
+            if (!resolved && tree instanceof J) {
+                resolved = true;
+                Scope.bindingOf(new Cursor(getCursor(), tree), renameVariable).ifPresent(binding -> {
+                    field = binding.getKind() == Scope.Kind.MEMBER;
+                    renamed.add(renameVariable.getName().getId());
+                    binding.references().forEach(reference -> renamed.add(reference.<J>getValue().getId()));
+                });
             }
-            return super.visitBlock(block, p);
+            return super.visit(tree, p);
         }
 
         @Override
@@ -104,7 +112,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         parent.putMessage("renamed", true);
                         return ident.withSimpleName(newName);
                     }
-                } else if (currentNameScope.size() == 1 && isVariableName(parent.getValue(), ident)) {
+                } else if (renamed.contains(ident.getId()) || field && isJavadocFieldReference(parent, ident)) {
                     if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                         Tree variableDeclaration = parent.getParentTreeCursor().getValue();
                         J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile || is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
@@ -118,7 +126,6 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         }
                     }
 
-                    // The size of the stack will be 1 if the identifier is in the right scope.
                     if (ident.getFieldType() != null) {
                         ident = ident.withFieldType(ident.getFieldType().withName(newName));
                     }
@@ -148,35 +155,38 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return m;
         }
 
-        private boolean isVariableName(Object value, J.Identifier ident) {
-            if (value instanceof J.MethodInvocation) {
-                J.MethodInvocation m = (J.MethodInvocation) value;
-                return m.getName() != ident;
-            } else if (value instanceof J.MethodDeclaration) {
-                J.MethodDeclaration m = (J.MethodDeclaration) value;
-                return m.getName() != ident && m.getReturnTypeExpression() != ident;
-            } else if (value instanceof J.NewClass) {
-                J.NewClass m = (J.NewClass) value;
-                return m.getClazz() != ident;
-            } else if (value instanceof J.NewArray) {
-                J.NewArray a = (J.NewArray) value;
-                return a.getTypeExpression() != ident;
-            } else if (value instanceof J.VariableDeclarations) {
-                J.VariableDeclarations v = (J.VariableDeclarations) value;
-                return ident != v.getTypeExpression();
-            } else if (value instanceof J.InstanceOf) {
-                J.InstanceOf i = (J.InstanceOf) value;
-                return i.getClazz() != ident;
-            } else if (value instanceof J.ArrayType) {
-                J.ArrayType a = (J.ArrayType) value;
-                return a.getElementType() != ident;
-            } else if (value instanceof J.Annotation) {
-                J.Annotation a = (J.Annotation) value;
-                return a.getAnnotationType() != ident;
-            } else if (value instanceof J.ControlParentheses) {
-                // ControlParentheses wraps the type in a J.TypeCast (e.g. `(Foo) x`); elsewhere (if/while/switch) it wraps a value expression.
-                return !(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.TypeCast);
-            } else return !(value instanceof J.ParameterizedType);
+        /**
+         * Whether the identifier in a Javadoc links to the field. Attribution tells where it resolved the link.
+         * Where it did not, the link means the class its qualifier names, or without one a class it is written in.
+         */
+        private boolean isJavadocFieldReference(Cursor parent, J.Identifier ident) {
+            JavaType.Variable field = renameVariable.getVariableType();
+            JavaType.FullyQualified owner = field == null ? null : TypeUtils.asFullyQualified(field.getOwner());
+            Object tree = parent.getValue();
+            if (owner == null || getCursor().firstEnclosing(Javadoc.class) == null ||
+                tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getName() == ident) {
+                return false;
+            }
+            if (tree instanceof J.MemberReference && ((J.MemberReference) tree).getReference() == ident) {
+                J.MemberReference link = (J.MemberReference) tree;
+                if (link.getVariableType() != null || link.getMethodType() != null) {
+                    return link.getVariableType() != null && TypeUtils.isOfType(link.getVariableType(), field);
+                }
+                Expression qualifier = link.getContaining();
+                if (!(qualifier instanceof J.Identifier && ((J.Identifier) qualifier).getSimpleName().isEmpty())) {
+                    JavaType.FullyQualified named = TypeUtils.asFullyQualified(qualifier.getType());
+                    return named != null && named.getFullyQualifiedName().equals(owner.getFullyQualifiedName());
+                }
+            }
+            for (Cursor c = parent; c != null; c = c.getParent()) {
+                if (c.getValue() instanceof J.ClassDeclaration) {
+                    JavaType.FullyQualified enclosing = ((J.ClassDeclaration) c.getValue()).getType();
+                    if (enclosing != null && enclosing.getFullyQualifiedName().equals(owner.getFullyQualifiedName())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /**
@@ -198,72 +208,12 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable namedVariable, P p) {
-            boolean nameEquals = namedVariable.getSimpleName().equals(renameVariable.getSimpleName());
-            if (nameEquals) {
-                Cursor parentScope = getCursorToParentScope(getCursor());
-                // The target variable was found and was not declared in a class declaration block.
-                if (currentNameScope.isEmpty()) {
-                    if (namedVariable.equals(renameVariable)) {
-                        currentNameScope.add(parentScope.getValue());
-                    }
-                } else {
-                    // A variable has been declared and created a new name scope.
-                    if (!parentScope.getValue().equals(currentNameScope.peek()) && getCursor().isScopeInPath(currentNameScope.peek())) {
-                        currentNameScope.add(parentScope.getValue());
-                    }
-                }
-            }
-
             J.VariableDeclarations.NamedVariable v = super.visitVariable(namedVariable, p);
-            if (nameEquals && v.getVariableType() != null && Boolean.TRUE.equals(getCursor().pollMessage("renamed"))) {
+            if (namedVariable.getSimpleName().equals(renameVariable.getSimpleName()) && v.getVariableType() != null &&
+                Boolean.TRUE.equals(getCursor().pollMessage("renamed"))) {
                 v = v.withVariableType(v.getVariableType().withName(newName));
             }
             return v;
-        }
-
-        @Override
-        public J.Try.Catch visitCatch(J.Try.Catch _catch, P p) {
-            // Check if the try added a new scope to the stack,
-            // postVisit doesn't happen until after both the try and catch are processed.
-            maybeChangeNameScope(getCursorToParentScope(getCursor()).getValue());
-            return super.visitCatch(_catch, p);
-        }
-
-        @Override
-        public @Nullable J postVisit(J tree, P p) {
-            maybeChangeNameScope(tree);
-            return super.postVisit(tree, p);
-        }
-
-        /**
-         * Used to check if the name scope has changed.
-         * Pops the stack if the tree element is at the top of the stack.
-         */
-        private void maybeChangeNameScope(Tree tree) {
-            if (!currentNameScope.isEmpty() && currentNameScope.peek().equals(tree)) {
-                currentNameScope.pop();
-            }
-        }
-
-        /**
-         * Returns either the current block or a J.Type that may create a reference to a variable.
-         * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
-         * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
-         * <p>
-         * J.* types that may only reference an existing name and do not create a new name scope are excluded.
-         */
-        private Cursor getCursorToParentScope(Cursor cursor) {
-            return cursor.dropParentUntil(is ->
-                    is instanceof JavaSourceFile ||
-                            is instanceof J.ClassDeclaration ||
-                            is instanceof J.MethodDeclaration ||
-                            is instanceof J.Block ||
-                            is instanceof J.ForLoop ||
-                            is instanceof J.ForEachLoop ||
-                            is instanceof J.Case ||
-                            is instanceof J.Try ||
-                            is instanceof J.Try.Catch ||
-                            is instanceof J.Lambda);
         }
     }
 

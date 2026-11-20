@@ -34,9 +34,23 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private var depth = 0
 
+  /** Signatures of the types described outside any type variable's bound, where they depend on the type alone. */
+  private val signatures = new java.util.IdentityHashMap[Type, String]()
+
+  private val binaryNames = new java.util.IdentityHashMap[Symbols.Symbol, String]()
+
   def signature(tpe: Type): String = {
     if (tpe == null) return "{undefined}"
+    if (typeVariableNameStack != null && !typeVariableNameStack.isEmpty) return describe(tpe)
+    var sig = signatures.get(tpe)
+    if (sig == null) {
+      sig = describe(tpe)
+      signatures.put(tpe, sig)
+    }
+    sig
+  }
 
+  private def describe(tpe: Type): String = {
     depth += 1
     try {
       tpe.dealias match {
@@ -62,10 +76,19 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
           unionMembers(ot).map(_._1).mkString(" | ")
-        case NoType =>
-          "{undefined}"
+        case ci: ClassInfo =>
+          classFqn(ci.cls)
+        case tt: ThisType =>
+          signature(tt.tref)
+        case et: ExprType =>
+          signature(et.resultType)
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => signature(at.tycon)
+          case _ => "{undefined}"
+        }
+        // What `ScalaTypeMapping.mapType` maps to `JavaType.Unknown`
         case _ =>
-          tpe.show
+          "{undefined}"
       }
     } catch {
       // A type too deep to describe is undefined as a whole. Answering at the level that ran out
@@ -135,9 +158,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
       val sb = new StringBuilder("Generic{" + name)
 
       bounds match {
-        case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
+        case tb: TypeBounds if !isAny(upperBoundOfKind(tb.hi)) =>
           sb.append(" extends ")
-          sb.append(signature(tb.hi))
+          sb.append(signature(upperBoundOfKind(tb.hi)))
         case _ =>
       }
 
@@ -148,9 +171,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   }
 
   private def boundsSignature(tb: TypeBounds): String = {
-    if (!(tb.hi =:= ctx.definitions.AnyType)) {
+    if (!isAny(tb.hi)) {
       "? extends " + signature(tb.hi)
-    } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
+    } else if (!isNothing(tb.lo)) {
       "? super " + signature(tb.lo)
     } else {
       "?"
@@ -161,7 +184,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   /** The signature of the method with the given parameter and result types, as instantiated at a call. */
   def methodSignature(sym: Symbols.Symbol, info: Type): String = {
-    val owner = methodOwnerFqn(sym.owner)
+    val owner = classFqn(sym.owner)
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
     val returnType = info.finalResultType match {
       case NoType => "void"
@@ -199,6 +222,23 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case other => List(other)
   }
 
+  /** Most bounds are `Any` or `Nothing` themselves, which needs no subtype check. */
+  def isAny(tp: Type): Boolean = tp match {
+    case tr: TypeRef if tr.symbol eq ctx.definitions.AnyClass => true
+    case _ => tp =:= ctx.definitions.AnyType
+  }
+
+  def isNothing(tp: Type): Boolean = tp match {
+    case tr: TypeRef if tr.symbol eq ctx.definitions.NothingClass => true
+    case _ => tp =:= ctx.definitions.NothingType
+  }
+
+  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
+  def upperBoundOfKind(hi: Type): Type = hi match {
+    case lambda: HKTypeLambda => lambda.resType
+    case other => other
+  }
+
   /**
    * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
    * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
@@ -223,9 +263,13 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   /** `flatName` leaves out the package, and joins a nested class to a module class owner without a doubled `$`. */
   private def binaryName(sym: Symbols.Symbol): String = {
-    val pkg = sym.enclosingPackageClass
-    if (pkg.isEffectiveRoot) sym.flatName.toString
-    else pkg.fullName.toString + "." + sym.flatName
+    var name = binaryNames.get(sym)
+    if (name == null) {
+      val pkg = sym.enclosingPackageClass
+      name = if (pkg.isEffectiveRoot) sym.flatName.toString else pkg.fullName.toString + "." + sym.flatName
+      binaryNames.put(sym, name)
+    }
+    name
   }
 
   def variableSignature(name: String): String = {

@@ -253,6 +253,8 @@ public interface JavaParser extends Parser {
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
         private boolean typeCacheConfigured;
+        protected @Nullable Path javaPlatform;
+        protected @Nullable Integer sourceCompatibility;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -267,6 +269,36 @@ public interface JavaParser extends Parser {
 
         public Builder() {
             super(J.CompilationUnit.class);
+        }
+
+        /** Select the JDK home whose platform classes javac resolves, including internal APIs. */
+        public B javaPlatform(@Nullable Path javaHome) {
+            if (javaHome != null && !supportsCompilerConfiguration(null)) {
+                throw new UnsupportedOperationException(getClass().getName() + " does not support selecting a Java platform");
+            }
+            if (!Objects.equals(javaPlatform, javaHome) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            javaPlatform = javaHome;
+            return (B) this;
+        }
+
+        /** Whether this parser supports platform selection and, when supplied, this source version. */
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return false;
+        }
+
+        /** Select source syntax independently of the runtime API; null keeps the parser's default. */
+        public B sourceCompatibility(@Nullable Integer majorVersion) {
+            if (majorVersion != null && !supportsCompilerConfiguration(majorVersion)) {
+                throw new UnsupportedOperationException(getClass().getName() +
+                        " does not support source compatibility " + majorVersion);
+            }
+            if (!Objects.equals(sourceCompatibility, majorVersion) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            sourceCompatibility = majorVersion;
+            return (B) this;
         }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -401,14 +433,14 @@ public interface JavaParser extends Parser {
          * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            if (javaTypeFactory != null || typeCacheConfigured) {
+            if (javaTypeFactory != null || typeCacheConfigured || javaPlatform != null || sourceCompatibility != null) {
                 return javaTypeFactory;
             }
             return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            boolean configured = typeCacheConfigured || javaTypeFactory != null;
+            boolean configured = typeCacheConfigured || javaTypeFactory != null || javaPlatform != null || sourceCompatibility != null;
             javaTypeCache = HashMapJavaTypeCache.forParser(
                     JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;

@@ -20,13 +20,18 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.scala.ScalaPrinter;
 import org.openrewrite.scala.ScalaVisitor;
 import org.openrewrite.scala.service.ScalaAutoFormatService;
+import org.openrewrite.scala.service.ScalaImportService;
+import org.openrewrite.scala.service.ScalaScopeService;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
@@ -34,6 +39,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -228,6 +234,7 @@ public interface S extends J {
         @Override
         public List<J.ClassDeclaration> getClasses() {
             return statements.stream()
+                    .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
                     .collect(Collectors.toList());
@@ -235,8 +242,14 @@ public interface S extends J {
 
         @Override
         public S.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
-            // Scala compilation units use statements, not a separate classes list
-            return this;
+            Iterator<J.ClassDeclaration> replacements = classes.iterator();
+            List<JRightPadded<Statement>> replaced = ListUtils.map(statements, rp ->
+                    !(rp.getElement() instanceof J.ClassDeclaration) ? rp :
+                            replacements.hasNext() ? rp.withElement(replacements.next()) : null);
+            while (replacements.hasNext()) {
+                replaced = ListUtils.concat(replaced, JRightPadded.<Statement>build(replacements.next()));
+            }
+            return getPadding().withStatements(replaced);
         }
 
         @Override
@@ -259,6 +272,14 @@ public interface S extends J {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName());
+                } else if (ScalaImportService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ImportService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaImportService.class.getName());
+                } else if (ScalaScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaScopeService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
@@ -1474,18 +1495,174 @@ public interface S extends J {
     }
 
     /**
-     * Represents a Scala pattern definition (destructuring declaration).
+     * A definition that binds the names in one or more patterns, which Scala parses apart from a
+     * plain {@code val x = ...}.
      * <p>
      * Examples:
      * <ul>
      *   <li>{@code val (a, b) = (1, 2)}</li>
-     *   <li>{@code var (x, y) = point}</li>
+     *   <li>{@code var Some(x) = option}</li>
+     *   <li>{@code val a, b: Int}, where each name gets the type and any value</li>
      *   <li>{@code case Red, Green, Blue} (enum cases)</li>
      * </ul>
+     * The {@code val}, {@code var} or {@code case} keyword is the last of the modifiers.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class PatternDefinition implements S, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        List<J.Annotation> leadingAnnotations;
+
+        @With @Getter
+        List<J.Modifier> modifiers;
+
+        /**
+         * The patterns, comma separated. The container's before-space is unused.
+         */
+        JContainer<J> patterns;
+
+        /**
+         * The declared type, after the space before its colon.
+         */
+        @Nullable
+        JLeftPadded<TypeTree> typeExpression;
+
+        /**
+         * The value, after the space before its {@code =}. An abstract definition or an enum case list has none.
+         */
+        @Nullable
+        JLeftPadded<Expression> initializer;
+
+        /**
+         * The whole definition as source text. Only an LST written before the other fields existed has it, and then
+         * none of them. The parser never sets it.
+         */
+        @Deprecated
+        @Nullable
+        @With
+        @Getter
+        String text;
+
+        public static PatternDefinition build(UUID id, Space prefix, Markers markers,
+                                              List<J.Annotation> leadingAnnotations, List<J.Modifier> modifiers,
+                                              JContainer<J> patterns, @Nullable JLeftPadded<TypeTree> typeExpression,
+                                              @Nullable JLeftPadded<Expression> initializer) {
+            return new PatternDefinition(null, id, prefix, markers, leadingAnnotations, modifiers, patterns,
+                    typeExpression, initializer, null);
+        }
+
+        public List<J> getPatterns() {
+            return patterns.getElements();
+        }
+
+        public PatternDefinition withPatterns(List<J> patterns) {
+            return getPadding().withPatterns(JContainer.withElements(this.patterns, patterns));
+        }
+
+        public @Nullable TypeTree getTypeExpression() {
+            return typeExpression == null ? null : typeExpression.getElement();
+        }
+
+        public PatternDefinition withTypeExpression(@Nullable TypeTree typeExpression) {
+            return getPadding().withTypeExpression(JLeftPadded.withElement(this.typeExpression, typeExpression));
+        }
+
+        public @Nullable Expression getInitializer() {
+            return initializer == null ? null : initializer.getElement();
+        }
+
+        public PatternDefinition withInitializer(@Nullable Expression initializer) {
+            return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitPatternDefinition(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PatternDefinition t;
+
+            public JContainer<J> getPatterns() {
+                return t.patterns;
+            }
+
+            public PatternDefinition withPatterns(JContainer<J> patterns) {
+                return t.patterns == patterns ? t : new PatternDefinition(null, t.id, t.prefix, t.markers,
+                        t.leadingAnnotations, t.modifiers, patterns, t.typeExpression, t.initializer, t.text);
+            }
+
+            public @Nullable JLeftPadded<TypeTree> getTypeExpression() {
+                return t.typeExpression;
+            }
+
+            public PatternDefinition withTypeExpression(@Nullable JLeftPadded<TypeTree> typeExpression) {
+                return t.typeExpression == typeExpression ? t : new PatternDefinition(null, t.id, t.prefix, t.markers,
+                        t.leadingAnnotations, t.modifiers, t.patterns, typeExpression, t.initializer, t.text);
+            }
+
+            public @Nullable JLeftPadded<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public PatternDefinition withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                return t.initializer == initializer ? t : new PatternDefinition(null, t.id, t.prefix, t.markers,
+                        t.leadingAnnotations, t.modifiers, t.patterns, t.typeExpression, initializer, t.text);
+            }
+        }
+    }
+
+    /**
+     * The self type that opens a class, trait, object or given body, such as {@code self: Runnable =>}, {@code self =>}
+     * or {@code this: Runnable =>}. It gives {@code this} a name, a type or both, and is the first statement of the
+     * body. The declaration of {@code this: Runnable =>} is named {@code this}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class SelfType implements S, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
 
         @With @Getter @EqualsAndHashCode.Include
         UUID id;
@@ -1497,27 +1674,59 @@ public interface S extends J {
         Markers markers;
 
         /**
-         * The original source text. Pattern definitions have complex structure
-         * (multiple patterns, types, initializer) that will be fully modeled later.
+         * The name and any type, padded by the space before {@code =>}.
          */
-        @With @Getter
-        String text;
+        JRightPadded<J.VariableDeclarations> declaration;
 
-        public PatternDefinition(UUID id, Space prefix, Markers markers, String text) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.text = text;
+        public static SelfType build(UUID id, Space prefix, Markers markers,
+                                     JRightPadded<J.VariableDeclarations> declaration) {
+            return new SelfType(null, id, prefix, markers, declaration);
+        }
+
+        public J.VariableDeclarations getDeclaration() {
+            return declaration.getElement();
+        }
+
+        public SelfType withDeclaration(J.VariableDeclarations declaration) {
+            return getPadding().withDeclaration(JRightPadded.withElement(this.declaration, declaration));
         }
 
         @Override
         public <P> J acceptScala(ScalaVisitor<P> v, P p) {
-            return v.visitPatternDefinition(this, p);
+            return v.visitSelfType(this, p);
         }
 
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SelfType t;
+
+            public JRightPadded<J.VariableDeclarations> getDeclaration() {
+                return t.declaration;
+            }
+
+            public SelfType withDeclaration(JRightPadded<J.VariableDeclarations> declaration) {
+                return t.declaration == declaration ? t : new SelfType(null, t.id, t.prefix, t.markers, declaration);
+            }
         }
     }
 
@@ -1744,6 +1953,8 @@ public interface S extends J {
     /**
      * Represents a Scala singleton type: {@code foo.type}.
      * The qualifier is any expression, typically an object/module reference.
+     * A literal type such as {@code "a"} or {@code -1} is a singleton type with a
+     * {@link J.Literal} qualifier and no {@code .type} suffix.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2212,6 +2423,96 @@ public interface S extends J {
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * A Scala 2 existential type such as {@code List[T] forSome { type T }}. Its clause declares
+     * names the underlying type uses, such as {@code type T <: Number} or {@code val x: String}.
+     * It adds no members to the underlying type, which is what sets it apart from a {@link RefinedType}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ExistentialType implements S, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        TypeTree underlying;
+
+        /**
+         * The declarations between the braces. The padding's before-space precedes {@code forSome}.
+         * The block's prefix is the space between {@code forSome} and the opening brace.
+         */
+        JLeftPadded<J.Block> clause;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static ExistentialType build(UUID id, Space prefix, Markers markers, TypeTree underlying,
+                                            JLeftPadded<J.Block> clause, @Nullable JavaType type) {
+            return new ExistentialType(null, id, prefix, markers, underlying, clause, type);
+        }
+
+        public J.Block getClause() {
+            return clause.getElement();
+        }
+
+        public ExistentialType withClause(J.Block clause) {
+            return getPadding().withClause(JLeftPadded.withElement(this.clause, clause));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitExistentialType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExistentialType t;
+
+            public JLeftPadded<J.Block> getClause() {
+                return t.clause;
+            }
+
+            public ExistentialType withClause(JLeftPadded<J.Block> clause) {
+                return t.clause == clause ? t :
+                        new ExistentialType(null, t.id, t.prefix, t.markers, t.underlying, clause, t.type);
+            }
         }
     }
 

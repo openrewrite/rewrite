@@ -21,12 +21,15 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.lang.reflect.Field;
 import java.util.Objects;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @Value
@@ -131,18 +134,61 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             }
 
             maybeAddImport(owningType, false);
-            return JavaTemplate.builder(template)
+            J constant = JavaTemplate.builder(template)
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())
                     .withPrefix(literal.getPrefix());
+            return constant instanceof J.FieldAccess ? attributed((J.FieldAccess) constant) : constant;
+        }
+
+        // A constant declared outside the JDK is unknown to the template parser, so attribute its access here
+        private J.FieldAccess attributed(J.FieldAccess constant) {
+            if (TypeUtils.isWellFormedType(constant.getType())) {
+                return constant;
+            }
+            JavaType.FullyQualified target = JavaType.ShallowClass.build(owningType);
+            JavaType.FullyQualified owner = target;
+            long flags = Flag.Public.getBitMask() | Flag.Static.getBitMask() | Flag.Final.getBitMask();
+            try {
+                Class<?> owningClass = loadClass(owningType);
+                Field field = owningClass.getField(constant.getSimpleName());
+                target = JavaType.ShallowClass.build(owningClass.getName());
+                owner = JavaType.ShallowClass.build(field.getDeclaringClass().getName());
+                flags = field.getModifiers();
+            } catch (ClassNotFoundException | NoSuchFieldException e) {
+                // The literal value was given explicitly, so the constant's class need not be on the classpath
+            }
+            JavaType.FullyQualified string = JavaType.ShallowClass.build("java.lang.String");
+            JavaType.Variable fieldType = new JavaType.Variable(null, flags, constant.getSimpleName(), owner, string,
+                    emptyList());
+            return constant
+                    .withTarget(constant.getTarget().withType(target))
+                    .withName(constant.getName().withType(string).withFieldType(fieldType))
+                    .withType(string);
         }
     }
 
     private static @Nullable Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
         String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
         String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
-        Field constantField = Class.forName(owningType).getField(constantName);
+        Field constantField = loadClass(owningType).getField(constantName);
         return constantField.get(null);
+    }
+
+    // A nested class may be written with dots, as in source, rather than with its binary name
+    private static Class<?> loadClass(String name) throws ClassNotFoundException {
+        String binaryName = name;
+        while (true) {
+            try {
+                return Class.forName(binaryName);
+            } catch (ClassNotFoundException e) {
+                int lastDot = binaryName.lastIndexOf('.');
+                if (lastDot < 0) {
+                    throw e;
+                }
+                binaryName = binaryName.substring(0, lastDot) + '$' + binaryName.substring(lastDot + 1);
+            }
+        }
     }
 }

@@ -40,4 +40,11 @@ public @interface Option {
     String[] valid() default "";
 
     boolean required() default true;
+
+    /**
+     * Whether the option's value is a secret, such as a password or token. A secret's value is still given
+     * to the recipe, but never shown in its instance name or recorded with what it changed, and tools that
+     * display, store or export a recipe's options mask it.
+     */
+    boolean secret() default false;
 }

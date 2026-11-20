@@ -15,12 +15,14 @@
  */
 package org.openrewrite.python;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.python.search.UsesImport;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
@@ -28,9 +30,8 @@ import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.singleton;
@@ -66,6 +67,32 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     @Nullable
     String groupName;
 
+    @Option(displayName = "Unless importing",
+            description = "Keep the dependency in a project where a Python source file still imports one of these " +
+                    "modules, matched the way `org.openrewrite.python.search.UsesImport` matches it, so a submodule " +
+                    "counts too. A file is attributed to the nearest dependency file above it that declares the " +
+                    "package. Imports are read as they stand at the start of each cycle, so in a migration the " +
+                    "dependency goes in the cycle after the last import of it is migrated. Name the modules the " +
+                    "package provides, such as `async_timeout` for `async-timeout`. Leave unset to remove the " +
+                    "dependency unconditionally.",
+            example = "async_timeout",
+            required = false)
+    @Nullable
+    List<String> unlessImporting;
+
+    public RemoveDependency(String packageName, @Nullable String scope, @Nullable String groupName) {
+        this(packageName, scope, groupName, null);
+    }
+
+    @JsonCreator
+    public RemoveDependency(String packageName, @Nullable String scope, @Nullable String groupName,
+                            @Nullable List<String> unlessImporting) {
+        this.packageName = packageName;
+        this.scope = scope;
+        this.groupName = groupName;
+        this.unlessImporting = unlessImporting;
+    }
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> v = super.validate();
@@ -89,6 +116,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     public String getDescription() {
         return "Remove a dependency from a Python project. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
+                "When `unlessImporting` is set, a project whose Python sources still import one of those modules " +
+                "keeps the dependency. " +
                 "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
                 "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
                 "package index over the network. " +
@@ -99,6 +128,41 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     static class Accumulator {
         final Map<Path, ProjectState> projects = new HashMap<>();
         final Map<Path, Path> lockToDeps = new HashMap<>();
+
+        /**
+         * The Python sources, as scanned, that import one of {@link RemoveDependency#unlessImporting}.
+         */
+        final Set<Path> filesImporting = new HashSet<>();
+
+        /**
+         * The directories of the dependency files that declare the package, and the subset of them kept for an
+         * importing source. Resolved after scanning, since dependency files and sources arrive in no particular order.
+         */
+        final Set<Path> declaringDirs = new HashSet<>();
+        @Nullable Set<Path> keptDirs;
+
+        Set<Path> keptDirs() {
+            if (keptDirs == null) {
+                keptDirs = new HashSet<>();
+                for (Path file : filesImporting) {
+                    for (Path dir = dirOf(file); ; dir = dirOf(dir)) {
+                        if (declaringDirs.contains(dir)) {
+                            keptDirs.add(dir);
+                            break;
+                        }
+                        if (dir.toString().isEmpty()) {
+                            break;
+                        }
+                    }
+                }
+            }
+            return keptDirs;
+        }
+    }
+
+    private static Path dirOf(Path file) {
+        Path parent = file.getParent();
+        return parent == null ? Paths.get("") : parent;
     }
 
     static class ProjectState {
@@ -121,6 +185,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+            final List<TreeVisitor<?, ExecutionContext>> importing = importingVisitors();
 
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
@@ -130,6 +195,14 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 }
                 SourceFile sourceFile = (SourceFile) tree;
                 Path sourcePath = sourceFile.getSourcePath();
+
+                // `UsesImport` marks the file it matches, so a returned copy is the sighting.
+                for (TreeVisitor<?, ExecutionContext> usesImport : importing) {
+                    if (usesImport.isAcceptable(sourceFile, ctx) && usesImport.visit(tree, ctx) != tree) {
+                        acc.filesImporting.add(sourcePath);
+                        break;
+                    }
+                }
 
                 if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
                     Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
@@ -163,12 +236,32 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null) {
                     ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
-                    ps.capturedEdit = matchesRemoveDependency(trait) ?
-                            PyProjectHelper.DepsEdit.of(trait, removal()) : null;
+                    boolean declares = matchesRemoveDependency(trait);
+                    ps.capturedEdit = declares ? PyProjectHelper.DepsEdit.of(trait, removal()) : null;
+                    if (declares) {
+                        acc.declaringDirs.add(dirOf(sourcePath));
+                    }
                 }
                 return tree;
             }
         };
+    }
+
+    private List<TreeVisitor<?, ExecutionContext>> importingVisitors() {
+        if (unlessImporting == null) {
+            return Collections.emptyList();
+        }
+        List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(unlessImporting.size());
+        for (String module : unlessImporting) {
+            if (!module.trim().isEmpty()) {
+                visitors.add(new UsesImport(module.trim()).getVisitor());
+            }
+        }
+        return visitors;
+    }
+
+    private boolean isKept(Accumulator acc, Path depsPath) {
+        return !acc.filesImporting.isEmpty() && acc.keptDirs().contains(dirOf(depsPath));
     }
 
     private boolean matchesRemoveDependency(PythonDependencyFile trait) {
@@ -196,7 +289,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 Path sourcePath = sourceFile.getSourcePath();
 
                 ProjectState ps = acc.projects.get(sourcePath);
-                if (ps != null) {
+                if (ps != null && !isKept(acc, sourcePath)) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     SourceFile modified = trait != null && (ps.computed || matchesRemoveDependency(trait)) ?
                             edit(ps, trait, ctx) : null;
@@ -213,7 +306,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 }
 
                 Path depsPath = acc.lockToDeps.get(sourcePath);
-                if (depsPath == null) {
+                if (depsPath == null || isKept(acc, depsPath)) {
                     return tree;
                 }
                 ProjectState lockPs = acc.projects.get(depsPath);

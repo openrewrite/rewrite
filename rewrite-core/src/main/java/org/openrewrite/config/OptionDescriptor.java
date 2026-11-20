@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +26,10 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class OptionDescriptor {
+    /**
+     * What a secret option's value is shown and recorded as.
+     */
+    public static final String REDACTED = "********";
 
     @EqualsAndHashCode.Include
     String name;
@@ -49,4 +54,27 @@ public class OptionDescriptor {
     @Nullable
     @EqualsAndHashCode.Include
     Object value;
+
+    /**
+     * Whether the value is a secret, such as a password or token, to be masked wherever it is
+     * displayed, stored or exported. See {@link org.openrewrite.Option#secret()}.
+     */
+    boolean secret;
+
+    /**
+     * @return This option, with its value replaced by {@link #REDACTED} when it is a secret that is set.
+     */
+    public OptionDescriptor redacted() {
+        return secret && value != null ?
+                new OptionDescriptor(name, type, displayName, description, example, valid, required, REDACTED, true) :
+                this;
+    }
+
+    /**
+     * @return The value to display or record: {@link #REDACTED} for a secret that is set.
+     */
+    @JsonIgnore
+    public @Nullable Object getDisplayValue() {
+        return redacted().value;
+    }
 }

@@ -49,6 +49,19 @@ class RefinedTypeTreeTest implements RewriteTest {
     }
 
     @Test
+    void structuralReturnType() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def g(): AnyRef { def greet(): String } = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitRefinedTypeTree — `{` in block comment before refinement body
         rewriteRun(

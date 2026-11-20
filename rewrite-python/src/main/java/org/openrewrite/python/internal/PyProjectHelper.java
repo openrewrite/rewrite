@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.PipfileParser;
+import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.trait.PythonDependencyFile;
@@ -57,6 +58,16 @@ public class PyProjectHelper {
             return trimmed;
         }
         return ">=" + trimmed;
+    }
+
+    /**
+     * Whether a declared version constraint already starts at or above {@code newVersion}, so that
+     * replacing it would lower the minimum version. An empty or unparseable constraint does not.
+     */
+    public static boolean startsAtOrAbove(String constraint, String newVersion) {
+        PythonVersionSpecifierSet current = PythonVersionSpecifierSet.parse(constraint);
+        PythonVersionSpecifierSet target = PythonVersionSpecifierSet.parse(normalizeVersionConstraint(newVersion));
+        return current != null && target != null && current.startsAtOrAbove(target);
     }
 
     /**
@@ -243,13 +254,31 @@ public class PyProjectHelper {
     }
 
     /**
-     * ExecutionContext key for the {@code Map<Path, LiveDeps>} that holds the
+     * ExecutionContext key for the {@link LiveDepsInCycle} that holds the
      * latest chain-modified deps file for each project path. Recipes write to this
      * after applying their edit so that subsequent recipes (or the same recipe's
      * lock-file visit when lock is visited before deps) can read the up-to-date
      * deps file.
      */
     private static final String LIVE_DEPS = "org.openrewrite.python.liveDeps";
+
+    /// The chain-modified deps files of one cycle. The next cycle scans the deps files as this one left them, including
+    /// edits by recipes that don't publish here, so it starts empty instead of building on these.
+    private static final class LiveDepsInCycle {
+        @Nullable
+        Object cycle;
+
+        final Map<Path, LiveDeps> byPath = new HashMap<>();
+
+        Map<Path, LiveDeps> byPath(ExecutionContext ctx) {
+            Object current = ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+            if (cycle != current) {
+                cycle = current;
+                byPath.clear();
+            }
+            return byPath;
+        }
+    }
 
     /**
      * A chain-modified deps file kept as its text and the lock regenerated with it, from which its tree is rebuilt.
@@ -265,10 +294,9 @@ public class PyProjectHelper {
      * or Pipfile from the shared {@link ExecutionContext} side channel, or return
      * {@code null} if no recipe has written one yet.
      */
-    @SuppressWarnings("unchecked")
     public static @Nullable SourceFile getLiveDepsTree(ExecutionContext ctx, Path depsPath) {
-        Map<Path, LiveDeps> map = (Map<Path, LiveDeps>) ctx.getMessage(LIVE_DEPS);
-        LiveDeps live = map == null ? null : map.get(depsPath);
+        LiveDepsInCycle liveDeps = ctx.getMessage(LIVE_DEPS);
+        LiveDeps live = liveDeps == null ? null : liveDeps.byPath(ctx).get(depsPath);
         if (live == null) {
             return null;
         }
@@ -295,8 +323,8 @@ public class PyProjectHelper {
      */
     public static void putLiveDeps(ExecutionContext ctx, Path depsPath, String depsContent,
                                    LockFileRegeneration.@Nullable Result regen) {
-        Map<Path, LiveDeps> map = ctx.computeMessageIfAbsent(LIVE_DEPS, k -> new HashMap<>());
-        map.put(depsPath, new LiveDeps(depsContent,
+        LiveDepsInCycle liveDeps = ctx.computeMessageIfAbsent(LIVE_DEPS, k -> new LiveDepsInCycle());
+        liveDeps.byPath(ctx).put(depsPath, new LiveDeps(depsContent,
                 regen != null && regen.isSuccess() ? regen.getLockFileContent() : null));
     }
 

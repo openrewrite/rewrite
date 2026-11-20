@@ -165,6 +165,28 @@ def test_project_urls_keep_their_order_over_the_wire():
         ('Source', 'https://github.com/psf/requests'), ('Documentation', 'https://requests.readthedocs.io')]
 
 
+def _cyclic_resolution():
+    a = PythonResolutionResult.ResolvedDependency('a', '1.0', None, None)
+    b = PythonResolutionResult.ResolvedDependency('b', '1.0', None, [a])
+    object.__setattr__(a, '_dependencies', [b])
+    return PythonResolutionResult(
+        random_id(), 'name', '1.0', None, None, 'pyproject.toml', None, None, [],
+        [PythonResolutionResult.Dependency('a', '>=1', None, None, a)],
+        {}, {}, [], [], [a, b], PythonResolutionResult.PackageManager.Uv, None)
+
+
+def test_resolved_dependency_cycle_survives_the_wire():
+    a = _round_trip(_cyclic_resolution()).resolved_dependencies[0]
+    b = a.dependencies[0]
+    assert b.name == 'b'
+    assert b.dependencies[0] is a
+
+
+def test_declared_dependency_resolves_to_the_graph_entry():
+    received = _round_trip(_cyclic_resolution())
+    assert received.dependencies[0].resolved is received.resolved_dependencies[0]
+
+
 def test_marker_without_a_wire_form_is_refused():
     with pytest.raises(TypeError, match="No RPC codec"):
         _round_trip(UnknownJavaMarker(random_id(), {}))
